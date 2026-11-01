@@ -73,7 +73,8 @@ ViaFrei API has a **service skeleton** in Go. Nothing is deployed yet, and no da
 | Technology evaluation | ✅ Published in the [wiki](https://github.com/mavrovde/viafrei-api/wiki/Technology-Evaluation) |
 | Technical specification | 📝 Draft for review, revision 1 — [published in the wiki](https://github.com/mavrovde/viafrei-api/wiki/Technical-Specification): protocol, requests and responses, errors, keys, limits, non-functional requirements |
 | Logical data model | 📝 Draft — [Data Model](https://github.com/mavrovde/viafrei-api/wiki/Data-Model): entities, fields and diagrams per domain, mapped to API fields (never a copy of storage) |
-| Testing strategy and test plans | 📝 Draft — [Testing Strategy](https://github.com/mavrovde/viafrei-api/wiki/Testing-Strategy); test infrastructure planned in #13–#20, no test has run yet |
+| Testing strategy and test plans | 📝 Draft — [Testing Strategy](https://github.com/mavrovde/viafrei-api/wiki/Testing-Strategy); unit, handler and integration tests run; test infrastructure continues in #14–#20 |
+| Synthetic fixture generator | 🔄 In review — seeded, Germany-wide, fictional ([docs/test-data.md](docs/test-data.md)) |
 | Architecture for Go, Rust and TypeScript | ✅ [Stack Comparison](https://github.com/mavrovde/viafrei-api/wiki/Stack-Comparison) |
 | Stack decision | ✅ **Go** — [ADR-0001](https://github.com/mavrovde/viafrei-api/wiki/Spec-Architecture-Decisions) accepted on 2026-11-01 |
 | Configuration layer | ✅ Every tunable is a documented key with bounds — [docs/configuration.md](docs/configuration.md) |
@@ -93,6 +94,7 @@ make build              # bin/viafrei-api, static, version and commit stamped in
 make test               # unit and handler tests
 make test-integration   # adds tests against a throwaway PostGIS container
 make generate           # regenerate sqlc code, docs/configuration.md, api/openapi.json
+make fixtures PROFILE=ci SEED=7   # synthetic test data, see docs/test-data.md
 ```
 
 The service reads its configuration from environment variables with the prefix `VFAPI_` and, optionally, a YAML file named by `VFAPI_CONFIG_FILE`. Every key, its default and its bounds are listed in [docs/configuration.md](docs/configuration.md). An unknown key or a value out of bounds stops the service at start-up with exit status 78. The one required value is the database URL of the service's read-only role:

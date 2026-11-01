@@ -8,7 +8,7 @@ LDFLAGS   := -s -w \
 	-X github.com/mavrovde/viafrei-api/internal/buildinfo.version=$(VERSION) \
 	-X github.com/mavrovde/viafrei-api/internal/buildinfo.commit=$(COMMIT)
 
-.PHONY: build test test-integration lint generate check-generated run clean
+.PHONY: build test test-integration lint generate check-generated fixtures run clean
 
 build: ## Build the binary into bin/
 	CGO_ENABLED=0 $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/viafrei-api
@@ -29,6 +29,12 @@ generate: ## Regenerate sqlc code, docs/configuration.md and api/openapi.json
 
 check-generated: generate ## Fail when a generated file differs from the committed one
 	git diff --exit-code -- internal/adapters/store/contractdb docs/configuration.md api/openapi.json
+
+PROFILE ?= tiny
+SEED    ?= 1
+
+fixtures: ## Write a synthetic fixture set: make fixtures PROFILE=ci SEED=7 (into testdata/fixtures/PROFILE)
+	$(GO) run ./cmd/fixturegen -profile $(PROFILE) -seed $(SEED) -out testdata/fixtures/$(PROFILE)
 
 run: build ## Run against VFAPI_DB_URL from the environment
 	$(BIN) serve

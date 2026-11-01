@@ -1,0 +1,19 @@
+# Keep the build context small and free of anything secret.
+.git
+.github
+.env
+.env.*
+!.env.example
+*.local.yaml
+bin
+dist
+coverage*
+*.test
+testdata/fixtures
+docs
+README.md
+CLAUDE.md
+.claude
+.idea
+.vscode
+compose.yaml

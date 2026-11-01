@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Technical specification
+    url: https://github.com/mavrovde/viafrei-api/wiki/Technical-Specification
+    about: Read the specification before proposing a change to the interface.

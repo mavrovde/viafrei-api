@@ -71,7 +71,9 @@ ViaFrei API is in its **design phase**. Nothing is deployed yet.
 |---|---|
 | Goals, principles and domain model | ✅ Written |
 | Technology evaluation | ✅ Published in the [wiki](https://github.com/mavrovde/viafrei-api/wiki/Technology-Evaluation) |
-| Stack decision: Go or Rust | 🔄 Benchmark planned |
+| Technical specification | 📝 Draft for review, revision 1 — [published in the wiki](https://github.com/mavrovde/viafrei-api/wiki/Technical-Specification): protocol, requests and responses, errors, keys, limits, non-functional requirements |
+| Architecture for Go, Rust and TypeScript | ✅ [Stack Comparison](https://github.com/mavrovde/viafrei-api/wiki/Stack-Comparison) |
+| Stack decision: Go, Rust or TypeScript | 🔄 Benchmark planned ([ADR-0001](https://github.com/mavrovde/viafrei-api/wiki/Spec-Architecture-Decisions), proposed) |
 | Project skeleton, CI and release pipeline | ⏳ Next |
 | Keys, rate limits and priority tiers | ⏳ Planned |
 | v1 feature endpoints | ⏳ Planned |
@@ -85,7 +87,13 @@ The [wiki](https://github.com/mavrovde/viafrei-api/wiki) holds the full design:
 - [Vision and Goals](https://github.com/mavrovde/viafrei-api/wiki/Vision-and-Goals) · [Principles](https://github.com/mavrovde/viafrei-api/wiki/Principles)
 - [Domain Model](https://github.com/mavrovde/viafrei-api/wiki/Domain-Model) · [API Design](https://github.com/mavrovde/viafrei-api/wiki/API-Design) · [Architecture Overview](https://github.com/mavrovde/viafrei-api/wiki/Architecture-Overview)
 - [Security and Access Keys](https://github.com/mavrovde/viafrei-api/wiki/Security-and-Access-Keys) · [Rate Limits and Priority](https://github.com/mavrovde/viafrei-api/wiki/Rate-Limits-and-Priority)
-- [Technology Evaluation](https://github.com/mavrovde/viafrei-api/wiki/Technology-Evaluation) · [Go vs Rust](https://github.com/mavrovde/viafrei-api/wiki/Go-vs-Rust)
+- [Technology Evaluation](https://github.com/mavrovde/viafrei-api/wiki/Technology-Evaluation) · [Stack Comparison](https://github.com/mavrovde/viafrei-api/wiki/Stack-Comparison) · [Benchmark Plan](https://github.com/mavrovde/viafrei-api/wiki/Benchmark-Plan)
+
+**Technical specification** ([index](https://github.com/mavrovde/viafrei-api/wiki/Technical-Specification)), with numbered requirements traced in the [Traceability Matrix](https://github.com/mavrovde/viafrei-api/wiki/Spec-Traceability-Matrix):
+
+- Interface: [Protocol](https://github.com/mavrovde/viafrei-api/wiki/Spec-Protocol) · [Common Envelope](https://github.com/mavrovde/viafrei-api/wiki/Spec-Common-Envelope) · [Resource Model](https://github.com/mavrovde/viafrei-api/wiki/Spec-Resource-Model) · [Errors](https://github.com/mavrovde/viafrei-api/wiki/Spec-Errors) · [Authentication](https://github.com/mavrovde/viafrei-api/wiki/Spec-Authentication-and-Authorisation) · [Rate Limiting](https://github.com/mavrovde/viafrei-api/wiki/Spec-Rate-Limiting-and-Quotas) · [Licensing and Attribution](https://github.com/mavrovde/viafrei-api/wiki/Spec-Data-Licensing-and-Attribution) · [Versioning](https://github.com/mavrovde/viafrei-api/wiki/Spec-Compatibility-and-Versioning) · [OpenAPI Skeleton](https://github.com/mavrovde/viafrei-api/wiki/Spec-OpenAPI-Skeleton)
+- Quality: [Non-Functional Requirements](https://github.com/mavrovde/viafrei-api/wiki/Spec-Non-Functional-Requirements) · [Quality Scenarios](https://github.com/mavrovde/viafrei-api/wiki/Spec-Quality-Scenarios) · [Threat Model](https://github.com/mavrovde/viafrei-api/wiki/Spec-Threat-Model)
+- Delivery: [Architecture Decisions](https://github.com/mavrovde/viafrei-api/wiki/Spec-Architecture-Decisions) · [Secure SDLC and Supply Chain](https://github.com/mavrovde/viafrei-api/wiki/Spec-Secure-SDLC-and-Supply-Chain) · [Test Strategy](https://github.com/mavrovde/viafrei-api/wiki/Spec-Test-Strategy) · [CI/CD and Release](https://github.com/mavrovde/viafrei-api/wiki/Spec-CI-CD-and-Release) · [Operations](https://github.com/mavrovde/viafrei-api/wiki/Spec-Operations) · [Developer Experience](https://github.com/mavrovde/viafrei-api/wiki/Spec-Developer-Experience)
 
 ## Security
 

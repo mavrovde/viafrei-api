@@ -71,7 +71,7 @@ ViaFrei API is in its **design phase**. Nothing is deployed yet.
 |---|---|
 | Goals, principles and domain model | ✅ Written |
 | Technology evaluation | ✅ Published in the [wiki](https://github.com/mavrovde/viafrei-api/wiki/Technology-Evaluation) |
-| Technical specification | ✅ [Published](https://github.com/mavrovde/viafrei-api/wiki/Technical-Specification): protocol, requests and responses, errors, keys, limits, non-functional requirements |
+| Technical specification | 📝 Draft for review, revision 1 — [published in the wiki](https://github.com/mavrovde/viafrei-api/wiki/Technical-Specification): protocol, requests and responses, errors, keys, limits, non-functional requirements |
 | Architecture for Go, Rust and TypeScript | ✅ [Stack Comparison](https://github.com/mavrovde/viafrei-api/wiki/Stack-Comparison) |
 | Stack decision: Go, Rust or TypeScript | 🔄 Benchmark planned ([ADR-0001](https://github.com/mavrovde/viafrei-api/wiki/Spec-Architecture-Decisions), proposed) |
 | Project skeleton, CI and release pipeline | ⏳ Next |

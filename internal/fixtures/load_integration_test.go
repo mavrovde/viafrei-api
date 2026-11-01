@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -102,13 +103,15 @@ func TestTinyLoadsIntoTheContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
-	// The ci set is already committed, so the counts are compared as the
-	// difference the tiny load makes.
-	before := map[string]int{}
-	for _, table := range fixtures.Tables {
-		if before[table], err = countRows(ctx, tx, table); err != nil {
-			t.Fatal(err)
-		}
+	// The ci set committed in TestMain uses the same identifiers, so the
+	// tables are emptied inside this transaction first; the rollback brings
+	// the ci set back for the other tests.
+	names := make([]string, len(fixtures.Tables))
+	for i, table := range fixtures.Tables {
+		names[i] = "contract." + pgx.Identifier{table}.Sanitize() //nolint:misspell // the pgx method's name
+	}
+	if _, err := tx.Exec(ctx, "truncate table "+strings.Join(names, ", ")); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := tx.Exec(ctx, buf.String()); err != nil {
 		t.Fatalf("tiny seed %d does not load: %v", m.Seed, err)
@@ -118,7 +121,7 @@ func TestTinyLoadsIntoTheContract(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := n - before[table]; got != m.Rows[table] {
+		if got := n; got != m.Rows[table] {
 			t.Errorf("%s: %d rows loaded, the manifest says %d", table, got, m.Rows[table])
 		}
 	}

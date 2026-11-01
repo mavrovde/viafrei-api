@@ -1,0 +1,11 @@
+version: "2"
+sql:
+  - engine: postgresql
+    schema: db/contract/0001_contract.sql
+    queries: db/queries
+    gen:
+      go:
+        package: contractdb
+        out: internal/adapters/store/contractdb
+        sql_package: pgx/v5
+        emit_methods_with_db_argument: false

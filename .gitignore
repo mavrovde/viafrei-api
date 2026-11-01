@@ -1,0 +1,17 @@
+# Build output
+/bin/
+/dist/
+*.test
+*.out
+coverage.*
+
+# Local configuration and secrets
+.env
+*.local.yaml
+
+# Editors and assistants
+.idea/
+.vscode/
+.DS_Store
+CLAUDE.md
+.claude/

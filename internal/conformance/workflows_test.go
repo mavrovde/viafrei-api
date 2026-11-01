@@ -1,6 +1,7 @@
 package conformance_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -21,7 +22,8 @@ type workflowFile struct {
 		Uses           string `yaml:"uses"`
 		TimeoutMinutes any    `yaml:"timeout-minutes"`
 		Steps          []struct {
-			Uses string `yaml:"uses"`
+			Uses string         `yaml:"uses"`
+			With map[string]any `yaml:"with"`
 		} `yaml:"steps"`
 	} `yaml:"jobs"`
 }
@@ -140,5 +142,55 @@ func TestCosignIdentityNamesRealWorkflows(t *testing.T) {
 	}
 	if !strings.Contains(string(doc), `(image|release)\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?)$`) {
 		t.Error("docs/container.md no longer carries the identity regexp")
+	}
+}
+
+// setupGoFindings: every actions/setup-go step names the exact toolchain of
+// go.mod. setup-go reads only the go line from go-version-file, so a job
+// using it built with an older patch release than the one pinned (and
+// govulncheck reported that release's standard-library vulnerabilities).
+func setupGoFindings(name string, src []byte, toolchain string) []string {
+	var w workflowFile
+	if err := yaml.Unmarshal(src, &w); err != nil {
+		return []string{name + ": does not parse"}
+	}
+	var out []string
+	for id, j := range w.Jobs {
+		for _, s := range j.Steps {
+			if !strings.HasPrefix(s.Uses, "actions/setup-go@") {
+				continue
+			}
+			if got := fmt.Sprint(s.With["go-version"]); got != toolchain {
+				out = append(out, fmt.Sprintf("%s: job %s sets up Go %q, go.mod pins %s", name, id, got, toolchain))
+			}
+		}
+	}
+	return out
+}
+
+func TestWorkflowsUseTheGoModToolchain(t *testing.T) {
+	req.Covers(t, "SSC-005")
+	mod, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := regexp.MustCompile(`(?m)^toolchain go([0-9]+\.[0-9]+\.[0-9]+)$`).FindSubmatch(mod)
+	if m == nil {
+		t.Fatal("go.mod has no toolchain line")
+	}
+	toolchain := string(m[1])
+	steps := 0
+	for name, src := range readWorkflows(t) {
+		steps += strings.Count(string(src), "actions/setup-go@")
+		for _, f := range setupGoFindings(name, src, toolchain) {
+			t.Error(f)
+		}
+	}
+	if steps == 0 {
+		t.Fatal("no setup-go step read")
+	}
+	bad := strings.Replace(string(readWorkflows(t)["ci.yml"]), `go-version: "`+toolchain+`"`, "go-version-file: go.mod", 1)
+	if len(setupGoFindings("ci.yml", []byte(bad), toolchain)) == 0 {
+		t.Error("a planted go-version-file step was not reported")
 	}
 }

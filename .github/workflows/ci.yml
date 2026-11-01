@@ -30,7 +30,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.15.0
@@ -48,7 +48,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
       - name: go test (race, shuffled)
         run: |
           set -o pipefail
@@ -73,7 +73,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
       - name: Pull the test image once
         run: docker pull postgis/postgis:16-3.4
       - name: go test -tags integration
@@ -98,7 +98,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
       - run: make check-generated SQLC="go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1"
 
   openapi:
@@ -112,7 +112,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
       - name: Spectral
         run: npx --yes @stoplight/spectral-cli@6.17.0 lint --ruleset .spectral.yaml --fail-severity warn api/openapi.json
       - name: Breaking changes against the base branch
@@ -130,7 +130,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -show verbose ./...
 
   image:

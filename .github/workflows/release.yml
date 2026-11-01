@@ -154,7 +154,7 @@ jobs:
         run: cosign attest --yes --type spdxjson --predicate dist/sbom.spdx.json "$IMAGE@$DIGEST"
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
       - name: openapi.json and its diff against the previous release
         id: oas
         env:

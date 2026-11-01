@@ -1,0 +1,80 @@
+# Keeps the release pull request up to date from the Conventional Commits on
+# main. When that pull request is merged, release-please writes a DRAFT
+# release (a draft creates no tag); the next job creates the annotated tag
+# vX.Y.Z on the release commit and runs release.yml, which builds, signs,
+# attests, attaches the assets, publishes the draft and verifies the result.
+# release.yml is called directly because a tag pushed with GITHUB_TOKEN does
+# not start other workflows.
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release pull request
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      created: ${{ steps.rp.outputs.release_created }}
+      tag: ${{ steps.rp.outputs.tag_name }}
+      sha: ${{ steps.rp.outputs.sha }}
+    steps:
+      - id: rp
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  tag:
+    name: Annotated tag
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Create and push the annotated tag
+        env:
+          TAG: ${{ needs.release-please.outputs.tag }}
+          SHA: ${{ needs.release-please.outputs.sha }}
+        run: |
+          [[ $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::release-please produced tag '$TAG', not vX.Y.Z"; exit 1; }
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::tag $TAG exists already; tags are never moved"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$SHA" -m "Release $TAG"
+          git push origin "refs/tags/$TAG"
+
+  release:
+    name: Release
+    needs: [release-please, tag]
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+      issues: write
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.release-please.outputs.tag }}

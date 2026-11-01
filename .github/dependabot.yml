@@ -1,0 +1,33 @@
+# Weekly dependency updates. Every update arrives as a pull request with a
+# Conventional Commit title (deps: ...) and runs the full CI.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: deps
+    groups:
+      otel:
+        patterns: ["go.opentelemetry.io/*"]
+      testcontainers:
+        patterns: ["github.com/testcontainers/*"]
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: ci
+    open-pull-requests-limit: 5
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: deps
+    open-pull-requests-limit: 3

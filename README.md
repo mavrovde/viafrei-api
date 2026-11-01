@@ -80,7 +80,7 @@ ViaFrei API has a **service skeleton** in Go. Nothing is deployed yet, and no da
 | Configuration layer | ✅ Every tunable is a documented key with bounds — [docs/configuration.md](docs/configuration.md) |
 | Service skeleton: `/healthz`, `/readyz`, `/v1/meta`, `/v1/openapi.json` | 🔄 In review (milestone 0.2.0) |
 | Container image (distroless, multi-arch) and local Compose stack | 🔄 In review — [docs/container.md](docs/container.md) |
-| CI, security checks and release pipeline | 🔄 In progress (milestone 0.2.0) |
+| CI, security checks and release pipeline | 🔄 In review — CI on every pull request; release-please, signed images and release pages ([docs/RELEASING.md](docs/RELEASING.md)) |
 | Keys, rate limits and priority tiers | ⏳ Planned |
 | v1 feature endpoints | ⏳ Planned |
 
@@ -153,9 +153,13 @@ The [wiki](https://github.com/mavrovde/viafrei-api/wiki) holds the full design:
 - Testing: [Testing Strategy](https://github.com/mavrovde/viafrei-api/wiki/Testing-Strategy) (ISO/IEC/IEEE 29119-3) · [Test Plan](https://github.com/mavrovde/viafrei-api/wiki/Test-Plan) per milestone · [Quality Gates](https://github.com/mavrovde/viafrei-api/wiki/Test-Environments-and-Quality-Gates) · [Security Test Plan](https://github.com/mavrovde/viafrei-api/wiki/Security-Test-Plan) · [Performance Test Plan](https://github.com/mavrovde/viafrei-api/wiki/Performance-Test-Plan); tests never touch a live data source or production
 - Delivery: [Architecture Decisions](https://github.com/mavrovde/viafrei-api/wiki/Spec-Architecture-Decisions) · [Secure SDLC and Supply Chain](https://github.com/mavrovde/viafrei-api/wiki/Spec-Secure-SDLC-and-Supply-Chain) · [Test Strategy](https://github.com/mavrovde/viafrei-api/wiki/Spec-Test-Strategy) · [CI/CD and Release](https://github.com/mavrovde/viafrei-api/wiki/Spec-CI-CD-and-Release) · [Operations](https://github.com/mavrovde/viafrei-api/wiki/Spec-Operations) · [Developer Experience](https://github.com/mavrovde/viafrei-api/wiki/Spec-Developer-Experience)
 
+## Releases
+
+Releases are cut by [release-please](https://github.com/googleapis/release-please) from Conventional Commits: merging the release pull request tags `vX.Y.Z` (annotated) and publishes the release page with the signed multi-arch image `ghcr.io/mavrovde/viafrei-api:X.Y.Z`, its SBOM and provenance, `openapi.json` with its diff against the previous release, and checksums. Every 0.x release is a pre-release. The [CHANGELOG](CHANGELOG.md) lists the changes; [docs/RELEASING.md](docs/RELEASING.md) is the maintainer checklist, including rollback, hotfixes and yanking.
+
 ## Security
 
-Please do not report security issues in public issues. Use GitHub's [private vulnerability reporting](https://github.com/mavrovde/viafrei-api/security/advisories/new).
+Please do not report security issues in public issues. Use GitHub's [private vulnerability reporting](https://github.com/mavrovde/viafrei-api/security/advisories/new). See [SECURITY.md](SECURITY.md).
 
 ## Contributing
 

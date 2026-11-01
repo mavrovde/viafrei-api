@@ -24,13 +24,14 @@ lint: ## golangci-lint with the repository configuration
 	golangci-lint run ./...
 
 generate: ## Regenerate sqlc code, docs/configuration.md and api/openapi.json
-	sqlc generate
+	$(SQLC) generate
 	$(GO) run ./cmd/viafrei-api config docs > docs/configuration.md
 	$(GO) run ./cmd/viafrei-api openapi > api/openapi.json
 
 check-generated: generate ## Fail when a generated file differs from the committed one
 	git diff --exit-code -- internal/adapters/store/contractdb docs/configuration.md api/openapi.json
 
+SQLC ?= sqlc
 PROFILE ?= tiny
 SEED    ?= 1
 

@@ -172,6 +172,7 @@ func build(d Deps) (http.Handler, []byte, error) {
 				Version:     InterfaceVersion,
 				Description: "Keyed, read-only access to live German mobility context. This document is generated from the code.",
 				License:     &huma.License{Name: "Terms of use", URL: "https://viafrei.de/"},
+				Contact:     &huma.Contact{Name: "ViaFrei API maintainers", URL: "https://github.com/mavrovde/viafrei-api/issues"},
 			},
 			Servers:    []*huma.Server{{URL: base}},
 			Components: &huma.Components{Schemas: huma.NewMapRegistry("#/components/schemas/", huma.DefaultSchemaNamer)},

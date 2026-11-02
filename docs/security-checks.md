@@ -15,7 +15,7 @@ DAST scan targets the local compose stack.
 | Known vulnerabilities, modules | OSV-Scanner 2.7.0 | any advisory against `go.mod` | SSC-014 |
 | Known vulnerabilities, repository | Trivy 0.76.0 `fs` (vuln, secret) | HIGH or CRITICAL with a fix | SSC-014 |
 | Known vulnerabilities, image | Trivy 0.76.0 `image` (CI workflow) | HIGH or CRITICAL with a fix | SSC-014 |
-| Dependencies | Snyk CLI 1.1308.1 | high or critical; fails naming `SNYK_TOKEN` when the secret is absent | SSC-014 |
+| Dependencies | Snyk CLI 1.1308.1 (binary, sha256 checked) | high or critical; fails naming `SNYK_TOKEN` when the secret is absent | SSC-014 |
 | New dependencies in a pull request | GitHub dependency review | a high advisory, or a licence outside the allow-list | SSC-003 |
 | Licences of every module | go-licenses 2.0.1 | a licence outside the allow-list; the report is an artifact | SSC-003 |
 | Dockerfile and workflows | Checkov 3.3.29, Hadolint 2.15.1 (CI workflow), actionlint and shellcheck (CI workflow) | any failed check | SSC-005, SSC-010 |

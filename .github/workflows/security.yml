@@ -100,7 +100,7 @@ jobs:
       - run: |
           docker run --rm -v "$PWD:/src" \
             aquasec/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222 \
-            fs --scanners vuln,secret --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --no-progress /src
+            fs --scanners vuln,secret --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --no-progress --db-repository mirror.gcr.io/aquasec/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2 /src
 
   snyk:
     name: Snyk (dependencies)
@@ -121,9 +121,14 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: Snyk CLI 1.1308.1, checksum verified
+        run: |
+          curl -fsSL --max-time 60 -o snyk https://static.snyk.io/cli/v1.1308.1/snyk-linux
+          echo "a8b2e420af6d8e61bf1d367c064475ccf699d767fc8763efb0072b9cac250f9a  snyk" | sha256sum -c -
+          chmod +x snyk
       - env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: npx --yes snyk@1.1308.1 test --severity-threshold=high
+        run: ./snyk test --severity-threshold=high
 
   dependency-review:
     name: Dependency review

@@ -24,6 +24,7 @@ fi
 teardown() {
   local code=$?
   if [[ $code -ne 0 ]]; then docker compose logs --no-color --tail 80 || true; fi
+  [[ -n "${zap_cid:-}" ]] && docker rm --force "$zap_cid" >/dev/null 2>&1 || true
   docker compose down --volumes --remove-orphans >/dev/null 2>&1 || true
   exit "$code"
 }
@@ -31,16 +32,20 @@ trap teardown EXIT
 
 docker compose up --detach --build --wait --wait-timeout 300
 
+# No host directory is shared with the ZAP container (its user is not the
+# runner's, and a world-writable mount is not an answer): the rules go in on
+# stdin, the reports are copied out of the stopped container.
+rm -rf zap-report
 mkdir -p zap-report
-cp scripts/zap-rules.tsv zap-report/rules.tsv
-chmod 0777 zap-report
+zap_cid="${PROJECT}-zap-$$"
 
 set +e
-docker run --rm --network "${PROJECT}_frontend" -v "$PWD/zap-report:/zap/wrk:rw" "$ZAP_IMAGE" \
-  zap-api-scan.py -t http://api:8080/v1/openapi.json -f openapi -O http://api:8080 \
-  -c rules.tsv -r zap.html -J zap.json -I
+docker run --interactive --name "$zap_cid" --network "${PROJECT}_frontend" --entrypoint sh "$ZAP_IMAGE" -c \
+  'mkdir -p /zap/wrk && cat >/zap/wrk/rules.tsv && exec zap-api-scan.py -t http://api:8080/v1/openapi.json -f openapi -O http://api:8080 -c rules.tsv -r zap.html -J zap.json -I' \
+  <scripts/zap-rules.tsv
 code=$?
 set -e
+docker cp "$zap_cid:/zap/wrk/." zap-report/ || true
 
 [[ -s zap-report/zap.json ]] || { echo "FAIL: ZAP wrote no report (exit $code)" >&2; exit 1; }
 alerts=$(jq '[.site[].alerts[]] | length' zap-report/zap.json)

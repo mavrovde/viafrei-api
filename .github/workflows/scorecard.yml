@@ -11,7 +11,8 @@ on:
   branch_protection_rule:
   workflow_dispatch:
 
-permissions: read-all
+# Nothing at workflow level; the job names exactly what it needs.
+permissions: {}
 
 concurrency:
   group: scorecard

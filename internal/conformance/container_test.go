@@ -179,7 +179,7 @@ func composeFindings(src []byte) []string {
 }
 
 func TestComposeRules(t *testing.T) {
-	req.Covers(t, "SSC-017")
+	req.Covers(t, "SSC-017", "SSC-019")
 	src, err := os.ReadFile(filepath.Join(root, "compose.yaml"))
 	if err != nil {
 		t.Fatal(err)
@@ -190,7 +190,7 @@ func TestComposeRules(t *testing.T) {
 }
 
 func TestComposeRulesCanSayNo(t *testing.T) {
-	req.Covers(t, "SSC-017")
+	req.Covers(t, "SSC-017", "SSC-019")
 	good, err := os.ReadFile(filepath.Join(root, "compose.yaml"))
 	if err != nil {
 		t.Fatal(err)

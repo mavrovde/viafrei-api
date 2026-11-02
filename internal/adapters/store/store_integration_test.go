@@ -187,17 +187,34 @@ func TestServerStopsTheStatementOnItsOwn(t *testing.T) {
 	st := openStore(t, ctx)
 	short, cancel := context.WithTimeout(ctx, 600*time.Millisecond)
 	defer cancel()
-	start := time.Now()
+	var limit, took time.Duration
 	err := st.Read(short, func(ctx context.Context, tx pgx.Tx) error {
-		// Detach the client-side cancel: only the statement timeout can stop it.
-		_, err := tx.Exec(context.WithoutCancel(ctx), "select pg_sleep(5)")
+		var raw string
+		if err := tx.QueryRow(ctx, "select current_setting('statement_timeout')").Scan(&raw); err != nil {
+			return err
+		}
+		if len(raw) < 3 || raw[len(raw)-2:] != "ms" {
+			return fmt.Errorf("statement_timeout %q is not the per-read budget in ms", raw)
+		}
+		ms, err := strconv.Atoi(raw[:len(raw)-2])
+		if err != nil {
+			return fmt.Errorf("statement_timeout %q is not the per-read budget in ms", raw)
+		}
+		limit = time.Duration(ms) * time.Millisecond
+		// Detach the client-side cancel: only the statement timeout can stop it. Only the
+		// statement is timed: the begin, this read and the rollback are outside its timeout,
+		// and timing them too made the bound fail on a loaded machine.
+		start := time.Now()
+		_, err = tx.Exec(context.WithoutCancel(ctx), "select pg_sleep(5)")
+		took = time.Since(start)
 		return err
 	})
 	if !errors.Is(err, store.ErrDeadlineExhausted) || sqlState(err) != "57014" {
 		t.Fatalf("want the server-side statement timeout (57014), got %v", err)
 	}
-	if took := time.Since(start); took > 700*time.Millisecond {
-		t.Fatalf("the statement ran %s past its budget", took)
+	// The server stops it at its own timeout: not before, and not long after.
+	if took < limit || took > limit+250*time.Millisecond {
+		t.Fatalf("the statement ran %s against a %s statement timeout", took, limit)
 	}
 }
 

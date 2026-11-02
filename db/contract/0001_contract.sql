@@ -177,6 +177,10 @@ create table contract.fuel_product (
     price_unit   text not null
 );
 
+-- Fuel prices are consumer information only and may not be redistributed.
+-- No endpoint may expose this table until the licence decision for it is
+-- recorded in the wiki's licence matrix; the stub keeps the shape so the
+-- contract stays complete.
 create table contract.fuel_price_observation (
     station_id   text not null references contract.fuel_station,
     product_code text not null references contract.fuel_product,

@@ -15,6 +15,11 @@ func TestMustReturnsTheValue(t *testing.T) {
 }
 
 func TestCheckPassesNil(t *testing.T) {
+	defer func() {
+		if v := recover(); v != nil {
+			t.Fatalf("Check(nil) panicked: %v", v)
+		}
+	}()
 	invariant.Check(nil)
 }
 

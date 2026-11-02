@@ -42,5 +42,14 @@ func TestFinishReportsEachFailure(t *testing.T) {
 }
 
 func TestStopWithoutContainer(t *testing.T) {
-	(&DB{}).Stop()
+	defer func() {
+		if v := recover(); v != nil {
+			t.Fatalf("Stop without a container panicked: %v", v)
+		}
+	}()
+	db := &DB{}
+	db.Stop()
+	if db.container != nil {
+		t.Fatal("Stop created a container")
+	}
 }

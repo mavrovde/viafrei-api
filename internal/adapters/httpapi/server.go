@@ -150,11 +150,14 @@ func build(d Deps) (http.Handler, []byte, error) {
 
 	base := strings.TrimRight(d.Config.Server.PublicBaseURL, "/")
 	router := chi.NewRouter()
+	// recoverPanics runs inside withRequest, so a panic's problem and log
+	// line carry the request id, the instance and the absolute type, and
+	// inside accessLog, so the 500 it writes is logged like any answer.
 	router.Use(
 		securityHeaders(d.Config.HTTP.HSTSMaxAge),
-		recoverPanics(s.log),
 		withRequest(base),
 		accessLog(s.log, s.now),
+		recoverPanics(s.log),
 		limitURI(d.Config.Server.MaxURIBytes),
 		withDeadline(d.Config.Deadline.Request),
 	)

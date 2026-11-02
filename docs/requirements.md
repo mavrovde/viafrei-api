@@ -60,3 +60,12 @@ uploads the `requirement-report` artifact:
 
 Locally, `make report` runs the unit tests and writes `requirement-report.md`.
 Integration-only requirements show as uncovered there; CI reads both levels.
+
+## The catalogue and the wiki
+
+CI never reads the wiki, so nothing checks automatically that
+`catalogue.tsv` still matches the Traceability Matrix. The check is manual:
+after a change to a spec page, regenerate the catalogue from a wiki checkout
+with `make catalogue WIKI=<path>` and commit the diff, if any, with the change
+that needs it. A review of a pull request that cites a new requirement ID
+checks that the catalogue holds it; `reqreport check` refuses an unknown ID.

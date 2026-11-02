@@ -111,6 +111,7 @@ built yet; until it is, no `Release-As` footer is used.
 
 - [ ] CI is green on the release pull request, including the image and compose jobs.
 - [ ] The Coverage gate job shows 100 % for every package, and every line of `test/coverage-exclusions.txt` carries its reason ([coverage](coverage.md)).
+- [ ] The `Requirement report` job is green on `main` at the release commit; its `requirement-report` artifact holds the requirement report and the draft test completion report, which the maintainers complete and attach to the release (TEST-002).
 - [ ] The CHANGELOG section reads correctly; every user-visible change has a line.
 - [ ] Every breaking change is intended and is described with a migration note.
 - [ ] `api/openapi.json` on `main` is the contract you mean to publish.

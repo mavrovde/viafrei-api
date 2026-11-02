@@ -277,3 +277,45 @@ jobs:
       - uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  requirements:
+    name: Requirement report
+    needs: [test, integration]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: test-unit-json
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: test-integration-json
+      - name: Every in-scope requirement has a passing test (TEST-002, TST-011, TST-012)
+        run: |
+          # The newest scope file is the milestone in progress.
+          scope=$(find test/requirements/scope -name '*.txt' | sort -V | tail -n 1)
+          if [ -z "$scope" ]; then echo "::error::no scope file under test/requirements/scope"; exit 1; fi
+          echo "scope: $scope"
+          go run ./cmd/reqreport check -scope "$scope" \
+            -results unit=test-unit.json -results integration=test-integration.json \
+            -version "$(basename "$scope" .txt) (after $(cat version.txt))" -commit "$GITHUB_SHA" \
+            -report requirement-report.md -completion test-completion-report.md
+      - name: Publish the summary
+        if: always()
+        run: |
+          if [ -s requirement-report.md ]; then cat requirement-report.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: requirement-report
+          path: |
+            requirement-report.md
+            test-completion-report.md
+          retention-days: 90
+          if-no-files-found: error

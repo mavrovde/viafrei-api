@@ -18,3 +18,7 @@ CLAUDE.md
 .claude/
 testdata/fixtures/
 zap-report/
+test-unit.json
+test-integration.json
+requirement-report.md
+test-completion-report.md

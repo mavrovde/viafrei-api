@@ -2,7 +2,7 @@
 # Compose guard (SSC-019): the local stack publishes the API on a loopback
 # address only. compose.yaml defaults API_PUBLISH to [::1]:8080; an override,
 # from the environment or from .env (the environment wins, as in compose),
-# must name [::1] or an address in 127.0.0.0/8 followed by a port. Anything
+# must name [::1] or an IPv4 loopback address (127.x.y.z) followed by a port. Anything
 # else is refused before compose is started.
 #
 # The env file is .env in the repository root unless API_ENV_FILE names

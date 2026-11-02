@@ -23,7 +23,7 @@ func TestCheckExitCodes(t *testing.T) {
 	cat := write("cat.tsv", "AAA-001\tMUST\tUnit\tComponent\tP\nAAA-002\tMUST\tUnit\tComponent\tP\n")
 	ok := write("ok.txt", "AAA-001\n")
 	missing := write("missing.txt", "AAA-001\nAAA-002\n")
-	res := write("unit.json", `{"Action":"output","Package":"m/p","Test":"TestA","Output":"REQ-ID: AAA-001\n"}`+"\n"+
+	res := write("unit.json", `{"Action":"output","Package":"m/p","Test":"TestA","Output":"    a_test.go:9: REQ-ID: AAA-001\n"}`+"\n"+
 		`{"Action":"pass","Package":"m/p","Test":"TestA","Elapsed":0.1}`+"\n")
 	empty := write("empty.json", "")
 	report := filepath.Join(dir, "report.md")

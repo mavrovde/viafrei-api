@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -96,11 +97,16 @@ func ReadResults(level string, r io.Reader) ([]TestResult, error) {
 	return out, nil
 }
 
+// markerLine is the line req.Covers writes through t.Log: the file:line
+// prefix go test adds, then the marker. "REQ-ID:" anywhere else in a test's
+// output (a message quoting it, a log of a fixture) is not a claim.
+var markerLine = regexp.MustCompile(`^\s*[\w.-]+\.go:\d+: ` + regexp.QuoteMeta(Marker) + `(.*)$`)
+
 func record(t *TestResult, e event) {
 	switch e.Action {
 	case "output":
-		if i := strings.Index(e.Output, Marker); i >= 0 {
-			t.IDs = append(t.IDs, strings.Fields(e.Output[i+len(Marker):])...)
+		if m := markerLine.FindStringSubmatch(strings.TrimRight(e.Output, "\n")); m != nil {
+			t.IDs = append(t.IDs, strings.Fields(m[1])...)
 		}
 	case "pass", "fail", "skip":
 		t.Outcome = e.Action

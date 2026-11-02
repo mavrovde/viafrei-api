@@ -379,6 +379,7 @@ REL-011	MUST	Lint	Static	Spec-CI-CD-and-Release
 REL-012	MUST	Handler	Component integration	Spec-CI-CD-and-Release
 REL-013	MUST	Ops	Acceptance	Spec-CI-CD-and-Release
 REL-014	SHOULD	Ops	Acceptance	Spec-CI-CD-and-Release
+REL-015	MUST	Lint	Static	Spec-CI-CD-and-Release
 RISK-001	-	Review	Static	Spec-Risks-Assumptions-Constraints
 RISK-002	-	Review	Static	Spec-Risks-Assumptions-Constraints
 RISK-003	-	Review	Static	Spec-Risks-Assumptions-Constraints

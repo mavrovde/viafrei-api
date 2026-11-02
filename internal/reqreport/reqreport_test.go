@@ -79,9 +79,9 @@ func TestCoveredScopePasses(t *testing.T) {
 
 func TestInScopeWithoutPassingTestFails(t *testing.T) {
 	req.Covers(t, "TEST-002")
-	ts := results(t, line("output", "TestA", "REQ-ID: AAA-001\\n", 0)+
+	ts := results(t, line("output", "TestA", "    a_test.go:9: REQ-ID: AAA-001\\n", 0)+
 		line("fail", "TestA", "", 0.01)+
-		line("output", "TestB", "REQ-ID: AAA-001\\n", 0)+
+		line("output", "TestB", "    a_test.go:9: REQ-ID: AAA-001\\n", 0)+
 		line("skip", "TestB", "", 0))
 	r := Check(catalogue(t), []string{"AAA-001", "AAA-002"}, 1, ts)
 	for _, want := range []string{"AAA-001 has no passing test", "AAA-002 has no passing test", "failed: unit internal/p.TestA"} {
@@ -91,9 +91,23 @@ func TestInScopeWithoutPassingTestFails(t *testing.T) {
 	}
 }
 
+func TestOnlyTheCoversLineIsAClaim(t *testing.T) {
+	req.Covers(t, "TEST-001")
+	ts := results(t, line("output", "TestA", "    a_test.go:9: REQ-ID: AAA-001\\n", 0)+
+		line("output", "TestA", "REQ-ID: AAA-002\\n", 0)+
+		line("output", "TestA", "    a_test.go:12: want REQ-ID: AAA-002 in the report\\n", 0)+
+		line("output", "TestA", "    a_test.go:13: fixture text\\n", 0)+
+		line("output", "TestA", "  REQ-ID: AAA-002 printed by a helper\\n", 0)+
+		line("output", "TestA", "    a_test.go:14: got z_test.go:3: REQ-ID: AAA-002 from a fixture\\n", 0)+
+		line("pass", "TestA", "", 0))
+	if len(ts) != 1 || strings.Join(ts[0].IDs, " ") != "AAA-001" {
+		t.Fatalf("IDs = %v, want only the req.Covers line (AAA-001)", ts[0].IDs)
+	}
+}
+
 func TestUnknownIDFails(t *testing.T) {
 	req.Covers(t, "TEST-001")
-	ts := results(t, line("output", "TestA", "REQ-ID: AAA-001 ZZZ-999\\n", 0)+line("pass", "TestA", "", 0))
+	ts := results(t, line("output", "TestA", "    a_test.go:9: REQ-ID: AAA-001\\n", 0)+line("output", "TestA", "    a_test.go:9: REQ-ID: ZZZ-999\\n", 0)+line("pass", "TestA", "", 0))
 	r := Check(catalogue(t), []string{"AAA-001"}, 1, ts)
 	if !hasFinding(r, "unknown requirement ZZZ-999") {
 		t.Fatalf("an ID outside the catalogue passed: %v", r.Findings)
@@ -102,7 +116,7 @@ func TestUnknownIDFails(t *testing.T) {
 
 func TestScopeHoldsOnlyAutomatedMustRows(t *testing.T) {
 	req.Covers(t, "TEST-002")
-	ts := results(t, line("output", "TestA", "REQ-ID: AAA-003 AAA-004\\n", 0)+line("pass", "TestA", "", 0))
+	ts := results(t, line("output", "TestA", "    a_test.go:9: REQ-ID: AAA-003\\n", 0)+line("output", "TestA", "    a_test.go:9: REQ-ID: AAA-004\\n", 0)+line("pass", "TestA", "", 0))
 	r := Check(catalogue(t), []string{"AAA-003", "AAA-004", "BBB-001"}, 1, ts)
 	for _, want := range []string{"scope lists AAA-003", "scope lists AAA-004", "BBB-001, which the catalogue does not hold"} {
 		if !hasFinding(r, want) {
@@ -198,7 +212,7 @@ func TestFromWikiReadsMatrixAndKeywords(t *testing.T) {
 
 func TestReportsCarryTheRun(t *testing.T) {
 	req.Covers(t, "TEST-002")
-	ts := results(t, line("output", "TestA", "REQ-ID: AAA-001\\n", 0)+line("pass", "TestA", "", 0.25))
+	ts := results(t, line("output", "TestA", "    a_test.go:9: REQ-ID: AAA-001\\n", 0)+line("pass", "TestA", "", 0.25))
 	r := Check(catalogue(t), []string{"AAA-001", "AAA-002"}, 1, ts)
 	m := Meta{Version: "9.9.9", Commit: "abc123", Generated: "2026-11-02T00:00:00Z"}
 	var rep, comp bytes.Buffer
@@ -260,10 +274,10 @@ func TestUnreadableStreamsAreErrors(t *testing.T) {
 // keeps its cmd/ prefix, and a clean run's completion draft says "none".
 func TestACleanRunReportsNoneAndSortsTests(t *testing.T) {
 	req.Covers(t, "TEST-002")
-	cmd := `{"Action":"output","Package":"example.com/m/cmd/tool","Test":"TestZ","Output":"REQ-ID: AAA-001\n"}` + "\n" +
+	cmd := `{"Action":"output","Package":"example.com/m/cmd/tool","Test":"TestZ","Output":"    a_test.go:9: REQ-ID: AAA-001\n"}` + "\n" +
 		`{"Action":"pass","Package":"example.com/m/cmd/tool","Test":"TestZ","Elapsed":0.1}` + "\n"
-	ts := results(t, line("output", "TestB", "REQ-ID: AAA-001\\n", 0)+"\n"+line("pass", "TestB", "", 0.1)+cmd+
-		line("output", "TestA", "REQ-ID: AAA-001\\n", 0)+line("pass", "TestA", "", 0.1))
+	ts := results(t, line("output", "TestB", "    a_test.go:9: REQ-ID: AAA-001\\n", 0)+"\n"+line("pass", "TestB", "", 0.1)+cmd+
+		line("output", "TestA", "    a_test.go:9: REQ-ID: AAA-001\\n", 0)+line("pass", "TestA", "", 0.1))
 	r := Check(catalogue(t), []string{"AAA-001"}, 1, ts)
 	var rep, comp bytes.Buffer
 	if err := WriteRequirementReport(&rep, r, Meta{}); err != nil {

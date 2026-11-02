@@ -86,15 +86,6 @@ var catalogue = map[string]problemKind{
 	SlugNotReady:             {http.StatusServiceUnavailable, "Not ready", true},
 }
 
-// Slugs returns every problem type slug of the catalogue.
-func Slugs() []string {
-	out := make([]string, 0, len(catalogue))
-	for s := range catalogue {
-		out = append(out, s)
-	}
-	return out
-}
-
 // newProblem builds a problem of a catalogued type for the request in ctx.
 // retryAfter > 0 sets Retry-After and retryAfter together (ERR-007).
 func newProblem(ctx context.Context, slug, detail string, retryAfter int) *Problem {

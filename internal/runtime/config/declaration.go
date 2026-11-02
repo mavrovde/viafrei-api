@@ -30,16 +30,6 @@ func Fields() []Field {
 	return out
 }
 
-// FieldByKey returns the field declared for key.
-func FieldByKey(key string) (Field, bool) {
-	for _, f := range Fields() {
-		if f.Key == key {
-			return f, true
-		}
-	}
-	return Field{}, false
-}
-
 // EnvName returns the environment variable spelling of a key.
 func EnvName(key string) string {
 	return EnvPrefix + strings.ToUpper(strings.ReplaceAll(key, ".", "_"))

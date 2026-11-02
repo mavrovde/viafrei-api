@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/store/contractdb"
+	"github.com/mavrovde/viafrei-api/internal/invariant"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
 
@@ -70,11 +71,9 @@ func Open(ctx context.Context, cfg *config.Config) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	pool, err := pgxpool.NewWithConfig(ctx, pc)
-	if err != nil {
-		return nil, fmt.Errorf("store: open pool: %w", ErrUnavailable)
-	}
-	return New(pool, cfg), nil
+	// NewWithConfig fails only on a pool configuration PoolConfig never
+	// builds (pool bounds are validated); it does not connect.
+	return New(invariant.Must(pgxpool.NewWithConfig(ctx, pc)), cfg), nil
 }
 
 // New wraps an existing pool.
@@ -125,14 +124,15 @@ func (s *Store) Read(ctx context.Context, fn func(context.Context, pgx.Tx) error
 	if !ok {
 		return ErrDeadlineExhausted
 	}
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})
+	// One round trip opens the read-only transaction and sets its statement
+	// timeout; the budget is an integer of milliseconds, never caller text.
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{
+		BeginQuery: "begin transaction read only; set local statement_timeout = " + strconv.FormatInt(budget.Milliseconds(), 10),
+	})
 	if err != nil {
 		return classify(ctx, err)
 	}
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
-	if _, err := tx.Exec(ctx, "select set_config('statement_timeout', $1, true)", strconv.FormatInt(budget.Milliseconds(), 10)); err != nil {
-		return classify(ctx, err)
-	}
 	if err := fn(ctx, tx); err != nil {
 		return classify(ctx, err)
 	}

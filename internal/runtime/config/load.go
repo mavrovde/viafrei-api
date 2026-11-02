@@ -16,6 +16,8 @@ import (
 	"github.com/knadh/koanf/providers/confmap"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
+
+	"github.com/mavrovde/viafrei-api/internal/invariant"
 )
 
 // ExitCode is the process exit status for a configuration error.
@@ -60,9 +62,8 @@ func Load(opts Options) (*Config, error) {
 			defaults[f.Key] = f.Default
 		}
 	}
-	if err := k.Load(confmap.Provider(defaults, "."), nil); err != nil {
-		return nil, fmt.Errorf("load defaults: %w", err)
-	}
+	// A map provider without a parser cannot fail.
+	invariant.Check(k.Load(confmap.Provider(defaults, "."), nil))
 
 	env := parseEnviron(opts.Environ)
 	path := opts.File
@@ -155,18 +156,10 @@ func Load(opts Options) (*Config, error) {
 	return cfg, nil
 }
 
-// FromEnvironment loads from the process environment.
-func FromEnvironment(requireSecrets bool) (*Config, error) {
-	return Load(Options{Environ: os.Environ(), RequireSecrets: requireSecrets})
-}
-
 // Defaults returns the configuration with every default and no secret.
 func Defaults() *Config {
-	cfg, err := Load(Options{})
-	if err != nil {
-		panic(fmt.Sprintf("the declared defaults do not validate: %v", err))
-	}
-	return cfg
+	// TestDefaultsValidate holds the declaration to this.
+	return invariant.Must(Load(Options{}))
 }
 
 func parseEnviron(environ []string) map[string]string {
@@ -204,8 +197,6 @@ func assign(dst reflect.Value, typ string, raw any) error {
 			dst.SetInt(int64(n))
 		case int:
 			dst.SetInt(int64(v))
-		case int64:
-			dst.SetInt(v)
 		case float64:
 			if v != float64(int64(v)) {
 				return fmt.Errorf("%v is not a whole number", v)
@@ -274,10 +265,10 @@ func validate(cfg *Config, known map[string]Field) Errors {
 	if err == nil {
 		return nil
 	}
+	// Struct on a *Config fails only with ValidationErrors; anything else
+	// would be a broken invariant, not a configuration fault.
 	var verrs validator.ValidationErrors
-	if !errors.As(err, &verrs) {
-		return Errors{err.Error()}
-	}
+	invariant.Check(asValidation(err, &verrs))
 	var out Errors
 	for _, fe := range verrs {
 		key := fe.Namespace()
@@ -288,6 +279,13 @@ func validate(cfg *Config, known map[string]Field) Errors {
 		out = append(out, fmt.Sprintf("%s: %s (bounds: %s)", key, describe(fe), Bounds(f)))
 	}
 	return out
+}
+
+func asValidation(err error, verrs *validator.ValidationErrors) error {
+	if errors.As(err, verrs) {
+		return nil
+	}
+	return err
 }
 
 func describe(fe validator.FieldError) string {

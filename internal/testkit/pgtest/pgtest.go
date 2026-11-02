@@ -9,7 +9,6 @@ package pgtest
 import (
 	"context"
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"net/url"
 	"time"
@@ -35,69 +34,70 @@ type DB struct {
 }
 
 // Start runs the container, builds the contract stub, creates the reader role
-// and publishes the contract version this build expects.
+// and publishes the contract version this build expects. On any failure the
+// container is removed.
 func Start(ctx context.Context) (*DB, error) {
-	ownerPassword, err := randomHex()
-	if err != nil {
-		return nil, err
-	}
 	c, err := postgres.Run(ctx, Image,
 		postgres.WithDatabase("contract"),
 		postgres.WithUsername("owner"),
-		postgres.WithPassword(ownerPassword),
+		postgres.WithPassword(rand.Text()),
 		postgres.BasicWaitStrategies(),
 	)
+	db := &DB{container: c}
+	if err == nil {
+		err = db.finish(ctx, c.ConnectionString)
+	}
 	if err != nil {
-		if c != nil {
-			_ = testcontainers.TerminateContainer(c)
-		}
+		db.Stop()
 		return nil, fmt.Errorf("pgtest: start %s: %w", Image, err)
 	}
-	db := &DB{container: c}
-	db.OwnerURL, err = c.ConnectionString(ctx, "sslmode=disable")
-	if err != nil {
-		db.Stop()
-		return nil, fmt.Errorf("pgtest: connection string: %w", err)
-	}
-	readerPassword, err := randomHex()
-	if err != nil {
-		db.Stop()
-		return nil, err
-	}
-	if err := db.prepare(ctx, readerPassword); err != nil {
-		db.Stop()
-		return nil, err
-	}
-	u, err := url.Parse(db.OwnerURL)
-	if err != nil {
-		db.Stop()
-		return nil, fmt.Errorf("pgtest: parse owner URL: %w", err)
-	}
-	u.User = url.UserPassword(contract.ReaderRole, readerPassword)
-	db.ReaderURL = u.String()
 	return db, nil
 }
 
-func (db *DB) prepare(ctx context.Context, readerPassword string) error {
-	conn, err := pgx.Connect(ctx, db.OwnerURL)
+// finish reads the owner URL from the running container, builds the stub and
+// derives the reader URL.
+func (db *DB) finish(ctx context.Context, connString func(context.Context, ...string) (string, error)) error {
+	owner, err := connString(ctx, "sslmode=disable")
 	if err != nil {
-		return fmt.Errorf("pgtest: connect as owner: %w", err)
+		return fmt.Errorf("connection string: %w", err)
+	}
+	u, err := url.Parse(owner)
+	if err != nil {
+		return fmt.Errorf("owner URL: %w", err)
+	}
+	// rand.Text is base32: safe inside a quoted SQL literal and a URL.
+	readerPassword := rand.Text()
+	if err := prepare(ctx, owner, readerPassword); err != nil {
+		return err
+	}
+	db.OwnerURL = owner
+	u.User = url.UserPassword(contract.ReaderRole, readerPassword)
+	db.ReaderURL = u.String()
+	return nil
+}
+
+type step struct {
+	sql  string
+	args []any
+}
+
+func prepare(ctx context.Context, ownerURL, readerPassword string) error {
+	conn, err := pgx.Connect(ctx, ownerURL)
+	if err != nil {
+		return fmt.Errorf("connect as owner: %w", err)
 	}
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
-	steps := []string{
-		contract.SchemaSQL(),
-		contract.ReaderRoleSQL(),
-		// The password is random hex, so quoting it inline is safe.
-		fmt.Sprintf("alter role %s password '%s'", contract.ReaderRole, readerPassword),
+	steps := []step{
+		{sql: contract.SchemaSQL()},
+		{sql: contract.ReaderRoleSQL()},
+		{sql: fmt.Sprintf("alter role %s password '%s'", contract.ReaderRole, readerPassword)},
+		{sql: "insert into contract.contract_info (contract_version, published_at) values ($1, $2)",
+			args: []any{contract.Version(), time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}},
 	}
-	for _, sql := range steps {
-		if _, err := conn.Exec(ctx, sql); err != nil {
-			return fmt.Errorf("pgtest: build contract stub: %w", err)
+	for _, st := range steps {
+		if _, err := conn.Exec(ctx, st.sql, st.args...); err != nil {
+			return fmt.Errorf("build contract stub: %w", err)
 		}
-	}
-	if _, err := conn.Exec(ctx, "insert into contract.contract_info (contract_version, published_at) values ($1, $2)",
-		contract.Version(), time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)); err != nil {
-		return fmt.Errorf("pgtest: publish contract version: %w", err)
 	}
 	return nil
 }
@@ -108,17 +108,7 @@ func (db *DB) Owner(ctx context.Context) (*pgx.Conn, error) {
 	return pgx.Connect(ctx, db.OwnerURL)
 }
 
-// Stop removes the container.
+// Stop removes the container; it does nothing when none was started.
 func (db *DB) Stop() {
-	if db.container != nil {
-		_ = testcontainers.TerminateContainer(db.container)
-	}
-}
-
-func randomHex() (string, error) {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("pgtest: random: %w", err)
-	}
-	return hex.EncodeToString(b), nil
+	_ = testcontainers.TerminateContainer(db.container)
 }

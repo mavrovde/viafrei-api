@@ -23,9 +23,6 @@ type requestContext struct {
 }
 
 func requestFrom(ctx context.Context) requestContext {
-	if ctx == nil {
-		return requestContext{}
-	}
 	rc, _ := ctx.Value(ctxKey{}).(requestContext)
 	return rc
 }
@@ -51,12 +48,7 @@ func withRequest(baseURL string) func(http.Handler) http.Handler {
 	}
 }
 
-func newRequestID() string {
-	if id, err := uuid.NewV7(); err == nil {
-		return id.String()
-	}
-	return uuid.NewString()
-}
+func newRequestID() string { return uuid.Must(uuid.NewV7()).String() }
 
 // limitURI answers 414 uri-too-long above server.max_uri_bytes (PROT-006).
 func limitURI(maxBytes int) func(http.Handler) http.Handler {

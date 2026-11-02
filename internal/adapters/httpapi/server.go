@@ -21,6 +21,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/app/health"
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
+	"github.com/mavrovde/viafrei-api/internal/invariant"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
 
@@ -196,14 +197,11 @@ func build(d Deps) (http.Handler, []byte, error) {
 		})
 	}
 
-	raw, err := json.Marshal(api.OpenAPI())
-	if err != nil {
-		return nil, nil, fmt.Errorf("httpapi: marshal OpenAPI: %w", err)
-	}
+	// The document is a value of huma's own fixed types: marshalling it
+	// cannot fail for any configuration.
+	raw := invariant.Must(json.Marshal(api.OpenAPI()))
 	var doc bytes.Buffer
-	if err := json.Indent(&doc, raw, "", "  "); err != nil {
-		return nil, nil, fmt.Errorf("httpapi: indent OpenAPI: %w", err)
-	}
+	_ = json.Indent(&doc, raw, "", "  ") // raw is the output of json.Marshal
 	doc.WriteByte('\n')
 	served := doc.Bytes()
 

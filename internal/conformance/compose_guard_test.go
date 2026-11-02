@@ -78,7 +78,7 @@ func TestComposeGuardRefusesNonLoopback(t *testing.T) {
 			t.Fatalf("the compose guard is judged by the real %s, which is not on PATH: %v", tool, err)
 		}
 	}
-	for name, c := range map[string]struct {
+	cases := map[string]struct {
 		env     []string
 		envFile string
 		want    int
@@ -100,12 +100,20 @@ func TestComposeGuardRefusesNonLoopback(t *testing.T) {
 		"colon separator in .env":      {nil, "API_PUBLISH: 0.0.0.0:9999\n", 2},
 		"space before = in .env":       {nil, "API_PUBLISH =0.0.0.0:9996\n", 2},
 		"spaces around the name":       {nil, "  API_PUBLISH  =0.0.0.0:9997\n", 2},
-	} {
-		// Sequential on purpose: each case starts a real docker compose, and
-		// seventeen at once on a CI runner took 3 s each (TST-012).
+	}
+	// Each case starts the real docker compose, whose start-up alone took
+	// up to 3.2 s on a busy CI runner. That is setup, not the judgement under
+	// test, so it runs here in the parent, one case at a time, and each
+	// subtest judges the exit status Compose's own reading produced (TST-012
+	// bounds leaves).
+	got := make(map[string]int, len(cases))
+	for name, c := range cases {
+		got[name] = runComposeGuard(t, path, c.env, c.envFile)
+	}
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			if got := runComposeGuard(t, path, c.env, c.envFile); got != c.want {
-				t.Errorf("exit %d, want %d", got, c.want)
+			if got[name] != c.want {
+				t.Errorf("exit %d, want %d", got[name], c.want)
 			}
 		})
 	}

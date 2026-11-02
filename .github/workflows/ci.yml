@@ -75,8 +75,14 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
-      - name: Pull the test image once
-        run: docker pull postgis/postgis:16-3.4
+      - name: Pull the test images once, by digest (SSC-005)
+        # testcontainers-go starts its reaper by tag and pulls only a missing
+        # image, so the pinned reaper is pulled by digest and tagged with the
+        # name it asks for. TestTestImagesArePinned holds both lines current.
+        run: |
+          docker pull postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5
+          docker pull testcontainers/ryuk:0.14.0@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0
+          docker tag testcontainers/ryuk:0.14.0@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0 testcontainers/ryuk:0.14.0
       - name: go test -tags integration
         run: |
           set -o pipefail

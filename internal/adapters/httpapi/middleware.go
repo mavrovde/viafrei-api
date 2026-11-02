@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -50,6 +51,25 @@ func withRequest(baseURL string) func(http.Handler) http.Handler {
 
 func newRequestID() string { return uuid.Must(uuid.NewV7()).String() }
 
+// securityHeaders sets the headers every answer carries (NFR-SEC-001). It
+// runs first, so a problem written by any later middleware carries them too.
+// The service answers JSON only and serves no cross-origin requests yet, so
+// the CSP and CORP values apply to every answer.
+func securityHeaders(hstsMaxAge time.Duration) func(http.Handler) http.Handler {
+	hsts := "max-age=" + strconv.FormatInt(int64(hstsMaxAge/time.Second), 10) + "; includeSubDomains"
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			h := w.Header()
+			h.Set("Strict-Transport-Security", hsts)
+			h.Set("X-Content-Type-Options", "nosniff")
+			h.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+			h.Set("Referrer-Policy", "no-referrer")
+			h.Set("Cross-Origin-Resource-Policy", "same-site")
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // limitURI answers 414 uri-too-long above server.max_uri_bytes (PROT-006).
 func limitURI(maxBytes int) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -77,23 +97,49 @@ func withDeadline(d time.Duration) func(http.Handler) http.Handler {
 }
 
 // recoverPanics turns a panic into 500 internal; the details go to the log
-// only (ERR-008).
+// only (ERR-008). A panic after the handler has started its answer cannot
+// become a problem: a second status line and body would follow the first.
+// The connection is aborted instead (http.ErrAbortHandler), so the client
+// sees a truncated answer, never a corrupted one.
 func recoverPanics(log *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			tw := &writeTracker{ResponseWriter: w}
 			defer func() { //nolint:contextcheck // false positive on a deferred recover; r.Context() is passed below
 				if v := recover(); v != nil {
 					if v == http.ErrAbortHandler { //nolint:errorlint // sentinel compared by identity, as net/http does
 						panic(v)
 					}
-					log.ErrorContext(r.Context(), "panic", "requestId", RequestIDFrom(r.Context()), "panic", v)
+					log.ErrorContext(r.Context(), "panic", "requestId", RequestIDFrom(r.Context()), "panic", v, "answerStarted", tw.started)
+					if tw.started {
+						panic(http.ErrAbortHandler)
+					}
 					writeProblem(w, newProblem(r.Context(), SlugInternal, "An unexpected fault occurred; quote the request id.", 0))
 				}
 			}()
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(tw, r)
 		})
 	}
 }
+
+// writeTracker records whether the answer has started: a status line or a
+// body byte has been handed to the writer.
+type writeTracker struct {
+	http.ResponseWriter
+	started bool
+}
+
+func (t *writeTracker) WriteHeader(code int) {
+	t.started = true
+	t.ResponseWriter.WriteHeader(code)
+}
+
+func (t *writeTracker) Write(b []byte) (int, error) {
+	t.started = true
+	return t.ResponseWriter.Write(b)
+}
+
+func (t *writeTracker) Unwrap() http.ResponseWriter { return t.ResponseWriter }
 
 type statusRecorder struct {
 	http.ResponseWriter

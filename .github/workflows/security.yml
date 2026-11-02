@@ -1,0 +1,208 @@
+# Security checks (SAST, secrets, dependencies, licences, IaC and DAST) on
+# every pull request, on main and weekly, so a new advisory against an
+# unchanged tree is still found. Nothing here reaches a live data source or
+# production (TST-010): DAST runs against the local compose stack only.
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  codeql:
+    name: CodeQL (Go)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          languages: go
+          build-mode: manual
+          queries: security-extended
+      - run: go build ./... && go vet -tags integration ./...
+      - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          category: /language:go
+
+  semgrep:
+    name: Semgrep
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: |
+          docker run --rm -v "$PWD:/src" -w /src \
+            semgrep/semgrep:1.181.0@sha256:81474464c1f07483ba0682a44787fd93c91397419762a04abe2bafaae396304b \
+            semgrep scan --config p/golang --config p/secrets --config p/dockerfile --config p/github-actions \
+            --error --metrics=off
+
+  gitleaks:
+    name: Secrets in history (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - run: |
+          docker run --rm -v "$PWD:/repo" --entrypoint sh \
+            zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
+            -c 'git config --global --add safe.directory /repo && gitleaks git /repo --redact --verbose --exit-code 1'
+
+  osv:
+    name: OSV-Scanner
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - run: go run github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.7.0 scan source --recursive .
+
+  trivy-fs:
+    name: Trivy (repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: |
+          docker run --rm -v "$PWD:/src" \
+            aquasec/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222 \
+            fs --scanners vuln,secret --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --no-progress --db-repository mirror.gcr.io/aquasec/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2 /src
+
+  snyk:
+    name: Snyk (dependencies)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: SNYK_TOKEN must be set
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          if [ -z "$SNYK_TOKEN" ]; then
+            if [ "$ACTOR" = "dependabot[bot]" ]; then
+              echo "::error::SNYK_TOKEN is not visible to this Dependabot pull request: Dependabot runs read Dependabot secrets, not Actions secrets. Add SNYK_TOKEN under Settings > Secrets and variables > Dependabot (docs/RELEASING.md)."
+            else
+              echo "::error::the repository secret SNYK_TOKEN is not set (a pull request from a fork never sees it); Snyk cannot test this run"
+            fi
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: Snyk CLI 1.1308.1, checksum verified
+        run: |
+          curl -fsSL --proto '=https' --tlsv1.2 --max-time 60 -o snyk https://static.snyk.io/cli/v1.1308.1/snyk-linux
+          echo "a8b2e420af6d8e61bf1d367c064475ccf699d767fc8763efb0072b9cac250f9a  snyk" | sha256sum -c -
+          chmod +x snyk
+      - env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: ./snyk test --severity-threshold=high
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, Unicode-3.0, Zlib, CC0-1.0, 0BSD
+          comment-summary-in-pr: on-failure
+
+  licenses:
+    name: Dependency licences
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: Every licence is on the allow-list (SSC-003)
+        env:
+          ALLOWED: MIT,Apache-2.0,BSD-2-Clause,BSD-3-Clause,ISC,MPL-2.0,Unicode-3.0,Zlib,CC0-1.0,0BSD
+        run: |
+          go run github.com/google/go-licenses/v2@v2.0.1 check ./... \
+            --allowed_licenses="$ALLOWED" --ignore github.com/mavrovde/viafrei-api
+      - name: Licence report
+        run: |
+          go run github.com/google/go-licenses/v2@v2.0.1 report ./... --ignore github.com/mavrovde/viafrei-api 2>/dev/null > licenses.csv
+          test -s licenses.csv
+          cut -d, -f3 licenses.csv | sort | uniq -c
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: licenses
+          path: licenses.csv
+          retention-days: 30
+
+  checkov:
+    name: Checkov (Dockerfile, workflows)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: |
+          docker run --rm -v "$PWD:/src" -w /src \
+            bridgecrew/checkov:3.3.29@sha256:3cc125b5337717b7303dbddd4e79374c120687b5ff6a24f9abdad56b562469f3 \
+            -d . --framework dockerfile github_actions secrets --quiet --compact
+
+  zap:
+    name: DAST (OWASP ZAP against the compose stack)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: scripts/zap-scan.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: zap-report
+          path: zap-report/
+          retention-days: 30

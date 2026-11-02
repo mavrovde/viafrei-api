@@ -20,6 +20,7 @@ const FileEnv = EnvPrefix + "CONFIG_FILE"
 // Config is the complete configuration of the service.
 type Config struct {
 	Server    Server    `koanf:"server"`
+	HTTP      HTTP      `koanf:"http"`
 	DB        DB        `koanf:"db"`
 	Deadline  Deadline  `koanf:"deadline"`
 	Contract  Contract  `koanf:"contract"`
@@ -40,6 +41,11 @@ type Server struct {
 	MaxHeaderBytes    int           `koanf:"max_header_bytes" default:"16384" validate:"min=4096,max=1048576" desc:"Largest accepted request header block, in bytes (431 above)."`
 	MaxURIBytes       int           `koanf:"max_uri_bytes" default:"8192" validate:"min=2048,max=65536" desc:"Longest accepted request URI, in bytes (414 above)."`
 	ShutdownGrace     time.Duration `koanf:"shutdown_grace" default:"10s" validate:"min=1s,max=60s" desc:"Time in-flight requests get to finish on shutdown."`
+}
+
+// HTTP holds the response-header settings (NFR-SEC-001).
+type HTTP struct {
+	HSTSMaxAge time.Duration `koanf:"hsts_max_age" default:"8760h" validate:"min=0s,max=17520h" desc:"max-age of Strict-Transport-Security on every answer, sent in whole seconds; 0s sends max-age=0, which tells browsers to forget the policy."`
 }
 
 // DB holds the storage settings of the read-only role.

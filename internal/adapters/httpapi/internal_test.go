@@ -48,6 +48,44 @@ func TestAbortHandlerPanicPassesThrough(t *testing.T) {
 	t.Fatal("the abort panic was swallowed")
 }
 
+// TestPanicAfterWriteDoesNotWriteAgain: once the handler has started its
+// answer, a panic aborts the connection instead of appending a problem.
+func TestPanicAfterWriteDoesNotWriteAgain(t *testing.T) {
+	req.Covers(t, "ERR-001")
+	for name, body := range map[string]string{"after WriteHeader": "", "after Write": `{"data":`} {
+		t.Run(name, func(t *testing.T) {
+			var logs bytes.Buffer
+			h := recoverPanics(slog.New(slog.NewJSONHandler(&logs, nil)))(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(body))
+				panic("late fault")
+			}))
+			w := httptest.NewRecorder()
+			func() {
+				defer func() {
+					if v := recover(); v != http.ErrAbortHandler { //nolint:errorlint // identity, as net/http compares it
+						t.Fatalf("recovered %v, want http.ErrAbortHandler", v)
+					}
+				}()
+				h.ServeHTTP(w, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/x", nil))
+			}()
+			if w.Code != http.StatusOK || w.Body.String() != body {
+				t.Fatalf("a second answer was written: status %d, body %q", w.Code, w.Body)
+			}
+			if !strings.Contains(logs.String(), "late fault") || !strings.Contains(logs.String(), `"answerStarted":true`) {
+				t.Fatalf("the late panic is not in the log: %s", logs.String())
+			}
+		})
+	}
+}
+
+func TestWriteTrackerUnwraps(t *testing.T) {
+	w := httptest.NewRecorder()
+	if (&writeTracker{ResponseWriter: w}).Unwrap() != w {
+		t.Fatal("Unwrap does not return the wrapped writer")
+	}
+}
+
 func TestStatusRecorderUnwraps(t *testing.T) {
 	w := httptest.NewRecorder()
 	if (&statusRecorder{ResponseWriter: w}).Unwrap() != w {

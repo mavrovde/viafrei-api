@@ -63,13 +63,26 @@ func workflowFindings(name string, src []byte) []string {
 	return out
 }
 
-// permissionFindings: the top level must set permissions, and never a write-all.
+// permissionFindings: the top level must set permissions and grant no write,
+// neither write-all nor a single scope such as contents: write. A job that
+// writes names that scope in its own block.
 func permissionFindings(name string, perms any) []string {
-	if perms == nil {
+	switch p := perms.(type) {
+	case nil:
 		return []string{name + ": no top-level permissions block"}
-	}
-	if s, ok := perms.(string); ok && strings.Contains(s, "write") {
-		return []string{name + ": top-level permissions grant " + s}
+	case string:
+		if strings.Contains(p, "write") {
+			return []string{name + ": top-level permissions grant " + p}
+		}
+	case map[string]any:
+		var out []string
+		for scope, level := range p {
+			if fmt.Sprint(level) == "write" {
+				out = append(out, name+": top-level permissions grant "+scope+": write")
+			}
+		}
+		sort.Strings(out)
+		return out
 	}
 	return nil
 }
@@ -117,6 +130,8 @@ func TestWorkflowRulesCanSayNo(t *testing.T) {
 		"not pinned to a commit SHA: actions/checkout@v7": sha.ReplaceAllString(string(good), "${1}@v7"),
 		"no top-level permissions block":                  strings.Replace(string(good), "permissions:\n  contents: read\n", "", 1),
 		"top-level permissions grant write-all":           strings.Replace(string(good), "permissions:\n  contents: read\n", "permissions: write-all\n", 1),
+		"top-level permissions grant contents: write":     strings.Replace(string(good), "permissions:\n  contents: read\n", "permissions:\n  contents: write\n", 1),
+		"top-level permissions grant packages: write":     strings.Replace(string(good), "permissions:\n  contents: read\n", "permissions:\n  contents: read\n  packages: write\n", 1),
 		"job lint has no timeout-minutes":                 strings.Replace(string(good), "    name: Lint\n    runs-on: ubuntu-24.04\n    timeout-minutes: 10\n", "    name: Lint\n    runs-on: ubuntu-24.04\n", 1),
 	} {
 		if bad == string(good) {
@@ -198,5 +213,49 @@ func TestWorkflowsUseTheGoModToolchain(t *testing.T) {
 	bad := strings.Replace(string(readWorkflows(t)["ci.yml"]), `go-version: "`+toolchain+`"`, "go-version-file: go.mod", 1)
 	if len(setupGoFindings("ci.yml", []byte(bad), toolchain)) == 0 {
 		t.Error("a planted go-version-file step was not reported")
+	}
+}
+
+// securityJobs are the checks of the Secure SDLC page, one job each (SSC-003, SSC-014).
+var securityJobs = []string{"codeql", "semgrep", "gitleaks", "osv", "trivy-fs", "snyk", "dependency-review", "licenses", "checkov", "zap"}
+
+func securityFindings(src []byte, zap string) []string {
+	var w workflowFile
+	if err := yaml.Unmarshal(src, &w); err != nil {
+		return []string{"security.yml does not parse"}
+	}
+	var out []string
+	for _, id := range securityJobs {
+		if _, ok := w.Jobs[id]; !ok {
+			out = append(out, "security.yml has no job "+id)
+		}
+	}
+	// DAST may only ever scan the compose container (TST-010).
+	if !strings.Contains(zap, "-t http://api:8080/v1/openapi.json") || !strings.Contains(zap, "-O http://api:8080") {
+		out = append(out, "zap-scan.sh does not pin its target to the compose API container")
+	}
+	return out
+}
+
+func TestSecurityWorkflowRunsEveryCheck(t *testing.T) {
+	req.Covers(t, "SSC-003", "SSC-012", "SSC-014", "TST-010")
+	wf := readWorkflows(t)
+	zap, err := os.ReadFile(filepath.Join(root, "scripts", "zap-scan.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wf["scorecard.yml"] == nil {
+		t.Error("no scorecard.yml")
+	}
+	for _, f := range securityFindings(wf["security.yml"], string(zap)) {
+		t.Error(f)
+	}
+	for want, bad := range map[string][2]string{
+		"no job gitleaks":         {strings.Replace(string(wf["security.yml"]), "\n  gitleaks:\n", "\n  leaks:\n", 1), string(zap)},
+		"does not pin its target": {string(wf["security.yml"]), strings.Replace(string(zap), "-O http://api:8080", "", 1)},
+	} {
+		if got := strings.Join(securityFindings([]byte(bad[0]), bad[1]), "; "); !strings.Contains(got, want) {
+			t.Errorf("planted %q, the rules said %q", want, got)
+		}
 	}
 }

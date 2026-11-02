@@ -93,6 +93,9 @@ func behaviours() map[string]behaviour {
 			d, _ := ctx.Deadline()
 			return time.Until(d).Round(time.Second).String()
 		}},
+		"http.hsts_max_age": {"1h", func(t *testing.T, c *config.Config) string {
+			return get(t, c, "/v1/meta").Header().Get("Strict-Transport-Security")
+		}},
 		"db.url":               {"postgres://reader:pw@other.invalid:6001/x", poolConfig},
 		"db.pool_max":          {"9", poolConfig},
 		"db.pool_min":          {"0", poolConfig},

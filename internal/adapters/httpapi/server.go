@@ -154,6 +154,7 @@ func build(d Deps) (http.Handler, []byte, error) {
 	// line carry the request id, the instance and the absolute type, and
 	// inside accessLog, so the 500 it writes is logged like any answer.
 	router.Use(
+		securityHeaders(d.Config.HTTP.HSTSMaxAge),
 		withRequest(base),
 		accessLog(s.log, s.now),
 		recoverPanics(s.log),

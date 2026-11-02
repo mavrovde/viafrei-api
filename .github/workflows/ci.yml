@@ -38,6 +38,8 @@ jobs:
           args: --build-tags integration --timeout 5m
       - name: actionlint (workflows, with shellcheck)
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+      - name: shellcheck (scripts)
+        run: shellcheck --version && shellcheck scripts/*.sh deploy/compose/*.sh
 
   test:
     name: Unit and handler tests

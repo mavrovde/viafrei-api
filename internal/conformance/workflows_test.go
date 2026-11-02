@@ -200,3 +200,47 @@ func TestWorkflowsUseTheGoModToolchain(t *testing.T) {
 		t.Error("a planted go-version-file step was not reported")
 	}
 }
+
+// securityJobs are the checks of the Secure SDLC page, one job each (SSC-003, SSC-014).
+var securityJobs = []string{"codeql", "semgrep", "gitleaks", "osv", "trivy-fs", "snyk", "dependency-review", "licenses", "checkov", "zap"}
+
+func securityFindings(src []byte, zap string) []string {
+	var w workflowFile
+	if err := yaml.Unmarshal(src, &w); err != nil {
+		return []string{"security.yml does not parse"}
+	}
+	var out []string
+	for _, id := range securityJobs {
+		if _, ok := w.Jobs[id]; !ok {
+			out = append(out, "security.yml has no job "+id)
+		}
+	}
+	// DAST may only ever scan the compose container (TST-010).
+	if !strings.Contains(zap, "-t http://api:8080/v1/openapi.json") || !strings.Contains(zap, "-O http://api:8080") {
+		out = append(out, "zap-scan.sh does not pin its target to the compose API container")
+	}
+	return out
+}
+
+func TestSecurityWorkflowRunsEveryCheck(t *testing.T) {
+	req.Covers(t, "SSC-003", "SSC-012", "SSC-014", "TST-010")
+	wf := readWorkflows(t)
+	zap, err := os.ReadFile(filepath.Join(root, "scripts", "zap-scan.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wf["scorecard.yml"] == nil {
+		t.Error("no scorecard.yml")
+	}
+	for _, f := range securityFindings(wf["security.yml"], string(zap)) {
+		t.Error(f)
+	}
+	for want, bad := range map[string][2]string{
+		"no job gitleaks":         {strings.Replace(string(wf["security.yml"]), "\n  gitleaks:\n", "\n  leaks:\n", 1), string(zap)},
+		"does not pin its target": {string(wf["security.yml"]), strings.Replace(string(zap), "-O http://api:8080", "", 1)},
+	} {
+		if got := strings.Join(securityFindings([]byte(bad[0]), bad[1]), "; "); !strings.Contains(got, want) {
+			t.Errorf("planted %q, the rules said %q", want, got)
+		}
+	}
+}

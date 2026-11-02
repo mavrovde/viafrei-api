@@ -3,7 +3,7 @@ package fixtures
 import (
 	"fmt"
 	"math"
-	"math/rand/v2"
+	"math/rand/v2" // nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used -- fixtures must be reproducible from a seed; nothing here is a secret
 	"strings"
 	"unicode"
 	"unicode/utf8"

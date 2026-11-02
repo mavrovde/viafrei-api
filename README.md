@@ -80,7 +80,7 @@ ViaFrei API has a **service skeleton** in Go. Nothing is deployed yet, and no da
 | Configuration layer | ✅ Every tunable is a documented key with bounds — [docs/configuration.md](docs/configuration.md) |
 | Service skeleton: `/healthz`, `/readyz`, `/v1/meta`, `/v1/openapi.json` | 🔄 In review (milestone 0.2.0) |
 | Container image (distroless, multi-arch) and local Compose stack | 🔄 In review — [docs/container.md](docs/container.md) |
-| CI, security checks and release pipeline | 🔄 In review — CI on every pull request; release-please, signed images and release pages ([docs/RELEASING.md](docs/RELEASING.md)) |
+| CI, security checks and release pipeline | 🔄 In review — CI on every pull request; SAST, secrets, dependency, licence and DAST checks ([docs/security-checks.md](docs/security-checks.md)); release-please, signed images and release pages ([docs/RELEASING.md](docs/RELEASING.md)) |
 | Keys, rate limits and priority tiers | ⏳ Planned |
 | v1 feature endpoints | ⏳ Planned |
 
@@ -160,7 +160,7 @@ Releases are cut by [release-please](https://github.com/googleapis/release-pleas
 
 ## Security
 
-Please do not report security issues in public issues. Use GitHub's [private vulnerability reporting](https://github.com/mavrovde/viafrei-api/security/advisories/new). See [SECURITY.md](SECURITY.md).
+Please do not report security issues in public issues. Use GitHub's [private vulnerability reporting](https://github.com/mavrovde/viafrei-api/security/advisories/new). See [SECURITY.md](SECURITY.md) for response times; the automated checks are listed in [docs/security-checks.md](docs/security-checks.md).
 
 ## Contributing
 

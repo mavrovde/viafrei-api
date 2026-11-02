@@ -8,6 +8,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
+	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
 func TestEmbeddedContract(t *testing.T) {
@@ -26,6 +27,7 @@ func TestEmbeddedContract(t *testing.T) {
 // largest pool the configuration accepts together: a pool at db.pool_max must
 // never be refused a connection by the role (NFR-SEC-004, CFG-004).
 func TestRoleLimitCoversPoolMax(t *testing.T) {
+	req.Covers(t, "NFR-SEC-004", "CFG-004")
 	m := regexp.MustCompile(`connection limit ([0-9]+)`).FindStringSubmatch(contract.ReaderRoleSQL())
 	if m == nil {
 		t.Fatal("ReaderRoleSQL() sets no connection limit")

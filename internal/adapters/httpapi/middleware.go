@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -49,6 +50,25 @@ func withRequest(baseURL string) func(http.Handler) http.Handler {
 }
 
 func newRequestID() string { return uuid.Must(uuid.NewV7()).String() }
+
+// securityHeaders sets the headers every answer carries (NFR-SEC-001). It
+// runs first, so a problem written by any later middleware carries them too.
+// The service answers JSON only and serves no cross-origin requests yet, so
+// the CSP and CORP values apply to every answer.
+func securityHeaders(hstsMaxAge time.Duration) func(http.Handler) http.Handler {
+	hsts := "max-age=" + strconv.FormatInt(int64(hstsMaxAge/time.Second), 10) + "; includeSubDomains"
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			h := w.Header()
+			h.Set("Strict-Transport-Security", hsts)
+			h.Set("X-Content-Type-Options", "nosniff")
+			h.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+			h.Set("Referrer-Policy", "no-referrer")
+			h.Set("Cross-Origin-Resource-Policy", "same-site")
+			next.ServeHTTP(w, r)
+		})
+	}
+}
 
 // limitURI answers 414 uri-too-long above server.max_uri_bytes (PROT-006).
 func limitURI(maxBytes int) func(http.Handler) http.Handler {

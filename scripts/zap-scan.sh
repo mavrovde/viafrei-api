@@ -20,7 +20,7 @@ if [[ ! -f .env ]]; then
   export API_READER_PASSWORD="${API_READER_PASSWORD:-$(openssl rand -hex 16)}"
 fi
 
-# shellcheck disable=SC2329 # run by the EXIT trap
+# shellcheck disable=SC2317,SC2329 # run by the EXIT trap (SC2317 before shellcheck 0.10, SC2329 after)
 teardown() {
   local code=$?
   if [[ $code -ne 0 ]]; then docker compose logs --no-color --tail 80 || true; fi

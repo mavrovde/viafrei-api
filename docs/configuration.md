@@ -17,6 +17,7 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `server.max_header_bytes` | `VFAPI_SERVER_MAX_HEADER_BYTES` | int | `16384` | 4096 to 1048576 | Largest accepted request header block, in bytes (431 above). |
 | `server.max_uri_bytes` | `VFAPI_SERVER_MAX_URI_BYTES` | int | `8192` | 2048 to 65536 | Longest accepted request URI, in bytes (414 above). |
 | `server.shutdown_grace` | `VFAPI_SERVER_SHUTDOWN_GRACE` | duration | `10s` | 1s to 60s | Time in-flight requests get to finish on shutdown. |
+| `http.hsts_max_age` | `VFAPI_HTTP_HSTS_MAX_AGE` | duration | `8760h` | 0s to 17520h | max-age of Strict-Transport-Security on every answer, sent in whole seconds; 0s sends max-age=0, which tells browsers to forget the policy. |
 | `db.url` | `VFAPI_DB_URL` or `VFAPI_DB_URL_FILE` | secret | secret, no default | — | Connection URL of the service's read-only role. Required to serve. Secret: environment or *_FILE only. |
 | `db.pool_max` | `VFAPI_DB_POOL_MAX` | int | `4` | 1 to 16 | Largest number of pooled connections. |
 | `db.pool_min` | `VFAPI_DB_POOL_MIN` | int | `1` | 0 to 16 | Connections kept open when idle. At most pool_max. |

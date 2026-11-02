@@ -151,6 +151,7 @@ func build(d Deps) (http.Handler, []byte, error) {
 	base := strings.TrimRight(d.Config.Server.PublicBaseURL, "/")
 	router := chi.NewRouter()
 	router.Use(
+		securityHeaders(d.Config.HTTP.HSTSMaxAge),
 		recoverPanics(s.log),
 		withRequest(base),
 		accessLog(s.log, s.now),

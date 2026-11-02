@@ -278,3 +278,27 @@ func TestDocsSwitch(t *testing.T) {
 	w := do(t, newHandler(t, cfg, nil), http.MethodGet, "/v1/openapi.json", nil)
 	assertProblem(t, w, http.StatusNotFound, "not-found")
 }
+
+// TestEveryAnswerCarriesSecurityHeaders holds NFR-SEC-001 on a success, on a
+// problem written by the router, on one written by a middleware before the
+// router and on the OpenAPI document.
+func TestEveryAnswerCarriesSecurityHeaders(t *testing.T) {
+	req.Covers(t, "NFR-SEC-001")
+	cfg := config.Defaults()
+	h := newHandler(t, cfg, &fakeReadiness{})
+	want := map[string]string{
+		"Strict-Transport-Security":    "max-age=31536000; includeSubDomains",
+		"X-Content-Type-Options":       "nosniff",
+		"Content-Security-Policy":      "default-src 'none'; frame-ancestors 'none'",
+		"Referrer-Policy":              "no-referrer",
+		"Cross-Origin-Resource-Policy": "same-site",
+	}
+	for _, target := range []string{"/v1/meta", "/healthz", "/v1/openapi.json", "/nowhere", "/v1/meta?pad=" + strings.Repeat("a", cfg.Server.MaxURIBytes)} {
+		w := do(t, h, http.MethodGet, target, nil)
+		for name, value := range want {
+			if got := w.Header().Get(name); got != value {
+				t.Errorf("GET %.40s (%d): %s = %q, want %q", target, w.Code, name, got, value)
+			}
+		}
+	}
+}

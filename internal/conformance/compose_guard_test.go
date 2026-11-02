@@ -1,3 +1,9 @@
+//go:build !integration
+
+// The compose guard needs no database, so it runs in the unit build only;
+// in the integration build it shared the runner with every container test
+// and its cases crossed the 2 s bound (TST-012).
+
 package conformance_test
 
 import (
@@ -95,8 +101,9 @@ func TestComposeGuardRefusesNonLoopback(t *testing.T) {
 		"space before = in .env":       {nil, "API_PUBLISH =0.0.0.0:9996\n", 2},
 		"spaces around the name":       {nil, "  API_PUBLISH  =0.0.0.0:9997\n", 2},
 	} {
+		// Sequential on purpose: each case starts a real docker compose, and
+		// seventeen at once on a CI runner took 3 s each (TST-012).
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
 			if got := runComposeGuard(t, path, c.env, c.envFile); got != c.want {
 				t.Errorf("exit %d, want %d", got, c.want)
 			}

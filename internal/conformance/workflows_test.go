@@ -63,13 +63,26 @@ func workflowFindings(name string, src []byte) []string {
 	return out
 }
 
-// permissionFindings: the top level must set permissions, and never a write-all.
+// permissionFindings: the top level must set permissions and grant no write,
+// neither write-all nor a single scope such as contents: write. A job that
+// writes names that scope in its own block.
 func permissionFindings(name string, perms any) []string {
-	if perms == nil {
+	switch p := perms.(type) {
+	case nil:
 		return []string{name + ": no top-level permissions block"}
-	}
-	if s, ok := perms.(string); ok && strings.Contains(s, "write") {
-		return []string{name + ": top-level permissions grant " + s}
+	case string:
+		if strings.Contains(p, "write") {
+			return []string{name + ": top-level permissions grant " + p}
+		}
+	case map[string]any:
+		var out []string
+		for scope, level := range p {
+			if fmt.Sprint(level) == "write" {
+				out = append(out, name+": top-level permissions grant "+scope+": write")
+			}
+		}
+		sort.Strings(out)
+		return out
 	}
 	return nil
 }
@@ -117,6 +130,8 @@ func TestWorkflowRulesCanSayNo(t *testing.T) {
 		"not pinned to a commit SHA: actions/checkout@v7": sha.ReplaceAllString(string(good), "${1}@v7"),
 		"no top-level permissions block":                  strings.Replace(string(good), "permissions:\n  contents: read\n", "", 1),
 		"top-level permissions grant write-all":           strings.Replace(string(good), "permissions:\n  contents: read\n", "permissions: write-all\n", 1),
+		"top-level permissions grant contents: write":     strings.Replace(string(good), "permissions:\n  contents: read\n", "permissions:\n  contents: write\n", 1),
+		"top-level permissions grant packages: write":     strings.Replace(string(good), "permissions:\n  contents: read\n", "permissions:\n  contents: read\n  packages: write\n", 1),
 		"job lint has no timeout-minutes":                 strings.Replace(string(good), "    name: Lint\n    runs-on: ubuntu-24.04\n    timeout-minutes: 10\n", "    name: Lint\n    runs-on: ubuntu-24.04\n", 1),
 	} {
 		if bad == string(good) {

@@ -30,4 +30,10 @@ updates:
       day: monday
     commit-message:
       prefix: deps
+    # The database image follows the platform's production database, which
+    # runs PostgreSQL 16 / PostGIS 3.4; a major bump would test against a
+    # server production does not run. Move it when the platform moves.
+    ignore:
+      - dependency-name: postgis/postgis
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 3

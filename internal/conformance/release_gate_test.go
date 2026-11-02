@@ -94,6 +94,7 @@ func releaseGateFindings(files map[string][]byte, gateScript string) []string {
 		parsed[name] = w
 	}
 	out := gateScriptFindings(parsed["ci.yml"], gateScript)
+	out = append(out, ciPushFindings(parsed["ci.yml"])...)
 	out = append(out, gateOrderFindings(parsed)...)
 	out = append(out, gateGrantFindings(parsed)...)
 	for _, name := range []string{"image.yml", "release-please.yml"} {
@@ -122,6 +123,24 @@ func gateScriptFindings(ci gatedWorkflow, gateScript string) []string {
 	for _, m := range required {
 		if !jobNames[m[1]] {
 			out = append(out, "ci-gate.sh requires "+m[1]+", which is no job name in ci.yml")
+		}
+	}
+	return out
+}
+
+// ciPushFindings: ci.yml runs on pushes to named branches and never on a
+// pushed tag. cigate trusts a push run whose head_branch is main or starts
+// with hotfix/, and a tag push reports the tag's name there, so a tag named
+// hotfix/x must never start a CI run.
+func ciPushFindings(ci gatedWorkflow) []string {
+	push, ok := ci.On["push"].(map[string]any)
+	if !ok || push["branches"] == nil {
+		return []string{"ci.yml's push trigger does not name its branches, so a pushed tag runs CI"}
+	}
+	var out []string
+	for _, k := range []string{"tags", "tags-ignore"} {
+		if _, has := push[k]; has {
+			out = append(out, "ci.yml's push trigger carries "+k+", so a tag named hotfix/x could pass as a hotfix branch run")
 		}
 	}
 	return out
@@ -239,6 +258,7 @@ func TestReleaseGateIsWired(t *testing.T) {
 	// already published.
 	late := plant("image.yml", gateStep, "        run: echo skipped\n")
 	late["image.yml"] = []byte(strings.Replace(string(late["image.yml"]), "        run: cosign sign --yes \"${IMAGE}@${DIGEST}\"\n", "        run: scripts/ci-gate.sh \"$SHA\" && cosign sign --yes \"${IMAGE}@${DIGEST}\"\n", 1))
+	const pushBranches = "    branches: [main, \"hotfix/**\"]\n"
 	checkout := "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n        with:\n          persist-credentials: false\n"
 	s := string(script)
 	for want, c := range map[string]struct {
@@ -272,6 +292,10 @@ func TestReleaseGateIsWired(t *testing.T) {
 		"does not use RELEASE_PLEASE_TOKEN":                                                           {plant("release-please.yml", tokenFallback, "secrets.GITHUB_TOKEN"), s},
 		"which is no job name in ci.yml":                                                              {files, strings.Replace(s, `"Coverage gate (100 % per package)"`, `"Coverage"`, 1)},
 		"requires fewer than three checks":                                                            {files, strings.Replace(s, `-require "Unit and handler tests"`, "", 1)},
+		"push trigger carries tags,":                                                                  {plant("ci.yml", pushBranches, pushBranches+"    tags: [\"hotfix/**\"]\n"), s},
+		"push trigger carries tags-ignore":                                                            {plant("ci.yml", pushBranches, pushBranches+"    tags-ignore: [\"v*\"]\n"), s},
+		"push trigger does not name its branches (bare)":                                              {plant("ci.yml", pushBranches, ""), s},
+		"push trigger does not name its branches (ignore list)":                                       {plant("ci.yml", pushBranches, "    branches-ignore: [docs]\n"), s},
 		"ci.yml does not parse":                                                                       {plant("ci.yml", "jobs:\n", "jobs: [\n"), s},
 	} {
 		w := strings.Split(want, " (")[0]

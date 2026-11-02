@@ -42,7 +42,7 @@ func publishFlags(src string) [][]string {
 }
 
 func TestScriptsPublishOnLoopbackOnly(t *testing.T) {
-	req.Covers(t, "SSC-017")
+	req.Covers(t, "SSC-019")
 	files, err := filepath.Glob(filepath.Join(root, "scripts", "*.sh"))
 	if err != nil || len(files) == 0 {
 		t.Fatalf("no scripts read (%v)", err)

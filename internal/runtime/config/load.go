@@ -110,6 +110,10 @@ func Load(opts Options) (*Config, error) {
 		}
 		if base, isFile := strings.CutSuffix(name, "_FILE"); isFile {
 			if f, ok := byEnv[base]; ok && f.Secret {
+				if _, both := env[base]; both {
+					errs = append(errs, fmt.Sprintf("%s: set by both %s and %s; set one of them", f.Key, base, name))
+					continue
+				}
 				b, err := os.ReadFile(value) // #nosec G304 -- the operator names the secret file
 				if err != nil {
 					errs = append(errs, fmt.Sprintf("%s: cannot read the secret file named by %s", f.Key, name))

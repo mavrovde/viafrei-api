@@ -31,6 +31,8 @@ teardown() {
   docker compose down --volumes --remove-orphans >/dev/null 2>&1 || true
   exit "$code"
 }
+scripts/compose-guard.sh
+
 trap teardown EXIT
 
 docker compose up --detach --build --wait --wait-timeout 300

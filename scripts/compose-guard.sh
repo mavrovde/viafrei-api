@@ -5,6 +5,7 @@
 # must name [::1] or an IPv4 loopback address (127.x.y.z) followed by a port. Anything
 # else is refused before compose is started.
 #
+# A line of the env file may start with "export ", as Compose accepts.
 # The env file is .env in the repository root unless API_ENV_FILE names
 # another one (the tests do).
 set -euo pipefail
@@ -18,7 +19,7 @@ if [[ -n "${API_PUBLISH+x}" ]]; then
   value="$API_PUBLISH"
   source="environment"
 elif [[ -f $env_file ]]; then
-  line=$(grep -E '^[[:space:]]*API_PUBLISH=' "$env_file" | tail -n 1 || true)
+  line=$(grep -E '^[[:space:]]*(export[[:space:]]+)?API_PUBLISH=' "$env_file" | tail -n 1 || true)
   if [[ -n $line ]]; then
     value="${line#*=}"
     value="${value%%#*}"

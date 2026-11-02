@@ -59,6 +59,8 @@ func TestComposeGuardRefusesNonLoopback(t *testing.T) {
 		"a routable address":           {[]string{"API_PUBLISH=192.0.2.10:8080"}, "", 2},
 		"loopback without a port":      {[]string{"API_PUBLISH=127.0.0.1"}, "", 2},
 		"non-loopback in .env":         {nil, "API_PUBLISH=0.0.0.0:8080\n", 2},
+		"loopback in .env, exported":   {nil, "export API_PUBLISH=[::1]:8080\n", 0},
+		"non-loopback in .env, export": {nil, "export API_PUBLISH=0.0.0.0:8080\n", 2},
 		"the environment wins over it": {[]string{"API_PUBLISH=0.0.0.0:8080"}, "API_PUBLISH=[::1]:8080\n", 2},
 	} {
 		if got := runComposeGuard(t, c.env, c.envFile); got != c.want {

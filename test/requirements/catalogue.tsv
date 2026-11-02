@@ -436,6 +436,7 @@ SSC-015	-	Ops	Acceptance	Spec-Secure-SDLC-and-Supply-Chain
 SSC-016	MUST	Docs	System	Spec-Secure-SDLC-and-Supply-Chain
 SSC-017	MAY	Security	Non-functional system	Spec-Secure-SDLC-and-Supply-Chain
 SSC-018	MUST	Review	Static	Spec-Secure-SDLC-and-Supply-Chain
+SSC-019	MUST	Lint	Static	Spec-Secure-SDLC-and-Supply-Chain
 TEST-001	MUST	Lint	Static	Spec-Conformance-and-Acceptance
 TEST-002	MUST	Lint	Static	Spec-Conformance-and-Acceptance
 TEST-003	MUST	Contract	Contract	Spec-Conformance-and-Acceptance

@@ -53,10 +53,12 @@ func TestTestImagesArePinned(t *testing.T) {
 	req.Covers(t, "SSC-005")
 	dockerfile := readText(t, "Dockerfile")
 	ci := readText(t, ".github", "workflows", "ci.yml")
-	for _, f := range testImageFindings(pgtest.Image, testcontainers.ReaperDefaultImage, dockerfile, ci) {
+	// The deprecated alias is the only exported name of the image the
+	// reaper is started from; it equals the internal value it was replaced by.
+	reaper := testcontainers.ReaperDefaultImage //nolint:staticcheck // see above
+	for _, f := range testImageFindings(pgtest.Image, reaper, dockerfile, ci) {
 		t.Error(f)
 	}
-	reaper := testcontainers.ReaperDefaultImage
 	unpinned := strings.SplitN(pgtest.Image, "@", 2)[0]
 	pull := "docker pull " + pgtest.Image + "\n"
 	// Each plant must produce the finding named for it, not just any finding.

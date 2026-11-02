@@ -6,7 +6,9 @@
 #   published and close the milestone when nothing in it is open.
 # Started by release-please.yml (workflow_call) after a release pull request
 # is merged, by a maintainer pushing an rc tag, or by hand for a tag that
-# exists. Tags are never moved or deleted here. See docs/RELEASING.md.
+# exists. Tags are never moved or deleted here, and a tag whose release is
+# published, or whose :X.Y.Z image exists, is refused before anything is
+# built. See docs/RELEASING.md.
 name: Release
 
 on:
@@ -21,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing annotated tag to (re)publish, vX.Y.Z or vX.Y.Z-rc.N
+        description: Existing annotated tag to publish, vX.Y.Z or vX.Y.Z-rc.N (a published one is refused)
         required: true
         type: string
 
@@ -151,6 +153,26 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Not released yet (a re-run never rebuilds or re-tags a release)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          # A published release page and the :X.Y.Z image are final: a re-run
+          # would build a new digest, move :X.Y.Z and sha- onto it and append
+          # the page's body a second time. Refused instead (docs/RELEASING.md).
+          # A draft page is not published; the tags endpoint answers 404 for it.
+          if out=$(gh api "repos/$GH_REPO/releases/tags/$TAG" --jq .html_url 2>&1); then
+            echo "::error::$TAG is already published ($out); a published release is never rebuilt or re-tagged"; exit 1
+          elif [[ $out != *"HTTP 404"* ]]; then
+            echo "::error::cannot tell whether $TAG is published: $out"; exit 1
+          fi
+          if out=$(docker buildx imagetools inspect "$IMAGE:$VERSION" 2>&1); then
+            echo "::error::$IMAGE:$VERSION already exists; a release image is never rebuilt or moved"; exit 1
+          elif [[ $out != *"not found"* ]]; then
+            echo "::error::cannot tell whether $IMAGE:$VERSION exists: $out"; exit 1
+          fi
       - id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -232,6 +254,9 @@ jobs:
             gh release create "$TAG" --verify-tag --draft --title "$TAG" --generate-notes ${PREV:+--notes-start-tag "$PREV"}
           fi
           gh release view "$TAG" --json body --jq .body > /tmp/notes.md
+          if grep -q '^## Container image$' /tmp/notes.md; then
+            echo "::error::the notes of $TAG already carry the image section; they are never appended twice"; exit 1
+          fi
           {
             echo
             if [[ $BREAKING == 1 ]]; then

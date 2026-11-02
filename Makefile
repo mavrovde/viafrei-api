@@ -8,7 +8,7 @@ LDFLAGS   := -s -w \
 	-X github.com/mavrovde/viafrei-api/internal/buildinfo.version=$(VERSION) \
 	-X github.com/mavrovde/viafrei-api/internal/buildinfo.commit=$(COMMIT)
 
-.PHONY: build test test-integration coverage lint generate check-generated fixtures run clean \
+.PHONY: build test test-integration coverage lint generate check-generated fixtures catalogue report run clean \
 	image image-multiarch up down logs reset compose-test
 
 build: ## Build the binary into bin/
@@ -44,6 +44,16 @@ SEED    ?= 1
 
 fixtures: ## Write a synthetic fixture set: make fixtures PROFILE=ci SEED=7 (into testdata/fixtures/PROFILE)
 	$(GO) run ./cmd/fixturegen -profile $(PROFILE) -seed $(SEED) -out testdata/fixtures/$(PROFILE)
+
+WIKI ?= ../viafrei-api.wiki
+
+catalogue: ## Regenerate test/requirements/catalogue.tsv from a wiki checkout: make catalogue WIKI=path
+	$(GO) run ./cmd/reqreport catalogue -wiki $(WIKI) > test/requirements/catalogue.tsv.new
+	mv test/requirements/catalogue.tsv.new test/requirements/catalogue.tsv
+
+report: ## Requirement report over local unit results: make report (writes requirement-report.md)
+	$(GO) test -count=1 -json ./... > test-unit.json
+	$(GO) run ./cmd/reqreport check -scope $$(find test/requirements/scope -name '*.txt' | sort -V | tail -n 1) -results unit=test-unit.json -report requirement-report.md
 
 run: build ## Run against VFAPI_DB_URL from the environment
 	$(BIN) serve

@@ -26,8 +26,9 @@ and merge release pull requests.
 3. A maintainer reviews and merges the release pull request (checklist below).
 4. release-please writes a **draft** release, which creates no tag. The `tag`
    job runs `scripts/ci-gate.sh` on the release commit: the check runs
-   `Unit and handler tests`, `Integration tests (PostGIS)` and
-   `Coverage gate (100 % per package)` must all have **completed with
+   `Unit and handler tests`, `Integration tests (PostGIS)`,
+   `Coverage gate (100 % per package)`, `Image (build, lint, scan, healthz)`,
+   `govulncheck` and `Lint` must all have **completed with
    success** on that commit, and a missing, queued, running or failed one is
    a refusal (REL-015). Only a check run that GitHub Actions created inside a
    run of `.github/workflows/ci.yml` on that commit counts: any app or
@@ -40,6 +41,10 @@ and merge release pull requests.
      hotfix branch, also that the hotfix ruleset protects it (see Hotfix)
    - runs `scripts/ci-gate.sh` on the tagged commit again, before anything is
      pushed or signed (this also covers a release-candidate tag pushed by hand)
+   - refuses, before anything is built, when the release of that tag is
+     already published or the image `:X.Y.Z` already exists: a re-run never
+     builds a second digest, never moves `:X.Y.Z` or `:sha-<12>`, and never
+     appends the notes twice
    - builds `linux/amd64` and `linux/arm64`, pushes to
      `ghcr.io/mavrovde/viafrei-api` as `:X.Y.Z` and `:sha-<12>`, plus `:X.Y`
      and `:latest` for a final release (`:X.Y` only when it is the highest
@@ -69,6 +74,12 @@ once it has succeeded, re-run the failed jobs of the Release Please run
 gate again. If the code is at fault, fix it through a pull request and
 release the next patch; the draft release of the refused version is deleted
 by hand (it never had a tag).
+
+### When the release run failed part-way
+
+A re-run of `release.yml` is accepted only while the release page is still a
+draft and `:X.Y.Z` does not exist. Once the image was pushed, the run is
+refused by design; release the next patch instead.
 
 ### Version rules
 
@@ -248,9 +259,9 @@ To withdraw one:
 
 1. Edit the release page: prefix the title with `[YANKED]` and put the reason
    and the replacement version at the top of the notes.
-2. If it carried `:latest` or `:X.Y`, publish the fix (or re-run `release.yml`
-   for the previous release with `workflow_dispatch`) so the moving tags point
-   to a good image again.
+2. If it carried `:latest` or `:X.Y`, publish the fix so the moving tags
+   point to a good image again (`release.yml` refuses to rebuild a published
+   release).
 3. Record the yank in `CHANGELOG.md` with the next release.
 4. For a security reason, publish a GitHub security advisory.
 

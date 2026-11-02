@@ -70,6 +70,7 @@ image-multiarch: ## Build the runtime image for amd64 and arm64 (not loaded, not
 	docker buildx build --platform $(PLATFORMS) --target runtime --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) .
 
 up: ## Build and start the API and the development database; wait until both are healthy
+	scripts/compose-guard.sh
 	VERSION=$(VERSION) COMMIT=$(COMMIT) docker compose up --detach --build --wait
 
 down: ## Stop the stack and keep the database volume

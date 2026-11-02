@@ -86,6 +86,19 @@ func TestSecretFromFileVariant(t *testing.T) {
 	}
 }
 
+func TestSecretSetTwiceRefused(t *testing.T) {
+	req.Covers(t, "CFG-002", "CFG-003")
+	path := writeFile(t, "postgres://reader:planted-file-secret@db/x\n")
+	_, err := config.Load(config.Options{Environ: []string{
+		"VFAPI_DB_URL=postgres://reader:planted-env-secret@db/x",
+		"VFAPI_DB_URL_FILE=" + path,
+	}, RequireSecrets: true})
+	assertRefused(t, err, "db.url: set by both VFAPI_DB_URL and VFAPI_DB_URL_FILE")
+	if strings.Contains(err.Error(), "planted-env-secret") || strings.Contains(err.Error(), "planted-file-secret") {
+		t.Fatal("the refusal printed the secret")
+	}
+}
+
 func TestSecretInConfigFileRefused(t *testing.T) {
 	req.Covers(t, "CFG-002", "CFG-007")
 	path := writeFile(t, "db:\n  url: postgres://reader:planted-yaml-secret@db/x\n")

@@ -95,9 +95,12 @@ func TestComposeGuardRefusesNonLoopback(t *testing.T) {
 		"space before = in .env":       {nil, "API_PUBLISH =0.0.0.0:9996\n", 2},
 		"spaces around the name":       {nil, "  API_PUBLISH  =0.0.0.0:9997\n", 2},
 	} {
-		if got := runComposeGuard(t, path, c.env, c.envFile); got != c.want {
-			t.Errorf("%s: exit %d, want %d", name, got, c.want)
-		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got := runComposeGuard(t, path, c.env, c.envFile); got != c.want {
+				t.Errorf("exit %d, want %d", got, c.want)
+			}
+		})
 	}
 	for _, file := range []string{"Makefile", "scripts/compose-smoke.sh"} {
 		src, err := os.ReadFile(filepath.Join(root, file))
@@ -117,7 +120,7 @@ func TestComposeGuardRefusesNonLoopback(t *testing.T) {
 // runs the real script with a PATH that lacks a tool or holds a docker stub.
 func TestComposeGuardRefusesWhenComposeCannotAnswer(t *testing.T) {
 	req.Covers(t, "SSC-019")
-	link := func(dir, tool string) {
+	link := func(t *testing.T, dir, tool string) {
 		t.Helper()
 		real, err := exec.LookPath(tool)
 		if err != nil {
@@ -127,41 +130,44 @@ func TestComposeGuardRefusesWhenComposeCannotAnswer(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	stub := func(dir, body string) {
+	stub := func(t *testing.T, dir, body string) {
 		t.Helper()
 		// #nosec G306 -- an executable test stub in a temporary directory
 		if err := os.WriteFile(filepath.Join(dir, "docker"), []byte("#!/bin/sh\n"+body+"\n"), 0o700); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for name, setup := range map[string]func(dir string){
-		"no docker": func(dir string) { link(dir, "jq") },
-		"no jq":     func(dir string) { link(dir, "docker") },
-		"compose config fails": func(dir string) {
-			link(dir, "jq")
-			stub(dir, "echo planted failure >&2; exit 1")
+	for name, setup := range map[string]func(t *testing.T, dir string){
+		"no docker": func(t *testing.T, dir string) { link(t, dir, "jq") },
+		"no jq":     func(t *testing.T, dir string) { link(t, dir, "docker") },
+		"compose config fails": func(t *testing.T, dir string) {
+			link(t, dir, "jq")
+			stub(t, dir, "echo planted failure >&2; exit 1")
 		},
-		"compose answers non-JSON": func(dir string) {
-			link(dir, "jq")
-			stub(dir, "echo not json")
+		"compose answers non-JSON": func(t *testing.T, dir string) {
+			link(t, dir, "jq")
+			stub(t, dir, "echo not json")
 		},
-		"the api publishes nothing": func(dir string) {
-			link(dir, "jq")
-			stub(dir, `echo '{"services":{"api":{}}}'`)
+		"the api publishes nothing": func(t *testing.T, dir string) {
+			link(t, dir, "jq")
+			stub(t, dir, `echo '{"services":{"api":{}}}'`)
 		},
-		"another service off loopback": func(dir string) {
-			link(dir, "jq")
-			stub(dir, `echo '{"services":{"api":{"ports":[{"host_ip":"::1","published":"8080"}]},"db":{"ports":[{"host_ip":"0.0.0.0","published":"5432"}]}}}'`)
+		"another service off loopback": func(t *testing.T, dir string) {
+			link(t, dir, "jq")
+			stub(t, dir, `echo '{"services":{"api":{"ports":[{"host_ip":"::1","published":"8080"}]},"db":{"ports":[{"host_ip":"0.0.0.0","published":"5432"}]}}}'`)
 		},
-		"loopback without a fixed port": func(dir string) {
-			link(dir, "jq")
-			stub(dir, `echo '{"services":{"api":{"ports":[{"host_ip":"127.0.0.1","target":8080}]}}}'`)
+		"loopback without a fixed port": func(t *testing.T, dir string) {
+			link(t, dir, "jq")
+			stub(t, dir, `echo '{"services":{"api":{"ports":[{"host_ip":"127.0.0.1","target":8080}]}}}'`)
 		},
 	} {
-		dir := t.TempDir()
-		setup(dir)
-		if got := runComposeGuard(t, dir, nil, ""); got != 2 {
-			t.Errorf("%s: exit %d, want 2", name, got)
-		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			setup(t, dir)
+			if got := runComposeGuard(t, dir, nil, ""); got != 2 {
+				t.Errorf("exit %d, want 2", got)
+			}
+		})
 	}
 }

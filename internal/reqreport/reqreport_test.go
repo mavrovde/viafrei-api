@@ -2,11 +2,13 @@ package reqreport
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
@@ -215,5 +217,78 @@ func TestReportsCarryTheRun(t *testing.T) {
 		if !strings.Contains(comp.String(), want) {
 			t.Errorf("completion draft lacks %q:\n%s", want, comp.String())
 		}
+	}
+}
+
+func TestFromWikiRefusesABrokenWiki(t *testing.T) {
+	req.Covers(t, "TEST-001")
+	const row = "| AAA-001 | S | Unit | Component | x |\n"
+	for want, pages := range map[string]map[string]string{
+		"no such file":               {},
+		"a row with 2 cells":         {matrixPage: "Source: [[A|Spec-A]]\n| AAA-001 | S |\n"},
+		"no requirement row read":    {matrixPage: "# Matrix without rows\n"},
+		"AAA-001 has no Source line": {matrixPage: row},
+		"Spec-A.md":                  {matrixPage: "Source: [[A|Spec-A]]\n" + row},
+	} {
+		dir := t.TempDir()
+		for name, body := range pages {
+			if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := FromWiki(dir); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("FromWiki = %v, want an error about %q", err, want)
+		}
+	}
+}
+
+func TestUnreadableStreamsAreErrors(t *testing.T) {
+	req.Covers(t, "TEST-002")
+	if _, err := ReadCatalogue(iotest.ErrReader(errors.New("catalogue gone"))); err == nil || !strings.Contains(err.Error(), "catalogue gone") {
+		t.Errorf("ReadCatalogue = %v", err)
+	}
+	if _, err := ReadScope(iotest.ErrReader(errors.New("scope gone"))); err == nil || !strings.Contains(err.Error(), "scope gone") {
+		t.Errorf("ReadScope = %v", err)
+	}
+	if _, err := ReadResults("unit", iotest.ErrReader(errors.New("results gone"))); err == nil || !strings.Contains(err.Error(), "results gone") {
+		t.Errorf("ReadResults = %v", err)
+	}
+}
+
+// TestACleanRunReportsNoneAndSortsTests: blank lines in a stream are skipped,
+// tests print in key order whatever order they ran in, a command package
+// keeps its cmd/ prefix, and a clean run's completion draft says "none".
+func TestACleanRunReportsNoneAndSortsTests(t *testing.T) {
+	req.Covers(t, "TEST-002")
+	cmd := `{"Action":"output","Package":"example.com/m/cmd/tool","Test":"TestZ","Output":"REQ-ID: AAA-001\n"}` + "\n" +
+		`{"Action":"pass","Package":"example.com/m/cmd/tool","Test":"TestZ","Elapsed":0.1}` + "\n"
+	ts := results(t, line("output", "TestB", "REQ-ID: AAA-001\\n", 0)+"\n"+line("pass", "TestB", "", 0.1)+cmd+
+		line("output", "TestA", "REQ-ID: AAA-001\\n", 0)+line("pass", "TestA", "", 0.1))
+	r := Check(catalogue(t), []string{"AAA-001"}, 1, ts)
+	var rep, comp bytes.Buffer
+	if err := WriteRequirementReport(&rep, r, Meta{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteCompletionDraft(&comp, r, Meta{}); err != nil {
+		t.Fatal(err)
+	}
+	a, b, z := strings.Index(rep.String(), "internal/p.TestA"), strings.Index(rep.String(), "internal/p.TestB"), strings.Index(rep.String(), "`cmd/tool.TestZ`")
+	if a < 0 || z < 0 || z >= a || a >= b {
+		t.Errorf("tests not in key order (cmd/tool.TestZ %d, TestA %d, TestB %d):\n%s", z, a, b, rep.String())
+	}
+	if !strings.Contains(comp.String(), "Rows without a passing test, with reason: none") ||
+		!strings.Contains(comp.String(), "Findings of the automated gates: none") {
+		t.Errorf("a clean run's draft does not say none:\n%s", comp.String())
+	}
+}
+
+func TestScopeReadsIDsOnceWithComments(t *testing.T) {
+	req.Covers(t, "TEST-002")
+	got, err := ReadScope(strings.NewReader("# milestone\nAAA-001 # why\n\nAAA-002\nAAA-001\n"))
+	if err != nil || strings.Join(got, ",") != "AAA-001,AAA-002" {
+		t.Fatalf("ReadScope = %v, %v", got, err)
+	}
+	if k := (TestResult{Level: "unit", Package: "example.com/m", Name: "TestRoot"}).Key(); k != "unit example.com/m.TestRoot" {
+		t.Errorf("a root package's key = %q", k)
 	}
 }

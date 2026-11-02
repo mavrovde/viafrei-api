@@ -159,9 +159,5 @@ func writeTo(path string, r *reqreport.Report, m reqreport.Meta, write func(io.W
 	if err != nil {
 		return err
 	}
-	if err := write(f, r, m); err != nil {
-		_ = f.Close()
-		return err
-	}
-	return f.Close()
+	return errors.Join(write(f, r, m), f.Close())
 }

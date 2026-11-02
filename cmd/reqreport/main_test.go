@@ -27,6 +27,15 @@ func TestCheckExitCodes(t *testing.T) {
 		`{"Action":"pass","Package":"m/p","Test":"TestA","Elapsed":0.1}`+"\n")
 	empty := write("empty.json", "")
 	report := filepath.Join(dir, "report.md")
+	wiki := t.TempDir()
+	for name, body := range map[string]string{
+		"Spec-Traceability-Matrix.md": "Source: [[A|Spec-A]]\n| AAA-001 | S | Unit | Component | x |\n",
+		"Spec-A.md":                   "| AAA-001 | The API MUST answer. | Unit |\n",
+	} {
+		if err := os.WriteFile(filepath.Join(wiki, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	cases := []struct {
 		name string
@@ -42,6 +51,16 @@ func TestCheckExitCodes(t *testing.T) {
 		{"no command", nil, 2, ""},
 		{"unknown command", []string{"lint"}, 2, ""},
 		{"catalogue without wiki", []string{"catalogue"}, 2, ""},
+		{"catalogue of an empty wiki", []string{"catalogue", "-wiki", dir}, 2, ""},
+		{"catalogue of a wiki", []string{"catalogue", "-wiki", wiki}, 0, "AAA-001\tMUST\tUnit\tComponent\tSpec-A"},
+		{"unknown flag", []string{"check", "-nope"}, 2, ""},
+		{"missing catalogue", []string{"check", "-catalogue", filepath.Join(dir, "absent.tsv"), "-scope", ok, "-results", "unit=" + res}, 2, ""},
+		{"malformed catalogue", []string{"check", "-catalogue", ok, "-scope", ok, "-results", "unit=" + res}, 2, ""},
+		{"missing scope", []string{"check", "-catalogue", cat, "-scope", filepath.Join(dir, "absent.txt"), "-results", "unit=" + res}, 2, ""},
+		{"malformed scope", []string{"check", "-catalogue", cat, "-scope", cat, "-results", "unit=" + res}, 2, ""},
+		{"missing results", []string{"check", "-catalogue", cat, "-scope", ok, "-results", "unit=" + filepath.Join(dir, "absent.json")}, 2, ""},
+		{"unwritable report", []string{"check", "-catalogue", cat, "-scope", ok, "-results", "unit=" + res, "-report", filepath.Join(dir, "no", "r.md")}, 2, ""},
+		{"unwritable completion", []string{"check", "-catalogue", cat, "-scope", ok, "-results", "unit=" + res, "-completion", filepath.Join(dir, "no", "c.md")}, 2, ""},
 	}
 	for _, c := range cases {
 		var stdout, stderr bytes.Buffer

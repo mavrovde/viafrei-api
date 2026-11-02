@@ -82,7 +82,12 @@ make reset                  # stop and delete this project's volume; the fixture
 make compose-test           # the CI smoke: healthz, readyz, meta and Schemathesis, then teardown
 ```
 
-On a host without IPv6 loopback, set `API_PUBLISH` in `.env` to the IPv4 loopback address followed by `:8080`. `make up` and `make compose-test` run `scripts/compose-guard.sh` first, which refuses an `API_PUBLISH` that is not a loopback address and port (SSC-019).
+On a host without IPv6 loopback, set `API_PUBLISH` in `.env` to the IPv4 loopback address followed by `:8080`. `make up` and `make compose-test` run `scripts/compose-guard.sh` first (SSC-019). The guard does not parse `.env` itself. It asks Compose for the configuration it will run (`docker compose config --format json`), so Compose's own precedence and `.env` syntax apply. It refuses (exit 2) in these cases:
+
+- a published port of any service has a host address other than `::1` or an IPv4 loopback address;
+- a published port has no fixed port;
+- the api service publishes no port;
+- it cannot get an answer: `docker` or `jq` is missing, or `docker compose config` fails or answers something that is not JSON.
 
 The upstream PostGIS image is published for `linux/amd64` only. On an arm64 machine it runs under emulation, which is slower to start.
 

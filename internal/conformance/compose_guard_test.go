@@ -78,7 +78,7 @@ func TestComposeGuardRefusesNonLoopback(t *testing.T) {
 			t.Fatalf("the compose guard is judged by the real %s, which is not on PATH: %v", tool, err)
 		}
 	}
-	for name, c := range map[string]struct {
+	cases := map[string]struct {
 		env     []string
 		envFile string
 		want    int
@@ -100,9 +100,16 @@ func TestComposeGuardRefusesNonLoopback(t *testing.T) {
 		"colon separator in .env":      {nil, "API_PUBLISH: 0.0.0.0:9999\n", 2},
 		"space before = in .env":       {nil, "API_PUBLISH =0.0.0.0:9996\n", 2},
 		"spaces around the name":       {nil, "  API_PUBLISH  =0.0.0.0:9997\n", 2},
-	} {
-		// Sequential on purpose: each case starts a real docker compose, and
-		// seventeen at once on a CI runner took 3 s each (TST-012).
+	}
+	// The first docker compose a fresh runner starts pays the binary's cold
+	// start: in CI run 41542493515 the case that happened to run first took
+	// 3.2 s and the other sixteen 0.09-0.11 s. That load is not the guard,
+	// so the parent pays it once with docker compose version, and every case
+	// then runs the real guard inside its own leaf (TST-012).
+	if out, err := exec.Command("docker", "compose", "version").CombinedOutput(); err != nil {
+		t.Fatalf("docker compose version: %v: %s", err, out)
+	}
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			if got := runComposeGuard(t, path, c.env, c.envFile); got != c.want {
 				t.Errorf("exit %d, want %d", got, c.want)

@@ -24,7 +24,7 @@ fi
 teardown() {
   local code=$?
   if [[ $code -ne 0 ]]; then docker compose logs --no-color --tail 80 || true; fi
-  [[ -n "${zap_cid:-}" ]] && docker rm --force "$zap_cid" >/dev/null 2>&1 || true
+  if [[ -n "${zap_cid:-}" ]]; then docker rm --force "$zap_cid" >/dev/null 2>&1 || true; fi
   docker compose down --volumes --remove-orphans >/dev/null 2>&1 || true
   exit "$code"
 }

@@ -73,6 +73,7 @@ built yet; until it is, no `Release-As` footer is used.
 ## Checklist for the release pull request
 
 - [ ] CI is green on the release pull request, including the image and compose jobs.
+- [ ] The Coverage gate job shows 100 % for every package, and every line of `test/coverage-exclusions.txt` carries its reason ([coverage](coverage.md)).
 - [ ] The CHANGELOG section reads correctly; every user-visible change has a line.
 - [ ] Every breaking change is intended and is described with a migration note.
 - [ ] `api/openapi.json` on `main` is the contract you mean to publish.

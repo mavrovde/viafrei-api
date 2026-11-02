@@ -73,7 +73,7 @@ ViaFrei API has a **service skeleton** in Go. Nothing is deployed yet, and no da
 | Technology evaluation | ✅ Published in the [wiki](https://github.com/mavrovde/viafrei-api/wiki/Technology-Evaluation) |
 | Technical specification | 📝 Draft for review, revision 1 — [published in the wiki](https://github.com/mavrovde/viafrei-api/wiki/Technical-Specification): protocol, requests and responses, errors, keys, limits, non-functional requirements |
 | Logical data model | 📝 Draft — [Data Model](https://github.com/mavrovde/viafrei-api/wiki/Data-Model): entities, fields and diagrams per domain, mapped to API fields (never a copy of storage) |
-| Testing strategy and test plans | 📝 Draft — [Testing Strategy](https://github.com/mavrovde/viafrei-api/wiki/Testing-Strategy); unit, handler and integration tests run; test infrastructure continues in #14–#20 |
+| Testing strategy and test plans | 📝 Draft — [Testing Strategy](https://github.com/mavrovde/viafrei-api/wiki/Testing-Strategy); unit, handler and integration tests run, 100 % statement coverage per package is enforced ([coverage](docs/coverage.md)); test infrastructure continues in #14–#20 |
 | Synthetic fixture generator | 🔄 In review — seeded, Germany-wide, fictional ([docs/test-data.md](docs/test-data.md)) |
 | Architecture for Go, Rust and TypeScript | ✅ [Stack Comparison](https://github.com/mavrovde/viafrei-api/wiki/Stack-Comparison) |
 | Stack decision | ✅ **Go** — [ADR-0001](https://github.com/mavrovde/viafrei-api/wiki/Spec-Architecture-Decisions) accepted on 2026-11-01 |
@@ -94,6 +94,7 @@ Requirements: Go 1.27 (the exact toolchain is pinned in `go.mod`), and a contain
 make build              # bin/viafrei-api, static, version and commit stamped in
 make test               # unit and handler tests
 make test-integration   # adds tests against a throwaway PostGIS container
+make coverage           # unit + integration + boot profiles, 100 % per package or it fails
 make generate           # regenerate sqlc code, docs/configuration.md, api/openapi.json
 make fixtures PROFILE=ci SEED=7   # synthetic test data, see docs/test-data.md
 ```

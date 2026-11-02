@@ -1,0 +1,8 @@
+# Coverage exclusions (TST-001).
+#
+# One entry per line: a glob over the module-relative file path, whitespace,
+# and the reason it is excluded. Only generated code may be listed. An entry
+# without a reason, or one that matches no measured file, fails the gate.
+#
+# Nothing is excluded today: the sqlc code is reached by the store integration
+# tests and every main by scripts/boot-coverage.sh.

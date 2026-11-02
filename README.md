@@ -79,6 +79,7 @@ ViaFrei API has a **service skeleton** in Go. Nothing is deployed yet, and no da
 | Stack decision | ✅ **Go** — [ADR-0001](https://github.com/mavrovde/viafrei-api/wiki/Spec-Architecture-Decisions) accepted on 2026-11-01 |
 | Configuration layer | ✅ Every tunable is a documented key with bounds — [docs/configuration.md](docs/configuration.md) |
 | Service skeleton: `/healthz`, `/readyz`, `/v1/meta`, `/v1/openapi.json` | 🔄 In review (milestone 0.2.0) |
+| Container image (distroless, multi-arch) and local Compose stack | 🔄 In review — [docs/container.md](docs/container.md) |
 | CI, security checks and release pipeline | 🔄 In progress (milestone 0.2.0) |
 | Keys, rate limits and priority tiers | ⏳ Planned |
 | v1 feature endpoints | ⏳ Planned |
@@ -110,6 +111,30 @@ curl -s localhost:8080/v1/meta                  # API, build and read-contract v
 Other subcommands: `healthcheck` (exit 0 when `/healthz` answers, for container healthchecks), `config show` (effective values, secrets hidden), `config docs`, `openapi`, `version`.
 
 The database the service reads is described by a versioned read contract in [`db/contract/`](db/contract): logical names only, created with a read-only role. Tests build it in a throwaway container. They never reach a live data source or production.
+
+## Run with Docker
+
+The image is distroless, runs as non-root and is built for `linux/amd64` and `linux/arm64`. Releases and `main` are published to `ghcr.io/mavrovde/viafrei-api`, signed with cosign, and carry an SBOM and build provenance.
+
+```sh
+docker run --rm --read-only -p "[::1]:8080:8080" \
+  -e VFAPI_DB_URL_FILE=/run/secrets/db_url -v "$PWD/db_url:/run/secrets/db_url:ro" \
+  ghcr.io/mavrovde/viafrei-api:edge
+```
+
+[docs/container.md](docs/container.md) covers the tags, the `healthcheck` subcommand, resource limits and how to verify an image's signature, SBOM and provenance before running it.
+
+## Local development with Compose
+
+`compose.yaml` starts the API and a PostGIS database that holds the read-contract stub, the read-only role and a synthetic fixture set. Only the API is published, and only on the loopback interface.
+
+```sh
+cp .env.example .env    # replace both placeholders
+make up                 # build, start, wait until healthy
+curl -s localhost:8080/v1/meta
+make compose-test       # smoke test with Schemathesis, then teardown
+make down               # or: make reset to drop the database volume
+```
 
 ## Documentation
 

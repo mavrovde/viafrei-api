@@ -8,7 +8,8 @@ LDFLAGS   := -s -w \
 	-X github.com/mavrovde/viafrei-api/internal/buildinfo.version=$(VERSION) \
 	-X github.com/mavrovde/viafrei-api/internal/buildinfo.commit=$(COMMIT)
 
-.PHONY: build test test-integration lint generate check-generated fixtures run clean
+.PHONY: build test test-integration lint generate check-generated fixtures run clean \
+	image image-multiarch up down logs reset compose-test
 
 build: ## Build the binary into bin/
 	CGO_ENABLED=0 $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/viafrei-api
@@ -38,6 +39,33 @@ fixtures: ## Write a synthetic fixture set: make fixtures PROFILE=ci SEED=7 (int
 
 run: build ## Run against VFAPI_DB_URL from the environment
 	$(BIN) serve
+
+# ---- container image and the local compose stack (docs/container.md)
+
+IMAGE     ?= viafrei-api:local
+PLATFORMS ?= linux/amd64,linux/arm64
+
+image: ## Build the runtime image for this machine's platform
+	docker buildx build --load --target runtime --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) -t $(IMAGE) .
+
+image-multiarch: ## Build the runtime image for amd64 and arm64 (not loaded, not pushed)
+	docker buildx build --platform $(PLATFORMS) --target runtime --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) .
+
+up: ## Build and start the API and the development database; wait until both are healthy
+	scripts/compose-guard.sh
+	VERSION=$(VERSION) COMMIT=$(COMMIT) docker compose up --detach --build --wait
+
+down: ## Stop the stack and keep the database volume
+	docker compose down
+
+logs: ## Follow the stack's logs
+	docker compose logs --follow
+
+reset: ## Stop the stack and delete this project's database volume (fixtures reload on the next up)
+	docker compose down --volumes --remove-orphans
+
+compose-test: ## Smoke-test the stack: healthz, readyz, meta and a short Schemathesis pass, then tear down
+	scripts/compose-smoke.sh
 
 clean:
 	rm -rf bin

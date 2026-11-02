@@ -1,0 +1,59 @@
+# ViaFrei API container image.
+#
+#   docker buildx build --platform linux/amd64,linux/arm64 \
+#     --build-arg VERSION=0.2.0-dev --build-arg COMMIT=$(git rev-parse --short=12 HEAD) .
+#
+# Stages:
+#   build     compiles the static binary on the build platform for the target platform
+#   fixtures  writes a synthetic fixture set (development database only)
+#   devdb     PostGIS with the read-contract stub, the read-only role and the fixtures
+#   runtime   distroless static, non-root: the image that is published (the default target)
+#
+# Every base image is pinned by digest; Dependabot proposes updates.
+
+FROM --platform=$BUILDPLATFORM golang:1.27.3-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9 AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
+COPY . .
+ARG TARGETOS TARGETARCH
+ARG VERSION=0.2.0-dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=""
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
+    -ldflags "-s -w -X github.com/mavrovde/viafrei-api/internal/buildinfo.version=${VERSION} -X github.com/mavrovde/viafrei-api/internal/buildinfo.commit=${COMMIT} -X github.com/mavrovde/viafrei-api/internal/buildinfo.date=${BUILD_DATE}" \
+    -o /out/app ./cmd/viafrei-api
+
+FROM build AS fixtures
+ARG FIXTURE_PROFILE=tiny
+ARG FIXTURE_SEED=1
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    go run ./cmd/fixturegen -profile "${FIXTURE_PROFILE}" -seed "${FIXTURE_SEED}" -out /out/fixtures
+
+# Development database only; never published. The upstream image is
+# single-architecture (linux/amd64).
+FROM postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5 AS devdb
+COPY db/contract/0001_contract.sql /docker-entrypoint-initdb.d/20_contract.sql
+COPY db/contract/0002_reader_role.sql /docker-entrypoint-initdb.d/21_reader_role.sql
+COPY deploy/compose/30_seed.sh /docker-entrypoint-initdb.d/30_seed.sh
+COPY db/contract/VERSION /seed/CONTRACT_VERSION
+COPY --from=fixtures /out/fixtures/ /seed/
+
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab AS runtime
+ARG VERSION=0.2.0-dev
+ARG COMMIT=unknown
+LABEL org.opencontainers.image.title="viafrei-api" \
+      org.opencontainers.image.description="ViaFrei API: read-only REST access to German mobility data" \
+      org.opencontainers.image.source="https://github.com/mavrovde/viafrei-api" \
+      org.opencontainers.image.url="https://github.com/mavrovde/viafrei-api" \
+      org.opencontainers.image.documentation="https://github.com/mavrovde/viafrei-api/blob/main/docs/container.md" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${COMMIT}"
+COPY --from=build /out/app /app
+USER nonroot:nonroot
+ENV VFAPI_SERVER_LISTEN_ADDR=:8080
+EXPOSE 8080
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 CMD ["/app", "healthcheck"]
+ENTRYPOINT ["/app"]
+CMD ["serve"]

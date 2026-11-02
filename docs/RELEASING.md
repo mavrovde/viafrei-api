@@ -185,8 +185,20 @@ Never by moving or deleting a tag. Every release is an immutable digest.
 For a fix that must not wait for what is already on `main`. A hotfix tag is
 released only from a `hotfix/*` branch that the hotfix ruleset protects:
 `release.yml` reads the branch's rules through the API and refuses unless
-they require a pull request and forbid force pushes, because anyone with
-write access can push an unprotected branch.
+they require a pull request with at least one approving review and forbid
+force pushes, because anyone with write access can push an unprotected
+branch.
+
+What this check cannot see, so the ruleset's owner keeps it true:
+
+- **Bypass actors.** The rules API lists the rules that apply to the branch,
+  not who may bypass them. Anyone in the ruleset's bypass list (an admin, a
+  team, an app) can still push to the branch directly; keep that list empty
+  for the hotfix ruleset, or as short as the tag ruleset's.
+- **Time of check.** The rules are read when `release.yml` runs, not when
+  each commit landed. A ruleset switched off, weakened or created after the
+  fact is not detected for commits pushed while it did not hold; changes to
+  rulesets are visible in the repository's audit log.
 
 1. Branch `hotfix/X.Y.Z+1` from the tag `vX.Y.Z`.
 2. Land the fix there through a pull request (`fix:` title), with review.

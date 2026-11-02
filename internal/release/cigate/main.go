@@ -6,18 +6,22 @@
 //
 //	gh api --paginate --slurp "repos/OWNER/REPO/actions/runs?head_sha=SHA&per_page=100" > runs.json
 //	gh api --paginate --slurp "repos/OWNER/REPO/commits/SHA/check-runs?per_page=100" |
-//	    go run ./internal/release/cigate -sha SHA -workflow .github/workflows/ci.yml \
-//	        -workflow-runs runs.json -require "Unit and handler tests" ...
+//	    go run ./internal/release/cigate -sha SHA -repo OWNER/REPO \
+//	        -workflow .github/workflows/ci.yml -workflow-runs runs.json \
+//	        -require "Unit and handler tests" ...
 //
 // stdin holds the GitHub check-runs answer, -workflow-runs the workflow-runs
 // answer for the same sha: each one page object, or the array of pages that
 // gh api --paginate --slurp prints.
 //
 // Only a check run that GitHub Actions created (app slug github-actions) in
-// the check suite of a run of -workflow on this sha counts. Any app or
-// workflow that holds checks: write can create a check run with any name and
-// conclusion, so a same-named run from elsewhere is never evidence. When a
-// name ran more than once (a re-run), any run still in progress refuses and
+// the check suite of a trusted run counts: a run of -workflow on this sha,
+// started by a push (event push) to main or a hotfix/* branch of -repo
+// itself. Any app or workflow that holds checks: write can create a check
+// run with any name and conclusion, and a pull-request run executes the
+// workflow file of the pull request's merge, which its author controls; so
+// a same-named run from anywhere else is never evidence. When a name ran
+// more than once (a re-run), any run still in progress refuses and
 // otherwise the newest completed run decides.
 //
 // Exit 0 when every required check passed, 1 on a refusal, 2 on a usage error
@@ -60,9 +64,25 @@ type checkRun struct {
 }
 
 type workflowRun struct {
-	CheckSuiteID int64  `json:"check_suite_id"`
-	Path         string `json:"path"`
-	HeadSHA      string `json:"head_sha"`
+	CheckSuiteID   int64  `json:"check_suite_id"`
+	Path           string `json:"path"`
+	HeadSHA        string `json:"head_sha"`
+	Event          string `json:"event"`
+	HeadBranch     string `json:"head_branch"`
+	HeadRepository struct {
+		FullName string `json:"full_name"`
+	} `json:"head_repository"`
+}
+
+// trust names the workflow runs whose check suites may carry the checks.
+type trust struct{ sha, repo, workflow string }
+
+// accepts: a run of the workflow on the sha, started by a push to main or a
+// hotfix/* branch of the repository itself.
+func (t trust) accepts(r workflowRun) bool {
+	return r.Path == t.workflow && r.HeadSHA == t.sha && r.Event == "push" &&
+		r.HeadRepository.FullName == t.repo &&
+		(r.HeadBranch == "main" || strings.HasPrefix(r.HeadBranch, "hotfix/"))
 }
 
 // page is one page of a GitHub listing: check runs or workflow runs.
@@ -83,6 +103,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("cigate", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	sha := fs.String("sha", "", "the full commit sha the check runs must belong to")
+	repo := fs.String("repo", "", "the repository (owner/name) whose pushes may carry the checks")
 	workflow := fs.String("workflow", "", "the workflow file whose runs may carry the checks (.github/workflows/ci.yml)")
 	runsFile := fs.String("workflow-runs", "", "file holding the workflow-runs answer for -sha")
 	var required names
@@ -90,11 +111,11 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	if !fullSHA.MatchString(*sha) || *workflow == "" || *runsFile == "" || len(required) == 0 || fs.NArg() != 0 {
-		fmt.Fprintln(stderr, "cigate: -sha <40 hex>, -workflow PATH, -workflow-runs FILE and at least one -require NAME are required")
+	if !fullSHA.MatchString(*sha) || !strings.Contains(*repo, "/") || *workflow == "" || *runsFile == "" || len(required) == 0 || fs.NArg() != 0 {
+		fmt.Fprintln(stderr, "cigate: -sha <40 hex>, -repo OWNER/NAME, -workflow PATH, -workflow-runs FILE and at least one -require NAME are required")
 		return 2
 	}
-	suites, err := readSuites(*runsFile, *sha, *workflow)
+	suites, err := readSuites(*runsFile, trust{sha: *sha, repo: *repo, workflow: *workflow})
 	if err != nil {
 		fmt.Fprintln(stderr, "cigate:", err)
 		return 2
@@ -119,8 +140,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// readSuites returns the check suites of the runs of workflow on sha.
-func readSuites(path, sha, workflow string) (map[int64]bool, error) {
+// readSuites returns the check suites of the runs t accepts.
+func readSuites(path string, t trust) (map[int64]bool, error) {
 	data, err := os.ReadFile(path) // #nosec G304 -- a path the caller names
 	if err != nil {
 		return nil, fmt.Errorf("reading the workflow runs: %w", err)
@@ -132,7 +153,7 @@ func readSuites(path, sha, workflow string) (map[int64]bool, error) {
 	suites := map[int64]bool{}
 	for _, p := range pages {
 		for _, r := range p.WorkflowRuns {
-			if r.Path == workflow && r.HeadSHA == sha {
+			if t.accepts(r) {
 				suites[r.CheckSuiteID] = true
 			}
 		}
@@ -193,7 +214,7 @@ func judge(checks []checkRun, suites map[int64]bool, sha, workflow string, requi
 // verdict judges the trusted runs of one required name; "" is a pass.
 func verdict(name string, mine []checkRun, foreign int, workflow string) string {
 	if len(mine) == 0 && foreign > 0 {
-		return fmt.Sprintf("%q has not run in %s on this commit; %d same-named run(s) from another app or workflow are not evidence", name, workflow, foreign)
+		return fmt.Sprintf("%q has not run in %s on this commit; %d same-named run(s) from another app, workflow or event are not evidence", name, workflow, foreign)
 	}
 	if len(mine) == 0 {
 		return fmt.Sprintf("%q has not run on this commit", name)

@@ -7,9 +7,10 @@
 # queued or running is a refusal, not a wait.
 #
 # Only check runs that GitHub Actions created inside a run of
-# .github/workflows/ci.yml on SHA count: the workflow runs for SHA are read
+# .github/workflows/ci.yml on SHA count, and only a run started by a push
+# to main or hotfix/* of GH_REPO itself: the workflow runs for SHA are read
 # too, and cigate matches each check run's check suite to one of them. A
-# same-named run from another app or workflow is never evidence.
+# same-named run from another app, workflow, event or fork is never evidence.
 #
 # Needs GH_TOKEN (checks: read, actions: read) and GH_REPO. The required names
 # are the job names in .github/workflows/ci.yml; TestReleaseGateIsWired holds
@@ -25,7 +26,7 @@ trap 'rm -rf "$work"' EXIT
 
 gh api --paginate --slurp "repos/$GH_REPO/actions/runs?head_sha=$sha&per_page=100" >"$work/runs.json"
 gh api --paginate --slurp "repos/$GH_REPO/commits/$sha/check-runs?per_page=100" >"$work/checks.json"
-go run ./internal/release/cigate -sha "$sha" \
+go run ./internal/release/cigate -sha "$sha" -repo "$GH_REPO" \
   -workflow .github/workflows/ci.yml \
   -workflow-runs "$work/runs.json" \
   -require "Unit and handler tests" \

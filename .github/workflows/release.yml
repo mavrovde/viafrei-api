@@ -83,12 +83,17 @@ jobs:
           [[ -n $on ]] || { echo "::error::$TAG points at a commit that is on neither main nor a hotfix/* branch"; exit 1; }
           # Anyone with write access can push a hotfix/* branch, so being on
           # one proves review only while the hotfix ruleset holds it: pull
-          # requests required and no force push (docs/RELEASING.md).
+          # requests with at least one approval, and no force push. This reads
+          # the rules as they are now, not as they were when each commit
+          # landed, and cannot see who may bypass them (docs/RELEASING.md).
           if [[ $on != main ]]; then
-            rules=" $(gh api "repos/$GH_REPO/rules/branches/$on" --jq '[.[].type] | join(" ")') "
+            rules=$(gh api "repos/$GH_REPO/rules/branches/$on")
+            types=" $(jq -r '[.[].type] | join(" ")' <<<"$rules") "
             for rule in pull_request non_fast_forward; do
-              [[ $rules == *" $rule "* ]] || { echo "::error::$on carries no '$rule' rule; a hotfix tag is released only from a hotfix/* branch the hotfix ruleset protects (docs/RELEASING.md)"; exit 1; }
+              [[ $types == *" $rule "* ]] || { echo "::error::$on carries no '$rule' rule; a hotfix tag is released only from a hotfix/* branch the hotfix ruleset protects (docs/RELEASING.md)"; exit 1; }
             done
+            reviews=$(jq '[.[] | select(.type == "pull_request") | .parameters.required_approving_review_count // 0] | max // 0' <<<"$rules")
+            (( reviews >= 1 )) || { echo "::error::$on requires $reviews approving reviews; the hotfix ruleset must require at least one (docs/RELEASING.md)"; exit 1; }
           fi
           version=${TAG#v}
           final=true; [[ -n $rc ]] && final=false

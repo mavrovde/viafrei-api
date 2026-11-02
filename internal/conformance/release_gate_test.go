@@ -67,6 +67,9 @@ const (
 	onMain        = `git merge-base --is-ancestor "$TAG^{commit}" origin/main`
 	hotfixRules   = `gh api "repos/$GH_REPO/rules/branches/$on"`
 	hotfixNeeds   = `for rule in pull_request non_fast_forward; do`
+	hotfixReviews = `(( reviews >= 1 )) || {`
+	reviewCount   = `select(.type == "pull_request") | .parameters.required_approving_review_count // 0] | max // 0`
+	gateRepo      = `-repo "$GH_REPO"`
 	minorGuard    = `if [[ $FINAL == true && $HIGHEST_IN_MINOR == true ]]; then echo "$IMAGE:$MINOR"; fi`
 	dispatchGuard = `if [[ $EVENT == workflow_dispatch && $REF != refs/heads/main ]]; then`
 	tokenFallback = "secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN"
@@ -108,6 +111,9 @@ func gateScriptFindings(ci gatedWorkflow, gateScript string) []string {
 	jobNames := map[string]bool{}
 	for _, j := range ci.Jobs {
 		jobNames[j.Name] = true
+	}
+	if !strings.Contains(gateScript, gateRepo) {
+		out = append(out, "ci-gate.sh does not name the repository whose pushes may carry the checks")
 	}
 	required := requireFlag.FindAllStringSubmatch(gateScript, -1)
 	if len(required) < 3 {
@@ -191,6 +197,9 @@ func shellRuleFindings(files map[string][]byte) []string {
 	if !before(hotfixRules) || !before(hotfixNeeds) {
 		out = append(out, "release.yml signs a hotfix tag without checking that the hotfix ruleset protects its branch")
 	}
+	if !before(reviewCount) || !before(hotfixReviews) {
+		out = append(out, "release.yml signs a hotfix tag without requiring at least one approving review")
+	}
 	if !strings.Contains(rel, minorGuard) {
 		out = append(out, "release.yml moves :X.Y without the highest-in-minor guard")
 	}
@@ -254,6 +263,10 @@ func TestReleaseGateIsWired(t *testing.T) {
 		"signs without first checking that the tag lies on main":                                      {plant("release.yml", onMain, "true"), s},
 		"signs a hotfix tag without checking that the hotfix ruleset (rules API)":                     {plant("release.yml", hotfixRules, "echo"), s},
 		"signs a hotfix tag without checking that the hotfix ruleset (rule list)":                     {plant("release.yml", hotfixNeeds, "for rule in; do"), s},
+		"signs a hotfix tag without requiring at least one approving review (no count)":               {plant("release.yml", reviewCount, "length"), s},
+		"signs a hotfix tag without requiring at least one approving review (no test)":                {plant("release.yml", hotfixReviews, "true || {"), s},
+		"signs a hotfix tag without requiring at least one approving review (zero)":                   {plant("release.yml", hotfixReviews, "(( reviews >= 0 )) || {"), s},
+		"ci-gate.sh does not name the repository":                                                     {files, strings.Replace(s, gateRepo, "", 1)},
 		"moves :X.Y without the highest-in-minor guard":                                               {plant("release.yml", "$FINAL == true && $HIGHEST_IN_MINOR == true ]]; then echo \"$IMAGE:$MINOR\"", "$FINAL == true ]]; then echo \"$IMAGE:$MINOR\""), s},
 		"image.yml publishes a dispatch from a branch other than main":                                {plant("image.yml", dispatchGuard, "if false; then"), s},
 		"does not use RELEASE_PLEASE_TOKEN":                                                           {plant("release-please.yml", tokenFallback, "secrets.GITHUB_TOKEN"), s},

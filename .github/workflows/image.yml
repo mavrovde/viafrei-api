@@ -82,16 +82,20 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      # No ref: the head of main (the default branch) for a workflow_run, the
-      # dispatched ref, refused above unless it is main, for a dispatch.
+      # No ref: GITHUB_SHA, which GitHub fixes when the event fires: the head
+      # of main (the default branch) then for a workflow_run, the dispatched
+      # commit (refused above unless on main) for a dispatch.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: The checkout is the commit CI passed
+      # This proves only that the checked-out commit is the one CI passed, as
+      # of the event. It cannot see main move after the event; the head job's
+      # check, and the CI run of any newer head, cover that.
+      - name: The checkout is the commit CI passed, as of the event
         run: |
           head=$(git rev-parse HEAD)
           if [[ $head != "$SHA" ]]; then
-            echo "::error::main moved from $SHA to $head after the head check; the CI run of $head publishes it"
+            echo "::error::the checkout ($head) is not the commit CI passed ($SHA) as of this event; nothing is published from it"
             exit 1
           fi
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0

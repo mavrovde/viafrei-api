@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -13,17 +14,36 @@ import (
 )
 
 const (
-	sha = "0123456789abcdef0123456789abcdef01234567"
-	ci  = ".github/workflows/ci.yml"
+	sha  = "0123456789abcdef0123456789abcdef01234567"
+	ci   = ".github/workflows/ci.yml"
+	repo = "owner/api"
 )
 
-// workflowRuns is the default answer: suite 7 is a run of ci.yml on sha,
-// suite 8 a run of another workflow on sha, suite 9 a run of ci.yml on
-// another sha.
-var workflowRuns = `{"total_count":3,"workflow_runs":[` +
-	`{"check_suite_id":7,"path":"` + ci + `","head_sha":"` + sha + `"},` +
-	`{"check_suite_id":8,"path":".github/workflows/other.yml","head_sha":"` + sha + `"},` +
-	`{"check_suite_id":9,"path":"` + ci + `","head_sha":"` + strings.Repeat("f", 40) + `"}]}`
+// wr is one workflow run.
+func wr(suite int, path, headSHA, event, branch, headRepo string) string {
+	return `{"check_suite_id":` + strconv.Itoa(suite) + `,"path":"` + path + `","head_sha":"` + headSHA +
+		`","event":"` + event + `","head_branch":"` + branch + `","head_repository":{"full_name":"` + headRepo + `"}}`
+}
+
+// trusted is a run of ci.yml on sha, pushed to main of repo.
+func trusted(suite int) string { return wr(suite, ci, sha, "push", "main", repo) }
+
+func runsAnswer(runs ...string) string {
+	return `{"total_count":` + strconv.Itoa(len(runs)) + `,"workflow_runs":[` + strings.Join(runs, ",") + `]}`
+}
+
+// workflowRuns is the default answer. Suites 7 (main) and 13 (hotfix/*) are
+// trusted push runs of ci.yml on sha; every other suite differs from a
+// trusted run in exactly one field.
+var workflowRuns = runsAnswer(
+	trusted(7),
+	wr(8, ".github/workflows/other.yml", sha, "push", "main", repo),
+	wr(9, ci, strings.Repeat("f", 40), "push", "main", repo),
+	wr(10, ci, sha, "pull_request", "main", repo),
+	wr(11, ci, sha, "push", "main", "fork/api"),
+	wr(12, ci, sha, "push", "feature", repo),
+	wr(13, ci, sha, "push", "hotfix/1.2.3", repo),
+)
 
 func file(t *testing.T, body string) string {
 	t.Helper()
@@ -37,7 +57,7 @@ func file(t *testing.T, body string) string {
 func gateWith(t *testing.T, runs, stdin string) (int, string, string) {
 	t.Helper()
 	var out, errs bytes.Buffer
-	args := []string{"-sha", sha, "-workflow", ci, "-workflow-runs", file(t, runs), "-require", "Unit", "-require", "Coverage"}
+	args := []string{"-sha", sha, "-repo", repo, "-workflow", ci, "-workflow-runs", file(t, runs), "-require", "Unit", "-require", "Coverage"}
 	code := run(args, strings.NewReader(stdin), &out, &errs)
 	return code, out.String(), errs.String()
 }
@@ -105,10 +125,17 @@ func TestRefusals(t *testing.T) {
 		`"Unit" has not run on this commit; "Coverage" has not run`:                      listing(0),
 		// The planted runs: same name, same sha, success, but not GitHub
 		// Actions in a ci.yml run on this sha.
-		planted + `1 same-named run(s) from another app or workflow are not evidence (another app)`: listing(2, unit, crIn("other-app", 7, "Coverage", "completed", "success", "02")),
-		planted + `1 same-named run(s) (another workflow)`:                                          listing(2, unit, crIn("github-actions", 8, "Coverage", "completed", "success", "02")),
-		planted + `1 same-named run(s) (ci.yml on another sha)`:                                     listing(2, unit, crIn("github-actions", 9, "Coverage", "completed", "success", "02")),
-		planted + `1 same-named run(s) (no suite)`:                                                  listing(2, unit, crIn("github-actions", 0, "Coverage", "completed", "success", "02")),
+		planted + `1 same-named run(s) from another app, workflow or event are not evidence (another app)`: listing(2, unit, crIn("other-app", 7, "Coverage", "completed", "success", "02")),
+		planted + `1 same-named run(s) (another workflow)`:                                                 listing(2, unit, crIn("github-actions", 8, "Coverage", "completed", "success", "02")),
+		planted + `1 same-named run(s) (ci.yml on another sha)`:                                            listing(2, unit, crIn("github-actions", 9, "Coverage", "completed", "success", "02")),
+		planted + `1 same-named run(s) (a pull-request run)`:                                               listing(2, unit, crIn("github-actions", 10, "Coverage", "completed", "success", "02")),
+		planted + `1 same-named run(s) (a push from a fork)`:                                               listing(2, unit, crIn("github-actions", 11, "Coverage", "completed", "success", "02")),
+		planted + `1 same-named run(s) (a push to another branch)`:                                         listing(2, unit, crIn("github-actions", 12, "Coverage", "completed", "success", "02")),
+		// A pull-request run of the release commit whose ci.yml exits 0
+		// finishes after the failing push run: the push run still decides.
+		`"Coverage" concluded "failure" (a pull-request success after a failing push)`: listing(3, unit, cr("Coverage", "completed", "failure", "02"),
+			crIn("github-actions", 10, "Coverage", "completed", "success", "05")),
+		planted + `1 same-named run(s) (no suite)`: listing(2, unit, crIn("github-actions", 0, "Coverage", "completed", "success", "02")),
 		planted + `2 same-named run(s) (two plants)`: listing(3, unit, crIn("other-app", 7, "Coverage", "completed", "success", "02"),
 			crIn("", 7, "Coverage", "completed", "success", "02")),
 	} {
@@ -125,17 +152,25 @@ func TestRefusals(t *testing.T) {
 	}
 }
 
-func TestNoRunOfTheWorkflowIsARefusal(t *testing.T) {
+func TestOnlyATrustedPushRunCarriesTheChecks(t *testing.T) {
 	req.Covers(t, "REL-015")
 	ok := listing(2, cr("Unit", "completed", "success", "01"), cr("Coverage", "completed", "success", "02"))
 	for name, runs := range map[string]string{
-		"no workflow runs":    `{"total_count":0,"workflow_runs":[]}`,
-		"only another path":   `{"total_count":1,"workflow_runs":[{"check_suite_id":7,"path":"ci.yml","head_sha":"` + sha + `"}]}`,
-		"ci.yml, another sha": `{"total_count":1,"workflow_runs":[{"check_suite_id":7,"path":"` + ci + `","head_sha":"` + strings.Repeat("e", 40) + `"}]}`,
+		"no workflow runs":           runsAnswer(),
+		"only another path":          runsAnswer(wr(7, "ci.yml", sha, "push", "main", repo)),
+		"ci.yml, another sha":        runsAnswer(wr(7, ci, strings.Repeat("e", 40), "push", "main", repo)),
+		"a pull_request run":         runsAnswer(wr(7, ci, sha, "pull_request", "main", repo)),
+		"a pull_request_target run":  runsAnswer(wr(7, ci, sha, "pull_request_target", "main", repo)),
+		"a push from a fork":         runsAnswer(wr(7, ci, sha, "push", "main", "fork/api")),
+		"a push to a feature branch": runsAnswer(wr(7, ci, sha, "push", "feature/hotfix/x", repo)),
+		"a push to hotfix without /": runsAnswer(wr(7, ci, sha, "push", "hotfix", repo)),
 	} {
 		if code, _, errs := gateWith(t, runs, ok); code != 1 || !strings.Contains(errs, "not evidence") {
 			t.Errorf("%s: exit %d, stderr %q", name, code, errs)
 		}
+	}
+	if code, _, errs := gateWith(t, runsAnswer(wr(7, ci, sha, "push", "hotfix/1.2.3", repo)), ok); code != 0 {
+		t.Errorf("a push to hotfix/1.2.3: exit %d, stderr %q", code, errs)
 	}
 	if code, _, errs := gateWith(t, ok, ok); code != 2 || !strings.Contains(errs, "holds 0 of 2 workflow runs") {
 		t.Errorf("a check-runs listing given as workflow runs: exit %d, stderr %q", code, errs)
@@ -166,12 +201,12 @@ func TestUnreadableAnswersAreNeverAPass(t *testing.T) {
 		}
 	}
 	var errs bytes.Buffer
-	args := []string{"-sha", sha, "-workflow", ci, "-workflow-runs", file(t, workflowRuns), "-require", "x"}
+	args := []string{"-sha", sha, "-repo", repo, "-workflow", ci, "-workflow-runs", file(t, workflowRuns), "-require", "x"}
 	if code := run(args, iotest.ErrReader(iotest.ErrTimeout), &bytes.Buffer{}, &errs); code != 2 || !strings.Contains(errs.String(), "reading the check runs") {
 		t.Errorf("an unreadable stdin: exit %d, stderr %q", code, errs.String())
 	}
 	errs.Reset()
-	args = []string{"-sha", sha, "-workflow", ci, "-workflow-runs", filepath.Join(t.TempDir(), "absent"), "-require", "x"}
+	args = []string{"-sha", sha, "-repo", repo, "-workflow", ci, "-workflow-runs", filepath.Join(t.TempDir(), "absent"), "-require", "x"}
 	if code := run(args, strings.NewReader(ok), &bytes.Buffer{}, &errs); code != 2 || !strings.Contains(errs.String(), "reading the workflow runs") {
 		t.Errorf("an absent workflow-runs file: exit %d, stderr %q", code, errs.String())
 	}
@@ -180,16 +215,27 @@ func TestUnreadableAnswersAreNeverAPass(t *testing.T) {
 func TestUsage(t *testing.T) {
 	req.Covers(t, "REL-015")
 	runs := file(t, workflowRuns)
-	full := []string{"-sha", sha, "-workflow", ci, "-workflow-runs", runs, "-require", "Unit"}
+	full := []string{"-sha", sha, "-repo", repo, "-workflow", ci, "-workflow-runs", runs, "-require", "Unit"}
+	without := func(flag string) []string {
+		i := slices.Index(full, flag)
+		return slices.Delete(slices.Clone(full), i, i+2)
+	}
+	with := func(flag, value string) []string {
+		out := slices.Clone(full)
+		out[slices.Index(out, flag)+1] = value
+		return out
+	}
 	for _, args := range [][]string{
 		nil,
-		{"-sha", sha, "-workflow", ci, "-workflow-runs", runs},
-		{"-workflow", ci, "-workflow-runs", runs, "-require", "Unit"},
-		{"-sha", sha, "-workflow-runs", runs, "-require", "Unit"},
-		{"-sha", sha, "-workflow", ci, "-require", "Unit"},
-		{"-sha", "abc", "-workflow", ci, "-workflow-runs", runs, "-require", "Unit"},
-		{"-sha", strings.ToUpper(sha), "-workflow", ci, "-workflow-runs", runs, "-require", "Unit"},
-		append(append([]string{}, full...), "extra"),
+		without("-sha"),
+		without("-repo"),
+		without("-workflow"),
+		without("-workflow-runs"),
+		without("-require"),
+		with("-sha", "abc"),
+		with("-sha", strings.ToUpper(sha)),
+		with("-repo", "api"),
+		append(slices.Clone(full), "extra"),
 		{"-unknown"},
 	} {
 		var errs bytes.Buffer

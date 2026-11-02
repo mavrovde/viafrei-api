@@ -89,7 +89,10 @@ func TestNoLiteralTunables(t *testing.T) {
 	req.Covers(t, "CFG-001")
 	fset := token.NewFileSet()
 	for _, path := range goFiles(t, "cmd", "internal") {
-		if strings.Contains(filepath.ToSlash(path), "internal/runtime/config/") {
+		// The configuration package declares the defaults; the fixture
+		// generator's durations are the shape of synthetic data (validity
+		// windows, delays), not tunables of the running service.
+		if p := filepath.ToSlash(path); strings.Contains(p, "internal/runtime/config/") || strings.Contains(p, "internal/fixtures/") {
 			continue
 		}
 		file, err := parser.ParseFile(fset, path, nil, 0)

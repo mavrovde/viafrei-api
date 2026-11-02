@@ -14,7 +14,7 @@
 #
 # Needs GH_TOKEN (checks: read, actions: read) and GH_REPO. The required names
 # are the job names in .github/workflows/ci.yml; TestReleaseGateIsWired holds
-# them equal.
+# them equal and holds every name of releaseRequired among them.
 set -euo pipefail
 
 sha=${1:?usage: ci-gate.sh SHA}
@@ -31,4 +31,7 @@ go run ./internal/release/cigate -sha "$sha" -repo "$GH_REPO" \
   -workflow-runs "$work/runs.json" \
   -require "Unit and handler tests" \
   -require "Integration tests (PostGIS)" \
-  -require "Coverage gate (100 % per package)" <"$work/checks.json"
+  -require "Coverage gate (100 % per package)" \
+  -require "Image (build, lint, scan, healthz)" \
+  -require "govulncheck" \
+  -require "Lint" <"$work/checks.json"

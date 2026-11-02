@@ -35,6 +35,18 @@ type gatedWorkflow struct {
 
 var requireFlag = regexp.MustCompile(`-require "([^"]+)"`)
 
+// releaseRequired are the ci.yml jobs a commit must have passed before a tag
+// or an image exists for it (REL-015): the tests, the coverage gate, the image
+// checks, the vulnerability scan and the linters.
+var releaseRequired = []string{
+	"Unit and handler tests",
+	"Integration tests (PostGIS)",
+	"Coverage gate (100 % per package)",
+	"Image (build, lint, scan, healthz)",
+	"govulncheck",
+	"Lint",
+}
+
 // gateRule: in workflow file, job runs scripts/ci-gate.sh before the first
 // step that matches publishes (a tag push, an image push, a signature).
 type gateRule struct{ file, job, publishes string }
@@ -73,6 +85,9 @@ const (
 	minorGuard    = `if [[ $FINAL == true && $HIGHEST_IN_MINOR == true ]]; then echo "$IMAGE:$MINOR"; fi`
 	dispatchGuard = `if [[ $EVENT == workflow_dispatch && $REF != refs/heads/main ]]; then`
 	tokenFallback = "secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN"
+	publishedRef  = `gh api "repos/$GH_REPO/releases/tags/$TAG"`
+	imageExists   = `docker buildx imagetools inspect "$IMAGE:$VERSION"`
+	notesOnce     = `if grep -q '^## Container image$' /tmp/notes.md; then`
 )
 
 // releaseGateFindings (REL-015): nothing is tagged or pushed for a commit CI
@@ -117,8 +132,14 @@ func gateScriptFindings(ci gatedWorkflow, gateScript string) []string {
 		out = append(out, "ci-gate.sh does not name the repository whose pushes may carry the checks")
 	}
 	required := requireFlag.FindAllStringSubmatch(gateScript, -1)
-	if len(required) < 3 {
-		out = append(out, "ci-gate.sh requires fewer than three checks")
+	named := map[string]bool{}
+	for _, m := range required {
+		named[m[1]] = true
+	}
+	for _, name := range releaseRequired {
+		if !named[name] {
+			out = append(out, "ci-gate.sh does not require "+name)
+		}
 	}
 	for _, m := range required {
 		if !jobNames[m[1]] {
@@ -219,6 +240,17 @@ func shellRuleFindings(files map[string][]byte) []string {
 	if !before(reviewCount) || !before(hotfixReviews) {
 		out = append(out, "release.yml signs a hotfix tag without requiring at least one approving review")
 	}
+	build := strings.Index(rel, "docker/build-push-action")
+	beforeBuild := func(s string) bool { i := strings.Index(rel, s); return i >= 0 && i < build }
+	if !beforeBuild(publishedRef) {
+		out = append(out, "release.yml rebuilds a release without first checking that it is not published")
+	}
+	if !beforeBuild(imageExists) {
+		out = append(out, "release.yml rebuilds a release without first checking that :X.Y.Z does not exist")
+	}
+	if notes := strings.Index(rel, "--json body --jq .body > /tmp/notes.md"); notes < 0 || !strings.Contains(rel[notes:], notesOnce) {
+		out = append(out, "release.yml appends the image section to notes that may already carry it")
+	}
 	if !strings.Contains(rel, minorGuard) {
 		out = append(out, "release.yml moves :X.Y without the highest-in-minor guard")
 	}
@@ -290,8 +322,14 @@ func TestReleaseGateIsWired(t *testing.T) {
 		"moves :X.Y without the highest-in-minor guard":                                               {plant("release.yml", "$FINAL == true && $HIGHEST_IN_MINOR == true ]]; then echo \"$IMAGE:$MINOR\"", "$FINAL == true ]]; then echo \"$IMAGE:$MINOR\""), s},
 		"image.yml publishes a dispatch from a branch other than main":                                {plant("image.yml", dispatchGuard, "if false; then"), s},
 		"does not use RELEASE_PLEASE_TOKEN":                                                           {plant("release-please.yml", tokenFallback, "secrets.GITHUB_TOKEN"), s},
+		"rebuilds a release without first checking that it is not published":                          {plant("release.yml", publishedRef, `echo "repos/$GH_REPO"`), s},
+		"rebuilds a release without first checking that :X.Y.Z does not exist":                        {plant("release.yml", imageExists, `echo "$IMAGE:$VERSION"`), s},
+		"appends the image section to notes that may already carry it":                                {plant("release.yml", notesOnce, "if false; then"), s},
 		"which is no job name in ci.yml":                                                              {files, strings.Replace(s, `"Coverage gate (100 % per package)"`, `"Coverage"`, 1)},
-		"requires fewer than three checks":                                                            {files, strings.Replace(s, `-require "Unit and handler tests"`, "", 1)},
+		"does not require Unit and handler tests":                                                     {files, strings.Replace(s, `-require "Unit and handler tests"`, "", 1)},
+		"does not require Image (build, lint, scan, healthz)":                                         {files, strings.Replace(s, `-require "Image (build, lint, scan, healthz)"`, "", 1)},
+		"does not require govulncheck":                                                                {files, strings.Replace(s, `-require "govulncheck"`, "", 1)},
+		"does not require Lint":                                                                       {files, strings.Replace(s, `-require "Lint"`, "", 1)},
 		"push trigger carries tags,":                                                                  {plant("ci.yml", pushBranches, pushBranches+"    tags: [\"hotfix/**\"]\n"), s},
 		"push trigger carries tags-ignore":                                                            {plant("ci.yml", pushBranches, pushBranches+"    tags-ignore: [\"v*\"]\n"), s},
 		"push trigger does not name its branches (bare)":                                              {plant("ci.yml", pushBranches, ""), s},

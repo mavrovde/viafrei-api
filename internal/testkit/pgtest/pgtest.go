@@ -21,8 +21,9 @@ import (
 )
 
 // Image is the PostGIS image the tests run against, the same major versions
-// as the compose stack.
-const Image = "postgis/postgis:16-3.4"
+// as the compose stack, pinned by digest like the Dockerfile's devdb stage
+// (SSC-005; TestTestImagesArePinned holds the two equal).
+const Image = "postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5"
 
 // DB is one running test database.
 type DB struct {

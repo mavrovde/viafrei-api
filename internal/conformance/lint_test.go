@@ -164,7 +164,7 @@ var skipDirs = map[string]bool{".git": true, "node_modules": true, "bin": true, 
 // TestNoCollectionScope holds the scope boundary: nothing in the repository
 // describes how data is collected, scheduled or hosted.
 func TestNoCollectionScope(t *testing.T) {
-	req.Covers(t, "SSC-017")
+	req.Covers(t, "CON-004")
 	read := 0
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -205,7 +205,7 @@ func TestNoCollectionScope(t *testing.T) {
 }
 
 func TestScopeLintCanSayNo(t *testing.T) {
-	req.Covers(t, "SSC-017")
+	req.Covers(t, "CON-004")
 	// The planted word is assembled at run time so it never appears whole.
 	planted := "the " + strings.Join([]string{"in", "gest"}, "") + " worker"
 	if len(scopeHits(planted)) != 1 || len(scopeHits("the read path")) != 0 {

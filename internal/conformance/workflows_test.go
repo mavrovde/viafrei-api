@@ -41,12 +41,7 @@ func workflowFindings(name string, src []byte) []string {
 	if len(w.Jobs) == 0 {
 		return []string{name + ": no job read"}
 	}
-	var out []string
-	if w.Permissions == nil {
-		out = append(out, name+": no top-level permissions block")
-	} else if s, ok := w.Permissions.(string); ok && strings.Contains(s, "write") {
-		out = append(out, name+": top-level permissions grant "+s)
-	}
+	out := permissionFindings(name, w.Permissions)
 	check := func(job, uses string) {
 		if uses == "" || strings.HasPrefix(uses, "./") {
 			return
@@ -66,6 +61,17 @@ func workflowFindings(name string, src []byte) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// permissionFindings: the top level must set permissions, and never a write-all.
+func permissionFindings(name string, perms any) []string {
+	if perms == nil {
+		return []string{name + ": no top-level permissions block"}
+	}
+	if s, ok := perms.(string); ok && strings.Contains(s, "write") {
+		return []string{name + ": top-level permissions grant " + s}
+	}
+	return nil
 }
 
 func readWorkflows(t *testing.T) map[string][]byte {

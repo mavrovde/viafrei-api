@@ -14,6 +14,8 @@ set -euo pipefail
 image=${1:?usage: image-smoke.sh IMAGE}
 name=vfapi-smoke-$$
 port=${SMOKE_PORT:-18080}
+# A throwaway password for a database that does not exist; never a real one.
+pass=$(openssl rand -hex 12)
 checks=0
 
 cleanup() { docker rm -f "$name" >/dev/null 2>&1 || true; }
@@ -21,7 +23,7 @@ trap cleanup EXIT
 
 docker run -d --name "$name" --read-only --cap-drop ALL --security-opt no-new-privileges \
   -p "$port:8080" \
-  -e VFAPI_DB_URL=postgres://api_reader:not-a-secret@db.invalid:5432/contract \
+  -e VFAPI_DB_URL=postgres://api_reader:$pass@db.invalid:5432/contract \
   "$image" >/dev/null
 
 url="http://localhost:$port"

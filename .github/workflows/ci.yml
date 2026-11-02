@@ -114,7 +114,7 @@ jobs:
         with:
           go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
       - name: Spectral
-        run: npx --yes @stoplight/spectral-cli@6.17.0 lint --ruleset .spectral.yaml --fail-severity warn api/openapi.json
+        run: npm exec --yes --ignore-scripts --package=@stoplight/spectral-cli@6.17.0 -- spectral lint --ruleset .spectral.yaml --fail-severity warn api/openapi.json
       - name: Breaking changes against the base branch
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -175,7 +175,7 @@ jobs:
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
             aquasec/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222 \
-            image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --no-progress viafrei-api:ci
+            image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --no-progress --db-repository mirror.gcr.io/aquasec/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2 viafrei-api:ci
 
   compose:
     name: Compose smoke (Schemathesis)

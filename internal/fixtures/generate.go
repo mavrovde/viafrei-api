@@ -389,16 +389,16 @@ func haversineKm(a, b lonLat) float64 {
 // along returns the point at fraction f of the road's length.
 func (rd road) along(f float64) lonLat {
 	target := f * rd.length
-	for i := 1; i < len(rd.points); i++ {
-		seg := haversineKm(rd.points[i-1], rd.points[i])
-		if target <= seg || i == len(rd.points)-1 {
-			t := math.Min(1, target/math.Max(seg, 1e-9))
-			a, b := rd.points[i-1], rd.points[i]
-			return lonLat{a.lon + t*(b.lon-a.lon), a.lat + t*(b.lat-a.lat)}
-		}
+	i := 1
+	seg := haversineKm(rd.points[0], rd.points[1])
+	for target > seg && i < len(rd.points)-1 {
 		target -= seg
+		i++
+		seg = haversineKm(rd.points[i-1], rd.points[i])
 	}
-	return rd.points[len(rd.points)-1]
+	t := math.Min(1, target/math.Max(seg, 1e-9))
+	a, b := rd.points[i-1], rd.points[i]
+	return lonLat{a.lon + t*(b.lon-a.lon), a.lat + t*(b.lat-a.lat)}
 }
 
 var (

@@ -12,15 +12,18 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
+	"github.com/mavrovde/viafrei-api/internal/invariant"
 )
 
 func main() {
@@ -40,6 +43,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "fixturegen: -out DIR is required and no positional arguments are accepted")
 		return 2
 	}
+	if !slices.Contains(fixtures.Profiles(), *profile) {
+		fmt.Fprintf(stderr, "fixturegen: unknown profile %q (known: %s)\n", *profile, strings.Join(fixtures.Profiles(), ", "))
+		return 2
+	}
 	if err := os.MkdirAll(*out, 0o750); err != nil {
 		fmt.Fprintln(stderr, "fixturegen:", err)
 		return 1
@@ -47,33 +54,21 @@ func run(args []string, stdout, stderr io.Writer) int {
 	m, err := write(*out, *profile, *seed)
 	if err != nil {
 		fmt.Fprintf(stderr, "fixturegen: %v (profile %s, seed %d)\n", err, *profile, *seed)
-		if m == nil {
-			return 2
-		}
 		return 1
 	}
 	fmt.Fprintln(stdout, m.Summary())
 	return 0
 }
 
-func write(dir, profile string, seed uint64) (m *fixtures.Manifest, err error) {
-	sqlPath := filepath.Join(dir, "seed.sql")
-	f, err := os.Create(filepath.Clean(sqlPath))
+func write(dir, profile string, seed uint64) (*fixtures.Manifest, error) {
+	f, err := os.Create(filepath.Clean(filepath.Join(dir, "seed.sql")))
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if cerr := f.Close(); err == nil && cerr != nil {
-			err = cerr
-		}
-	}()
-	m, err = fixtures.Generate(f, profile, seed, contract.Version())
-	if err != nil {
+	m, err := fixtures.Generate(f, profile, seed, contract.Version())
+	if err = errors.Join(err, f.Close()); err != nil {
 		return m, err
 	}
-	data, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		return m, err
-	}
+	data := invariant.Must(json.MarshalIndent(m, "", "  "))
 	return m, os.WriteFile(filepath.Join(dir, "manifest.json"), append(data, '\n'), 0o600)
 }

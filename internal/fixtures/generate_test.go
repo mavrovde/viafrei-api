@@ -3,6 +3,7 @@ package fixtures_test
 import (
 	"bytes"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -181,5 +182,33 @@ func TestNoPersonalDataOrSecretShape(t *testing.T) {
 		if !bytes.HasSuffix(u[1], []byte(".example")) {
 			t.Errorf("web address %q is not on the reserved .example domain", u[0])
 		}
+	}
+}
+
+type brokenWriter struct{}
+
+func (brokenWriter) Write([]byte) (int, error) { return 0, errors.New("disk full") }
+
+// TestAWriteFailureIsAnError: output that cannot be written fails the run; a
+// manifest is never returned for a set that did not reach its destination.
+func TestAWriteFailureIsAnError(t *testing.T) {
+	req.Covers(t, "TST-014")
+	m, err := fixtures.Generate(brokenWriter{}, "tiny", 1, "0.1")
+	if err == nil || m != nil || !strings.Contains(err.Error(), "disk full") {
+		t.Fatalf("manifest %v, error %v, want the write error and no manifest", m, err)
+	}
+}
+
+// TestAGapInTheGeneratedSetIsAnError: a family the generator produces no rows
+// for fails Generate itself, with the manifest returned for diagnosis.
+func TestAGapInTheGeneratedSetIsAnError(t *testing.T) {
+	req.Covers(t, "TST-014")
+	saved := fixtures.Families
+	t.Cleanup(func() { fixtures.Families = saved })
+	fixtures.Families = append(slices.Clone(saved), struct{ Name, Category string }{"omega", "attribution"})
+	var buf bytes.Buffer
+	m, err := fixtures.Generate(&buf, "tiny", 1, "0.1")
+	if err == nil || m == nil || !strings.Contains(err.Error(), "family omega has no rows") {
+		t.Fatalf("manifest %v, error %v, want a coverage-gap error naming omega", m != nil, err)
 	}
 }

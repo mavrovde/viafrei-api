@@ -60,3 +60,43 @@ func TestUsageErrorsExit2(t *testing.T) {
 		}
 	}
 }
+
+// TestOutputFailuresExit1: a destination that cannot hold the set is exit 1
+// with the reason, never a usage error and never a partial success.
+func TestOutputFailuresExit1(t *testing.T) {
+	req.Covers(t, "TST-011")
+	file := filepath.Join(t.TempDir(), "plain")
+	if err := os.WriteFile(file, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	seedDir := t.TempDir()
+	manifestDir := t.TempDir()
+	for _, d := range []string{filepath.Join(seedDir, "seed.sql"), filepath.Join(manifestDir, "manifest.json")} {
+		if err := os.Mkdir(d, 0o750); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for name, out := range map[string]string{
+		"out under a file":       filepath.Join(file, "sub"),
+		"seed.sql is a dir":      seedDir,
+		"manifest.json is a dir": manifestDir,
+	} {
+		var stdout, stderr bytes.Buffer
+		if code := run([]string{"-out", out}, &stdout, &stderr); code != 1 || stdout.Len() != 0 || stderr.Len() == 0 {
+			t.Errorf("%s: exit %d, stdout %q, stderr %q", name, code, stdout.String(), stderr.String())
+		}
+	}
+}
+
+// TestACoverageGapExits1: a set with a gap is written for diagnosis but the
+// run fails, so CI never loads a set that misses a family.
+func TestACoverageGapExits1(t *testing.T) {
+	req.Covers(t, "TST-014")
+	saved := fixtures.Families
+	t.Cleanup(func() { fixtures.Families = saved })
+	fixtures.Families = append(append(fixtures.Families[:0:0], saved...), struct{ Name, Category string }{"omega", "attribution"})
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"-out", t.TempDir()}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "omega") {
+		t.Fatalf("exit %d, stderr %q", code, stderr.String())
+	}
+}

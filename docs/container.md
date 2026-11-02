@@ -26,8 +26,8 @@ This page shows how to use the image.
 | `X.Y` | a release tag | to the newest patch of that minor |
 | `latest` | a release tag, but not a release candidate | to the newest release |
 | `X.Y.Z-rc.N` | a release-candidate tag | never |
-| `sha-<12 hex>` | every push to `main` and every release | never |
-| `edge` | every push to `main` | to the newest `main` |
+| `sha-<12 hex>` | every push to `main` once CI passed on it, and every release | never |
+| `edge` | a push to `main` once CI passed on it (`image.yml` follows the CI run) | to the newest `main` only, never back to an older commit |
 
 Deploy by digest (`ghcr.io/mavrovde/viafrei-api@sha256:…`), not by a moving tag.
 

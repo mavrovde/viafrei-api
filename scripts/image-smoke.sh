@@ -21,12 +21,14 @@ checks=0
 cleanup() { docker rm -f "$name" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 
+# Published on the loopback address only, as compose.yaml does; never on
+# every interface of the runner.
 docker run -d --name "$name" --read-only --cap-drop ALL --security-opt no-new-privileges \
-  -p "$port:8080" \
-  -e VFAPI_DB_URL=postgres://api_reader:$pass@db.invalid:5432/contract \
+  -p "[::1]:$port:8080" \
+  -e "VFAPI_DB_URL=postgres://api_reader:$pass@db.invalid:5432/contract" \
   "$image" >/dev/null
 
-url="http://localhost:$port"
+url="http://[::1]:$port"
 for _ in $(seq 1 50); do
   curl -fsS --max-time 1 "$url/healthz" >/dev/null 2>&1 && break
   sleep 0.2

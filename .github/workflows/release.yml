@@ -45,6 +45,7 @@ jobs:
     timeout-minutes: 40
     permissions:
       contents: write
+      checks: read
       packages: write
       id-token: write
       attestations: write
@@ -67,6 +68,18 @@ jobs:
           [[ $TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-rc\.[0-9]+)?$ ]] || { echo "::error::'$TAG' is not vX.Y.Z or vX.Y.Z-rc.N"; exit 1; }
           major=${BASH_REMATCH[1]} minor=${BASH_REMATCH[2]} rc=${BASH_REMATCH[4]}
           [[ $(gh api "repos/$GH_REPO/git/ref/tags/$TAG" --jq .object.type) == tag ]] || { echo "::error::$TAG is a lightweight tag; releases need an annotated tag (git tag -a)"; exit 1; }
+          # A release comes from reviewed history: main, or a hotfix branch
+          # cut from a release tag (docs/RELEASING.md). Checked before
+          # anything is built or signed.
+          on=""
+          if git merge-base --is-ancestor "$TAG^{commit}" origin/main; then
+            on=main
+          else
+            while read -r b; do
+              if git merge-base --is-ancestor "$TAG^{commit}" "$b"; then on=$b; break; fi
+            done < <(git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/hotfix/*')
+          fi
+          [[ -n $on ]] || { echo "::error::$TAG points at a commit that is on neither main nor a hotfix/* branch"; exit 1; }
           version=${TAG#v}
           final=true; [[ -n $rc ]] && final=false
           prerelease=false; [[ $major == 0 || -n $rc ]] && prerelease=true
@@ -82,10 +95,20 @@ jobs:
             echo "prerelease=$prerelease"
             echo "previous=$prev"
             echo "highest=$([[ $(git tag -l "v*" | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V | tail -n 1) == "$TAG" ]] && echo true || echo false)"
+            echo "highest_in_minor=$([[ $(git tag -l "v$major.$minor.*" | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V | tail -n 1) == "$TAG" ]] && echo true || echo false)"
             echo "commit=$(git rev-parse HEAD)"
             echo "date=$(git log -1 --format=%cI "$TAG")"
           } >> "$GITHUB_OUTPUT"
-          echo "releasing $TAG (version $version, prerelease $prerelease, previous release ${prev:-none})"
+          echo "releasing $TAG from $on (version $version, prerelease $prerelease, previous release ${prev:-none})"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: CI passed on the tagged commit (REL-015)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ steps.tag.outputs.commit }}
+        run: scripts/ci-gate.sh "$SHA"
       - name: Image tags
         id: tags
         env:
@@ -94,12 +117,15 @@ jobs:
           FINAL: ${{ steps.tag.outputs.final }}
           COMMIT: ${{ steps.tag.outputs.commit }}
           HIGHEST: ${{ steps.tag.outputs.highest }}
+          HIGHEST_IN_MINOR: ${{ steps.tag.outputs.highest_in_minor }}
         run: |
           {
             echo "list<<EOF"
             echo "$IMAGE:$VERSION"
             echo "$IMAGE:sha-${COMMIT::12}"
-            if [[ $FINAL == true ]]; then echo "$IMAGE:$MINOR"; fi
+            # :X.Y moves to the newest patch of its minor only; a backported
+            # patch of an older line never moves it back.
+            if [[ $FINAL == true && $HIGHEST_IN_MINOR == true ]]; then echo "$IMAGE:$MINOR"; fi
             if [[ $FINAL == true && $HIGHEST == true ]]; then echo "$IMAGE:latest"; fi
             echo EOF
           } >> "$GITHUB_OUTPUT"
@@ -152,9 +178,6 @@ jobs:
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: cosign attest --yes --type spdxjson --predicate dist/sbom.spdx.json "$IMAGE@$DIGEST"
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
       - name: openapi.json and its diff against the previous release
         id: oas
         env:
@@ -185,6 +208,7 @@ jobs:
           PRERELEASE: ${{ steps.tag.outputs.prerelease }}
           PREV: ${{ steps.tag.outputs.previous }}
           BREAKING: ${{ steps.oas.outputs.breaking }}
+          HIGHEST: ${{ steps.tag.outputs.highest }}
           TAGLIST: ${{ steps.tags.outputs.list }}
         run: |
           base=${VERSION%%-*}
@@ -230,7 +254,7 @@ jobs:
             [[ -n $milestone ]] && echo "Milestone: $milestone"
           } >> /tmp/notes.md
           gh release upload "$TAG" dist/* --clobber
-          gh release edit "$TAG" --notes-file /tmp/notes.md --prerelease="$PRERELEASE" --latest="$([[ $PRERELEASE == true ]] && echo false || echo true)"
+          gh release edit "$TAG" --notes-file /tmp/notes.md --prerelease="$PRERELEASE" --latest="$([[ $PRERELEASE == false && $HIGHEST == true ]] && echo true || echo false)"
           gh release edit "$TAG" --draft=false
           echo "published $(gh release view "$TAG" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
 

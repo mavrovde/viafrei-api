@@ -5,10 +5,18 @@
 # attests, attaches the assets, publishes the draft and verifies the result.
 # release.yml is called directly because a tag pushed with GITHUB_TOKEN does
 # not start other workflows.
+#
+# It runs after CI has passed on a push to main, and scripts/ci-gate.sh checks
+# the release commit's CI result again before the tag is created (REL-015).
+# The release pull request is opened with RELEASE_PLEASE_TOKEN when that
+# secret exists, so CI runs on it; with GITHUB_TOKEN alone GitHub starts no
+# workflow for it, and the gate is then what stops an unchecked release.
 name: Release Please
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -22,6 +30,7 @@ concurrency:
 jobs:
   release-please:
     name: Release pull request
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -32,10 +41,17 @@ jobs:
       tag: ${{ steps.rp.outputs.tag_name }}
       sha: ${{ steps.rp.outputs.sha }}
     steps:
+      - name: Release pull requests get CI only with RELEASE_PLEASE_TOKEN
+        env:
+          HAS_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN != '' }}
+        run: |
+          if [[ $HAS_TOKEN != true ]]; then
+            echo "::warning::RELEASE_PLEASE_TOKEN is not set: the release pull request is opened with GITHUB_TOKEN and no CI runs on it. scripts/ci-gate.sh still refuses to tag a commit CI has not passed. See docs/RELEASING.md."
+          fi
       - id: rp
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
@@ -44,13 +60,23 @@ jobs:
     needs: release-please
     if: needs.release-please.outputs.created == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
       contents: write
+      checks: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: CI passed on the release commit (REL-015)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ needs.release-please.outputs.sha }}
+        run: scripts/ci-gate.sh "$SHA"
       - name: Create and push the annotated tag
         env:
           TAG: ${{ needs.release-please.outputs.tag }}

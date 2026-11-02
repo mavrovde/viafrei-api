@@ -15,21 +15,32 @@ and merge release pull requests.
    (`feat:`, `fix:`, `docs:`, `ci:`, `deps:`, … and `!` or a
    `BREAKING CHANGE:` footer for a breaking change). The title becomes the
    squash commit and the changelog line.
-2. On every push to `main`, [release-please](https://github.com/googleapis/release-please)
-   (`.github/workflows/release-please.yml`) opens or updates the **release
-   pull request** `chore: release X.Y.Z`. It bumps `version.txt`, updates
+2. Once CI has passed on a push to `main`, [release-please](https://github.com/googleapis/release-please)
+   (`.github/workflows/release-please.yml`, started by `workflow_run`) opens
+   or updates the **release pull request** `chore: release X.Y.Z`. It opens
+   that pull request with `RELEASE_PLEASE_TOKEN` when the secret exists, so
+   CI runs on it; with the built-in `GITHUB_TOKEN` GitHub starts no workflow
+   for it (see the secrets table). It bumps `version.txt`, updates
    `.release-please-manifest.json` and adds the section to `CHANGELOG.md`
    ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/) headings).
 3. A maintainer reviews and merges the release pull request (checklist below).
 4. release-please writes a **draft** release, which creates no tag. The `tag`
-   job then creates the **annotated** tag `vX.Y.Z` on the release commit and
-   pushes it.
+   job runs `scripts/ci-gate.sh` on the release commit: the check runs
+   `Unit and handler tests`, `Integration tests (PostGIS)` and
+   `Coverage gate (100 % per package)` must all have **completed with
+   success** on that commit, and a missing, queued, running or failed one is
+   a refusal (REL-015). Only then does it create the **annotated** tag
+   `vX.Y.Z` on the release commit and push it.
 5. The same run calls `.github/workflows/release.yml`, which:
-   - checks the tag is annotated and well-formed
+   - checks the tag is annotated and well-formed, and that its commit lies on
+     `main` or a `hotfix/*` branch (`git merge-base --is-ancestor`)
+   - runs `scripts/ci-gate.sh` on the tagged commit again, before anything is
+     pushed or signed (this also covers a release-candidate tag pushed by hand)
    - builds `linux/amd64` and `linux/arm64`, pushes to
      `ghcr.io/mavrovde/viafrei-api` as `:X.Y.Z` and `:sha-<12>`, plus `:X.Y`
-     and `:latest` for a final release (`:latest` only when it is the highest
-     version)
+     and `:latest` for a final release (`:X.Y` only when it is the highest
+     patch of its minor, `:latest` only when it is the highest version, so a
+     backported patch never moves either back)
    - signs the digest with cosign (keyless) and attests SLSA build provenance
      and the SPDX SBOM to the image
    - attaches `openapi.json`, `openapi-changelog.txt`, `openapi-breaking.txt`
@@ -160,6 +171,8 @@ For a fix that must not wait for what is already on `main`:
 
 1. Branch `hotfix/X.Y.Z+1` from the tag `vX.Y.Z`.
 2. Land the fix there through a pull request (`fix:` title), with review.
+   CI runs on every push to `hotfix/**`, so the merged head has the check
+   runs the release gate requires.
 3. A maintainer creates the annotated tag `vX.Y.(Z+1)` on that branch's
    head and pushes it; `release.yml` publishes it from the tag push.
 4. Merge or cherry-pick the fix into `main` and add the version to
@@ -183,7 +196,9 @@ To withdraw one:
 | Item | Used by | Without it |
 |---|---|---|
 | `GITHUB_TOKEN` (built in) | every workflow | — |
+| `RELEASE_PLEASE_TOKEN` (repository secret; **the owner creates it**): a fine-grained personal access token or a GitHub App installation token for this repository only, with Contents and Pull requests read and write | release-please opens the release pull request with it | the release pull request is opened with `GITHUB_TOKEN`, so **no CI runs on it** and the job logs a warning; the release is still refused by `scripts/ci-gate.sh` unless CI passed on the release commit on `main` |
 | `SONAR_TOKEN` | CI `sonar` job | the job fails and names the secret |
 | `SNYK_TOKEN` | security workflow | the job fails and names the secret |
+| `SONAR_TOKEN` and `SNYK_TOKEN` again as **Dependabot secrets** (Settings > Secrets and variables > Dependabot; **the owner adds them**) | the same jobs on a Dependabot pull request, which reads Dependabot secrets and never Actions secrets | both jobs fail on every Dependabot pull request, saying that the Dependabot secret is missing |
 | Workflow permission "Allow GitHub Actions to create and approve pull requests" | release-please | no release pull request |
 | GHCR package visibility public, linked to this repository | image pulls | anonymous pulls fail |

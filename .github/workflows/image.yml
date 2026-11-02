@@ -1,11 +1,15 @@
-# Publishes the main-line image: every push to main builds linux/amd64 and
-# linux/arm64, pushes ghcr.io/mavrovde/viafrei-api:edge and :sha-<12>, signs
-# the digest with cosign (keyless, GitHub OIDC) and attests its build
-# provenance. Release images are published by release.yml, never here.
+# Publishes the main-line image once CI has passed on a push to main: builds
+# linux/amd64 and linux/arm64, pushes ghcr.io/mavrovde/viafrei-api:sha-<12>
+# and, when the commit is still the head of main, :edge; signs the digest
+# with cosign (keyless, GitHub OIDC) and attests its build provenance.
+# scripts/ci-gate.sh checks the CI result again before anything is pushed
+# (REL-015). Release images are published by release.yml, never here.
 name: Image
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -22,25 +26,50 @@ env:
 jobs:
   publish:
     name: Build, push, sign, attest (edge)
+    # A CI run on a push to main that succeeded, or a maintainer by hand; the
+    # event check keeps out a fork's pull request from a branch named main.
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     permissions:
       contents: read
+      checks: read
       packages: write
       id-token: write
       attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ env.SHA }}
           persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: CI passed on this commit (REL-015)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: scripts/ci-gate.sh "$SHA"
       - name: Version for this main build
         id: v
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           base=$(tr -d '[:space:]' < version.txt)
+          head=$(gh api "repos/$GH_REPO/commits/main" --jq .sha)
           {
-            echo "version=${base}+main.${GITHUB_SHA::12}"
-            echo "short=${GITHUB_SHA::12}"
+            echo "version=${base}+main.${SHA::12}"
+            echo "short=${SHA::12}"
             echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "tags<<EOF"
+            echo "$IMAGE:sha-${SHA::12}"
+            # :edge moves to the newest main only; an older run finishing late
+            # never moves it back.
+            if [[ $head == "$SHA" ]]; then echo "$IMAGE:edge"; else echo "::notice::$SHA is no longer the head of main; :edge is left where it is" >&2; fi
+            echo EOF
           } >> "$GITHUB_OUTPUT"
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -58,12 +87,10 @@ jobs:
           push: true
           sbom: true
           provenance: mode=max
-          tags: |
-            ${{ env.IMAGE }}:edge
-            ${{ env.IMAGE }}:sha-${{ steps.v.outputs.short }}
+          tags: ${{ steps.v.outputs.tags }}
           build-args: |
             VERSION=${{ steps.v.outputs.version }}
-            COMMIT=${{ github.sha }}
+            COMMIT=${{ env.SHA }}
             BUILD_DATE=${{ steps.v.outputs.date }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -80,11 +107,12 @@ jobs:
       - name: Summary
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
+          TAGS: ${{ steps.v.outputs.tags }}
           IDENTITY: ^https://github\.com/mavrovde/viafrei-api/\.github/workflows/(image|release)\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?)$
         run: |
           {
             echo "### Published ${IMAGE}@${DIGEST}"
-            echo "Tags: edge, sha-${GITHUB_SHA::12}"
+            echo "Tags: $(echo "$TAGS" | sed 's|.*:||' | paste -sd, -)"
             echo
             echo '```'
             echo "cosign verify ${IMAGE}@${DIGEST} \\"

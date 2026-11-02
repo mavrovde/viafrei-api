@@ -6,7 +6,8 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    # hotfix/* too: a hotfix tag is released only from a commit CI passed (REL-015).
+    branches: [main, "hotfix/**"]
   workflow_dispatch:
 
 permissions:
@@ -243,9 +244,14 @@ jobs:
       - name: SONAR_TOKEN must be set
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          ACTOR: ${{ github.actor }}
         run: |
           if [ -z "$SONAR_TOKEN" ]; then
-            echo "::error::the repository secret SONAR_TOKEN is not set (a pull request from a fork never sees it); SonarCloud cannot analyse this run"
+            if [ "$ACTOR" = "dependabot[bot]" ]; then
+              echo "::error::SONAR_TOKEN is not visible to this Dependabot pull request: Dependabot runs read Dependabot secrets, not Actions secrets. Add SONAR_TOKEN under Settings > Secrets and variables > Dependabot (docs/RELEASING.md)."
+            else
+              echo "::error::the repository secret SONAR_TOKEN is not set (a pull request from a fork never sees it); SonarCloud cannot analyse this run"
+            fi
             exit 1
           fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

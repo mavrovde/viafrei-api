@@ -50,6 +50,9 @@ invoke() {
     internal/testkit/covergate)
       expect 2 "$bin"
       ;;
+    internal/release/cigate)
+      expect 2 "$bin"
+      ;;
     *)
       echo "boot-coverage: main package $pkg has no invocation in $0" >&2
       exit 1

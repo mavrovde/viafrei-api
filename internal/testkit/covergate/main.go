@@ -11,7 +11,9 @@
 // Exclusions are a named file, one entry per line: a glob over the
 // module-relative file path, whitespace, and the reason. An entry without a
 // reason, or one that matches no measured file (stale), fails the gate, so the
-// file can only ever list what it names on purpose.
+// file can only ever list what it names on purpose. Only generated code may be
+// excluded: every file an entry matches must carry the standard
+// "// Code generated ... DO NOT EDIT." line, or the gate fails.
 //
 // Exit 0 when every package reaches the threshold, 1 on a package below it or
 // a bad exclusion, 2 on a usage error, an unreadable file or a profile that
@@ -26,6 +28,8 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -89,6 +93,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	problems = append(problems, g.report(stdout, module, excl, *exclPath, *minPct)...)
+	problems = append(problems, notGenerated(filepath.Dir(*gomod), excl)...)
 	if len(problems) > 0 {
 		for _, p := range problems {
 			fmt.Fprintln(stderr, "FAIL", p)
@@ -257,6 +262,33 @@ func (g *gate) report(w io.Writer, module string, excl []*exclusion, exclPath st
 		}
 	}
 	fmt.Fprintf(w, "total %.1f%% of %d statements in %d packages\n", all.pct(), all.total, len(names))
+	return problems
+}
+
+// generatedHeader is the line the Go toolchain recognises as marking a
+// generated file (https://go.dev/s/generatedcode).
+var generatedHeader = regexp.MustCompile(`(?m)^// Code generated .* DO NOT EDIT\.$`)
+
+// notGenerated lists every excluded file that is not generated code: only a
+// generator's output may leave the 100 % rule.
+func notGenerated(root string, excl []*exclusion) []string {
+	var problems []string
+	for _, e := range excl {
+		files := make([]string, 0, len(e.files))
+		for f := range e.files {
+			files = append(files, f)
+		}
+		slices.Sort(files)
+		for _, f := range files {
+			src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(f))) // #nosec G304 -- a file the measured profile names
+			switch {
+			case err != nil:
+				problems = append(problems, fmt.Sprintf("exclusion %s: %s cannot be read, so it is not shown to be generated: %v", e.glob, f, err))
+			case !generatedHeader.Match(src):
+				problems = append(problems, fmt.Sprintf("exclusion %s: %s has no \"// Code generated ... DO NOT EDIT.\" line; only generated code may be excluded", e.glob, f))
+			}
+		}
+	}
 	return problems
 }
 

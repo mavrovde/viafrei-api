@@ -12,16 +12,20 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
+type ciStep struct {
+	Name            string `yaml:"name"`
+	Run             string `yaml:"run"`
+	ContinueOnError any    `yaml:"continue-on-error"`
+}
+
+type ciJob struct {
+	Needs           any      `yaml:"needs"`
+	ContinueOnError any      `yaml:"continue-on-error"`
+	Steps           []ciStep `yaml:"steps"`
+}
+
 type ciJobs struct {
-	Jobs map[string]struct {
-		Needs           any `yaml:"needs"`
-		ContinueOnError any `yaml:"continue-on-error"`
-		Steps           []struct {
-			Name            string `yaml:"name"`
-			Run             string `yaml:"run"`
-			ContinueOnError any    `yaml:"continue-on-error"`
-		} `yaml:"steps"`
-	} `yaml:"jobs"`
+	Jobs map[string]ciJob `yaml:"jobs"`
 }
 
 // orTrue matches a command whose failure is discarded: "|| true" or "|| :".
@@ -52,20 +56,34 @@ func coverageGateFindings(src []byte) []string {
 	if err := yaml.Unmarshal(src, &w); err != nil {
 		return []string{"ci.yml does not parse: " + err.Error()}
 	}
-	run := func(job string) string {
-		var b strings.Builder
-		for _, s := range w.Jobs[job].Steps {
-			b.WriteString(s.Run + "\n")
-		}
-		return b.String()
+	out := measureFindings(w)
+	for _, job := range []string{"test", "integration", "coverage"} {
+		out = append(out, swallowFindings(job, w.Jobs[job])...)
 	}
+	out = append(out, needsFindings(w)...)
+	slices.Sort(out)
+	return out
+}
+
+// runOf joins the run scripts of a job's steps.
+func runOf(j ciJob) string {
+	var b strings.Builder
+	for _, s := range j.Steps {
+		b.WriteString(s.Run + "\n")
+	}
+	return b.String()
+}
+
+// measureFindings: both test jobs measure every package, and the coverage
+// job merges their profiles with the boot smoke at -min 100.
+func measureFindings(w ciJobs) []string {
 	var out []string
 	for job, profile := range map[string]string{"test": "coverage-unit.out", "integration": "coverage-integration.out"} {
-		if r := run(job); !strings.Contains(r, "-coverpkg=./...") || !strings.Contains(r, "-coverprofile="+profile) {
+		if r := runOf(w.Jobs[job]); !strings.Contains(r, "-coverpkg=./...") || !strings.Contains(r, "-coverprofile="+profile) {
 			out = append(out, "job "+job+" does not measure every package into "+profile)
 		}
 	}
-	gate := run("coverage")
+	gate := runOf(w.Jobs["coverage"])
 	for _, want := range []string{
 		"scripts/boot-coverage.sh coverage-boot.out",
 		"covergate -min 100 -exclusions test/coverage-exclusions.txt -o coverage.out",
@@ -75,20 +93,34 @@ func coverageGateFindings(src []byte) []string {
 			out = append(out, "job coverage does not run "+want)
 		}
 	}
-	for _, job := range []string{"test", "integration", "coverage"} {
-		j := w.Jobs[job]
-		if j.ContinueOnError != nil && fmt.Sprint(j.ContinueOnError) != "false" {
-			out = append(out, "job "+job+" sets continue-on-error")
+	return out
+}
+
+// set: a continue-on-error value that is present and not false.
+func set(v any) bool { return v != nil && fmt.Sprint(v) != "false" }
+
+// swallowFindings: a job that may not swallow a failure, neither by
+// continue-on-error on the job or a step nor by || true in a step.
+func swallowFindings(job string, j ciJob) []string {
+	var out []string
+	if set(j.ContinueOnError) {
+		out = append(out, "job "+job+" sets continue-on-error")
+	}
+	for i, s := range j.Steps {
+		if set(s.ContinueOnError) {
+			out = append(out, fmt.Sprintf("job %s step %d (%s) sets continue-on-error", job, i+1, s.Name))
 		}
-		for i, s := range j.Steps {
-			if s.ContinueOnError != nil && fmt.Sprint(s.ContinueOnError) != "false" {
-				out = append(out, fmt.Sprintf("job %s step %d (%s) sets continue-on-error", job, i+1, s.Name))
-			}
-			if orTrue.MatchString(s.Run) {
-				out = append(out, fmt.Sprintf("job %s step %d (%s) swallows a failure with || true", job, i+1, s.Name))
-			}
+		if orTrue.MatchString(s.Run) {
+			out = append(out, fmt.Sprintf("job %s step %d (%s) swallows a failure with || true", job, i+1, s.Name))
 		}
 	}
+	return out
+}
+
+// needsFindings: the coverage job waits for both test jobs, Sonar for the
+// merged profile.
+func needsFindings(w ciJobs) []string {
+	var out []string
 	for job, want := range map[string][]string{"coverage": {"test", "integration"}, "sonar": {"coverage"}} {
 		for _, n := range want {
 			if !slices.Contains(needs(w.Jobs[job].Needs), n) {
@@ -96,7 +128,6 @@ func coverageGateFindings(src []byte) []string {
 			}
 		}
 	}
-	slices.Sort(out)
 	return out
 }
 
@@ -127,6 +158,10 @@ func TestCoverageGateIsWired(t *testing.T) {
 		if got := strings.Join(coverageGateFindings([]byte(bad)), "; "); !strings.Contains(got, want) {
 			t.Errorf("planted %q, the rule said %q", want, got)
 		}
+	}
+	explicit := strings.Replace(string(ci), "      - name: Merge and gate\n", "      - name: Merge and gate\n        continue-on-error: false\n", 1)
+	if f := coverageGateFindings([]byte(explicit)); explicit == string(ci) || len(f) > 0 {
+		t.Errorf("continue-on-error: false swallows nothing, yet the rule said %q", f)
 	}
 	if got := needs(map[string]any{}); got != nil {
 		t.Errorf("needs of a map = %v, want nil", got)

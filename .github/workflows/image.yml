@@ -1,9 +1,15 @@
 # Publishes the main-line image once CI has passed on a push to main: builds
 # linux/amd64 and linux/arm64, pushes ghcr.io/mavrovde/viafrei-api:sha-<12>
-# and, when the commit is still the head of main, :edge; signs the digest
-# with cosign (keyless, GitHub OIDC) and attests its build provenance.
-# scripts/ci-gate.sh checks the CI result again before anything is pushed
-# (REL-015). Release images are published by release.yml, never here.
+# and :edge, signs the digest with cosign (keyless, GitHub OIDC) and attests
+# its build provenance. scripts/ci-gate.sh checks the CI result again before
+# anything is pushed (REL-015). Release images are published by release.yml,
+# never here.
+#
+# The publish job checks out the head of main, never a sha taken from the
+# event, so only this repository's main runs next to the packages: write
+# token. When main has moved on since the CI run that started this, nothing
+# is published: the CI run of the newer head starts its own publish, so
+# :edge only ever moves forward.
 name: Image
 
 on:
@@ -24,26 +30,70 @@ env:
   IMAGE: ghcr.io/mavrovde/viafrei-api
 
 jobs:
+  head:
+    name: The commit CI passed is the head of main
+    # A CI run on a push to this repository's main that succeeded, or a
+    # maintainer by hand (refused below unless dispatched from main). The
+    # event and repository checks keep out a fork's pull request from a
+    # branch named main.
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      publish: ${{ steps.head.outputs.publish }}
+      sha: ${{ steps.head.outputs.sha }}
+    steps:
+      - id: head
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          if [[ $EVENT == workflow_dispatch && $REF != refs/heads/main ]]; then
+            echo "::error::Image was dispatched from $REF; it publishes from refs/heads/main only"
+            exit 1
+          fi
+          head=$(gh api "repos/$GH_REPO/commits/main" --jq .sha)
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          if [[ $head == "$SHA" ]]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::main has moved on from $SHA to $head; the CI run of $head publishes, nothing is published here"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
   publish:
     name: Build, push, sign, attest (edge)
-    # A CI run on a push to main that succeeded, or a maintainer by hand; the
-    # event check keeps out a fork's pull request from a branch named main.
-    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    needs: head
+    if: needs.head.outputs.publish == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      SHA: ${{ needs.head.outputs.sha }}
     permissions:
       contents: read
       checks: read
+      actions: read
       packages: write
       id-token: write
       attestations: write
     steps:
+      # No ref: the head of main (the default branch) for a workflow_run, the
+      # dispatched ref, refused above unless it is main, for a dispatch.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.SHA }}
           persist-credentials: false
+      - name: The checkout is the commit CI passed
+        run: |
+          head=$(git rev-parse HEAD)
+          if [[ $head != "$SHA" ]]; then
+            echo "::error::main moved from $SHA to $head after the head check; the CI run of $head publishes it"
+            exit 1
+          fi
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
@@ -54,21 +104,15 @@ jobs:
         run: scripts/ci-gate.sh "$SHA"
       - name: Version for this main build
         id: v
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
         run: |
           base=$(tr -d '[:space:]' < version.txt)
-          head=$(gh api "repos/$GH_REPO/commits/main" --jq .sha)
           {
             echo "version=${base}+main.${SHA::12}"
             echo "short=${SHA::12}"
             echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo "tags<<EOF"
             echo "$IMAGE:sha-${SHA::12}"
-            # :edge moves to the newest main only; an older run finishing late
-            # never moves it back.
-            if [[ $head == "$SHA" ]]; then echo "$IMAGE:edge"; else echo "::notice::$SHA is no longer the head of main; :edge is left where it is" >&2; fi
+            echo "$IMAGE:edge"
             echo EOF
           } >> "$GITHUB_OUTPUT"
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0

@@ -24,7 +24,7 @@ expect() {
   local want=$1 got=0
   shift
   "$@" >"$work/run/stdout" 2>"$work/run/stderr" || got=$?
-  if [ "$got" != "$want" ]; then
+  if [[ $got != "$want" ]]; then
     echo "boot-coverage: $* exited $got, want $want" >&2
     cat "$work/run/stderr" >&2
     exit 1
@@ -69,12 +69,12 @@ while IFS= read -r pkg; do
   n=$((n + 1))
 done < <(go list -f '{{if eq .Name "main"}}{{.ImportPath}}{{end}}' ./...)
 
-if [ "$n" -eq 0 ]; then
+if [[ $n -eq 0 ]]; then
   echo "boot-coverage: found no main package; nothing was measured" >&2
   exit 1
 fi
 go tool covdata textfmt -i="$GOCOVERDIR" -o "$out"
-if [ "$(wc -l <"$out")" -le 1 ]; then
+if [[ $(wc -l <"$out") -le 1 ]]; then
   echo "boot-coverage: $out holds no coverage block" >&2
   exit 1
 fi

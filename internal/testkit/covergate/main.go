@@ -55,8 +55,18 @@ type gate struct {
 	order  []string
 }
 
+// prog prefixes every message this command prints.
+const prog = "covergate"
+
+// usageErr prints err and returns the exit code of an input that cannot be
+// read: 2, never a pass.
+func usageErr(stderr io.Writer, err error) int {
+	fmt.Fprintln(stderr, prog+":", err)
+	return 2
+}
+
 func run(args []string, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("covergate", flag.ContinueOnError)
+	fs := flag.NewFlagSet(prog, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	minPct := fs.Float64("min", 100, "minimum statement coverage per package, in percent")
 	exclPath := fs.String("exclusions", "", "exclusion file (required; it may list nothing)")
@@ -66,30 +76,26 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	if *exclPath == "" || fs.NArg() == 0 {
-		fmt.Fprintln(stderr, "covergate: -exclusions FILE and at least one profile are required")
+		fmt.Fprintln(stderr, prog+": -exclusions FILE and at least one profile are required")
 		return 2
 	}
 	module, err := modulePath(*gomod)
 	if err != nil {
-		fmt.Fprintln(stderr, "covergate:", err)
-		return 2
+		return usageErr(stderr, err)
 	}
 	excl, problems, err := readExclusions(*exclPath)
 	if err != nil {
-		fmt.Fprintln(stderr, "covergate:", err)
-		return 2
+		return usageErr(stderr, err)
 	}
 	g := &gate{blocks: map[string]*block{}}
 	for _, p := range fs.Args() {
 		if err := g.read(p); err != nil {
-			fmt.Fprintln(stderr, "covergate:", err)
-			return 2
+			return usageErr(stderr, err)
 		}
 	}
 	if *out != "" {
 		if err := os.WriteFile(*out, g.profile(), 0o600); err != nil {
-			fmt.Fprintln(stderr, "covergate:", err)
-			return 2
+			return usageErr(stderr, err)
 		}
 	}
 	problems = append(problems, g.report(stdout, module, excl, *exclPath, *minPct)...)

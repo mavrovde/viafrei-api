@@ -30,7 +30,10 @@ concurrency:
 jobs:
   release-please:
     name: Release pull request
-    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    # A CI run on a push to this repository's main that succeeded, or a
+    # maintainer by hand. The event and repository checks keep out a fork's
+    # pull request from a branch named main.
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -64,6 +67,7 @@ jobs:
     permissions:
       contents: write
       checks: read
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -95,8 +99,12 @@ jobs:
   release:
     name: Release
     needs: [release-please, tag]
+    # A called workflow gets at most what its caller grants: release.yml's
+    # gate reads check runs and workflow runs.
     permissions:
       contents: write
+      checks: read
+      actions: read
       packages: write
       id-token: write
       attestations: write

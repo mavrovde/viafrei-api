@@ -46,6 +46,7 @@ jobs:
     permissions:
       contents: write
       checks: read
+      actions: read
       packages: write
       id-token: write
       attestations: write
@@ -76,10 +77,19 @@ jobs:
             on=main
           else
             while read -r b; do
-              if git merge-base --is-ancestor "$TAG^{commit}" "$b"; then on=$b; break; fi
+              if git merge-base --is-ancestor "$TAG^{commit}" "$b"; then on=${b#origin/}; break; fi
             done < <(git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/hotfix/*')
           fi
           [[ -n $on ]] || { echo "::error::$TAG points at a commit that is on neither main nor a hotfix/* branch"; exit 1; }
+          # Anyone with write access can push a hotfix/* branch, so being on
+          # one proves review only while the hotfix ruleset holds it: pull
+          # requests required and no force push (docs/RELEASING.md).
+          if [[ $on != main ]]; then
+            rules=" $(gh api "repos/$GH_REPO/rules/branches/$on" --jq '[.[].type] | join(" ")') "
+            for rule in pull_request non_fast_forward; do
+              [[ $rules == *" $rule "* ]] || { echo "::error::$on carries no '$rule' rule; a hotfix tag is released only from a hotfix/* branch the hotfix ruleset protects (docs/RELEASING.md)"; exit 1; }
+            done
+          fi
           version=${TAG#v}
           final=true; [[ -n $rc ]] && final=false
           prerelease=false; [[ $major == 0 || -n $rc ]] && prerelease=true

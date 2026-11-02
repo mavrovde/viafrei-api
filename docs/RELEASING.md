@@ -29,11 +29,15 @@ and merge release pull requests.
    `Unit and handler tests`, `Integration tests (PostGIS)` and
    `Coverage gate (100 % per package)` must all have **completed with
    success** on that commit, and a missing, queued, running or failed one is
-   a refusal (REL-015). Only then does it create the **annotated** tag
-   `vX.Y.Z` on the release commit and push it.
+   a refusal (REL-015). Only a check run that GitHub Actions created inside a
+   run of `.github/workflows/ci.yml` on that commit counts: any app or
+   workflow holding `checks: write` can create a check run of any name, so a
+   same-named run from elsewhere is not evidence. Only then does it create
+   the **annotated** tag `vX.Y.Z` on the release commit and push it.
 5. The same run calls `.github/workflows/release.yml`, which:
    - checks the tag is annotated and well-formed, and that its commit lies on
-     `main` or a `hotfix/*` branch (`git merge-base --is-ancestor`)
+     `main` or a `hotfix/*` branch (`git merge-base --is-ancestor`); for a
+     hotfix branch, also that the hotfix ruleset protects it (see Hotfix)
    - runs `scripts/ci-gate.sh` on the tagged commit again, before anything is
      pushed or signed (this also covers a release-candidate tag pushed by hand)
    - builds `linux/amd64` and `linux/arm64`, pushes to
@@ -54,6 +58,17 @@ and merge release pull requests.
    the downloaded assets, and smoke-tests `/healthz` of the published image.
    It then closes the milestone whose title starts with `X.Y.Z` if no issue in
    it is open, or lists the open issues in the job summary.
+
+### When CI failed on the release commit
+
+The `tag` job refuses and nothing is tagged or published. If the failure was
+not in the code (a flaky runner, a registry outage), re-run the failed jobs
+of the CI run on the release commit (`gh run rerun <ci-run-id> --failed`);
+once it has succeeded, re-run the failed jobs of the Release Please run
+(`gh run rerun <release-please-run-id> --failed`), whose `tag` job runs the
+gate again. If the code is at fault, fix it through a pull request and
+release the next patch; the draft release of the refused version is deleted
+by hand (it never had a tag).
 
 ### Version rules
 
@@ -167,7 +182,11 @@ Never by moving or deleting a tag. Every release is an immutable digest.
 
 ## Hotfix
 
-For a fix that must not wait for what is already on `main`:
+For a fix that must not wait for what is already on `main`. A hotfix tag is
+released only from a `hotfix/*` branch that the hotfix ruleset protects:
+`release.yml` reads the branch's rules through the API and refuses unless
+they require a pull request and forbid force pushes, because anyone with
+write access can push an unprotected branch.
 
 1. Branch `hotfix/X.Y.Z+1` from the tag `vX.Y.Z`.
 2. Land the fix there through a pull request (`fix:` title), with review.
@@ -177,6 +196,37 @@ For a fix that must not wait for what is already on `main`:
    head and pushes it; `release.yml` publishes it from the tag push.
 4. Merge or cherry-pick the fix into `main` and add the version to
    `.release-please-manifest.json` there, so release-please continues from it.
+
+### Hotfix ruleset (documented here, applied by a repository admin)
+
+Applied once, like the tag ruleset; no workflow applies it.
+
+```sh
+gh api -X POST repos/mavrovde/viafrei-api/rulesets --input - <<'JSON'
+{
+  "name": "hotfix branches",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": { "ref_name": { "include": ["refs/heads/hotfix/**"], "exclude": [] } },
+  "rules": [
+    { "type": "pull_request", "parameters": {
+        "required_approving_review_count": 1,
+        "dismiss_stale_reviews_on_push": true,
+        "require_code_owner_review": false,
+        "require_last_push_approval": true,
+        "required_review_thread_resolution": true } },
+    { "type": "non_fast_forward" },
+    { "type": "deletion" }
+  ]
+}
+JSON
+```
+
+Check what `release.yml` will see for a branch:
+
+```sh
+gh api repos/mavrovde/viafrei-api/rules/branches/hotfix/X.Y.Z --jq '[.[].type]'
+```
 
 ## Yanking a release
 

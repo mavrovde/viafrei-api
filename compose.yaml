@@ -25,7 +25,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       API_READER_PASSWORD: ${API_READER_PASSWORD:?set API_READER_PASSWORD in .env}
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - db-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U owner -d contract && psql -U owner -d contract -tAc 'select 1 from contract.contract_info' | grep -q 1"]
       interval: 5s

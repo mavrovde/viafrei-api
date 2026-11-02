@@ -33,7 +33,7 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
 
 # Development database only; never published. The upstream image is
 # single-architecture (linux/amd64).
-FROM postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5 AS devdb
+FROM postgis/postgis:18-3.6@sha256:4a43e3c3e5d55b9208240fc71db543b79c638766280c625a425bd0a2390989c4 AS devdb
 COPY db/contract/0001_contract.sql /docker-entrypoint-initdb.d/20_contract.sql
 COPY db/contract/0002_reader_role.sql /docker-entrypoint-initdb.d/21_reader_role.sql
 COPY deploy/compose/30_seed.sh /docker-entrypoint-initdb.d/30_seed.sh

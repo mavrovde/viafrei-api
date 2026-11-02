@@ -1,0 +1,360 @@
+{
+  "components": {
+    "schemas": {
+      "HealthBody": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "description": "Always ok when the process answers.",
+            "enum": [
+              "ok"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
+      "Links": {
+        "additionalProperties": false,
+        "properties": {
+          "self": {
+            "description": "This response's own URL.",
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "self"
+        ],
+        "type": "object"
+      },
+      "MetaData": {
+        "additionalProperties": false,
+        "properties": {
+          "apiVersion": {
+            "description": "Version of this build of the service.",
+            "type": "string"
+          },
+          "buildSha": {
+            "description": "Source revision the build was made from.",
+            "type": "string"
+          },
+          "contractVersion": {
+            "description": "Read-contract version (major.minor) the service is built for.",
+            "type": "string"
+          },
+          "languages": {
+            "description": "Languages the service answers in.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "openapi": {
+            "description": "URL of the OpenAPI document.",
+            "format": "uri",
+            "type": "string"
+          },
+          "platformVersion": {
+            "description": "Platform version the service is kept in step with; null until version sync exists.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "apiVersion",
+          "buildSha",
+          "contractVersion",
+          "platformVersion",
+          "openapi",
+          "languages"
+        ],
+        "type": "object"
+      },
+      "MetaEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MetaData"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "ParamError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "parameter": {
+            "type": "string"
+          },
+          "pointer": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "detail"
+        ],
+        "type": "object"
+      },
+      "Problem": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "description": "What went wrong in this occurrence.",
+            "type": "string"
+          },
+          "errors": {
+            "description": "One entry per violation, for invalid-parameter.",
+            "items": {
+              "$ref": "#/components/schemas/ParamError"
+            },
+            "type": "array"
+          },
+          "instance": {
+            "description": "The request path without the query string.",
+            "type": "string"
+          },
+          "requestId": {
+            "description": "Equal to the X-Request-Id header.",
+            "type": "string"
+          },
+          "retryAfter": {
+            "description": "Seconds, equal to Retry-After, where applicable.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "retryable": {
+            "description": "Whether repeating the same request may succeed.",
+            "type": "boolean"
+          },
+          "status": {
+            "description": "Equal to the HTTP status.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "title": {
+            "description": "Short title, fixed per type.",
+            "type": "string"
+          },
+          "type": {
+            "description": "Stable URI of the problem type; resolves to its documentation page.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "requestId",
+          "retryable"
+        ],
+        "type": "object"
+      },
+      "ReadinessBody": {
+        "additionalProperties": false,
+        "properties": {
+          "checks": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Per check: pass or fail. Present when not ready.",
+            "type": "object"
+          },
+          "status": {
+            "description": "ready when every check passes.",
+            "enum": [
+              "ready",
+              "not_ready"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
+      "ResponseMeta": {
+        "additionalProperties": false,
+        "properties": {
+          "generatedAt": {
+            "description": "When the service produced this body.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "language": {
+            "description": "The language of the texts in data (BCP 47).",
+            "type": "string"
+          },
+          "requestId": {
+            "description": "The request id, equal to the X-Request-Id header.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId",
+          "generatedAt",
+          "language"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Keyed, read-only access to live German mobility context. This document is generated from the code.",
+    "license": {
+      "name": "Terms of use",
+      "url": "https://viafrei.de/"
+    },
+    "title": "ViaFrei API",
+    "version": "1.0.0-draft"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/healthz": {
+      "get": {
+        "description": "The process runs and answers. Never touches storage (FR-SVC-004).",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthBody"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Liveness",
+        "tags": [
+          "service"
+        ]
+      }
+    },
+    "/readyz": {
+      "get": {
+        "description": "Storage answers within the readiness timeout and publishes a compatible read contract (FR-SVC-004).",
+        "operationId": "getReadiness",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessBody"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Not ready: a check failed."
+          }
+        },
+        "summary": "Readiness",
+        "tags": [
+          "service"
+        ]
+      }
+    },
+    "/v1/meta": {
+      "get": {
+        "description": "The API version, the build revision and the read-contract version.",
+        "operationId": "getMeta",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetaEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Service metadata",
+        "tags": [
+          "service"
+        ]
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.viafrei.de"
+    }
+  ],
+  "tags": [
+    {
+      "description": "Health, readiness and service metadata.",
+      "name": "service"
+    }
+  ]
+}

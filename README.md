@@ -8,7 +8,7 @@
 
 [Website](https://viafrei.de) · [Wiki](https://github.com/mavrovde/viafrei-api/wiki) · [Roadmap](https://github.com/mavrovde/viafrei-api/wiki/Roadmap) · [MCP server](https://github.com/mavrovde/viafrei-mcp)
 
-![status](https://img.shields.io/badge/status-design%20phase-blue)
+![status](https://img.shields.io/badge/status-skeleton-blue)
 ![api](https://img.shields.io/badge/API-v1%20planned-lightgrey)
 ![openapi](https://img.shields.io/badge/OpenAPI-3.1-green)
 
@@ -65,7 +65,7 @@ Standards we build on: OpenAPI 3.1, RFC 9457 problem details for errors, cursor 
 
 ## Status
 
-ViaFrei API is in its **design phase**. Nothing is deployed yet.
+ViaFrei API has a **service skeleton** in Go. Nothing is deployed yet, and no data endpoint exists.
 
 | Step | State |
 |---|---|
@@ -75,12 +75,39 @@ ViaFrei API is in its **design phase**. Nothing is deployed yet.
 | Logical data model | 📝 Draft — [Data Model](https://github.com/mavrovde/viafrei-api/wiki/Data-Model): entities, fields and diagrams per domain, mapped to API fields (never a copy of storage) |
 | Testing strategy and test plans | 📝 Draft — [Testing Strategy](https://github.com/mavrovde/viafrei-api/wiki/Testing-Strategy); test infrastructure planned in #13–#20, no test has run yet |
 | Architecture for Go, Rust and TypeScript | ✅ [Stack Comparison](https://github.com/mavrovde/viafrei-api/wiki/Stack-Comparison) |
-| Stack decision: Go, Rust or TypeScript | 🔄 Benchmark planned ([ADR-0001](https://github.com/mavrovde/viafrei-api/wiki/Spec-Architecture-Decisions), proposed) |
-| Project skeleton, CI and release pipeline | ⏳ Next |
+| Stack decision | ✅ **Go** — [ADR-0001](https://github.com/mavrovde/viafrei-api/wiki/Spec-Architecture-Decisions) accepted on 2026-11-01 |
+| Configuration layer | ✅ Every tunable is a documented key with bounds — [docs/configuration.md](docs/configuration.md) |
+| Service skeleton: `/healthz`, `/readyz`, `/v1/meta`, `/v1/openapi.json` | 🔄 In review (milestone 0.2.0) |
+| CI, security checks and release pipeline | 🔄 In progress (milestone 0.2.0) |
 | Keys, rate limits and priority tiers | ⏳ Planned |
 | v1 feature endpoints | ⏳ Planned |
 
 Follow progress in the [Roadmap](https://github.com/mavrovde/viafrei-api/wiki/Roadmap) and in [Issues](https://github.com/mavrovde/viafrei-api/issues).
+
+## Build and run
+
+Requirements: Go 1.27 (the exact toolchain is pinned in `go.mod`), and a container runtime for the integration tests.
+
+```sh
+make build              # bin/viafrei-api, static, version and commit stamped in
+make test               # unit and handler tests
+make test-integration   # adds tests against a throwaway PostGIS container
+make generate           # regenerate sqlc code, docs/configuration.md, api/openapi.json
+```
+
+The service reads its configuration from environment variables with the prefix `VFAPI_` and, optionally, a YAML file named by `VFAPI_CONFIG_FILE`. Every key, its default and its bounds are listed in [docs/configuration.md](docs/configuration.md). An unknown key or a value out of bounds stops the service at start-up with exit status 78. The one required value is the database URL of the service's read-only role:
+
+```sh
+export VFAPI_DB_URL_FILE=/run/secrets/db_url   # or VFAPI_DB_URL=postgres://...
+bin/viafrei-api config check                    # validate and exit
+bin/viafrei-api                                 # serve on localhost:8080
+curl -s localhost:8080/healthz                  # {"status":"ok"}
+curl -s localhost:8080/v1/meta                  # API, build and read-contract versions
+```
+
+Other subcommands: `healthcheck` (exit 0 when `/healthz` answers, for container healthchecks), `config show` (effective values, secrets hidden), `config docs`, `openapi`, `version`.
+
+The database the service reads is described by a versioned read contract in [`db/contract/`](db/contract): logical names only, created with a read-only role. Tests build it in a throwaway container. They never reach a live data source or production.
 
 ## Documentation
 
@@ -105,7 +132,7 @@ Please do not report security issues in public issues. Use GitHub's [private vul
 
 ## Contributing
 
-Ideas and questions are welcome in [Issues](https://github.com/mavrovde/viafrei-api/issues). Code contributions open once the project skeleton is in place; the process (pull requests, required checks, review) is described in [Development Process](https://github.com/mavrovde/viafrei-api/wiki/Development-Process).
+Ideas and questions are welcome in [Issues](https://github.com/mavrovde/viafrei-api/issues). Code contributions are welcome through pull requests; the process (pull requests, required checks, review) is described in [Development Process](https://github.com/mavrovde/viafrei-api/wiki/Development-Process).
 
 ## Related
 

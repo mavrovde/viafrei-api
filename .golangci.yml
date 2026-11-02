@@ -1,0 +1,81 @@
+version: "2"
+
+run:
+  timeout: 5m
+  build-tags:
+    - integration
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - contextcheck
+    - depguard
+    - errorlint
+    - gosec
+    - misspell
+    - noctx
+    - nolintlint
+    - revive
+    - sqlclosecheck
+    - unconvert
+    - usestdlibvars
+  settings:
+    misspell:
+      locale: UK
+    depguard:
+      rules:
+        # The domain imports the standard library only.
+        domain:
+          files:
+            - "**/internal/domain/**"
+            - "!$test"
+          allow:
+            - $gostd
+            - github.com/mavrovde/viafrei-api/internal/domain
+        # Use cases know ports, never adapters or transport.
+        app:
+          files:
+            - "**/internal/app/**"
+            - "!$test"
+          allow:
+            - $gostd
+            - github.com/mavrovde/viafrei-api/internal/domain
+            - github.com/mavrovde/viafrei-api/internal/app
+            - github.com/mavrovde/viafrei-api/internal/testkit
+        # Only the store adapter may speak to the database driver.
+        no-driver-outside-store:
+          files:
+            - "**/internal/adapters/httpapi/**"
+            - "**/internal/app/**"
+            - "**/internal/domain/**"
+            - "**/internal/runtime/**"
+          deny:
+            - pkg: github.com/jackc/pgx
+              desc: storage access belongs in internal/adapters/store
+    gosec:
+      excludes:
+        - G104 # unhandled errors are errcheck's job
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+          - noctx
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/mavrovde/viafrei-api

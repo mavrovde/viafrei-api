@@ -23,7 +23,7 @@ import (
 // Image is the PostGIS image the tests run against, the same major versions
 // as the compose stack, pinned by digest like the Dockerfile's devdb stage
 // (SSC-005; TestTestImagesArePinned holds the two equal).
-const Image = "postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5"
+const Image = "postgis/postgis:18-3.6@sha256:4a43e3c3e5d55b9208240fc71db543b79c638766280c625a425bd0a2390989c4"
 
 // DB is one running test database.
 type DB struct {
@@ -43,6 +43,11 @@ func Start(ctx context.Context) (*DB, error) {
 		postgres.WithUsername("owner"),
 		postgres.WithPassword(rand.Text()),
 		postgres.BasicWaitStrategies(),
+		// The upstream PostGIS image is published for linux/amd64 only, the
+		// platform compose.yaml names too; an arm64 host runs it emulated.
+		testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
+			ContainerRequest: testcontainers.ContainerRequest{ImagePlatform: "linux/amd64"},
+		}),
 	)
 	db := &DB{container: c}
 	if err == nil {

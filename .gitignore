@@ -3,7 +3,8 @@
 /dist/
 *.test
 *.out
-coverage.*
+/coverage.*
+/coverage-summary.txt
 
 # Local configuration and secrets
 .env

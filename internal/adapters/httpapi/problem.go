@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/danielgtaylor/huma/v2"
 )
@@ -126,8 +127,13 @@ func writeProblem(w http.ResponseWriter, p *Problem) {
 // hookHumaErrors makes huma's own error answers (validation, negotiation,
 // panics) project problems. huma keeps these hooks in package variables; the
 // values set here depend only on the request context, so every server built in
-// one process shares them safely.
-func hookHumaErrors() {
+// one process shares them. They are installed exactly once (hookOnce): writing
+// them per server raced with servers already answering in other goroutines.
+func hookHumaErrors() { hookOnce.Do(installHumaErrorHooks) }
+
+var hookOnce sync.Once
+
+func installHumaErrorHooks() {
 	// A list in an answer is an empty array when there is nothing, never null.
 	huma.DefaultArrayNullable = false
 	huma.NewErrorWithContext = func(hctx huma.Context, status int, msg string, errs ...error) huma.StatusError {

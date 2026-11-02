@@ -225,6 +225,10 @@
     }
   },
   "info": {
+    "contact": {
+      "name": "ViaFrei API maintainers",
+      "url": "https://github.com/mavrovde/viafrei-api/issues"
+    },
     "description": "Keyed, read-only access to live German mobility context. This document is generated from the code.",
     "license": {
       "name": "Terms of use",

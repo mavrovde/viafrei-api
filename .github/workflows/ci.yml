@@ -1,0 +1,277 @@
+# Pull-request and main checks. Every job is bounded, nothing is retried
+# (TST-017), every third-party action is pinned by commit SHA (SSC-005), and
+# no job reaches a live data source or production (TST-010).
+name: CI
+
+on:
+  pull_request:
+  push:
+    # hotfix/* too: a hotfix tag is released only from a commit CI passed (REL-015).
+    branches: [main, "hotfix/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+          args: --build-tags integration --timeout 5m
+      - name: actionlint (workflows, with shellcheck)
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+
+  test:
+    name: Unit and handler tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: go test (race, shuffled)
+        run: |
+          set -o pipefail
+          go test -race -shuffle=on -count=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage-unit.out -json ./... | tee test-unit.json | go run ./internal/testkit/gotestsum-lite
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: test-unit-json
+          path: |
+            test-unit.json
+            coverage-unit.out
+          retention-days: 30
+          if-no-files-found: error
+
+  integration:
+    name: Integration tests (PostGIS)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: Pull the test images once, by digest (SSC-005)
+        # testcontainers-go starts its reaper by tag and pulls only a missing
+        # image, so the pinned reaper is pulled by digest and tagged with the
+        # name it asks for. TestTestImagesArePinned holds both lines current.
+        run: |
+          docker pull postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5
+          docker pull testcontainers/ryuk:0.14.0@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0
+          docker tag testcontainers/ryuk:0.14.0@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0 testcontainers/ryuk:0.14.0
+      - name: go test -tags integration
+        run: |
+          set -o pipefail
+          go test -race -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out -json ./... | tee test-integration.json | go run ./internal/testkit/gotestsum-lite
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: test-integration-json
+          path: |
+            test-integration.json
+            coverage-integration.out
+          retention-days: 30
+          if-no-files-found: error
+
+  coverage:
+    name: Coverage gate (100 % per package)
+    # TST-001: every package of every layer at 100 % of its statements, from
+    # the unit, integration and boot-smoke profiles merged. Generated code may
+    # be left out only through test/coverage-exclusions.txt, one reason per
+    # entry. The merged profile is the one SonarCloud reads.
+    needs: [test, integration]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: test-unit-json
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: test-integration-json
+      - name: Boot smoke (every main, built with -cover)
+        run: scripts/boot-coverage.sh coverage-boot.out
+      - name: Merge and gate
+        run: |
+          set -o pipefail
+          go run ./internal/testkit/covergate -min 100 -exclusions test/coverage-exclusions.txt -o coverage.out \
+            coverage-unit.out coverage-integration.out coverage-boot.out | tee coverage-summary.txt
+      - name: Coverage table in the job summary
+        if: always()
+        run: |
+          if [ -s coverage-summary.txt ]; then
+            { echo '```'; cat coverage-summary.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: coverage
+          path: |
+            coverage.out
+            coverage-summary.txt
+          retention-days: 30
+          if-no-files-found: error
+
+  generated:
+    name: Generated files are current
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - run: make check-generated SQLC="go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1"
+
+  openapi:
+    name: OpenAPI lint and breaking changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: Spectral
+        run: npm exec --yes --ignore-scripts --package=@stoplight/spectral-cli@6.17.0 -- spectral lint --ruleset .spectral.yaml --fail-severity warn api/openapi.json
+      - name: Breaking changes against the base branch
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: scripts/openapi-diff.sh "$BASE_REF" api/openapi.json
+
+  vulncheck:
+    name: govulncheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -show verbose ./...
+
+  image:
+    name: Image (build, lint, scan, healthz)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Hadolint
+        run: docker run --rm -i hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d hadolint --failure-threshold warning - < Dockerfile
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build linux/amd64 and linux/arm64 (not pushed)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: runtime
+          platforms: linux/amd64,linux/arm64
+          push: false
+          build-args: |
+            VERSION=0.0.0-ci
+            COMMIT=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Load linux/amd64 for the checks below
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: runtime
+          platforms: linux/amd64
+          load: true
+          tags: viafrei-api:ci
+          build-args: |
+            VERSION=0.0.0-ci
+            COMMIT=${{ github.sha }}
+          cache-from: type=gha
+      - name: The image answers /healthz and reports itself healthy
+        run: scripts/image-smoke.sh viafrei-api:ci
+      - name: Trivy (HIGH and CRITICAL fail)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222 \
+            image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --no-progress --db-repository mirror.gcr.io/aquasec/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2 viafrei-api:ci
+
+  compose:
+    name: Compose smoke (Schemathesis)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: make compose-test COMMIT=${{ github.sha }}
+
+  sonar:
+    name: SonarCloud analysis
+    needs: [test, coverage]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: SONAR_TOKEN must be set
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            if [ "$ACTOR" = "dependabot[bot]" ]; then
+              echo "::error::SONAR_TOKEN is not visible to this Dependabot pull request: Dependabot runs read Dependabot secrets, not Actions secrets. Add SONAR_TOKEN under Settings > Secrets and variables > Dependabot (docs/RELEASING.md)."
+            else
+              echo "::error::the repository secret SONAR_TOKEN is not set (a pull request from a fork never sees it); SonarCloud cannot analyse this run"
+            fi
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: test-unit-json
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage
+      - name: The merged coverage report is there
+        run: test -s coverage.out && test -s test-unit.json
+      - uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

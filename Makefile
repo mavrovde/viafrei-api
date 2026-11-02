@@ -8,7 +8,7 @@ LDFLAGS   := -s -w \
 	-X github.com/mavrovde/viafrei-api/internal/buildinfo.version=$(VERSION) \
 	-X github.com/mavrovde/viafrei-api/internal/buildinfo.commit=$(COMMIT)
 
-.PHONY: build test test-integration lint generate check-generated fixtures run clean \
+.PHONY: build test test-integration coverage lint generate check-generated fixtures run clean \
 	image image-multiarch up down logs reset compose-test
 
 build: ## Build the binary into bin/
@@ -20,17 +20,25 @@ test: ## Unit and handler tests (no container runtime needed)
 test-integration: ## Integration tests against a throwaway PostGIS (testcontainers)
 	$(GO) test -race -count=1 -tags integration ./...
 
+coverage: ## Unit + integration + boot profiles merged, gated at 100 % per package (TST-001)
+	$(GO) test -count=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage-unit.out ./...
+	$(GO) test -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out ./...
+	scripts/boot-coverage.sh coverage-boot.out
+	$(GO) run ./internal/testkit/covergate -min 100 -exclusions test/coverage-exclusions.txt -o coverage.out \
+		coverage-unit.out coverage-integration.out coverage-boot.out
+
 lint: ## golangci-lint with the repository configuration
 	golangci-lint run ./...
 
 generate: ## Regenerate sqlc code, docs/configuration.md and api/openapi.json
-	sqlc generate
+	$(SQLC) generate
 	$(GO) run ./cmd/viafrei-api config docs > docs/configuration.md
 	$(GO) run ./cmd/viafrei-api openapi > api/openapi.json
 
 check-generated: generate ## Fail when a generated file differs from the committed one
 	git diff --exit-code -- internal/adapters/store/contractdb docs/configuration.md api/openapi.json
 
+SQLC ?= sqlc
 PROFILE ?= tiny
 SEED    ?= 1
 

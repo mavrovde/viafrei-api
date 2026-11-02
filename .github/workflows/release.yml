@@ -1,0 +1,363 @@
+# Publishes one release from an annotated tag vX.Y.Z or vX.Y.Z-rc.N:
+#   build linux/amd64 + linux/arm64, push to GHCR, sign (cosign keyless),
+#   attest build provenance and the SBOM, attach openapi.json, its diff
+#   against the previous release, the SBOMs and SHA256SUMS to the release
+#   page, publish it (0.x and -rc are pre-releases), then verify what was
+#   published and close the milestone when nothing in it is open.
+# Started by release-please.yml (workflow_call) after a release pull request
+# is merged, by a maintainer pushing an rc tag, or by hand for a tag that
+# exists. Tags are never moved or deleted here, and a tag whose release is
+# published, or whose :X.Y.Z image exists, is refused before anything is
+# built. See docs/RELEASING.md.
+name: Release
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Annotated tag to release (vX.Y.Z)
+        required: true
+        type: string
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing annotated tag to publish, vX.Y.Z or vX.Y.Z-rc.N (a published one is refused)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/mavrovde/viafrei-api
+  TAG: ${{ inputs.tag || github.ref_name }}
+  IDENTITY: ^https://github\.com/mavrovde/viafrei-api/\.github/workflows/(image|release)\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?)$
+  ISSUER: https://token.actions.githubusercontent.com
+
+jobs:
+  publish:
+    name: Build, sign, attest, publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: write
+      checks: read
+      actions: read
+      packages: write
+      id-token: write
+      attestations: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      version: ${{ steps.tag.outputs.version }}
+      final: ${{ steps.tag.outputs.final }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: The tag is an annotated vX.Y.Z or vX.Y.Z-rc.N
+        id: tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          [[ $TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-rc\.[0-9]+)?$ ]] || { echo "::error::'$TAG' is not vX.Y.Z or vX.Y.Z-rc.N"; exit 1; }
+          major=${BASH_REMATCH[1]} minor=${BASH_REMATCH[2]} rc=${BASH_REMATCH[4]}
+          [[ $(gh api "repos/$GH_REPO/git/ref/tags/$TAG" --jq .object.type) == tag ]] || { echo "::error::$TAG is a lightweight tag; releases need an annotated tag (git tag -a)"; exit 1; }
+          # A release comes from reviewed history: main, or a hotfix branch
+          # cut from a release tag (docs/RELEASING.md). Checked before
+          # anything is built or signed.
+          on=""
+          if git merge-base --is-ancestor "$TAG^{commit}" origin/main; then
+            on=main
+          else
+            while read -r b; do
+              if git merge-base --is-ancestor "$TAG^{commit}" "$b"; then on=${b#origin/}; break; fi
+            done < <(git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/hotfix/*')
+          fi
+          [[ -n $on ]] || { echo "::error::$TAG points at a commit that is on neither main nor a hotfix/* branch"; exit 1; }
+          # Anyone with write access can push a hotfix/* branch, so being on
+          # one proves review only while the hotfix ruleset holds it: pull
+          # requests with at least one approval, and no force push. This reads
+          # the rules as they are now, not as they were when each commit
+          # landed, and cannot see who may bypass them (docs/RELEASING.md).
+          if [[ $on != main ]]; then
+            rules=$(gh api "repos/$GH_REPO/rules/branches/$on")
+            types=" $(jq -r '[.[].type] | join(" ")' <<<"$rules") "
+            for rule in pull_request non_fast_forward; do
+              [[ $types == *" $rule "* ]] || { echo "::error::$on carries no '$rule' rule; a hotfix tag is released only from a hotfix/* branch the hotfix ruleset protects (docs/RELEASING.md)"; exit 1; }
+            done
+            reviews=$(jq '[.[] | select(.type == "pull_request") | .parameters.required_approving_review_count // 0] | max // 0' <<<"$rules")
+            (( reviews >= 1 )) || { echo "::error::$on requires $reviews approving reviews; the hotfix ruleset must require at least one (docs/RELEASING.md)"; exit 1; }
+          fi
+          version=${TAG#v}
+          final=true; [[ -n $rc ]] && final=false
+          prerelease=false; [[ $major == 0 || -n $rc ]] && prerelease=true
+          prev=""
+          for t in $(git tag -l "v*" --sort=-v:refname); do
+            [[ $t =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ && $t != "$TAG" ]] || continue
+            if [[ $(printf "%s\n%s\n" "$t" "$TAG" | sort -V | tail -n 1) == "$TAG" ]]; then prev=$t; break; fi
+          done
+          {
+            echo "version=$version"
+            echo "minor=$major.$minor"
+            echo "final=$final"
+            echo "prerelease=$prerelease"
+            echo "previous=$prev"
+            echo "highest=$([[ $(git tag -l "v*" | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V | tail -n 1) == "$TAG" ]] && echo true || echo false)"
+            echo "highest_in_minor=$([[ $(git tag -l "v$major.$minor.*" | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V | tail -n 1) == "$TAG" ]] && echo true || echo false)"
+            echo "commit=$(git rev-parse HEAD)"
+            echo "date=$(git log -1 --format=%cI "$TAG")"
+          } >> "$GITHUB_OUTPUT"
+          echo "releasing $TAG from $on (version $version, prerelease $prerelease, previous release ${prev:-none})"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: CI passed on the tagged commit (REL-015)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ steps.tag.outputs.commit }}
+        run: scripts/ci-gate.sh "$SHA"
+      - name: Image tags
+        id: tags
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+          MINOR: ${{ steps.tag.outputs.minor }}
+          FINAL: ${{ steps.tag.outputs.final }}
+          COMMIT: ${{ steps.tag.outputs.commit }}
+          HIGHEST: ${{ steps.tag.outputs.highest }}
+          HIGHEST_IN_MINOR: ${{ steps.tag.outputs.highest_in_minor }}
+        run: |
+          {
+            echo "list<<EOF"
+            echo "$IMAGE:$VERSION"
+            echo "$IMAGE:sha-${COMMIT::12}"
+            # :X.Y moves to the newest patch of its minor only; a backported
+            # patch of an older line never moves it back.
+            if [[ $FINAL == true && $HIGHEST_IN_MINOR == true ]]; then echo "$IMAGE:$MINOR"; fi
+            if [[ $FINAL == true && $HIGHEST == true ]]; then echo "$IMAGE:latest"; fi
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Not released yet (a re-run never rebuilds or re-tags a release)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          # A published release page and the :X.Y.Z image are final: a re-run
+          # would build a new digest, move :X.Y.Z and sha- onto it and append
+          # the page's body a second time. Refused instead (docs/RELEASING.md).
+          # A draft page is not published; the tags endpoint answers 404 for it.
+          if out=$(gh api "repos/$GH_REPO/releases/tags/$TAG" --jq .html_url 2>&1); then
+            echo "::error::$TAG is already published ($out); a published release is never rebuilt or re-tagged"; exit 1
+          elif [[ $out != *"HTTP 404"* ]]; then
+            echo "::error::cannot tell whether $TAG is published: $out"; exit 1
+          fi
+          if out=$(docker buildx imagetools inspect "$IMAGE:$VERSION" 2>&1); then
+            echo "::error::$IMAGE:$VERSION already exists; a release image is never rebuilt or moved"; exit 1
+          elif [[ $out != *"not found"* ]]; then
+            echo "::error::cannot tell whether $IMAGE:$VERSION exists: $out"; exit 1
+          fi
+      - id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: runtime
+          platforms: linux/amd64,linux/arm64
+          push: true
+          sbom: true
+          provenance: mode=max
+          tags: ${{ steps.tags.outputs.list }}
+          build-args: |
+            VERSION=${{ steps.tag.outputs.version }}
+            COMMIT=${{ steps.tag.outputs.commit }}
+            BUILD_DATE=${{ steps.tag.outputs.date }}
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Sign the digest (keyless)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "$IMAGE@$DIGEST"
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+      - name: SBOM (SPDX)
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: dist/sbom.spdx.json
+          upload-artifact: false
+      - name: SBOM (CycloneDX)
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+          format: cyclonedx-json
+          output-file: dist/sbom.cdx.json
+          upload-artifact: false
+      - name: Attest the SBOM to the image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign attest --yes --type spdxjson --predicate dist/sbom.spdx.json "$IMAGE@$DIGEST"
+      - name: openapi.json and its diff against the previous release
+        id: oas
+        env:
+          PREV: ${{ steps.tag.outputs.previous }}
+          GOTOOLCHAIN: local
+        run: |
+          cp api/openapi.json dist/openapi.json
+          breaking=0
+          if [[ -n $PREV ]] && git cat-file -e "$PREV:api/openapi.json" 2>/dev/null; then
+            git show "$PREV:api/openapi.json" > /tmp/prev-openapi.json
+            go run github.com/oasdiff/oasdiff@v1.34.0 changelog /tmp/prev-openapi.json dist/openapi.json > dist/openapi-changelog.txt
+            go run github.com/oasdiff/oasdiff@v1.34.0 breaking /tmp/prev-openapi.json dist/openapi.json > dist/openapi-breaking.txt
+            [[ -s dist/openapi-breaking.txt ]] && breaking=1
+          else
+            echo "No previous release holds api/openapi.json: this is the first published contract." > dist/openapi-changelog.txt
+            : > dist/openapi-breaking.txt
+          fi
+          echo "breaking=$breaking" >> "$GITHUB_OUTPUT"
+      - name: SHA256SUMS
+        working-directory: dist
+        run: sha256sum -- * > SHA256SUMS && cat SHA256SUMS
+      - name: Release page
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          VERSION: ${{ steps.tag.outputs.version }}
+          PRERELEASE: ${{ steps.tag.outputs.prerelease }}
+          PREV: ${{ steps.tag.outputs.previous }}
+          BREAKING: ${{ steps.oas.outputs.breaking }}
+          HIGHEST: ${{ steps.tag.outputs.highest }}
+          TAGLIST: ${{ steps.tags.outputs.list }}
+        run: |
+          base=${VERSION%%-*}
+          milestone=$(gh api "repos/$GH_REPO/milestones?state=all&per_page=100" --jq "[.[] | select(.title | startswith(\"$base\"))][0].html_url // empty")
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --draft --title "$TAG" --generate-notes ${PREV:+--notes-start-tag "$PREV"}
+          fi
+          gh release view "$TAG" --json body --jq .body > /tmp/notes.md
+          if grep -q '^## Container image$' /tmp/notes.md; then
+            echo "::error::the notes of $TAG already carry the image section; they are never appended twice"; exit 1
+          fi
+          {
+            echo
+            if [[ $BREAKING == 1 ]]; then
+              echo "## ⚠ Breaking API changes"
+              echo
+              echo "oasdiff reports breaking changes against $PREV; see \`openapi-breaking.txt\`."
+              echo
+            fi
+            echo "## Container image"
+            echo
+            echo "Digest: \`$IMAGE@$DIGEST\`"
+            echo
+            echo "Tags:"
+            while read -r t; do [[ -n $t ]] && echo "- \`$t\`"; done <<<"$TAGLIST"
+            echo
+            echo "Platforms: linux/amd64, linux/arm64. SBOM (SPDX, CycloneDX) and SLSA build provenance are attached to the image and to this page."
+            echo
+            echo "## Verify"
+            echo
+            echo '```sh'
+            echo "cosign verify $IMAGE@$DIGEST \\"
+            echo "  --certificate-identity-regexp '$IDENTITY' \\"
+            echo "  --certificate-oidc-issuer $ISSUER"
+            echo "gh attestation verify oci://$IMAGE@$DIGEST --repo $GH_REPO"
+            echo "sha256sum -c SHA256SUMS"
+            echo '```'
+            echo
+            echo "## Assets"
+            echo
+            echo "- \`openapi.json\`: the contract of this release"
+            echo "- \`openapi-changelog.txt\`, \`openapi-breaking.txt\`: the diff against ${PREV:-nothing (first release)}"
+            echo "- \`sbom.spdx.json\`, \`sbom.cdx.json\`: software bill of materials of the image"
+            echo "- \`SHA256SUMS\`: checksums of the assets above"
+            echo
+            [[ -n $milestone ]] && echo "Milestone: $milestone"
+          } >> /tmp/notes.md
+          gh release upload "$TAG" dist/* --clobber
+          gh release edit "$TAG" --notes-file /tmp/notes.md --prerelease="$PRERELEASE" --latest="$([[ $PRERELEASE == false && $HIGHEST == true ]] && echo true || echo false)"
+          gh release edit "$TAG" --draft=false
+          echo "published $(gh release view "$TAG" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
+
+  verify:
+    name: Verify the published release
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+      attestations: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          persist-credentials: false
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Pull by digest
+        env:
+          DIGEST: ${{ needs.publish.outputs.digest }}
+        run: docker pull "$IMAGE@$DIGEST"
+      - name: cosign verify
+        env:
+          DIGEST: ${{ needs.publish.outputs.digest }}
+        run: cosign verify "$IMAGE@$DIGEST" --certificate-identity-regexp "$IDENTITY" --certificate-oidc-issuer "$ISSUER" > /dev/null
+      - name: gh attestation verify
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DIGEST: ${{ needs.publish.outputs.digest }}
+        run: gh attestation verify "oci://$IMAGE@$DIGEST" --repo "${{ github.repository }}"
+      - name: The checksums on the page hold
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/assets && cd /tmp/assets
+          gh release download "$TAG" --repo "${{ github.repository }}"
+          sha256sum -c SHA256SUMS
+      - name: /healthz smoke of the published image
+        env:
+          DIGEST: ${{ needs.publish.outputs.digest }}
+        run: scripts/image-smoke.sh "$IMAGE@$DIGEST"
+      - name: Close the milestone, or report what is still open in it
+        if: needs.publish.outputs.final == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.publish.outputs.version }}
+        run: |
+          m=$(gh api "repos/$GH_REPO/milestones?state=open&per_page=100" --jq "[.[] | select(.title | startswith(\"$VERSION\"))][0] // empty")
+          if [[ -z $m ]]; then
+            echo "no open milestone titled $VERSION…" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          number=$(jq -r .number <<<"$m") open=$(jq -r .open_issues <<<"$m") title=$(jq -r .title <<<"$m")
+          if [[ $open == 0 ]]; then
+            gh api -X PATCH "repos/$GH_REPO/milestones/$number" -f state=closed >/dev/null
+            echo "closed milestone \"$title\"" >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "milestone \"$title\" stays open: $open issue(s) open"
+              gh issue list --repo "$GH_REPO" --milestone "$title" --state open --json number,title --jq '.[] | "- #\(.number) \(.title)"'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::milestone $title has $open open issue(s); see the job summary"
+          fi

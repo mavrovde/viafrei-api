@@ -1,0 +1,114 @@
+# Keeps the release pull request up to date from the Conventional Commits on
+# main. When that pull request is merged, release-please writes a DRAFT
+# release (a draft creates no tag); the next job creates the annotated tag
+# vX.Y.Z on the release commit and runs release.yml, which builds, signs,
+# attests, attaches the assets, publishes the draft and verifies the result.
+# release.yml is called directly because a tag pushed with GITHUB_TOKEN does
+# not start other workflows.
+#
+# It runs after CI has passed on a push to main, and scripts/ci-gate.sh checks
+# the release commit's CI result again before the tag is created (REL-015).
+# The release pull request is opened with RELEASE_PLEASE_TOKEN when that
+# secret exists, so CI runs on it; with GITHUB_TOKEN alone GitHub starts no
+# workflow for it, and the gate is then what stops an unchecked release.
+name: Release Please
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release pull request
+    # A CI run on a push to this repository's main that succeeded, or a
+    # maintainer by hand. The event and repository checks keep out a fork's
+    # pull request from a branch named main.
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      created: ${{ steps.rp.outputs.release_created }}
+      tag: ${{ steps.rp.outputs.tag_name }}
+      sha: ${{ steps.rp.outputs.sha }}
+    steps:
+      - name: Release pull requests get CI only with RELEASE_PLEASE_TOKEN
+        env:
+          HAS_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN != '' }}
+        run: |
+          if [[ $HAS_TOKEN != true ]]; then
+            echo "::warning::RELEASE_PLEASE_TOKEN is not set: the release pull request is opened with GITHUB_TOKEN and no CI runs on it. scripts/ci-gate.sh still refuses to tag a commit CI has not passed. See docs/RELEASING.md."
+          fi
+      - id: rp
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  tag:
+    name: Annotated tag
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      checks: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: CI passed on the release commit (REL-015)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ needs.release-please.outputs.sha }}
+        run: scripts/ci-gate.sh "$SHA"
+      - name: Create and push the annotated tag
+        env:
+          TAG: ${{ needs.release-please.outputs.tag }}
+          SHA: ${{ needs.release-please.outputs.sha }}
+        run: |
+          [[ $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::release-please produced tag '$TAG', not vX.Y.Z"; exit 1; }
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::tag $TAG exists already; tags are never moved"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$SHA" -m "Release $TAG"
+          git push origin "refs/tags/$TAG"
+
+  release:
+    name: Release
+    needs: [release-please, tag]
+    # A called workflow gets at most what its caller grants: release.yml's
+    # gate reads check runs and workflow runs.
+    permissions:
+      contents: write
+      checks: read
+      actions: read
+      packages: write
+      id-token: write
+      attestations: write
+      issues: write
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.release-please.outputs.tag }}

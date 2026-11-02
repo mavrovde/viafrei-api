@@ -336,9 +336,13 @@ func TestReleaseGateIsWired(t *testing.T) {
 		"push trigger does not name its branches (ignore list)":                                       {plant("ci.yml", pushBranches, "    branches-ignore: [docs]\n"), s},
 		"ci.yml does not parse":                                                                       {plant("ci.yml", "jobs:\n", "jobs: [\n"), s},
 	} {
-		w := strings.Split(want, " (")[0]
-		if got := strings.Join(releaseGateFindings(c.files, c.script), "; "); !strings.Contains(got, w) {
-			t.Errorf("planted %q, the rule said %q", want, got)
-		}
+		// One subtest per planted fault, so each is bounded on its own
+		// (TST-012): as one leaf the forty plants crossed 2 s under -race.
+		t.Run(want, func(t *testing.T) {
+			w := strings.Split(want, " (")[0]
+			if got := strings.Join(releaseGateFindings(c.files, c.script), "; "); !strings.Contains(got, w) {
+				t.Errorf("planted %q, the rule said %q", want, got)
+			}
+		})
 	}
 }

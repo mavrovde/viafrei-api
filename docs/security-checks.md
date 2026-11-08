@@ -27,7 +27,8 @@ SARIF, each result located on `api/openapi.json`.
 | Dockerfile | Hadolint 2.15.1 (CI workflow) | a warning or worse | `hadolint` | SSC-005 |
 | Workflows and scripts | actionlint 1.7.7 and shellcheck (CI workflow) | any finding | — (log) | SSC-005, SSC-010 |
 | OpenAPI document | Spectral 6.17.0 with `.spectral.yaml` (CI workflow) | a warning or worse | `spectral` | — |
-| API fuzzing | Schemathesis against the compose stack (CI workflow, `Compose smoke`) | any failed property | — (log) | TST-010 |
+| API fuzzing | Schemathesis against the compose stack: a short run on every pull request (CI workflow, `Compose smoke`), a long run nightly with every answer within 2.05 s (`fuzz-nightly.yml`) | any failed property | — (log) | TST-010, TST-016 |
+| Parser fuzzing | Go native fuzzing, one target per parser (`test/fuzz/targets.tsv`): 20 s per target on every pull request (CI workflow, `Fuzz smoke`), 10 min nightly (`fuzz-nightly.yml`) | a crash, a broken invariant, or a target with zero executions | — (report and reproducers as artifacts) | TEST-006, TST-016 |
 | DAST | OWASP ZAP API scan (`zap-stable` 20261016) with the service's OpenAPI document, against the compose stack (`scripts/zap-scan.sh`), on every pull request, on `main` and weekly | a rule at FAIL level in `scripts/zap-rules.tsv`; WARN-level alerts are in the report artifact | `zap` | TST-010 |
 | Quality and coverage | SonarCloud, CI-based analysis with the Go coverage report (CI workflow) | the quality gate; fails naming `SONAR_TOKEN` when the secret is absent | — (the `SonarCloud Code Analysis` check) | — |
 | Repository posture | OpenSSF Scorecard (`scorecard.yml`, `main` and weekly only) | published to code scanning; target score 7.0 | Scorecard's own | SSC-012 |
@@ -51,6 +52,48 @@ fails it.
 
 Licence allow-list (SSC-003): MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC,
 MPL-2.0, Unicode-3.0, Zlib, CC0-1.0, 0BSD.
+
+## Fuzzing
+
+Each parser of the service has a native fuzz target, listed in
+`test/fuzz/targets.tsv` with its package and functions:
+
+| Parser | Target | Invariants |
+|---|---|---|
+| configuration loader (environment and YAML file) | `FuzzLoad` | no crash; a refusal is a list of violations and never carries the database secret; the same input loads twice to the same values |
+| read-contract version | `FuzzParseContractVersion` | no crash; round trip (what parses renders back to the same version); a version accepts itself |
+| platform version file (version sync) | `FuzzParsePlatform` | no crash; round trip; only `unsynced` or a release version `X.Y.Z` is accepted |
+| request: query allow-list, request-id header, URI limit | `FuzzRequest` | a success or a 4xx problem, never a 5xx (a recovered panic is a 500); every answer within the request deadline plus its reserve |
+
+The cursor, key, polyline, location, `fields`, `lang` and query `POST` body
+parsers are listed as planned, each with the issue that builds it. The
+inventory test (`internal/conformance/fuzz_inventory_test.go`) fails on a
+parser the Test Strategy names that has no line, on a target that does not
+exist or has fewer than three committed seed files, and on any parse-,
+decode-, unmarshal- or load-shaped function of a package the service is
+built from that no target covers. So a parser added without a target fails
+CI. When the cursor codec exists, its target adds the tamper rule: any change
+to a signed cursor is refused with `invalid-cursor`, for 100 % of a tamper
+corpus (QAS-SEC-02).
+
+The seed corpus is committed in `<package>/testdata/fuzz/<target>/`. It is
+synthetic and holds no real data. Plain `go test` runs every seed file as a
+unit test. `scripts/fuzz.sh BUDGET [REPORT]` runs every target for BUDGET
+and writes a report with the executions, the new corpus entries and the
+crashes per target. A crash's reproducer is copied to `fuzz-crashers/` in
+the package layout. Commit it with the fix, and it becomes the unit test
+that keeps the fix. The nightly run also uploads the new interesting inputs
+(`FUZZ_CORPUS_OUT`), to grow the corpus.
+
+Fuzzing reaches only the code under test or the compose stack the job
+starts. `compose-smoke.sh` refuses any target that is not the loopback, and
+`TestFuzzingTargetsOnlyTheCodeOrTheCIStack` holds both rules (TST-010).
+
+```sh
+scripts/fuzz.sh 20s                       # the pull-request budget
+go test -run '^$' -fuzz '^FuzzRequest$' -fuzztime 1m ./internal/adapters/httpapi
+SMOKE_MAX_EXAMPLES=500 SMOKE_MAX_RESPONSE_TIME=2.05 make compose-test
+```
 
 ## Suppressions
 

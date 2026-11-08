@@ -1,0 +1,23 @@
+# Fuzz inventory (TEST-006, TST-016, issue #16): one line per parser of the
+# service, tab-separated: the parser, its package, the functions it consists
+# of (comma-separated), the native fuzz target that covers them, and the
+# issue that introduces a parser not built yet.
+#
+# internal/conformance/fuzz_inventory_test.go holds the rules: every parser
+# named by the Test Strategy has a line; a built parser names a target that
+# exists, with a committed seed corpus in <package>/testdata/fuzz/<target>;
+# every parse-, decode-, unmarshal- or load-shaped function of a package the
+# service is built from is listed under a target, so a new parser without a
+# target fails the inventory. A planned line names no package, no functions
+# and no target until its parser exists. scripts/fuzz.sh runs every target.
+configuration	internal/runtime/config	Load,parseEnviron	FuzzLoad	-
+contract-version	internal/domain/service	ParseContractVersion	FuzzParseContractVersion	-
+platform-version	internal/buildinfo	ParsePlatform	FuzzParsePlatform	-
+request	internal/adapters/httpapi	strictQuery,withRequest,limitURI	FuzzRequest	-
+cursor	-	-	-	#9
+key	-	-	-	#7
+polyline	-	-	-	#10
+location	-	-	-	#10
+fields	-	-	-	#10
+lang	-	-	-	#10
+query-body	-	-	-	#10

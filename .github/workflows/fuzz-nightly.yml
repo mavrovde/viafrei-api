@@ -1,0 +1,75 @@
+# Nightly fuzzing (TEST-006, TST-016): the long budget of every native fuzz
+# target of test/fuzz/targets.tsv, and the long schema-driven run of
+# Schemathesis against the compose stack this job starts, with the response
+# time held to the 2 s deadline plus 50 ms. Neither reaches anything but the
+# code under test and that CI-started instance (TST-010).
+#
+# The report names, per target, the executions, the new corpus entries and
+# the crashes; a target that ran zero executions fails. Crash reproducers
+# and the new corpus entries are uploaded in the package layout, ready to be
+# committed: a reproducer becomes a unit test in the fixing pull request.
+name: Fuzz nightly
+
+on:
+  schedule:
+    - cron: "23 2 * * *"
+  workflow_dispatch:
+    inputs:
+      budget:
+        description: Fuzzing time per target (a Go duration)
+        default: 10m
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-nightly
+  cancel-in-progress: false
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  native:
+    name: Native fuzz targets (nightly budget)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: Every fuzz target
+        env:
+          BUDGET: ${{ inputs.budget || '10m' }}
+          FUZZ_CORPUS_OUT: fuzz-corpus
+        run: scripts/fuzz.sh "$BUDGET" fuzz-report.md
+      - name: Report in the job summary
+        if: always()
+        run: cat fuzz-report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: fuzz-nightly
+          path: |
+            fuzz-report.md
+            fuzz-crashers
+            fuzz-corpus
+          retention-days: 30
+          if-no-files-found: error
+
+  schema:
+    name: Schema-driven fuzzing (Schemathesis, nightly budget)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Long run against the compose stack, every answer within 2.05 s
+        env:
+          SMOKE_MAX_EXAMPLES: "500"
+          SMOKE_MAX_RESPONSE_TIME: "2.05"
+        run: make compose-test COMMIT=${{ github.sha }}

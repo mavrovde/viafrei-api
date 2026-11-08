@@ -1,0 +1,19 @@
+# Collection vocabulary (LIC-010): words that describe how data is obtained.
+# The API is about access to published data; none of these belongs in its
+# code, documentation or OpenAPI document. One case-insensitive regular
+# expression per line, matched at the start of a word, a tab, then the reason.
+scrap(e|es|ed|er|ers|ing)\b	describes obtaining data from someone else's pages
+crawl	describes walking someone else's site to obtain data
+inges(t|ts|ted|ter|ting|tion)	names the collection pipeline
+harvest	describes obtaining data in bulk from a publisher
+poll(er|ers|ing)\b	describes fetching a source on a schedule
+fetchers?\b	names a component that obtains data
+collectors?\b	names a component that obtains data
+data[ -]collection	names the collection process itself
+collected from	describes where data was obtained
+feeds?\b	a source feed is the collection route, not a resource of the API
+gtfs	an exchange format of the collection side; the API speaks its own resources
+datex	an exchange format of the collection side; the API speaks its own resources
+siri\b	an exchange format of the collection side; the API speaks its own resources
+netex	an exchange format of the collection side; the API speaks its own resources
+ocpi\b	an exchange format of the collection side; the API speaks its own resources

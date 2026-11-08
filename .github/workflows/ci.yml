@@ -177,6 +177,8 @@ jobs:
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: scripts/openapi-diff.sh "$BASE_REF" api/openapi.json
+      - name: Breaking changes against the last released document (TEST-004)
+        run: scripts/openapi-released.sh api/openapi.json
 
   vulncheck:
     name: govulncheck

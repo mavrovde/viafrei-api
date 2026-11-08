@@ -63,6 +63,7 @@ Each parser of the service has a native fuzz target, listed in
 | configuration loader (environment and YAML file) | `FuzzLoad` | no crash; a refusal is a list of violations and never carries the database secret; the same input loads twice to the same values |
 | read-contract version | `FuzzParseContractVersion` | no crash; round trip (what parses renders back to the same version); a version accepts itself |
 | platform version file (version sync) | `FuzzParsePlatform` | no crash; round trip; only `unsynced` or a release version `X.Y.Z` is accepted |
+| API key (`Authorization` and `X-API-Key`) | `FuzzParse` | no crash; a refusal is `ErrMalformed` alone with nothing returned; what parses is the input's own id and secret at their fixed lengths, and never parses for the other environment |
 | request: query allow-list, request-id header, URI limit | `FuzzRequest` | a success or a 4xx problem, never a 5xx (a recovered panic is a 500); every answer within the request deadline plus its reserve |
 
 The cursor, key, polyline, location, `fields`, `lang` and query `POST` body

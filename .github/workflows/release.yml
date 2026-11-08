@@ -3,7 +3,9 @@
 #   attest build provenance and the SBOM, attach openapi.json, its diff
 #   against the previous release, the SBOMs and SHA256SUMS to the release
 #   page, publish it (0.x and -rc are pre-releases), then verify what was
-#   published and close the milestone when nothing in it is open.
+#   published, close the milestone when nothing in it is open, and publish
+#   the docs (OpenAPI reference and guide) of the newest final release to
+#   GitHub Pages.
 # Started by release-please.yml (workflow_call) after a release pull request
 # is merged, by a maintainer pushing an rc tag, or by hand for a tag that
 # exists. Tags are never moved or deleted here, and a tag whose release is
@@ -56,6 +58,7 @@ jobs:
       digest: ${{ steps.build.outputs.digest }}
       version: ${{ steps.tag.outputs.version }}
       final: ${{ steps.tag.outputs.final }}
+      highest: ${{ steps.tag.outputs.highest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -361,3 +364,49 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
             echo "::warning::milestone $title has $open open issue(s); see the job summary"
           fi
+
+  pages:
+    name: Publish the docs to GitHub Pages
+    needs: [publish, verify]
+    # The docs of the newest final release only: an rc or a backported patch
+    # of an older line never replaces them. The github-pages environment
+    # deploys from main only, which is the ref of a release started by
+    # release-please.yml or dispatched from main.
+    if: needs.publish.outputs.final == 'true' && needs.publish.outputs.highest == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          persist-credentials: false
+      - name: Build the site
+        env:
+          VERSION: ${{ needs.publish.outputs.version }}
+        run: scripts/docs-build.sh site "$VERSION"
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      - name: The published site serves this version
+        env:
+          URL: ${{ steps.deploy.outputs.page_url }}
+          VERSION: ${{ needs.publish.outputs.version }}
+        run: |
+          deadline=$((SECONDS + 300))
+          for page in index.html reference.html openapi.json; do
+            until body=$(curl -fsS --max-time 20 "${URL%/}/$page?v=$VERSION-$SECONDS") && { [[ $page != index.html ]] || grep -qF "Version $VERSION" <<<"$body"; }; do
+              (( SECONDS < deadline )) || { echo "::error::${URL%/}/$page does not serve version $VERSION by the deadline"; exit 1; }
+              sleep 10
+            done
+            echo "served ${URL%/}/$page"
+          done
+          echo "docs of $VERSION live at $URL" >> "$GITHUB_STEP_SUMMARY"

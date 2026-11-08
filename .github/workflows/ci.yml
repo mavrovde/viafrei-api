@@ -194,6 +194,8 @@ jobs:
         run: scripts/openapi-diff.sh "$BASE_REF" api/openapi.json
       - name: Breaking changes against the last released document (TEST-004)
         run: scripts/openapi-released.sh api/openapi.json
+      - name: Docs build (the site release.yml publishes to GitHub Pages)
+        run: scripts/docs-build.sh site
 
   vulncheck:
     name: govulncheck

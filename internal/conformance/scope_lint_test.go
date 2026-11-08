@@ -31,8 +31,8 @@ const scopeDir = "test/scope"
 const scopeSelf = "internal/conformance/scope_lint_test.go"
 
 type vocabEntry struct {
-	re     *regexp.Regexp
-	reason string
+	re             *regexp.Regexp
+	prefix, reason string // prefix: the literal start of the pattern, a cheap filter before the expression runs
 }
 
 type allowEntry struct {
@@ -75,11 +75,15 @@ func parseVocabulary(src []byte) ([]vocabEntry, error) {
 		if !ok || strings.TrimSpace(reason) == "" {
 			return nil, fmt.Errorf("vocabulary line %q has no reason", l)
 		}
-		re, err := regexp.Compile(`(?i)\b(` + pattern + `)`)
+		plain, err := regexp.Compile(pattern)
 		if err != nil {
 			return nil, fmt.Errorf("vocabulary pattern %q: %w", pattern, err)
 		}
-		out = append(out, vocabEntry{re: re, reason: reason})
+		prefix, _ := plain.LiteralPrefix()
+		if prefix == "" || prefix != strings.ToLower(prefix) {
+			return nil, fmt.Errorf("vocabulary pattern %q must start with lower-case literal text", pattern)
+		}
+		out = append(out, vocabEntry{re: regexp.MustCompile(`(?i)\b(?:` + pattern + `)`), prefix: prefix, reason: reason})
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("the vocabulary is empty")
@@ -125,23 +129,69 @@ func nameHash(name string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-var wordPattern = regexp.MustCompile(`[A-Za-z][A-Za-z0-9_-]*`)
+func isWordByte(b byte, first bool) bool {
+	letter := (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+	return letter || (!first && ((b >= '0' && b <= '9') || b == '_' || b == '-'))
+}
+
+// words returns the words of a line: an ASCII letter followed by letters,
+// digits, underscores and hyphens.
+func words(line string) []string {
+	var out []string
+	for i := 0; i < len(line); {
+		if !isWordByte(line[i], true) {
+			i++
+			continue
+		}
+		j := i + 1
+		for j < len(line) && isWordByte(line[j], false) {
+			j++
+		}
+		out = append(out, line[i:j])
+		i = j
+	}
+	return out
+}
+
+// denyCache remembers the verdict for each word already hashed, so a word
+// that recurs across the tree is hashed once.
+type denyCache struct {
+	deny map[string]bool
+	seen map[string]bool
+}
+
+func (c *denyCache) denied(word string) bool {
+	low := strings.ToLower(word)
+	v, ok := c.seen[low]
+	if !ok {
+		v = c.deny[nameHash(low)]
+		c.seen[low] = v
+	}
+	return v
+}
 
 // scanText applies the vocabulary and the denylist to one file. A word is
 // checked as written (lower case, a hyphen read as an underscore) and each of
 // its hyphen-separated parts.
-func scanText(path string, src []byte, vocab []vocabEntry, deny map[string]bool) []scopeFinding {
+func scanText(path string, src []byte, vocab []vocabEntry, deny *denyCache) []scopeFinding {
 	var out []scopeFinding
 	for i, line := range strings.Split(string(src), "\n") {
+		lower := strings.ToLower(line)
 		for _, v := range vocab {
+			if !strings.Contains(lower, v.prefix) {
+				continue
+			}
 			for _, m := range v.re.FindAllString(line, -1) {
 				out = append(out, scopeFinding{rule: "vocabulary", path: path, line: i + 1, token: strings.ToLower(m)})
 			}
 		}
-		for _, w := range wordPattern.FindAllString(line, -1) {
-			candidates := append([]string{strings.ReplaceAll(w, "-", "_")}, strings.Split(w, "-")...)
+		for _, w := range words(line) {
+			candidates := []string{strings.ReplaceAll(w, "-", "_")}
+			if strings.Contains(w, "-") {
+				candidates = append(candidates, strings.Split(w, "-")...)
+			}
 			for _, c := range candidates {
-				if deny[nameHash(c)] {
+				if c != "" && deny.denied(c) {
 					out = append(out, scopeFinding{rule: "denylist", path: path, line: i + 1, length: len(c), token: strings.ToLower(c)})
 					break
 				}
@@ -309,6 +359,7 @@ func TestScopeLint(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	cache := &denyCache{deny: deny, seen: map[string]bool{}}
 	var findings []scopeFinding
 	scanned, lines := 0, 0
 	for _, p := range trackedFiles(t) {
@@ -324,7 +375,7 @@ func TestScopeLint(t *testing.T) {
 		}
 		scanned++
 		lines += bytes.Count(src, []byte("\n"))
-		findings = append(findings, scanText(p, src, vocab, deny)...)
+		findings = append(findings, scanText(p, src, vocab, cache)...)
 	}
 
 	var sql strings.Builder
@@ -373,7 +424,7 @@ func TestScopeLintCanSayNo(t *testing.T) {
 		t.Fatal(err)
 	}
 	src := []byte("a clean line\nthe Crawler job reads feeds\nselect * from Planted_Internal_Name\npath /planted-internal-name/x\nfeedback is fine\n")
-	got := scanText("x.md", src, vocab, deny)
+	got := scanText("x.md", src, vocab, &denyCache{deny: deny, seen: map[string]bool{}})
 	var rendered []string
 	for _, f := range got {
 		rendered = append(rendered, f.String())
@@ -421,6 +472,8 @@ func TestScopeListsFailClosed(t *testing.T) {
 		"empty vocabulary":   second(parseVocabulary([]byte("# only a comment\n"))),
 		"reasonless pattern": second(parseVocabulary([]byte("crawl\n"))),
 		"bad pattern":        second(parseVocabulary([]byte("(\treason\n"))),
+		"no literal start":   second(parseVocabulary([]byte("[a-z]+\treason\n"))),
+		"upper-case start":   second(parseVocabulary([]byte("Crawl\treason\n"))),
 		"empty denylist":     second(parseDenylist([]byte("\n"))),
 		"plain name listed":  second(parseDenylist([]byte("some_name\n"))),
 		"allow short":        second(parseAllow([]byte("column\tdoc\tx\n"))),

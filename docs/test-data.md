@@ -23,6 +23,23 @@ The same generator version, profile and seed give the same bytes on every
 machine. `testdata/fixtures/` is ignored by git: a set is rebuilt from its seed,
 never committed.
 
+`test/fixtures/checksums.tsv` records the checksum of seed 1 of every profile,
+taken on one machine and architecture and checked equal on another before it
+was committed. The unit tests regenerate the `tiny` and `ci` sets against it,
+and CI regenerates all three on its own runner:
+
+```sh
+make fixtures-verify   # go run ./cmd/fixturegen -verify test/fixtures/checksums.tsv
+```
+
+A change to the generator's output bumps `fixtures.GeneratorVersion` and
+records the lines again; a line recorded for another generator version fails.
+The generator's production code may import only the packages listed in
+`internal/conformance/fixture_inputs_test.go`: no network, database, process
+or embedded-file package, so it reads nothing but its seed. Every generated
+name parses as syllables of the generator's own lists
+(`TestNamesAreBuiltFromOurSyllablesOnly`).
+
 ## Profiles
 
 | Profile | Rows (seed 7) | Used by |

@@ -2,8 +2,13 @@ package fixtures
 
 import (
 	"math/rand/v2"
+	"regexp"
 	"strings"
 	"testing"
+	"unicode"
+	"unicode/utf8"
+
+	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
 // TestSourcePickerRefusesAMissingFamily: asking for a family the domain has no
@@ -33,5 +38,38 @@ func TestAlongEndsOnTheLastPoint(t *testing.T) {
 		if d := haversineKm(got, want); d > 1e-6 {
 			t.Errorf("along(%v) = %v, want %v", f, got, want)
 		}
+	}
+}
+
+// TestNamesAreBuiltFromOurSyllablesOnly holds the "fictional in content" rule
+// of TST-014: every generated name parses as syllables of our own lists plus
+// one of our endings, so none can come from a real-world list of names.
+func TestNamesAreBuiltFromOurSyllablesOnly(t *testing.T) {
+	req.Covers(t, "TST-014")
+	alt := func(list []string) string {
+		quoted := make([]string, len(list))
+		for i, s := range list {
+			quoted[i] = regexp.QuoteMeta(s)
+		}
+		return "(?:" + strings.Join(quoted, "|") + ")"
+	}
+	syl := alt(onsets) + alt(nuclei) + alt(codas)
+	grammar := map[string]*regexp.Regexp{
+		"settlement": regexp.MustCompile("^" + syl + syl + alt(endings) + "$"),
+		"region":     regexp.MustCompile("^" + syl + syl + "land$"),
+		"person":     regexp.MustCompile("^" + syl + syl + "$"),
+	}
+	n := &namer{r: rand.New(rand.NewPCG(3, 4))}
+	for i := 0; i < 5000; i++ {
+		for kind, name := range map[string]string{"settlement": n.settlement(), "region": n.region(), "person": n.person()} {
+			lower := strings.ToLower(name[:1]) + name[1:]
+			if r, _ := utf8.DecodeRuneInString(name); !unicode.IsUpper(r) || !grammar[kind].MatchString(lower) {
+				t.Fatalf("%s %q is not built from the syllable lists", kind, name)
+			}
+		}
+	}
+	// The check can say no: a real-sounding name that is not in the grammar.
+	if grammar["settlement"].MatchString("xylophonstadt") {
+		t.Fatal("the grammar accepts a name outside the lists")
 	}
 }

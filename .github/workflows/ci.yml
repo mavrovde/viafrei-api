@@ -291,31 +291,6 @@ jobs:
         with:
           sarif_file: sarif/trivy-image.sarif
           category: trivy-image
-      - name: SNYK_TOKEN must be set
-        if: always()
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          [ -n "$SNYK_TOKEN" ] || { echo "::error::SNYK_TOKEN is not set (a Dependabot pull request reads it from the Dependabot secrets, a fork's pull request never sees it); Snyk Container cannot test this image"; exit 1; }
-      - name: Snyk CLI 1.1308.1, checksum verified
-        if: always()
-        run: |
-          curl -fsSL --proto '=https' --tlsv1.2 --max-time 60 -o snyk https://static.snyk.io/cli/v1.1308.1/snyk-linux
-          echo "a8b2e420af6d8e61bf1d367c064475ccf699d767fc8763efb0072b9cac250f9a  snyk" | sha256sum -c -
-          chmod +x snyk
-      - name: Snyk Container (high and critical fail)
-        if: always()
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          mkdir -p sarif
-          ./snyk container test viafrei-api:ci --file=Dockerfile --severity-threshold=high --sarif-file-output=sarif/snyk-container.sarif
-      - name: Upload SARIF to code scanning
-        if: always() && hashFiles('sarif/snyk-container.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
-        with:
-          sarif_file: sarif/snyk-container.sarif
-          category: snyk-container
 
   compose:
     name: Compose smoke (Schemathesis)

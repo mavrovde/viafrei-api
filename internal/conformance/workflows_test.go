@@ -217,7 +217,7 @@ func TestWorkflowsUseTheGoModToolchain(t *testing.T) {
 }
 
 // securityJobs are the checks of the Secure SDLC page, one job each (SSC-003, SSC-014).
-var securityJobs = []string{"codeql", "semgrep", "gitleaks", "osv", "trivy-fs", "snyk", "dependency-review", "licenses", "checkov", "zap"}
+var securityJobs = []string{"codeql", "gitleaks", "snyk", "dependency-review", "licenses", "zap"}
 
 func securityFindings(src []byte, zap string) []string {
 	var w workflowFile
@@ -264,20 +264,17 @@ func TestSecurityWorkflowRunsEveryCheck(t *testing.T) {
 // scanning, so its findings are listed in the Security tab (SSC-014). The
 // key is "workflow/job" (a "#n" suffix tells apart several uploads of one
 // job), the value the upload's category. CodeQL and Scorecard upload through
-// their own actions.
+// their own actions. It is also the whole set: one tool per kind of check
+// (docs/security-checks.md), so an upload under any other category is a
+// second tool doing a job one of these already does, and is reported.
 var sarifUploads = map[string]string{
-	"security.yml/semgrep":  "semgrep",
 	"security.yml/gitleaks": "gitleaks",
-	"security.yml/osv":      "osv-scanner",
-	"security.yml/trivy-fs": "trivy-fs",
 	"security.yml/snyk":     "snyk-open-source",
-	"security.yml/checkov":  "checkov",
 	"security.yml/zap":      "zap",
 	"ci.yml/openapi":        "spectral",
 	"ci.yml/vulncheck":      "govulncheck",
 	"ci.yml/image":          "trivy-image",
 	"ci.yml/image#2":        "hadolint",
-	"ci.yml/image#3":        "snyk-container",
 }
 
 const uploadSarif = "github/codeql-action/upload-sarif@"
@@ -304,10 +301,22 @@ func sarifFindings(files map[string][]byte) []string {
 		}
 	}
 	var out []string
+	want := map[string]map[string]bool{}
 	for key, cat := range sarifUploads {
 		job, _, _ := strings.Cut(key, "#")
+		if want[job] == nil {
+			want[job] = map[string]bool{}
+		}
+		want[job][cat] = true
 		if !got[job][cat] {
 			out = append(out, job+" does not upload SARIF with category "+cat)
+		}
+	}
+	for job, cats := range got {
+		for cat := range cats {
+			if !want[job][cat] && !(job == "scorecard.yml/analysis" && cat == "") {
+				out = append(out, job+" uploads SARIF with category "+cat+", which is not in the tool set")
+			}
 		}
 	}
 	sort.Strings(out)
@@ -321,10 +330,11 @@ func TestScannersUploadSARIF(t *testing.T) {
 		t.Fatal(strings.Join(f, "; "))
 	}
 	for want, plant := range map[string][3]string{
-		"security.yml/gitleaks does not upload SARIF with category gitleaks": {"security.yml", "category: gitleaks", "category: other"},
-		"security.yml/zap does not upload SARIF with category zap":           {"security.yml", "category: zap", "category: other"},
-		"ci.yml/image does not upload SARIF with category snyk-container":    {"ci.yml", "category: snyk-container", "category: other"},
-		"ci.yml/openapi does not upload SARIF with category spectral":        {"ci.yml", uploadSarif, "github/other-action@"},
+		"security.yml/gitleaks does not upload SARIF with category gitleaks":           {"security.yml", "category: gitleaks", "category: other"},
+		"security.yml/zap does not upload SARIF with category zap":                     {"security.yml", "category: zap", "category: other"},
+		"ci.yml/image does not upload SARIF with category trivy-image":                 {"ci.yml", "category: trivy-image", "category: other"},
+		"ci.yml/image uploads SARIF with category other, which is not in the tool set": {"ci.yml", "category: hadolint", "category: other"},
+		"ci.yml/openapi does not upload SARIF with category spectral":                  {"ci.yml", uploadSarif, "github/other-action@"},
 	} {
 		t.Run(want, func(t *testing.T) {
 			m := map[string][]byte{}

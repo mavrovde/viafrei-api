@@ -314,7 +314,10 @@ func sarifFindings(files map[string][]byte) []string {
 	}
 	for job, cats := range got {
 		for cat := range cats {
-			if !want[job][cat] && !(job == "scorecard.yml/analysis" && cat == "") {
+			if job == "scorecard.yml/analysis" && cat == "" {
+				continue // Scorecard's own SARIF, uploaded without a category
+			}
+			if !want[job][cat] {
 				out = append(out, job+" uploads SARIF with category "+cat+", which is not in the tool set")
 			}
 		}

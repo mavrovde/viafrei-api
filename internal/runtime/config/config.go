@@ -28,6 +28,10 @@ type Config struct {
 	Log       Log       `koanf:"log"`
 	Docs      Docs      `koanf:"docs"`
 	Endpoints Endpoints `koanf:"endpoints"`
+	Access    Access    `koanf:"access"`
+	Auth      Auth      `koanf:"auth"`
+	Audit     Audit     `koanf:"audit"`
+	Sources   Sources   `koanf:"sources"`
 }
 
 // Server holds the public HTTP listener settings.
@@ -93,3 +97,47 @@ type Docs struct {
 type Endpoints struct {
 	Disabled []string `koanf:"disabled" default:"" desc:"Operation ids switched off: they answer 404 feature-disabled and leave the OpenAPI document. Comma-separated in the environment."`
 }
+
+// Access holds the settings of the access store: the API's own small store of
+// plans, keys, terms acceptances and audit records.
+type Access struct {
+	URL     Secret `koanf:"url" secret:"true" desc:"Connection URL of the API's own access-store role. Without it every keyed operation answers 404 feature-disabled. Secret: environment or *_FILE only."`
+	PoolMax int    `koanf:"pool_max" default:"2" validate:"min=1,max=8" desc:"Largest number of pooled access-store connections."`
+}
+
+// Auth holds the API-key settings (Spec: Authentication and Authorisation).
+type Auth struct {
+	Environment           string        `koanf:"environment" default:"live" validate:"oneof=live test" desc:"Which keys this instance accepts: live (production) or test (sandbox). A key of the other environment is invalid here (SEC-004)."`
+	KeyPrefixLive         string        `koanf:"key_prefix_live" default:"vf_live_" validate:"key_prefix" desc:"Prefix of a production key: two groups of 1 to 5 lowercase letters or digits, each closed by an underscore."`
+	KeyPrefixTest         string        `koanf:"key_prefix_test" default:"vf_test_" validate:"key_prefix" desc:"Prefix of a sandbox key, in the same form. Differs from auth.key_prefix_live."`
+	Pepper                Secret        `koanf:"pepper" secret:"true" desc:"Server-side MAC pepper, at least 32 bytes. Required with access.url. Held outside the access store (SEC-010). Secret: environment or *_FILE only."`
+	PepperPrevious        Secret        `koanf:"pepper_previous" secret:"true" desc:"The previous pepper during a pepper rotation: a key that matches under it is re-MACed under auth.pepper on first use (SEC-011). At least 32 bytes when set."`
+	KeyCacheTTL           time.Duration `koanf:"key_cache_ttl" default:"60s" validate:"min=1s,max=10m" desc:"How long a key read from the access store is kept in memory. A plan change or a revocation is seen at the latest after this time (SEC-022)."`
+	NegativeCacheTTL      time.Duration `koanf:"negative_cache_ttl" default:"10s" validate:"min=0s,max=5m" desc:"How long an unknown key id is remembered as unknown, to blunt floods of random keys (SEC-050). 0s turns it off."`
+	KeyCacheSize          int           `koanf:"key_cache_size" default:"10000" validate:"min=10,max=1000000" desc:"Largest number of key ids held in the key cache, known and unknown together; when full, expired entries are dropped first, then any one."`
+	RotationOverlap       time.Duration `koanf:"rotation_overlap" default:"168h" validate:"min=0s,max=720h" desc:"How long the previous secret stays valid after a rotation (SEC-041)."`
+	DefaultExpiry         time.Duration `koanf:"default_expiry" default:"8760h" validate:"min=24h,max=26280h" desc:"Lifetime of a key issued without an explicit expiry (SEC-040). An explicit expiry is held to 26280h (1 095 days) too."`
+	RevocationPropagation time.Duration `koanf:"revocation_propagation" default:"5s" validate:"min=1s,max=60s" desc:"Interval at which the service asks the access store for keys changed since its last look and drops them from its cache (SEC-042). At most auth.key_cache_ttl."`
+	ExpiryWarningDays     int           `koanf:"expiry_warning_days" default:"14" validate:"min=0,max=90" desc:"Days before expiry from which an answer carries the key_expiring warning (SEC-043). 0 turns the warning off."`
+	FailureLimit          int           `koanf:"failure_limit" default:"10" validate:"min=1,max=1000" desc:"Authentication failures one client address may have per auth.failure_window before it is answered 429 rate-limited (SEC-052)."`
+	FailureWindow         time.Duration `koanf:"failure_window" default:"1m" validate:"min=1s,max=1h" desc:"The window auth.failure_limit counts in."`
+	FailureTrackSize      int           `koanf:"failure_track_size" default:"10000" validate:"min=10,max=1000000" desc:"Largest number of client addresses whose failures are counted at once; when full, ended windows are dropped first, then any one."`
+}
+
+// Audit holds the audit-log settings.
+type Audit struct {
+	RetentionDays int `koanf:"retention_days" default:"395" validate:"min=30,max=1825" desc:"Days an audit record is kept; keys prune removes older ones (SEC-045)."`
+}
+
+// Sources holds the licence-gate switches.
+type Sources struct {
+	Disabled []string `koanf:"disabled" default:"" desc:"Source families the licence gate always denies, whatever the plan (SEC-030). Comma-separated in the environment."`
+}
+
+// Day is the length of the day counts of this configuration
+// (auth.expiry_warning_days, audit.retention_days).
+const Day = 24 * time.Hour
+
+// MaxKeyLifetime is the longest lifetime a key may be issued with: 1 095
+// days, the upper bound of auth.default_expiry (SEC-040).
+const MaxKeyLifetime = 1095 * Day

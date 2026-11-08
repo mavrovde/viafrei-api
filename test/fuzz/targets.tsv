@@ -15,7 +15,7 @@ contract-version	internal/domain/service	ParseContractVersion	FuzzParseContractV
 platform-version	internal/buildinfo	ParsePlatform	FuzzParsePlatform	-
 request	internal/adapters/httpapi	strictQuery,withRequest,limitURI	FuzzRequest	-
 cursor	-	-	-	#9
-key	-	-	-	#7
+key	internal/domain/access	Parse	FuzzParse	-
 polyline	-	-	-	#10
 location	-	-	-	#10
 fields	-	-	-	#10

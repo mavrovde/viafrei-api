@@ -2,3 +2,6 @@
 # rule (vocabulary, denylist or column), the path, the matched word, the reason.
 # An entry that matches no finding fails the lint, so none outlives its cause.
 column	api/openapi.json	contractVersion	the version of the read contract itself is public by design (FR-SVC-003); the contract is the published interface, not storage
+column	api/openapi.json	licenceUrl	member name of the attribution object fixed by Spec: Data Licensing and Attribution, section 2; the licence vocabulary, not a storage name
+column	api/openapi.json	shareAlike	member name of the attribution object fixed by Spec: Data Licensing and Attribution, section 2; the licence vocabulary, not a storage name
+column	api/openapi.json	termsUrl	member name of the attribution object fixed by Spec: Data Licensing and Attribution, section 2; the licence vocabulary, not a storage name

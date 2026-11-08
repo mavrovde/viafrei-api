@@ -12,11 +12,14 @@ import (
 	"time"
 
 	"github.com/mavrovde/viafrei-api/db/contract"
+	"github.com/mavrovde/viafrei-api/internal/adapters/accessstore"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/health"
+	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/runtime/logging"
+	"github.com/mavrovde/viafrei-api/internal/runtime/wire"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
@@ -146,6 +149,28 @@ func behaviours() map[string]behaviour {
 		"endpoints.disabled": {"getMeta", func(t *testing.T, c *config.Config) string {
 			return fmt.Sprint(get(t, c, "/v1/meta").Code)
 		}},
+		"access.url":                  {"postgres://access:pw@other.invalid:6002/x", accessPool},
+		"access.pool_max":             {"7", accessPool},
+		"auth.environment":            {"test", authSettings},
+		"auth.key_prefix_live":        {"ab_live_", authSettings},
+		"auth.key_prefix_test":        {"ab_test_", authSettings},
+		"auth.pepper":                 {strings.Repeat("c", 32), authSettings},
+		"auth.pepper_previous":        {strings.Repeat("d", 32), authSettings},
+		"auth.key_cache_ttl":          {"30s", authSettings},
+		"auth.negative_cache_ttl":     {"0s", authSettings},
+		"auth.key_cache_size":         {"50", authSettings},
+		"auth.rotation_overlap":       {"24h", authSettings},
+		"auth.default_expiry":         {"720h", authSettings},
+		"auth.revocation_propagation": {"10s", authSettings},
+		"auth.expiry_warning_days":    {"30", authSettings},
+		"auth.failure_limit":          {"3", authSettings},
+		"auth.failure_window":         {"10s", authSettings},
+		"auth.failure_track_size":     {"20", authSettings},
+		"audit.retention_days":        {"90", authSettings},
+		"sources.disabled": {"alpha", func(t *testing.T, c *config.Config) string {
+			register := []access.Terms{{Family: "alpha", UseClasses: access.UseClasses, Reviewed: true}}
+			return fmt.Sprint(access.NewGate(register, access.Plan{UseClass: "consumer", Sources: []string{"alpha"}}, nil, c.Sources.Disabled).Allowed())
+		}},
 	}
 }
 
@@ -208,6 +233,9 @@ func TestEveryKeyChangesBehaviour(t *testing.T) {
 			if f.Key == "db.url" {
 				env = nil
 			}
+			if f.Key == "access.url" {
+				env = append(env, "VFAPI_AUTH_PEPPER="+strings.Repeat("e", 32))
+			}
 			changed, err := config.Load(config.Options{Environ: append(env, f.Env+"="+b.value)})
 			if err != nil {
 				t.Fatal(err)
@@ -221,4 +249,20 @@ func TestEveryKeyChangesBehaviour(t *testing.T) {
 	for key := range all {
 		t.Errorf("behaviour for %s, which is not a declared key", key)
 	}
+}
+
+// authSettings is what the authenticator and the key lifecycle are built
+// with; their own tests prove each setting drives their behaviour.
+func authSettings(t *testing.T, c *config.Config) string {
+	t.Helper()
+	return fmt.Sprintf("%+v", wire.AuthSettings(c))
+}
+
+func accessPool(t *testing.T, c *config.Config) string {
+	t.Helper()
+	pc, err := accessstore.PoolConfig(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fmt.Sprintf("%s:%d max=%d", pc.ConnConfig.Host, pc.ConnConfig.Port, pc.MaxConns)
 }

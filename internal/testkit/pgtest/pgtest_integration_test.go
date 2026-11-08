@@ -47,7 +47,7 @@ func TestHarnessIsUsable(t *testing.T) {
 	if !strings.Contains(harness.ReaderURL, "api_reader:") {
 		t.Error("the reader URL does not name the reader role")
 	}
-	if err := prepare(ctx, harness.OwnerURL, "AAAA"); err == nil || !strings.Contains(err.Error(), "build contract stub") {
+	if err := prepare(ctx, harness.OwnerURL, "AAAA", "BBBB"); err == nil || !strings.Contains(err.Error(), "build contract stub") {
 		t.Fatalf("a second build of the stub = %v, want a refusal", err)
 	}
 }

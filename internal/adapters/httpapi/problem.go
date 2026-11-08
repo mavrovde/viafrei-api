@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"sync"
@@ -70,6 +71,15 @@ const (
 	SlugDeadlineExhausted    = "deadline-exhausted"
 	SlugUpstreamUnavailable  = "upstream-unavailable"
 	SlugNotReady             = "not-ready"
+	SlugKeyInQuery           = "key-in-query"
+	SlugMissingKey           = "missing-key"
+	SlugInvalidKey           = "invalid-key"
+	SlugKeyExpired           = "key-expired"
+	SlugKeyRevoked           = "key-revoked"
+	SlugScopeDenied          = "scope-denied"
+	SlugSourceNotPermitted   = "source-not-permitted"
+	SlugTermsNotAccepted     = "terms-not-accepted"
+	SlugRateLimited          = "rate-limited"
 )
 
 var catalogue = map[string]problemKind{
@@ -85,6 +95,15 @@ var catalogue = map[string]problemKind{
 	SlugDeadlineExhausted:    {http.StatusServiceUnavailable, "Deadline exhausted", true},
 	SlugUpstreamUnavailable:  {http.StatusServiceUnavailable, "Upstream unavailable", true},
 	SlugNotReady:             {http.StatusServiceUnavailable, "Not ready", true},
+	SlugKeyInQuery:           {http.StatusBadRequest, "Key in query", false},
+	SlugMissingKey:           {http.StatusUnauthorized, "Missing key", false},
+	SlugInvalidKey:           {http.StatusUnauthorized, "Invalid key", false},
+	SlugKeyExpired:           {http.StatusUnauthorized, "Key expired", false},
+	SlugKeyRevoked:           {http.StatusUnauthorized, "Key revoked", false},
+	SlugScopeDenied:          {http.StatusForbidden, "Scope denied", false},
+	SlugSourceNotPermitted:   {http.StatusForbidden, "Source not permitted", false},
+	SlugTermsNotAccepted:     {http.StatusForbidden, "Terms not accepted", false},
+	SlugRateLimited:          {http.StatusTooManyRequests, "Rate limited", true},
 }
 
 // newProblem builds a problem of a catalogued type for the request in ctx.
@@ -140,6 +159,13 @@ func installHumaErrorHooks() {
 		ctx := context.Background()
 		if hctx != nil {
 			ctx = hctx.Context()
+		}
+		// A problem this package built is written as it is.
+		for _, e := range errs {
+			var own *Problem
+			if errors.As(e, &own) {
+				return own
+			}
 		}
 		var p *Problem
 		switch status {

@@ -2,6 +2,8 @@
 //
 //	viafrei-api [serve]            run the service (the default)
 //	viafrei-api healthcheck        exit 0 when /healthz answers ok (for container healthchecks)
+//	viafrei-api meta-check [-platform X.Y.Z] [-contract M.m]
+//	                               exit 0 when /v1/meta reports these versions, 1 on a mismatch
 //	viafrei-api config check       validate the configuration and exit
 //	viafrei-api config show        print the effective configuration, secrets hidden
 //	viafrei-api config docs        print the configuration reference (docs/configuration.md)
@@ -13,6 +15,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -43,6 +46,8 @@ func run(args, environ []string, stdout, stderr io.Writer) int {
 		return serve(environ, stderr)
 	case "healthcheck":
 		return healthcheck(environ, stderr)
+	case "meta-check":
+		return metaCheck(args, environ, stderr)
 	case "config":
 		return configCmd(args, environ, stdout, stderr)
 	case "openapi":
@@ -51,7 +56,7 @@ func run(args, environ []string, stdout, stderr io.Writer) int {
 		_ = json.NewEncoder(stdout).Encode(buildinfo.Get())
 		return 0
 	default:
-		fmt.Fprintf(stderr, "unknown command %q; known: serve, healthcheck, config {check,show,docs}, openapi, version\n", cmd)
+		fmt.Fprintf(stderr, "unknown command %q; known: serve, healthcheck, meta-check, config {check,show,docs}, openapi, version\n", cmd)
 		return 2
 	}
 }
@@ -129,6 +134,40 @@ func healthcheck(environ []string, stderr io.Writer) int {
 	if err := httpapi.Probe(context.Background(), cfg); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
+	}
+	return 0
+}
+
+// metaCheck is the platform deployment check's half inside the container:
+// it asks the running service's own /v1/meta and compares the platform
+// release and the read-contract version with the ones the deployment
+// expects. Exit 0 on a match, 1 on a mismatch (both values named), 2 when the
+// answer cannot be read or the flags are wrong, never a pass.
+func metaCheck(args, environ []string, stderr io.Writer) int {
+	fs := flag.NewFlagSet("meta-check", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var want httpapi.Versions
+	fs.StringVar(&want.Platform, "platform", "", "platform release X.Y.Z the service must report")
+	fs.StringVar(&want.Contract, "contract", "", "read-contract version major.minor the service must report")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if want == (httpapi.Versions{}) {
+		fmt.Fprintln(stderr, "meta-check: name -platform, -contract or both; a check of nothing is not a pass")
+		return 2
+	}
+	cfg, ok := load(environ, false, stderr)
+	if !ok {
+		return config.ExitCode
+	}
+	err := httpapi.CheckVersions(context.Background(), cfg, want)
+	switch {
+	case errors.Is(err, httpapi.ErrVersionMismatch):
+		fmt.Fprintln(stderr, err)
+		return 1
+	case err != nil:
+		fmt.Fprintln(stderr, err)
+		return 2
 	}
 	return 0
 }

@@ -104,20 +104,53 @@ refused by design; release the next patch instead.
 Pre-1.0 releases are always pre-releases on GitHub. The OpenAPI diff flags a
 breaking change on the release page even when the version rules allow it.
 
-### First public release
+### Version sync with the platform
 
-At the "First public release" milestone the API version switches to the
-platform-synced version (issue #6). The switch is one commit on `main` with a
-`Release-As` footer, for example:
+From the "First public release" milestone on, the API's release follows the
+ViaFrei platform's release (REL-001), the way the MCP server's does. The
+sync is `.github/workflows/platform-sync.yml`, daily and by hand, built on
+`go run ./internal/release/platformsync`:
 
-```text
-chore: switch to the platform-synced version
+1. `platformsync read` reads the platform's current release from a public
+   source only: the npm dist-tag `latest` of the package `viafrei` (default)
+   or the latest release of `mavrovde/viafrei-mcp` (`-source github`). One
+   read-only request within `-timeout` (10 s in the workflow); an answer that is not one release version
+   `X.Y.Z` (an error, a draft or pre-release, unreadable JSON) fails the run
+   with exit 2, never a guess.
+2. `platformsync apply -version X.Y.Z` writes the version to
+   `internal/buildinfo/platform-version.txt` and the commit message of the
+   sync: the subject `deps: keep in step with ViaFrei platform X.Y.Z` (the
+   CHANGELOG line, under Dependencies) and the footer `Release-As: X.Y.Z`.
+   It never goes back: a version older than the synced one or than
+   `version.txt` is refused (exit 1).
+3. The workflow pushes `platform-sync/X.Y.Z`, opens the pull request
+   assigned to a maintainer, and approves its CI and Security runs. A
+   maintainer reviews and squash-merges it; the squash keeps the footer.
+4. release-please then proposes exactly `X.Y.Z`: the release pull request
+   bumps `version.txt`, `.release-please-manifest.json` and `CHANGELOG.md` in
+   one commit, and the tag job tags that commit `vX.Y.Z` as for every release.
 
-Release-As: <the platform version, X.Y.Z>
+`/v1/meta` reports `platformVersion` from that file (null before the first
+sync) beside `apiVersion` and `contractVersion`. A deployment checks the
+running service against the platform's release and read-contract version
+with a subcommand that needs no shell in the image:
+
+```sh
+viafrei-api meta-check -platform X.Y.Z -contract M.m   # 0 match, 1 mismatch (both values named), 2 unreadable
 ```
 
-release-please then proposes exactly that version. The sync itself is not
-built yet; until it is, no `Release-As` footer is used.
+Before the first public release the file says `unsynced` and the scheduled
+run only reports the platform's version. The switch is one manual run of the
+workflow with `start: true` at that milestone; until then no `Release-As`
+footer is used.
+
+Try the sync against a fixture version, with no network:
+
+```sh
+go run ./internal/release/platformsync apply -version 2.5.21 -start -message /tmp/msg
+go run ./cmd/viafrei-api version   # "platform":"2.5.21"
+git checkout internal/buildinfo/platform-version.txt
+```
 
 ## Checklist for the release pull request
 

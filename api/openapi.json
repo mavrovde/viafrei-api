@@ -59,7 +59,7 @@
             "type": "string"
           },
           "platformVersion": {
-            "description": "Platform version the service is kept in step with; null until version sync exists.",
+            "description": "ViaFrei platform release this build is kept in step with (version sync); null before the first sync.",
             "type": [
               "string",
               "null"
@@ -336,7 +336,7 @@
     },
     "/v1/meta": {
       "get": {
-        "description": "The API version, the build revision and the read-contract version.",
+        "description": "The API version, the build revision, the read-contract version and the platform release the build is kept in step with.",
         "operationId": "getMeta",
         "responses": {
           "200": {

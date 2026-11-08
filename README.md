@@ -106,10 +106,10 @@ export VFAPI_DB_URL_FILE=/run/secrets/db_url   # or VFAPI_DB_URL=postgres://...
 bin/viafrei-api config check                    # validate and exit
 bin/viafrei-api                                 # serve on localhost:8080
 curl -s localhost:8080/healthz                  # {"status":"ok"}
-curl -s localhost:8080/v1/meta                  # API, build and read-contract versions
+curl -s localhost:8080/v1/meta                  # API, build, read-contract and platform versions
 ```
 
-Other subcommands: `healthcheck` (exit 0 when `/healthz` answers, for container healthchecks), `config show` (effective values, secrets hidden), `config docs`, `openapi`, `version`.
+Other subcommands: `healthcheck` (exit 0 when `/healthz` answers, for container healthchecks), `meta-check` (compare the running service's versions with the expected platform and read-contract versions, [releasing](docs/RELEASING.md#version-sync-with-the-platform)), `config show` (effective values, secrets hidden), `config docs`, `openapi`, `version`.
 
 The database the service reads is described by a versioned read contract in [`db/contract/`](db/contract): logical names only, created with a read-only role. Tests build it in a throwaway container. They never reach a live data source or production.
 

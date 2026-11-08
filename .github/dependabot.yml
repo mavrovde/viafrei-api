@@ -1,5 +1,7 @@
 # Weekly dependency updates. Every update arrives as a pull request with a
-# Conventional Commit title (deps: ...) and runs the full CI.
+# Conventional Commit title (deps: ...) and runs the full CI. A version
+# update waits 7 days after its release (cooldown), so a malicious or broken
+# release has time to be found first; security updates are not delayed.
 version: 2
 updates:
   - package-ecosystem: gomod
@@ -7,6 +9,8 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: deps
     groups:
@@ -20,6 +24,8 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: ci
     open-pull-requests-limit: 5
@@ -28,6 +34,8 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: deps
     open-pull-requests-limit: 3

@@ -52,34 +52,55 @@ jobs:
     name: Semgrep
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write # uploads SARIF to code scanning
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - run: |
-          docker run --rm -v "$PWD:/src" -w /src \
+          scripts/sarif-docker.sh semgrep /tmp/semgrep.sarif -- -v "$PWD:/src" -w /src \
             semgrep/semgrep:1.181.0@sha256:81474464c1f07483ba0682a44787fd93c91397419762a04abe2bafaae396304b \
-            semgrep scan --config p/golang --config p/secrets --config p/dockerfile --config p/github-actions \
-            --error --metrics=off
+            semgrep scan --config p/golang --config p/owasp-top-ten --config p/secrets --config p/dockerfile --config p/github-actions \
+            --error --metrics=off --sarif-output=/tmp/semgrep.sarif
+      - name: Upload SARIF to code scanning
+        if: always() && hashFiles('sarif/semgrep.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: sarif/semgrep.sarif
+          category: semgrep
 
   gitleaks:
     name: Secrets in history (gitleaks)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write # uploads SARIF to code scanning
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
       - run: |
-          docker run --rm -v "$PWD:/repo" --entrypoint sh \
+          scripts/sarif-docker.sh gitleaks /tmp/gitleaks.sarif -- -v "$PWD:/repo" --entrypoint sh \
             zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
-            -c 'git config --global --add safe.directory /repo && gitleaks git /repo --redact --verbose --exit-code 1'
+            -c 'git config --global --add safe.directory /repo && gitleaks git /repo --redact --verbose --exit-code 1 --report-format sarif --report-path /tmp/gitleaks.sarif'
+      - name: Upload SARIF to code scanning
+        if: always() && hashFiles('sarif/gitleaks.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: sarif/gitleaks.sarif
+          category: gitleaks
 
   osv:
     name: OSV-Scanner
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write # uploads SARIF to code scanning
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -88,24 +109,50 @@ jobs:
         with:
           go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
       - run: go run github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.7.0 scan source --recursive .
+      - name: OSV-Scanner SARIF
+        if: always()
+        run: |
+          mkdir -p sarif
+          # exit 1 means advisories were found; the step above has failed on them already
+          go run github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.7.0 scan source --recursive --format sarif . > sarif/osv.sarif || [[ $? == 1 ]]
+          jq -e '.runs | type == "array"' sarif/osv.sarif >/dev/null
+      - name: Upload SARIF to code scanning
+        if: always() && hashFiles('sarif/osv.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: sarif/osv.sarif
+          category: osv-scanner
 
   trivy-fs:
     name: Trivy (repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write # uploads SARIF to code scanning
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - run: |
-          docker run --rm -v "$PWD:/src" \
+          scripts/sarif-docker.sh trivy-fs /tmp/trivy-fs.sarif -- -v "$PWD:/src" \
             aquasec/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222 \
-            fs --scanners vuln,secret --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --no-progress --db-repository mirror.gcr.io/aquasec/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2 /src
+            fs --scanners vuln,secret --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --no-progress --db-repository mirror.gcr.io/aquasec/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2 \
+            --format sarif --output /tmp/trivy-fs.sarif /src
+      - name: Upload SARIF to code scanning
+        if: always() && hashFiles('sarif/trivy-fs.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: sarif/trivy-fs.sarif
+          category: trivy-fs
 
   snyk:
     name: Snyk (dependencies)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write # uploads SARIF to code scanning
     steps:
       - name: SNYK_TOKEN must be set
         env:
@@ -133,7 +180,15 @@ jobs:
           chmod +x snyk
       - env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: ./snyk test --severity-threshold=high
+        run: |
+          mkdir -p sarif
+          ./snyk test --severity-threshold=high --sarif-file-output=sarif/snyk.sarif
+      - name: Upload SARIF to code scanning
+        if: always() && hashFiles('sarif/snyk.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: sarif/snyk.sarif
+          category: snyk-open-source
 
   dependency-review:
     name: Dependency review
@@ -182,19 +237,32 @@ jobs:
     name: Checkov (Dockerfile, workflows)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write # uploads SARIF to code scanning
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - run: |
-          docker run --rm -v "$PWD:/src" -w /src \
+          scripts/sarif-docker.sh checkov /tmp/checkov.sarif -- -v "$PWD:/src" -w /src \
             bridgecrew/checkov:3.3.29@sha256:3cc125b5337717b7303dbddd4e79374c120687b5ff6a24f9abdad56b562469f3 \
-            -d . --framework dockerfile github_actions secrets --quiet --compact
+            -d . --framework dockerfile github_actions secrets --quiet --compact \
+            -o cli -o sarif --output-file-path console,/tmp/checkov.sarif
+      - name: Upload SARIF to code scanning
+        if: always() && hashFiles('sarif/checkov.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: sarif/checkov.sarif
+          category: checkov
 
   zap:
     name: DAST (OWASP ZAP against the compose stack)
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write # uploads SARIF to code scanning
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -206,3 +274,9 @@ jobs:
           name: zap-report
           path: zap-report/
           retention-days: 30
+      - name: Upload SARIF to code scanning
+        if: always() && hashFiles('zap-report/zap.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: zap-report/zap.sarif
+          category: zap

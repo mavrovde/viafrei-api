@@ -22,3 +22,4 @@ test-unit.json
 test-integration.json
 requirement-report.md
 test-completion-report.md
+sarif/

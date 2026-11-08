@@ -7,7 +7,7 @@
 #
 # A rule at FAIL level fails the run; WARN-level alerts are listed in the
 # report and do not fail it. Per-rule decisions live in scripts/zap-rules.tsv.
-# The HTML and JSON reports are written to ./zap-report/.
+# The HTML, JSON and SARIF reports are written to ./zap-report/.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -50,6 +50,7 @@ docker cp "$zap_cid:/zap/wrk/." zap-report/ || true
 [[ -s zap-report/zap.json ]] || { echo "FAIL: ZAP wrote no report (exit $code)" >&2; exit 1; }
 alerts=$(jq '[.site[].alerts[]] | length' zap-report/zap.json)
 echo "zap: exit $code, $alerts alert type(s); report in zap-report/"
+scripts/zap-sarif.sh zap-report/zap.json > zap-report/zap.sarif
 # zap-api-scan exits 1 when a FAIL-level rule fired (-I ignores warnings) and
 # 3 on an internal error; both fail the run.
 exit "$code"

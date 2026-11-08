@@ -53,6 +53,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+      # The approval script is read from main's checkout, not the release branch.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.rp.outputs.pr != ''
+        with:
+          persist-credentials: false
       - name: Approve CI and Security on the release pull request
         if: steps.rp.outputs.pr != ''
         env:

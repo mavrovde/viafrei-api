@@ -66,6 +66,15 @@ and merge release pull requests.
    the downloaded assets, and smoke-tests `/healthz` of the published image.
    It then closes the milestone whose title starts with `X.Y.Z` if no issue in
    it is open, or lists the open issues in the job summary.
+7. The `pages` job builds the documentation site from the tag
+   (`scripts/docs-build.sh`: the guide from `README.md` and the guide pages
+   under `docs/`, the OpenAPI reference rendered from `api/openapi.json`, and
+   the document itself) and deploys it to GitHub Pages,
+   <https://mavrovde.github.io/viafrei-api/>, then reads the published
+   `index.html`, `reference.html` and `openapi.json` back and fails unless
+   they serve that version. Only the newest final release publishes; an rc
+   or a backported patch never replaces the site. CI builds the same site on
+   every pull request (`OpenAPI lint and breaking changes` job).
 
 ### When CI failed on the release commit
 
@@ -278,3 +287,4 @@ To withdraw one:
 | `SONAR_TOKEN` and `SNYK_TOKEN` again as **Dependabot secrets** (Settings > Secrets and variables > Dependabot; **the owner adds them**) | the same jobs on a Dependabot pull request, which reads Dependabot secrets and never Actions secrets | both jobs fail on every Dependabot pull request, saying that the Dependabot secret is missing |
 | Workflow permission "Allow GitHub Actions to create and approve pull requests" (on) | release-please opens the release pull request with `GITHUB_TOKEN` | no release pull request: the job fails with "GitHub Actions is not permitted to create or approve pull requests" |
 | GHCR package visibility public, linked to this repository | image pulls | anonymous pulls fail |
+| GitHub Pages on, source "GitHub Actions"; the `github-pages` environment deploys from `main` | release `pages` job | the deploy step fails |

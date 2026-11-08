@@ -85,8 +85,9 @@ const (
 	minorGuard    = `if [[ $FINAL == true && $HIGHEST_IN_MINOR == true ]]; then echo "$IMAGE:$MINOR"; fi`
 	dispatchGuard = `if [[ $EVENT == workflow_dispatch && $REF != refs/heads/main ]]; then`
 	builtinToken  = "token: ${{ secrets.GITHUB_TOKEN }}"
-	dispatchCI    = `for wf in ci.yml security.yml; do`
-	dispatchRun   = `gh workflow run "$wf" --ref "$branch"`
+	approveScript = "approve-release-runs.sh"
+	approveStep   = `scripts/approve-release-runs.sh "$branch"`
+	approveRun    = `gh api -X POST "repos/$GH_REPO/actions/runs/$id/approve"`
 	dispatchGrant = "      actions: write"
 	publishedRef  = `gh api "repos/$GH_REPO/releases/tags/$TAG"`
 	imageExists   = `docker buildx imagetools inspect "$IMAGE:$VERSION"`
@@ -105,6 +106,9 @@ const (
 func releaseGateFindings(files map[string][]byte, gateScript string) []string {
 	parsed := map[string]gatedWorkflow{}
 	for name, src := range files {
+		if !strings.HasSuffix(name, ".yml") {
+			continue
+		}
 		var w gatedWorkflow
 		if err := yaml.Unmarshal(src, &w); err != nil {
 			return []string{name + " does not parse: " + err.Error()}
@@ -261,11 +265,12 @@ func shellRuleFindings(files map[string][]byte) []string {
 		out = append(out, "image.yml publishes a dispatch from a branch other than main")
 	}
 	rp := string(files["release-please.yml"])
+	approve := string(files[approveScript])
 	if !strings.Contains(rp, builtinToken) || strings.Contains(rp, "RELEASE_PLEASE_TOKEN") {
 		out = append(out, "release-please.yml does not open the release pull request with the built-in GITHUB_TOKEN alone")
 	}
-	if !strings.Contains(rp, dispatchCI) || !strings.Contains(rp, dispatchRun) || !strings.Contains(rp, dispatchGrant) {
-		out = append(out, "release-please.yml does not dispatch CI and Security on the release pull request")
+	if !strings.Contains(rp, approveStep) || !strings.Contains(rp, dispatchGrant) || !strings.Contains(approve, approveRun) || !strings.Contains(approve, "for wf in CI Security; do") {
+		out = append(out, "release-please.yml does not approve CI and Security on the release pull request")
 	}
 	return out
 }
@@ -277,6 +282,11 @@ func TestReleaseGateIsWired(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	approve, err := os.ReadFile(filepath.Join(root, "scripts", approveScript))
+	if err != nil {
+		t.Fatal(err)
+	}
+	files[approveScript] = approve
 	if f := releaseGateFindings(files, string(script)); len(f) > 0 {
 		t.Fatal(strings.Join(f, "; "))
 	}
@@ -330,9 +340,10 @@ func TestReleaseGateIsWired(t *testing.T) {
 		"image.yml publishes a dispatch from a branch other than main":                                {plant("image.yml", dispatchGuard, "if false; then"), s},
 		"does not open the release pull request with the built-in GITHUB_TOKEN alone (other token)":   {plant("release-please.yml", builtinToken, "token: ${{ secrets.RELEASE_PLEASE_TOKEN }}"), s},
 		"does not open the release pull request with the built-in GITHUB_TOKEN alone (fallback)":      {plant("release-please.yml", builtinToken, "token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}"), s},
-		"does not dispatch CI and Security on the release pull request (no loop)":                     {plant("release-please.yml", dispatchCI, "for wf in; do"), s},
-		"does not dispatch CI and Security on the release pull request (no run)":                      {plant("release-please.yml", dispatchRun, "echo"), s},
-		"does not dispatch CI and Security on the release pull request (no grant)":                    {plant("release-please.yml", dispatchGrant+" #", "      actions: read #"), s},
+		"does not approve CI and Security on the release pull request (no step)":                      {plant("release-please.yml", approveStep, "echo"), s},
+		"does not approve CI and Security on the release pull request (no approval)":                  {plant(approveScript, approveRun, "echo"), s},
+		"does not approve CI and Security on the release pull request (no loop)":                      {plant(approveScript, "for wf in CI Security; do", "for wf in CI; do"), s},
+		"does not approve CI and Security on the release pull request (no grant)":                     {plant("release-please.yml", dispatchGrant+" #", "      actions: read #"), s},
 		"rebuilds a release without first checking that it is not published":                          {plant("release.yml", publishedRef, `echo "repos/$GH_REPO"`), s},
 		"rebuilds a release without first checking that :X.Y.Z does not exist":                        {plant("release.yml", imageExists, `echo "$IMAGE:$VERSION"`), s},
 		"appends the image section to notes that may already carry it":                                {plant("release.yml", notesOnce, "if false; then"), s},

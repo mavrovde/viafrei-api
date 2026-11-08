@@ -54,6 +54,13 @@ type Deps struct {
 	Sources SourceReader
 	// Features answers the feature operations; nil switches them off.
 	Features Features
+	// Addresses is gate 1, the per-address bucket; nil switches it off.
+	Addresses AddressGate
+	// Keys is gates 2 and 3, the per-key bucket and quotas; nil switches
+	// them off.
+	Keys KeyGate
+	// Meter records each keyed request's usage; nil records nothing.
+	Meter Meter
 }
 
 type server struct {
@@ -66,6 +73,8 @@ type server struct {
 	auth            Authenticator
 	sources         SourceReader
 	features        Features
+	keyGate         KeyGate
+	metering        Meter
 }
 
 // operation is one registered API operation.
@@ -157,6 +166,8 @@ func build(d Deps, extra []operation) (http.Handler, []byte, error) {
 		auth:            d.Auth,
 		sources:         d.Sources,
 		features:        d.Features,
+		keyGate:         d.Keys,
+		metering:        d.Meter,
 	}
 	if s.now == nil {
 		s.now = time.Now
@@ -178,10 +189,12 @@ func build(d Deps, extra []operation) (http.Handler, []byte, error) {
 	router.Use(
 		securityHeaders(d.Config.HTTP.HSTSMaxAge),
 		withRequest(base),
+		withClient(TrustedProxies(d.Config.Server.TrustedProxies)),
 		accessLog(s.log, s.now),
 		recoverPanics(s.log),
 		refuseKeyInQuery(access.Prefixes{Live: d.Config.Auth.KeyPrefixLive, Test: d.Config.Auth.KeyPrefixTest}),
 		limitURI(d.Config.Server.MaxURIBytes),
+		limitAddress(d.Addresses),
 		withDeadline(d.Config.Deadline.Request),
 	)
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
@@ -245,6 +258,10 @@ func build(d Deps, extra []operation) (http.Handler, []byte, error) {
 		op.register(api, s, hop)
 	}
 	amendNullableObjects(api)
+
+	if d.Config.RateLimit.Headers {
+		documentRateLimit(api)
+	}
 
 	// The document is a value of huma's own fixed types: marshalling it
 	// cannot fail for any configuration.

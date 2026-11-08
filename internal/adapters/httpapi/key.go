@@ -8,6 +8,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
+	"github.com/mavrovde/viafrei-api/internal/app/metering"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 )
 
@@ -143,7 +144,11 @@ func (s *server) permittedSources(ctx context.Context, k access.Record) ([]Attri
 
 // storageProblem maps a storage failure to its problem.
 func (s *server) storageProblem(ctx context.Context, err error) *Problem {
+	if p, ok := s.overloadedProblem(ctx, err); ok {
+		return p
+	}
 	if errors.Is(err, store.ErrDeadlineExhausted) {
+		noteRefusal(ctx, metering.DeadlineExhausted)
 		return newProblem(ctx, SlugDeadlineExhausted, "The request ran out of time.", 1)
 	}
 	return newProblem(ctx, SlugUpstreamUnavailable, "Storage is unavailable.", 1)

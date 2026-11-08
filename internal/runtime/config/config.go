@@ -9,7 +9,12 @@
 // enforces that (DEV-043).
 package config
 
-import "time"
+import (
+	"time"
+	// The zone database is built in, so quota.reset_tz resolves in an image
+	// without one (the distroless runtime image ships none).
+	_ "time/tzdata"
+)
 
 // EnvPrefix is the prefix of every environment variable the service reads.
 const EnvPrefix = "VFAPI_"
@@ -35,6 +40,11 @@ type Config struct {
 	Geo        Geo        `koanf:"geo"`
 	Pagination Pagination `koanf:"pagination"`
 	Compose    Compose    `koanf:"compose"`
+	RateLimit  RateLimit  `koanf:"ratelimit"`
+	Quota      Quota      `koanf:"quota"`
+	Tiers      Tiers      `koanf:"tiers"`
+	Admission  Admission  `koanf:"admission"`
+	Metering   Metering   `koanf:"metering"`
 }
 
 // Server holds the public HTTP listener settings.
@@ -47,7 +57,8 @@ type Server struct {
 	IdleTimeout       time.Duration `koanf:"idle_timeout" default:"60s" validate:"min=100ms,max=300s" desc:"Time an idle keep-alive connection is kept open."`
 	MaxHeaderBytes    int           `koanf:"max_header_bytes" default:"16384" validate:"min=4096,max=1048576" desc:"Largest accepted request header block, in bytes (431 above)."`
 	MaxURIBytes       int           `koanf:"max_uri_bytes" default:"8192" validate:"min=2048,max=65536" desc:"Longest accepted request URI, in bytes (414 above)."`
-	ShutdownGrace     time.Duration `koanf:"shutdown_grace" default:"10s" validate:"min=1s,max=60s" desc:"Time in-flight requests get to finish on shutdown."`
+	ShutdownGrace     time.Duration `koanf:"shutdown_grace" default:"10s" validate:"min=1s,max=60s" desc:"Time in-flight requests get to finish on shutdown; the final metering flush runs after it."`
+	TrustedProxies    []string      `koanf:"trusted_proxies" default:"" validate:"dive,cidr" desc:"Networks (CIDR) of the reverse proxies whose X-Forwarded-For header is believed; the client address is then the nearest address in that header outside these networks. Empty: the immediate peer is the client (RATE-001). Comma-separated in the environment."`
 }
 
 // HTTP holds the response-header settings (NFR-SEC-001).
@@ -151,6 +162,67 @@ type Pagination struct {
 type Compose struct {
 	PartDeadline time.Duration `koanf:"part_deadline" default:"800ms" validate:"min=100ms,max=2s" desc:"Sub-deadline of each part of a composed answer (FR-BRIEF-003); a part that does not finish in it is reported timeout."`
 	PerPartLimit int           `koanf:"per_part_limit" default:"5" validate:"min=1,max=20" desc:"Items per part of a composed answer when the request names no per_part_limit."`
+}
+
+// RateLimit holds the per-address flood control and the rate-limit headers
+// (Spec: Rate Limiting, Quotas and Priority, gates 1 and 2).
+type RateLimit struct {
+	AnonRPS     int           `koanf:"anon_rps" default:"1" validate:"min=0,max=100" desc:"Requests per second one client address may make without presenting a key (service endpoints and keyless requests), as a token bucket (RATE-001, SEC-051). 0 switches the per-address limit off."`
+	AnonBurst   int           `koanf:"anon_burst" default:"5" validate:"min=1,max=1000" desc:"Burst of the per-address token bucket: requests a client address may make at once before ratelimit.anon_rps applies."`
+	Headers     bool          `koanf:"headers" default:"true" desc:"Send RateLimit-Policy and RateLimit on every keyed answer (RATE-006)."`
+	IPStateTTL  time.Duration `koanf:"ip_state_ttl" default:"10m" validate:"min=1m,max=60m" desc:"How long the state of an idle client address is kept; it is held in memory only and never stored (RATE-015)."`
+	IPTrackSize int           `koanf:"ip_track_size" default:"100000" validate:"min=100,max=10000000" desc:"Largest number of client addresses tracked at once; when full, idle entries are dropped first, then any one."`
+}
+
+// Quota holds the quota-window settings (gate 3).
+type Quota struct {
+	ResetTZ string `koanf:"reset_tz" default:"Europe/Berlin" validate:"required,timezone" desc:"Time zone whose midnight resets the daily quota and whose first of the month resets the monthly quota (RATE-003)."`
+}
+
+// Tiers holds the priority-admission tiers (gate 4). The permits are
+// db.pool_max (RATE-008).
+type Tiers struct {
+	Critical       CriticalTier `koanf:"critical"`
+	Standard       StandardTier `koanf:"standard"`
+	Bulk           BulkTier     `koanf:"bulk"`
+	PerKeyInflight int          `koanf:"per_key_inflight" default:"4" validate:"min=1,max=16" desc:"Permits one key may hold at once (RATE-016). At most db.pool_max."`
+}
+
+// CriticalTier is the highest tier.
+type CriticalTier struct {
+	Reserved     int           `koanf:"reserved" default:"1" validate:"min=0,max=16" desc:"Permits kept for the critical tier that lower tiers cannot use (RATE-009)."`
+	QueueLen     int           `koanf:"queue_len" default:"32" validate:"min=0,max=1024" desc:"Critical requests that may wait for a permit; one more is shed."`
+	QueueMaxWait time.Duration `koanf:"queue_max_wait" default:"800ms" validate:"min=0s,max=2s" desc:"Longest time a critical request waits for a permit before it is shed. Less than deadline.request."`
+}
+
+// StandardTier is the middle tier.
+type StandardTier struct {
+	Reserved     int           `koanf:"reserved" default:"0" validate:"min=0,max=16" desc:"Permits kept for the standard tier (and above) that the bulk tier cannot use."`
+	QueueLen     int           `koanf:"queue_len" default:"32" validate:"min=0,max=1024" desc:"Standard requests that may wait for a permit; one more is shed."`
+	QueueMaxWait time.Duration `koanf:"queue_max_wait" default:"400ms" validate:"min=0s,max=2s" desc:"Longest time a standard request waits for a permit before it is shed. Less than deadline.request."`
+}
+
+// BulkTier is the lowest tier.
+type BulkTier struct {
+	Reserved     int           `koanf:"reserved" default:"0" validate:"min=0,max=16" desc:"Permits reserved for the bulk tier. No tier is below it, so they keep nothing from anyone; they count against db.pool_max only."`
+	QueueLen     int           `koanf:"queue_len" default:"4" validate:"min=0,max=1024" desc:"Bulk requests that may wait for a permit; one more is shed."`
+	QueueMaxWait time.Duration `koanf:"queue_max_wait" default:"200ms" validate:"min=0s,max=2s" desc:"Longest time a bulk request waits for a permit before it is shed. Less than deadline.request."`
+	MaxInflight  int           `koanf:"max_inflight" default:"1" validate:"min=0,max=16" desc:"Permits the bulk tier may hold at once, however many are free (RATE-009). 0 keeps bulk out of storage. At most db.pool_max."`
+}
+
+// Admission holds the admission controller's settings.
+type Admission struct {
+	AgingAfter time.Duration `koanf:"aging_after" default:"500ms" validate:"min=0s,max=2s" desc:"A waiter older than this is promoted one tier, so no tier starves (RATE-010). 0s promotes every waiter at once."`
+	EWMAAlpha  float64       `koanf:"ewma_alpha" default:"0.2" validate:"min=0.01,max=1" desc:"Weight of the newest storage service time in the moving average the wait estimate uses (RATE-011)."`
+	ShedStatus int           `koanf:"shed_status" default:"429" validate:"oneof=429 503" desc:"HTTP status of an overloaded refusal: 429 or 503. The problem type is overloaded either way, with Retry-After."`
+}
+
+// Metering holds the usage-metering settings (RATE-014).
+type Metering struct {
+	FlushInterval   time.Duration `koanf:"flush_interval" default:"30s" validate:"min=5s,max=5m" desc:"Interval of the batched usage write to the access store. A crash loses at most one interval of counts; one more flush runs on shutdown."`
+	MaxKeysBuffered int           `koanf:"max_keys_buffered" default:"100000" validate:"min=100,max=1000000" desc:"Largest number of (key, hour, operation) counters held between flushes; the counts of a new counter beyond it are dropped and the drop is logged."`
+	WriteTimeout    time.Duration `koanf:"write_timeout" default:"1s" validate:"min=100ms,max=10s" desc:"Deadline of one usage write; a failed write keeps its counts for the next flush."`
+	RetentionDays   int           `koanf:"retention_days" default:"400" validate:"min=30,max=1825" desc:"Days a usage record is kept; keys prune removes older ones."`
 }
 
 // Day is the length of the day counts of this configuration

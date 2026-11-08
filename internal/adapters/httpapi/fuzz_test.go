@@ -2,14 +2,17 @@ package httpapi_test
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/app/health"
+	"github.com/mavrovde/viafrei-api/internal/domain/limits"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
 
@@ -56,6 +59,51 @@ func FuzzRequest(f *testing.F) {
 		}
 		if w.Code >= 400 && !strings.HasPrefix(w.Header().Get("Content-Type"), httpapi.ProblemContentType) {
 			t.Fatalf("GET %s?%q: %d without a problem body (%q)", path, rawQuery, w.Code, w.Header().Get("Content-Type"))
+		}
+	})
+}
+
+// clientRecorder is a per-address gate that admits every request and
+// records the address it was asked about.
+type clientRecorder struct{ last string }
+
+func (c *clientRecorder) Take(client string) limits.Decision {
+	c.last = client
+	return limits.Decision{Allowed: true}
+}
+
+// FuzzForwarded (TEST-006, TST-016): the client address of a request from a
+// trusted proxy is read from X-Forwarded-For. Whatever the header holds, the
+// request is answered without a 5xx, and the address the per-address gate
+// is charged with is either the proxy itself or a well-formed address.
+// Seed corpus: testdata/fuzz/FuzzForwarded (test/fuzz/targets.tsv).
+func FuzzForwarded(f *testing.F) {
+	cfg := config.Defaults()
+	cfg.Server.TrustedProxies = []string{"10.0.0.0/8"}
+	gate := &clientRecorder{}
+	h, err := httpapi.NewHandler(httpapi.Deps{Config: cfg, Addresses: gate})
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Add("10.0.0.1:5000", "192.0.2.7")
+	f.Add("10.0.0.1:5000", "spoofed, 192.0.2.7 , 2001:db8::1")
+	f.Add("198.51.100.1:5000", "192.0.2.7")
+	f.Add("10.0.0.1", ",,,")
+	f.Fuzz(func(t *testing.T, remote, forwarded string) {
+		r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/healthz", nil)
+		r.RemoteAddr = remote
+		r.Header["X-Forwarded-For"] = []string{forwarded}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code >= 500 {
+			t.Fatalf("remote %q forwarded %q: status %d", remote, forwarded, w.Code)
+		}
+		host, _, splitErr := net.SplitHostPort(remote)
+		if splitErr != nil {
+			host = remote
+		}
+		if _, err := netip.ParseAddr(gate.last); gate.last != host && err != nil {
+			t.Fatalf("remote %q forwarded %q: charged %q, neither the peer nor an address", remote, forwarded, gate.last)
 		}
 	})
 }

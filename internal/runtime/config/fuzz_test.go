@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -55,7 +56,7 @@ func FuzzLoad(f *testing.F) {
 			t.Fatal("loaded without a configuration")
 		}
 		again, err := config.Load(opts)
-		if err != nil || again.Server != cfg.Server {
+		if err != nil || !reflect.DeepEqual(config.Show(again), config.Show(cfg)) {
 			t.Fatalf("the same input loaded twice differs: %v", err)
 		}
 	})

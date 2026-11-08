@@ -61,6 +61,8 @@ type Settings struct {
 	MinExpiry, MaxExpiry time.Duration
 	// AuditRetention is how long an audit record is kept (SEC-045).
 	AuditRetention time.Duration
+	// UsageRetentionDays is how many days a usage record is kept (RATE-014).
+	UsageRetentionDays int
 }
 
 // Principal is an authenticated key.

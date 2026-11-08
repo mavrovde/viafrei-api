@@ -72,6 +72,8 @@ func typeName(t reflect.Type) string {
 		return "duration"
 	case t.Kind() == reflect.Int:
 		return "int"
+	case t.Kind() == reflect.Float64:
+		return "float"
 	case t.Kind() == reflect.Bool:
 		return "bool"
 	case t.Kind() == reflect.Slice:

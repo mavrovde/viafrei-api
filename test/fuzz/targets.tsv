@@ -14,6 +14,7 @@ configuration	internal/runtime/config	Load,parseEnviron	FuzzLoad	-
 contract-version	internal/domain/service	ParseContractVersion	FuzzParseContractVersion	-
 platform-version	internal/buildinfo	ParsePlatform	FuzzParsePlatform	-
 request	internal/adapters/httpapi	strictQuery,withRequest,limitURI	FuzzRequest	-
+forwarded	internal/adapters/httpapi	withClient,parseForwarded	FuzzForwarded	-
 cursor	-	-	-	#9
 key	internal/domain/access	Parse	FuzzParse	-
 polyline	-	-	-	#10

@@ -33,6 +33,7 @@ func AuthSettings(cfg *config.Config) auth.Settings {
 		MinExpiry:             config.Day,
 		MaxExpiry:             config.MaxKeyLifetime,
 		AuditRetention:        time.Duration(cfg.Audit.RetentionDays) * config.Day,
+		UsageRetentionDays:    cfg.Metering.RetentionDays,
 	}
 	if a.PepperPrevious.IsSet() {
 		s.Peppers.Previous = []byte(a.PepperPrevious.Reveal())

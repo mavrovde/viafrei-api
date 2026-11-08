@@ -97,7 +97,7 @@ func settings() auth.Settings {
 		KeyCacheTTL: time.Minute, NegativeCacheTTL: 10 * time.Second, KeyCacheSize: 100,
 		ExpiryWarning: 14 * 24 * time.Hour, FailureLimit: 3, FailureWindow: time.Minute, FailureTrackSize: 100,
 		RotationOverlap: 7 * 24 * time.Hour, DefaultExpiry: 365 * 24 * time.Hour,
-		MinExpiry: 24 * time.Hour, MaxExpiry: 1095 * 24 * time.Hour, AuditRetention: 395 * 24 * time.Hour,
+		MinExpiry: 24 * time.Hour, MaxExpiry: 1095 * 24 * time.Hour, AuditRetention: 395 * 24 * time.Hour, UsageRetentionDays: 400,
 	}
 }
 

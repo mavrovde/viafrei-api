@@ -19,6 +19,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -29,9 +30,12 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/adapters/accessstore"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
+	"github.com/mavrovde/viafrei-api/internal/app/admission"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/app/health"
+	"github.com/mavrovde/viafrei-api/internal/app/metering"
+	"github.com/mavrovde/viafrei-api/internal/app/ratelimit"
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/runtime/keyscli"
@@ -99,6 +103,9 @@ func serve(environ []string, stderr io.Writer) int {
 		return config.ExitCode
 	}
 	defer st.Close()
+	st.WithAdmission(admission.New(wire.AdmissionSettings(cfg), nil))
+	addresses := ratelimit.NewIPLimiter(wire.AddressSettings(cfg), nil)
+	go addresses.Run(ctx)
 
 	deps := httpapi.Deps{
 		Config:          cfg,
@@ -109,7 +116,9 @@ func serve(environ []string, stderr io.Writer) int {
 		Sources:         st,
 		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st},
 			wire.FeatureSettings(cfg), time.Now),
+		Addresses: addresses,
 	}
+
 	if cfg.Access.URL.IsSet() {
 		as, err := accessstore.Open(ctx, cfg)
 		if err != nil {
@@ -120,6 +129,16 @@ func serve(environ []string, stderr io.Writer) int {
 		authn := auth.New(wire.AuthSettings(cfg), as, nil)
 		go authn.Run(ctx)
 		deps.Auth = authn
+		deps.Keys = ratelimit.NewKeyLimiter(wire.QuotaZone(cfg), as, nil)
+		meter := metering.New(wire.MeteringSettings(cfg), as, nil)
+		deps.Meter = meter
+		// The meter outlives the server: it is stopped after the shutdown,
+		// so the requests answered during the shutdown are counted, and its
+		// last flush is waited for before the access store closes.
+		mctx, stopMeter := context.WithCancel(context.WithoutCancel(ctx))
+		metered := make(chan struct{})
+		go func() { meter.Run(mctx, reportUsage(log)); close(metered) }()
+		defer func() { stopMeter(); <-metered }()
 	} else {
 		log.Warn("no access store configured: keyed operations are switched off")
 	}
@@ -263,4 +282,17 @@ func keysCmd(args, environ []string, stdout, stderr io.Writer) int {
 	}
 	defer as.Close()
 	return keyscli.Run(ctx, args, auth.NewKeys(wire.AuthSettings(cfg), as, nil, nil), stdout, stderr)
+}
+
+// reportUsage logs a usage flush that failed or dropped counts; a clean
+// flush is silent.
+func reportUsage(log *slog.Logger) func(metering.Report) {
+	return func(r metering.Report) {
+		if r.Err != nil {
+			log.Error("usage write failed; the counts are kept for the next flush", "error", r.Err)
+		}
+		if r.Dropped > 0 {
+			log.Warn("usage counts dropped: metering.max_keys_buffered reached", "dropped", r.Dropped)
+		}
+	}
 }

@@ -48,6 +48,9 @@ services:
     environment:
       VFAPI_SERVER_LISTEN_ADDR: ":8080"
       VFAPI_DB_URL: postgres://api_reader:${API_READER_PASSWORD:?set API_READER_PASSWORD in .env}@db:5432/contract?sslmode=disable
+      # The per-address limit of keyless requests (RATE-001); the fuzzing
+      # scripts switch it off with 0, see docs/rate-limits.md.
+      VFAPI_RATELIMIT_ANON_RPS: ${VFAPI_RATELIMIT_ANON_RPS:-1}
     ports:
       # Loopback only. Override API_PUBLISH in .env on a host without IPv6 loopback.
       - "${API_PUBLISH:-[::1]:8080}:8080"

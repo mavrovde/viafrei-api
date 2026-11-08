@@ -80,6 +80,8 @@ const (
 	SlugSourceNotPermitted   = "source-not-permitted"
 	SlugTermsNotAccepted     = "terms-not-accepted"
 	SlugRateLimited          = "rate-limited"
+	SlugQuotaExceeded        = "quota-exceeded"
+	SlugOverloaded           = "overloaded"
 )
 
 var catalogue = map[string]problemKind{
@@ -104,6 +106,8 @@ var catalogue = map[string]problemKind{
 	SlugSourceNotPermitted:   {http.StatusForbidden, "Source not permitted", false},
 	SlugTermsNotAccepted:     {http.StatusForbidden, "Terms not accepted", false},
 	SlugRateLimited:          {http.StatusTooManyRequests, "Rate limited", true},
+	SlugQuotaExceeded:        {http.StatusTooManyRequests, "Quota exceeded", true},
+	SlugOverloaded:           {http.StatusTooManyRequests, "Overloaded", true},
 }
 
 // newProblem builds a problem of a catalogued type for the request in ctx.

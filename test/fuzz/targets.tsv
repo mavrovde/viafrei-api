@@ -12,6 +12,7 @@
 # and no target until its parser exists. scripts/fuzz.sh runs every target.
 configuration	internal/runtime/config	Load,parseEnviron	FuzzLoad	-
 contract-version	internal/domain/service	ParseContractVersion	FuzzParseContractVersion	-
+platform-version	internal/buildinfo	ParsePlatform	FuzzParsePlatform	-
 request	internal/adapters/httpapi	strictQuery,withRequest,limitURI	FuzzRequest	-
 cursor	-	-	-	#9
 key	-	-	-	#7

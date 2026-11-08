@@ -19,8 +19,9 @@
 #
 # A change that touches no in-scope code mutates nothing and passes, and
 # says so. The report (default mutation-report.md) carries the counts and
-# every survivor. GREMLINS names the binary (default gremlins, pinned in the
-# workflow).
+# every survivor. Gremlins is built from tools/gremlins, whose go.mod and
+# go.sum lock its version (v0.6.0) and every dependency; GREMLINS names
+# another binary instead.
 #
 # Exit 0 at or above the target, 1 below it or on a gate finding, 2 on a
 # usage error or an input that cannot be read.
@@ -31,13 +32,16 @@ cd "$(dirname "$0")/.."
 mode=${1:-}
 scope=test/mutation/scope.tsv
 equivalent=test/mutation/equivalent.tsv
-gremlins=${GREMLINS:-gremlins}
 work=$(mktemp -d)
+gremlins=${GREMLINS:-$work/gremlins}
 cleanup() {
   if [[ -d $work/base ]]; then git worktree remove --force "$work/base" >/dev/null 2>&1 || true; fi
   rm -rf "$work"
 }
 trap cleanup EXIT
+if [[ -z ${GREMLINS:-} ]]; then
+  go -C tools/gremlins build -o "$gremlins" github.com/go-gremlins/gremlins/cmd/gremlins
+fi
 
 # A timeout counts against the score, so it must mean a hang, not a busy
 # runner: Gremlins' default timeout timed out mutants whose tests fail in

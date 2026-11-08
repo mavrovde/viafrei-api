@@ -74,5 +74,6 @@ by restructuring (a `switch`'s case expressions are reported as not covered,
 so the rules use `if` chains).
 
 Run it locally with `scripts/mutation.sh pr origin/main` or
-`scripts/mutation.sh full`, with Gremlins installed
-(`go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0`).
+`scripts/mutation.sh full`. The script builds Gremlins from `tools/gremlins`,
+a module of its own whose `go.sum` locks the tool and every dependency, so
+it never enters the service's module graph.

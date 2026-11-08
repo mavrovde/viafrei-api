@@ -245,10 +245,10 @@ jobs:
         with:
           persist-credentials: false
       - run: |
-          scripts/sarif-docker.sh checkov /tmp/checkov/results_sarif.sarif -- -v "$PWD:/src" -w /src \
+          scripts/sarif-docker.sh checkov /tmp/checkov.sarif -- -v "$PWD:/src" -w /src \
             bridgecrew/checkov:3.3.29@sha256:3cc125b5337717b7303dbddd4e79374c120687b5ff6a24f9abdad56b562469f3 \
             -d . --framework dockerfile github_actions secrets --quiet --compact \
-            -o cli -o sarif --output-file-path console,/tmp/checkov
+            -o cli -o sarif --output-file-path console,/tmp/checkov.sarif
       - name: Upload SARIF to code scanning
         if: always() && hashFiles('sarif/checkov.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1

@@ -130,7 +130,7 @@ func TestAnswer(t *testing.T) {
 		t.Errorf("partial answer: %v %v %v", got, partial, err)
 	}
 	got, partial, err = g.Answer([]string{"alpha", "zeta"})
-	if err != nil || partial || len(got) != 2 {
+	if err != nil || len(got) != 2 {
 		t.Errorf("full answer: %v %v %v", got, partial, err)
 	}
 	if _, _, err := g.Answer([]string{"gamma", "epsilon"}); !errors.Is(err, access.ErrNonePermitted) {

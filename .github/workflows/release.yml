@@ -176,6 +176,11 @@ jobs:
           elif [[ $out != *"not found"* ]]; then
             echo "::error::cannot tell whether $IMAGE:$VERSION exists: $out"; exit 1
           fi
+      # Every asset below is written into dist/, and the SBOM action does not
+      # create its output directory (v0.2.0 stopped there after the image was
+      # pushed). Created before anything is pushed.
+      - name: The asset directory
+        run: mkdir -p dist
       - id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:

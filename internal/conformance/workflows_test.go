@@ -259,3 +259,86 @@ func TestSecurityWorkflowRunsEveryCheck(t *testing.T) {
 		}
 	}
 }
+
+// sarifUploads: every scanner that can write SARIF hands it to GitHub code
+// scanning, so its findings are listed in the Security tab (SSC-014). The
+// key is "workflow/job" (a "#n" suffix tells apart several uploads of one
+// job), the value the upload's category. CodeQL and Scorecard upload through
+// their own actions.
+var sarifUploads = map[string]string{
+	"security.yml/semgrep":  "semgrep",
+	"security.yml/gitleaks": "gitleaks",
+	"security.yml/osv":      "osv-scanner",
+	"security.yml/trivy-fs": "trivy-fs",
+	"security.yml/snyk":     "snyk-open-source",
+	"security.yml/checkov":  "checkov",
+	"security.yml/zap":      "zap",
+	"ci.yml/openapi":        "spectral",
+	"ci.yml/vulncheck":      "govulncheck",
+	"ci.yml/image":          "trivy-image",
+	"ci.yml/image#2":        "hadolint",
+	"ci.yml/image#3":        "snyk-container",
+}
+
+const uploadSarif = "github/codeql-action/upload-sarif@"
+
+func sarifFindings(files map[string][]byte) []string {
+	got := map[string]map[string]bool{}
+	for name, src := range files {
+		var w workflowFile
+		if err := yaml.Unmarshal(src, &w); err != nil {
+			return []string{name + " does not parse"}
+		}
+		for id, job := range w.Jobs {
+			for _, st := range job.Steps {
+				if !strings.HasPrefix(st.Uses, uploadSarif) {
+					continue
+				}
+				key := name + "/" + id
+				if got[key] == nil {
+					got[key] = map[string]bool{}
+				}
+				c, _ := st.With["category"].(string)
+				got[key][c] = true
+			}
+		}
+	}
+	var out []string
+	for key, cat := range sarifUploads {
+		job, _, _ := strings.Cut(key, "#")
+		if !got[job][cat] {
+			out = append(out, job+" does not upload SARIF with category "+cat)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func TestScannersUploadSARIF(t *testing.T) {
+	req.Covers(t, "SSC-014")
+	wf := readWorkflows(t)
+	if f := sarifFindings(wf); len(f) > 0 {
+		t.Fatal(strings.Join(f, "; "))
+	}
+	for want, plant := range map[string][3]string{
+		"security.yml/gitleaks does not upload SARIF with category gitleaks": {"security.yml", "category: gitleaks", "category: other"},
+		"security.yml/zap does not upload SARIF with category zap":           {"security.yml", "category: zap", "category: other"},
+		"ci.yml/image does not upload SARIF with category snyk-container":    {"ci.yml", "category: snyk-container", "category: other"},
+		"ci.yml/openapi does not upload SARIF with category spectral":        {"ci.yml", uploadSarif, "github/other-action@"},
+	} {
+		t.Run(want, func(t *testing.T) {
+			m := map[string][]byte{}
+			for k, v := range wf {
+				m[k] = v
+			}
+			bad := strings.Replace(string(m[plant[0]]), plant[1], plant[2], 1)
+			if bad == string(m[plant[0]]) {
+				t.Fatalf("plant in %s changed nothing: %q", plant[0], plant[1])
+			}
+			m[plant[0]] = []byte(bad)
+			if got := strings.Join(sarifFindings(m), "; "); !strings.Contains(got, want) {
+				t.Errorf("planted %q, the rules said %q", want, got)
+			}
+		})
+	}
+}

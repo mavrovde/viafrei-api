@@ -174,30 +174,6 @@
         ],
         "type": "object"
       },
-      "ReadinessBody": {
-        "additionalProperties": false,
-        "properties": {
-          "checks": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "description": "Per check: pass or fail. Present when not ready.",
-            "type": "object"
-          },
-          "status": {
-            "description": "ready when every check passes.",
-            "enum": [
-              "ready",
-              "not_ready"
-            ],
-            "type": "string"
-          }
-        },
-        "required": [
-          "status"
-        ],
-        "type": "object"
-      },
       "ResponseMeta": {
         "additionalProperties": false,
         "properties": {
@@ -273,62 +249,6 @@
           }
         },
         "summary": "Liveness",
-        "tags": [
-          "service"
-        ]
-      }
-    },
-    "/readyz": {
-      "get": {
-        "description": "Storage answers within the readiness timeout and publishes a compatible read contract (FR-SVC-004).",
-        "operationId": "getReadiness",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ReadinessBody"
-                }
-              }
-            },
-            "description": "OK",
-            "headers": {
-              "Cache-Control": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ReadinessBody"
-                }
-              }
-            },
-            "description": "Not ready: a check failed.",
-            "headers": {
-              "Cache-Control": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Readiness",
         "tags": [
           "service"
         ]

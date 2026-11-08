@@ -9,6 +9,13 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [0.2.1](https://github.com/mavrovde/viafrei-api/compare/v0.2.0...v0.2.1) (2026-11-08)
+
+
+### Fixed
+
+* **release:** create dist/ before the image is built, so the SBOM step can write its file ([#5](https://github.com/mavrovde/viafrei-api/issues/5)) ([#56](https://github.com/mavrovde/viafrei-api/issues/56)) ([b6ac2fa](https://github.com/mavrovde/viafrei-api/commit/b6ac2facbdd3ce9da390ad50d81086a5f39febcd))
+
 ## [0.2.0](https://github.com/mavrovde/viafrei-api/compare/v0.1.0...v0.2.0) (2026-11-08)
 
 

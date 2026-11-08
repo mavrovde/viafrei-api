@@ -21,7 +21,7 @@ SARIF, each result located on `api/openapi.json`.
 | Lint-level security | golangci-lint with gosec (CI workflow) | any finding | — (log) | SSC-014 |
 | Secrets in the whole history | gitleaks 8.30.1 | any finding (redacted in the log and the report) | `gitleaks` | SSC-017 |
 | Known vulnerabilities, reachable | govulncheck 1.9.0 (CI workflow) | a vulnerable function that is called | `govulncheck` | SSC-014 |
-| Known vulnerabilities, modules | OSV-Scanner 2.7.0 | any advisory against `go.mod` | `osv-scanner` | SSC-014 |
+| Known vulnerabilities, modules | OSV-Scanner 2.7.0 | an advisory against `go.mod` whose vulnerable code is called (its Go call analysis; uncalled ones are listed in code scanning and do not fail) | `osv-scanner` | SSC-014 |
 | Known vulnerabilities, repository | Trivy 0.76.0 `fs` (vuln, secret) | HIGH or CRITICAL with a fix | `trivy-fs` | SSC-014 |
 | Known vulnerabilities, image | Trivy 0.76.0 `image` (CI workflow) | HIGH or CRITICAL with a fix | `trivy-image` | SSC-014 |
 | Dependencies | Snyk Open Source, CLI 1.1308.1 (binary, sha256 checked) | high or critical; fails naming `SNYK_TOKEN` when the secret is absent | `snyk-open-source` | SSC-014 |

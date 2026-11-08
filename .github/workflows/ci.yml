@@ -163,6 +163,9 @@ jobs:
     name: OpenAPI lint and breaking changes
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write # uploads SARIF to code scanning
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -173,6 +176,18 @@ jobs:
           go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
       - name: Spectral
         run: npm exec --yes --ignore-scripts --package=@stoplight/spectral-cli@6.17.0 -- spectral lint --ruleset .spectral.yaml --fail-severity warn api/openapi.json
+      - name: Spectral SARIF
+        if: always()
+        run: |
+          mkdir -p sarif
+          npm exec --yes --ignore-scripts --package=@stoplight/spectral-cli@6.17.0 -- spectral lint --ruleset .spectral.yaml --fail-severity error --format sarif --output sarif/spectral.sarif api/openapi.json || true
+          jq -e '.runs | type == "array"' sarif/spectral.sarif >/dev/null
+      - name: Upload SARIF to code scanning
+        if: always() && hashFiles('sarif/spectral.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: sarif/spectral.sarif
+          category: spectral
       - name: Breaking changes against the base branch
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -184,6 +199,9 @@ jobs:
     name: govulncheck
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write # uploads SARIF to code scanning
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -192,17 +210,45 @@ jobs:
         with:
           go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -show verbose ./...
+      - name: govulncheck SARIF
+        if: always()
+        run: |
+          mkdir -p sarif
+          go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -format sarif ./... > sarif/govulncheck.sarif
+          jq -e '.runs | type == "array"' sarif/govulncheck.sarif >/dev/null
+      - name: Upload SARIF to code scanning
+        if: always() && hashFiles('sarif/govulncheck.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: sarif/govulncheck.sarif
+          category: govulncheck
 
   image:
     name: Image (build, lint, scan, healthz)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write # uploads SARIF to code scanning
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Hadolint
         run: docker run --rm -i hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d hadolint --failure-threshold warning - < Dockerfile
+      - name: Hadolint SARIF
+        if: always()
+        run: |
+          mkdir -p sarif
+          docker run --rm -i hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d hadolint --no-fail --format sarif - < Dockerfile > sarif/hadolint.sarif
+          jq -e '.runs | type == "array"' sarif/hadolint.sarif >/dev/null
+          jq '.runs[].results[]?.locations[]?.physicalLocation.artifactLocation.uri |= "Dockerfile"' sarif/hadolint.sarif > sarif/hadolint.tmp && mv sarif/hadolint.tmp sarif/hadolint.sarif
+      - name: Upload SARIF to code scanning
+        if: always() && hashFiles('sarif/hadolint.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: sarif/hadolint.sarif
+          category: hadolint
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build linux/amd64 and linux/arm64 (not pushed)
@@ -233,9 +279,41 @@ jobs:
         run: scripts/image-smoke.sh viafrei-api:ci
       - name: Trivy (HIGH and CRITICAL fail)
         run: |
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+          scripts/sarif-docker.sh trivy-image /tmp/trivy-image.sarif -- -v /var/run/docker.sock:/var/run/docker.sock \
             aquasec/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222 \
-            image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --no-progress --db-repository mirror.gcr.io/aquasec/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2 viafrei-api:ci
+            image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --no-progress --db-repository mirror.gcr.io/aquasec/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2 \
+            --format sarif --output /tmp/trivy-image.sarif viafrei-api:ci
+      - name: Upload SARIF to code scanning
+        if: always() && hashFiles('sarif/trivy-image.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: sarif/trivy-image.sarif
+          category: trivy-image
+      - name: SNYK_TOKEN must be set
+        if: always()
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          [ -n "$SNYK_TOKEN" ] || { echo "::error::SNYK_TOKEN is not set (a Dependabot pull request reads it from the Dependabot secrets, a fork's pull request never sees it); Snyk Container cannot test this image"; exit 1; }
+      - name: Snyk CLI 1.1308.1, checksum verified
+        if: always()
+        run: |
+          curl -fsSL --proto '=https' --tlsv1.2 --max-time 60 -o snyk https://static.snyk.io/cli/v1.1308.1/snyk-linux
+          echo "a8b2e420af6d8e61bf1d367c064475ccf699d767fc8763efb0072b9cac250f9a  snyk" | sha256sum -c -
+          chmod +x snyk
+      - name: Snyk Container (high and critical fail)
+        if: always()
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          mkdir -p sarif
+          ./snyk container test viafrei-api:ci --file=Dockerfile --severity-threshold=high --sarif-file-output=sarif/snyk-container.sarif
+      - name: Upload SARIF to code scanning
+        if: always() && hashFiles('sarif/snyk-container.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: sarif/snyk-container.sarif
+          category: snyk-container
 
   compose:
     name: Compose smoke (Schemathesis)

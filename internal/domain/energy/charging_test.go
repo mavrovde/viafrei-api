@@ -114,3 +114,11 @@ func TestAccessFilterCodes(t *testing.T) {
 		t.Errorf("all %v", got)
 	}
 }
+
+func TestSummariseKeepsTheFirstOfEqualPowers(t *testing.T) {
+	req.Covers(t, "ENV-041")
+	s := energy.Site{Points: []energy.ChargePoint{point("", 0, kw(50)), point("", 0, kw(50))}}
+	if got := s.Summarise(now, time.Minute).MaxPowerKw; got != s.Points[0].MaxPowerKw {
+		t.Error("the highest power is not the first point's of equal powers")
+	}
+}

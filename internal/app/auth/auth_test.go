@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -134,6 +135,12 @@ func TestAuthenticateRefusals(t *testing.T) {
 	test, _ := access.NewSecret(rand.Reader, access.Test, prefixes, k.ID)
 	other, _ := access.Generate(rand.Reader, access.Live, prefixes)
 	wrong, _ := access.NewSecret(rand.Reader, access.Live, prefixes, k.ID)
+	// The last checksum character, always changed: appending a fixed one
+	// left the key valid whenever the checksum already ended in it (1 in 62).
+	altered := k.Full[:len(k.Full)-1] + "x"
+	if strings.HasSuffix(k.Full, "x") {
+		altered = k.Full[:len(k.Full)-1] + "y"
+	}
 	for name, c := range map[string]struct {
 		key  string
 		want error
@@ -143,7 +150,7 @@ func TestAuthenticateRefusals(t *testing.T) {
 		"other env":        {test.Full, access.ErrInvalid},
 		"unknown id":       {other.Full, access.ErrInvalid},
 		"wrong secret":     {wrong.Full, access.ErrInvalid},
-		"checksum altered": {k.Full[:len(k.Full)-1] + "x", access.ErrInvalid},
+		"checksum altered": {altered, access.ErrInvalid},
 	} {
 		if _, err := a.Authenticate(ctx, c.key, name); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)

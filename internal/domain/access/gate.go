@@ -38,20 +38,24 @@ const (
 // by its terms, and any required acceptance of the current terms version is
 // recorded for the key (SEC-030, SEC-034). Anything else is denied.
 func Decide(t Terms, plan Plan, accepted []Acceptance, disabled []string) Refusal {
-	switch {
-	case slices.Contains(disabled, t.Family):
+	// An if chain, not a switch: a mutation tool reports a switch's case
+	// expressions as uncovered, and these are the rules it must mutate.
+	if slices.Contains(disabled, t.Family) {
 		return Disabled
-	case !t.Reviewed:
-		return NotReviewed
-	case !slices.Contains(plan.Sources, t.Family):
-		return NotInPlan
-	case !slices.Contains(t.UseClasses, plan.UseClass):
-		return UseClassForbidden
-	case t.AcceptanceRequired && !slices.Contains(accepted, Acceptance{Source: t.Family, Version: t.Version}):
-		return TermsNotAccepted
-	default:
-		return Allowed
 	}
+	if !t.Reviewed {
+		return NotReviewed
+	}
+	if !slices.Contains(plan.Sources, t.Family) {
+		return NotInPlan
+	}
+	if !slices.Contains(t.UseClasses, plan.UseClass) {
+		return UseClassForbidden
+	}
+	if t.AcceptanceRequired && !slices.Contains(accepted, Acceptance{Source: t.Family, Version: t.Version}) {
+		return TermsNotAccepted
+	}
+	return Allowed
 }
 
 // Gate is the result of the licence gate for one key: the families it may
@@ -132,14 +136,13 @@ func (g Gate) Answer(answering []string) (permitted []string, partial bool, err 
 		}
 		terms = terms && g.Refused(f) == TermsNotAccepted
 	}
-	switch {
-	case len(permitted) > 0:
+	if len(permitted) > 0 {
 		return permitted, len(permitted) < len(answering), nil
-	case terms:
-		return nil, false, ErrTermsNotAccepted
-	default:
-		return nil, false, ErrNonePermitted
 	}
+	if terms {
+		return nil, false, ErrTermsNotAccepted
+	}
+	return nil, false, ErrNonePermitted
 }
 
 // Source is one source family's attribution, as a keyed answer carries it.

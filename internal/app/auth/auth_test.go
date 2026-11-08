@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -134,6 +135,12 @@ func TestAuthenticateRefusals(t *testing.T) {
 	test, _ := access.NewSecret(rand.Reader, access.Test, prefixes, k.ID)
 	other, _ := access.Generate(rand.Reader, access.Live, prefixes)
 	wrong, _ := access.NewSecret(rand.Reader, access.Live, prefixes, k.ID)
+	// The last checksum character, always changed: appending a fixed one
+	// left the key valid whenever the checksum already ended in it (1 in 62).
+	altered := k.Full[:len(k.Full)-1] + "x"
+	if strings.HasSuffix(k.Full, "x") {
+		altered = k.Full[:len(k.Full)-1] + "y"
+	}
 	for name, c := range map[string]struct {
 		key  string
 		want error
@@ -143,7 +150,7 @@ func TestAuthenticateRefusals(t *testing.T) {
 		"other env":        {test.Full, access.ErrInvalid},
 		"unknown id":       {other.Full, access.ErrInvalid},
 		"wrong secret":     {wrong.Full, access.ErrInvalid},
-		"checksum altered": {k.Full[:len(k.Full)-1] + "x", access.ErrInvalid},
+		"checksum altered": {altered, access.ErrInvalid},
 	} {
 		if _, err := a.Authenticate(ctx, c.key, name); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)
@@ -180,6 +187,15 @@ func TestExpiryWarning(t *testing.T) {
 	soon := issue(t, f, t0.Add(13*24*time.Hour))
 	if p, err := a.Authenticate(context.Background(), soon.Full, "c"); err != nil || !p.Expiring {
 		t.Fatalf("no warning 13 days before expiry: %v %+v", err, p)
+	}
+	// The warning starts exactly expiry_warning_days before expiry.
+	edge := issue(t, f, t0.Add(14*24*time.Hour))
+	if p, err := a.Authenticate(context.Background(), edge.Full, "c"); err != nil || !p.Expiring {
+		t.Fatalf("no warning exactly 14 days before expiry: %v %+v", err, p)
+	}
+	later := issue(t, f, t0.Add(14*24*time.Hour+time.Second))
+	if p, err := a.Authenticate(context.Background(), later.Full, "c"); err != nil || p.Expiring {
+		t.Fatalf("a warning before the window: %v %+v", err, p)
 	}
 	s := settings()
 	s.ExpiryWarning = 0
@@ -296,6 +312,35 @@ func TestCacheSizeIsBounded(t *testing.T) {
 	_, _ = a.Authenticate(ctx, k.Full, "c")
 	if n := a.Cached(); n != 1 {
 		t.Fatalf("expired entries kept: %d", n)
+	}
+}
+
+// TestRefreshingAnEntryInAFullCacheEvictsNothing: reading an id the cache
+// already holds again replaces that entry and evicts no other.
+func TestRefreshingAnEntryInAFullCacheEvictsNothing(t *testing.T) {
+	c := &clock{t: t0}
+	f := &fakeStore{}
+	s := settings()
+	s.KeyCacheSize = 10
+	a := auth.New(s, f, c.now)
+	ctx := context.Background()
+	var first access.Key
+	for i := range 10 {
+		if i == 5 {
+			c.add(40 * time.Second)
+		}
+		k := issue(t, f, t0.Add(time.Hour))
+		if i == 0 {
+			first = k
+		}
+		_, _ = a.Authenticate(ctx, k.Full, "c")
+	}
+	c.add(30 * time.Second) // the first five expired, the last five live
+	if _, err := a.Authenticate(ctx, first.Full, "c"); err != nil {
+		t.Fatal(err)
+	}
+	if n := a.Cached(); n != 10 {
+		t.Fatalf("re-reading a held id left %d entries, want 10", n)
 	}
 }
 

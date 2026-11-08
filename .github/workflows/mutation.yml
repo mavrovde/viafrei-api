@@ -1,0 +1,66 @@
+# Mutation testing (TST-002, issue #17) of the domain, access and admission
+# code of test/mutation/scope.tsv, with Gremlins scored by
+# internal/testkit/mutgate.
+#
+# On a pull request: the changed in-scope code only, failing below 80 % and
+# on zero mutants for changed in-scope code. The release pull request of a
+# minor version (X.Y.0), and a manual run, take the full run over every
+# in-scope mutant instead, failing below 70 % and on a stale equivalent
+# entry. The report lists the counts and every mutant not detected.
+name: Mutation
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  mutation:
+    name: Mutation testing
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: Mutation testing
+        env:
+          EVENT: ${{ github.event_name }}
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          mode="pr"
+          if [[ $EVENT == workflow_dispatch ]]; then
+            mode="full"
+          elif [[ $HEAD_REF == release-please--* ]] && jq -er '.["."] | test("^[0-9]+\\.[0-9]+\\.0$")' .release-please-manifest.json >/dev/null; then
+            mode="full"
+          fi
+          echo "mutation: $mode run"
+          if [[ $mode == full ]]; then
+            scripts/mutation.sh full mutation-report.md
+          else
+            scripts/mutation.sh pr "origin/$BASE_REF" mutation-report.md
+          fi
+      - name: Report in the job summary
+        if: always()
+        run: if [[ -f mutation-report.md ]]; then cat mutation-report.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: mutation-report
+          path: mutation-report.md
+          if-no-files-found: ignore
+          retention-days: 30

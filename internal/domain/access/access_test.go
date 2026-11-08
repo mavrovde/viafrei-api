@@ -172,6 +172,13 @@ func TestVerify(t *testing.T) {
 	if m, err := access.Verify(rot, "old", access.Peppers{Current: pepper2, Previous: pepper}, now); err != nil || !m.Previous || m.Remac == nil {
 		t.Errorf("previous secret under the old pepper: %v %+v", err, m)
 	}
+
+	// An absent pepper is never a key: a MAC stored under the empty pepper
+	// does not match while no previous pepper is set.
+	bare := record("right", nil)
+	if _, err := access.Verify(bare, "right", cur, now); !errors.Is(err, access.ErrInvalid) {
+		t.Errorf("a MAC under the empty pepper matched: %v", err)
+	}
 }
 
 func TestPlanHas(t *testing.T) {

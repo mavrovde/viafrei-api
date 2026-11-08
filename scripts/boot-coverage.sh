@@ -50,6 +50,9 @@ invoke() {
     internal/testkit/covergate)
       expect 2 "$bin"
       ;;
+    internal/testkit/mutgate)
+      expect 2 "$bin"
+      ;;
     internal/release/cigate)
       expect 2 "$bin"
       ;;

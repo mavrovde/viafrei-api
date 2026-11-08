@@ -103,6 +103,16 @@ func TestIssue(t *testing.T) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
+	// The bounds are inclusive: the shortest and longest expiry and a text
+	// of exactly the limit are accepted.
+	for name, exp := range map[string]time.Duration{"shortest": 24 * time.Hour, "longest": 1095 * 24 * time.Hour} {
+		if _, err := k.Issue(ctx, "standard", "l", "c", exp, "o"); err != nil {
+			t.Errorf("%s expiry refused: %v", name, err)
+		}
+	}
+	if _, err := k.Issue(ctx, "standard", strings.Repeat("x", 200), "c", 0, "o"); err != nil {
+		t.Errorf("a label of exactly 200 characters refused: %v", err)
+	}
 	l.err = errors.New("refused")
 	if _, err := k.Issue(ctx, "p", "l", "c", 0, "o"); err == nil {
 		t.Error("a store refusal is lost")

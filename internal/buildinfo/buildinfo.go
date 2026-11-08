@@ -7,7 +7,7 @@
 package buildinfo
 
 import (
-	_ "embed"
+	_ "embed" // for the go:embed of platform-version.txt
 	"fmt"
 	"regexp"
 	"strings"

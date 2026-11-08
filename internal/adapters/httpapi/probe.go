@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
@@ -71,6 +72,13 @@ func CheckVersions(ctx context.Context, cfg *config.Config, want Versions) error
 	return nil
 }
 
+// loopback is the URL of path on this machine's loopback. The service
+// listens without TLS behind its proxy; the request never leaves the host.
+func loopback(port, path string) string {
+	u := url.URL{Scheme: "http", Host: net.JoinHostPort("localhost", port), Path: path}
+	return u.String()
+}
+
 // askSelf GETs path on the loopback at the port of server.listen_addr within
 // health.probe_timeout and decodes the JSON answer into out.
 func askSelf(ctx context.Context, cfg *config.Config, path string, out any) (int, error) {
@@ -80,7 +88,7 @@ func askSelf(ctx context.Context, cfg *config.Config, path string, out any) (int
 	}
 	ctx, cancel := context.WithTimeout(ctx, cfg.Health.ProbeTimeout)
 	defer cancel()
-	r, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+net.JoinHostPort("localhost", port)+path, nil)
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, loopback(port, path), nil)
 	if err != nil {
 		return 0, err
 	}

@@ -6,9 +6,11 @@ toolchain go1.27.3
 
 require (
 	github.com/danielgtaylor/huma/v2 v2.40.0
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/go-playground/validator/v10 v10.30.6
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/websocket v1.4.0
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/knadh/koanf/parsers/yaml v1.1.1
 	github.com/knadh/koanf/providers/confmap v1.0.1

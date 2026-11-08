@@ -138,11 +138,10 @@ func (a *Authenticator) Authenticate(ctx context.Context, presented, client stri
 		return Principal{}, access.ErrInvalid
 	}
 	rec, cached, err := a.lookup(ctx, id)
-	switch {
-	case errors.Is(err, ErrUnknown):
-		_, _ = access.Verify(a.dummy, secret, a.s.Peppers, now)
-		fallthrough
-	case err != nil:
+	if err != nil {
+		if errors.Is(err, ErrUnknown) {
+			_, _ = access.Verify(a.dummy, secret, a.s.Peppers, now)
+		}
 		return Principal{}, a.refuse(client, err)
 	}
 	m, err := access.Verify(rec, secret, a.s.Peppers, now)
@@ -169,7 +168,7 @@ func (a *Authenticator) Authenticate(ctx context.Context, presented, client stri
 		}
 		a.put(id, entry{rec: rec, until: now.Add(a.s.KeyCacheTTL)})
 	}
-	return Principal{Key: rec, Expiring: a.s.ExpiryWarning > 0 && rec.ExpiresAt.Sub(now) <= a.s.ExpiryWarning}, nil
+	return Principal{Key: rec, Expiring: rec.ExpiresAt.Sub(now) <= a.s.ExpiryWarning}, nil
 }
 
 // lookup reads a key through the cache; concurrent first requests for one
@@ -196,10 +195,12 @@ func (a *Authenticator) lookup(ctx context.Context, id string) (rec access.Recor
 	c.rec, c.err = a.store.Lookup(ctx, id)
 
 	now := a.now()
-	switch {
-	case c.err == nil:
+	if c.err == nil {
 		a.put(id, entry{rec: c.rec, until: now.Add(a.s.KeyCacheTTL)})
-	case errors.Is(c.err, ErrUnknown) && a.s.NegativeCacheTTL > 0:
+	}
+	if errors.Is(c.err, ErrUnknown) {
+		// With negative_cache_ttl 0 the entry is born expired: never served,
+		// and the first to go when the cache is full.
 		a.put(id, entry{err: c.err, until: now.Add(a.s.NegativeCacheTTL)})
 	}
 	a.mu.Lock()
@@ -214,18 +215,24 @@ func (a *Authenticator) lookup(ctx context.Context, id string) (rec access.Recor
 func (a *Authenticator) put(id string, e entry) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if _, ok := a.cache[id]; !ok && len(a.cache) >= a.s.KeyCacheSize {
+	if _, ok := a.cache[id]; ok {
+		a.cache[id] = e
+		return
+	}
+	if len(a.cache) >= a.s.KeyCacheSize {
 		now := a.now()
 		for k, v := range a.cache {
 			if !now.Before(v.until) {
 				delete(a.cache, k)
 			}
 		}
-		for k := range a.cache {
-			if len(a.cache) < a.s.KeyCacheSize {
+		// The cache never holds more than its size, so one arbitrary
+		// entry makes room when no entry had expired.
+		if len(a.cache) >= a.s.KeyCacheSize {
+			for k := range a.cache {
+				delete(a.cache, k)
 				break
 			}
-			delete(a.cache, k)
 		}
 	}
 	a.cache[id] = e
@@ -251,7 +258,8 @@ func (a *Authenticator) fail(client string) {
 	now := a.now()
 	w := a.fails[client]
 	if w == nil || !now.Before(w.start.Add(a.s.FailureWindow)) {
-		if w == nil && len(a.fails) >= a.s.FailureTrackSize {
+		delete(a.fails, client) // an ended window makes room for its own successor
+		if len(a.fails) >= a.s.FailureTrackSize {
 			for k, v := range a.fails {
 				if !now.Before(v.start.Add(a.s.FailureWindow)) || len(a.fails) >= a.s.FailureTrackSize {
 					delete(a.fails, k)

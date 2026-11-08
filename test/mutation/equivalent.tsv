@@ -1,0 +1,7 @@
+# Equivalent mutants (TST-002, issue #17): a mutant no test can kill
+# because it does not change behaviour. One line per mutant, tab-separated:
+# the location (module-relative file:line:column, as the report prints it),
+# the Gremlins mutator, the reason it is equivalent, and the reviewer who
+# agreed. An entry without a reason or a reviewer is refused; one naming a
+# mutant the tests kill, or (full run) one matching no mutant, fails the gate.
+# Prefer a refactor that removes the equivalent mutant to an entry here.

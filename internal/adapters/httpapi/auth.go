@@ -136,12 +136,11 @@ func (s *server) authenticate(api huma.API) func(huma.Context, func(huma.Context
 		} else {
 			principal, err := s.auth.Authenticate(ctx.Context(), presented(ctx), clientAddress(ctx))
 			scope, _ := op.Metadata[scopeExtension].(access.Scope)
-			switch {
-			case err != nil:
+			if err != nil {
 				p = authProblem(ctx.Context(), err, int(s.cfg.Auth.FailureWindow.Seconds()))
-			case scope != "" && !principal.Key.Plan.Has(scope):
+			} else if scope != "" && !principal.Key.Plan.Has(scope) {
 				p = newProblem(ctx.Context(), SlugScopeDenied, "The key's plan does not include the scope "+string(scope)+".", 0)
-			default:
+			} else {
 				next(huma.WithValue(ctx, principalKey{}, principal))
 				return
 			}

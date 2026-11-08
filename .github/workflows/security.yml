@@ -1,6 +1,8 @@
-# Security checks (SAST, secrets, dependencies, licences, IaC and DAST) on
-# every pull request, on main and weekly, so a new advisory against an
-# unchanged tree is still found. Nothing here reaches a live data source or
+# Security checks (SAST, secrets, dependencies, licences and DAST) on every
+# pull request, on main and weekly, so a new advisory against an unchanged
+# tree is still found. One tool per kind of check (docs/security-checks.md);
+# the Dockerfile, reachable Go vulnerabilities and the image are checked in
+# ci.yml. Nothing here reaches a live data source or
 # production (TST-010): DAST runs against the local compose stack only.
 name: Security
 
@@ -48,29 +50,6 @@ jobs:
         with:
           category: /language:go
 
-  semgrep:
-    name: Semgrep
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      security-events: write # uploads SARIF to code scanning
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - run: |
-          scripts/sarif-docker.sh semgrep /tmp/semgrep.sarif -- -v "$PWD:/src" -w /src \
-            semgrep/semgrep:1.181.0@sha256:81474464c1f07483ba0682a44787fd93c91397419762a04abe2bafaae396304b \
-            semgrep scan --config p/golang --config p/owasp-top-ten --config p/secrets --config p/dockerfile --config p/github-actions \
-            --error --metrics=off --sarif-output=/tmp/semgrep.sarif
-      - name: Upload SARIF to code scanning
-        if: always() && hashFiles('sarif/semgrep.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
-        with:
-          sarif_file: sarif/semgrep.sarif
-          category: semgrep
-
   gitleaks:
     name: Secrets in history (gitleaks)
     runs-on: ubuntu-24.04
@@ -93,58 +72,6 @@ jobs:
         with:
           sarif_file: sarif/gitleaks.sarif
           category: gitleaks
-
-  osv:
-    name: OSV-Scanner
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      security-events: write # uploads SARIF to code scanning
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
-      - run: go run github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.7.0 scan source --recursive .
-      - name: OSV-Scanner SARIF
-        if: always()
-        run: |
-          mkdir -p sarif
-          # exit 1 means advisories were found; the step above has failed on them already
-          go run github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.7.0 scan source --recursive --format sarif . > sarif/osv.sarif || [[ $? == 1 ]]
-          jq -e '.runs | type == "array"' sarif/osv.sarif >/dev/null
-      - name: Upload SARIF to code scanning
-        if: always() && hashFiles('sarif/osv.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
-        with:
-          sarif_file: sarif/osv.sarif
-          category: osv-scanner
-
-  trivy-fs:
-    name: Trivy (repository)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      security-events: write # uploads SARIF to code scanning
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - run: |
-          scripts/sarif-docker.sh trivy-fs /tmp/trivy-fs.sarif -- -v "$PWD:/src" \
-            aquasec/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222 \
-            fs --scanners vuln,secret --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --no-progress --db-repository mirror.gcr.io/aquasec/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2 \
-            --format sarif --output /tmp/trivy-fs.sarif /src
-      - name: Upload SARIF to code scanning
-        if: always() && hashFiles('sarif/trivy-fs.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
-        with:
-          sarif_file: sarif/trivy-fs.sarif
-          category: trivy-fs
 
   snyk:
     name: Snyk (dependencies)
@@ -232,29 +159,6 @@ jobs:
           name: licenses
           path: licenses.csv
           retention-days: 30
-
-  checkov:
-    name: Checkov (Dockerfile, workflows)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      security-events: write # uploads SARIF to code scanning
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - run: |
-          scripts/sarif-docker.sh checkov /tmp/checkov.sarif -- -v "$PWD:/src" -w /src \
-            bridgecrew/checkov:3.3.29@sha256:3cc125b5337717b7303dbddd4e79374c120687b5ff6a24f9abdad56b562469f3 \
-            -d . --framework dockerfile github_actions secrets --quiet --compact \
-            -o cli -o sarif --output-file-path console,/tmp/checkov.sarif
-      - name: Upload SARIF to code scanning
-        if: always() && hashFiles('sarif/checkov.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
-        with:
-          sarif_file: sarif/checkov.sarif
-          category: checkov
 
   zap:
     name: DAST (OWASP ZAP against the compose stack)

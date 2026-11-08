@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"net/http"
+	"reflect"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -47,8 +48,23 @@ type ReadinessOutput struct {
 func registerReadiness(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "Readiness"
 	op.Description = "Storage answers within the readiness timeout and publishes a compatible read contract (FR-SVC-004)."
+	// The 503 answer carries the same body and cache header as the 200 one;
+	// every other failure is a problem, as on every operation.
+	reg := api.OpenAPI().Components.Schemas
 	op.Responses = map[string]*huma.Response{
-		"503": {Description: "Not ready: a check failed."},
+		"503": {
+			Description: "Not ready: a check failed.",
+			Headers:     map[string]*huma.Param{"Cache-Control": {Schema: &huma.Schema{Type: huma.TypeString}}},
+			Content: map[string]*huma.MediaType{
+				"application/json": {Schema: reg.Schema(reflect.TypeFor[ReadinessBody](), true, "ReadinessBody")},
+			},
+		},
+		"default": {
+			Description: "Error",
+			Content: map[string]*huma.MediaType{
+				ProblemContentType: {Schema: reg.Schema(reflect.TypeFor[Problem](), true, "Problem")},
+			},
+		},
 	}
 	huma.Register(api, op, func(ctx context.Context, _ *struct{}) (*ReadinessOutput, error) {
 		out := &ReadinessOutput{CacheControl: noStore}

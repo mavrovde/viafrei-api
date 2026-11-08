@@ -186,6 +186,7 @@ func build(d Deps) (http.Handler, []byte, error) {
 		DefaultFormat: "application/json",
 	}
 	api := humachi.New(router, hc)
+	api.UseMiddleware(strictQuery(api))
 
 	for _, op := range ops {
 		if disabled[op.id] {

@@ -13,6 +13,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
+	"github.com/go-chi/chi/v5"
 
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
@@ -189,5 +190,31 @@ func TestServerAppliesDefaultsWithoutALogger(t *testing.T) {
 	doc, err := OpenAPI(config.Defaults())
 	if err != nil || !json.Valid(doc) {
 		t.Fatalf("OpenAPI = %d bytes, %v", len(doc), err)
+	}
+}
+
+// TestStrictQueryRefusesARepeatedDeclaredParameter: a declared parameter
+// given twice is a violation of its own (ERR-005, NFR-SEC-002).
+func TestStrictQueryRefusesARepeatedDeclaredParameter(t *testing.T) {
+	req.Covers(t, "ERR-005", "NFR-SEC-002")
+	hookHumaErrors()
+	router := chi.NewRouter()
+	api := humachi.New(router, huma.DefaultConfig("t", "1"))
+	api.UseMiddleware(strictQuery(api))
+	type in struct {
+		Radius int `query:"radius_m"`
+	}
+	huma.Register(api, huma.Operation{OperationID: "t", Method: http.MethodGet, Path: "/t"}, func(_ context.Context, _ *in) (*struct{}, error) {
+		return nil, nil
+	})
+	for target, want := range map[string]int{"/t?radius_m=1": http.StatusNoContent, "/t?radius_m=1&radius_m=2": http.StatusBadRequest} {
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, httptest.NewRequestWithContext(context.Background(), http.MethodGet, target, nil))
+		if w.Code != want {
+			t.Fatalf("%s: %d %s", target, w.Code, w.Body)
+		}
+		if want == http.StatusBadRequest && !strings.Contains(w.Body.String(), `"parameter":"query.radius_m","code":"invalid","detail":"repeated parameter"`) {
+			t.Fatalf("%s: %s", target, w.Body)
+		}
 	}
 }

@@ -55,6 +55,7 @@ func do(t *testing.T, h http.Handler, method, target string, header http.Header)
 	}
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
+	checkContract(t, method, target, w)
 	return w
 }
 

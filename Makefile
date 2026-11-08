@@ -8,7 +8,7 @@ LDFLAGS   := -s -w \
 	-X github.com/mavrovde/viafrei-api/internal/buildinfo.version=$(VERSION) \
 	-X github.com/mavrovde/viafrei-api/internal/buildinfo.commit=$(COMMIT)
 
-.PHONY: build test test-integration coverage lint generate check-generated fixtures catalogue report run clean \
+.PHONY: build test test-integration coverage lint generate check-generated fixtures fixtures-verify catalogue report run clean \
 	image image-multiarch up down logs reset compose-test
 
 build: ## Build the binary into bin/
@@ -44,6 +44,9 @@ SEED    ?= 1
 
 fixtures: ## Write a synthetic fixture set: make fixtures PROFILE=ci SEED=7 (into testdata/fixtures/PROFILE)
 	$(GO) run ./cmd/fixturegen -profile $(PROFILE) -seed $(SEED) -out testdata/fixtures/$(PROFILE)
+
+fixtures-verify: ## Regenerate every recorded set and compare it with test/fixtures/checksums.tsv (TST-014)
+	$(GO) run ./cmd/fixturegen -verify test/fixtures/checksums.tsv
 
 WIKI ?= ../viafrei-api.wiki
 

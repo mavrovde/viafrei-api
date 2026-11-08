@@ -243,6 +243,11 @@ func (d *Document) Check(method, target string, status int, h http.Header, body 
 	var errs []error
 	for _, k := range slices.Sorted(maps.Keys(h)) {
 		hdr, declared := resp.Headers[k]
+		for name, v := range resp.Headers {
+			if !declared && http.CanonicalHeaderKey(name) == k {
+				hdr, declared = v, true
+			}
+		}
 		switch {
 		case declared:
 			if err := d.validate(hdr.Schema, headerValue(hdr.Schema, h.Get(k))); err != nil {

@@ -9,6 +9,7 @@
 //	viafrei-api config docs        print the configuration reference (docs/configuration.md)
 //	viafrei-api openapi            print the OpenAPI document (api/openapi.json)
 //	viafrei-api version            print the build's version facts
+//	viafrei-api keys COMMAND       the operator's key tool (plan, issue, rotate, revoke, move, accept, prune)
 package main
 
 import (
@@ -24,12 +25,16 @@ import (
 	"syscall"
 
 	"github.com/mavrovde/viafrei-api/db/contract"
+	"github.com/mavrovde/viafrei-api/internal/adapters/accessstore"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
+	"github.com/mavrovde/viafrei-api/internal/app/auth"
 	"github.com/mavrovde/viafrei-api/internal/app/health"
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
+	"github.com/mavrovde/viafrei-api/internal/runtime/keyscli"
 	"github.com/mavrovde/viafrei-api/internal/runtime/logging"
+	"github.com/mavrovde/viafrei-api/internal/runtime/wire"
 )
 
 func main() {
@@ -52,11 +57,13 @@ func run(args, environ []string, stdout, stderr io.Writer) int {
 		return configCmd(args, environ, stdout, stderr)
 	case "openapi":
 		return openapiCmd(environ, stdout, stderr)
+	case "keys":
+		return keysCmd(args, environ, stdout, stderr)
 	case "version":
 		_ = json.NewEncoder(stdout).Encode(buildinfo.Get())
 		return 0
 	default:
-		fmt.Fprintf(stderr, "unknown command %q; known: serve, healthcheck, meta-check, config {check,show,docs}, openapi, version\n", cmd)
+		fmt.Fprintf(stderr, "unknown command %q; known: serve, healthcheck, meta-check, config {check,show,docs}, openapi, keys, version\n", cmd)
 		return 2
 	}
 }
@@ -91,13 +98,28 @@ func serve(environ []string, stderr io.Writer) int {
 	}
 	defer st.Close()
 
-	srv, err := httpapi.NewServer(httpapi.Deps{
+	deps := httpapi.Deps{
 		Config:          cfg,
 		Readiness:       health.NewChecker(st, expected, cfg.Health.ReadyTimeout),
 		Logger:          log,
 		Build:           buildinfo.Get(),
 		ContractVersion: contract.Version(),
-	})
+		Sources:         st,
+	}
+	if cfg.Access.URL.IsSet() {
+		as, err := accessstore.Open(ctx, cfg)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return config.ExitCode
+		}
+		defer as.Close()
+		authn := auth.New(wire.AuthSettings(cfg), as, nil)
+		go authn.Run(ctx)
+		deps.Auth = authn
+	} else {
+		log.Warn("no access store configured: keyed operations are switched off")
+	}
+	srv, err := httpapi.NewServer(deps)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return config.ExitCode
@@ -217,4 +239,24 @@ func openapiCmd(environ []string, stdout, stderr io.Writer) int {
 	}
 	_, _ = stdout.Write(doc)
 	return 0
+}
+
+// keysCmd runs the operator's key tool against the access store.
+func keysCmd(args, environ []string, stdout, stderr io.Writer) int {
+	cfg, ok := load(environ, false, stderr)
+	if !ok {
+		return config.ExitCode
+	}
+	if !cfg.Access.URL.IsSet() {
+		fmt.Fprintln(stderr, "keys: access.url is not set; set VFAPI_ACCESS_URL or VFAPI_ACCESS_URL_FILE")
+		return config.ExitCode
+	}
+	ctx := context.Background()
+	as, err := accessstore.Open(ctx, cfg)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return config.ExitCode
+	}
+	defer as.Close()
+	return keyscli.Run(ctx, args, auth.NewKeys(wire.AuthSettings(cfg), as, nil, nil), stdout, stderr)
 }

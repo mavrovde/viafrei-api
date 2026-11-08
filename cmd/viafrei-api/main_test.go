@@ -34,6 +34,14 @@ func dbURL(t *testing.T) string {
 	return "VFAPI_DB_URL=postgres://reader:pw@" + freeAddr(t) + "/contract?sslmode=disable"
 }
 
+// pepperEnv is a throwaway pepper for these tests; none is committed for use.
+var pepperEnv = "VFAPI_AUTH_PEPPER=" + strings.Repeat("t", 40)
+
+// accessURL points the access store at a closed port.
+func accessURL(t *testing.T) string {
+	return "VFAPI_ACCESS_URL=postgres://access:pw@" + freeAddr(t) + "/contract?sslmode=disable"
+}
+
 type failingWriter struct{}
 
 func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("closed") }
@@ -90,6 +98,12 @@ func TestCommands(t *testing.T) {
 		{"serve bad contract", []string{"serve"}, []string{dbURL(t), "VFAPI_CONTRACT_EXPECTED=99999999999999999999.1"}, config.ExitCode, ""},
 		{"serve bad URL", []string{"serve"}, []string{"VFAPI_DB_URL=postgres://u:p@h:notaport/x"}, config.ExitCode, ""},
 		{"serve bad switch", []string{"serve"}, []string{dbURL(t), "VFAPI_ENDPOINTS_DISABLED=noSuchOperation"}, config.ExitCode, ""},
+		{"serve bad access URL", []string{"serve"}, []string{dbURL(t), pepperEnv, "VFAPI_ACCESS_URL=postgres://u:p@h:notaport/x"}, config.ExitCode, ""},
+		{"keys refused", []string{"keys"}, []string{"VFAPI_NOPE=1"}, config.ExitCode, ""},
+		{"keys without an access store", []string{"keys"}, nil, config.ExitCode, ""},
+		{"keys bad access URL", []string{"keys"}, []string{pepperEnv, "VFAPI_ACCESS_URL=postgres://u:p@h:notaport/x"}, config.ExitCode, ""},
+		{"keys usage", []string{"keys"}, []string{pepperEnv, accessURL(t)}, 2, ""},
+		{"keys store unreachable", []string{"keys", "revoke", "-id", "abcdefghij", "-reason", "r", "-actor", "a"}, []string{pepperEnv, accessURL(t)}, 1, ""},
 	}
 	for _, c := range cases {
 		code, stdout, stderr := runCmd(c.args, c.environ)
@@ -176,5 +190,24 @@ func TestServeReportsAnIncompleteShutdown(t *testing.T) {
 	_ = conn.Close()
 	if code != 1 {
 		t.Fatalf("shutdown past the grace: exit %d, want 1", code)
+	}
+}
+
+func TestServeWithAnAccessStore(t *testing.T) {
+	req.Covers(t, "SEC-001")
+	code := serveUntilTerm(t, []string{pepperEnv, accessURL(t)}, func(addr string) {
+		r, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+addr+"/v1/key", nil)
+		r.Header.Set("Authorization", "Bearer not-a-key")
+		resp, err := http.DefaultClient.Do(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("a malformed key: %d", resp.StatusCode)
+		}
+	})
+	if code != 0 {
+		t.Fatalf("exit %d", code)
 	}
 }

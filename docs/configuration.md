@@ -36,3 +36,22 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `log.format` | `VFAPI_LOG_FORMAT` | string | `json` | one of json, text | Log line format on standard output: json or text. |
 | `docs.enabled` | `VFAPI_DOCS_ENABLED` | bool | `true` | — | Serve the OpenAPI document at /v1/openapi.json and /openapi.json. |
 | `endpoints.disabled` | `VFAPI_ENDPOINTS_DISABLED` | list | empty | — | Operation ids switched off: they answer 404 feature-disabled and leave the OpenAPI document. Comma-separated in the environment. |
+| `access.url` | `VFAPI_ACCESS_URL` or `VFAPI_ACCESS_URL_FILE` | secret | secret, no default | — | Connection URL of the API's own access-store role. Without it every keyed operation answers 404 feature-disabled. Secret: environment or *_FILE only. |
+| `access.pool_max` | `VFAPI_ACCESS_POOL_MAX` | int | `2` | 1 to 8 | Largest number of pooled access-store connections. |
+| `auth.environment` | `VFAPI_AUTH_ENVIRONMENT` | string | `live` | one of live, test | Which keys this instance accepts: live (production) or test (sandbox). A key of the other environment is invalid here (SEC-004). |
+| `auth.key_prefix_live` | `VFAPI_AUTH_KEY_PREFIX_LIVE` | string | `vf_live_` | key_prefix | Prefix of a production key: two groups of 1 to 5 lowercase letters or digits, each closed by an underscore. |
+| `auth.key_prefix_test` | `VFAPI_AUTH_KEY_PREFIX_TEST` | string | `vf_test_` | key_prefix | Prefix of a sandbox key, in the same form. Differs from auth.key_prefix_live. |
+| `auth.pepper` | `VFAPI_AUTH_PEPPER` or `VFAPI_AUTH_PEPPER_FILE` | secret | secret, no default | — | Server-side MAC pepper, at least 32 bytes. Required with access.url. Held outside the access store (SEC-010). Secret: environment or *_FILE only. |
+| `auth.pepper_previous` | `VFAPI_AUTH_PEPPER_PREVIOUS` or `VFAPI_AUTH_PEPPER_PREVIOUS_FILE` | secret | secret, no default | — | The previous pepper during a pepper rotation: a key that matches under it is re-MACed under auth.pepper on first use (SEC-011). At least 32 bytes when set. |
+| `auth.key_cache_ttl` | `VFAPI_AUTH_KEY_CACHE_TTL` | duration | `60s` | 1s to 10m | How long a key read from the access store is kept in memory. A plan change or a revocation is seen at the latest after this time (SEC-022). |
+| `auth.negative_cache_ttl` | `VFAPI_AUTH_NEGATIVE_CACHE_TTL` | duration | `10s` | 0s to 5m | How long an unknown key id is remembered as unknown, to blunt floods of random keys (SEC-050). 0s turns it off. |
+| `auth.key_cache_size` | `VFAPI_AUTH_KEY_CACHE_SIZE` | int | `10000` | 10 to 1000000 | Largest number of key ids held in the key cache, known and unknown together; when full, expired entries are dropped first, then any one. |
+| `auth.rotation_overlap` | `VFAPI_AUTH_ROTATION_OVERLAP` | duration | `168h` | 0s to 720h | How long the previous secret stays valid after a rotation (SEC-041). |
+| `auth.default_expiry` | `VFAPI_AUTH_DEFAULT_EXPIRY` | duration | `8760h` | 24h to 26280h | Lifetime of a key issued without an explicit expiry (SEC-040). An explicit expiry is held to 26280h (1 095 days) too. |
+| `auth.revocation_propagation` | `VFAPI_AUTH_REVOCATION_PROPAGATION` | duration | `5s` | 1s to 60s | Interval at which the service asks the access store for keys changed since its last look and drops them from its cache (SEC-042). At most auth.key_cache_ttl. |
+| `auth.expiry_warning_days` | `VFAPI_AUTH_EXPIRY_WARNING_DAYS` | int | `14` | 0 to 90 | Days before expiry from which an answer carries the key_expiring warning (SEC-043). 0 turns the warning off. |
+| `auth.failure_limit` | `VFAPI_AUTH_FAILURE_LIMIT` | int | `10` | 1 to 1000 | Authentication failures one client address may have per auth.failure_window before it is answered 429 rate-limited (SEC-052). |
+| `auth.failure_window` | `VFAPI_AUTH_FAILURE_WINDOW` | duration | `1m` | 1s to 1h | The window auth.failure_limit counts in. |
+| `auth.failure_track_size` | `VFAPI_AUTH_FAILURE_TRACK_SIZE` | int | `10000` | 10 to 1000000 | Largest number of client addresses whose failures are counted at once; when full, ended windows are dropped first, then any one. |
+| `audit.retention_days` | `VFAPI_AUDIT_RETENTION_DAYS` | int | `395` | 30 to 1825 | Days an audit record is kept; keys prune removes older ones (SEC-045). |
+| `sources.disabled` | `VFAPI_SOURCES_DISABLED` | list | empty | — | Source families the licence gate always denies, whatever the plan (SEC-030). Comma-separated in the environment. |

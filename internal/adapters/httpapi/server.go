@@ -21,6 +21,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/app/health"
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
+	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/invariant"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
@@ -47,6 +48,10 @@ type Deps struct {
 	Build           buildinfo.Info
 	ContractVersion string
 	Now             func() time.Time
+	// Auth checks keys; nil switches keyed operations off.
+	Auth Authenticator
+	// Sources reads the source register for the licence gate.
+	Sources SourceReader
 }
 
 type server struct {
@@ -56,6 +61,8 @@ type server struct {
 	build           buildinfo.Info
 	contractVersion string
 	now             func() time.Time
+	auth            Authenticator
+	sources         SourceReader
 }
 
 // operation is one registered API operation.
@@ -63,6 +70,9 @@ type operation struct {
 	id       string
 	method   string
 	path     string
+	tag      string
+	keyed    bool         // needs a key (SEC-001)
+	scope    access.Scope // the scope a keyed operation needs (SEC-020); empty for none
 	register func(api huma.API, s *server, op huma.Operation)
 }
 
@@ -71,6 +81,7 @@ func operations() []operation {
 		{id: "getHealth", method: http.MethodGet, path: "/healthz", register: registerHealth},
 		{id: "getReadiness", method: http.MethodGet, path: "/readyz", register: registerReadiness},
 		{id: "getMeta", method: http.MethodGet, path: "/v1/meta", register: registerMeta},
+		{id: "getKey", method: http.MethodGet, path: "/v1/key", tag: "access", keyed: true, register: registerKey},
 	}
 }
 
@@ -86,14 +97,14 @@ func OperationIDs() []string {
 
 // NewHandler builds the complete HTTP handler.
 func NewHandler(d Deps) (http.Handler, error) {
-	h, _, err := build(d)
+	h, _, err := build(d, nil)
 	return h, err
 }
 
 // OpenAPI returns the OpenAPI document the handler built from cfg would
 // serve. `viafrei-api openapi` writes it to api/openapi.json.
 func OpenAPI(cfg *config.Config) ([]byte, error) {
-	_, doc, err := build(Deps{Config: cfg})
+	_, doc, err := build(Deps{Config: cfg}, nil)
 	return doc, err
 }
 
@@ -123,7 +134,9 @@ func logger(d Deps) *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-func build(d Deps) (http.Handler, []byte, error) {
+// build makes the handler; extra operations are registered after the
+// catalogue (tests only).
+func build(d Deps, extra []operation) (http.Handler, []byte, error) {
 	if d.Config == nil {
 		return nil, nil, errors.New("httpapi: no configuration")
 	}
@@ -135,11 +148,13 @@ func build(d Deps) (http.Handler, []byte, error) {
 		build:           d.Build,
 		contractVersion: d.ContractVersion,
 		now:             d.Now,
+		auth:            d.Auth,
+		sources:         d.Sources,
 	}
 	if s.now == nil {
 		s.now = time.Now
 	}
-	ops := operations()
+	ops := append(operations(), extra...)
 	disabled := map[string]bool{}
 	for _, id := range d.Config.Endpoints.Disabled {
 		if !slices.Contains(OperationIDs(), id) {
@@ -158,6 +173,7 @@ func build(d Deps) (http.Handler, []byte, error) {
 		withRequest(base),
 		accessLog(s.log, s.now),
 		recoverPanics(s.log),
+		refuseKeyInQuery(access.Prefixes{Live: d.Config.Auth.KeyPrefixLive, Test: d.Config.Auth.KeyPrefixTest}),
 		limitURI(d.Config.Server.MaxURIBytes),
 		withDeadline(d.Config.Deadline.Request),
 	)
@@ -178,15 +194,24 @@ func build(d Deps) (http.Handler, []byte, error) {
 				License:     &huma.License{Name: "Terms of use", URL: "https://viafrei.de/"},
 				Contact:     &huma.Contact{Name: "ViaFrei API maintainers", URL: "https://github.com/mavrovde/viafrei-api/issues"},
 			},
-			Servers:    []*huma.Server{{URL: base}},
-			Components: &huma.Components{Schemas: huma.NewMapRegistry("#/components/schemas/", huma.DefaultSchemaNamer)},
-			Tags:       []*huma.Tag{{Name: "service", Description: "Health, readiness and service metadata."}},
+			Servers: []*huma.Server{{URL: base}},
+			Components: &huma.Components{
+				Schemas: huma.NewMapRegistry("#/components/schemas/", huma.DefaultSchemaNamer),
+				SecuritySchemes: map[string]*huma.SecurityScheme{
+					schemeBearer: {Type: "http", Scheme: "bearer", Description: "An API key as a bearer token (RFC 6750)."},
+					schemeHeader: {Type: "apiKey", In: "header", Name: APIKeyHeader, Description: "An API key in the X-API-Key header."},
+				},
+			},
+			Tags: []*huma.Tag{
+				{Name: "service", Description: "Health, readiness and service metadata."},
+				{Name: "access", Description: "The presenting key and what it may read."},
+			},
 		},
 		Formats:       huma.DefaultFormats,
 		DefaultFormat: "application/json",
 	}
 	api := humachi.New(router, hc)
-	api.UseMiddleware(strictQuery(api))
+	api.UseMiddleware(strictQuery(api), s.authenticate(api))
 
 	for _, op := range ops {
 		if disabled[op.id] {
@@ -195,12 +220,19 @@ func build(d Deps) (http.Handler, []byte, error) {
 			}))
 			continue
 		}
-		op.register(api, s, huma.Operation{
-			OperationID: op.id,
-			Method:      op.method,
-			Path:        op.path,
-			Tags:        []string{"service"},
-		})
+		hop := huma.Operation{OperationID: op.id, Method: op.method, Path: op.path, Tags: []string{"service"}}
+		if op.tag != "" {
+			hop.Tags = []string{op.tag}
+		}
+		if op.keyed {
+			hop.Security = []map[string][]string{{schemeBearer: {}}, {schemeHeader: {}}}
+			hop.Responses = keyedResponses(api)
+		}
+		if op.scope != "" {
+			hop.Metadata = map[string]any{scopeExtension: op.scope}
+			hop.Extensions = map[string]any{scopeExtension: string(op.scope)}
+		}
+		op.register(api, s, hop)
 	}
 
 	// The document is a value of huma's own fixed types: marshalling it

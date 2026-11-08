@@ -17,6 +17,7 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
+	accessdb "github.com/mavrovde/viafrei-api/db/access"
 	"github.com/mavrovde/viafrei-api/db/contract"
 )
 
@@ -31,6 +32,8 @@ type DB struct {
 	OwnerURL string
 	// ReaderURL connects as the read-only role the service uses.
 	ReaderURL string
+	// AccessURL connects as the API's own access-store role.
+	AccessURL string
 	container testcontainers.Container
 }
 
@@ -72,13 +75,15 @@ func (db *DB) finish(ctx context.Context, connString func(context.Context, ...st
 		return fmt.Errorf("owner URL: %w", err)
 	}
 	// rand.Text is base32: safe inside a quoted SQL literal and a URL.
-	readerPassword := rand.Text()
-	if err := prepare(ctx, owner, readerPassword); err != nil {
+	readerPassword, accessPassword := rand.Text(), rand.Text()
+	if err := prepare(ctx, owner, readerPassword, accessPassword); err != nil {
 		return err
 	}
 	db.OwnerURL = owner
 	u.User = url.UserPassword(contract.ReaderRole, readerPassword)
 	db.ReaderURL = u.String()
+	u.User = url.UserPassword(accessdb.Role, accessPassword)
+	db.AccessURL = u.String()
 	return nil
 }
 
@@ -87,7 +92,7 @@ type step struct {
 	args []any
 }
 
-func prepare(ctx context.Context, ownerURL, readerPassword string) error {
+func prepare(ctx context.Context, ownerURL, readerPassword, accessPassword string) error {
 	conn, err := pgx.Connect(ctx, ownerURL)
 	if err != nil {
 		return fmt.Errorf("connect as owner: %w", err)
@@ -99,10 +104,13 @@ func prepare(ctx context.Context, ownerURL, readerPassword string) error {
 		{sql: fmt.Sprintf("alter role %s password '%s'", contract.ReaderRole, readerPassword)},
 		{sql: "insert into contract.contract_info (contract_version, published_at) values ($1, $2)",
 			args: []any{contract.Version(), time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}},
+		{sql: accessdb.SchemaSQL()},
+		{sql: accessdb.RoleSQL()},
+		{sql: fmt.Sprintf("alter role %s password '%s'", accessdb.Role, accessPassword)},
 	}
 	for _, st := range steps {
 		if _, err := conn.Exec(ctx, st.sql, st.args...); err != nil {
-			return fmt.Errorf("build contract stub: %w", err)
+			return fmt.Errorf("build contract stub and access store: %w", err)
 		}
 	}
 	return nil

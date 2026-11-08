@@ -1,6 +1,68 @@
 {
   "components": {
     "schemas": {
+      "Attribution": {
+        "additionalProperties": false,
+        "properties": {
+          "domain": {
+            "description": "The domain the family answers for.",
+            "type": "string"
+          },
+          "family": {
+            "description": "The source family id.",
+            "type": "string"
+          },
+          "licence": {
+            "description": "The licence's name.",
+            "type": "string"
+          },
+          "licenceUrl": {
+            "description": "The licence's canonical URL.",
+            "format": "uri",
+            "type": "string"
+          },
+          "publisher": {
+            "description": "The publisher, as its licence asks to be named.",
+            "type": "string"
+          },
+          "shareAlike": {
+            "description": "True for share-alike data.",
+            "type": "boolean"
+          },
+          "shareAlikeOffer": {
+            "description": "Where the derived database is offered under the same licence; set when shareAlike.",
+            "format": "uri",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "termsUrl": {
+            "description": "The terms a client must follow or accept, when any.",
+            "format": "uri",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text": {
+            "description": "The attribution notice clients displaying the data must show.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "family",
+          "domain",
+          "publisher",
+          "text",
+          "licence",
+          "licenceUrl",
+          "shareAlike",
+          "shareAlikeOffer",
+          "termsUrl"
+        ],
+        "type": "object"
+      },
       "HealthBody": {
         "additionalProperties": false,
         "properties": {
@@ -14,6 +76,139 @@
         },
         "required": [
           "status"
+        ],
+        "type": "object"
+      },
+      "KeyData": {
+        "additionalProperties": false,
+        "properties": {
+          "environment": {
+            "description": "The environment the key belongs to.",
+            "enum": [
+              "live",
+              "test"
+            ],
+            "type": "string"
+          },
+          "expiresAt": {
+            "description": "When the key stops working.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "keyId": {
+            "description": "The key's public id.",
+            "type": "string"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/KeyPlan"
+          },
+          "sources": {
+            "description": "The source families the licence gate lets this key receive, sorted by family.",
+            "items": {
+              "$ref": "#/components/schemas/Attribution"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "keyId",
+          "environment",
+          "plan",
+          "expiresAt",
+          "sources"
+        ],
+        "type": "object"
+      },
+      "KeyEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/KeyData"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/KeyMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "KeyMeta": {
+        "additionalProperties": false,
+        "properties": {
+          "generatedAt": {
+            "description": "When the service produced this body.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "language": {
+            "description": "The language of the texts in data (BCP 47).",
+            "type": "string"
+          },
+          "requestId": {
+            "description": "The request id, equal to the X-Request-Id header.",
+            "type": "string"
+          },
+          "warnings": {
+            "description": "Warnings about this answer; empty when there is none.",
+            "items": {
+              "$ref": "#/components/schemas/Warning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "warnings",
+          "requestId",
+          "generatedAt",
+          "language"
+        ],
+        "type": "object"
+      },
+      "KeyPlan": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "The plan's name.",
+            "type": "string"
+          },
+          "scopes": {
+            "description": "The feature families the key may call.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "tier": {
+            "description": "Priority under load.",
+            "enum": [
+              "critical",
+              "standard",
+              "bulk"
+            ],
+            "type": "string"
+          },
+          "useClass": {
+            "description": "The use the plan is for; source terms permit use classes.",
+            "enum": [
+              "consumer",
+              "non_commercial",
+              "commercial"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "useClass",
+          "tier",
+          "scopes"
         ],
         "type": "object"
       },
@@ -221,6 +416,40 @@
           "language"
         ],
         "type": "object"
+      },
+      "Warning": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "description": "Stable warning code.",
+            "enum": [
+              "key_expiring"
+            ],
+            "type": "string"
+          },
+          "detail": {
+            "description": "What the warning means for this answer.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "detail"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerKey": {
+        "description": "An API key as a bearer token (RFC 6750).",
+        "scheme": "bearer",
+        "type": "http"
+      },
+      "headerKey": {
+        "description": "An API key in the X-API-Key header.",
+        "in": "header",
+        "name": "X-API-Key",
+        "type": "apiKey"
       }
     }
   },
@@ -334,6 +563,70 @@
         ]
       }
     },
+    "/v1/key": {
+      "get": {
+        "description": "The key's id, plan, expiry and the source families the licence gate lets it receive, with their attribution. Needs a key, no scope.",
+        "operationId": "getKey",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "The presenting key",
+        "tags": [
+          "access"
+        ]
+      }
+    },
     "/v1/meta": {
       "get": {
         "description": "The API version, the build revision, the read-contract version and the platform release the build is kept in step with.",
@@ -383,6 +676,10 @@
     {
       "description": "Health, readiness and service metadata.",
       "name": "service"
+    },
+    {
+      "description": "The presenting key and what it may read.",
+      "name": "access"
     }
   ]
 }

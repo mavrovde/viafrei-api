@@ -81,7 +81,8 @@ ViaFrei API has a **service skeleton** in Go. Nothing is deployed yet, and no da
 | Service skeleton: `/healthz`, `/readyz`, `/v1/meta`, `/v1/openapi.json` | 🔄 In review (milestone 0.2.0) |
 | Container image (distroless, multi-arch) and local Compose stack | 🔄 In review — [docs/container.md](docs/container.md) |
 | CI, security checks and release pipeline | 🔄 In review — CI on every pull request; SAST, secrets, dependency, licence and DAST checks ([docs/security-checks.md](docs/security-checks.md)); release-please, signed images and release pages ([docs/RELEASING.md](docs/RELEASING.md)) |
-| Keys, rate limits and priority tiers | ⏳ Planned |
+| Keys and the licence gate: hashed keys, scopes, rotation, revocation, audit log, `GET /v1/key` | 🔄 In review (milestone 0.4.0) — [docs/access-keys.md](docs/access-keys.md) |
+| Rate limits and priority tiers | ⏳ Planned |
 | v1 feature endpoints | ⏳ Planned |
 
 Follow progress in the [Roadmap](https://github.com/mavrovde/viafrei-api/wiki/Roadmap) and in [Issues](https://github.com/mavrovde/viafrei-api/issues).
@@ -109,7 +110,7 @@ curl -s localhost:8080/healthz                  # {"status":"ok"}
 curl -s localhost:8080/v1/meta                  # API, build, read-contract and platform versions
 ```
 
-Other subcommands: `healthcheck` (exit 0 when `/healthz` answers, for container healthchecks), `meta-check` (compare the running service's versions with the expected platform and read-contract versions, [releasing](docs/RELEASING.md#version-sync-with-the-platform)), `config show` (effective values, secrets hidden), `config docs`, `openapi`, `version`.
+Other subcommands: `healthcheck` (exit 0 when `/healthz` answers, for container healthchecks), `meta-check` (compare the running service's versions with the expected platform and read-contract versions, [releasing](docs/RELEASING.md#version-sync-with-the-platform)), `config show` (effective values, secrets hidden), `config docs`, `openapi`, `keys` (the operator's key tool, [docs/access-keys.md](docs/access-keys.md)), `version`.
 
 The database the service reads is described by a versioned read contract in [`db/contract/`](db/contract): logical names only, created with a read-only role. Tests build it in a throwaway container. They never reach a live data source or production.
 

@@ -261,8 +261,18 @@ func newValidator() *validator.Validate {
 	_ = v.RegisterValidation("contract_version", func(fl validator.FieldLevel) bool {
 		return contractVersionPattern.MatchString(fl.Field().String())
 	})
+	_ = v.RegisterValidation("key_prefix", func(fl validator.FieldLevel) bool {
+		return keyPrefixPattern.MatchString(fl.Field().String())
+	})
 	return v
 }
+
+// keyPrefixPattern is the form of a key prefix: two groups of lowercase
+// letters or digits, each closed by an underscore.
+var keyPrefixPattern = regexp.MustCompile(`^[a-z0-9]{1,5}_[a-z0-9]{1,5}_$`)
+
+// MinPepperBytes is the shortest accepted MAC pepper.
+const MinPepperBytes = 32
 
 func validate(cfg *Config, known map[string]Field) Errors {
 	err := newValidator().Struct(cfg)
@@ -321,6 +331,31 @@ func crossField(c *Config) Errors {
 	}
 	if c.DB.StatementTimeoutFloor >= c.Deadline.Request-c.Deadline.Reserve {
 		out = append(out, fmt.Sprintf("db.statement_timeout_floor: %s leaves no budget inside deadline.request minus deadline.reserve", c.DB.StatementTimeoutFloor))
+	}
+	return append(out, crossFieldAuth(c)...)
+}
+
+func crossFieldAuth(c *Config) Errors {
+	var out Errors
+	if c.Auth.KeyPrefixLive == c.Auth.KeyPrefixTest {
+		out = append(out, "auth.key_prefix_test: equal to auth.key_prefix_live; the two environments need different prefixes")
+	}
+	if c.Auth.RevocationPropagation > c.Auth.KeyCacheTTL {
+		out = append(out, fmt.Sprintf("auth.revocation_propagation: %s is longer than auth.key_cache_ttl %s", c.Auth.RevocationPropagation, c.Auth.KeyCacheTTL))
+	}
+	if c.Access.URL.IsSet() && !c.Auth.Pepper.IsSet() {
+		out = append(out, fmt.Sprintf("auth.pepper: required with access.url; set %s or %s_FILE", EnvName("auth.pepper"), EnvName("auth.pepper")))
+	}
+	for _, p := range []struct {
+		key string
+		s   Secret
+	}{{"auth.pepper", c.Auth.Pepper}, {"auth.pepper_previous", c.Auth.PepperPrevious}} {
+		if p.s.IsSet() && len(p.s.Reveal()) < MinPepperBytes {
+			out = append(out, fmt.Sprintf("%s: shorter than %d bytes", p.key, MinPepperBytes))
+		}
+	}
+	if c.Auth.PepperPrevious.IsSet() && c.Auth.PepperPrevious.Reveal() == c.Auth.Pepper.Reveal() {
+		out = append(out, "auth.pepper_previous: equal to auth.pepper; set it only during a rotation, to the old value")
 	}
 	return out
 }

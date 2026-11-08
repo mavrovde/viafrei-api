@@ -234,3 +234,26 @@ func assertRefused(t *testing.T, err error, wants ...string) {
 		}
 	}
 }
+
+func TestCrossFieldAuthRules(t *testing.T) {
+	req.Covers(t, "CFG-004")
+	_, err := config.Load(config.Options{Environ: []string{
+		"VFAPI_AUTH_KEY_PREFIX_TEST=vf_live_",
+		"VFAPI_AUTH_REVOCATION_PROPAGATION=30s",
+		"VFAPI_AUTH_KEY_CACHE_TTL=10s",
+		"VFAPI_ACCESS_URL=postgres://access@db.invalid/x",
+		"VFAPI_AUTH_PEPPER_PREVIOUS=short",
+	}})
+	assertRefused(t, err,
+		"auth.key_prefix_test: equal to auth.key_prefix_live",
+		"auth.revocation_propagation: 30s is longer than auth.key_cache_ttl 10s",
+		"auth.pepper: required with access.url",
+		"auth.pepper_previous: shorter than 32 bytes",
+	)
+	same := strings.Repeat("s", 32)
+	_, err = config.Load(config.Options{Environ: []string{"VFAPI_AUTH_PEPPER=" + same, "VFAPI_AUTH_PEPPER_PREVIOUS=" + same, "VFAPI_AUTH_KEY_PREFIX_LIVE=Bad"}})
+	assertRefused(t, err, "auth.pepper_previous: equal to auth.pepper", "auth.key_prefix_live: fails the key_prefix rule")
+	if _, err := config.Load(config.Options{Environ: []string{"VFAPI_AUTH_PEPPER=" + same, "VFAPI_ACCESS_URL=postgres://a@b/c"}}); err != nil {
+		t.Fatal(err)
+	}
+}

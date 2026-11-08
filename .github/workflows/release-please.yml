@@ -8,9 +8,12 @@
 #
 # It runs after CI has passed on a push to main, and scripts/ci-gate.sh checks
 # the release commit's CI result again before the tag is created (REL-015).
-# The release pull request is opened with RELEASE_PLEASE_TOKEN when that
-# secret exists, so CI runs on it; with GITHUB_TOKEN alone GitHub starts no
-# workflow for it, and the gate is then what stops an unchecked release.
+# The release pull request is opened with the built-in GITHUB_TOKEN (the
+# repository allows GitHub Actions to create pull requests). GitHub starts no
+# pull_request workflow for a push made with that token, so the next step
+# dispatches CI and Security on the release branch: a workflow_dispatch is the
+# one event that token may start, and the check runs it creates sit on the
+# release pull request's head commit, where branch protection reads them.
 name: Release Please
 
 on:
@@ -39,24 +42,31 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      actions: write # dispatches CI and Security on the release branch
     outputs:
       created: ${{ steps.rp.outputs.release_created }}
       tag: ${{ steps.rp.outputs.tag_name }}
       sha: ${{ steps.rp.outputs.sha }}
     steps:
-      - name: Release pull requests get CI only with RELEASE_PLEASE_TOKEN
-        env:
-          HAS_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN != '' }}
-        run: |
-          if [[ $HAS_TOKEN != true ]]; then
-            echo "::warning::RELEASE_PLEASE_TOKEN is not set: the release pull request is opened with GITHUB_TOKEN and no CI runs on it. scripts/ci-gate.sh still refuses to tag a commit CI has not passed. See docs/RELEASING.md."
-          fi
       - id: rp
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+      - name: Run CI and Security on the release pull request
+        if: steps.rp.outputs.pr != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ steps.rp.outputs.pr }}
+        run: |
+          branch=$(jq -r '.headBranchName // empty' <<<"$PR")
+          [[ $branch == release-please--* ]] || { echo "::error::release-please reported head branch '$branch', not release-please--*"; exit 1; }
+          for wf in ci.yml security.yml; do
+            gh workflow run "$wf" --ref "$branch"
+            echo "dispatched $wf on $branch"
+          done
 
   tag:
     name: Annotated tag

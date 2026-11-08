@@ -17,10 +17,12 @@ and merge release pull requests.
    squash commit and the changelog line.
 2. Once CI has passed on a push to `main`, [release-please](https://github.com/googleapis/release-please)
    (`.github/workflows/release-please.yml`, started by `workflow_run`) opens
-   or updates the **release pull request** `chore: release X.Y.Z`. It opens
-   that pull request with `RELEASE_PLEASE_TOKEN` when the secret exists, so
-   CI runs on it; with the built-in `GITHUB_TOKEN` GitHub starts no workflow
-   for it (see the secrets table). It bumps `version.txt`, updates
+   or updates the **release pull request** `chore: release X.Y.Z` with the
+   built-in `GITHUB_TOKEN`. GitHub starts no `pull_request` workflow for a
+   push made with that token, so the same job then dispatches `ci.yml` and
+   `security.yml` on the release branch (`workflow_dispatch`, the one event
+   that token may start); their check runs land on the pull request's head
+   commit, where branch protection reads them. It bumps `version.txt`, updates
    `.release-please-manifest.json` and adds the section to `CHANGELOG.md`
    ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/) headings).
 3. A maintainer reviews and merges the release pull request (checklist below).
@@ -270,9 +272,8 @@ To withdraw one:
 | Item | Used by | Without it |
 |---|---|---|
 | `GITHUB_TOKEN` (built in) | every workflow | — |
-| `RELEASE_PLEASE_TOKEN` (repository secret; **the owner creates it**): a fine-grained personal access token or a GitHub App installation token for this repository only, with Contents and Pull requests read and write | release-please opens the release pull request with it | the release pull request is opened with `GITHUB_TOKEN`, so **no CI runs on it** and the job logs a warning; the release is still refused by `scripts/ci-gate.sh` unless CI passed on the release commit on `main` |
 | `SONAR_TOKEN` | CI `sonar` job | the job fails and names the secret |
 | `SNYK_TOKEN` | security workflow | the job fails and names the secret |
 | `SONAR_TOKEN` and `SNYK_TOKEN` again as **Dependabot secrets** (Settings > Secrets and variables > Dependabot; **the owner adds them**) | the same jobs on a Dependabot pull request, which reads Dependabot secrets and never Actions secrets | both jobs fail on every Dependabot pull request, saying that the Dependabot secret is missing |
-| Workflow permission "Allow GitHub Actions to create and approve pull requests" | release-please | no release pull request |
+| Workflow permission "Allow GitHub Actions to create and approve pull requests" (on) | release-please opens the release pull request with `GITHUB_TOKEN` | no release pull request: the job fails with "GitHub Actions is not permitted to create or approve pull requests" |
 | GHCR package visibility public, linked to this repository | image pulls | anonymous pulls fail |

@@ -84,7 +84,10 @@ const (
 	gateRepo      = `-repo "$GH_REPO"`
 	minorGuard    = `if [[ $FINAL == true && $HIGHEST_IN_MINOR == true ]]; then echo "$IMAGE:$MINOR"; fi`
 	dispatchGuard = `if [[ $EVENT == workflow_dispatch && $REF != refs/heads/main ]]; then`
-	tokenFallback = "secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN"
+	builtinToken  = "token: ${{ secrets.GITHUB_TOKEN }}"
+	dispatchCI    = `for wf in ci.yml security.yml; do`
+	dispatchRun   = `gh workflow run "$wf" --ref "$branch"`
+	dispatchGrant = "      actions: write"
 	publishedRef  = `gh api "repos/$GH_REPO/releases/tags/$TAG"`
 	imageExists   = `docker buildx imagetools inspect "$IMAGE:$VERSION"`
 	notesOnce     = `if grep -q '^## Container image$' /tmp/notes.md; then`
@@ -257,8 +260,12 @@ func shellRuleFindings(files map[string][]byte) []string {
 	if !strings.Contains(string(files["image.yml"]), dispatchGuard) {
 		out = append(out, "image.yml publishes a dispatch from a branch other than main")
 	}
-	if !strings.Contains(string(files["release-please.yml"]), tokenFallback) {
-		out = append(out, "release-please.yml does not use RELEASE_PLEASE_TOKEN when it is set")
+	rp := string(files["release-please.yml"])
+	if !strings.Contains(rp, builtinToken) || strings.Contains(rp, "RELEASE_PLEASE_TOKEN") {
+		out = append(out, "release-please.yml does not open the release pull request with the built-in GITHUB_TOKEN alone")
+	}
+	if !strings.Contains(rp, dispatchCI) || !strings.Contains(rp, dispatchRun) || !strings.Contains(rp, dispatchGrant) {
+		out = append(out, "release-please.yml does not dispatch CI and Security on the release pull request")
 	}
 	return out
 }
@@ -321,7 +328,11 @@ func TestReleaseGateIsWired(t *testing.T) {
 		"ci-gate.sh does not name the repository":                                                     {files, strings.Replace(s, gateRepo, "", 1)},
 		"moves :X.Y without the highest-in-minor guard":                                               {plant("release.yml", "$FINAL == true && $HIGHEST_IN_MINOR == true ]]; then echo \"$IMAGE:$MINOR\"", "$FINAL == true ]]; then echo \"$IMAGE:$MINOR\""), s},
 		"image.yml publishes a dispatch from a branch other than main":                                {plant("image.yml", dispatchGuard, "if false; then"), s},
-		"does not use RELEASE_PLEASE_TOKEN":                                                           {plant("release-please.yml", tokenFallback, "secrets.GITHUB_TOKEN"), s},
+		"does not open the release pull request with the built-in GITHUB_TOKEN alone (other token)":   {plant("release-please.yml", builtinToken, "token: ${{ secrets.RELEASE_PLEASE_TOKEN }}"), s},
+		"does not open the release pull request with the built-in GITHUB_TOKEN alone (fallback)":      {plant("release-please.yml", builtinToken, "token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}"), s},
+		"does not dispatch CI and Security on the release pull request (no loop)":                     {plant("release-please.yml", dispatchCI, "for wf in; do"), s},
+		"does not dispatch CI and Security on the release pull request (no run)":                      {plant("release-please.yml", dispatchRun, "echo"), s},
+		"does not dispatch CI and Security on the release pull request (no grant)":                    {plant("release-please.yml", dispatchGrant+" #", "      actions: read #"), s},
 		"rebuilds a release without first checking that it is not published":                          {plant("release.yml", publishedRef, `echo "repos/$GH_REPO"`), s},
 		"rebuilds a release without first checking that :X.Y.Z does not exist":                        {plant("release.yml", imageExists, `echo "$IMAGE:$VERSION"`), s},
 		"appends the image section to notes that may already carry it":                                {plant("release.yml", notesOnce, "if false; then"), s},

@@ -146,3 +146,26 @@ func TestAnswer(t *testing.T) {
 		t.Errorf("nothing answering: %v", err)
 	}
 }
+
+func TestAnsweringIsTheDomainsFamiliesSorted(t *testing.T) {
+	req.Covers(t, "SEC-032")
+	reg := []access.Terms{{Family: "zeta", Domain: "energy"}, {Family: "beta", Domain: "parking"}, {Family: "alpha", Domain: "energy"}}
+	if got := access.Answering(reg, "energy"); !slices.Equal(got, []string{"alpha", "zeta"}) {
+		t.Errorf("Answering energy = %v", got)
+	}
+	if got := access.Answering(reg, "places"); len(got) != 0 {
+		t.Errorf("Answering places = %v", got)
+	}
+}
+
+func TestPendingIsTermsOnly(t *testing.T) {
+	req.Covers(t, "SEC-030")
+	g := access.NewGate(register, plan("commercial", "alpha", "gamma", "delta", "epsilon"), nil, nil)
+	if got := g.Pending(all); !slices.Equal(got, []string{"delta"}) {
+		t.Errorf("Pending = %v, want only the family waiting for acceptance", got)
+	}
+	accepted := access.NewGate(register, plan("commercial", "delta"), []access.Acceptance{{Source: "delta", Version: "v2"}}, nil)
+	if got := accepted.Pending(all); len(got) != 0 {
+		t.Errorf("Pending after acceptance = %v", got)
+	}
+}

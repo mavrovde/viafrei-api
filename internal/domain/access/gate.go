@@ -9,7 +9,10 @@ import (
 // Terms are the licence terms of one source family as the source register
 // publishes them.
 type Terms struct {
-	Family     string
+	Family string
+	// Domain is the domain the family answers for, such as energy or
+	// parking: the families that can answer a feature's question.
+	Domain     string
 	UseClasses []UseClass
 	// AcceptanceRequired families are withheld until the key holder has
 	// accepted Version of their terms.
@@ -156,4 +159,30 @@ type Source struct {
 	ShareAlike      bool
 	ShareAlikeOffer *string
 	TermsURL        *string
+}
+
+// Answering returns the families of the register that answer for domain:
+// the families that could answer a feature's question, sorted.
+func Answering(register []Terms, domain string) []string {
+	var out []string
+	for _, t := range register {
+		if t.Domain == domain {
+			out = append(out, t.Family)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// Pending returns the families among answering that are refused only because
+// their terms are not accepted: such a family's items may be listed, without
+// the data its terms protect (SEC-030).
+func (g Gate) Pending(answering []string) []string {
+	var out []string
+	for _, f := range answering {
+		if g.Refused(f) == TermsNotAccepted {
+			out = append(out, f)
+		}
+	}
+	return out
 }

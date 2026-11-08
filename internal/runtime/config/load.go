@@ -332,6 +332,9 @@ func crossField(c *Config) Errors {
 	if c.DB.StatementTimeoutFloor >= c.Deadline.Request-c.Deadline.Reserve {
 		out = append(out, fmt.Sprintf("db.statement_timeout_floor: %s leaves no budget inside deadline.request minus deadline.reserve", c.DB.StatementTimeoutFloor))
 	}
+	if c.Compose.PartDeadline > c.Deadline.Request-c.Deadline.Reserve {
+		out = append(out, fmt.Sprintf("compose.part_deadline: %s is longer than deadline.request minus deadline.reserve", c.Compose.PartDeadline))
+	}
 	return append(out, crossFieldAuth(c)...)
 }
 

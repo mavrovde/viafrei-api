@@ -19,19 +19,22 @@ const FileEnv = EnvPrefix + "CONFIG_FILE"
 
 // Config is the complete configuration of the service.
 type Config struct {
-	Server    Server    `koanf:"server"`
-	HTTP      HTTP      `koanf:"http"`
-	DB        DB        `koanf:"db"`
-	Deadline  Deadline  `koanf:"deadline"`
-	Contract  Contract  `koanf:"contract"`
-	Health    Health    `koanf:"health"`
-	Log       Log       `koanf:"log"`
-	Docs      Docs      `koanf:"docs"`
-	Endpoints Endpoints `koanf:"endpoints"`
-	Access    Access    `koanf:"access"`
-	Auth      Auth      `koanf:"auth"`
-	Audit     Audit     `koanf:"audit"`
-	Sources   Sources   `koanf:"sources"`
+	Server     Server     `koanf:"server"`
+	HTTP       HTTP       `koanf:"http"`
+	DB         DB         `koanf:"db"`
+	Deadline   Deadline   `koanf:"deadline"`
+	Contract   Contract   `koanf:"contract"`
+	Health     Health     `koanf:"health"`
+	Log        Log        `koanf:"log"`
+	Docs       Docs       `koanf:"docs"`
+	Endpoints  Endpoints  `koanf:"endpoints"`
+	Access     Access     `koanf:"access"`
+	Auth       Auth       `koanf:"auth"`
+	Audit      Audit      `koanf:"audit"`
+	Sources    Sources    `koanf:"sources"`
+	Geo        Geo        `koanf:"geo"`
+	Pagination Pagination `koanf:"pagination"`
+	Compose    Compose    `koanf:"compose"`
 }
 
 // Server holds the public HTTP listener settings.
@@ -132,6 +135,22 @@ type Audit struct {
 // Sources holds the licence-gate switches.
 type Sources struct {
 	Disabled []string `koanf:"disabled" default:"" desc:"Source families the licence gate always denies, whatever the plan (SEC-030). Comma-separated in the environment."`
+}
+
+// Geo holds the settings of position searches.
+type Geo struct {
+	DefaultRadiusM int `koanf:"default_radius_m" default:"2000" validate:"min=1,max=50000" desc:"Search radius in metres when a near search names none. At most the radius_m maximum of the interface, 50000."`
+}
+
+// Pagination holds the settings of list answers.
+type Pagination struct {
+	DefaultLimit int `koanf:"default_limit" default:"20" validate:"min=1,max=100" desc:"Items a list answer returns when the request names no limit (ENV-021). At most the limit maximum of the interface, 100."`
+}
+
+// Compose holds the settings of composed answers.
+type Compose struct {
+	PartDeadline time.Duration `koanf:"part_deadline" default:"800ms" validate:"min=100ms,max=2s" desc:"Sub-deadline of each part of a composed answer (FR-BRIEF-003); a part that does not finish in it is reported timeout."`
+	PerPartLimit int           `koanf:"per_part_limit" default:"5" validate:"min=1,max=20" desc:"Items per part of a composed answer when the request names no per_part_limit."`
 }
 
 // Day is the length of the day counts of this configuration

@@ -55,3 +55,7 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `auth.failure_track_size` | `VFAPI_AUTH_FAILURE_TRACK_SIZE` | int | `10000` | 10 to 1000000 | Largest number of client addresses whose failures are counted at once; when full, ended windows are dropped first, then any one. |
 | `audit.retention_days` | `VFAPI_AUDIT_RETENTION_DAYS` | int | `395` | 30 to 1825 | Days an audit record is kept; keys prune removes older ones (SEC-045). |
 | `sources.disabled` | `VFAPI_SOURCES_DISABLED` | list | empty | — | Source families the licence gate always denies, whatever the plan (SEC-030). Comma-separated in the environment. |
+| `geo.default_radius_m` | `VFAPI_GEO_DEFAULT_RADIUS_M` | int | `2000` | 1 to 50000 | Search radius in metres when a near search names none. At most the radius_m maximum of the interface, 50000. |
+| `pagination.default_limit` | `VFAPI_PAGINATION_DEFAULT_LIMIT` | int | `20` | 1 to 100 | Items a list answer returns when the request names no limit (ENV-021). At most the limit maximum of the interface, 100. |
+| `compose.part_deadline` | `VFAPI_COMPOSE_PART_DEADLINE` | duration | `800ms` | 100ms to 2s | Sub-deadline of each part of a composed answer (FR-BRIEF-003); a part that does not finish in it is reported timeout. |
+| `compose.per_part_limit` | `VFAPI_COMPOSE_PER_PART_LIMIT` | int | `5` | 1 to 20 | Items per part of a composed answer when the request names no per_part_limit. |

@@ -5,6 +5,9 @@ package wire
 import (
 	"time"
 
+	"github.com/mavrovde/viafrei-api/internal/adapters/store"
+	"github.com/mavrovde/viafrei-api/internal/app/features"
+
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
@@ -36,3 +39,17 @@ func AuthSettings(cfg *config.Config) auth.Settings {
 	}
 	return s
 }
+
+// FeatureSettings reads the settings of the feature use cases.
+func FeatureSettings(cfg *config.Config) features.Settings {
+	return features.Settings{
+		Language:     Language,
+		PartDeadline: cfg.Compose.PartDeadline,
+		Disabled:     cfg.Sources.Disabled,
+		IsTimeout:    store.IsDeadline,
+	}
+}
+
+// Language is the language of every answer's texts until language
+// negotiation arrives.
+const Language = "en"

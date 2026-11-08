@@ -269,6 +269,11 @@ func shellRuleFindings(files map[string][]byte) []string {
 	if !strings.Contains(rp, builtinToken) || strings.Contains(rp, "RELEASE_PLEASE_TOKEN") {
 		out = append(out, "release-please.yml does not open the release pull request with the built-in GITHUB_TOKEN alone")
 	}
+	// The approval script is in the repository, so the job checks it out first.
+	co, step := strings.Index(rp, "actions/checkout@"), strings.Index(rp, approveStep)
+	if co < 0 || co > step {
+		out = append(out, "release-please.yml runs the approval script without checking the repository out first")
+	}
 	if !strings.Contains(rp, approveStep) || !strings.Contains(rp, dispatchGrant) || !strings.Contains(approve, approveRun) || !strings.Contains(approve, "for wf in CI Security; do") {
 		out = append(out, "release-please.yml does not approve CI and Security on the release pull request")
 	}
@@ -341,6 +346,7 @@ func TestReleaseGateIsWired(t *testing.T) {
 		"does not open the release pull request with the built-in GITHUB_TOKEN alone (other token)":   {plant("release-please.yml", builtinToken, "token: ${{ secrets.RELEASE_PLEASE_TOKEN }}"), s},
 		"does not open the release pull request with the built-in GITHUB_TOKEN alone (fallback)":      {plant("release-please.yml", builtinToken, "token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}"), s},
 		"does not approve CI and Security on the release pull request (no step)":                      {plant("release-please.yml", approveStep, "echo"), s},
+		"runs the approval script without checking the repository out first":                          {plant("release-please.yml", "actions/checkout@", "actions/other@"), s},
 		"does not approve CI and Security on the release pull request (no approval)":                  {plant(approveScript, approveRun, "echo"), s},
 		"does not approve CI and Security on the release pull request (no loop)":                      {plant(approveScript, "for wf in CI Security; do", "for wf in CI; do"), s},
 		"does not approve CI and Security on the release pull request (no grant)":                     {plant("release-please.yml", dispatchGrant+" #", "      actions: read #"), s},

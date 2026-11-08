@@ -119,8 +119,8 @@ func TestMetaEnvelopeAndVersions(t *testing.T) {
 	if data["apiVersion"] != "0.2.0-test" || data["buildSha"] != "abc1234" || data["contractVersion"] != "0.1" {
 		t.Fatalf("versions: %v", data)
 	}
-	if _, present := data["platformVersion"]; !present {
-		t.Fatal("platformVersion must be present (null until version sync)")
+	if v, present := data["platformVersion"]; !present || v != nil {
+		t.Fatalf("platformVersion must be present and null for an unsynced build: %v", data)
 	}
 	meta := body["meta"].(map[string]any)
 	if meta["requestId"] != "client-req-0001" || w.Header().Get("X-Request-Id") != "client-req-0001" {
@@ -131,6 +131,24 @@ func TestMetaEnvelopeAndVersions(t *testing.T) {
 	}
 	if body["links"].(map[string]any)["self"] != "https://api.viafrei.de/v1/meta" {
 		t.Fatalf("links: %v", body["links"])
+	}
+}
+
+func TestMetaReportsThePlatformVersionOfASyncedBuild(t *testing.T) {
+	req.Covers(t, "FR-SVC-003", "REL-001")
+	h, err := httpapi.NewHandler(httpapi.Deps{
+		Config:          config.Defaults(),
+		Build:           buildinfo.Info{Version: "2.5.21", Commit: "abc1234", Platform: "2.5.21"},
+		ContractVersion: "0.1",
+		Now:             func() time.Time { return fixedNow },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := do(t, h, http.MethodGet, "/v1/meta", nil)
+	data := decode(t, w)["data"].(map[string]any)
+	if data["apiVersion"] != "2.5.21" || data["platformVersion"] != "2.5.21" || data["contractVersion"] != "0.1" {
+		t.Fatalf("versions: %v", data)
 	}
 }
 

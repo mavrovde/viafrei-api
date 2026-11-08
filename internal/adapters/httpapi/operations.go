@@ -92,7 +92,7 @@ type MetaData struct {
 	APIVersion      string   `json:"apiVersion" doc:"Version of this build of the service."`
 	BuildSha        string   `json:"buildSha" doc:"Source revision the build was made from."`
 	ContractVersion string   `json:"contractVersion" doc:"Read-contract version (major.minor) the service is built for."`
-	PlatformVersion *string  `json:"platformVersion" nullable:"true" doc:"Platform version the service is kept in step with; null until version sync exists."`
+	PlatformVersion *string  `json:"platformVersion" nullable:"true" doc:"ViaFrei platform release this build is kept in step with (version sync); null before the first sync."`
 	OpenAPI         string   `json:"openapi" format:"uri" doc:"URL of the OpenAPI document."`
 	Languages       []string `json:"languages" doc:"Languages the service answers in."`
 }
@@ -112,7 +112,12 @@ type MetaOutput struct {
 
 func registerMeta(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "Service metadata"
-	op.Description = "The API version, the build revision and the read-contract version."
+	op.Description = "The API version, the build revision, the read-contract version and the platform release the build is kept in step with."
+	var platform *string
+	if s.build.Platform != "" {
+		v := s.build.Platform
+		platform = &v
+	}
 	huma.Register(api, op, func(ctx context.Context, _ *struct{}) (*MetaOutput, error) {
 		return &MetaOutput{
 			CacheControl: noStore,
@@ -121,7 +126,7 @@ func registerMeta(api huma.API, s *server, op huma.Operation) {
 					APIVersion:      s.build.Version,
 					BuildSha:        s.build.Commit,
 					ContractVersion: s.contractVersion,
-					PlatformVersion: nil,
+					PlatformVersion: platform,
 					OpenAPI:         s.cfg.Server.PublicBaseURL + "/v1/openapi.json",
 					Languages:       []string{defaultLanguage},
 				},

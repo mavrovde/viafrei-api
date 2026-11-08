@@ -1,0 +1,109 @@
+# Version sync (REL-001): keeps the API's release in step with the ViaFrei
+# platform's. It reads the platform's current release from a public source
+# only (the npm dist-tag latest of the package viafrei, or the latest release
+# of mavrovde/viafrei-mcp), and when the API is behind it opens a pull
+# request on platform-sync/X.Y.Z that writes the version to
+# internal/buildinfo/platform-version.txt and carries a Release-As footer.
+# Once that pull request is merged, release-please proposes exactly that
+# version: its release pull request bumps version.txt and CHANGELOG.md in one
+# commit, and the tag job tags that commit (docs/RELEASING.md).
+#
+# The read is the only network call, read-only and bounded; an answer that
+# cannot be read fails the run, never a guess. Before the first public
+# release the file says unsynced and the scheduled run only reports; a
+# maintainer starts the sync once, by hand, with start: true.
+name: Platform version sync
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      start:
+        description: Make the first sync (the API is not yet in step with a platform release)
+        type: boolean
+        default: false
+      source:
+        description: Public source of the platform version
+        type: choice
+        options: [npm, github]
+        default: npm
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-sync
+  cancel-in-progress: false
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  sync:
+    name: Version sync
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # pushes the platform-sync branch
+      pull-requests: write # opens the pull request
+      actions: write # approves CI and Security on it, like the release pull request
+    steps:
+      - name: Only main is synced
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          if [[ $REF != refs/heads/main ]]; then echo "::error::the sync runs on main only, not $REF"; exit 2; fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: Read the platform version (public source, fails closed)
+        id: read
+        env:
+          SOURCE: ${{ inputs.source || 'npm' }}
+        run: |
+          v=$(go run ./internal/release/platformsync read -timeout 10s -source "$SOURCE")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "platform release $v (read from $SOURCE)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Apply
+        id: apply
+        env:
+          VERSION: ${{ steps.read.outputs.version }}
+          START: ${{ inputs.start && '-start' || '' }}
+        run: |
+          # START is empty or the one flag -start.
+          # shellcheck disable=SC2086
+          status=$(go run ./internal/release/platformsync apply -version "$VERSION" $START -message "$RUNNER_TEMP/message")
+          echo "$status" >> "$GITHUB_STEP_SUMMARY"
+          echo "status=${status%% *}" >> "$GITHUB_OUTPUT"
+      - name: Open the version-sync pull request
+        if: steps.apply.outputs.status == 'changed'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ steps.read.outputs.version }}
+        run: |
+          branch="platform-sync/$VERSION"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "$branch exists already; its pull request carries this sync" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add internal/buildinfo/platform-version.txt
+          git commit --file "$RUNNER_TEMP/message"
+          git push origin "$branch"
+          {
+            echo "Keeps the API in step with ViaFrei platform release $VERSION (docs/RELEASING.md)."
+            echo
+            echo "- internal/buildinfo/platform-version.txt: $VERSION, reported by /v1/meta as platformVersion."
+            echo "- The commit's Release-As footer makes release-please propose $VERSION; that release pull request bumps version.txt and CHANGELOG.md, and its merge is tagged v$VERSION."
+            echo
+            echo "Opened by the Platform version sync workflow."
+          } > "$RUNNER_TEMP/body.md"
+          gh pr create --base main --head "$branch" --title "$(head -n 1 "$RUNNER_TEMP/message")" --body-file "$RUNNER_TEMP/body.md" --assignee mavrovde
+          scripts/approve-release-runs.sh "$branch"

@@ -52,6 +52,12 @@ func TestCommands(t *testing.T) {
 	}))
 	defer ok.Close()
 	healthy := "VFAPI_SERVER_LISTEN_ADDR=" + strings.TrimPrefix(ok.URL, "http://")
+	meta := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"platformVersion":"2.5.21","contractVersion":"0.1"}}`))
+	}))
+	defer meta.Close()
+	synced := "VFAPI_SERVER_LISTEN_ADDR=" + strings.TrimPrefix(meta.URL, "http://")
 	cases := []struct {
 		name    string
 		args    []string
@@ -73,6 +79,12 @@ func TestCommands(t *testing.T) {
 		{"openapi bad switch", []string{"openapi"}, []string{"VFAPI_ENDPOINTS_DISABLED=noSuchOperation"}, 1, ""},
 		{"healthcheck", []string{"healthcheck"}, []string{healthy}, 0, ""},
 		{"healthcheck no answer", []string{"healthcheck"}, []string{"VFAPI_SERVER_LISTEN_ADDR=" + freeAddr(t)}, 1, ""},
+		{"meta-check", []string{"meta-check", "-platform", "2.5.21", "-contract", "0.1"}, []string{synced}, 0, ""},
+		{"meta-check mismatch", []string{"meta-check", "-platform", "2.5.22"}, []string{synced}, 1, ""},
+		{"meta-check no answer", []string{"meta-check", "-contract", "0.1"}, []string{"VFAPI_SERVER_LISTEN_ADDR=" + freeAddr(t)}, 2, ""},
+		{"meta-check of nothing", []string{"meta-check"}, []string{synced}, 2, ""},
+		{"meta-check bad flag", []string{"meta-check", "-nope"}, nil, 2, ""},
+		{"meta-check refused", []string{"meta-check", "-contract", "0.1"}, []string{"VFAPI_NOPE=1"}, config.ExitCode, ""},
 		{"healthcheck refused", []string{"healthcheck"}, []string{"VFAPI_NOPE=1"}, config.ExitCode, ""},
 		{"serve refused", nil, nil, config.ExitCode, ""},
 		{"serve bad contract", []string{"serve"}, []string{dbURL(t), "VFAPI_CONTRACT_EXPECTED=99999999999999999999.1"}, config.ExitCode, ""},

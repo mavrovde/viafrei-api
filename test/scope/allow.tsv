@@ -1,0 +1,4 @@
+# Reasoned exceptions to the scope lint. One line per exception:
+# rule (vocabulary, denylist or column), the path, the matched word, the reason.
+# An entry that matches no finding fails the lint, so none outlives its cause.
+column	api/openapi.json	contractVersion	the version of the read contract itself is public by design (FR-SVC-003); the contract is the published interface, not storage

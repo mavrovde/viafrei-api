@@ -18,11 +18,12 @@ and merge release pull requests.
 2. Once CI has passed on a push to `main`, [release-please](https://github.com/googleapis/release-please)
    (`.github/workflows/release-please.yml`, started by `workflow_run`) opens
    or updates the **release pull request** `chore: release X.Y.Z` with the
-   built-in `GITHUB_TOKEN`. GitHub starts no `pull_request` workflow for a
-   push made with that token, so the same job then dispatches `ci.yml` and
-   `security.yml` on the release branch (`workflow_dispatch`, the one event
-   that token may start); their check runs land on the pull request's head
-   commit, where branch protection reads them. It bumps `version.txt`, updates
+   built-in `GITHUB_TOKEN`. GitHub holds the pull request's CI and Security
+   runs as "action_required" because github-actions[bot] opened it, and
+   branch protection reads only pull-request runs (a `workflow_dispatch` run
+   on the same commit is not associated with the pull request), so the same
+   job approves them (`scripts/approve-release-runs.sh`, which fails when
+   either workflow has no run on the head commit). It bumps `version.txt`, updates
    `.release-please-manifest.json` and adds the section to `CHANGELOG.md`
    ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/) headings).
 3. A maintainer reviews and merges the release pull request (checklist below).

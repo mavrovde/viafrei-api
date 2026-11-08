@@ -9,11 +9,10 @@
 # It runs after CI has passed on a push to main, and scripts/ci-gate.sh checks
 # the release commit's CI result again before the tag is created (REL-015).
 # The release pull request is opened with the built-in GITHUB_TOKEN (the
-# repository allows GitHub Actions to create pull requests). GitHub starts no
-# pull_request workflow for a push made with that token, so the next step
-# dispatches CI and Security on the release branch: a workflow_dispatch is the
-# one event that token may start, and the check runs it creates sit on the
-# release pull request's head commit, where branch protection reads them.
+# repository allows GitHub Actions to create pull requests). GitHub holds the
+# pull_request runs of CI and Security for that pull request as
+# "action_required", and branch protection reads only pull_request runs, so the
+# next step approves them (scripts/approve-release-runs.sh).
 name: Release Please
 
 on:
@@ -42,7 +41,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      actions: write # dispatches CI and Security on the release branch
+      actions: write # approves CI and Security on the release pull request
     outputs:
       created: ${{ steps.rp.outputs.release_created }}
       tag: ${{ steps.rp.outputs.tag_name }}
@@ -54,7 +53,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-      - name: Run CI and Security on the release pull request
+      - name: Approve CI and Security on the release pull request
         if: steps.rp.outputs.pr != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -62,11 +61,7 @@ jobs:
           PR: ${{ steps.rp.outputs.pr }}
         run: |
           branch=$(jq -r '.headBranchName // empty' <<<"$PR")
-          [[ $branch == release-please--* ]] || { echo "::error::release-please reported head branch '$branch', not release-please--*"; exit 1; }
-          for wf in ci.yml security.yml; do
-            gh workflow run "$wf" --ref "$branch"
-            echo "dispatched $wf on $branch"
-          done
+          scripts/approve-release-runs.sh "$branch"
 
   tag:
     name: Annotated tag

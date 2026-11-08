@@ -19,9 +19,10 @@
 #
 # A change that touches no in-scope code mutates nothing and passes, and
 # says so. The report (default mutation-report.md) carries the counts and
-# every survivor. Gremlins is built from tools/gremlins, whose go.mod and
-# go.sum lock its version (v0.6.0) and every dependency; GREMLINS names
-# another binary instead.
+# every survivor. Gremlins runs as go run of v0.6.0, the way the other CI
+# tools run: the version resolves through the tool's own go.mod and is
+# verified against the checksum database, and it never enters this
+# module's dependencies. GREMLINS names an installed binary instead.
 #
 # Exit 0 at or above the target, 1 below it or on a gate finding, 2 on a
 # usage error or an input that cannot be read.
@@ -33,20 +34,18 @@ mode=${1:-}
 scope=test/mutation/scope.tsv
 equivalent=test/mutation/equivalent.tsv
 work=$(mktemp -d)
-gremlins=${GREMLINS:-$work/gremlins}
 cleanup() {
   if [[ -d $work/base ]]; then git worktree remove --force "$work/base" >/dev/null 2>&1 || true; fi
   rm -rf "$work"
 }
 trap cleanup EXIT
-if [[ -z ${GREMLINS:-} ]]; then
-  go -C tools/gremlins build -o "$gremlins" github.com/go-gremlins/gremlins/cmd/gremlins
-fi
 
 # A timeout counts against the score, so it must mean a hang, not a busy
 # runner: Gremlins' default timeout timed out mutants whose tests fail in
 # well under a second on a loaded machine; 30 times the clean run did not.
-mutate() { "$gremlins" unleash --silent --invert-logical --invert-loopctrl --timeout-coefficient 30 --output "$1" "$2"; }
+gremlins=(go run github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0)
+if [[ -n ${GREMLINS:-} ]]; then gremlins=("$GREMLINS"); fi
+mutate() { "${gremlins[@]}" unleash --silent --invert-logical --invert-loopctrl --timeout-coefficient 30 --output "$1" "$2"; }
 gate() { go run ./internal/testkit/mutgate -scope "$scope" -equivalent "$equivalent" "$@"; }
 
 case "$mode" in

@@ -19,16 +19,6 @@ updates:
       testcontainers:
         patterns: ["github.com/testcontainers/*"]
     open-pull-requests-limit: 5
-  - package-ecosystem: gomod
-    directory: /tools/gremlins
-    schedule:
-      interval: weekly
-      day: monday
-    cooldown:
-      default-days: 7
-    commit-message:
-      prefix: deps
-    open-pull-requests-limit: 1
   - package-ecosystem: github-actions
     directory: /
     schedule:

@@ -178,7 +178,7 @@ func GateViolations() int64 { return gateViolations.Load() }
 
 // rateLimitDoc pins the draft revision whose syntax the RateLimit fields
 // follow (RATE-006).
-const rateLimitDoc = "Sent on every keyed answer, success or error, in the syntax of " + RateLimitDraft +
+const rateLimitDoc = "Sent on every keyed answer but a 401, success or error, in the syntax of " + RateLimitDraft +
 	": a burst policy, and a day and a month policy for a plan with those quotas."
 
 // keyedResponses documents the refusals every keyed operation may answer
@@ -206,14 +206,18 @@ func keyedResponses(api huma.API) map[string]*huma.Response {
 }
 
 // documentRateLimit adds the RateLimit fields to every answer of every keyed
-// operation in the document (RATE-006).
+// operation in the document (RATE-006), but the 401: a refused key reaches
+// no key gate, so its answer carries none.
 func documentRateLimit(api huma.API) {
 	for _, item := range api.OpenAPI().Paths {
 		for _, op := range []*huma.Operation{item.Get, item.Head, item.Post, item.Put, item.Patch, item.Delete} {
 			if op == nil || len(op.Security) == 0 {
 				continue
 			}
-			for _, r := range op.Responses {
+			for status, r := range op.Responses {
+				if status == "401" {
+					continue
+				}
 				if r.Headers == nil {
 					r.Headers = map[string]*huma.Param{}
 				}

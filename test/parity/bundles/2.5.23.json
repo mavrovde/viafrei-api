@@ -2,7 +2,7 @@
   "format": "viafrei.parity/2",
   "platform": "2.5.23",
   "producer": "mcp",
-  "commit": "f338f142c65dadce7ca41a70f13f203c0b625f2c",
+  "commit": "198b687d58c43eb433692723286036b7ba8badf2",
   "rules": "viafrei.parity.rules/3",
   "fixture": {
     "profile": "tiny",

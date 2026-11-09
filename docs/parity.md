@@ -139,18 +139,27 @@ which are therefore differences that remain:
 
 ## Known differences that remain
 
-Platform 2.5.23 bundle: 9 facts in the two parking cases. All have one
-cause: the MCP side reads the newest SID reading against the database's
-clock instead of the question's `now` (platform issue #1262, open, shipping
-in 2.5.24). On these rows it finds no reading, so it states no
-`sidOccupancy` block at all, and from that follows each fact:
+Platform 2.5.24 bundle: 2 facts, `meta.notes.condition` in the two parking
+cases. Platform 2.5.24 reads the SID reading against the question's `now`
+(platform issue #1262). The 2.5.23 bundle differed in 9 facts because the
+MCP side read it against the database's clock. Seven of those 9 are now
+equal: `termsRequired` in both cases, and the four `occupancy` facts of
+`pk-07-0012` in the accepted case.
 
-- `meta.notes.condition`, in both cases: the terms note goes with the block;
-- `data[pk-07-0012].termsRequired`, in both cases: the MCP projection
-  states it from the block (`shown: false` is true, `shown: true` is
-  false) and states nothing when there is no block;
-- `data[pk-07-0012].occupancy`, in the accepted case: the reading is the
-  block's.
+The two that remain have two different causes:
+
+- **parking-terms-pending.** The API states the condition note of the
+  gated family (`["Use only after accepting the terms (synthetic)."]`).
+  The MCP side states `[]`. The MCP capability attaches a condition note
+  only for a source whose data the answer shows. Until the terms are
+  accepted it shows no SID reading, so it credits no SID source and states
+  no note. The API states the note of every family it lists. Which rule is
+  right is an open decision.
+- **parking-terms-accepted.** Both sides state one condition note, but with
+  different texts. The API states the fixture family's synthetic text. The
+  MCP side states the platform register's SID condition. This is the cause
+  for which the attribution texts are excluded: the fixture's families have
+  no real register entry, so the texts cannot be equal on these rows.
 
 They are not excluded.
 

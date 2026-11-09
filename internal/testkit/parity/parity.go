@@ -111,17 +111,64 @@ type Rules struct {
 	// Meta are the members of meta that are facts; the rest describe the
 	// request, not the answer.
 	Meta []string
+	// Excluded are the facts left out of the comparison, each with its
+	// reason (docs/parity.md). Project drops them and Parse refuses a bundle
+	// that states one, so neither side can compare them by accident.
+	Excluded []Exclusion
+}
+
+// Exclusion is one fact, or family of facts, left out of the comparison.
+// Pattern is a fact name in which [*] stands for any element key; it covers
+// the name itself and every fact under it.
+type Exclusion struct {
+	Pattern string
+	Reason  string
+}
+
+// Excludes reports whether the fact name falls under one of r's exclusions.
+func (r Rules) Excludes(name string) bool {
+	for _, e := range r.Excluded {
+		if exclusionPattern(e.Pattern).MatchString(name) {
+			return true
+		}
+	}
+	return false
+}
+
+func exclusionPattern(p string) *regexp.Regexp {
+	q := strings.ReplaceAll(regexp.QuoteMeta(p), `\[\*\]`, `\[[^\]]*\]`)
+	return regexp.MustCompile(`^` + q + `(?:$|[.\[])`)
 }
 
 // Default is the projection rule set of this format.
 var Default = Rules{
-	ID:               "viafrei.parity.rules/2",
+	ID:               "viafrei.parity.rules/3",
 	PositionDecimals: 5,
 	Positions:        []string{"lat", "lon"},
 	Keys:             []string{"id", "family", "code"},
 	Identifiers:      []string{"sourceFamily"},
 	Meta:             []string{"asOf", "attribution", "freshness", "notes", "page", "warnings"},
+	Excluded: []Exclusion{
+		{"data[*].access", "the MCP capability has no access concept: no charging source of the platform publishes who may use a site"},
+		{"data[*].chargePoints[*].current", "the MCP capability states no current per point"},
+		{"meta.freshness", "API-only: the per-family freshness block of the read contract (ENV-003)"},
+		{"meta.warnings", "API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got"},
+		{"meta.page.hasMore", "the MCP capability states no count of the sites a power filter keeps, so it cannot say whether there are more"},
+		{"meta.asOf", "each side defines it differently: the API the oldest family dataAsOf (ENV-004), MCP the newest current status or its clock"},
+		{"meta.attribution[*].domain", attributionReason},
+		{"meta.attribution[*].licence", attributionReason},
+		{"meta.attribution[*].licenceUrl", attributionReason},
+		{"meta.attribution[*].publisher", attributionReason},
+		{"meta.attribution[*].shareAlike", attributionReason},
+		{"meta.attribution[*].shareAlikeOffer", attributionReason},
+		{"meta.attribution[*].termsUrl", attributionReason},
+		{"meta.attribution[*].text", attributionReason},
+	},
 }
+
+// attributionReason is why only the credited family of an attribution entry
+// is compared.
+const attributionReason = "the fixture's families carry synthetic register texts, the platform credits its own register rows for the sources the families are stored as; which families are credited is compared"
 
 // Errors of loading a bundle.
 var (
@@ -208,6 +255,11 @@ func Parse(raw []byte, platform string) (Bundle, error) {
 		seen[c.ID] = true
 		if n, ok := repeated(c.Facts); ok {
 			return Bundle{}, fmt.Errorf("%w: case %q names the fact %q more than once", ErrMalformed, c.ID, n)
+		}
+		for _, f := range c.Facts {
+			if Default.Excludes(f.Name) {
+				return Bundle{}, fmt.Errorf("%w: case %q states %q, which %s excludes from the comparison", ErrMalformed, c.ID, f.Name, Default.ID)
+			}
 		}
 	}
 	return b, nil
@@ -370,7 +422,13 @@ func Project(body []byte, r Rules) ([]Fact, error) {
 	if n, ok := repeated(p.out); ok {
 		return nil, fmt.Errorf("%w: %q", ErrDuplicateFact, n)
 	}
-	return p.out, nil
+	kept := p.out[:0]
+	for _, f := range p.out {
+		if !r.Excludes(f.Name) {
+			kept = append(kept, f)
+		}
+	}
+	return kept, nil
 }
 
 // repeated returns a fact name that occurs more than once in fs.

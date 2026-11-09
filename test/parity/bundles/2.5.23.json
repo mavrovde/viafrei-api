@@ -2,8 +2,8 @@
   "format": "viafrei.parity/2",
   "platform": "2.5.23",
   "producer": "mcp",
-  "commit": "7eb1929b56c284c6221d48b6a3b9732d1586cc8f",
-  "rules": "viafrei.parity.rules/2",
+  "commit": "7d79da61ae601603f4add628af98a9755fec83c3",
+  "rules": "viafrei.parity.rules/3",
   "fixture": {
     "profile": "tiny",
     "seed": 1,
@@ -11,10 +11,10 @@
   },
   "cases": [
     {
-      "id": "charging-public-commercial",
+      "id": "charging-commercial",
       "operation": "listChargingOptions",
       "counterpart": "charging station search",
-      "request": "/v1/charging-options?at=50.82,6.0&radius_m=20000",
+      "request": "/v1/charging-options?at=50.82,6.0&radius_m=20000&access=all&limit=5",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -95,7 +95,7 @@
         },
         {
           "name": "data[cs-05-0012].distanceM",
-          "value": "2600"
+          "value": "2644"
         },
         {
           "name": "data[cs-05-0012].id",
@@ -147,7 +147,7 @@
         },
         {
           "name": "data[cs-05-0014].distanceM",
-          "value": "5800"
+          "value": "5789"
         },
         {
           "name": "data[cs-05-0014].id",
@@ -186,40 +186,8 @@
           "value": "22"
         },
         {
-          "name": "meta.asOf",
-          "value": "2026-03-30T00:00:00Z"
-        },
-        {
-          "name": "meta.attribution[mobilithek_afir_tesla_dyn].licence",
-          "value": "CC0 1.0"
-        },
-        {
-          "name": "meta.attribution[mobilithek_afir_tesla_dyn].licenceUrl",
-          "value": "https://mobilithek.info/offers/953843379766972416"
-        },
-        {
-          "name": "meta.attribution[mobilithek_afir_tesla_dyn].shareAlike",
-          "value": "false"
-        },
-        {
-          "name": "meta.attribution[mobilithek_afir_tesla_dyn].text",
-          "value": "Ladepunkt-Verfügbarkeit: Tesla Germany GmbH via Mobilithek, CC0 1.0"
-        },
-        {
-          "name": "meta.attribution[mobilithek_afir_tesla_stat].licence",
-          "value": "CC0 1.0"
-        },
-        {
-          "name": "meta.attribution[mobilithek_afir_tesla_stat].licenceUrl",
-          "value": "https://mobilithek.info/offers/953828817873125376"
-        },
-        {
-          "name": "meta.attribution[mobilithek_afir_tesla_stat].shareAlike",
-          "value": "false"
-        },
-        {
-          "name": "meta.attribution[mobilithek_afir_tesla_stat].text",
-          "value": "Ladepunkte: Tesla Germany GmbH via Mobilithek, CC0 1.0"
+          "name": "meta.attribution[src-beta-energy].family",
+          "value": "src-beta-energy"
         },
         {
           "name": "meta.notes.condition",
@@ -228,10 +196,6 @@
         {
           "name": "meta.notes.purpose",
           "value": "[]"
-        },
-        {
-          "name": "meta.page.hasMore",
-          "value": "false"
         },
         {
           "name": "meta.page.limit",
@@ -276,7 +240,7 @@
         },
         {
           "name": "data[cs-01-0000].distanceM",
-          "value": "1600"
+          "value": "1605"
         },
         {
           "name": "data[cs-01-0000].id",
@@ -348,7 +312,7 @@
         },
         {
           "name": "data[cs-01-0001].distanceM",
-          "value": "1400"
+          "value": "1361"
         },
         {
           "name": "data[cs-01-0001].id",
@@ -387,40 +351,8 @@
           "value": "300"
         },
         {
-          "name": "meta.asOf",
-          "value": "2026-03-30T00:00:00Z"
-        },
-        {
-          "name": "meta.attribution[mobilithek_afir_ecomovement].licence",
-          "value": "CC BY 4.0"
-        },
-        {
-          "name": "meta.attribution[mobilithek_afir_ecomovement].licenceUrl",
-          "value": "https://mobilithek.info/offers/954064102947180544"
-        },
-        {
-          "name": "meta.attribution[mobilithek_afir_ecomovement].shareAlike",
-          "value": "false"
-        },
-        {
-          "name": "meta.attribution[mobilithek_afir_ecomovement].text",
-          "value": "Ladepunkte: Eco-Movement via Mobilithek, CC BY 4.0, bearbeitet"
-        },
-        {
-          "name": "meta.attribution[mobilithek_afir_ecomovement_dyn].licence",
-          "value": "CC BY 4.0"
-        },
-        {
-          "name": "meta.attribution[mobilithek_afir_ecomovement_dyn].licenceUrl",
-          "value": "https://mobilithek.info/offers/955166494396665856"
-        },
-        {
-          "name": "meta.attribution[mobilithek_afir_ecomovement_dyn].shareAlike",
-          "value": "false"
-        },
-        {
-          "name": "meta.attribution[mobilithek_afir_ecomovement_dyn].text",
-          "value": "Ladepunkt-Verfügbarkeit: Eco-Movement via Mobilithek, CC BY 4.0, bearbeitet"
+          "name": "meta.attribution[src-alpha-energy].family",
+          "value": "src-alpha-energy"
         },
         {
           "name": "meta.notes.condition",
@@ -437,10 +369,235 @@
       ]
     },
     {
+      "id": "charging-status-age-limit",
+      "operation": "listChargingOptions",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options?at=48.41,7.68&radius_m=25000&access=all&limit=2",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "src-alpha-energy",
+          "src-beta-energy",
+          "src-gamma-energy"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-29T21:50:00Z",
+      "facts": [
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-0].availability.observedAt",
+          "value": "2026-03-29T21:11:57Z"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-0].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-0].id",
+          "value": "cp-00000-0"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-0].maxPowerKw",
+          "value": "22"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-1].availability.observedAt",
+          "value": "2026-03-29T15:46:18Z"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-1].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-1].id",
+          "value": "cp-00000-1"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-1].maxPowerKw",
+          "value": "22"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].availability.observedAt",
+          "value": "2026-03-29T09:34:59Z"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].id",
+          "value": "cp-00000-2"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].maxPowerKw",
+          "value": "150"
+        },
+        {
+          "name": "data[cs-01-0000].distanceM",
+          "value": "1605"
+        },
+        {
+          "name": "data[cs-01-0000].id",
+          "value": "cs-01-0000"
+        },
+        {
+          "name": "data[cs-01-0000].location.lat",
+          "value": "48.40452"
+        },
+        {
+          "name": "data[cs-01-0000].location.lon",
+          "value": "7.65994"
+        },
+        {
+          "name": "data[cs-01-0000].name",
+          "value": "Kofüßwerder Laden"
+        },
+        {
+          "name": "data[cs-01-0000].operator",
+          "value": "Wickmel Strom"
+        },
+        {
+          "name": "data[cs-01-0000].sourceFamily",
+          "value": "src-alpha-energy"
+        },
+        {
+          "name": "data[cs-01-0000].summary.availableNow",
+          "value": "null"
+        },
+        {
+          "name": "data[cs-01-0000].summary.chargePoints",
+          "value": "3"
+        },
+        {
+          "name": "data[cs-01-0000].summary.maxPowerKw",
+          "value": "150"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-0].availability.observedAt",
+          "value": "2026-03-28T07:03:46Z"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-0].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-0].id",
+          "value": "cp-00001-0"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-0].maxPowerKw",
+          "value": "22"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-1].availability",
+          "value": "null"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-1].id",
+          "value": "cp-00001-1"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-1].maxPowerKw",
+          "value": "11"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].availability.observedAt",
+          "value": "2026-03-29T16:42:46Z"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].id",
+          "value": "cp-00001-2"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].maxPowerKw",
+          "value": "50"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].availability.observedAt",
+          "value": "2026-03-29T15:32:38Z"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].id",
+          "value": "cp-00001-3"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].maxPowerKw",
+          "value": "300"
+        },
+        {
+          "name": "data[cs-01-0001].distanceM",
+          "value": "1361"
+        },
+        {
+          "name": "data[cs-01-0001].id",
+          "value": "cs-01-0001"
+        },
+        {
+          "name": "data[cs-01-0001].location.lat",
+          "value": "48.41116"
+        },
+        {
+          "name": "data[cs-01-0001].location.lon",
+          "value": "7.69830"
+        },
+        {
+          "name": "data[cs-01-0001].name",
+          "value": "Kofüßwerder Laden"
+        },
+        {
+          "name": "data[cs-01-0001].operator",
+          "value": "Döszäl Strom"
+        },
+        {
+          "name": "data[cs-01-0001].sourceFamily",
+          "value": "src-alpha-energy"
+        },
+        {
+          "name": "data[cs-01-0001].summary.availableNow",
+          "value": "null"
+        },
+        {
+          "name": "data[cs-01-0001].summary.chargePoints",
+          "value": "4"
+        },
+        {
+          "name": "data[cs-01-0001].summary.maxPowerKw",
+          "value": "300"
+        },
+        {
+          "name": "meta.attribution[src-alpha-energy].family",
+          "value": "src-alpha-energy"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "2"
+        }
+      ]
+    },
+    {
       "id": "parking-terms-pending",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.39,10.23&radius_m=25000",
+      "request": "/v1/parking-options?at=50.39,10.23&radius_m=25000&limit=5",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -457,11 +614,11 @@
       "facts": [
         {
           "name": "data[pk-07-0012].distanceM",
-          "value": "300"
+          "value": "324"
         },
         {
           "name": "data[pk-07-0012].id",
-          "value": "109"
+          "value": "pk-07-0012"
         },
         {
           "name": "data[pk-07-0012].kind",
@@ -492,24 +649,8 @@
           "value": "src-delta-parking"
         },
         {
-          "name": "meta.asOf",
-          "value": "2026-03-30T00:00:00Z"
-        },
-        {
-          "name": "meta.attribution[mobilithek_truckpark_static_geonutzv].licence",
-          "value": "GeoNutzV"
-        },
-        {
-          "name": "meta.attribution[mobilithek_truckpark_static_geonutzv].licenceUrl",
-          "value": "https://mobilithek.info/offers/110000000002465001"
-        },
-        {
-          "name": "meta.attribution[mobilithek_truckpark_static_geonutzv].shareAlike",
-          "value": "false"
-        },
-        {
-          "name": "meta.attribution[mobilithek_truckpark_static_geonutzv].text",
-          "value": "LKW-Parken: © Lkw-Parken BAB Deutschland / Bundesministerium für Verkehr (BMV) {Jahr} — GeoNutzV, Daten verändert"
+          "name": "meta.attribution[src-delta-parking].family",
+          "value": "src-delta-parking"
         },
         {
           "name": "meta.notes.condition",
@@ -518,10 +659,6 @@
         {
           "name": "meta.notes.purpose",
           "value": "[]"
-        },
-        {
-          "name": "meta.page.hasMore",
-          "value": "false"
         },
         {
           "name": "meta.page.limit",
@@ -533,7 +670,7 @@
       "id": "parking-terms-accepted",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.39,10.23&radius_m=25000",
+      "request": "/v1/parking-options?at=50.39,10.23&radius_m=25000&limit=5",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -555,11 +692,11 @@
       "facts": [
         {
           "name": "data[pk-07-0012].distanceM",
-          "value": "300"
+          "value": "324"
         },
         {
           "name": "data[pk-07-0012].id",
-          "value": "109"
+          "value": "pk-07-0012"
         },
         {
           "name": "data[pk-07-0012].kind",
@@ -590,24 +727,8 @@
           "value": "src-delta-parking"
         },
         {
-          "name": "meta.asOf",
-          "value": "2026-03-30T00:00:00Z"
-        },
-        {
-          "name": "meta.attribution[mobilithek_truckpark_static_geonutzv].licence",
-          "value": "GeoNutzV"
-        },
-        {
-          "name": "meta.attribution[mobilithek_truckpark_static_geonutzv].licenceUrl",
-          "value": "https://mobilithek.info/offers/110000000002465001"
-        },
-        {
-          "name": "meta.attribution[mobilithek_truckpark_static_geonutzv].shareAlike",
-          "value": "false"
-        },
-        {
-          "name": "meta.attribution[mobilithek_truckpark_static_geonutzv].text",
-          "value": "LKW-Parken: © Lkw-Parken BAB Deutschland / Bundesministerium für Verkehr (BMV) {Jahr} — GeoNutzV, Daten verändert"
+          "name": "meta.attribution[src-delta-parking].family",
+          "value": "src-delta-parking"
         },
         {
           "name": "meta.notes.condition",
@@ -616,10 +737,6 @@
         {
           "name": "meta.notes.purpose",
           "value": "[]"
-        },
-        {
-          "name": "meta.page.hasMore",
-          "value": "false"
         },
         {
           "name": "meta.page.limit",

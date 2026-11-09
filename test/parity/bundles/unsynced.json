@@ -2,7 +2,7 @@
   "format": "viafrei.parity/2",
   "platform": "unsynced",
   "producer": "api",
-  "rules": "viafrei.parity.rules/2",
+  "rules": "viafrei.parity.rules/3",
   "fixture": {
     "profile": "tiny",
     "seed": 1,
@@ -10,10 +10,10 @@
   },
   "cases": [
     {
-      "id": "charging-public-commercial",
+      "id": "charging-commercial",
       "operation": "listChargingOptions",
       "counterpart": "charging station search",
-      "request": "/v1/charging-options?at=50.82,6.0\u0026radius_m=20000",
+      "request": "/v1/charging-options?at=50.82,6.0\u0026radius_m=20000\u0026access=all\u0026limit=5",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -29,20 +29,12 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
-          "name": "data[cs-05-0012].access",
-          "value": "public"
-        },
-        {
           "name": "data[cs-05-0012].chargePoints[cp-00012-0].availability.observedAt",
           "value": "2026-03-29T03:23:03Z"
         },
         {
           "name": "data[cs-05-0012].chargePoints[cp-00012-0].availability.state",
-          "value": "reserved"
-        },
-        {
-          "name": "data[cs-05-0012].chargePoints[cp-00012-0].current",
-          "value": "dc"
+          "value": "stale"
         },
         {
           "name": "data[cs-05-0012].chargePoints[cp-00012-0].id",
@@ -58,11 +50,7 @@
         },
         {
           "name": "data[cs-05-0012].chargePoints[cp-00012-1].availability.state",
-          "value": "occupied"
-        },
-        {
-          "name": "data[cs-05-0012].chargePoints[cp-00012-1].current",
-          "value": "dc"
+          "value": "stale"
         },
         {
           "name": "data[cs-05-0012].chargePoints[cp-00012-1].id",
@@ -78,11 +66,7 @@
         },
         {
           "name": "data[cs-05-0012].chargePoints[cp-00012-2].availability.state",
-          "value": "reserved"
-        },
-        {
-          "name": "data[cs-05-0012].chargePoints[cp-00012-2].current",
-          "value": "ac"
+          "value": "stale"
         },
         {
           "name": "data[cs-05-0012].chargePoints[cp-00012-2].id",
@@ -98,11 +82,7 @@
         },
         {
           "name": "data[cs-05-0012].chargePoints[cp-00012-3].availability.state",
-          "value": "reserved"
-        },
-        {
-          "name": "data[cs-05-0012].chargePoints[cp-00012-3].current",
-          "value": "dc"
+          "value": "stale"
         },
         {
           "name": "data[cs-05-0012].chargePoints[cp-00012-3].id",
@@ -153,64 +133,60 @@
           "value": "300"
         },
         {
-          "name": "meta.asOf",
-          "value": "2026-03-29T23:55:00Z"
+          "name": "data[cs-05-0014].chargePoints[cp-00014-0].availability",
+          "value": "null"
         },
         {
-          "name": "meta.attribution[src-beta-energy].domain",
-          "value": "energy"
+          "name": "data[cs-05-0014].chargePoints[cp-00014-0].id",
+          "value": "cp-00014-0"
+        },
+        {
+          "name": "data[cs-05-0014].chargePoints[cp-00014-0].maxPowerKw",
+          "value": "22"
+        },
+        {
+          "name": "data[cs-05-0014].distanceM",
+          "value": "5789"
+        },
+        {
+          "name": "data[cs-05-0014].id",
+          "value": "cs-05-0014"
+        },
+        {
+          "name": "data[cs-05-0014].location.lat",
+          "value": "50.80773"
+        },
+        {
+          "name": "data[cs-05-0014].location.lon",
+          "value": "5.92017"
+        },
+        {
+          "name": "data[cs-05-0014].name",
+          "value": "Gielfürau Laden"
+        },
+        {
+          "name": "data[cs-05-0014].operator",
+          "value": "Keßräß Strom"
+        },
+        {
+          "name": "data[cs-05-0014].sourceFamily",
+          "value": "src-beta-energy"
+        },
+        {
+          "name": "data[cs-05-0014].summary.availableNow",
+          "value": "null"
+        },
+        {
+          "name": "data[cs-05-0014].summary.chargePoints",
+          "value": "1"
+        },
+        {
+          "name": "data[cs-05-0014].summary.maxPowerKw",
+          "value": "22"
         },
         {
           "name": "meta.attribution[src-beta-energy].family",
           "value": "src-beta-energy"
-        },
-        {
-          "name": "meta.attribution[src-beta-energy].licence",
-          "value": "Synthetic licence beta"
-        },
-        {
-          "name": "meta.attribution[src-beta-energy].licenceUrl",
-          "value": "https://licences.example/beta"
-        },
-        {
-          "name": "meta.attribution[src-beta-energy].publisher",
-          "value": "Stönwän Datenwerk"
-        },
-        {
-          "name": "meta.attribution[src-beta-energy].shareAlike",
-          "value": "true"
-        },
-        {
-          "name": "meta.attribution[src-beta-energy].shareAlikeOffer",
-          "value": "https://beta.example/share-alike/energy"
-        },
-        {
-          "name": "meta.attribution[src-beta-energy].termsUrl",
-          "value": "https://beta.example/terms"
-        },
-        {
-          "name": "meta.attribution[src-beta-energy].text",
-          "value": "Synthetic data from family beta, licence lic-beta."
-        },
-        {
-          "name": "meta.freshness[src-beta-energy].ageS",
-          "value": "300"
-        },
-        {
-          "name": "meta.freshness[src-beta-energy].dataAsOf",
-          "value": "2026-03-29T23:55:00Z"
-        },
-        {
-          "name": "meta.freshness[src-beta-energy].family",
-          "value": "src-beta-energy"
-        },
-        {
-          "name": "meta.freshness[src-beta-energy].stale",
-          "value": "false"
-        },
-        {
-          "name": "meta.freshness[src-beta-energy].staleAfterS",
-          "value": "3600"
         },
         {
           "name": "meta.notes.condition",
@@ -221,20 +197,8 @@
           "value": "[]"
         },
         {
-          "name": "meta.page.hasMore",
-          "value": "false"
-        },
-        {
           "name": "meta.page.limit",
-          "value": "20"
-        },
-        {
-          "name": "meta.warnings[partial].code",
-          "value": "partial"
-        },
-        {
-          "name": "meta.warnings[partial].detail",
-          "value": "A source family that could answer was withheld under the key's licence terms."
+          "value": "5"
         }
       ]
     },
@@ -258,20 +222,177 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
-          "name": "data[cs-01-0000].access",
-          "value": "public"
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].availability.observedAt",
+          "value": "2026-03-29T09:34:59Z"
         },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].id",
+          "value": "cp-00000-2"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].maxPowerKw",
+          "value": "150"
+        },
+        {
+          "name": "data[cs-01-0000].distanceM",
+          "value": "1605"
+        },
+        {
+          "name": "data[cs-01-0000].id",
+          "value": "cs-01-0000"
+        },
+        {
+          "name": "data[cs-01-0000].location.lat",
+          "value": "48.40452"
+        },
+        {
+          "name": "data[cs-01-0000].location.lon",
+          "value": "7.65994"
+        },
+        {
+          "name": "data[cs-01-0000].name",
+          "value": "Kofüßwerder Laden"
+        },
+        {
+          "name": "data[cs-01-0000].operator",
+          "value": "Wickmel Strom"
+        },
+        {
+          "name": "data[cs-01-0000].sourceFamily",
+          "value": "src-alpha-energy"
+        },
+        {
+          "name": "data[cs-01-0000].summary.availableNow",
+          "value": "null"
+        },
+        {
+          "name": "data[cs-01-0000].summary.chargePoints",
+          "value": "1"
+        },
+        {
+          "name": "data[cs-01-0000].summary.maxPowerKw",
+          "value": "150"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].availability.observedAt",
+          "value": "2026-03-29T16:42:46Z"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].id",
+          "value": "cp-00001-2"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].maxPowerKw",
+          "value": "50"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].availability.observedAt",
+          "value": "2026-03-29T15:32:38Z"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].id",
+          "value": "cp-00001-3"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].maxPowerKw",
+          "value": "300"
+        },
+        {
+          "name": "data[cs-01-0001].distanceM",
+          "value": "1361"
+        },
+        {
+          "name": "data[cs-01-0001].id",
+          "value": "cs-01-0001"
+        },
+        {
+          "name": "data[cs-01-0001].location.lat",
+          "value": "48.41116"
+        },
+        {
+          "name": "data[cs-01-0001].location.lon",
+          "value": "7.69830"
+        },
+        {
+          "name": "data[cs-01-0001].name",
+          "value": "Kofüßwerder Laden"
+        },
+        {
+          "name": "data[cs-01-0001].operator",
+          "value": "Döszäl Strom"
+        },
+        {
+          "name": "data[cs-01-0001].sourceFamily",
+          "value": "src-alpha-energy"
+        },
+        {
+          "name": "data[cs-01-0001].summary.availableNow",
+          "value": "null"
+        },
+        {
+          "name": "data[cs-01-0001].summary.chargePoints",
+          "value": "2"
+        },
+        {
+          "name": "data[cs-01-0001].summary.maxPowerKw",
+          "value": "300"
+        },
+        {
+          "name": "meta.attribution[src-alpha-energy].family",
+          "value": "src-alpha-energy"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "3"
+        }
+      ]
+    },
+    {
+      "id": "charging-status-age-limit",
+      "operation": "listChargingOptions",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options?at=48.41,7.68\u0026radius_m=25000\u0026access=all\u0026limit=2",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "src-alpha-energy",
+          "src-beta-energy",
+          "src-gamma-energy"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-29T21:50:00Z",
+      "facts": [
         {
           "name": "data[cs-01-0000].chargePoints[cp-00000-0].availability.observedAt",
           "value": "2026-03-29T21:11:57Z"
         },
         {
           "name": "data[cs-01-0000].chargePoints[cp-00000-0].availability.state",
-          "value": "occupied"
-        },
-        {
-          "name": "data[cs-01-0000].chargePoints[cp-00000-0].current",
-          "value": "ac"
+          "value": "stale"
         },
         {
           "name": "data[cs-01-0000].chargePoints[cp-00000-0].id",
@@ -287,11 +408,7 @@
         },
         {
           "name": "data[cs-01-0000].chargePoints[cp-00000-1].availability.state",
-          "value": "available"
-        },
-        {
-          "name": "data[cs-01-0000].chargePoints[cp-00000-1].current",
-          "value": "ac"
+          "value": "stale"
         },
         {
           "name": "data[cs-01-0000].chargePoints[cp-00000-1].id",
@@ -307,11 +424,7 @@
         },
         {
           "name": "data[cs-01-0000].chargePoints[cp-00000-2].availability.state",
-          "value": "reserved"
-        },
-        {
-          "name": "data[cs-01-0000].chargePoints[cp-00000-2].current",
-          "value": "dc"
+          "value": "stale"
         },
         {
           "name": "data[cs-01-0000].chargePoints[cp-00000-2].id",
@@ -362,20 +475,12 @@
           "value": "150"
         },
         {
-          "name": "data[cs-01-0001].access",
-          "value": "restricted"
-        },
-        {
           "name": "data[cs-01-0001].chargePoints[cp-00001-0].availability.observedAt",
-          "value": "2026-03-29T22:02:46Z"
+          "value": "2026-03-28T07:03:46Z"
         },
         {
           "name": "data[cs-01-0001].chargePoints[cp-00001-0].availability.state",
-          "value": "reserved"
-        },
-        {
-          "name": "data[cs-01-0001].chargePoints[cp-00001-0].current",
-          "value": "ac"
+          "value": "stale"
         },
         {
           "name": "data[cs-01-0001].chargePoints[cp-00001-0].id",
@@ -386,16 +491,8 @@
           "value": "22"
         },
         {
-          "name": "data[cs-01-0001].chargePoints[cp-00001-1].availability.observedAt",
-          "value": "2026-03-29T18:47:00Z"
-        },
-        {
-          "name": "data[cs-01-0001].chargePoints[cp-00001-1].availability.state",
-          "value": "unknown"
-        },
-        {
-          "name": "data[cs-01-0001].chargePoints[cp-00001-1].current",
-          "value": "ac"
+          "name": "data[cs-01-0001].chargePoints[cp-00001-1].availability",
+          "value": "null"
         },
         {
           "name": "data[cs-01-0001].chargePoints[cp-00001-1].id",
@@ -411,11 +508,7 @@
         },
         {
           "name": "data[cs-01-0001].chargePoints[cp-00001-2].availability.state",
-          "value": "out_of_order"
-        },
-        {
-          "name": "data[cs-01-0001].chargePoints[cp-00001-2].current",
-          "value": "dc"
+          "value": "stale"
         },
         {
           "name": "data[cs-01-0001].chargePoints[cp-00001-2].id",
@@ -431,11 +524,7 @@
         },
         {
           "name": "data[cs-01-0001].chargePoints[cp-00001-3].availability.state",
-          "value": "available"
-        },
-        {
-          "name": "data[cs-01-0001].chargePoints[cp-00001-3].current",
-          "value": "dc"
+          "value": "stale"
         },
         {
           "name": "data[cs-01-0001].chargePoints[cp-00001-3].id",
@@ -486,64 +575,8 @@
           "value": "300"
         },
         {
-          "name": "meta.asOf",
-          "value": "2026-03-29T23:55:00Z"
-        },
-        {
-          "name": "meta.attribution[src-alpha-energy].domain",
-          "value": "energy"
-        },
-        {
           "name": "meta.attribution[src-alpha-energy].family",
           "value": "src-alpha-energy"
-        },
-        {
-          "name": "meta.attribution[src-alpha-energy].licence",
-          "value": "Synthetic licence alpha"
-        },
-        {
-          "name": "meta.attribution[src-alpha-energy].licenceUrl",
-          "value": "https://licences.example/alpha"
-        },
-        {
-          "name": "meta.attribution[src-alpha-energy].publisher",
-          "value": "Nimbruß Datenwerk"
-        },
-        {
-          "name": "meta.attribution[src-alpha-energy].shareAlike",
-          "value": "false"
-        },
-        {
-          "name": "meta.attribution[src-alpha-energy].shareAlikeOffer",
-          "value": "null"
-        },
-        {
-          "name": "meta.attribution[src-alpha-energy].termsUrl",
-          "value": "https://alpha.example/terms"
-        },
-        {
-          "name": "meta.attribution[src-alpha-energy].text",
-          "value": "Synthetic data from family alpha, licence lic-alpha."
-        },
-        {
-          "name": "meta.freshness[src-alpha-energy].ageS",
-          "value": "300"
-        },
-        {
-          "name": "meta.freshness[src-alpha-energy].dataAsOf",
-          "value": "2026-03-29T23:55:00Z"
-        },
-        {
-          "name": "meta.freshness[src-alpha-energy].family",
-          "value": "src-alpha-energy"
-        },
-        {
-          "name": "meta.freshness[src-alpha-energy].stale",
-          "value": "false"
-        },
-        {
-          "name": "meta.freshness[src-alpha-energy].staleAfterS",
-          "value": "3600"
         },
         {
           "name": "meta.notes.condition",
@@ -554,20 +587,8 @@
           "value": "[]"
         },
         {
-          "name": "meta.page.hasMore",
-          "value": "false"
-        },
-        {
           "name": "meta.page.limit",
-          "value": "3"
-        },
-        {
-          "name": "meta.warnings[partial].code",
-          "value": "partial"
-        },
-        {
-          "name": "meta.warnings[partial].detail",
-          "value": "A source family that could answer was withheld under the key's licence terms."
+          "value": "2"
         }
       ]
     },
@@ -575,7 +596,7 @@
       "id": "parking-terms-pending",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=25000",
+      "request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=25000\u0026limit=5",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -631,64 +652,8 @@
           "value": "true"
         },
         {
-          "name": "meta.asOf",
-          "value": "2026-03-29T23:57:30Z"
-        },
-        {
-          "name": "meta.attribution[src-delta-parking].domain",
-          "value": "parking"
-        },
-        {
           "name": "meta.attribution[src-delta-parking].family",
           "value": "src-delta-parking"
-        },
-        {
-          "name": "meta.attribution[src-delta-parking].licence",
-          "value": "Synthetic licence delta"
-        },
-        {
-          "name": "meta.attribution[src-delta-parking].licenceUrl",
-          "value": "https://licences.example/delta"
-        },
-        {
-          "name": "meta.attribution[src-delta-parking].publisher",
-          "value": "Kleber Datenwerk"
-        },
-        {
-          "name": "meta.attribution[src-delta-parking].shareAlike",
-          "value": "false"
-        },
-        {
-          "name": "meta.attribution[src-delta-parking].shareAlikeOffer",
-          "value": "null"
-        },
-        {
-          "name": "meta.attribution[src-delta-parking].termsUrl",
-          "value": "https://delta.example/terms"
-        },
-        {
-          "name": "meta.attribution[src-delta-parking].text",
-          "value": "Synthetic data from family delta, licence lic-delta."
-        },
-        {
-          "name": "meta.freshness[src-delta-parking].ageS",
-          "value": "150"
-        },
-        {
-          "name": "meta.freshness[src-delta-parking].dataAsOf",
-          "value": "2026-03-29T23:57:30Z"
-        },
-        {
-          "name": "meta.freshness[src-delta-parking].family",
-          "value": "src-delta-parking"
-        },
-        {
-          "name": "meta.freshness[src-delta-parking].stale",
-          "value": "false"
-        },
-        {
-          "name": "meta.freshness[src-delta-parking].staleAfterS",
-          "value": "1800"
         },
         {
           "name": "meta.notes.condition",
@@ -699,20 +664,8 @@
           "value": "[]"
         },
         {
-          "name": "meta.page.hasMore",
-          "value": "false"
-        },
-        {
           "name": "meta.page.limit",
-          "value": "20"
-        },
-        {
-          "name": "meta.warnings[partial].code",
-          "value": "partial"
-        },
-        {
-          "name": "meta.warnings[partial].detail",
-          "value": "A source family that could answer was withheld under the key's licence terms. Sites marked termsRequired are listed without their occupancy until their terms are accepted."
+          "value": "5"
         }
       ]
     },
@@ -720,7 +673,7 @@
       "id": "parking-terms-accepted",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=25000",
+      "request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=25000\u0026limit=5",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -793,64 +746,8 @@
           "value": "false"
         },
         {
-          "name": "meta.asOf",
-          "value": "2026-03-29T23:57:30Z"
-        },
-        {
-          "name": "meta.attribution[src-delta-parking].domain",
-          "value": "parking"
-        },
-        {
           "name": "meta.attribution[src-delta-parking].family",
           "value": "src-delta-parking"
-        },
-        {
-          "name": "meta.attribution[src-delta-parking].licence",
-          "value": "Synthetic licence delta"
-        },
-        {
-          "name": "meta.attribution[src-delta-parking].licenceUrl",
-          "value": "https://licences.example/delta"
-        },
-        {
-          "name": "meta.attribution[src-delta-parking].publisher",
-          "value": "Kleber Datenwerk"
-        },
-        {
-          "name": "meta.attribution[src-delta-parking].shareAlike",
-          "value": "false"
-        },
-        {
-          "name": "meta.attribution[src-delta-parking].shareAlikeOffer",
-          "value": "null"
-        },
-        {
-          "name": "meta.attribution[src-delta-parking].termsUrl",
-          "value": "https://delta.example/terms"
-        },
-        {
-          "name": "meta.attribution[src-delta-parking].text",
-          "value": "Synthetic data from family delta, licence lic-delta."
-        },
-        {
-          "name": "meta.freshness[src-delta-parking].ageS",
-          "value": "150"
-        },
-        {
-          "name": "meta.freshness[src-delta-parking].dataAsOf",
-          "value": "2026-03-29T23:57:30Z"
-        },
-        {
-          "name": "meta.freshness[src-delta-parking].family",
-          "value": "src-delta-parking"
-        },
-        {
-          "name": "meta.freshness[src-delta-parking].stale",
-          "value": "false"
-        },
-        {
-          "name": "meta.freshness[src-delta-parking].staleAfterS",
-          "value": "1800"
         },
         {
           "name": "meta.notes.condition",
@@ -861,20 +758,8 @@
           "value": "[]"
         },
         {
-          "name": "meta.page.hasMore",
-          "value": "false"
-        },
-        {
           "name": "meta.page.limit",
-          "value": "20"
-        },
-        {
-          "name": "meta.warnings[partial].code",
-          "value": "partial"
-        },
-        {
-          "name": "meta.warnings[partial].detail",
-          "value": "A source family that could answer was withheld under the key's licence terms."
+          "value": "5"
         }
       ]
     }

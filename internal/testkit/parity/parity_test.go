@@ -10,7 +10,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/testkit/parity"
 )
 
-const good = `{"format":"viafrei.parity/2","platform":"1.2.3","producer":"api","rules":"viafrei.parity.rules/2",
+const good = `{"format":"viafrei.parity/2","platform":"1.2.3","producer":"api","rules":"viafrei.parity.rules/3",
 "fixture":{"profile":"tiny","seed":1,"sha256":"ab"},
 "cases":[{"id":"c1","operation":"listX","counterpart":"x search","request":"/v1/x","key":{"useClass":"consumer","scopes":["x"],"sources":["s"],"accepted":null},
 "now":"2026-03-30T00:00:00Z","facts":[{"name":"data[a].id","value":"a"}]}]}`
@@ -66,13 +66,14 @@ func TestParseRefusesWhatItCannotCompare(t *testing.T) {
 		"unknown member": strings.Replace(good, `"rules"`, `"extra":1,"rules"`, 1),
 		"other format":   strings.Replace(good, "viafrei.parity/2", "viafrei.parity/1", 1),
 		"other platform": strings.Replace(good, `"1.2.3"`, `"1.2.4"`, 1),
-		"other rules":    strings.Replace(good, "rules/2", "rules/1", 1),
+		"other rules":    strings.Replace(good, "rules/3", "rules/2", 1),
 		"no facts":       strings.Replace(good, `[{"name":"data[a].id","value":"a"}]`, `[]`, 1),
 		"no id":          strings.Replace(good, `"id":"c1"`, `"id":""`, 1),
 		"no operation":   strings.Replace(good, `"operation":"listX"`, `"operation":""`, 1),
 		"no request":     strings.Replace(good, `"request":"/v1/x"`, `"request":""`, 1),
 		"no producer":    strings.Replace(good, `"producer":"api",`, ``, 1),
 		"other producer": strings.Replace(good, `"producer":"api"`, `"producer":"platform"`, 1),
+		"excluded fact":  strings.Replace(good, `[{"name":"data[a].id","value":"a"}]`, `[{"name":"data[a].id","value":"a"},{"name":"meta.asOf","value":"2026-03-30T00:00:00Z"}]`, 1),
 		"repeated fact":  strings.Replace(good, `[{"name":"data[a].id","value":"a"}]`, `[{"name":"data[a].id","value":"a"},{"name":"data[a].id","value":"b"}]`, 1),
 		"duplicate id":   strings.Replace(good, `]}]}`, `]},`+good[strings.Index(good, `{"id"`):len(good)-2]+`]}`, 1),
 	}
@@ -132,9 +133,7 @@ func TestProjectAppliesTheRules(t *testing.T) {
 		{"data[cs-1].sourceFamily", "src-a"},
 		{"data[cs-1].tags", `["a","b"]`},
 		{"meta.attribution[src-a].family", "src-a"},
-		{"meta.attribution[src-a].text", "T"},
 		{"meta.notes.condition", `["Use only after accepting."]`},
-		{"meta.warnings[partial].code", "partial"},
 	}
 	if d := parity.Diff(want, got); len(d) > 0 {
 		t.Errorf("projection differs:\n%s", strings.Join(d, "\n"))
@@ -188,5 +187,33 @@ func TestDiffStatesMissingExtraAndChanged(t *testing.T) {
 	}
 	if d := parity.Diff(want, want); d != nil {
 		t.Errorf("equal facts differ: %q", d)
+	}
+}
+
+func TestExclusionsCoverANameAndWhatIsUnderItOnly(t *testing.T) {
+	r := parity.Default
+	for _, name := range []string{
+		"meta.asOf", "meta.freshness", "meta.freshness[src-a].ageS", "meta.warnings[partial].code", "meta.page.hasMore",
+		"data[cs-1].access", "data[cs-1].chargePoints[cp-1].current", "meta.attribution[src-a].text", "meta.attribution[src-a].shareAlikeOffer",
+	} {
+		if !r.Excludes(name) {
+			t.Errorf("%s is compared", name)
+		}
+	}
+	for _, name := range []string{
+		"meta.asOfX", "meta.page.limit", "data[cs-1].accessible", "data[cs-1].chargePoints[cp-1].currentKw",
+		"data[cs-1].chargePoints[cp-1].availability.state", "meta.attribution[src-a].family", "meta.notes.condition", "data.access",
+	} {
+		if r.Excludes(name) {
+			t.Errorf("%s is excluded", name)
+		}
+	}
+	for _, e := range r.Excluded {
+		if e.Pattern == "" || e.Reason == "" {
+			t.Errorf("an exclusion without its pattern or reason: %+v", e)
+		}
+	}
+	if (parity.Rules{}).Excludes("meta.asOf") {
+		t.Error("a rule set with no exclusion excluded a fact")
 	}
 }

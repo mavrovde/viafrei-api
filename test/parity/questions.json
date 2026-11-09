@@ -6,10 +6,10 @@
   },
   "cases": [
     {
-      "id": "charging-public-commercial",
+      "id": "charging-commercial",
       "operation": "listChargingOptions",
       "counterpart": "charging station search",
-      "request": "/v1/charging-options?at=50.82,6.0&radius_m=20000",
+      "request": "/v1/charging-options?at=50.82,6.0&radius_m=20000&access=all&limit=5",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -44,10 +44,29 @@
       "now": "2026-03-30T00:00:00Z"
     },
     {
+      "id": "charging-status-age-limit",
+      "operation": "listChargingOptions",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options?at=48.41,7.68&radius_m=25000&access=all&limit=2",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "src-alpha-energy",
+          "src-beta-energy",
+          "src-gamma-energy"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-29T21:50:00Z"
+    },
+    {
       "id": "parking-terms-pending",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.39,10.23&radius_m=25000",
+      "request": "/v1/parking-options?at=50.39,10.23&radius_m=25000&limit=5",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -66,7 +85,7 @@
       "id": "parking-terms-accepted",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.39,10.23&radius_m=25000",
+      "request": "/v1/parking-options?at=50.39,10.23&radius_m=25000&limit=5",
       "key": {
         "useClass": "commercial",
         "scopes": [

@@ -154,6 +154,7 @@ func TestCrossFieldRules(t *testing.T) {
 		"deadline.reserve:",
 		"health.ready_timeout:",
 		"db.statement_timeout_floor:",
+		"compose.part_deadline: 800ms is longer than deadline.request minus deadline.reserve",
 	)
 }
 

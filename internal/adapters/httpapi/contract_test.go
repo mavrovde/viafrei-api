@@ -11,8 +11,11 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/app/health"
+	"github.com/mavrovde/viafrei-api/internal/buildinfo"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/testkit/oascheck"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
@@ -73,7 +76,7 @@ func TestContractInBothDirections(t *testing.T) {
 	d := contract(t)
 	for name, ready := range map[string]health.Result{"ready": {Ready: true}, "not ready": {}} {
 		t.Run(name, func(t *testing.T) {
-			rep, err := d.Exercise(newHandler(t, config.Defaults(), &fakeReadiness{result: ready}))
+			rep, err := d.Exercise(contractHandler(t, &fakeReadiness{result: ready}))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -86,6 +89,31 @@ func TestContractInBothDirections(t *testing.T) {
 			t.Log(rep)
 		})
 	}
+}
+
+// contractHandler admits every request with a key of every feature scope, so
+// that each keyed operation reaches its parameter checks and its examples are
+// answered by a feature fake.
+func contractHandler(t *testing.T, ready httpapi.Readiness) http.Handler {
+	t.Helper()
+	h, err := httpapi.NewHandler(httpapi.Deps{
+		Config: config.Defaults(), Readiness: ready, Build: buildinfo.Info{Version: "0.2.0-test", Commit: "abc1234"},
+		ContractVersion: "0.1", Now: func() time.Time { return fixedNow },
+		Auth: &fakeAuth{p: featureScopes()}, Sources: &fakeSources{register: fixtureRegister}, Features: everyAnswer(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return h
+}
+
+func contractBytes(t *testing.T) []byte {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "api", "openapi.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
 }
 
 // TestUnknownAndRepeatedParametersAreListed: every violation is listed, not

@@ -167,6 +167,12 @@ func behaviours() map[string]behaviour {
 		"auth.failure_window":         {"10s", authSettings},
 		"auth.failure_track_size":     {"20", authSettings},
 		"audit.retention_days":        {"90", authSettings},
+		"geo.default_radius_m":        {"750", featureAsk("/v1/charging-options?at=1,2")},
+		"pagination.default_limit":    {"7", featureAsk("/v1/parking-options?at=1,2")},
+		"compose.per_part_limit":      {"3", featureAsk("/v1/places/pl-1/overview")},
+		"compose.part_deadline": {"300ms", func(t *testing.T, c *config.Config) string {
+			return wire.FeatureSettings(c).PartDeadline.String()
+		}},
 		"sources.disabled": {"alpha", func(t *testing.T, c *config.Config) string {
 			register := []access.Terms{{Family: "alpha", UseClasses: access.UseClasses, Reviewed: true}}
 			return fmt.Sprint(access.NewGate(register, access.Plan{UseClass: "consumer", Sources: []string{"alpha"}}, nil, c.Sources.Disabled).Allowed())

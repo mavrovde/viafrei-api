@@ -142,6 +142,9 @@ func (s *Store) Read(ctx context.Context, fn func(context.Context, pgx.Tx) error
 	return nil
 }
 
+// IsDeadline reports whether err means the request budget ran out.
+func IsDeadline(err error) bool { return errors.Is(err, ErrDeadlineExhausted) }
+
 // ContractVersion implements health.ContractReader.
 func (s *Store) ContractVersion(ctx context.Context) (string, error) {
 	var v string

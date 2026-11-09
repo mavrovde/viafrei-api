@@ -136,11 +136,7 @@ func (s *server) permittedSources(ctx context.Context, k access.Record) ([]Attri
 	}
 	out := make([]Attribution, len(rows))
 	for i, r := range rows {
-		out[i] = Attribution{
-			Family: r.Family, Domain: r.Domain, Publisher: r.Publisher, Text: r.AttributionText,
-			Licence: r.Licence, LicenceURL: r.LicenceURL, ShareAlike: r.ShareAlike,
-			ShareAlikeOffer: r.ShareAlikeOffer, TermsURL: r.TermsURL,
-		}
+		out[i] = attribution(r)
 	}
 	return out, nil
 }

@@ -23,12 +23,14 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/adapters/accessstore"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
+	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/app/health"
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
@@ -105,6 +107,8 @@ func serve(environ []string, stderr io.Writer) int {
 		Build:           buildinfo.Get(),
 		ContractVersion: contract.Version(),
 		Sources:         st,
+		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st},
+			wire.FeatureSettings(cfg), time.Now),
 	}
 	if cfg.Access.URL.IsSet() {
 		as, err := accessstore.Open(ctx, cfg)

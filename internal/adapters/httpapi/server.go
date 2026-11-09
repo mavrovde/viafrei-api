@@ -52,6 +52,8 @@ type Deps struct {
 	Auth Authenticator
 	// Sources reads the source register for the licence gate.
 	Sources SourceReader
+	// Features answers the feature operations; nil switches them off.
+	Features Features
 }
 
 type server struct {
@@ -63,6 +65,7 @@ type server struct {
 	now             func() time.Time
 	auth            Authenticator
 	sources         SourceReader
+	features        Features
 }
 
 // operation is one registered API operation.
@@ -82,6 +85,9 @@ func operations() []operation {
 		{id: "getReadiness", method: http.MethodGet, path: "/readyz", register: registerReadiness},
 		{id: "getMeta", method: http.MethodGet, path: "/v1/meta", register: registerMeta},
 		{id: "getKey", method: http.MethodGet, path: "/v1/key", tag: "access", keyed: true, register: registerKey},
+		{id: "listChargingOptions", method: http.MethodGet, path: "/v1/charging-options", tag: "energy", keyed: true, scope: "energy", register: registerCharging},
+		{id: "listParkingOptions", method: http.MethodGet, path: "/v1/parking-options", tag: "parking", keyed: true, scope: "parking", register: registerParking},
+		{id: "getPlaceOverview", method: http.MethodGet, path: "/v1/places/{placeId}/overview", tag: "places", keyed: true, scope: "places", register: registerOverview},
 	}
 }
 
@@ -150,6 +156,7 @@ func build(d Deps, extra []operation) (http.Handler, []byte, error) {
 		now:             d.Now,
 		auth:            d.Auth,
 		sources:         d.Sources,
+		features:        d.Features,
 	}
 	if s.now == nil {
 		s.now = time.Now
@@ -205,6 +212,9 @@ func build(d Deps, extra []operation) (http.Handler, []byte, error) {
 			Tags: []*huma.Tag{
 				{Name: "service", Description: "Health, readiness and service metadata."},
 				{Name: "access", Description: "The presenting key and what it may read."},
+				{Name: "energy", Description: "Where to charge."},
+				{Name: "parking", Description: "Where to park."},
+				{Name: "places", Description: "Places, and what is around them."},
 			},
 		},
 		Formats:       huma.DefaultFormats,
@@ -234,6 +244,7 @@ func build(d Deps, extra []operation) (http.Handler, []byte, error) {
 		}
 		op.register(api, s, hop)
 	}
+	amendNullableObjects(api)
 
 	// The document is a value of huma's own fixed types: marshalling it
 	// cannot fail for any configuration.

@@ -65,7 +65,7 @@ Standards we build on: OpenAPI 3.1, RFC 9457 problem details for errors, cursor 
 
 ## Status
 
-ViaFrei API has a **service skeleton** in Go. Nothing is deployed yet, and no data endpoint exists.
+ViaFrei API has a **service skeleton** in Go with its first data endpoints. Nothing is deployed yet.
 
 | Step | State |
 |---|---|
@@ -83,7 +83,7 @@ ViaFrei API has a **service skeleton** in Go. Nothing is deployed yet, and no da
 | CI, security checks and release pipeline | 🔄 In review — CI on every pull request; SAST, secrets, dependency, licence and DAST checks ([docs/security-checks.md](docs/security-checks.md)); release-please, signed images and release pages ([docs/RELEASING.md](docs/RELEASING.md)) |
 | Keys and the licence gate: hashed keys, scopes, rotation, revocation, audit log, `GET /v1/key` | 🔄 In review (milestone 0.4.0) — [docs/access-keys.md](docs/access-keys.md) |
 | Rate limits and priority tiers | ⏳ Planned |
-| v1 feature endpoints | ⏳ Planned |
+| v1 feature endpoints | 🔄 In progress (milestone 0.6.0) — first slice: `GET /v1/charging-options`, `GET /v1/parking-options`, `GET /v1/places/{placeId}/overview` |
 
 Follow progress in the [Roadmap](https://github.com/mavrovde/viafrei-api/wiki/Roadmap) and in [Issues](https://github.com/mavrovde/viafrei-api/issues).
 

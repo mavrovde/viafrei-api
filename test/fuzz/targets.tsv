@@ -17,7 +17,7 @@ request	internal/adapters/httpapi	strictQuery,withRequest,limitURI	FuzzRequest	-
 cursor	-	-	-	#9
 key	internal/domain/access	Parse	FuzzParse	-
 polyline	-	-	-	#10
-location	-	-	-	#10
+location	internal/domain/geo	ParsePoint	FuzzParsePoint	-
 fields	-	-	-	#10
 lang	-	-	-	#10
 query-body	-	-	-	#10

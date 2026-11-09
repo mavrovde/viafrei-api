@@ -89,6 +89,7 @@ func TestCoverageCheckGoesRedOnEachGap(t *testing.T) {
 		"edge case unknown_code is missing":                   func(m *fixtures.Manifest) { delete(m.EdgeCases, "unknown_code") },
 		"table place_alias is empty":                          func(m *fixtures.Manifest) { delete(m.Rows, "place_alias") },
 		"edge case max_decimal_price is missing":              func(m *fixtures.Manifest) { delete(m.EdgeCases, "max_decimal_price") },
+		"edge case foreign_unknown_report is missing":         func(m *fixtures.Manifest) { delete(m.EdgeCases, "foreign_unknown_report") },
 		"Land 16 has no rows":                                 func(m *fixtures.Manifest) { m.RowsPerLand["16"] = 0 },
 		"licence class restricted_purpose is not represented": func(m *fixtures.Manifest) { m.LicenceClasses["gamma"] = "" },
 	}

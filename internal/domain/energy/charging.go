@@ -133,11 +133,12 @@ type Summary struct {
 }
 
 // Summarise sums up the site at now. A report is live when it is no older
-// than staleAfter; an older one is shown on its point but not counted.
-func (s Site) Summarise(now time.Time, staleAfter time.Duration) Summary {
+// than staleAfter of the report's own family, which may differ from the
+// site's; an older one is shown on its point but not counted.
+func (s Site) Summarise(now time.Time, staleAfter func(family string) time.Duration) Summary {
 	out := Summary{ChargePoints: len(s.Points)}
 	for _, p := range s.Points {
-		if a := p.Availability; a != nil && now.Sub(a.ObservedAt) <= staleAfter {
+		if a := p.Availability; a != nil && now.Sub(a.ObservedAt) <= staleAfter(a.Family) {
 			n := 0
 			if out.AvailableNow != nil {
 				n = *out.AvailableNow

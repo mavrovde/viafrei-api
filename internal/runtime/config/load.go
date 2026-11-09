@@ -17,6 +17,7 @@ import (
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
 
+	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/invariant"
 )
 
@@ -347,8 +348,10 @@ func crossField(c *Config) Errors {
 	if c.DB.StatementTimeoutFloor >= c.Deadline.Request-c.Deadline.Reserve {
 		out = append(out, fmt.Sprintf("db.statement_timeout_floor: %s leaves no budget inside deadline.request minus deadline.reserve", c.DB.StatementTimeoutFloor))
 	}
-	if c.Compose.PartDeadline > c.Deadline.Request-c.Deadline.Reserve {
-		out = append(out, fmt.Sprintf("compose.part_deadline: %s is longer than deadline.request minus deadline.reserve", c.Compose.PartDeadline))
+	// The parts of a composed answer run one after the other, so every part's
+	// sub-deadline together must fit in the request's budget (FR-BRIEF-003).
+	if parts := len(features.Parts); c.Compose.PartDeadline*time.Duration(parts) > c.Deadline.Request-c.Deadline.Reserve {
+		out = append(out, fmt.Sprintf("compose.part_deadline: %s × %d parts is longer than deadline.request minus deadline.reserve", c.Compose.PartDeadline, parts))
 	}
 	out = append(out, crossFieldAuth(c)...)
 	return append(out, crossFieldTiers(c)...)

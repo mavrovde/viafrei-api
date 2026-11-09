@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -120,6 +121,7 @@ func attribution(r access.Source) Attribution {
 const (
 	partialDetail = "A source family that could answer was withheld under the key's licence terms."
 	termsDetail   = "Sites marked termsRequired are listed without their occupancy until their terms are accepted."
+	partDetail    = "At least one asked part is not ok; meta.parts says why."
 	staleDetail   = "The data of at least one family is older than its design threshold; see meta.freshness."
 )
 
@@ -160,6 +162,27 @@ func (s *server) featureProblem(ctx context.Context, err error) *Problem {
 		return s.storageProblem(ctx, err)
 	}
 }
+
+// featureResponses adds the answers every feature operation can give to the
+// keyed ones, so the document lists them by status (ERR-001): notFound says
+// what a 404 means for the operation.
+func featureResponses(api huma.API, op *huma.Operation, notFound string) {
+	problem := map[string]*huma.MediaType{ProblemContentType: {
+		Schema: api.OpenAPI().Components.Schemas.Schema(reflect.TypeFor[Problem](), true, "Problem"),
+	}}
+	op.Responses["403"] = &huma.Response{
+		Description: "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+		Content:     problem,
+	}
+	op.Responses["404"] = &huma.Response{Description: notFound, Content: problem}
+	op.Responses["503"] = &huma.Response{
+		Description: "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After.",
+		Headers:     map[string]*huma.Param{"Retry-After": {Schema: &huma.Schema{Type: huma.TypeInteger}}},
+		Content:     problem,
+	}
+}
+
+const featureOffDoc = "The operation is switched off on this instance (feature-disabled)."
 
 // featuresOff answers a feature operation of an instance without storage.
 func (s *server) featuresOff(ctx context.Context) error {
@@ -278,13 +301,16 @@ type ChargingOutput struct {
 }
 
 func chargingSites(a features.Answer[energy.Site]) []ChargingSite {
-	staleAfter := map[string]time.Duration{}
+	// Each report is judged by its own family's threshold; every family that
+	// contributed is in a.Families (ENV-003).
+	thresholds := map[string]time.Duration{}
 	for _, f := range a.Families {
-		staleAfter[f.Source.Family] = f.StaleAfter
+		thresholds[f.Source.Family] = f.StaleAfter
 	}
+	staleAfter := func(family string) time.Duration { return thresholds[family] }
 	out := make([]ChargingSite, len(a.Items))
 	for i, v := range a.Items {
-		sum := v.Summarise(a.At, staleAfter[v.Family])
+		sum := v.Summarise(a.At, staleAfter)
 		item := ChargingSite{
 			ID: v.ID, Name: v.Name, Operator: v.Operator, Location: position(v.Location), DistanceM: v.DistanceM,
 			Access: string(v.Access), ChargePoints: []ChargePoint{}, SourceFamily: v.Family,
@@ -310,6 +336,7 @@ func registerCharging(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "Where to charge near a position"
 	op.Description = "Charging sites within the radius of a position, nearest first, then by id, each with its points and their last reported availability. Needs the scope energy."
 	op.Extensions[counterpartExtension] = "charging station search" // a keyed operation carries its scope extension already
+	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, in *ChargingInput) (*ChargingOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
@@ -407,6 +434,7 @@ func registerParking(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "Where to park near a position"
 	op.Description = "Parking sites within the radius of a position, nearest first, then by id, each with its last reported occupancy. A site whose terms need accepting first is listed without its occupancy and marked termsRequired. Needs the scope parking."
 	op.Extensions[counterpartExtension] = "parking search"
+	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, in *ParkingInput) (*ParkingOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
@@ -542,9 +570,22 @@ func noPartProblem(ctx context.Context, parts []features.PartResult) *Problem {
 	}
 }
 
+// missingPart reports whether a part that was asked for is not ok.
+func missingPart(parts []features.PartResult) bool {
+	for _, r := range parts {
+		if r.Status != features.StatusOK && r.Status != features.StatusNotRequested {
+			return true
+		}
+	}
+	return false
+}
+
 func registerOverview(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "What is around a place"
 	op.Description = "A composed answer: the place, then each asked part (charging, parking) around it, each under the licence gate on its own and within its own sub-deadline (compose.part_deadline). A part that is not ok is absent from data and named in meta.parts. 200 when at least one part is ok. Needs the scope places; each part also needs its own scope."
+	featureResponses(api, &op, "No place with this id (not-found), or the operation is switched off on this instance (feature-disabled).")
+	op.Responses["403"].Description = "The key's plan lacks the scope places (scope-denied), no places family is permitted to it (source-not-permitted, terms-not-accepted), or no asked part is permitted (source-not-permitted)."
+	op.Responses["503"].Description = "Storage did not answer in time or is unavailable for the place, or no asked part is ok (deadline-exhausted, upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After."
 	huma.Register(api, op, func(ctx context.Context, in *OverviewInput) (*OverviewOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
@@ -577,12 +618,20 @@ func registerOverview(api huma.API, s *server, op huma.Operation) {
 			sites, withheld = parkingSites(*o.Parking)
 			data.Parking = &ParkingPart{Sites: sites}
 		}
-		detail := partialDetail
+		// A part asked for and not ok makes the answer partial as well
+		// (FR-BRIEF-005, NFR-RES-003): it is 200 and says so in meta.warnings.
+		var details []string
+		if o.Partial {
+			details = append(details, partialDetail)
+		}
 		if withheld {
-			detail += " " + termsDetail
+			details = append(details, termsDetail)
+		}
+		if missingPart(o.Parts) {
+			details = append(details, partDetail)
 		}
 		meta := OverviewMeta{
-			DataMeta: s.dataMeta(ctx, o.Families, s.now(), o.Partial, detail),
+			DataMeta: s.dataMeta(ctx, o.Families, s.now(), len(details) > 0, strings.Join(details, " ")),
 			Parts:    []PartStatus{},
 			Query:    OverviewQuery{PlaceID: q.PlaceID, RadiusM: q.RadiusM, PerPartLimit: q.PerPartLimit},
 		}

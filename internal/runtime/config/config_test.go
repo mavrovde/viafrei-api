@@ -154,8 +154,14 @@ func TestCrossFieldRules(t *testing.T) {
 		"deadline.reserve:",
 		"health.ready_timeout:",
 		"db.statement_timeout_floor:",
-		"compose.part_deadline: 800ms is longer than deadline.request minus deadline.reserve",
+		"compose.part_deadline: 800ms × 2 parts is longer than deadline.request minus deadline.reserve",
 	)
+	// One part fits the budget, every part together does not.
+	_, err = config.Load(config.Options{Environ: []string{"VFAPI_DEADLINE_REQUEST=1s", "VFAPI_COMPOSE_PART_DEADLINE=500ms"}})
+	assertRefused(t, err, "compose.part_deadline: 500ms × 2 parts is longer than deadline.request minus deadline.reserve")
+	if _, err := config.Load(config.Options{Environ: []string{"VFAPI_DEADLINE_REQUEST=1s", "VFAPI_COMPOSE_PART_DEADLINE=450ms"}}); err != nil {
+		t.Errorf("every part fits the budget: %v", err)
+	}
 }
 
 func TestMissingRequiredSecret(t *testing.T) {

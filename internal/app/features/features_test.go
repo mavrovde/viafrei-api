@@ -45,9 +45,17 @@ type fake struct {
 	gotLang                              string
 	gotProv                              [][]string
 	chDelay                              bool
+	reg                                  []access.Terms // replaces register when set
+	regCalls                             int
 }
 
-func (f *fake) Register(context.Context) ([]access.Terms, error) { return register, f.regErr }
+func (f *fake) Register(context.Context) ([]access.Terms, error) {
+	f.regCalls++
+	if f.reg != nil {
+		return f.reg, f.regErr
+	}
+	return register, f.regErr
+}
 
 func (f *fake) Provenance(_ context.Context, fams []string, lang string) ([]provenance.Family, error) {
 	f.provCalls++
@@ -191,6 +199,52 @@ func TestParkingListsPendingFamiliesWithoutOccupancy(t *testing.T) {
 	}
 }
 
+func TestParkingAttributesOccupancyOfAnotherFamily(t *testing.T) {
+	req.Covers(t, "FR-PARK-002", "SEC-032", "ENV-003")
+	// A site of p1 whose occupancy is reported by p3, a third permitted
+	// family: the report is gate-checked and attributed as p3's.
+	reg := append(slices.Clone(register), access.Terms{Family: "p3", Domain: "parking", UseClasses: all, Version: "v1", Reviewed: true})
+	f := &fake{reg: reg, parks: []parking.Site{{ID: "a", Family: "p1", Occupancy: free(2, "p3")}}}
+	a, err := service(f, nil).Parking(context.Background(), key("commercial", allScopes, "p1", "p3"), parking.Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(names(a.Families), []string{"p1", "p3"}) || !slices.Equal(f.gotProv[0], []string{"p1", "p3"}) || a.Items[0].Occupancy == nil {
+		t.Errorf("attributed %v, provenance asked for %v", names(a.Families), f.gotProv)
+	}
+	// The same report from a family outside the key is still refused.
+	f = &fake{reg: reg, parks: []parking.Site{{ID: "a", Family: "p1", Occupancy: free(2, "p3")}}}
+	if _, err := service(f, nil).Parking(context.Background(), key("commercial", allScopes, "p1"), parking.Query{}); !errors.Is(err, features.ErrGateViolation) {
+		t.Errorf("a report of a family outside the key: %v", err)
+	}
+}
+
+func TestParkingListsAKeyWhoseFamiliesAreAllPending(t *testing.T) {
+	req.Covers(t, "FR-PARK-003", "SEC-030")
+	// Every parking family that could answer waits for its terms: the sites
+	// are listed without occupancy, partial, rather than refused.
+	reg := []access.Terms{
+		{Family: "p2", Domain: "parking", UseClasses: all, AcceptanceRequired: true, Version: "v1", Reviewed: true},
+		{Family: "p4", Domain: "parking", UseClasses: all, AcceptanceRequired: true, Version: "v1", Reviewed: true},
+	}
+	f := &fake{reg: reg, parks: []parking.Site{{ID: "b", Family: "p2", Occupancy: free(5, "p2")}, {ID: "d", Family: "p4"}}}
+	a, err := service(f, nil).Parking(context.Background(), key("commercial", allScopes, "p2", "p4"), parking.Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(f.gotListed, []string{"p2", "p4"}) || len(f.gotOccupancy) != 0 {
+		t.Errorf("listed %v, occupancy from %v", f.gotListed, f.gotOccupancy)
+	}
+	if !a.Partial || a.Items[0].Occupancy != nil || !a.Items[0].TermsRequired || !a.Items[1].TermsRequired || !slices.Equal(names(a.Families), []string{"p2", "p4"}) {
+		t.Errorf("items %+v, partial %v, attributed %v", a.Items, a.Partial, names(a.Families))
+	}
+	// Pending and otherwise refused together: the pending one is listed.
+	f = &fake{parks: []parking.Site{{ID: "b", Family: "p2"}}}
+	if a, err := service(f, nil).Parking(context.Background(), key("commercial", allScopes, "p2"), parking.Query{}); err != nil || !a.Partial || !slices.Equal(f.gotListed, []string{"p2"}) {
+		t.Errorf("a pending family beside a refused one: %+v, %v", a, err)
+	}
+}
+
 func TestParkingRefusals(t *testing.T) {
 	req.Covers(t, "SEC-030", "SEC-033")
 	k := key("commercial", allScopes, everything...)
@@ -201,7 +255,7 @@ func TestParkingRefusals(t *testing.T) {
 		want error
 	}{
 		{"register", &fake{regErr: errStore}, k, errStore},
-		{"nothing permitted", &fake{}, key("commercial", allScopes, "p2"), access.ErrNonePermitted},
+		{"nothing permitted", &fake{}, key("commercial", allScopes, "e1"), access.ErrNonePermitted},
 		{"store", &fake{pkErr: errStore}, k, errStore},
 		{"a site of an unlisted family", &fake{parks: []parking.Site{{Family: "e1"}}}, k, features.ErrGateViolation},
 		{"occupancy of a pending family", &fake{parks: []parking.Site{{Family: "p1", Occupancy: free(1, "p2")}}}, k, features.ErrGateViolation},
@@ -244,6 +298,17 @@ func TestOverviewComposesTheParts(t *testing.T) {
 	o, err = service(f, nil).Overview(context.Background(), accepted, features.OverviewQuery{Needs: []features.Part{features.PartParking}})
 	if err != nil || !slices.Equal(statuses(o), []features.Status{features.StatusNotRequested, features.StatusOK}) || o.Charging != nil || o.Partial {
 		t.Errorf("needs parking: %v, %v, partial %v", statuses(o), err, o.Partial)
+	}
+}
+
+func TestOverviewReadsTheRegisterOnce(t *testing.T) {
+	req.Covers(t, "FR-BRIEF-002", "FR-BRIEF-008")
+	f := &fake{place: berlin, sites: []energy.Site{site("e1")}, parks: []parking.Site{{Family: "p1"}}}
+	if _, err := service(f, nil).Overview(context.Background(), key("commercial", allScopes, everything...), features.OverviewQuery{}); err != nil {
+		t.Fatal(err)
+	}
+	if f.regCalls != 1 {
+		t.Errorf("the register was read %d times for one overview", f.regCalls)
 	}
 }
 

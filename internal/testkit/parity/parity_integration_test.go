@@ -176,6 +176,9 @@ func TestParity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if b.Producer == parity.ProducerAPI {
+		t.Logf("bundle %s was recorded by the API itself: it is a regression lock, not parity evidence; parity needs a bundle the MCP side produced", platform())
+	}
 	if got := seed(t, b.Fixture); got != b.Fixture.SHA256 {
 		t.Fatalf("the fixture rows are %s, the bundle was recorded on %s: re-record the bundle", got, b.Fixture.SHA256)
 	}
@@ -224,12 +227,12 @@ func TestInventory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	missing, err := parity.Inventory(doc, b)
+	findings, err := parity.Inventory(doc, b)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(missing) > 0 {
-		t.Errorf("operations with an MCP counterpart and no parity case: %v", missing)
+	if len(findings) > 0 {
+		t.Errorf("the bundle does not cover the document:\n  %s", strings.Join(findings, "\n  "))
 	}
 }
 
@@ -260,7 +263,7 @@ var questions = []parity.Case{
 
 func recordBundle(t *testing.T) {
 	t.Helper()
-	b := parity.Bundle{Format: parity.Format, Platform: platform(), Rules: parity.Default.ID, Fixture: parity.Fixture{Profile: "tiny", Seed: 1}}
+	b := parity.Bundle{Format: parity.Format, Platform: platform(), Producer: parity.ProducerAPI, Rules: parity.Default.ID, Fixture: parity.Fixture{Profile: "tiny", Seed: 1}}
 	b.Fixture.SHA256 = seed(t, b.Fixture)
 	a := open(t)
 	for _, q := range questions {

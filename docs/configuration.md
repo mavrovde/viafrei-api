@@ -4,7 +4,7 @@
 
 Every tunable of the service is one key below. Sources are layered: the built-in default, then an optional YAML file (path in `VFAPI_CONFIG_FILE`), then environment variables. The service refuses to start on an unknown key, an unknown variable with the prefix, a value out of bounds or a broken cross-field rule, and lists every violation. Secrets are read only from the environment or from a file named by the `_FILE` variant (one of the two, never both), never from the YAML file, and are never printed. Exit status on a configuration error: 78.
 
-Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadline.request`; `health.ready_timeout` ≤ `deadline.request`; `db.statement_timeout_floor` < `deadline.request` − `deadline.reserve`; the sum of `tiers.*.reserved`, `tiers.bulk.max_inflight` and `tiers.per_key_inflight` are each ≤ `db.pool_max`; every `tiers.*.queue_max_wait` < `deadline.request`.
+Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadline.request`; `health.ready_timeout` ≤ `deadline.request`; `db.statement_timeout_floor` < `deadline.request` − `deadline.reserve`; `compose.part_deadline` × the number of overview parts ≤ `deadline.request` − `deadline.reserve`; the sum of `tiers.*.reserved`, `tiers.bulk.max_inflight` and `tiers.per_key_inflight` are each ≤ `db.pool_max`; every `tiers.*.queue_max_wait` < `deadline.request`.
 
 | Key | Environment | Type | Default | Bounds | Description |
 |---|---|---|---|---|---|
@@ -58,7 +58,7 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `sources.disabled` | `VFAPI_SOURCES_DISABLED` | list | empty | — | Source families the licence gate always denies, whatever the plan (SEC-030). Comma-separated in the environment. |
 | `geo.default_radius_m` | `VFAPI_GEO_DEFAULT_RADIUS_M` | int | `2000` | 1 to 50000 | Search radius in metres when a near search names none. At most the radius_m maximum of the interface, 50000. |
 | `pagination.default_limit` | `VFAPI_PAGINATION_DEFAULT_LIMIT` | int | `20` | 1 to 100 | Items a list answer returns when the request names no limit (ENV-021). At most the limit maximum of the interface, 100. |
-| `compose.part_deadline` | `VFAPI_COMPOSE_PART_DEADLINE` | duration | `800ms` | 100ms to 2s | Sub-deadline of each part of a composed answer (FR-BRIEF-003); a part that does not finish in it is reported timeout. |
+| `compose.part_deadline` | `VFAPI_COMPOSE_PART_DEADLINE` | duration | `800ms` | 100ms to 2s | Sub-deadline of each part of a composed answer (FR-BRIEF-003); a part that does not finish in it is reported timeout. The parts run one after the other, so this times the number of parts must not exceed deadline.request minus deadline.reserve. |
 | `compose.per_part_limit` | `VFAPI_COMPOSE_PER_PART_LIMIT` | int | `5` | 1 to 20 | Items per part of a composed answer when the request names no per_part_limit. |
 | `ratelimit.anon_rps` | `VFAPI_RATELIMIT_ANON_RPS` | int | `1` | 0 to 100 | Requests per second one client address may make without presenting a key (service endpoints and keyless requests), as a token bucket (RATE-001, SEC-051). 0 switches the per-address limit off. |
 | `ratelimit.anon_burst` | `VFAPI_RATELIMIT_ANON_BURST` | int | `5` | 1 to 1000 | Burst of the per-address token bucket: requests a client address may make at once before ratelimit.anon_rps applies. |

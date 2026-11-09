@@ -76,7 +76,7 @@ func TestSummarise(t *testing.T) {
 		}, energy.Summary{ChargePoints: 4, AvailableNow: intp(2), MaxPowerKw: kw(300)}},
 	}
 	for _, c := range cases {
-		got := energy.Site{Points: c.points}.Summarise(now, stale)
+		got := energy.Site{Points: c.points}.Summarise(now, func(string) time.Duration { return stale })
 		if !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%s: %+v, want %+v", c.name, show(got), show(c.want))
 		}
@@ -118,7 +118,24 @@ func TestAccessFilterCodes(t *testing.T) {
 func TestSummariseKeepsTheFirstOfEqualPowers(t *testing.T) {
 	req.Covers(t, "ENV-041")
 	s := energy.Site{Points: []energy.ChargePoint{point("", 0, kw(50)), point("", 0, kw(50))}}
-	if got := s.Summarise(now, time.Minute).MaxPowerKw; got != s.Points[0].MaxPowerKw {
+	if got := s.Summarise(now, func(string) time.Duration { return time.Minute }).MaxPowerKw; got != s.Points[0].MaxPowerKw {
 		t.Error("the highest power is not the first point's of equal powers")
+	}
+}
+
+func TestSummariseJudgesEachReportByItsOwnFamily(t *testing.T) {
+	req.Covers(t, "ENV-041", "FR-ENERGY-004")
+	// Two reports of the same age: one family's threshold keeps it live, the
+	// other's makes it stale. The site's own family has no say.
+	quick, slow := point(energy.StateAvailable, 20*time.Minute, nil), point(energy.StateAvailable, 20*time.Minute, nil)
+	quick.Availability.Family, slow.Availability.Family = "fast", "slow"
+	thresholds := map[string]time.Duration{"site": time.Hour, "fast": 5 * time.Minute, "slow": 30 * time.Minute}
+	var asked []string
+	got := energy.Site{Family: "site", Points: []energy.ChargePoint{quick, slow}}.Summarise(now, func(f string) time.Duration {
+		asked = append(asked, f)
+		return thresholds[f]
+	})
+	if got.AvailableNow == nil || *got.AvailableNow != 1 || !reflect.DeepEqual(asked, []string{"fast", "slow"}) {
+		t.Errorf("available %v, thresholds asked for %v", show(got)[1], asked)
 	}
 }

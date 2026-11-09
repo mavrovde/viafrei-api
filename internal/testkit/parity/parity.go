@@ -21,18 +21,31 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mavrovde/viafrei-api/internal/invariant"
 )
 
 // Format names the bundle layout this package reads.
-const Format = "viafrei.parity/1"
+const Format = "viafrei.parity/2"
+
+// The producers a bundle can name.
+const (
+	ProducerAPI = "api"
+	ProducerMCP = "mcp"
+)
 
 // LockFile is the name of the lock file in a parity directory.
 const LockFile = "lock.tsv"
 
 // Bundle is one platform version's parity questions and facts.
 type Bundle struct {
-	Format   string  `json:"format"`
-	Platform string  `json:"platform"`
+	Format   string `json:"format"`
+	Platform string `json:"platform"`
+	// Producer names the side that recorded the facts: ProducerMCP for
+	// facts the MCP capability gave, ProducerAPI for facts this API recorded
+	// itself. An api bundle is a regression lock, not parity evidence: the
+	// API agrees with it by construction.
+	Producer string  `json:"producer"`
 	Rules    string  `json:"rules"`
 	Fixture  Fixture `json:"fixture"`
 	Cases    []Case  `json:"cases"`
@@ -96,7 +109,7 @@ type Rules struct {
 
 // Default is the projection rule set of this format.
 var Default = Rules{
-	ID:               "viafrei.parity.rules/1",
+	ID:               "viafrei.parity.rules/2",
 	PositionDecimals: 5,
 	Positions:        []string{"lat", "lon"},
 	Keys:             []string{"id", "family", "code"},
@@ -172,6 +185,8 @@ func Parse(raw []byte, platform string) (Bundle, error) {
 		return Bundle{}, fmt.Errorf("%w: platform %q, pinned for %q", ErrMalformed, b.Platform, platform)
 	case b.Rules != Default.ID:
 		return Bundle{}, fmt.Errorf("%w: rules %q, want %q", ErrMalformed, b.Rules, Default.ID)
+	case b.Producer != ProducerAPI && b.Producer != ProducerMCP:
+		return Bundle{}, fmt.Errorf("%w: producer %q, want %q or %q", ErrMalformed, b.Producer, ProducerAPI, ProducerMCP)
 	case len(b.Cases) == 0:
 		return Bundle{}, ErrEmpty
 	}
@@ -181,12 +196,17 @@ func Parse(raw []byte, platform string) (Bundle, error) {
 			return Bundle{}, fmt.Errorf("%w: case %q needs a unique id, an operation, a request and facts", ErrMalformed, c.ID)
 		}
 		seen[c.ID] = true
+		if n, ok := repeated(c.Facts); ok {
+			return Bundle{}, fmt.Errorf("%w: case %q names the fact %q more than once", ErrMalformed, c.ID, n)
+		}
 	}
 	return b, nil
 }
 
-// Inventory names every operation of an OpenAPI document that declares an
-// MCP counterpart and has no case in b.
+// Inventory states every operation of an OpenAPI document that declares an
+// MCP counterpart and has no case in b, and every case whose counterpart is
+// not the one its operation declares; none means the bundle covers the
+// document.
 func Inventory(doc []byte, b Bundle) ([]string, error) {
 	var d struct {
 		Paths map[string]map[string]struct {
@@ -197,23 +217,38 @@ func Inventory(doc []byte, b Bundle) ([]string, error) {
 	if err := json.Unmarshal(doc, &d); err != nil {
 		return nil, err
 	}
-	asked := map[string]bool{}
-	for _, c := range b.Cases {
-		asked[c.Operation] = true
-	}
-	var missing []string
+	declared := map[string]string{}
 	for _, ops := range d.Paths {
 		for _, op := range ops {
-			if op.Counterpart != "" && !asked[op.OperationID] {
-				missing = append(missing, op.OperationID)
+			if op.Counterpart != "" {
+				declared[op.OperationID] = op.Counterpart
 			}
 		}
 	}
-	sort.Strings(missing)
-	return missing, nil
+	asked := map[string]bool{}
+	var out []string
+	for _, c := range b.Cases {
+		asked[c.Operation] = true
+		if want, ok := declared[c.Operation]; ok && c.Counterpart != want {
+			out = append(out, fmt.Sprintf("case %s: counterpart %q, %s declares %q", c.ID, c.Counterpart, c.Operation, want))
+		}
+	}
+	for op := range declared {
+		if !asked[op] {
+			out = append(out, op+": no case")
+		}
+	}
+	sort.Strings(out)
+	return out, nil
 }
 
-// Project turns a response body into its facts under r, sorted by name.
+// ErrDuplicateFact means two values of an answer project onto one fact name,
+// so one of them could not be compared.
+var ErrDuplicateFact = errors.New("parity: two values project onto one fact name")
+
+// Project turns a response body into its facts under r, sorted by name. Two
+// values under one name are an error: a comparison keeping either would hide
+// a difference in the other.
 func Project(body []byte, r Rules) ([]Fact, error) {
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.UseNumber()
@@ -230,7 +265,22 @@ func Project(body []byte, r Rules) ([]Fact, error) {
 		}
 	}
 	sort.Slice(p.out, func(i, j int) bool { return p.out[i].Name < p.out[j].Name })
+	if n, ok := repeated(p.out); ok {
+		return nil, fmt.Errorf("%w: %q", ErrDuplicateFact, n)
+	}
 	return p.out, nil
+}
+
+// repeated returns a fact name that occurs more than once in fs.
+func repeated(fs []Fact) (string, bool) {
+	seen := make(map[string]bool, len(fs))
+	for _, f := range fs {
+		if seen[f.Name] {
+			return f.Name, true
+		}
+		seen[f.Name] = true
+	}
+	return "", false
 }
 
 type projector struct {
@@ -268,9 +318,11 @@ func (p *projector) array(path, member string, xs []any) {
 		return
 	}
 	if strs, ok := stringList(xs); ok {
-		// A list of values is a set: families, codes, notes.
+		// A list of values is a set: families, codes, notes. It is stated
+		// as a sorted JSON array, so no value can be mistaken for a
+		// separator.
 		slices.Sort(strs)
-		p.add(path, strings.Join(strs, " | "))
+		p.add(path, string(invariant.Must(json.Marshal(strs)))) // a list of strings always encodes
 		return
 	}
 	for i, e := range xs {

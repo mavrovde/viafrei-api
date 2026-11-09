@@ -1,7 +1,8 @@
 {
-  "format": "viafrei.parity/1",
+  "format": "viafrei.parity/2",
   "platform": "unsynced",
-  "rules": "viafrei.parity.rules/1",
+  "producer": "api",
+  "rules": "viafrei.parity.rules/2",
   "fixture": {
     "profile": "tiny",
     "seed": 1,
@@ -691,7 +692,7 @@
         },
         {
           "name": "meta.notes.condition",
-          "value": "Use only after accepting the terms (synthetic)."
+          "value": "[\"Use only after accepting the terms (synthetic).\"]"
         },
         {
           "name": "meta.notes.purpose",
@@ -853,7 +854,7 @@
         },
         {
           "name": "meta.notes.condition",
-          "value": "Use only after accepting the terms (synthetic)."
+          "value": "[\"Use only after accepting the terms (synthetic).\"]"
         },
         {
           "name": "meta.notes.purpose",

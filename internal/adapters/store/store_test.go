@@ -104,6 +104,7 @@ func TestBudgetUsesConfiguredDeadlineAndReserve(t *testing.T) {
 		"VFAPI_DEADLINE_REQUEST=1s",
 		"VFAPI_DEADLINE_RESERVE=200ms",
 		"VFAPI_DB_STATEMENT_TIMEOUT_FLOOR=300ms",
+		"VFAPI_COMPOSE_PART_DEADLINE=400ms",
 	}})
 	if err != nil {
 		t.Fatal(err)

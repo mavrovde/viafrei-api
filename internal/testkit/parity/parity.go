@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io/fs"
 	"math"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -45,10 +46,15 @@ type Bundle struct {
 	// facts the MCP capability gave, ProducerAPI for facts this API recorded
 	// itself. An api bundle is a regression lock, not parity evidence: the
 	// API agrees with it by construction.
-	Producer string  `json:"producer"`
-	Rules    string  `json:"rules"`
-	Fixture  Fixture `json:"fixture"`
-	Cases    []Case  `json:"cases"`
+	Producer string `json:"producer"`
+	// Commit is the platform commit the MCP side answered from (40 hex
+	// digits). It is required of an mcp bundle, because a platform version
+	// alone does not name the code that answered, and absent from an api
+	// bundle, which no platform code answered.
+	Commit  string  `json:"commit,omitempty"`
+	Rules   string  `json:"rules"`
+	Fixture Fixture `json:"fixture"`
+	Cases   []Case  `json:"cases"`
 }
 
 // Fixture names the generated seed rows the facts were taken on.
@@ -187,6 +193,10 @@ func Parse(raw []byte, platform string) (Bundle, error) {
 		return Bundle{}, fmt.Errorf("%w: rules %q, want %q", ErrMalformed, b.Rules, Default.ID)
 	case b.Producer != ProducerAPI && b.Producer != ProducerMCP:
 		return Bundle{}, fmt.Errorf("%w: producer %q, want %q or %q", ErrMalformed, b.Producer, ProducerAPI, ProducerMCP)
+	case b.Producer == ProducerMCP && !commitPattern.MatchString(b.Commit):
+		return Bundle{}, fmt.Errorf("%w: an mcp bundle names the platform commit it answered from, 40 hex digits; got %q", ErrMalformed, b.Commit)
+	case b.Producer == ProducerAPI && b.Commit != "":
+		return Bundle{}, fmt.Errorf("%w: an api bundle was answered by no platform commit, got %q", ErrMalformed, b.Commit)
 	case len(b.Cases) == 0:
 		return Bundle{}, ErrEmpty
 	}
@@ -201,6 +211,98 @@ func Parse(raw []byte, platform string) (Bundle, error) {
 		}
 	}
 	return b, nil
+}
+
+var commitPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
+
+// Question is a case without its answer: what both sides are asked.
+type Question struct {
+	ID          string    `json:"id"`
+	Operation   string    `json:"operation"`
+	Counterpart string    `json:"counterpart"`
+	Request     string    `json:"request"`
+	Key         Key       `json:"key"`
+	Now         time.Time `json:"now"`
+}
+
+// Questions are the parity questions and the fixture rows they are asked on.
+// Both producers read them from one file (test/parity/questions.json): the
+// API's recorder and the MCP side's producer.
+type Questions struct {
+	Fixture Fixture    `json:"fixture"`
+	Cases   []Question `json:"cases"`
+}
+
+// QuestionsFile is the name of the questions file in a parity directory.
+const QuestionsFile = "questions.json"
+
+// LoadQuestions reads the questions file of fsys; it fails closed on an
+// empty or malformed file.
+func LoadQuestions(fsys fs.FS) (Questions, error) {
+	raw, err := fs.ReadFile(fsys, QuestionsFile)
+	if err != nil {
+		return Questions{}, err
+	}
+	var q Questions
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&q); err != nil {
+		return Questions{}, fmt.Errorf("%w: %s: %w", ErrMalformed, QuestionsFile, err)
+	}
+	if len(q.Cases) == 0 {
+		return Questions{}, fmt.Errorf("%w: %s", ErrEmpty, QuestionsFile)
+	}
+	seen := map[string]bool{}
+	for _, c := range q.Cases {
+		if c.ID == "" || seen[c.ID] || c.Operation == "" || c.Request == "" || c.Now.IsZero() {
+			return Questions{}, fmt.Errorf("%w: %s: question %q needs a unique id, an operation, a request and a now", ErrMalformed, QuestionsFile, c.ID)
+		}
+		seen[c.ID] = true
+	}
+	return q, nil
+}
+
+// QuestionOf is the question a case answers.
+func QuestionOf(c Case) Question {
+	return Question{ID: c.ID, Operation: c.Operation, Counterpart: c.Counterpart, Request: c.Request, Key: c.Key, Now: c.Now}
+}
+
+// Answers states every way in which b does not answer exactly q: a question
+// it leaves out, one it adds, one it asks differently, or other fixture rows.
+// None means the bundle answers the questions.
+func Answers(b Bundle, q Questions) []string {
+	var out []string
+	if fx := b.Fixture; fx != q.Fixture {
+		out = append(out, fmt.Sprintf("fixture: the bundle was answered on %+v, the questions are asked on %+v", fx, q.Fixture))
+	}
+	asked := map[string]Question{}
+	for _, c := range q.Cases {
+		asked[c.ID] = c
+	}
+	answered := map[string]bool{}
+	for _, c := range b.Cases {
+		answered[c.ID] = true
+		want, ok := asked[c.ID]
+		switch {
+		case !ok:
+			out = append(out, "case "+c.ID+": not a question")
+		case !sameQuestion(QuestionOf(c), want):
+			out = append(out, "case "+c.ID+": asked differently from the question")
+		}
+	}
+	for _, c := range q.Cases {
+		if !answered[c.ID] {
+			out = append(out, "question "+c.ID+": no case answers it")
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func sameQuestion(a, b Question) bool {
+	ja := invariant.Must(json.Marshal(a)) // a question always encodes
+	jb := invariant.Must(json.Marshal(b))
+	return bytes.Equal(ja, jb)
 }
 
 // Inventory states every operation of an OpenAPI document that declares an

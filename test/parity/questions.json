@@ -1,0 +1,90 @@
+{
+  "fixture": {
+    "profile": "tiny",
+    "seed": 1,
+    "sha256": "3ceda198a6c900e357bc3c8b4e8230a5c55e475ad5616361bd9559f66a1612cc"
+  },
+  "cases": [
+    {
+      "id": "charging-public-commercial",
+      "operation": "listChargingOptions",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options?at=50.82,6.0&radius_m=20000",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "src-alpha-energy",
+          "src-beta-energy",
+          "src-gamma-energy"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "charging-all-consumer-fast",
+      "operation": "listChargingOptions",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options?at=48.41,7.68&radius_m=25000&access=all&min_kw=50&limit=3",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "src-alpha-energy",
+          "src-beta-energy",
+          "src-gamma-energy"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "parking-terms-pending",
+      "operation": "listParkingOptions",
+      "counterpart": "parking search",
+      "request": "/v1/parking-options?at=50.39,10.23&radius_m=25000",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "parking"
+        ],
+        "sources": [
+          "src-alpha-parking",
+          "src-beta-parking",
+          "src-delta-parking"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "parking-terms-accepted",
+      "operation": "listParkingOptions",
+      "counterpart": "parking search",
+      "request": "/v1/parking-options?at=50.39,10.23&radius_m=25000",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "parking"
+        ],
+        "sources": [
+          "src-alpha-parking",
+          "src-beta-parking",
+          "src-delta-parking"
+        ],
+        "accepted": [
+          {
+            "source": "src-delta-parking",
+            "version": "2026-03-01"
+          }
+        ]
+      },
+      "now": "2026-03-30T00:00:00Z"
+    }
+  ]
+}

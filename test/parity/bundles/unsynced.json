@@ -242,7 +242,7 @@
       "id": "charging-all-consumer-fast",
       "operation": "listChargingOptions",
       "counterpart": "charging station search",
-      "request": "/v1/charging-options?at=48.41,7.68\u0026radius_m=30000\u0026access=all\u0026min_kw=50\u0026limit=3",
+      "request": "/v1/charging-options?at=48.41,7.68\u0026radius_m=25000\u0026access=all\u0026min_kw=50\u0026limit=3",
       "key": {
         "useClass": "consumer",
         "scopes": [
@@ -575,7 +575,7 @@
       "id": "parking-terms-pending",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=50000",
+      "request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=25000",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -720,7 +720,7 @@
       "id": "parking-terms-accepted",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=50000",
+      "request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=25000",
       "key": {
         "useClass": "commercial",
         "scopes": [

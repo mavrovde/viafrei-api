@@ -8,13 +8,15 @@ fixture rows, offline: no live MCP server, no network.
 
 | Piece | Where |
 |---|---|
+| Questions: what both sides are asked, and the fixture rows they are asked on | `test/parity/questions.json` |
 | Bundle: the questions and the facts the capability answered | `test/parity/bundles/<platform>.json` |
 | Lock file: one bundle per platform version, with its SHA-256 | `test/parity/lock.tsv` |
 | Projection rules, loader, inventory and comparator | `internal/testkit/parity` |
 | Harness: seeds a throwaway PostGIS, asks the real handler, compares | `internal/testkit/parity/parity_integration_test.go` |
 
 A bundle (`format: viafrei.parity/2`) names the side that produced its facts
-(`producer`: `mcp` or `api`), the fixture rows it was taken on (`profile`,
+(`producer`: `mcp` or `api`), for an `mcp` bundle the platform commit it
+answered from (`commit`, 40 hex digits; an `api` bundle names none), the fixture rows it was taken on (`profile`,
 `seed` and the SHA-256 of the generated SQL), the rule set it was projected
 with (`viafrei.parity.rules/2`) and its cases. A case is one
 question: the operation, its MCP counterpart, the request, the key it is
@@ -59,6 +61,9 @@ rule set `viafrei.parity.rules/2` (`parity.Default`):
 - An empty bundle, an unknown member, another format, platform or rule set,
   a producer other than `mcp` or `api`, or a case naming a fact twice.
 - Fixture rows that are not the ones the bundle names.
+- A bundle that does not answer `test/parity/questions.json` exactly: a
+  question left out, a case that is not a question, a case asked differently
+  (request, key or `now`), or other fixture rows.
 - An operation that declares `x-mcp-counterpart` in `api/openapi.json` and has
   no case, or a case whose `counterpart` is not the one its operation declares
   (`TestInventory`).
@@ -69,23 +74,55 @@ and requires it to fail on the position facts alone, so it can say no.
 ## Running it
 
 ```sh
-go test -tags integration -run 'TestParity|TestInventory' -v ./internal/testkit/parity/
+go test -tags integration -run 'TestParity|TestRegressionLock|TestInventory' -v ./internal/testkit/parity/
 ```
 
-With `-v` it prints the operations and cases it compared.
+With `-v` it prints the operations and cases it compared, and which side
+produced the bundle it compared.
 
-## Recording a bundle
+## Two bundles, two jobs
 
-Until the MCP side publishes a bundle for a platform version, the bundle is
-recorded here from the questions in the harness and reviewed fact by fact in
-the pull request. Such a bundle says `"producer": "api"`: the API agrees with
-it by construction, so it locks the API's answers against regressions and is
-not evidence of parity with the MCP side. `TestParity` says so in its log
-whenever it compares one.
+- **Parity evidence** is the bundle pinned for the platform version in
+  `internal/buildinfo/platform-version.txt`, produced by the MCP side
+  (`"producer": "mcp"`). `TestParity` compares it.
+- **The regression lock** is `bundles/unsynced.json`, the API's own recording
+  (`"producer": "api"`). `TestRegressionLock` compares it on every run. The
+  API agrees with it by construction, so it is no evidence of parity.
+
+## Producing the MCP bundle
+
+The platform repository carries the producer,
+`packages/mcp/scripts/parity-bundle.ts`. It reads `questions.json` and the
+fixture SQL this repository generates, loads them into a throwaway platform
+database (`scripts/test-db.sh up <name>`) in one transaction it rolls back,
+asks the real MCP tool handlers each question in-process, and projects each
+answer to the facts above. The projection translates format only (units,
+the field names, the platform's storage names back to the fixture's
+families); a value the tool states differently stays different, and a
+parameter the tool has no argument for is named on stderr. It refuses fixture
+SQL whose checksum is not the questions', and a platform tree with
+uncommitted changes, because the bundle names the commit it answered from.
 
 ```sh
-go test -tags integration -run TestParity ./internal/testkit/parity/ -parity.record
+# here: the fixture SQL the questions name (testdata/fixtures/tiny/seed.sql)
+make fixtures PROFILE=tiny SEED=1
+# in the platform checkout, against a test_* database
+TEST_DATABASE_URL=... npx tsx packages/mcp/scripts/parity-bundle.ts \
+  --questions <api>/test/parity/questions.json \
+  --contract <api>/db/contract/0001_contract.sql \
+  --seed <api>/testdata/fixtures/tiny/seed.sql \
+  --platform X.Y.Z --out <api>/test/parity/bundles/X.Y.Z.json
 ```
 
-It rewrites `test/parity/bundles/<platform>.json` and the lock file. A new
-question is a new entry in `questions` in the harness.
+It prints the lock line on stdout; add it to `test/parity/lock.tsv`.
+
+## Recording the regression lock
+
+```sh
+go test -tags integration -run TestRegressionLock ./internal/testkit/parity/ -parity.record
+```
+
+It rewrites `test/parity/bundles/unsynced.json` and its lock line, never a
+platform version's bundle. A new question is a new entry in
+`test/parity/questions.json`; record the lock and produce the MCP bundle
+again.

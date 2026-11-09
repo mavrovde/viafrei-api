@@ -47,6 +47,7 @@ type fake struct {
 	chDelay                              bool
 	reg                                  []access.Terms // replaces register when set
 	regCalls                             int
+	notes                                map[string][]provenance.Note
 }
 
 func (f *fake) Register(context.Context) ([]access.Terms, error) {
@@ -66,7 +67,7 @@ func (f *fake) Provenance(_ context.Context, fams []string, lang string) ([]prov
 	}
 	out := make([]provenance.Family, len(fams))
 	for i, s := range fams {
-		out[i] = provenance.Family{Source: access.Source{Family: s}}
+		out[i] = provenance.Family{Source: access.Source{Family: s}, Notes: f.notes[s]}
 	}
 	return out, nil
 }
@@ -196,6 +197,45 @@ func TestParkingListsPendingFamiliesWithoutOccupancy(t *testing.T) {
 	f = &fake{}
 	if a, err := service(f, nil).Parking(context.Background(), key("commercial", allScopes, "p1"), parking.Query{}); err != nil || !slices.Equal(names(a.Families), []string{"p1"}) {
 		t.Errorf("an empty answer names the listed families: %v, %v", names(a.Families), err)
+	}
+}
+
+func TestParkingStatesAPendingFamilysConditionOnlyOnceAccepted(t *testing.T) {
+	req.Covers(t, "FR-PARK-003", "SEC-030")
+	cond := provenance.Note{Kind: provenance.Condition, Text: "p2 condition"}
+	purpose := provenance.Note{Kind: provenance.Purpose, Text: "p2 purpose"}
+	other := provenance.Note{Kind: provenance.Condition, Text: "p1 condition"}
+	notes := map[string][]provenance.Note{"p1": {other}, "p2": {cond, purpose}}
+	parks := []parking.Site{{ID: "a", Family: "p1", Occupancy: free(3, "p1")}, {ID: "b", Family: "p2", Occupancy: free(5, "p2")}}
+	ask := func(k access.Record) features.Answer[parking.Site] {
+		t.Helper()
+		a, err := service(&fake{parks: parks, notes: notes}, nil).Parking(context.Background(), k, parking.Query{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return a
+	}
+	// Pending: p2 is listed and credited, its occupancy and its condition are
+	// withheld; its purpose and another family's condition are kept.
+	a := ask(key("commercial", allScopes, everything...))
+	if got := provenance.Notes(a.Families, provenance.Condition); !slices.Equal(got, []string{"p1 condition"}) {
+		t.Errorf("pending: conditions %v", got)
+	}
+	if got := provenance.Notes(a.Families, provenance.Purpose); !slices.Equal(got, []string{"p2 purpose"}) {
+		t.Errorf("pending: purposes %v", got)
+	}
+	if !slices.Equal(names(a.Families), []string{"p1", "p2"}) {
+		t.Errorf("pending: credited %v", names(a.Families))
+	}
+	// Accepted: the reading is shown and its condition with it.
+	k := key("commercial", allScopes, everything...)
+	k.Accepted = []access.Acceptance{{Source: "p2", Version: "v1"}}
+	a = ask(k)
+	if got := provenance.Notes(a.Families, provenance.Condition); !slices.Equal(got, []string{"p1 condition", "p2 condition"}) {
+		t.Errorf("accepted: conditions %v", got)
+	}
+	if notes["p2"][0] != cond || len(notes["p2"]) != 2 {
+		t.Errorf("the register's notes were changed: %v", notes["p2"])
 	}
 }
 

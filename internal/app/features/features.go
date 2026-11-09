@@ -213,5 +213,13 @@ func (s *Service) parking(ctx context.Context, reg []access.Terms, gate access.G
 	if err != nil {
 		return Answer[parking.Site]{}, err
 	}
+	// A condition note is stated only for a family whose data the answer
+	// shows under it: a pending family's occupancy is withheld, so its
+	// conditions are too, as the MCP capability does (docs/parity.md).
+	for i, f := range fams {
+		if slices.Contains(pending, f.Source.Family) {
+			fams[i] = f.Without(provenance.Condition)
+		}
+	}
 	return Answer[parking.Site]{Items: sites, HasMore: more, Families: fams, Partial: partial, At: now}, nil
 }

@@ -122,7 +122,18 @@ type Rules struct {
 	// difference, and a named difference no case shows any more fails, so a
 	// change of either side is seen.
 	Differences []Difference
+	// OwnedNotes are the note kinds of meta.notes whose text is not
+	// compared: each is stated per family that owns a note of it, as
+	// meta.notes.<kind>[<family>] = how many distinct notes it owns, and as
+	// meta.notes.<kind> = [] when the answer states none (docs/parity.md).
+	// The count and the family are compared; the text is not.
+	OwnedNotes []string
 }
+
+// Owners maps a note's text to the families whose notes carry it. The API's
+// answer states its notes as texts only; the harness reads who owns each
+// from the fixture rows.
+type Owners map[string][]string
 
 // Exclusion is one fact, or family of facts, left out of the comparison.
 // Pattern is a fact name in which [*] stands for any element key; it covers
@@ -187,7 +198,7 @@ func exclusionPattern(p string) *regexp.Regexp {
 
 // Default is the projection rule set of this format.
 var Default = Rules{
-	ID:               "viafrei.parity.rules/3",
+	ID:               "viafrei.parity.rules/4",
 	PositionDecimals: 5,
 	Positions:        []string{"lat", "lon"},
 	Keys:             []string{"id", "family", "code"},
@@ -212,6 +223,10 @@ var Default = Rules{
 	Differences: []Difference{
 		{"data[*].chargePoints[*].availability.state", "occupied", "reserved", "the MCP capability answers a reservation as occupied; the API keeps the reported state reserved, which says more"},
 	},
+	// The fixture's condition notes are synthetic register texts and the
+	// platform states its own register's (attributionReason): which family
+	// a condition belongs to and how many it has are compared, the text is not.
+	OwnedNotes: []string{"condition"},
 }
 
 // attributionReason is why only the credited family of an attribution entry
@@ -225,6 +240,10 @@ var (
 	ErrEmpty     = errors.New("parity bundle has no cases")
 	ErrMalformed = errors.New("parity bundle is malformed")
 )
+
+// ErrUnownedNote means an answer states a note no family owns, so it could
+// not be stated by its family and would not be compared.
+var ErrUnownedNote = errors.New("parity: a note no family owns")
 
 // Load reads the bundle pinned for platform in the lock file of fsys, after
 // verifying its checksum.
@@ -308,12 +327,34 @@ func Parse(raw []byte, platform string) (Bundle, error) {
 			if Default.Excludes(c.Request, f.Name) {
 				return Bundle{}, fmt.Errorf("%w: case %q states %q, which %s excludes from the comparison", ErrMalformed, c.ID, f.Name, Default.ID)
 			}
+			if !Default.ownedNoteFact(f) {
+				return Bundle{}, fmt.Errorf("%w: case %q states %q as %q; %s states a note of that kind as [] or as a count per family, never its text", ErrMalformed, c.ID, f.Name, f.Value, Default.ID)
+			}
 		}
 	}
 	return b, nil
 }
 
 var commitPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
+
+var countPattern = regexp.MustCompile(`^[1-9][0-9]*$`)
+
+// ownedNoteFact reports whether f, if it names a note kind of r.OwnedNotes,
+// is stated the way r states that kind: [] for none, or a positive count
+// under one family. Any other fact is not one and is accepted.
+func (r Rules) ownedNoteFact(f Fact) bool {
+	for _, k := range r.OwnedNotes {
+		base := "meta.notes." + k
+		switch {
+		case f.Name == base:
+			return f.Value == "[]"
+		case strings.HasPrefix(f.Name, base+"["):
+			fam, ok := strings.CutSuffix(strings.TrimPrefix(f.Name, base+"["), "]")
+			return ok && fam != "" && fam == normalise(fam) && !strings.ContainsAny(fam, "[]") && countPattern.MatchString(f.Value)
+		}
+	}
+	return true
+}
 
 // Question is a case without its answer: what both sides are asked.
 type Question struct {
@@ -450,8 +491,10 @@ var ErrDuplicateFact = errors.New("parity: two values project onto one fact name
 
 // Project turns the response body of a case asking request into its facts
 // under r, sorted by name. Two values under one name are an error: a
-// comparison keeping either would hide a difference in the other.
-func Project(body []byte, r Rules, request string) ([]Fact, error) {
+// comparison keeping either would hide a difference in the other. A note of
+// a kind in r.OwnedNotes is stated by the families owners names for its text;
+// a note owners names no family for is an error (ErrUnownedNote).
+func Project(body []byte, r Rules, request string, owners Owners) ([]Fact, error) {
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.UseNumber()
 	var doc map[string]any
@@ -462,9 +505,17 @@ func Project(body []byte, r Rules, request string) ([]Fact, error) {
 	p.walk("data", "data", doc["data"])
 	meta, _ := doc["meta"].(map[string]any)
 	for _, m := range r.Meta {
-		if v, ok := meta[m]; ok {
-			p.walk("meta."+m, m, v)
+		v, ok := meta[m]
+		if !ok {
+			continue
 		}
+		if notes, isMap := v.(map[string]any); m == "notes" && isMap {
+			if err := p.notes(notes, owners); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		p.walk("meta."+m, m, v)
 	}
 	sort.Slice(p.out, func(i, j int) bool { return p.out[i].Name < p.out[j].Name })
 	if n, ok := repeated(p.out); ok {
@@ -497,6 +548,47 @@ type projector struct {
 }
 
 func (p *projector) add(name, value string) { p.out = append(p.out, Fact{name, value}) }
+
+// notes states meta.notes: an owned kind per family as a count, every other
+// member as walk states it.
+func (p *projector) notes(notes map[string]any, owners Owners) error {
+	if len(notes) == 0 {
+		p.add("meta.notes", "{}")
+	}
+	for k, v := range notes {
+		path := "meta.notes." + k
+		if !slices.Contains(p.r.OwnedNotes, k) {
+			p.walk(path, k, v)
+			continue
+		}
+		xs, isList := v.([]any)
+		texts, ok := stringList(xs)
+		if !isList || !ok {
+			return fmt.Errorf("%w: %s is not a list of texts", ErrMalformed, path)
+		}
+		count := map[string]map[string]bool{}
+		for _, text := range texts {
+			fams := owners[text]
+			if len(fams) == 0 {
+				return fmt.Errorf("%w: %s, %d character(s)", ErrUnownedNote, path, len(text))
+			}
+			for _, f := range fams {
+				f = normalise(f)
+				if count[f] == nil {
+					count[f] = map[string]bool{}
+				}
+				count[f][text] = true
+			}
+		}
+		if len(count) == 0 {
+			p.add(path, "[]")
+		}
+		for f, ts := range count {
+			p.add(path+"["+f+"]", strconv.Itoa(len(ts)))
+		}
+	}
+	return nil
+}
 
 func (p *projector) walk(path, member string, v any) {
 	switch x := v.(type) {

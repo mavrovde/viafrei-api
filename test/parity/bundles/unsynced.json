@@ -2,7 +2,7 @@
   "format": "viafrei.parity/2",
   "platform": "unsynced",
   "producer": "api",
-  "rules": "viafrei.parity.rules/3",
+  "rules": "viafrei.parity.rules/4",
   "fixture": {
     "profile": "tiny",
     "seed": 1,
@@ -886,7 +886,7 @@
         },
         {
           "name": "meta.notes.condition",
-          "value": "[\"Use only after accepting the terms (synthetic).\"]"
+          "value": "[]"
         },
         {
           "name": "meta.notes.purpose",
@@ -983,8 +983,8 @@
           "value": "src-delta-parking"
         },
         {
-          "name": "meta.notes.condition",
-          "value": "[\"Use only after accepting the terms (synthetic).\"]"
+          "name": "meta.notes.condition[src-delta-parking]",
+          "value": "1"
         },
         {
           "name": "meta.notes.purpose",

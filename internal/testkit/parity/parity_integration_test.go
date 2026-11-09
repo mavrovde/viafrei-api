@@ -103,8 +103,9 @@ func seed(t *testing.T, fx parity.Fixture) string {
 
 // asker answers a case through the real handler, store and use cases.
 type asker struct {
-	cfg *config.Config
-	st  *store.Store
+	cfg    *config.Config
+	st     *store.Store
+	owners parity.Owners
 }
 
 type keyAuth struct{ p auth.Principal }
@@ -164,7 +165,32 @@ func open(t *testing.T) asker {
 		t.Fatal(err)
 	}
 	t.Cleanup(st.Close)
-	return asker{cfg: cfg, st: st}
+	return asker{cfg: cfg, st: st, owners: noteOwners(t)}
+}
+
+// noteOwners reads which families' condition notes carry each text, from the
+// fixture rows: the API states its notes as texts, and rules/4 states a
+// condition note by its family. A kind the service does not know is a
+// condition (provenance.MapNoteKind), so every kind but purpose is read.
+func noteOwners(t *testing.T) parity.Owners {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), testBound)
+	defer cancel()
+	conn, err := db.Owner(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(ctx) }()
+	rows, _ := conn.Query(ctx, `select body, source_ref from contract.source_note where note_kind <> 'purpose' order by body, source_ref`)
+	pairs, err := pgx.CollectRows(rows, pgx.RowToStructByPos[struct{ Body, Family string }])
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := parity.Owners{}
+	for _, p := range pairs {
+		out[p.Body] = append(out[p.Body], p.Family)
+	}
+	return out
 }
 
 // compare asks every case of the bundle pinned under name and compares the
@@ -189,7 +215,7 @@ func compare(t *testing.T, name string) parity.Bundle {
 	compared := map[string][]string{}
 	var seen []parity.Difference
 	for _, c := range b.Cases {
-		got, err := parity.Project(a.ask(t, c), parity.Default, c.Request)
+		got, err := parity.Project(a.ask(t, c), parity.Default, c.Request, a.owners)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -233,11 +259,11 @@ func TestParity(t *testing.T) {
 	a := open(t)
 	planted := parity.Default
 	planted.PositionDecimals = 4
-	got, err := parity.Project(a.ask(t, b.Cases[0]), planted, b.Cases[0].Request)
+	got, err := parity.Project(a.ask(t, b.Cases[0]), planted, b.Cases[0].Request, a.owners)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, err := parity.Project(a.ask(t, b.Cases[0]), parity.Default, b.Cases[0].Request)
+	want, err := parity.Project(a.ask(t, b.Cases[0]), parity.Default, b.Cases[0].Request, a.owners)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,7 +328,7 @@ func recordBundle(t *testing.T) {
 	a := open(t)
 	for _, qq := range q.Cases {
 		c := parity.Case{ID: qq.ID, Operation: qq.Operation, Counterpart: qq.Counterpart, Request: qq.Request, Key: qq.Key, Now: qq.Now}
-		facts, err := parity.Project(a.ask(t, c), parity.Default, c.Request)
+		facts, err := parity.Project(a.ask(t, c), parity.Default, c.Request, a.owners)
 		if err != nil {
 			t.Fatal(err)
 		}

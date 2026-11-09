@@ -18,7 +18,7 @@ A bundle (`format: viafrei.parity/2`) names the side that produced its facts
 (`producer`: `mcp` or `api`), for an `mcp` bundle the platform commit it
 answered from (`commit`, 40 hex digits; an `api` bundle names none), the fixture rows it was taken on (`profile`,
 `seed` and the SHA-256 of the generated SQL), the rule set it was projected
-with (`viafrei.parity.rules/3`) and its cases. A case is one
+with (`viafrei.parity.rules/4`) and its cases. A case is one
 question: the operation, its MCP counterpart, the request, the key it is
 asked as (use class, scopes, source families, accepted terms), a fixed
 `now`, and the expected facts.
@@ -26,7 +26,7 @@ asked as (use class, scopes, source families, accepted terms), a fixed
 ## Projection rules
 
 Both sides state an answer as a sorted list of facts, `name = value`. The
-rule set `viafrei.parity.rules/3` (`parity.Default`):
+rule set `viafrei.parity.rules/4` (`parity.Default`):
 
 - **Facts** are the members of `data` and the members `asOf`, `attribution`,
   `freshness`, `notes`, `page` and `warnings` of `meta`. The rest of `meta`
@@ -44,7 +44,17 @@ rule set `viafrei.parity.rules/3` (`parity.Default`):
 - **Instants** are UTC, RFC 3339.
 - **Lists of values** (families, codes, notes) are sets: sorted and stated as
   a JSON array (`["a","b"]`), so no value can be read as a separator.
-  Condition and purpose notes are compared verbatim.
+  Purpose notes are compared verbatim.
+- **Condition notes** are stated by the family each belongs to:
+  `meta.notes.condition[<family>]` is how many distinct condition notes of
+  that family the answer carries, and `meta.notes.condition` is `[]` when it
+  carries none. The text is not compared (below); which families have a
+  condition and how many each has are. The API's answer states its notes as
+  texts, so the harness reads which family owns each text from the fixture
+  rows (`contract.source_note`; every kind but `purpose`, because the service
+  answers an unknown kind as a condition). A text no family owns is an error,
+  not a fact. A bundle stating a condition note's text, or a count that is
+  not a positive whole number, is refused.
 - **One value per name.** Two values that project onto one name (two array
   elements with the same key) are an error, not a fact: keeping either would
   hide a difference in the other. A case naming a fact twice is refused too.
@@ -75,6 +85,7 @@ rule set `viafrei.parity.rules/3` (`parity.Default`):
 | `meta.page.hasMore`, in a case that asks `min_kw` | The MCP capability states no count of the sites a power filter keeps, so under `min_kw` it cannot say whether there are more. Without `min_kw` it states the count of the circle, and the fact is compared. |
 | `meta.asOf` | Each side defines it differently: the API states the oldest `dataAsOf` of its families (ENV-004), the MCP capability the newest current point status, or its clock when none is current. Neither is a format of the other. |
 | `meta.attribution[*].` `domain`, `licence`, `licenceUrl`, `publisher`, `shareAlike`, `shareAlikeOffer`, `termsUrl`, `text` | The fixture's families carry synthetic register texts; the platform credits its own register rows for the sources the producer stores each family as, so the texts cannot be equal on these rows. Which families are credited (`meta.attribution[*].family`) is compared. |
+| The text of a condition note (`meta.notes.condition`) | The same reason, since rules/4: the fixture's condition notes are synthetic and the platform states its own register's condition. The family of each note and how many each family has are compared (`meta.notes.condition[<family>]`, above). |
 
 ### Named differences
 
@@ -139,29 +150,28 @@ which are therefore differences that remain:
 
 ## Known differences that remain
 
-Platform 2.5.24 bundle: 2 facts, `meta.notes.condition` in the two parking
-cases. Platform 2.5.24 reads the SID reading against the question's `now`
-(platform issue #1262). The 2.5.23 bundle differed in 9 facts because the
-MCP side read it against the database's clock. Seven of those 9 are now
-equal: `termsRequired` in both cases, and the four `occupancy` facts of
-`pk-07-0012` in the accepted case.
+None in the platform 2.5.24 bundle: `TestParity` passes.
 
-The two that remain have two different causes:
+The 2.5.23 bundle differed in 9 facts. All 9 are closed:
 
-- **parking-terms-pending.** The API states the condition note of the
-  gated family (`["Use only after accepting the terms (synthetic)."]`).
-  The MCP side states `[]`. The MCP capability attaches a condition note
-  only for a source whose data the answer shows. Until the terms are
-  accepted it shows no SID reading, so it credits no SID source and states
-  no note. The API states the note of every family it lists. Which rule is
-  right is an open decision.
-- **parking-terms-accepted.** Both sides state one condition note, but with
-  different texts. The API states the fixture family's synthetic text. The
-  MCP side states the platform register's SID condition. This is the cause
-  for which the attribution texts are excluded: the fixture's families have
-  no real register entry, so the texts cannot be equal on these rows.
+- Seven came from the MCP side reading the SID reading against the
+  database's clock instead of the question's `now` (platform issue #1262,
+  fixed in 2.5.24): `termsRequired` in both parking cases, and the four
+  `occupancy` facts of `pk-07-0012` in the accepted case.
+- `meta.notes.condition` in parking-terms-pending: the API stated the gated
+  family's condition while it withheld that family's occupancy. The API now
+  follows the MCP capability's rule: a family's condition is stated only
+  where the answer shows the data it conditions. A family whose terms are
+  not accepted is listed and credited, but its occupancy is withheld, and so
+  is its condition. Its purpose notes are kept.
+- `meta.notes.condition` in parking-terms-accepted: both sides state one
+  condition, with the fixture's synthetic text on one side and the
+  platform register's text on the other. Rules/4 compares the family and the
+  count, not the text.
 
-They are not excluded.
+The 2.5.23 bundle stays pinned as the record of that version. It was
+projected with rules/3, which this harness no longer reads, so it can be
+compared only by a checkout of its own time.
 
 ## What fails
 

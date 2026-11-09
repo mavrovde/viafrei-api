@@ -195,7 +195,7 @@ func TestChargingOptionsAnswer(t *testing.T) {
 	p0, _ := pts[0].(map[string]any)
 	p1, _ := pts[1].(map[string]any)
 	av, _ := p0["availability"].(map[string]any)
-	if p0["current"] != "ac" || av["state"] != "available" || av["observedAt"] != "2026-03-29T01:29:00Z" {
+	if p0["current"] != "ac" || av["state"] != "available" || av["reportedAt"] != "2026-03-29T01:29:00Z" {
 		t.Errorf("point %v", p0)
 	}
 	if p1["current"] != nil || p1["maxPowerKw"] != nil || p1["availability"] != nil {
@@ -208,7 +208,7 @@ func TestChargingOptionsAnswer(t *testing.T) {
 	}
 	fr, _ := m["freshness"].([]any)
 	f0, _ := fr[0].(map[string]any)
-	if f0["family"] != "src-alpha-energy" || f0["ageS"] != 300.0 || f0["staleAfterS"] != 3600.0 || f0["stale"] != false {
+	if f0["family"] != "src-alpha-energy" || f0["ageSeconds"] != 300.0 || f0["staleAfterSeconds"] != 3600.0 || f0["stale"] != false {
 		t.Errorf("freshness %v", f0)
 	}
 	if attr, _ := m["attribution"].([]any); len(attr) != 1 {
@@ -246,7 +246,7 @@ func TestChargingOptionsWarnsOfStaleAndWithheldData(t *testing.T) {
 	m = meta(t, decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/charging-options?at=52.52,13.405", bearer)))
 	fr, _ := m["freshness"].([]any)
 	f0, _ := fr[0].(map[string]any)
-	if m["asOf"] != nil || f0["dataAsOf"] != nil || f0["ageS"] != nil || f0["stale"] != true {
+	if m["asOf"] != nil || f0["asOf"] != nil || f0["ageSeconds"] != nil || f0["stale"] != true {
 		t.Errorf("a family that published nothing: %v", m)
 	}
 }
@@ -463,6 +463,72 @@ func TestFeatureOperationsNameTheirMCPCounterpart(t *testing.T) {
 	for path, want := range map[string]string{"/v1/charging-options": "charging station search", "/v1/parking-options": "parking search"} {
 		if got := d.Paths[path]["get"]["x-mcp-counterpart"]; got != want {
 			t.Errorf("%s: counterpart %v", path, got)
+		}
+	}
+}
+
+func TestChargingSummaryJudgesEachReportByItsOwnFamily(t *testing.T) {
+	req.Covers(t, "ENV-041", "FR-ENERGY-004")
+	// A site of one family with two reports of the same age, each from a
+	// family with its own threshold: only the report within its own
+	// family's threshold counts as available now.
+	slow, quick := fresh, terms
+	slow.Source.Family, slow.StaleAfter = "src-alpha-energy", time.Hour
+	quick.Source.Family, quick.StaleAfter = "src-beta-energy", 10*time.Minute
+	report := func(fam string) *energy.Availability {
+		return &energy.Availability{State: energy.StateAvailable, ObservedAt: fixedNow.Add(-20 * time.Minute), Family: fam}
+	}
+	f := everyAnswer()
+	f.charging.Items[0].Family = "src-gamma-energy"
+	f.charging.Items[0].Points = []energy.ChargePoint{{ID: "cp-1", Availability: report("src-alpha-energy")}, {ID: "cp-2", Availability: report("src-beta-energy")}}
+	f.charging.Families = []provenance.Family{slow, quick}
+	data, _ := decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/charging-options?at=52.52,13.405", bearer))["data"].([]any)
+	site, _ := data[0].(map[string]any)
+	if sum, _ := site["summary"].(map[string]any); sum["availableNow"] != 1.0 {
+		t.Errorf("summary %v: each report must use its own family's threshold", sum)
+	}
+}
+
+func TestOverviewWithAMissingPartIsPartial(t *testing.T) {
+	req.Covers(t, "FR-BRIEF-005", "NFR-RES-003")
+	f := everyAnswer()
+	f.overview.Parking, f.overview.Partial, f.overview.Charging.Partial = nil, false, false
+	f.overview.Parts = []features.PartResult{
+		{Part: features.PartCharging, Status: features.StatusOK},
+		{Part: features.PartParking, Status: features.StatusTimeout, Err: context.DeadlineExceeded},
+	}
+	w := do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/places/pl-01-0001/overview", bearer)
+	m := meta(t, decode(t, w))
+	ws, _ := m["warnings"].([]any)
+	w0, _ := ws[0].(map[string]any)
+	if w.Code != http.StatusOK || !slices.Contains(warningCodes(m), "partial") || !strings.Contains(w0["detail"].(string), "meta.parts") {
+		t.Errorf("status %d, warnings %v", w.Code, ws)
+	}
+	// A part that was not asked for is no reason to warn.
+	f.overview.Parts[1] = features.PartResult{Part: features.PartParking, Status: features.StatusNotRequested}
+	m = meta(t, decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/places/pl-01-0001/overview?needs=charging", bearer)))
+	if slices.Contains(warningCodes(m), "partial") {
+		t.Errorf("warnings %v for an answer with every asked part ok", warningCodes(m))
+	}
+}
+
+func TestFeatureOperationsListTheirRefusals(t *testing.T) {
+	req.Covers(t, "ERR-001")
+	var d struct {
+		Paths map[string]map[string]struct {
+			Responses map[string]struct {
+				Content map[string]any `json:"content"`
+			} `json:"responses"`
+		} `json:"paths"`
+	}
+	if err := json.Unmarshal(contractBytes(t), &d); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/v1/charging-options", "/v1/parking-options", "/v1/places/{place}/overview"} {
+		for _, status := range []string{"403", "404", "503"} {
+			if _, ok := d.Paths[path]["get"].Responses[status].Content["application/problem+json"]; !ok {
+				t.Errorf("%s does not list its %s problem", path, status)
+			}
 		}
 	}
 }

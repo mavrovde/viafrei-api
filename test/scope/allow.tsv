@@ -5,7 +5,3 @@ column	api/openapi.json	contractVersion	the version of the read contract itself 
 column	api/openapi.json	licenceUrl	member name of the attribution object fixed by Spec: Data Licensing and Attribution, section 2; the licence vocabulary, not a storage name
 column	api/openapi.json	shareAlike	member name of the attribution object fixed by Spec: Data Licensing and Attribution, section 2; the licence vocabulary, not a storage name
 column	api/openapi.json	termsUrl	member name of the attribution object fixed by Spec: Data Licensing and Attribution, section 2; the licence vocabulary, not a storage name
-column	api/openapi.json	dataAsOf	member name of the freshness entry fixed by Spec: Common Envelope, meta.freshness; the envelope vocabulary, not a storage name
-column	api/openapi.json	observedAt	member name of a reported state fixed by Spec: Resource Model, observations; the resource vocabulary, not a storage name
-column	api/openapi.json	placeId	path parameter and meta.query member named by Spec: Resource Model, places; the resource vocabulary, not a storage name
-column	api/openapi.json	staleAfterS	member name of the freshness entry fixed by Spec: Common Envelope, meta.freshness; the envelope vocabulary, not a storage name

@@ -113,7 +113,7 @@ func behaviours() map[string]behaviour {
 			_, ok := store.New(nil, c).Budget(ctx)
 			return fmt.Sprint(ok)
 		}},
-		"deadline.request": {"1s", func(t *testing.T, c *config.Config) string {
+		"deadline.request": {"1750ms", func(t *testing.T, c *config.Config) string {
 			b, _ := store.New(nil, c).Budget(context.Background())
 			return b.Round(100 * time.Millisecond).String()
 		}},

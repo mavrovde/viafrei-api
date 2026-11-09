@@ -149,7 +149,7 @@ type Pagination struct {
 
 // Compose holds the settings of composed answers.
 type Compose struct {
-	PartDeadline time.Duration `koanf:"part_deadline" default:"800ms" validate:"min=100ms,max=2s" desc:"Sub-deadline of each part of a composed answer (FR-BRIEF-003); a part that does not finish in it is reported timeout."`
+	PartDeadline time.Duration `koanf:"part_deadline" default:"800ms" validate:"min=100ms,max=2s" desc:"Sub-deadline of each part of a composed answer (FR-BRIEF-003); a part that does not finish in it is reported timeout. The parts run one after the other, so this times the number of parts must not exceed deadline.request minus deadline.reserve."`
 	PerPartLimit int           `koanf:"per_part_limit" default:"5" validate:"min=1,max=20" desc:"Items per part of a composed answer when the request names no per_part_limit."`
 }
 

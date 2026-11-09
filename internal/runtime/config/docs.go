@@ -62,7 +62,7 @@ func WriteReference(w io.Writer) error {
 	fmt.Fprintf(&b, "(path in `%s`), then environment variables. ", FileEnv)
 	b.WriteString("The service refuses to start on an unknown key, an unknown variable with the prefix, a value out of bounds or a broken cross-field rule, and lists every violation. ")
 	fmt.Fprintf(&b, "Secrets are read only from the environment or from a file named by the `_FILE` variant (one of the two, never both), never from the YAML file, and are never printed. Exit status on a configuration error: %d.\n\n", ExitCode)
-	b.WriteString("Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadline.request`; `health.ready_timeout` ≤ `deadline.request`; `db.statement_timeout_floor` < `deadline.request` − `deadline.reserve`.\n\n")
+	b.WriteString("Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadline.request`; `health.ready_timeout` ≤ `deadline.request`; `db.statement_timeout_floor` < `deadline.request` − `deadline.reserve`; `compose.part_deadline` × the number of overview parts ≤ `deadline.request` − `deadline.reserve`.\n\n")
 	b.WriteString("| Key | Environment | Type | Default | Bounds | Description |\n")
 	b.WriteString("|---|---|---|---|---|---|\n")
 	for _, f := range Fields() {

@@ -51,15 +51,40 @@ func (s slowSources) Register(ctx context.Context) ([]access.Terms, error) {
 	return s.Store.Register(ctx)
 }
 
+// oneRead holds a permit for the fixed time and answers the register read
+// before the test from memory, and no source rows: each /v1/key request
+// then takes exactly one permit, so the order permits are handed out in is
+// the order requests are served in.
+type oneRead struct {
+	slowSources
+	register []access.Terms
+}
+
+func (o oneRead) Register(ctx context.Context) ([]access.Terms, error) {
+	err := o.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `select pg_sleep($1)`, o.hold.Seconds())
+		return err
+	})
+	return o.register, err
+}
+
+func (oneRead) Sources(context.Context, []string) ([]access.Source, error) { return nil, nil }
+
 // limitedStack is the whole service with every gate on: admission in front
 // of the reader pool, the key gates and the meter on the access store.
 type limitedStack struct {
 	stack
 	store *accessstore.Store
 	meter *metering.Meter
+	adm   *admission.Controller
 }
 
 func newLimitedStack(t *testing.T, hold time.Duration, extra ...string) limitedStack {
+	t.Helper()
+	return newLimitedStackOf(t, func(s slowSources) httpapi.SourceReader { return s }, hold, extra...)
+}
+
+func newLimitedStackOf(t *testing.T, sources func(slowSources) httpapi.SourceReader, hold time.Duration, extra ...string) limitedStack {
 	t.Helper()
 	c := cfg(t, extra...)
 	as := open(t)
@@ -68,18 +93,165 @@ func newLimitedStack(t *testing.T, hold time.Duration, extra ...string) limitedS
 		t.Fatal(err)
 	}
 	t.Cleanup(st.Close)
-	st.WithAdmission(admission.New(wire.AdmissionSettings(c), nil))
+	adm := admission.New(wire.AdmissionSettings(c), nil)
+	st.WithAdmission(adm)
 	meter := metering.New(wire.MeteringSettings(c), as, nil)
 	var log bytes.Buffer
 	h, err := httpapi.NewHandler(httpapi.Deps{
-		Config: c, Sources: slowSources{st, hold}, Auth: auth.New(wire.AuthSettings(c), as, nil),
+		Config: c, Sources: sources(slowSources{st, hold}), Auth: auth.New(wire.AuthSettings(c), as, nil),
 		Logger: logging.New(c.Log, &log), ContractVersion: contract.Version(),
 		Keys: ratelimit.NewKeyLimiter(wire.QuotaZone(c), as, nil), Meter: meter,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return limitedStack{stack: stack{h: h, keys: auth.NewKeys(wire.AuthSettings(c), as, nil, nil), log: &log}, store: as, meter: meter}
+	return limitedStack{stack: stack{h: h, keys: auth.NewKeys(wire.AuthSettings(c), as, nil, nil), log: &log}, store: as, meter: meter, adm: adm}
+}
+
+// contended is the stack of the contended tests: two permits, none kept for
+// the critical tier, and the bulk tier allowed to hold both, so a bulk flood
+// can take the whole pool and the order of the waiters behind it is decided
+// by dispatch alone (RATE-009, RATE-010).
+func contended(t *testing.T, hold time.Duration, agingAfter string) limitedStack {
+	t.Helper()
+	return newLimitedStackOf(t, func(s slowSources) httpapi.SourceReader {
+		register, err := s.Store.Register(bounded(t))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return oneRead{s, register}
+	}, hold,
+		"VFAPI_DB_POOL_MAX=2", "VFAPI_TIERS_CRITICAL_RESERVED=0", "VFAPI_TIERS_BULK_MAX_INFLIGHT=2",
+		"VFAPI_TIERS_PER_KEY_INFLIGHT=1", "VFAPI_ADMISSION_AGING_AFTER="+agingAfter,
+		"VFAPI_TIERS_CRITICAL_QUEUE_MAX_WAIT=1500ms", "VFAPI_TIERS_STANDARD_QUEUE_MAX_WAIT=1500ms", "VFAPI_TIERS_BULK_QUEUE_MAX_WAIT=1500ms")
+}
+
+// served runs one /v1/key request in the background and, when it is
+// answered, appends name to the order (on a 200) or fails the test.
+func (s limitedStack) served(t *testing.T, ctx context.Context, wg *sync.WaitGroup, mu *sync.Mutex, order *[]string, name, key string) {
+	wg.Go(func() {
+		r := httptest.NewRequestWithContext(ctx, http.MethodGet, "/v1/key", nil)
+		r.Header.Set("Authorization", "Bearer "+key)
+		w := httptest.NewRecorder()
+		s.h.ServeHTTP(w, r)
+		mu.Lock()
+		defer mu.Unlock()
+		if w.Code != http.StatusOK {
+			t.Errorf("%s: %d %s", name, w.Code, w.Body)
+			return
+		}
+		*order = append(*order, name)
+	})
+}
+
+// until waits, within the test's bound, for the admission to reach a state.
+func (s limitedStack) until(t *testing.T, ctx context.Context, what string, ok func(admission.Snapshot) bool) admission.Snapshot {
+	t.Helper()
+	for {
+		snap := s.adm.Snapshot()
+		if ok(snap) {
+			return snap
+		}
+		if ctx.Err() != nil {
+			t.Fatalf("never reached %s: %+v", what, snap)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+// TestUnderContentionPermitsGoToTheHighestTierFirst: two bulk requests hold
+// every permit, nothing being reserved; a bulk, a standard and a critical
+// request queue behind them in that order. When the permits come back they
+// go to the critical and the standard request, and the bulk one, the oldest
+// waiter, is served last (RATE-009).
+func TestUnderContentionPermitsGoToTheHighestTierFirst(t *testing.T) {
+	req.Covers(t, "RATE-008", "RATE-009")
+	const hold = 300 * time.Millisecond
+	s := contended(t, hold, "2s")
+	holders := []access.Key{s.keyOn(t, "bulk", 1000, 1000, 0), s.keyOn(t, "bulk", 1000, 1000, 0)}
+	bulk, standard, critical := s.keyOn(t, "bulk", 1000, 1000, 0), s.keyOn(t, "standard", 1000, 1000, 0), s.keyOn(t, "critical", 1000, 1000, 0)
+	ctx := bounded(t)
+	var (
+		wg    sync.WaitGroup
+		mu    sync.Mutex
+		order []string
+	)
+	s.served(t, ctx, &wg, &mu, &order, "holder", holders[0].Full)
+	s.served(t, ctx, &wg, &mu, &order, "holder", holders[1].Full)
+	s.until(t, ctx, "bulk holding both permits", func(n admission.Snapshot) bool { return n.Inflight[admission.Bulk] == 2 && n.Free == 0 })
+	s.served(t, ctx, &wg, &mu, &order, "bulk", bulk.Full)
+	s.until(t, ctx, "the bulk waiter", func(n admission.Snapshot) bool { return n.Waiting[admission.Bulk] == 1 })
+	s.served(t, ctx, &wg, &mu, &order, "standard", standard.Full)
+	s.until(t, ctx, "the standard waiter", func(n admission.Snapshot) bool { return n.Waiting[admission.Standard] == 1 })
+	s.served(t, ctx, &wg, &mu, &order, "critical", critical.Full)
+	s.until(t, ctx, "the critical waiter", func(n admission.Snapshot) bool { return n.Waiting[admission.Critical] == 1 })
+	snap := s.until(t, ctx, "both permits handed on", func(n admission.Snapshot) bool {
+		return n.Inflight[admission.Bulk] < 2 && n.Free == 0 && n.Waiting[admission.Critical]+n.Waiting[admission.Standard] == 0
+	})
+	if snap.Inflight[admission.Critical] != 1 || snap.Inflight[admission.Standard] != 1 || snap.Waiting[admission.Bulk] != 1 {
+		t.Errorf("the permits did not go to the higher tiers: %+v", snap)
+	}
+	wg.Wait()
+	if len(order) != 5 || order[4] != "bulk" || !slices.Contains(order[2:4], "critical") || !slices.Contains(order[2:4], "standard") {
+		t.Fatalf("served in the order %v; want both holders, then critical and standard, then bulk", order)
+	}
+}
+
+// TestAnAgedBulkWaiterIsServedAheadOfNewerStandardWaiters: two bulk
+// requests hold every permit; a bulk request queues, and two standard ones
+// queue well after it. With admission.aging_after shorter than the bulk
+// waiter's wait and longer than the standard ones', the bulk waiter counts
+// as standard and, being the oldest, takes one of the two permits; with
+// aging out of reach, both standard waiters go first (RATE-010).
+func TestAnAgedBulkWaiterIsServedAheadOfNewerStandardWaiters(t *testing.T) {
+	req.Covers(t, "RATE-009", "RATE-010")
+	const hold = 400 * time.Millisecond
+	for _, tc := range []struct {
+		aging string
+		aged  bool
+	}{{"200ms", true}, {"2s", false}} {
+		t.Run(tc.aging, func(t *testing.T) {
+			s := contended(t, hold, tc.aging)
+			keys := []access.Key{s.keyOn(t, "bulk", 1000, 1000, 0), s.keyOn(t, "bulk", 1000, 1000, 0), s.keyOn(t, "bulk", 1000, 1000, 0),
+				s.keyOn(t, "standard", 1000, 1000, 0), s.keyOn(t, "standard", 1000, 1000, 0)}
+			ctx := bounded(t)
+			var (
+				wg    sync.WaitGroup
+				mu    sync.Mutex
+				order []string
+			)
+			began := time.Now()
+			s.served(t, ctx, &wg, &mu, &order, "holder", keys[0].Full)
+			s.served(t, ctx, &wg, &mu, &order, "holder", keys[1].Full)
+			s.until(t, ctx, "bulk holding both permits", func(n admission.Snapshot) bool { return n.Inflight[admission.Bulk] == 2 })
+			s.served(t, ctx, &wg, &mu, &order, "bulk", keys[2].Full)
+			s.until(t, ctx, "the bulk waiter", func(n admission.Snapshot) bool { return n.Waiting[admission.Bulk] == 1 })
+			// The standard waiters arrive 100 ms before the holders are
+			// done: inside the aging threshold, while the bulk waiter is
+			// well past it.
+			time.Sleep(time.Until(began.Add(hold - 100*time.Millisecond)))
+			s.served(t, ctx, &wg, &mu, &order, "standard", keys[3].Full)
+			s.served(t, ctx, &wg, &mu, &order, "standard", keys[4].Full)
+			s.until(t, ctx, "the standard waiters", func(n admission.Snapshot) bool { return n.Waiting[admission.Standard] == 2 })
+			if n := s.adm.Snapshot(); n.Inflight[admission.Bulk] != 2 {
+				t.Fatalf("the holders were done before the standard waiters queued: %+v", n)
+			}
+			snap := s.until(t, ctx, "both permits handed on", func(n admission.Snapshot) bool {
+				return n.Free == 0 && n.Waiting[admission.Bulk]+n.Waiting[admission.Standard] == 1
+			})
+			if got := snap.Waiting[admission.Bulk] == 0; got != tc.aged {
+				t.Errorf("aging %s: the bulk waiter served ahead %v, want %v: %+v", tc.aging, got, tc.aged, snap)
+			}
+			wg.Wait()
+			want := "standard"
+			if !tc.aged {
+				want = "bulk"
+			}
+			if len(order) != 5 || order[4] != want {
+				t.Fatalf("aging %s: served in the order %v; want %s last", tc.aging, order, want)
+			}
+		})
+	}
 }
 
 // keyOn issues a key on a new plan of the tier with the given limits.

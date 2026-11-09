@@ -87,7 +87,7 @@ func operations() []operation {
 		{id: "getKey", method: http.MethodGet, path: "/v1/key", tag: "access", keyed: true, register: registerKey},
 		{id: "listChargingOptions", method: http.MethodGet, path: "/v1/charging-options", tag: "energy", keyed: true, scope: "energy", register: registerCharging},
 		{id: "listParkingOptions", method: http.MethodGet, path: "/v1/parking-options", tag: "parking", keyed: true, scope: "parking", register: registerParking},
-		{id: "getPlaceOverview", method: http.MethodGet, path: "/v1/places/{place}/overview", tag: "places", keyed: true, scope: "places", register: registerOverview},
+		{id: "getPlaceOverview", method: http.MethodGet, path: "/v1/places/{placeId}/overview", tag: "places", keyed: true, scope: "places", register: registerOverview},
 	}
 }
 

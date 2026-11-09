@@ -75,11 +75,11 @@ func position(p geo.Point) Position {
 
 // FreshnessEntry is one entry of meta.freshness.
 type FreshnessEntry struct {
-	Family            string     `json:"family" doc:"The source family."`
-	AsOf              *time.Time `json:"asOf" nullable:"true" doc:"The instant the family's data is current to; null when it published none."`
-	AgeSeconds        *int64     `json:"ageSeconds" nullable:"true" doc:"generatedAt minus asOf, in whole seconds; null when asOf is."`
-	StaleAfterSeconds int64      `json:"staleAfterSeconds" doc:"The family's design threshold in seconds: data older than this is stale."`
-	Stale             bool       `json:"stale" doc:"True when ageSeconds is above staleAfterSeconds, or asOf is unknown."`
+	Family      string     `json:"family" doc:"The source family."`
+	DataAsOf    *time.Time `json:"dataAsOf" nullable:"true" doc:"The instant the family's data is current to; null when it published none."`
+	AgeS        *int64     `json:"ageS" nullable:"true" doc:"generatedAt minus dataAsOf, in whole seconds; null when dataAsOf is."`
+	StaleAfterS int64      `json:"staleAfterS" doc:"The family's design threshold: data older than this is stale."`
+	Stale       bool       `json:"stale" doc:"True when ageS is above staleAfterS, or dataAsOf is unknown."`
 }
 
 // Notes are the verbatim licence notes of the contributing families.
@@ -97,7 +97,7 @@ type DataWarning struct {
 // DataMeta is the meta member of every data answer (ENV-001 to ENV-006).
 type DataMeta struct {
 	ResponseMeta
-	AsOf        *time.Time       `json:"asOf" nullable:"true" doc:"The oldest asOf of meta.freshness; null when one is unknown."`
+	AsOf        *time.Time       `json:"asOf" nullable:"true" doc:"The oldest dataAsOf of meta.freshness; null when one is unknown."`
 	Freshness   []FreshnessEntry `json:"freshness" doc:"One entry per contributing source family."`
 	Attribution []Attribution    `json:"attribution" doc:"One entry per contributing source family; clients displaying the data must show its text."`
 	Notes       Notes            `json:"notes"`
@@ -131,7 +131,7 @@ func (s *server) dataMeta(ctx context.Context, fams []provenance.Family, at time
 	for _, f := range fams {
 		fr := f.Assess(at)
 		fs = append(fs, fr)
-		m.Freshness = append(m.Freshness, FreshnessEntry{Family: fr.Family, AsOf: fr.DataAsOf, AgeSeconds: fr.AgeS, StaleAfterSeconds: fr.StaleAfterS, Stale: fr.Stale})
+		m.Freshness = append(m.Freshness, FreshnessEntry{Family: fr.Family, DataAsOf: fr.DataAsOf, AgeS: fr.AgeS, StaleAfterS: fr.StaleAfterS, Stale: fr.Stale})
 		m.Attribution = append(m.Attribution, attribution(f.Source))
 	}
 	m.AsOf = provenance.AsOf(fs)
@@ -242,7 +242,7 @@ type ChargingInput struct {
 // Availability is the last reported state of a charge point.
 type Availability struct {
 	State      string    `json:"state" enum:"available,occupied,reserved,out_of_order,unknown,other" doc:"Open enumeration; treat an unknown value as other."`
-	ReportedAt time.Time `json:"reportedAt" doc:"When the state was reported."`
+	ObservedAt time.Time `json:"observedAt" doc:"When the state was reported."`
 }
 
 // ChargePoint is one point of a charging site.
@@ -323,7 +323,7 @@ func chargingSites(a features.Answer[energy.Site]) []ChargingSite {
 				cp.Current = &c
 			}
 			if p.Availability != nil {
-				cp.Availability = &Availability{State: string(p.Availability.State), ReportedAt: p.Availability.ObservedAt.UTC()}
+				cp.Availability = &Availability{State: string(p.Availability.State), ObservedAt: p.Availability.ObservedAt.UTC()}
 			}
 			item.ChargePoints = append(item.ChargePoints, cp)
 		}
@@ -371,7 +371,7 @@ type Occupancy struct {
 	Free       *int      `json:"free" nullable:"true" doc:"Free spaces; null when not published, never 0 for unknown."`
 	Total      *int      `json:"total" nullable:"true" doc:"Spaces in total; null when not published."`
 	State      string    `json:"state" enum:"free,filling,full,closed,unknown,other" doc:"Open enumeration; treat an unknown value as other."`
-	ReportedAt time.Time `json:"reportedAt" doc:"When the occupancy was reported."`
+	ObservedAt time.Time `json:"observedAt" doc:"When the occupancy was reported."`
 }
 
 // ParkingSite is one item of listParkingOptions.
@@ -422,7 +422,7 @@ func parkingSites(a features.Answer[parking.Site]) ([]ParkingSite, bool) {
 			DistanceM: v.DistanceM, TermsRequired: v.TermsRequired, SourceFamily: v.Family,
 		}
 		if o := v.Occupancy; o != nil {
-			item.Occupancy = &Occupancy{Free: o.Free, Total: o.Total, State: string(o.State), ReportedAt: o.ObservedAt.UTC()}
+			item.Occupancy = &Occupancy{Free: o.Free, Total: o.Total, State: string(o.State), ObservedAt: o.ObservedAt.UTC()}
 		}
 		withheld = withheld || v.TermsRequired
 		out[i] = item
@@ -465,7 +465,7 @@ func registerParking(api huma.API, s *server, op huma.Operation) {
 
 // OverviewInput is the input of getPlaceOverview.
 type OverviewInput struct {
-	PlaceID      string   `path:"place" maxLength:"64" pattern:"^[A-Za-z0-9_.-]+$" example:"pl-01-0001" doc:"The place's id."`
+	PlaceID      string   `path:"placeId" maxLength:"64" pattern:"^[A-Za-z0-9_.-]+$" example:"pl-01-0001" doc:"The place's id."`
 	Needs        []string `query:"needs" enum:"charging,parking" doc:"The parts to compute, comma-separated. Default: every part."`
 	RadiusM      int      `query:"radius_m" minimum:"1" maximum:"50000" doc:"Radius around the place, in metres. Default: geo.default_radius_m."`
 	PerPartLimit int      `query:"per_part_limit" minimum:"1" maximum:"20" doc:"Most items per part. Default: compose.per_part_limit."`
@@ -507,7 +507,7 @@ type PartStatus struct {
 
 // OverviewQuery is meta.query of getPlaceOverview.
 type OverviewQuery struct {
-	PlaceID      string `json:"place"`
+	PlaceID      string `json:"placeId"`
 	RadiusM      int    `json:"radiusM"`
 	PerPartLimit int    `json:"perPartLimit"`
 }

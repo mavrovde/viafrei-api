@@ -70,7 +70,7 @@
             "additionalProperties": false,
             "description": "The last report; null when none is published.",
             "properties": {
-              "reportedAt": {
+              "observedAt": {
                 "description": "When the state was reported.",
                 "format": "date-time",
                 "type": "string"
@@ -90,7 +90,7 @@
             },
             "required": [
               "state",
-              "reportedAt"
+              "observedAt"
             ],
             "type": [
               "object",
@@ -157,7 +157,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest asOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -389,15 +389,15 @@
       "FreshnessEntry": {
         "additionalProperties": false,
         "properties": {
-          "ageSeconds": {
-            "description": "generatedAt minus asOf, in whole seconds; null when asOf is.",
+          "ageS": {
+            "description": "generatedAt minus dataAsOf, in whole seconds; null when dataAsOf is.",
             "format": "int64",
             "type": [
               "integer",
               "null"
             ]
           },
-          "asOf": {
+          "dataAsOf": {
             "description": "The instant the family's data is current to; null when it published none.",
             "format": "date-time",
             "type": [
@@ -410,20 +410,20 @@
             "type": "string"
           },
           "stale": {
-            "description": "True when ageSeconds is above staleAfterSeconds, or asOf is unknown.",
+            "description": "True when ageS is above staleAfterS, or dataAsOf is unknown.",
             "type": "boolean"
           },
-          "staleAfterSeconds": {
-            "description": "The family's design threshold in seconds: data older than this is stale.",
+          "staleAfterS": {
+            "description": "The family's design threshold: data older than this is stale.",
             "format": "int64",
             "type": "integer"
           }
         },
         "required": [
           "family",
-          "asOf",
-          "ageSeconds",
-          "staleAfterSeconds",
+          "dataAsOf",
+          "ageS",
+          "staleAfterS",
           "stale"
         ],
         "type": "object"
@@ -724,7 +724,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest asOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -800,7 +800,7 @@
             "format": "int64",
             "type": "integer"
           },
-          "place": {
+          "placeId": {
             "type": "string"
           },
           "radiusM": {
@@ -809,7 +809,7 @@
           }
         },
         "required": [
-          "place",
+          "placeId",
           "radiusM",
           "perPartLimit"
         ],
@@ -883,7 +883,7 @@
         "additionalProperties": false,
         "properties": {
           "asOf": {
-            "description": "The oldest asOf of meta.freshness; null when one is unknown.",
+            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
             "format": "date-time",
             "type": [
               "string",
@@ -1031,7 +1031,7 @@
                   "null"
                 ]
               },
-              "reportedAt": {
+              "observedAt": {
                 "description": "When the occupancy was reported.",
                 "format": "date-time",
                 "type": "string"
@@ -1061,7 +1061,7 @@
               "free",
               "total",
               "state",
-              "reportedAt"
+              "observedAt"
             ],
             "type": [
               "object",
@@ -1877,7 +1877,7 @@
         "x-required-scope": "parking"
       }
     },
-    "/v1/places/{place}/overview": {
+    "/v1/places/{placeId}/overview": {
       "get": {
         "description": "A composed answer: the place, then each asked part (charging, parking) around it, each under the licence gate on its own and within its own sub-deadline (compose.part_deadline). A part that is not ok is absent from data and named in meta.parts. 200 when at least one part is ok. Needs the scope places; each part also needs its own scope.",
         "operationId": "getPlaceOverview",
@@ -1885,7 +1885,7 @@
           {
             "description": "The place's id.",
             "in": "path",
-            "name": "place",
+            "name": "placeId",
             "required": true,
             "schema": {
               "description": "The place's id.",

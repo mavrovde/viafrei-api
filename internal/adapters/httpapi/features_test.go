@@ -195,7 +195,7 @@ func TestChargingOptionsAnswer(t *testing.T) {
 	p0, _ := pts[0].(map[string]any)
 	p1, _ := pts[1].(map[string]any)
 	av, _ := p0["availability"].(map[string]any)
-	if p0["current"] != "ac" || av["state"] != "available" || av["reportedAt"] != "2026-03-29T01:29:00Z" {
+	if p0["current"] != "ac" || av["state"] != "available" || av["observedAt"] != "2026-03-29T01:29:00Z" {
 		t.Errorf("point %v", p0)
 	}
 	if p1["current"] != nil || p1["maxPowerKw"] != nil || p1["availability"] != nil {
@@ -208,7 +208,7 @@ func TestChargingOptionsAnswer(t *testing.T) {
 	}
 	fr, _ := m["freshness"].([]any)
 	f0, _ := fr[0].(map[string]any)
-	if f0["family"] != "src-alpha-energy" || f0["ageSeconds"] != 300.0 || f0["staleAfterSeconds"] != 3600.0 || f0["stale"] != false {
+	if f0["family"] != "src-alpha-energy" || f0["ageS"] != 300.0 || f0["staleAfterS"] != 3600.0 || f0["stale"] != false {
 		t.Errorf("freshness %v", f0)
 	}
 	if attr, _ := m["attribution"].([]any); len(attr) != 1 {
@@ -246,7 +246,7 @@ func TestChargingOptionsWarnsOfStaleAndWithheldData(t *testing.T) {
 	m = meta(t, decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/charging-options?at=52.52,13.405", bearer)))
 	fr, _ := m["freshness"].([]any)
 	f0, _ := fr[0].(map[string]any)
-	if m["asOf"] != nil || f0["asOf"] != nil || f0["ageSeconds"] != nil || f0["stale"] != true {
+	if m["asOf"] != nil || f0["dataAsOf"] != nil || f0["ageS"] != nil || f0["stale"] != true {
 		t.Errorf("a family that published nothing: %v", m)
 	}
 }
@@ -524,7 +524,7 @@ func TestFeatureOperationsListTheirRefusals(t *testing.T) {
 	if err := json.Unmarshal(contractBytes(t), &d); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"/v1/charging-options", "/v1/parking-options", "/v1/places/{place}/overview"} {
+	for _, path := range []string{"/v1/charging-options", "/v1/parking-options", "/v1/places/{placeId}/overview"} {
 		for _, status := range []string{"403", "404", "503"} {
 			if _, ok := d.Paths[path]["get"].Responses[status].Content["application/problem+json"]; !ok {
 				t.Errorf("%s does not list its %s problem", path, status)

@@ -126,6 +126,9 @@ sync is `.github/workflows/platform-sync.yml`, daily and by hand, built on
 3. The workflow pushes `platform-sync/X.Y.Z`, opens the pull request
    assigned to a maintainer, and approves its CI and Security runs. A
    maintainer reviews and squash-merges it; the squash keeps the footer.
+   The pull request also pins the parity bundle of `X.Y.Z` in
+   `test/parity/lock.tsv` ([parity](parity.md)): with none pinned the parity
+   harness fails closed, so the sync cannot merge without one.
 4. release-please then proposes exactly `X.Y.Z`: the release pull request
    bumps `version.txt`, `.release-please-manifest.json` and `CHANGELOG.md` in
    one commit, and the tag job tags that commit `vX.Y.Z` as for every release.

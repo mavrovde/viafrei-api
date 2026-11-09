@@ -54,7 +54,8 @@ rule set `viafrei.parity.rules/4` (`parity.Default`):
   rows (`contract.source_note`; every kind but `purpose`, because the service
   answers an unknown kind as a condition). A text no family owns is an error,
   not a fact. A bundle stating a condition note's text, or a count that is
-  not a positive whole number, is refused.
+  not a positive whole number, is refused, and so is a case stating a kind
+  both as `[]` and per family.
 - **One value per name.** Two values that project onto one name (two array
   elements with the same key) are an error, not a fact: keeping either would
   hide a difference in the other. A case naming a fact twice is refused too.
@@ -163,14 +164,19 @@ The 2.5.23 bundle differed in 9 facts. All 9 are closed:
   follows the MCP capability's rule: a family's condition is stated only
   where the answer shows the data it conditions. A family whose terms are
   not accepted is listed and credited, but its occupancy is withheld, and so
-  is its condition. Its purpose notes are kept.
+  is its condition. Its purpose notes are kept. The rule holds in the place
+  overview (`/v1/places/{id}/overview`) too, which reads the families of its
+  parts again: a family its parking part withheld keeps its credit and loses
+  its condition there as well. The overview has no MCP counterpart, so no
+  case compares it; the use-case tests hold it.
 - `meta.notes.condition` in parking-terms-accepted: both sides state one
   condition, with the fixture's synthetic text on one side and the
   platform register's text on the other. Rules/4 compares the family and the
   count, not the text.
 
 The 2.5.23 bundle stays pinned as the record of that version. It was
-projected with rules/3, which this harness no longer reads, so it can be
+projected with rules/3, which this harness no longer reads (`Load` refuses
+it, and `lock_test.go` asserts that), so it can be
 compared only by a checkout of its own time.
 
 ## What fails

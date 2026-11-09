@@ -331,6 +331,9 @@ func Parse(raw []byte, platform string) (Bundle, error) {
 				return Bundle{}, fmt.Errorf("%w: case %q states %q as %q; %s states a note of that kind as [] or as a count per family, never its text", ErrMalformed, c.ID, f.Name, f.Value, Default.ID)
 			}
 		}
+		if k, ok := Default.bothWays(c.Facts); ok {
+			return Bundle{}, fmt.Errorf("%w: case %q states meta.notes.%s both as [] and per family", ErrMalformed, c.ID, k)
+		}
 	}
 	return b, nil
 }
@@ -354,6 +357,20 @@ func (r Rules) ownedNoteFact(f Fact) bool {
 		}
 	}
 	return true
+}
+
+// bothWays returns a note kind of r.OwnedNotes that facts state both as []
+// (none) and as a count under a family (some): one of the two is false.
+func (r Rules) bothWays(facts []Fact) (string, bool) {
+	for _, k := range r.OwnedNotes {
+		base := "meta.notes." + k
+		none := slices.ContainsFunc(facts, func(f Fact) bool { return f.Name == base })
+		some := slices.ContainsFunc(facts, func(f Fact) bool { return strings.HasPrefix(f.Name, base+"[") })
+		if none && some {
+			return k, true
+		}
+	}
+	return "", false
 }
 
 // Question is a case without its answer: what both sides are asked.

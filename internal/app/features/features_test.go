@@ -341,6 +341,42 @@ func TestOverviewComposesTheParts(t *testing.T) {
 	}
 }
 
+func TestOverviewStatesAPendingFamilysConditionOnlyOnceAccepted(t *testing.T) {
+	req.Covers(t, "FR-BRIEF-008", "SEC-030")
+	notes := map[string][]provenance.Note{
+		"p2": {{Kind: provenance.Condition, Text: "p2 condition"}, {Kind: provenance.Purpose, Text: "p2 purpose"}},
+		"pl": {{Kind: provenance.Condition, Text: "pl condition"}},
+	}
+	ask := func(k access.Record) features.Overview {
+		t.Helper()
+		f := &fake{place: berlin, parks: []parking.Site{{ID: "b", Family: "p2", Occupancy: free(5, "p2")}}, notes: notes}
+		o, err := service(f, nil).Overview(context.Background(), k, features.OverviewQuery{PlaceID: "pl-1", Needs: []features.Part{features.PartParking}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return o
+	}
+	// Pending: the overview reads the families again; p2 is credited, its
+	// condition is withheld as the parking part withholds it, the place's is kept.
+	o := ask(key("commercial", allScopes, everything...))
+	if got := provenance.Notes(o.Families, provenance.Condition); !slices.Equal(got, []string{"pl condition"}) {
+		t.Errorf("pending: conditions %v", got)
+	}
+	if got := provenance.Notes(o.Families, provenance.Purpose); !slices.Equal(got, []string{"p2 purpose"}) || !slices.Equal(names(o.Families), []string{"p2", "pl"}) {
+		t.Errorf("pending: purposes %v, credited %v", got, names(o.Families))
+	}
+	if !slices.Equal(o.Parking.Withheld, []string{"p2"}) {
+		t.Errorf("pending: withheld %v", o.Parking.Withheld)
+	}
+	// Accepted: the reading is shown, and its condition with it.
+	k := key("commercial", allScopes, everything...)
+	k.Accepted = []access.Acceptance{{Source: "p2", Version: "v1"}}
+	o = ask(k)
+	if got := provenance.Notes(o.Families, provenance.Condition); !slices.Equal(got, []string{"p2 condition", "pl condition"}) {
+		t.Errorf("accepted: conditions %v", got)
+	}
+}
+
 func TestOverviewReadsTheRegisterOnce(t *testing.T) {
 	req.Covers(t, "FR-BRIEF-002", "FR-BRIEF-008")
 	f := &fake{place: berlin, sites: []energy.Site{site("e1")}, parks: []parking.Site{{Family: "p1"}}}

@@ -99,6 +99,7 @@ func TestParseStatesConditionNotesOnlyByFamily(t *testing.T) {
 		`{"name":"meta.notes.condition[]","value":"1"}`,
 		`{"name":"meta.notes.condition[fam-a].text","value":"1"}`,
 		`{"name":"meta.notes.condition[a][b]","value":"1"}`,
+		`{"name":"meta.notes.condition","value":"[]"},{"name":"meta.notes.condition[fam-a]","value":"1"}`,
 	} {
 		if _, err := parity.Parse([]byte(with(bad)), "1.2.3"); !errors.Is(err, parity.ErrMalformed) {
 			t.Errorf("%s: %v", bad, err)

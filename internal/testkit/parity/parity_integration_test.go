@@ -344,13 +344,18 @@ func recordBundle(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, file), raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	lock := "# Parity bundles pinned per platform version: platform, bundle, sha256.\n" +
-		"# Pinned by the version sync; see docs/parity.md.\n"
+	// Every other line is kept where it stands, its comments too: only the
+	// regression lock's own line is rewritten.
+	lock := ""
 	old, _ := os.ReadFile(filepath.Join(dir, parity.LockFile))
 	for _, line := range strings.Split(string(old), "\n") {
-		if line != "" && !strings.HasPrefix(line, "#") && !strings.HasPrefix(line, name+"\t") {
+		if line != "" && !strings.HasPrefix(line, name+"\t") {
 			lock += line + "\n"
 		}
+	}
+	if lock == "" {
+		lock = "# Parity bundles pinned per platform version: platform, bundle, sha256.\n" +
+			"# Pinned by the version sync; see docs/parity.md.\n"
 	}
 	lock += name + "\t" + file + "\t" + parity.Checksum(raw) + "\n"
 	if err := os.WriteFile(filepath.Join(dir, parity.LockFile), []byte(lock), 0o600); err != nil {

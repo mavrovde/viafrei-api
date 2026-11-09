@@ -65,10 +65,14 @@ const (
 	StateOutOfOrder State = "out_of_order"
 	StateUnknown    State = "unknown"
 	StateOther      State = Other
+	// StateStale is the state of a report too old to count (Availability.Live):
+	// an answer states it instead of the reported code. No stored code maps
+	// to it.
+	StateStale State = "stale"
 )
 
 // States lists every availability state an answer can carry.
-var States = []State{StateAvailable, StateOccupied, StateReserved, StateOutOfOrder, StateUnknown, StateOther}
+var States = []State{StateAvailable, StateOccupied, StateReserved, StateOutOfOrder, StateUnknown, StateOther, StateStale}
 
 // MapState maps a stored availability code.
 func MapState(raw string) State {
@@ -88,6 +92,38 @@ type Availability struct {
 	ObservedAt time.Time
 	// Family is the source family of the report.
 	Family string
+}
+
+// StatusLimit is how old a report may be and still count: the shorter of
+// the status age limit (charging.status_max_age, the MCP capability's own
+// limit) and the design threshold of the report's family. This is the MCP
+// capability's rule for a point's status: a report older than either is
+// stale.
+func StatusLimit(maxAge, staleAfter time.Duration) time.Duration {
+	return min(maxAge, staleAfter)
+}
+
+// Says reports whether the report states anything: a report of unknown, or
+// of a code the service cannot map (other), says nothing about the point and
+// is answered as no report at all. The MCP capability's rule: a status whose
+// own word is unknown is no status, stale or otherwise.
+func (a Availability) Says() bool {
+	return a.State != StateUnknown && a.State != StateOther
+}
+
+// Live reports whether the report still counts at now: no older than limit
+// (StatusLimit). A report exactly at the limit is live.
+func (a Availability) Live(now time.Time, limit time.Duration) bool {
+	return now.Sub(a.ObservedAt) <= limit
+}
+
+// Shown is the state an answer states at now: the reported one while the
+// report is live, StateStale once it is not.
+func (a Availability) Shown(now time.Time, limit time.Duration) State {
+	if a.Live(now, limit) {
+		return a.State
+	}
+	return StateStale
 }
 
 // ChargePoint is one point of a site.
@@ -132,13 +168,14 @@ type Summary struct {
 	MaxPowerKw *float64
 }
 
-// Summarise sums up the site at now. A report is live when it is no older
-// than staleAfter of the report's own family, which may differ from the
-// site's; an older one is shown on its point but not counted.
-func (s Site) Summarise(now time.Time, staleAfter func(family string) time.Duration) Summary {
+// Summarise sums up the site at now. A report counts while it says something
+// (Availability.Says) and is live (Availability.Live) by the limit of the
+// report's own family, which may differ from the site's; an older one is
+// shown on its point as stale and not counted.
+func (s Site) Summarise(now time.Time, limit func(family string) time.Duration) Summary {
 	out := Summary{ChargePoints: len(s.Points)}
 	for _, p := range s.Points {
-		if a := p.Availability; a != nil && now.Sub(a.ObservedAt) <= staleAfter(a.Family) {
+		if a := p.Availability; a != nil && a.Says() && a.Live(now, limit(a.Family)) {
 			n := 0
 			if out.AvailableNow != nil {
 				n = *out.AvailableNow
@@ -177,7 +214,8 @@ func (f AccessFilter) Codes() []Access {
 type Query struct {
 	At      geo.Point
 	RadiusM int
-	// MinKw keeps sites with at least one point of at least this power.
+	// MinKw keeps sites with at least one point of at least this power, and
+	// of each site only those points.
 	MinKw  float64
 	Access AccessFilter
 	Limit  int

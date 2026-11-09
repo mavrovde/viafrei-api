@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
+	"github.com/mavrovde/viafrei-api/internal/app/metering"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
@@ -209,5 +211,19 @@ func TestServeWithAnAccessStore(t *testing.T) {
 	})
 	if code != 0 {
 		t.Fatalf("exit %d", code)
+	}
+}
+
+func TestReportUsageLogsOnlyTrouble(t *testing.T) {
+	req.Covers(t, "RATE-014")
+	var buf bytes.Buffer
+	report := reportUsage(slog.New(slog.NewTextHandler(&buf, nil)))
+	report(metering.Report{Rows: 3})
+	if buf.Len() != 0 {
+		t.Fatalf("a clean flush logged %q", buf.String())
+	}
+	report(metering.Report{Err: errors.New("store down"), Dropped: 2})
+	if out := buf.String(); !strings.Contains(out, "usage write failed") || !strings.Contains(out, "dropped=2") {
+		t.Fatalf("trouble not logged: %q", out)
 	}
 }

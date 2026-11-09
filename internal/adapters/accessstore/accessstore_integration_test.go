@@ -123,7 +123,7 @@ func newPlan(t *testing.T, k *auth.Keys, use access.UseClass, families ...string
 	t.Helper()
 	planSeq++
 	name := fmt.Sprintf("plan-%d", planSeq)
-	if err := k.PutPlan(bounded(t), access.Plan{Name: name, UseClass: use, Tier: "standard", Scopes: access.Scopes, Sources: families}, "tester"); err != nil {
+	if err := k.PutPlan(bounded(t), access.Plan{Name: name, UseClass: use, Tier: "standard", Scopes: access.Scopes, Sources: families, Rate: 1000, Burst: 1000}, "tester"); err != nil {
 		t.Fatal(err)
 	}
 	return name
@@ -275,7 +275,7 @@ func TestStoreRefusals(t *testing.T) {
 		"accept bad source":  s.Accept(ctx, auth.Change{Action: "accept_terms", KeyID: key.ID, Actor: "t", At: now}, access.Acceptance{Source: bad, Version: "1"}),
 		"audit bad action":   s.Revoke(ctx, auth.Change{Action: "bogus", KeyID: key.ID, Actor: "t", Reason: "r", At: now}),
 		"rotate unknown":     s.Rotate(ctx, auth.Change{Action: "rotate", KeyID: "nosuchkey0", Actor: "t", At: now}, make([]byte, 32), now),
-		"plan bad use class": s.PutPlan(ctx, auth.Change{Action: "plan_put", Actor: "t", At: now}, access.Plan{Name: "zz", UseClass: "x", Tier: "bulk"}),
+		"plan bad use class": s.PutPlan(ctx, auth.Change{Action: "plan_put", Actor: "t", At: now}, access.Plan{Name: "zz", UseClass: "x", Tier: "bulk", Rate: 1, Burst: 1}),
 		"changed bad context": func() error {
 			c, cancel := context.WithCancel(ctx)
 			cancel()

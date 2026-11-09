@@ -2,10 +2,13 @@
 # admission code. One line per scope root, tab-separated: the root (a
 # module-relative directory, mutated with every package under it), the files
 # under it that are in scope (* for all, or a comma-separated list), and the
-# reason. Tests are never in scope. Admission (#8) adds its package here.
+# reason. Tests are never in scope.
 #
 # internal/testkit/mutgate reads this file; scripts/mutation.sh runs Gremlins
 # on the roots a change touches (pr) or on every root (full).
 internal/domain	*	the domain: key format and check, the licence gate rules, service rules
 internal/app/auth	*	authentication, the key cache, the failure limit and the key lifecycle
-internal/adapters/httpapi	auth.go,key.go	the key check at the edge and the gated answer of GET /v1/key
+internal/adapters/httpapi	auth.go,key.go,limits.go	the key check at the edge, the gated answer of GET /v1/key, and the limit gates at the edge
+internal/app/admission	*	the priority admission in front of storage: permits, tiers, reservations, aging, early refusal (#8)
+internal/app/ratelimit	*	the per-address and per-key buckets and the quota windows (#8)
+internal/app/metering	*	the usage counts per key, hour and operation and their batched write (#8)

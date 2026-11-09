@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mavrovde/viafrei-api/internal/app/metering"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 )
 
@@ -32,7 +33,10 @@ const (
 	ActionRevoke  = "revoke"
 	ActionAccept  = "accept_terms"
 	ActionPruned  = "audit_pruned"
+	ActionUsage   = "usage_pruned"
 	maxTextLength = 200
+	// maxLimit bounds a plan's rate and burst, as the access store does.
+	maxLimit = 100000
 )
 
 // Ledger is the write side of the access store the lifecycle needs.
@@ -45,6 +49,12 @@ type Ledger interface {
 	Move(ctx context.Context, c Change, plan string) error
 	Accept(ctx context.Context, c Change, a access.Acceptance) error
 	PruneAudit(ctx context.Context, c Change, before time.Time) (int64, error)
+	// PruneUsage removes usage records older than keepDays days, counted
+	// by the store's own clock so no clock skew can cross its floor.
+	PruneUsage(ctx context.Context, c Change, keepDays int) (int64, error)
+	// Usage reads the usage records from since on, of one key or (id
+	// empty) of every key, oldest first (RATE-014).
+	Usage(ctx context.Context, id string, since time.Time) ([]metering.Row, error)
 }
 
 // Keys runs the key lifecycle.
@@ -96,6 +106,12 @@ func (k *Keys) PutPlan(ctx context.Context, p access.Plan, actor string) error {
 		if !slices.Contains(access.Scopes, s) {
 			return fmt.Errorf("%w: scope %q is not one of %v", ErrInput, s, access.Scopes)
 		}
+	}
+	if p.Rate < 1 || p.Rate > maxLimit || p.Burst < 1 || p.Burst > maxLimit {
+		return fmt.Errorf("%w: rate and burst must be 1 to %d", ErrInput, maxLimit)
+	}
+	if p.QuotaDay < 0 || p.QuotaMonth < 0 {
+		return fmt.Errorf("%w: a quota is 0 (none) or more", ErrInput)
 	}
 	return k.ledger.PutPlan(ctx, Change{Action: ActionPlan, Actor: actor, At: k.now()}, p)
 }
@@ -183,6 +199,25 @@ func (k *Keys) Prune(ctx context.Context, actor string) (int64, error) {
 	}
 	now := k.now()
 	return k.ledger.PruneAudit(ctx, Change{Action: ActionPruned, Actor: actor, At: now}, now.Add(-k.s.AuditRetention))
+}
+
+// PruneUsage removes usage records older than metering.retention_days; the
+// removal is audited.
+func (k *Keys) PruneUsage(ctx context.Context, actor string) (int64, error) {
+	if err := text("actor", actor); err != nil {
+		return 0, err
+	}
+	now := k.now()
+	return k.ledger.PruneUsage(ctx, Change{Action: ActionUsage, Actor: actor, At: now}, k.s.UsageRetentionDays)
+}
+
+// Usage reads the usage of the last window, of one key or (id empty) of
+// every key: what the maintainers read the metering by (RATE-014).
+func (k *Keys) Usage(ctx context.Context, id string, window time.Duration) ([]metering.Row, error) {
+	if window <= 0 {
+		return nil, fmt.Errorf("%w: the window must be longer than zero", ErrInput)
+	}
+	return k.ledger.Usage(ctx, id, k.now().Add(-window).UTC().Truncate(time.Hour))
 }
 
 // Move puts a key on another plan; the change reaches every instance within

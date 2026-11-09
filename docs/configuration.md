@@ -4,7 +4,7 @@
 
 Every tunable of the service is one key below. Sources are layered: the built-in default, then an optional YAML file (path in `VFAPI_CONFIG_FILE`), then environment variables. The service refuses to start on an unknown key, an unknown variable with the prefix, a value out of bounds or a broken cross-field rule, and lists every violation. Secrets are read only from the environment or from a file named by the `_FILE` variant (one of the two, never both), never from the YAML file, and are never printed. Exit status on a configuration error: 78.
 
-Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadline.request`; `health.ready_timeout` ≤ `deadline.request`; `db.statement_timeout_floor` < `deadline.request` − `deadline.reserve`.
+Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadline.request`; `health.ready_timeout` ≤ `deadline.request`; `db.statement_timeout_floor` < `deadline.request` − `deadline.reserve`; the sum of `tiers.*.reserved`, `tiers.bulk.max_inflight` and `tiers.per_key_inflight` are each ≤ `db.pool_max`; every `tiers.*.queue_max_wait` < `deadline.request`.
 
 | Key | Environment | Type | Default | Bounds | Description |
 |---|---|---|---|---|---|
@@ -16,7 +16,8 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `server.idle_timeout` | `VFAPI_SERVER_IDLE_TIMEOUT` | duration | `60s` | 100ms to 300s | Time an idle keep-alive connection is kept open. |
 | `server.max_header_bytes` | `VFAPI_SERVER_MAX_HEADER_BYTES` | int | `16384` | 4096 to 1048576 | Largest accepted request header block, in bytes (431 above). |
 | `server.max_uri_bytes` | `VFAPI_SERVER_MAX_URI_BYTES` | int | `8192` | 2048 to 65536 | Longest accepted request URI, in bytes (414 above). |
-| `server.shutdown_grace` | `VFAPI_SERVER_SHUTDOWN_GRACE` | duration | `10s` | 1s to 60s | Time in-flight requests get to finish on shutdown. |
+| `server.shutdown_grace` | `VFAPI_SERVER_SHUTDOWN_GRACE` | duration | `10s` | 1s to 60s | Time in-flight requests get to finish on shutdown; the final metering flush runs after it. |
+| `server.trusted_proxies` | `VFAPI_SERVER_TRUSTED_PROXIES` | list | empty | CIDR list | Networks (CIDR) of the reverse proxies whose X-Forwarded-For header is believed; the client address is then the nearest address in that header outside these networks. Empty: the immediate peer is the client (RATE-001). Comma-separated in the environment. |
 | `http.hsts_max_age` | `VFAPI_HTTP_HSTS_MAX_AGE` | duration | `8760h` | 0s to 17520h | max-age of Strict-Transport-Security on every answer, sent in whole seconds; 0s sends max-age=0, which tells browsers to forget the policy. |
 | `db.url` | `VFAPI_DB_URL` or `VFAPI_DB_URL_FILE` | secret | secret, no default | — | Connection URL of the service's read-only role. Required to serve. Secret: environment or *_FILE only. |
 | `db.pool_max` | `VFAPI_DB_POOL_MAX` | int | `4` | 1 to 16 | Largest number of pooled connections. |
@@ -59,3 +60,28 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `pagination.default_limit` | `VFAPI_PAGINATION_DEFAULT_LIMIT` | int | `20` | 1 to 100 | Items a list answer returns when the request names no limit (ENV-021). At most the limit maximum of the interface, 100. |
 | `compose.part_deadline` | `VFAPI_COMPOSE_PART_DEADLINE` | duration | `800ms` | 100ms to 2s | Sub-deadline of each part of a composed answer (FR-BRIEF-003); a part that does not finish in it is reported timeout. |
 | `compose.per_part_limit` | `VFAPI_COMPOSE_PER_PART_LIMIT` | int | `5` | 1 to 20 | Items per part of a composed answer when the request names no per_part_limit. |
+| `ratelimit.anon_rps` | `VFAPI_RATELIMIT_ANON_RPS` | int | `1` | 0 to 100 | Requests per second one client address may make without presenting a key (service endpoints and keyless requests), as a token bucket (RATE-001, SEC-051). 0 switches the per-address limit off. |
+| `ratelimit.anon_burst` | `VFAPI_RATELIMIT_ANON_BURST` | int | `5` | 1 to 1000 | Burst of the per-address token bucket: requests a client address may make at once before ratelimit.anon_rps applies. |
+| `ratelimit.headers` | `VFAPI_RATELIMIT_HEADERS` | bool | `true` | — | Send RateLimit-Policy and RateLimit on every keyed answer (RATE-006). |
+| `ratelimit.ip_state_ttl` | `VFAPI_RATELIMIT_IP_STATE_TTL` | duration | `10m` | 1m to 60m | How long the state of an idle client address is kept; it is held in memory only and never stored (RATE-015). |
+| `ratelimit.ip_track_size` | `VFAPI_RATELIMIT_IP_TRACK_SIZE` | int | `100000` | 100 to 10000000 | Largest number of client addresses tracked at once; when full, idle entries are dropped first, then the least recently seen. |
+| `ratelimit.ipv6_prefix` | `VFAPI_RATELIMIT_IPV6_PREFIX` | int | `64` | 32 to 128 | Prefix length an IPv6 client address is counted by: every address inside one such prefix shares one per-address bucket, since one subscriber is routinely given a whole /64 (RATE-001). 128 counts each address alone. |
+| `quota.reset_tz` | `VFAPI_QUOTA_RESET_TZ` | string | `Europe/Berlin` | IANA time zone | Time zone whose midnight resets the daily quota and whose first of the month resets the monthly quota (RATE-003). |
+| `tiers.critical.reserved` | `VFAPI_TIERS_CRITICAL_RESERVED` | int | `1` | 0 to 16 | Permits kept for the critical tier that lower tiers cannot use (RATE-009). |
+| `tiers.critical.queue_len` | `VFAPI_TIERS_CRITICAL_QUEUE_LEN` | int | `32` | 0 to 1024 | Critical requests that may wait for a permit; one more is shed. |
+| `tiers.critical.queue_max_wait` | `VFAPI_TIERS_CRITICAL_QUEUE_MAX_WAIT` | duration | `800ms` | 0s to 2s | Longest time a critical request waits for a permit before it is shed. Less than deadline.request. |
+| `tiers.standard.reserved` | `VFAPI_TIERS_STANDARD_RESERVED` | int | `0` | 0 to 16 | Permits kept for the standard tier (and above) that the bulk tier cannot use. |
+| `tiers.standard.queue_len` | `VFAPI_TIERS_STANDARD_QUEUE_LEN` | int | `32` | 0 to 1024 | Standard requests that may wait for a permit; one more is shed. |
+| `tiers.standard.queue_max_wait` | `VFAPI_TIERS_STANDARD_QUEUE_MAX_WAIT` | duration | `400ms` | 0s to 2s | Longest time a standard request waits for a permit before it is shed. Less than deadline.request. |
+| `tiers.bulk.reserved` | `VFAPI_TIERS_BULK_RESERVED` | int | `0` | 0 to 16 | Permits reserved for the bulk tier. No tier is below it, so they keep nothing from anyone; they count against db.pool_max only. |
+| `tiers.bulk.queue_len` | `VFAPI_TIERS_BULK_QUEUE_LEN` | int | `4` | 0 to 1024 | Bulk requests that may wait for a permit; one more is shed. |
+| `tiers.bulk.queue_max_wait` | `VFAPI_TIERS_BULK_QUEUE_MAX_WAIT` | duration | `200ms` | 0s to 2s | Longest time a bulk request waits for a permit before it is shed. Less than deadline.request. |
+| `tiers.bulk.max_inflight` | `VFAPI_TIERS_BULK_MAX_INFLIGHT` | int | `1` | 0 to 16 | Permits the bulk tier may hold at once, however many are free (RATE-009). 0 keeps bulk out of storage. At most db.pool_max. |
+| `tiers.per_key_inflight` | `VFAPI_TIERS_PER_KEY_INFLIGHT` | int | `4` | 1 to 16 | Permits one key may hold at once (RATE-016). At most db.pool_max. |
+| `admission.aging_after` | `VFAPI_ADMISSION_AGING_AFTER` | duration | `500ms` | 0s to 2s | A waiter older than this is promoted one tier, so no tier starves (RATE-010). 0s promotes every waiter at once. |
+| `admission.ewma_alpha` | `VFAPI_ADMISSION_EWMA_ALPHA` | float | `0.2` | 0.01 to 1 | Weight of the newest storage service time in the moving average the wait estimate uses (RATE-011). |
+| `admission.shed_status` | `VFAPI_ADMISSION_SHED_STATUS` | int | `429` | one of 429, 503 | HTTP status of an overloaded refusal: 429 or 503. The problem type is overloaded either way, with Retry-After. |
+| `metering.flush_interval` | `VFAPI_METERING_FLUSH_INTERVAL` | duration | `30s` | 5s to 5m | Interval of the batched usage write to the access store. A crash loses at most one interval of counts; one more flush runs on shutdown. |
+| `metering.max_keys_buffered` | `VFAPI_METERING_MAX_KEYS_BUFFERED` | int | `100000` | 100 to 1000000 | Largest number of (key, hour, operation) counters held between flushes; the counts of a new counter beyond it are dropped and the drop is logged. |
+| `metering.write_timeout` | `VFAPI_METERING_WRITE_TIMEOUT` | duration | `1s` | 100ms to 10s | Deadline of one usage write; a failed write keeps its counts for the next flush. |
+| `metering.retention_days` | `VFAPI_METERING_RETENTION_DAYS` | int | `400` | 30 to 1825 | Days a usage record is kept; keys prune removes older ones. |

@@ -1,6 +1,6 @@
 // Package access embeds the access store's schema: the SQL that builds it and
-// the API's own role in it. The operator applies them; tests build them in a
-// throwaway database.
+// the API's own role in it. The operator applies them in file order; tests
+// build them in a throwaway database.
 package access
 
 import _ "embed"
@@ -11,12 +11,14 @@ var schemaSQL string
 //go:embed 0002_access_role.sql
 var roleSQL string
 
+//go:embed 0003_limits.sql
+var limitsSQL string
+
 // Role is the name of the API's own access-store role.
 const Role = "api_access"
 
-// Version is the schema version this build expects: the number of the newest
-// migration.
-const Version = 1
+// Version is the schema version this build expects.
+const Version = 2
 
 // SchemaSQL returns the statements that build the access store.
 func SchemaSQL() string { return schemaSQL }
@@ -24,3 +26,7 @@ func SchemaSQL() string { return schemaSQL }
 // RoleSQL returns the statements that create the API's role. The caller sets
 // the role's password separately.
 func RoleSQL() string { return roleSQL }
+
+// LimitsSQL returns the statements of schema version 2: the plans' limits
+// and the usage records. They run after RoleSQL, whose role they grant to.
+func LimitsSQL() string { return limitsSQL }

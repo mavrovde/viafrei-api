@@ -39,11 +39,11 @@ as HMAC-SHA-256 of its secret under `auth.pepper`, which is held outside the
 store. The full key is printed once, at issue or rotation, and is not
 recoverable afterwards by anyone.
 
-The owner of the store applies the two files once, then sets the role's
-password:
+The owner of the store applies the files once, in order, then sets the
+role's password:
 
 ```sh
-psql "$OWNER_URL" -v ON_ERROR_STOP=1 -f db/access/0001_access.sql -f db/access/0002_access_role.sql
+psql "$OWNER_URL" -v ON_ERROR_STOP=1 -f db/access/0001_access.sql -f db/access/0002_access_role.sql -f db/access/0003_limits.sql
 psql "$OWNER_URL" -c "alter role api_access password '…'"
 ```
 
@@ -52,6 +52,13 @@ The service then needs `VFAPI_ACCESS_URL` (the `api_access` role) and
 `_FILE`. The role may read and change plans and keys and append audit
 records; it can neither change nor delete an audit record. Old records leave
 only through `keys prune`, never younger than 30 days.
+
+`0003_limits.sql` (schema version 2) adds each plan's rate, burst and
+quotas and the usage table, one row per key, hour and operation. A store
+upgraded from version 1 gives every existing plan a rate and burst of 1
+and no quota until `keys plan` sets the real values. The role may add to
+usage rows but not delete them; `keys prune` removes those older than
+`metering.retention_days`, never younger than 30 days.
 
 Pepper rotation: set the new value as `auth.pepper` and the old one as
 `auth.pepper_previous`. A key that still matches under the old pepper is
@@ -82,19 +89,26 @@ reason, instant; never the secret, the MAC or an address) are written in one
 transaction.
 
 ```sh
-viafrei-api keys plan   -name standard -use-class commercial -tier standard -scopes roads,energy -sources src-a,src-b -actor ops
+viafrei-api keys plan   -name standard -use-class commercial -tier standard -scopes roads,energy -sources src-a,src-b \
+                        -rate 10 -burst 20 -quota-day 50000 -quota-month 1000000 -actor ops
 viafrei-api keys issue  -plan standard -label "Example GmbH" -contact ops@example.test -actor ops
 viafrei-api keys rotate -id <keyId> -actor ops          # the old secret stays valid for auth.rotation_overlap
 viafrei-api keys revoke -id <keyId> -reason "leaked" -actor ops
 viafrei-api keys move   -id <keyId> -plan pro -actor ops
 viafrei-api keys accept -id <keyId> -source src-b -version 2026-03-01 -actor ops
-viafrei-api keys prune  -actor ops                      # audit records past audit.retention_days
+viafrei-api keys prune  -actor ops                      # audit records past audit.retention_days, usage past metering.retention_days
+viafrei-api keys usage  -id <keyId> -hours 24           # usage per hour and operation; without -id, every key
 ```
 
 A key expires after `auth.default_expiry` unless `-expires` is given (at
 most 1 095 days). A revocation, a plan move, a plan change or an acceptance
 reaches every running instance within `auth.revocation_propagation`, and at
 the latest after `auth.key_cache_ttl`.
+
+A plan's `-rate` (requests per second) and `-burst` are its token bucket,
+each 1 to 100 000; `-quota-day` and `-quota-month` are quota units, 0 for
+none. `-tier` is `critical`, `standard` or `bulk`, the plan's priority in
+front of storage. See [rate limits](rate-limits.md).
 
 Exit status: 0 done, 1 refused by the store, 2 a usage or input error, 78 a
 configuration error.

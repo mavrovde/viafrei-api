@@ -1531,6 +1531,18 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           },
@@ -1551,6 +1563,36 @@
               }
             }
           },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -1559,7 +1601,21 @@
                 }
               }
             },
-            "description": "Error"
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1597,6 +1653,18 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           },
@@ -1617,6 +1685,36 @@
               }
             }
           },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -1625,7 +1723,21 @@
                 }
               }
             },
-            "description": "Error"
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1756,6 +1868,18 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           },
@@ -1776,6 +1900,36 @@
               }
             }
           },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -1784,7 +1938,21 @@
                 }
               }
             },
-            "description": "Error"
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1882,6 +2050,18 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           },
@@ -1902,6 +2082,36 @@
               }
             }
           },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
           "default": {
             "content": {
               "application/problem+json": {
@@ -1910,7 +2120,21 @@
                 }
               }
             },
-            "description": "Error"
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           }
         },
         "security": [

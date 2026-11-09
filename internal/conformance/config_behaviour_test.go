@@ -221,6 +221,9 @@ func probeVerdict(t *testing.T, c *config.Config) string {
 func TestEveryKeyChangesBehaviour(t *testing.T) {
 	req.Covers(t, "CFG-006")
 	all := behaviours()
+	for k, b := range limitBehaviours() {
+		all[k] = b
+	}
 	for _, f := range config.Fields() {
 		b, ok := all[f.Key]
 		if !ok {

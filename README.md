@@ -82,6 +82,7 @@ ViaFrei API has a **service skeleton** in Go with its first data endpoints. Noth
 | Container image (distroless, multi-arch) and local Compose stack | 🔄 In review — [docs/container.md](docs/container.md) |
 | CI, security checks and release pipeline | 🔄 In review — CI on every pull request; SAST, secrets, dependency, licence and DAST checks ([docs/security-checks.md](docs/security-checks.md)); release-please, signed images and release pages ([docs/RELEASING.md](docs/RELEASING.md)) |
 | Keys and the licence gate: hashed keys, scopes, rotation, revocation, audit log, `GET /v1/key` | 🔄 In review (milestone 0.4.0) — [docs/access-keys.md](docs/access-keys.md) |
+| Rate limits, quotas, priority tiers, deadlines, load shedding, usage metering | 🔄 In review (milestone 0.5.0) — [docs/rate-limits.md](docs/rate-limits.md) |
 | Rate limits and priority tiers | ⏳ Planned |
 | v1 feature endpoints | 🔄 In progress (milestone 0.6.0) — first slice: `GET /v1/charging-options`, `GET /v1/parking-options`, `GET /v1/places/{placeId}/overview` |
 

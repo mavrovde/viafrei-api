@@ -1,7 +1,8 @@
 {
-  "format": "viafrei.parity/1",
+  "format": "viafrei.parity/2",
   "platform": "unsynced",
-  "rules": "viafrei.parity.rules/1",
+  "producer": "api",
+  "rules": "viafrei.parity.rules/2",
   "fixture": {
     "profile": "tiny",
     "seed": 1,
@@ -32,7 +33,7 @@
           "value": "public"
         },
         {
-          "name": "data[cs-05-0012].chargePoints[cp-00012-0].availability.observedAt",
+          "name": "data[cs-05-0012].chargePoints[cp-00012-0].availability.reportedAt",
           "value": "2026-03-29T03:23:03Z"
         },
         {
@@ -52,7 +53,7 @@
           "value": "150"
         },
         {
-          "name": "data[cs-05-0012].chargePoints[cp-00012-1].availability.observedAt",
+          "name": "data[cs-05-0012].chargePoints[cp-00012-1].availability.reportedAt",
           "value": "2026-03-29T14:51:34Z"
         },
         {
@@ -72,7 +73,7 @@
           "value": "150"
         },
         {
-          "name": "data[cs-05-0012].chargePoints[cp-00012-2].availability.observedAt",
+          "name": "data[cs-05-0012].chargePoints[cp-00012-2].availability.reportedAt",
           "value": "2026-03-29T18:57:01Z"
         },
         {
@@ -92,7 +93,7 @@
           "value": "11"
         },
         {
-          "name": "data[cs-05-0012].chargePoints[cp-00012-3].availability.observedAt",
+          "name": "data[cs-05-0012].chargePoints[cp-00012-3].availability.reportedAt",
           "value": "2026-03-29T06:47:06Z"
         },
         {
@@ -192,11 +193,11 @@
           "value": "Synthetic data from family beta, licence lic-beta."
         },
         {
-          "name": "meta.freshness[src-beta-energy].ageS",
+          "name": "meta.freshness[src-beta-energy].ageSeconds",
           "value": "300"
         },
         {
-          "name": "meta.freshness[src-beta-energy].dataAsOf",
+          "name": "meta.freshness[src-beta-energy].asOf",
           "value": "2026-03-29T23:55:00Z"
         },
         {
@@ -208,7 +209,7 @@
           "value": "false"
         },
         {
-          "name": "meta.freshness[src-beta-energy].staleAfterS",
+          "name": "meta.freshness[src-beta-energy].staleAfterSeconds",
           "value": "3600"
         },
         {
@@ -261,7 +262,7 @@
           "value": "public"
         },
         {
-          "name": "data[cs-01-0000].chargePoints[cp-00000-0].availability.observedAt",
+          "name": "data[cs-01-0000].chargePoints[cp-00000-0].availability.reportedAt",
           "value": "2026-03-29T21:11:57Z"
         },
         {
@@ -281,7 +282,7 @@
           "value": "22"
         },
         {
-          "name": "data[cs-01-0000].chargePoints[cp-00000-1].availability.observedAt",
+          "name": "data[cs-01-0000].chargePoints[cp-00000-1].availability.reportedAt",
           "value": "2026-03-29T15:46:18Z"
         },
         {
@@ -301,7 +302,7 @@
           "value": "22"
         },
         {
-          "name": "data[cs-01-0000].chargePoints[cp-00000-2].availability.observedAt",
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].availability.reportedAt",
           "value": "2026-03-29T09:34:59Z"
         },
         {
@@ -365,7 +366,7 @@
           "value": "restricted"
         },
         {
-          "name": "data[cs-01-0001].chargePoints[cp-00001-0].availability.observedAt",
+          "name": "data[cs-01-0001].chargePoints[cp-00001-0].availability.reportedAt",
           "value": "2026-03-29T22:02:46Z"
         },
         {
@@ -385,7 +386,7 @@
           "value": "22"
         },
         {
-          "name": "data[cs-01-0001].chargePoints[cp-00001-1].availability.observedAt",
+          "name": "data[cs-01-0001].chargePoints[cp-00001-1].availability.reportedAt",
           "value": "2026-03-29T18:47:00Z"
         },
         {
@@ -405,7 +406,7 @@
           "value": "11"
         },
         {
-          "name": "data[cs-01-0001].chargePoints[cp-00001-2].availability.observedAt",
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].availability.reportedAt",
           "value": "2026-03-29T16:42:46Z"
         },
         {
@@ -425,7 +426,7 @@
           "value": "50"
         },
         {
-          "name": "data[cs-01-0001].chargePoints[cp-00001-3].availability.observedAt",
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].availability.reportedAt",
           "value": "2026-03-29T15:32:38Z"
         },
         {
@@ -525,11 +526,11 @@
           "value": "Synthetic data from family alpha, licence lic-alpha."
         },
         {
-          "name": "meta.freshness[src-alpha-energy].ageS",
+          "name": "meta.freshness[src-alpha-energy].ageSeconds",
           "value": "300"
         },
         {
-          "name": "meta.freshness[src-alpha-energy].dataAsOf",
+          "name": "meta.freshness[src-alpha-energy].asOf",
           "value": "2026-03-29T23:55:00Z"
         },
         {
@@ -541,7 +542,7 @@
           "value": "false"
         },
         {
-          "name": "meta.freshness[src-alpha-energy].staleAfterS",
+          "name": "meta.freshness[src-alpha-energy].staleAfterSeconds",
           "value": "3600"
         },
         {
@@ -670,11 +671,11 @@
           "value": "Synthetic data from family delta, licence lic-delta."
         },
         {
-          "name": "meta.freshness[src-delta-parking].ageS",
+          "name": "meta.freshness[src-delta-parking].ageSeconds",
           "value": "150"
         },
         {
-          "name": "meta.freshness[src-delta-parking].dataAsOf",
+          "name": "meta.freshness[src-delta-parking].asOf",
           "value": "2026-03-29T23:57:30Z"
         },
         {
@@ -686,12 +687,12 @@
           "value": "false"
         },
         {
-          "name": "meta.freshness[src-delta-parking].staleAfterS",
+          "name": "meta.freshness[src-delta-parking].staleAfterSeconds",
           "value": "1800"
         },
         {
           "name": "meta.notes.condition",
-          "value": "Use only after accepting the terms (synthetic)."
+          "value": "[\"Use only after accepting the terms (synthetic).\"]"
         },
         {
           "name": "meta.notes.purpose",
@@ -768,7 +769,7 @@
           "value": "93"
         },
         {
-          "name": "data[pk-07-0012].occupancy.observedAt",
+          "name": "data[pk-07-0012].occupancy.reportedAt",
           "value": "2026-03-29T22:01:21Z"
         },
         {
@@ -832,11 +833,11 @@
           "value": "Synthetic data from family delta, licence lic-delta."
         },
         {
-          "name": "meta.freshness[src-delta-parking].ageS",
+          "name": "meta.freshness[src-delta-parking].ageSeconds",
           "value": "150"
         },
         {
-          "name": "meta.freshness[src-delta-parking].dataAsOf",
+          "name": "meta.freshness[src-delta-parking].asOf",
           "value": "2026-03-29T23:57:30Z"
         },
         {
@@ -848,12 +849,12 @@
           "value": "false"
         },
         {
-          "name": "meta.freshness[src-delta-parking].staleAfterS",
+          "name": "meta.freshness[src-delta-parking].staleAfterSeconds",
           "value": "1800"
         },
         {
           "name": "meta.notes.condition",
-          "value": "Use only after accepting the terms (synthetic)."
+          "value": "[\"Use only after accepting the terms (synthetic).\"]"
         },
         {
           "name": "meta.notes.purpose",

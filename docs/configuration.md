@@ -64,7 +64,8 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `ratelimit.anon_burst` | `VFAPI_RATELIMIT_ANON_BURST` | int | `5` | 1 to 1000 | Burst of the per-address token bucket: requests a client address may make at once before ratelimit.anon_rps applies. |
 | `ratelimit.headers` | `VFAPI_RATELIMIT_HEADERS` | bool | `true` | — | Send RateLimit-Policy and RateLimit on every keyed answer (RATE-006). |
 | `ratelimit.ip_state_ttl` | `VFAPI_RATELIMIT_IP_STATE_TTL` | duration | `10m` | 1m to 60m | How long the state of an idle client address is kept; it is held in memory only and never stored (RATE-015). |
-| `ratelimit.ip_track_size` | `VFAPI_RATELIMIT_IP_TRACK_SIZE` | int | `100000` | 100 to 10000000 | Largest number of client addresses tracked at once; when full, idle entries are dropped first, then any one. |
+| `ratelimit.ip_track_size` | `VFAPI_RATELIMIT_IP_TRACK_SIZE` | int | `100000` | 100 to 10000000 | Largest number of client addresses tracked at once; when full, idle entries are dropped first, then the least recently seen. |
+| `ratelimit.ipv6_prefix` | `VFAPI_RATELIMIT_IPV6_PREFIX` | int | `64` | 32 to 128 | Prefix length an IPv6 client address is counted by: every address inside one such prefix shares one per-address bucket, since one subscriber is routinely given a whole /64 (RATE-001). 128 counts each address alone. |
 | `quota.reset_tz` | `VFAPI_QUOTA_RESET_TZ` | string | `Europe/Berlin` | IANA time zone | Time zone whose midnight resets the daily quota and whose first of the month resets the monthly quota (RATE-003). |
 | `tiers.critical.reserved` | `VFAPI_TIERS_CRITICAL_RESERVED` | int | `1` | 0 to 16 | Permits kept for the critical tier that lower tiers cannot use (RATE-009). |
 | `tiers.critical.queue_len` | `VFAPI_TIERS_CRITICAL_QUEUE_LEN` | int | `32` | 0 to 1024 | Critical requests that may wait for a permit; one more is shed. |

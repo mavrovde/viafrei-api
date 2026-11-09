@@ -57,6 +57,26 @@ func anonymousCodes(t *testing.T, c *config.Config) string {
 	return strings.Join(codes, ",")
 }
 
+// sixAddressesOfOneSubnet sends six keyless requests from six IPv6
+// addresses of one /64 and returns their status codes: by default they
+// share one bucket, so the sixth is over the burst.
+func sixAddressesOfOneSubnet(t *testing.T, c *config.Config) string {
+	t.Helper()
+	h, err := httpapi.NewHandler(httpapi.Deps{Config: c, Addresses: ratelimit.NewIPLimiter(wire.AddressSettings(c), nil)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var codes []string
+	for i := range 6 {
+		r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/healthz", nil)
+		r.RemoteAddr = fmt.Sprintf("[2001:db8:0:1::%x]:4000", i+1)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		codes = append(codes, fmt.Sprint(w.Code))
+	}
+	return strings.Join(codes, ",")
+}
+
 // keyed asks for /v1/key with a key the stub accepts, under the key gates
 // built from c and a register the admission sheds; it returns the status
 // and the RateLimit fields.
@@ -103,6 +123,7 @@ func limitBehaviours() map[string]behaviour {
 		"ratelimit.headers":             {"false", keyed},
 		"ratelimit.ip_state_ttl":        {"2m", addressSettings},
 		"ratelimit.ip_track_size":       {"500", addressSettings},
+		"ratelimit.ipv6_prefix":         {"128", sixAddressesOfOneSubnet},
 		"quota.reset_tz":                {"UTC", func(t *testing.T, c *config.Config) string { return wire.QuotaZone(c).String() }},
 		"tiers.critical.reserved":       {"2", admissionSettings},
 		"tiers.critical.queue_len":      {"8", admissionSettings},

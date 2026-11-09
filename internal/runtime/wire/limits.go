@@ -33,7 +33,7 @@ func AdmissionSettings(cfg *config.Config) admission.Settings {
 // AddressSettings reads the per-address ratelimit.* settings.
 func AddressSettings(cfg *config.Config) ratelimit.IPSettings {
 	r := cfg.RateLimit
-	return ratelimit.IPSettings{Rate: limits.Rate{Per: r.AnonRPS, Burst: r.AnonBurst}, TTL: r.IPStateTTL, Size: r.IPTrackSize}
+	return ratelimit.IPSettings{Rate: limits.Rate{Per: r.AnonRPS, Burst: r.AnonBurst}, TTL: r.IPStateTTL, Size: r.IPTrackSize, IPv6Prefix: r.IPv6Prefix}
 }
 
 // QuotaZone reads quota.reset_tz; the declaration has validated it.

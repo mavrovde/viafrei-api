@@ -6,7 +6,9 @@
 package ratelimit
 
 import (
+	"container/list"
 	"context"
+	"net/netip"
 	"sync"
 	"time"
 
@@ -21,20 +23,30 @@ type IPSettings struct {
 	TTL time.Duration
 	// Size bounds the addresses tracked at once.
 	Size int
+	// IPv6Prefix is the prefix length an IPv6 address is keyed by: every
+	// address inside one such prefix shares a bucket, since one subscriber
+	// is routinely handed a whole /64. Outside 1 to 128 the whole address
+	// is the key.
+	IPv6Prefix int
 }
 
 type ipState struct {
+	key    string
 	bucket limits.Bucket
 	seen   time.Time
 }
 
-// IPLimiter is the per-address flood control (RATE-001, SEC-051).
+// IPLimiter is the per-address flood control (RATE-001, SEC-051). Its
+// table is a least-recently-seen list: a new address, an eviction and an
+// expiry each cost O(1), however full the table is.
 type IPLimiter struct {
 	s   IPSettings
 	now func() time.Time
 
 	mu    sync.Mutex
-	state map[string]*ipState
+	state map[string]*list.Element
+	// order holds the entries, the most recently seen at the front.
+	order *list.List
 }
 
 // NewIPLimiter returns a limiter; now is the clock (time.Now when nil).
@@ -42,7 +54,25 @@ func NewIPLimiter(s IPSettings, now func() time.Time) *IPLimiter {
 	if now == nil {
 		now = time.Now
 	}
-	return &IPLimiter{s: s, now: now, state: map[string]*ipState{}}
+	if s.IPv6Prefix < 1 || s.IPv6Prefix > 128 {
+		s.IPv6Prefix = 128
+	}
+	return &IPLimiter{s: s, now: now, state: map[string]*list.Element{}, order: list.New()}
+}
+
+// keyOf is the bucket key of a client address: an IPv4 address itself, an
+// IPv6 address its IPv6Prefix, anything that is no address as written.
+func (l *IPLimiter) keyOf(client string) string {
+	a, err := netip.ParseAddr(client)
+	if err != nil {
+		return client
+	}
+	a = a.Unmap().WithZone("")
+	if a.Is4() {
+		return a.String()
+	}
+	p, _ := a.Prefix(l.s.IPv6Prefix) // an unzoned IPv6 address and 1 to 128 bits never fail
+	return p.String()
 }
 
 // Take charges one request of client. A refusal carries the time until a
@@ -51,15 +81,19 @@ func (l *IPLimiter) Take(client string) limits.Decision {
 	if l.s.Rate.Per == 0 {
 		return limits.Decision{Allowed: true}
 	}
+	key := l.keyOf(client)
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := l.now()
-	st, ok := l.state[client]
-	if !ok {
+	e, ok := l.state[key]
+	if ok {
+		l.order.MoveToFront(e)
+	} else {
 		l.makeRoom(now)
-		st = &ipState{}
-		l.state[client] = st
+		e = l.order.PushFront(&ipState{key: key})
+		l.state[key] = e
 	}
+	st := e.Value.(*ipState)
 	st.seen = now
 	return st.bucket.Take(now, l.s.Rate)
 }
@@ -70,19 +104,24 @@ func (l *IPLimiter) makeRoom(now time.Time) {
 	if len(l.state) < l.s.Size {
 		return
 	}
-	var oldest string
-	for k, v := range l.state {
-		if now.Sub(v.seen) >= l.s.TTL {
-			delete(l.state, k)
-			continue
-		}
-		if oldest == "" || v.seen.Before(l.state[oldest].seen) {
-			oldest = k
-		}
-	}
+	l.expire(now)
 	if len(l.state) >= l.s.Size {
-		delete(l.state, oldest)
+		l.remove(l.order.Back())
 	}
+}
+
+// expire drops entries from the back while they are idle longer than the
+// TTL: the list is ordered by when each was last seen, so it stops at the
+// first one that is not.
+func (l *IPLimiter) expire(now time.Time) {
+	for e := l.order.Back(); e != nil && now.Sub(e.Value.(*ipState).seen) >= l.s.TTL; e = l.order.Back() {
+		l.remove(e)
+	}
+}
+
+func (l *IPLimiter) remove(e *list.Element) {
+	delete(l.state, e.Value.(*ipState).key)
+	l.order.Remove(e)
 }
 
 // Expire drops the state of every address idle longer than the TTL
@@ -90,12 +129,7 @@ func (l *IPLimiter) makeRoom(now time.Time) {
 func (l *IPLimiter) Expire() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	now := l.now()
-	for k, v := range l.state {
-		if now.Sub(v.seen) >= l.s.TTL {
-			delete(l.state, k)
-		}
-	}
+	l.expire(l.now())
 }
 
 // Tracked returns the number of addresses held.

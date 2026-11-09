@@ -3,6 +3,7 @@ package ratelimit_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -93,6 +94,64 @@ func TestAddressStateExpiresAndIsBounded(t *testing.T) {
 	l.Expire()
 	if l.Tracked() != 0 {
 		t.Fatal("not expired after the TTL")
+	}
+}
+
+func TestAFullAddressTableStaysBoundedAndEvictsTheLeastRecentlySeen(t *testing.T) {
+	req.Covers(t, "RATE-015", "SEC-051")
+	clk := &clock{t0}
+	const size = 100
+	l := ratelimit.NewIPLimiter(ratelimit.IPSettings{Rate: limits.Rate{Per: 1, Burst: 1}, TTL: time.Hour, Size: size, IPv6Prefix: 64}, clk.now)
+	l.Take("192.0.2.1")
+	for i := range 50 * size {
+		clk.t = clk.t.Add(time.Microsecond)
+		if i%10 == 0 {
+			// Seen again and again: never the least recently seen.
+			if l.Take("192.0.2.1").Allowed {
+				t.Fatal("the busy address lost its state")
+			}
+		}
+		if !l.Take(fmt.Sprintf("10.%d.%d.%d", i>>16, (i>>8)&255, i&255)).Allowed {
+			t.Fatalf("new address %d refused", i)
+		}
+		if n := l.Tracked(); n > size {
+			t.Fatalf("tracked %d of at most %d", n, size)
+		}
+	}
+	if l.Tracked() != size {
+		t.Fatalf("tracked %d", l.Tracked())
+	}
+}
+
+func TestIPv6AddressesShareTheBucketOfTheirPrefix(t *testing.T) {
+	req.Covers(t, "RATE-001", "SEC-051")
+	for _, tc := range []struct {
+		prefix int
+		other  string
+		shared bool
+	}{
+		{64, "2001:db8:0:1:ffff:ffff:ffff:ffff", true},
+		{64, "2001:db8:0:2::1", false},
+		{48, "2001:db8:0:2::1", true},
+		{128, "2001:db8:0:1::2", false},
+		{0, "2001:db8:0:1::2", false},    // outside 1 to 128: the whole address
+		{129, "2001:db8:0:1::2", false},  // outside 1 to 128: the whole address
+		{64, "[2001:db8:0:1::1]", false}, // no address: as written
+	} {
+		l := ratelimit.NewIPLimiter(ratelimit.IPSettings{Rate: limits.Rate{Per: 1, Burst: 1}, TTL: time.Minute, Size: 10, IPv6Prefix: tc.prefix}, (&clock{t0}).now)
+		l.Take("2001:db8:0:1::1%eth0")
+		if got := !l.Take(tc.other).Allowed; got != tc.shared {
+			t.Errorf("/%d %s: shared %v, want %v", tc.prefix, tc.other, got, tc.shared)
+		}
+	}
+	// IPv4, also mapped into IPv6, is keyed by the whole address.
+	l := ratelimit.NewIPLimiter(ratelimit.IPSettings{Rate: limits.Rate{Per: 1, Burst: 1}, TTL: time.Minute, Size: 10, IPv6Prefix: 64}, (&clock{t0}).now)
+	l.Take("::ffff:192.0.2.1")
+	if l.Take("192.0.2.1").Allowed {
+		t.Error("a mapped IPv4 address has a bucket of its own")
+	}
+	if !l.Take("192.0.2.2").Allowed {
+		t.Error("two IPv4 addresses share a bucket")
 	}
 }
 

@@ -171,7 +171,8 @@ type RateLimit struct {
 	AnonBurst   int           `koanf:"anon_burst" default:"5" validate:"min=1,max=1000" desc:"Burst of the per-address token bucket: requests a client address may make at once before ratelimit.anon_rps applies."`
 	Headers     bool          `koanf:"headers" default:"true" desc:"Send RateLimit-Policy and RateLimit on every keyed answer (RATE-006)."`
 	IPStateTTL  time.Duration `koanf:"ip_state_ttl" default:"10m" validate:"min=1m,max=60m" desc:"How long the state of an idle client address is kept; it is held in memory only and never stored (RATE-015)."`
-	IPTrackSize int           `koanf:"ip_track_size" default:"100000" validate:"min=100,max=10000000" desc:"Largest number of client addresses tracked at once; when full, idle entries are dropped first, then any one."`
+	IPTrackSize int           `koanf:"ip_track_size" default:"100000" validate:"min=100,max=10000000" desc:"Largest number of client addresses tracked at once; when full, idle entries are dropped first, then the least recently seen."`
+	IPv6Prefix  int           `koanf:"ipv6_prefix" default:"64" validate:"min=32,max=128" desc:"Prefix length an IPv6 client address is counted by: every address inside one such prefix shares one per-address bucket, since one subscriber is routinely given a whole /64 (RATE-001). 128 counts each address alone."`
 }
 
 // Quota holds the quota-window settings (gate 3).

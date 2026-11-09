@@ -176,7 +176,7 @@ func featureResponses(api huma.API, op *huma.Operation, notFound string) {
 	}
 	op.Responses["404"] = &huma.Response{Description: notFound, Content: problem}
 	op.Responses["503"] = &huma.Response{
-		Description: "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable); retryable, with Retry-After.",
+		Description: "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After.",
 		Headers:     map[string]*huma.Param{"Retry-After": {Schema: &huma.Schema{Type: huma.TypeInteger}}},
 		Content:     problem,
 	}
@@ -585,7 +585,7 @@ func registerOverview(api huma.API, s *server, op huma.Operation) {
 	op.Description = "A composed answer: the place, then each asked part (charging, parking) around it, each under the licence gate on its own and within its own sub-deadline (compose.part_deadline). A part that is not ok is absent from data and named in meta.parts. 200 when at least one part is ok. Needs the scope places; each part also needs its own scope."
 	featureResponses(api, &op, "No place with this id (not-found), or the operation is switched off on this instance (feature-disabled).")
 	op.Responses["403"].Description = "The key's plan lacks the scope places (scope-denied), no places family is permitted to it (source-not-permitted, terms-not-accepted), or no asked part is permitted (source-not-permitted)."
-	op.Responses["503"].Description = "Storage did not answer in time or is unavailable for the place, or no asked part is ok (deadline-exhausted, upstream-unavailable); retryable, with Retry-After."
+	op.Responses["503"].Description = "Storage did not answer in time or is unavailable for the place, or no asked part is ok (deadline-exhausted, upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After."
 	huma.Register(api, op, func(ctx context.Context, in *OverviewInput) (*OverviewOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err

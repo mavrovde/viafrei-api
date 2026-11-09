@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/store/contractdb"
+	"github.com/mavrovde/viafrei-api/internal/app/admission"
 	"github.com/mavrovde/viafrei-api/internal/invariant"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
@@ -37,6 +38,15 @@ type Store struct {
 	reserve time.Duration
 	floor   time.Duration
 	nowFn   func() time.Time
+	admit   *admission.Controller
+}
+
+// WithAdmission puts the priority admission in front of every read: a read
+// first takes one of its permits, which equal the pool, so no read waits in
+// the pool itself (RATE-008).
+func (s *Store) WithAdmission(c *admission.Controller) *Store {
+	s.admit = c
+	return s
 }
 
 // PoolConfig translates the configuration into a pgx pool configuration.
@@ -120,6 +130,21 @@ func (s *Store) Read(ctx context.Context, fn func(context.Context, pgx.Tx) error
 		ctx, cancel = context.WithTimeout(ctx, s.request)
 		defer cancel()
 	}
+	if _, ok := s.Budget(ctx); !ok {
+		return ErrDeadlineExhausted
+	}
+	if s.admit != nil {
+		release, err := s.admit.Acquire(ctx)
+		if err != nil {
+			if errors.Is(err, admission.ErrOverloaded) {
+				return err
+			}
+			return fmt.Errorf("%w: %w", ErrDeadlineExhausted, err)
+		}
+		defer release()
+	}
+	// The wait for a permit spent part of the budget: what is left is the
+	// statement timeout.
 	budget, ok := s.Budget(ctx)
 	if !ok {
 		return ErrDeadlineExhausted

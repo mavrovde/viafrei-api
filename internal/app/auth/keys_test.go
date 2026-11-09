@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
+	"github.com/mavrovde/viafrei-api/internal/app/metering"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
@@ -24,6 +25,7 @@ type fakeLedger struct {
 	moved   []string
 	accepts []access.Acceptance
 	before  []time.Time
+	kept    []int
 	err     error
 }
 
@@ -62,6 +64,16 @@ func (l *fakeLedger) Accept(_ context.Context, c auth.Change, a access.Acceptanc
 func (l *fakeLedger) PruneAudit(_ context.Context, c auth.Change, before time.Time) (int64, error) {
 	l.before = append(l.before, before)
 	return 3, l.note(c)
+}
+
+func (l *fakeLedger) PruneUsage(_ context.Context, c auth.Change, keepDays int) (int64, error) {
+	l.kept = append(l.kept, keepDays)
+	return 5, l.note(c)
+}
+
+func (l *fakeLedger) Usage(_ context.Context, id string, since time.Time) ([]metering.Row, error) {
+	l.before = append(l.before, since)
+	return []metering.Row{{Key: id}}, l.err
 }
 
 func newKeys(l *fakeLedger) *auth.Keys {
@@ -171,7 +183,8 @@ func TestLifecycleValidatesAndAudits(t *testing.T) {
 	l := &fakeLedger{}
 	k := newKeys(l)
 	ctx := context.Background()
-	good := access.Plan{Name: "pro", UseClass: "commercial", Tier: "standard", Scopes: []access.Scope{"roads"}, Sources: []string{"alpha"}}
+	good := access.Plan{Name: "pro", UseClass: "commercial", Tier: "standard", Scopes: []access.Scope{"roads"}, Sources: []string{"alpha"},
+		Rate: 1, Burst: 100000, QuotaDay: 0, QuotaMonth: 0}
 	if err := k.PutPlan(ctx, good, "o"); err != nil {
 		t.Fatal(err)
 	}
@@ -205,6 +218,14 @@ func TestLifecycleValidatesAndAudits(t *testing.T) {
 		{"plan use class", k.PutPlan(ctx, access.Plan{Name: "x", UseClass: "everyone", Tier: "bulk"}, "o")},
 		{"plan tier", k.PutPlan(ctx, access.Plan{Name: "x", UseClass: "consumer", Tier: "gold"}, "o")},
 		{"plan scope", k.PutPlan(ctx, access.Plan{Name: "x", UseClass: "consumer", Tier: "bulk", Scopes: []access.Scope{"all"}}, "o")},
+		{"plan no rate", k.PutPlan(ctx, withLimits(good, 0, 1, 0, 0), "o")},
+		{"plan rate too high", k.PutPlan(ctx, withLimits(good, 100001, 1, 0, 0), "o")},
+		{"plan no burst", k.PutPlan(ctx, withLimits(good, 1, 0, 0, 0), "o")},
+		{"plan burst too high", k.PutPlan(ctx, withLimits(good, 1, 100001, 0, 0), "o")},
+		{"plan negative day quota", k.PutPlan(ctx, withLimits(good, 1, 1, -1, 0), "o")},
+		{"plan negative month quota", k.PutPlan(ctx, withLimits(good, 1, 1, 0, -1), "o")},
+		{"prune usage no actor", func() error { _, err := k.PruneUsage(ctx, ""); return err }()},
+		{"usage no window", func() error { _, err := k.Usage(ctx, "", 0); return err }()},
 		{"revoke no reason", k.Revoke(ctx, "abcdefghij", "", "o")},
 		{"move no plan", k.Move(ctx, "abcdefghij", "", "o")},
 		{"accept no version", k.Accept(ctx, "abcdefghij", "delta", "", "o")},
@@ -214,5 +235,34 @@ func TestLifecycleValidatesAndAudits(t *testing.T) {
 		if !errors.Is(b.err, auth.ErrInput) {
 			t.Errorf("%s: %v", b.name, b.err)
 		}
+	}
+}
+
+func withLimits(p access.Plan, rate, burst int, day, month int64) access.Plan {
+	p.Rate, p.Burst, p.QuotaDay, p.QuotaMonth = rate, burst, day, month
+	return p
+}
+
+func TestUsageReadAndPrune(t *testing.T) {
+	req.Covers(t, "RATE-014")
+	l := &fakeLedger{}
+	k := newKeys(l)
+	ctx := context.Background()
+	if err := k.PutPlan(ctx, access.Plan{Name: "p", UseClass: "consumer", Tier: "bulk", Rate: 100000, Burst: 1, QuotaDay: 9, QuotaMonth: 90}, "o"); err != nil {
+		t.Fatalf("the upper rate bound and quotas refused: %v", err)
+	}
+	if n, err := k.PruneUsage(ctx, "o"); err != nil || n != 5 || l.kept[0] != 400 {
+		t.Fatalf("prune usage %d %v %v", n, err, l.kept)
+	}
+	if c := l.changes[1]; c.Action != auth.ActionUsage || c.Actor != "o" || !c.At.Equal(t0) {
+		t.Fatalf("usage prune not audited: %+v", c)
+	}
+	rows, err := k.Usage(ctx, "abcdefghij", 90*time.Minute)
+	// The window starts at the full hour before now minus the window.
+	if err != nil || len(rows) != 1 || rows[0].Key != "abcdefghij" || !l.before[0].Equal(t0.Add(-90*time.Minute).UTC().Truncate(time.Hour)) {
+		t.Fatalf("usage %v %v %v", rows, err, l.before)
+	}
+	if _, err := k.Usage(ctx, "", -time.Hour); !errors.Is(err, auth.ErrInput) {
+		t.Errorf("a negative window: %v", err)
 	}
 }

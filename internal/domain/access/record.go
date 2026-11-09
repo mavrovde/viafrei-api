@@ -48,6 +48,12 @@ type Plan struct {
 	Scopes   []Scope
 	// Sources are the source families the plan includes.
 	Sources []string
+	// Rate and Burst are the plan's token bucket: Rate requests a second,
+	// Burst at once (RATE-002).
+	Rate, Burst int
+	// QuotaDay and QuotaMonth are the units a key may use per quota day
+	// and month; 0 means no quota (RATE-003).
+	QuotaDay, QuotaMonth int64
 }
 
 // Has reports whether the plan grants scope.

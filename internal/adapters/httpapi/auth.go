@@ -3,7 +3,6 @@ package httpapi
 import (
 	"context"
 	"errors"
-	"net"
 	"net/http"
 	"reflect"
 	"strings"
@@ -11,7 +10,9 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/mavrovde/viafrei-api/internal/app/admission"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
+	"github.com/mavrovde/viafrei-api/internal/app/metering"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 )
 
@@ -79,12 +80,13 @@ func presented(ctx huma.Context) string {
 	return strings.TrimSpace(ctx.Header(APIKeyHeader))
 }
 
+// clientAddress is the request's client address as withClient found it,
+// else the immediate peer.
 func clientAddress(ctx huma.Context) string {
-	host, _, err := net.SplitHostPort(ctx.RemoteAddr())
-	if err != nil {
-		return ctx.RemoteAddr()
+	if c := clientFrom(ctx.Context()); c != "" {
+		return c
 	}
-	return host
+	return peer(ctx.RemoteAddr())
 }
 
 // challenge is the WWW-Authenticate value of a 401 answer.
@@ -138,11 +140,24 @@ func (s *server) authenticate(api huma.API) func(huma.Context, func(huma.Context
 			scope, _ := op.Metadata[scopeExtension].(access.Scope)
 			if err != nil {
 				p = authProblem(ctx.Context(), err, int(s.cfg.Auth.FailureWindow.Seconds()))
-			} else if scope != "" && !principal.Key.Plan.Has(scope) {
-				p = newProblem(ctx.Context(), SlugScopeDenied, "The key's plan does not include the scope "+string(scope)+".", 0)
 			} else {
-				next(huma.WithValue(ctx, principalKey{}, principal))
-				return
+				// From here the key is known: the request counts against it
+				// and is metered whatever its answer (RATE-004, RATE-014).
+				refused := metering.Refusal("")
+				defer func() { s.meter(ctx, principal.Key.ID, refused) }()
+				if p, refused = s.keyGates(ctx, principal.Key); p == nil {
+					if scope != "" && !principal.Key.Plan.Has(scope) {
+						p = newProblem(ctx.Context(), SlugScopeDenied, "The key's plan does not include the scope "+string(scope)+".", 0)
+					} else {
+						o := &outcome{}
+						rctx := admission.WithTally(context.WithValue(ctx.Context(), outcomeKey{}, o))
+						rctx = admission.WithCaller(rctx, admission.Caller{Tier: admission.TierNamed(principal.Key.Plan.Tier), Key: principal.Key.ID})
+						ctx = huma.WithContext(ctx, rctx)
+						next(huma.WithValue(ctx, principalKey{}, principal))
+						refused = o.refused
+						return
+					}
+				}
 			}
 		}
 		for k, vs := range p.headers {
@@ -161,6 +176,11 @@ var gateViolations atomic.Int64
 // GateViolations returns the number of answers the post-check aborted.
 func GateViolations() int64 { return gateViolations.Load() }
 
+// rateLimitDoc pins the draft revision whose syntax the RateLimit fields
+// follow (RATE-006).
+const rateLimitDoc = "Sent on every keyed answer but a 401, success or error, in the syntax of " + RateLimitDraft +
+	": a burst policy, and a day and a month policy for a plan with those quotas."
+
 // keyedResponses documents the refusals every keyed operation may answer
 // besides its own: a 401 carries the WWW-Authenticate challenge (RFC 6750).
 func keyedResponses(api huma.API) map[string]*huma.Response {
@@ -172,6 +192,39 @@ func keyedResponses(api huma.API) map[string]*huma.Response {
 			Headers:     map[string]*huma.Param{"WWW-Authenticate": {Schema: &huma.Schema{Type: huma.TypeString}}},
 			Content:     problem,
 		},
+		"429": {
+			Description: "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+			Headers: map[string]*huma.Param{
+				"Retry-After":      {Description: "Whole seconds to wait before retrying.", Schema: &huma.Schema{Type: huma.TypeInteger}},
+				"RateLimit-Policy": {Description: rateLimitDoc, Schema: &huma.Schema{Type: huma.TypeString}},
+				"RateLimit":        {Description: rateLimitDoc, Schema: &huma.Schema{Type: huma.TypeString}},
+			},
+			Content: problem,
+		},
 		"default": {Description: "Error", Content: problem},
+	}
+}
+
+// documentRateLimit adds the RateLimit fields to every answer of every keyed
+// operation in the document (RATE-006), but the 401: a refused key reaches
+// no key gate, so its answer carries none.
+func documentRateLimit(api huma.API) {
+	for _, item := range api.OpenAPI().Paths {
+		for _, op := range []*huma.Operation{item.Get, item.Head, item.Post, item.Put, item.Patch, item.Delete} {
+			if op == nil || len(op.Security) == 0 {
+				continue
+			}
+			for status, r := range op.Responses {
+				if status == "401" {
+					continue
+				}
+				if r.Headers == nil {
+					r.Headers = map[string]*huma.Param{}
+				}
+				for _, name := range []string{"RateLimit-Policy", "RateLimit"} {
+					r.Headers[name] = &huma.Param{Description: rateLimitDoc, Schema: &huma.Schema{Type: huma.TypeString}}
+				}
+			}
+		}
 	}
 }

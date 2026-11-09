@@ -15,6 +15,7 @@ import (
 
 	accessdb "github.com/mavrovde/viafrei-api/db/access"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
+	"github.com/mavrovde/viafrei-api/internal/app/metering"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/invariant"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
@@ -74,7 +75,7 @@ func (s *Store) CheckSchema(ctx context.Context) error {
 
 const lookupSQL = `
 select k.key_id, k.environment, k.mac, k.previous_mac, coalesce(k.previous_until, 'epoch'), k.expires_at, k.revoked_at,
-       p.plan_name, p.use_class, p.tier, p.scopes, p.sources,
+       p.plan_name, p.use_class, p.tier, p.scopes, p.sources, p.rate_per_second, p.burst, p.quota_day, p.quota_month,
        coalesce((select array_agg(a.source_family order by a.source_family, a.terms_version) from access.terms_acceptance a where a.key_id = k.key_id), '{}'),
        coalesce((select array_agg(a.terms_version order by a.source_family, a.terms_version) from access.terms_acceptance a where a.key_id = k.key_id), '{}')
 from access.api_key k join access.plan p using (plan_name)
@@ -88,7 +89,8 @@ func (s *Store) Lookup(ctx context.Context, id string) (access.Record, error) {
 		scopes, fams, terms []string
 	)
 	err := s.pool.QueryRow(ctx, lookupSQL, id).Scan(&r.ID, &env, &r.MAC, &r.PreviousMAC, &r.PreviousUntil, &r.ExpiresAt, &r.RevokedAt,
-		&r.Plan.Name, &useClass, &r.Plan.Tier, &scopes, &r.Plan.Sources, &fams, &terms)
+		&r.Plan.Name, &useClass, &r.Plan.Tier, &scopes, &r.Plan.Sources,
+		&r.Plan.Rate, &r.Plan.Burst, &r.Plan.QuotaDay, &r.Plan.QuotaMonth, &fams, &terms)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return access.Record{}, auth.ErrUnknown
 	}
@@ -169,10 +171,13 @@ func (s *Store) PutPlan(ctx context.Context, c auth.Change, p access.Plan) error
 	}
 	return s.write(ctx, c, nil, &p.Name, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `
-insert into access.plan (plan_name, use_class, tier, scopes, sources, changed_at) values ($1, $2, $3, $4, $5, $6)
+insert into access.plan (plan_name, use_class, tier, scopes, sources, rate_per_second, burst, quota_day, quota_month, changed_at)
+values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 on conflict (plan_name) do update set use_class = excluded.use_class, tier = excluded.tier,
-    scopes = excluded.scopes, sources = excluded.sources, changed_at = excluded.changed_at`,
-			p.Name, string(p.UseClass), p.Tier, scopes, sources, c.At)
+    scopes = excluded.scopes, sources = excluded.sources, rate_per_second = excluded.rate_per_second,
+    burst = excluded.burst, quota_day = excluded.quota_day, quota_month = excluded.quota_month,
+    changed_at = excluded.changed_at`,
+			p.Name, string(p.UseClass), p.Tier, scopes, sources, p.Rate, p.Burst, p.QuotaDay, p.QuotaMonth, c.At)
 		return err
 	})
 }
@@ -236,6 +241,80 @@ func (s *Store) PruneAudit(ctx context.Context, c auth.Change, before time.Time)
 	var n int64
 	err := s.write(ctx, c, nil, nil, func(tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `select access.prune_audit($1)`, before).Scan(&n)
+	})
+	return n, err
+}
+
+// AddUsage implements metering.Writer: the rows are added to the stored
+// usage in one statement; a row that exists is added to.
+func (s *Store) AddUsage(ctx context.Context, rows []metering.Row) error {
+	n := len(rows)
+	keys, ops, hours := make([]string, n), make([]string, n), make([]time.Time, n)
+	cols := [7][]int64{}
+	for c := range cols {
+		cols[c] = make([]int64, n)
+	}
+	for i, r := range rows {
+		keys[i], hours[i], ops[i] = r.Key, r.Hour, r.Operation
+		for c, v := range []int64{r.Requests, r.NotModified, r.RateLimited, r.QuotaExceeded,
+			r.Overloaded, r.DeadlineExhausted, r.Storage.Milliseconds()} {
+			cols[c][i] = v
+		}
+	}
+	_, err := s.pool.Exec(ctx, addUsageSQL, keys, hours, ops, cols[0], cols[1], cols[2], cols[3], cols[4], cols[5], cols[6])
+	return err
+}
+
+const addUsageSQL = `
+insert into access.usage as u (key_id, hour, operation, requests, not_modified, rate_limited, quota_exceeded,
+    overloaded, deadline_exhausted, storage_ms)
+select * from unnest($1::text[], $2::timestamptz[], $3::text[], $4::bigint[], $5::bigint[], $6::bigint[],
+    $7::bigint[], $8::bigint[], $9::bigint[], $10::bigint[])
+on conflict (key_id, hour, operation) do update set
+    requests = u.requests + excluded.requests, not_modified = u.not_modified + excluded.not_modified,
+    rate_limited = u.rate_limited + excluded.rate_limited, quota_exceeded = u.quota_exceeded + excluded.quota_exceeded,
+    overloaded = u.overloaded + excluded.overloaded, deadline_exhausted = u.deadline_exhausted + excluded.deadline_exhausted,
+    storage_ms = u.storage_ms + excluded.storage_ms`
+
+// Used implements ratelimit.UsageReader: the quota units a key used since the
+// start of its quota day and of its quota month, as recorded. A unit is a
+// request both key gates admitted, so the ones they refused are not counted.
+func (s *Store) Used(ctx context.Context, key string, dayStart, monthStart time.Time) (day, month int64, err error) {
+	err = s.pool.QueryRow(ctx, `
+select coalesce(sum(requests - rate_limited - quota_exceeded) filter (where hour >= $2), 0)::bigint,
+       coalesce(sum(requests - rate_limited - quota_exceeded) filter (where hour >= $3), 0)::bigint
+from access.usage where key_id = $1 and hour >= least($2::timestamptz, $3::timestamptz)`,
+		key, dayStart, monthStart).Scan(&day, &month)
+	return day, month, err
+}
+
+// Usage implements auth.Ledger.
+func (s *Store) Usage(ctx context.Context, id string, since time.Time) ([]metering.Row, error) {
+	rows, err := s.pool.Query(ctx, `
+select key_id, hour, operation, requests, not_modified, rate_limited, quota_exceeded, overloaded,
+       deadline_exhausted, storage_ms
+from access.usage where hour >= $2 and ($1 = '' or key_id = $1)
+order by hour, key_id, operation`, id, since)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (metering.Row, error) {
+		var (
+			u  metering.Row
+			ms int64
+		)
+		err := r.Scan(&u.Key, &u.Hour, &u.Operation, &u.Requests, &u.NotModified, &u.RateLimited,
+			&u.QuotaExceeded, &u.Overloaded, &u.DeadlineExhausted, &ms)
+		u.Hour, u.Storage = u.Hour.UTC(), time.Duration(ms)*time.Millisecond
+		return u, err
+	})
+}
+
+// PruneUsage implements auth.Ledger.
+func (s *Store) PruneUsage(ctx context.Context, c auth.Change, keepDays int) (int64, error) {
+	var n int64
+	err := s.write(ctx, c, nil, nil, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `select access.prune_usage($1)`, keepDays).Scan(&n)
 	})
 	return n, err
 }

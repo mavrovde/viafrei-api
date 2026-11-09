@@ -14,7 +14,7 @@ func Bounds(f Field) string {
 	for rule := range strings.SplitSeq(f.Validate, ",") {
 		name, param, _ := strings.Cut(rule, "=")
 		switch name {
-		case "", "omitempty", "required":
+		case "", "omitempty", "required", "dive":
 		case "min":
 			min = param
 		case "max":
@@ -29,6 +29,10 @@ func Bounds(f Field) string {
 			parts = append(parts, "starts with "+param)
 		case "contract_version":
 			parts = append(parts, "major.minor")
+		case "cidr":
+			parts = append(parts, "CIDR list")
+		case "timezone":
+			parts = append(parts, "IANA time zone")
 		default:
 			parts = append(parts, rule)
 		}
@@ -62,7 +66,7 @@ func WriteReference(w io.Writer) error {
 	fmt.Fprintf(&b, "(path in `%s`), then environment variables. ", FileEnv)
 	b.WriteString("The service refuses to start on an unknown key, an unknown variable with the prefix, a value out of bounds or a broken cross-field rule, and lists every violation. ")
 	fmt.Fprintf(&b, "Secrets are read only from the environment or from a file named by the `_FILE` variant (one of the two, never both), never from the YAML file, and are never printed. Exit status on a configuration error: %d.\n\n", ExitCode)
-	b.WriteString("Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadline.request`; `health.ready_timeout` ≤ `deadline.request`; `db.statement_timeout_floor` < `deadline.request` − `deadline.reserve`; `compose.part_deadline` × the number of overview parts ≤ `deadline.request` − `deadline.reserve`.\n\n")
+	b.WriteString("Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadline.request`; `health.ready_timeout` ≤ `deadline.request`; `db.statement_timeout_floor` < `deadline.request` − `deadline.reserve`; `compose.part_deadline` × the number of overview parts ≤ `deadline.request` − `deadline.reserve`; the sum of `tiers.*.reserved`, `tiers.bulk.max_inflight` and `tiers.per_key_inflight` are each ≤ `db.pool_max`; every `tiers.*.queue_max_wait` < `deadline.request`.\n\n")
 	b.WriteString("| Key | Environment | Type | Default | Bounds | Description |\n")
 	b.WriteString("|---|---|---|---|---|---|\n")
 	for _, f := range Fields() {

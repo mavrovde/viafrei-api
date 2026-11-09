@@ -36,6 +36,12 @@ if [[ ! -f .env ]]; then
   export API_READER_PASSWORD="${API_READER_PASSWORD:-$(openssl rand -hex 16)}"
 fi
 
+# The fuzzer sends hundreds of keyless requests from one address, which the
+# per-address limit (RATE-001) would answer with 429 after the first few, so
+# the run would test the limiter and nothing else. It is switched off for this
+# stack only; the unit and conformance tests prove the limit.
+export VFAPI_RATELIMIT_ANON_RPS=0
+
 checks=0
 fail() { echo "FAIL: $*" >&2; exit 1; }
 teardown() {

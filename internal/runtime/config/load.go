@@ -210,6 +210,21 @@ func assign(dst reflect.Value, typ string, raw any) error {
 		default:
 			return fmt.Errorf("%v is not a whole number", raw)
 		}
+	case "float":
+		switch v := raw.(type) {
+		case string:
+			x, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+			if err != nil {
+				return fmt.Errorf("%q is not a number", v)
+			}
+			dst.SetFloat(x)
+		case float64:
+			dst.SetFloat(v)
+		case int:
+			dst.SetFloat(float64(v))
+		default:
+			return fmt.Errorf("%v is not a number", raw)
+		}
 	case "bool":
 		switch v := raw.(type) {
 		case string:
@@ -338,7 +353,37 @@ func crossField(c *Config) Errors {
 	if parts := len(features.Parts); c.Compose.PartDeadline*time.Duration(parts) > c.Deadline.Request-c.Deadline.Reserve {
 		out = append(out, fmt.Sprintf("compose.part_deadline: %s × %d parts is longer than deadline.request minus deadline.reserve", c.Compose.PartDeadline, parts))
 	}
-	return append(out, crossFieldAuth(c)...)
+	out = append(out, crossFieldAuth(c)...)
+	return append(out, crossFieldTiers(c)...)
+}
+
+// crossFieldTiers holds the admission tiers inside the permit pool and the
+// deadline (RATE-008, RATE-009).
+func crossFieldTiers(c *Config) Errors {
+	var out Errors
+	t := c.Tiers
+	if r := t.Critical.Reserved + t.Standard.Reserved + t.Bulk.Reserved; r > c.DB.PoolMax {
+		out = append(out, fmt.Sprintf("tiers.*.reserved: %d reserved permits are more than db.pool_max %d", r, c.DB.PoolMax))
+	}
+	if t.Bulk.MaxInflight > c.DB.PoolMax {
+		out = append(out, fmt.Sprintf("tiers.bulk.max_inflight: %d is more than db.pool_max %d", t.Bulk.MaxInflight, c.DB.PoolMax))
+	}
+	if t.PerKeyInflight > c.DB.PoolMax {
+		out = append(out, fmt.Sprintf("tiers.per_key_inflight: %d is more than db.pool_max %d", t.PerKeyInflight, c.DB.PoolMax))
+	}
+	for _, w := range []struct {
+		key  string
+		wait time.Duration
+	}{
+		{"tiers.critical.queue_max_wait", t.Critical.QueueMaxWait},
+		{"tiers.standard.queue_max_wait", t.Standard.QueueMaxWait},
+		{"tiers.bulk.queue_max_wait", t.Bulk.QueueMaxWait},
+	} {
+		if w.wait >= c.Deadline.Request {
+			out = append(out, fmt.Sprintf("%s: %s must be less than deadline.request %s", w.key, w.wait, c.Deadline.Request))
+		}
+	}
+	return out
 }
 
 func crossFieldAuth(c *Config) Errors {

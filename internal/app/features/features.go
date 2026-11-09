@@ -133,6 +133,11 @@ func (s *Service) Charging(ctx context.Context, key access.Record, q energy.Quer
 	if err != nil {
 		return Answer[energy.Site]{}, err
 	}
+	return s.charging(ctx, reg, gate, q)
+}
+
+// charging answers Charging under a register and gate already read.
+func (s *Service) charging(ctx context.Context, reg []access.Terms, gate access.Gate, q energy.Query) (Answer[energy.Site], error) {
 	permitted, partial, err := gate.Answer(access.Answering(reg, "energy"))
 	if err != nil {
 		return Answer[energy.Site]{}, err
@@ -158,18 +163,29 @@ func (s *Service) Charging(ctx context.Context, key access.Record, q energy.Quer
 
 // Parking answers "where can I park near here" for key (FR-PARK). A family
 // refused only because its terms are not accepted is listed without its
-// occupancy and marked; the answer is then partial (SEC-030).
+// occupancy and marked; the answer is then partial (SEC-030), also when every
+// family that could answer is such a family.
 func (s *Service) Parking(ctx context.Context, key access.Record, q parking.Query) (Answer[parking.Site], error) {
 	reg, gate, err := s.gate(ctx, key)
 	if err != nil {
 		return Answer[parking.Site]{}, err
 	}
+	return s.parking(ctx, reg, gate, q)
+}
+
+// parking answers Parking under a register and gate already read.
+func (s *Service) parking(ctx context.Context, reg []access.Terms, gate access.Gate, q parking.Query) (Answer[parking.Site], error) {
 	answering := access.Answering(reg, "parking")
+	pending := gate.Pending(answering)
 	permitted, partial, err := gate.Answer(answering)
 	if err != nil {
-		return Answer[parking.Site]{}, err
+		if len(pending) == 0 {
+			return Answer[parking.Site]{}, err
+		}
+		// Nothing is permitted, but the pending families are listed
+		// without their occupancy.
+		permitted, partial = nil, true
 	}
-	pending := gate.Pending(answering)
 	listed := slices.Sorted(slices.Values(append(slices.Clone(permitted), pending...)))
 	now := s.now()
 	sites, more, err := s.repos.Parking.ParkingNear(ctx, q, listed, permitted, now)
@@ -184,7 +200,10 @@ func (s *Service) Parking(ctx context.Context, key access.Record, q parking.Quer
 			continue
 		}
 		if site.Occupancy != nil {
+			// The report may come from another family than the site's: it is
+			// checked and attributed as its own family.
 			occupancy = append(occupancy, site.Occupancy.Family)
+			contributed = append(contributed, site.Occupancy.Family)
 		}
 	}
 	if err := errors.Join(checkAll(contributed, listed), gate.Check(occupancy)); err != nil {

@@ -101,7 +101,7 @@ func (s *Service) Overview(ctx context.Context, key access.Record, q OverviewQue
 	for _, part := range Parts {
 		res := PartResult{Part: part, Status: StatusNotRequested}
 		if len(q.Needs) == 0 || slices.Contains(q.Needs, part) {
-			fams, partial, err := s.runPart(ctx, key, part, place, q, &out)
+			fams, partial, err := s.runPart(ctx, key, reg, gate, part, place, q, &out)
 			res.Status, res.Err = s.status(err), err
 			if errors.Is(err, ErrGateViolation) {
 				return Overview{}, err
@@ -125,21 +125,22 @@ func (s *Service) Overview(ctx context.Context, key access.Record, q OverviewQue
 }
 
 // runPart runs one part within its sub-deadline and stores its answer in out.
-func (s *Service) runPart(ctx context.Context, key access.Record, part Part, place places.Place, q OverviewQuery, out *Overview) ([]provenance.Family, bool, error) {
+// The register and gate are the overview's own, read once for every part.
+func (s *Service) runPart(ctx context.Context, key access.Record, reg []access.Terms, gate access.Gate, part Part, place places.Place, q OverviewQuery, out *Overview) ([]provenance.Family, bool, error) {
 	if !key.Plan.Has(scopeOf[part]) {
 		return nil, false, ErrScopeDenied
 	}
 	pctx, cancel := context.WithTimeout(ctx, s.set.PartDeadline)
 	defer cancel()
 	if part == PartCharging {
-		a, err := s.Charging(pctx, key, energy.Query{At: place.Location, RadiusM: q.RadiusM, Access: energy.FilterPublic, Limit: q.PerPartLimit})
+		a, err := s.charging(pctx, reg, gate, energy.Query{At: place.Location, RadiusM: q.RadiusM, Access: energy.FilterPublic, Limit: q.PerPartLimit})
 		if err != nil {
 			return nil, false, err
 		}
 		out.Charging = &a
 		return a.Families, a.Partial, nil
 	}
-	a, err := s.Parking(pctx, key, parking.Query{At: place.Location, RadiusM: q.RadiusM, Limit: q.PerPartLimit})
+	a, err := s.parking(pctx, reg, gate, parking.Query{At: place.Location, RadiusM: q.RadiusM, Limit: q.PerPartLimit})
 	if err != nil {
 		return nil, false, err
 	}

@@ -53,7 +53,16 @@ rule set `viafrei.parity.rules/3` (`parity.Default`):
 - **Excluded facts** are left out of the comparison, each for the reason
   below. The API's projection drops them, and a bundle that states one is
   refused, so the MCP producer cannot emit one by accident. A pattern covers
-  the fact it names and every fact under it; `[*]` is any element key.
+  the fact it names and every fact under it; `[*]` is any element key. An
+  exclusion may hold only in a case that asks a parameter: a parameter is
+  asked when it is present and its value is not a number of 0 or less, which
+  filters nothing.
+- **Named differences** are facts both sides state differently by design,
+  each with its reason (below). They are still compared: a fact differing in
+  exactly the named way (the MCP side's value against the API's) is reported
+  as that difference and not as a mismatch, any other difference in it is a
+  mismatch, and a named difference that no case of an MCP bundle shows fails
+  the harness. So a change on either side is seen.
 
 ### Excluded facts
 
@@ -63,9 +72,15 @@ rule set `viafrei.parity.rules/3` (`parity.Default`):
 | `data[*].chargePoints[*].current` | The MCP capability states no current (AC/DC) per point. |
 | `meta.freshness` | API-only: the per-family freshness block of the read contract (ENV-003). |
 | `meta.warnings` | API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got (for example `partial` when a commercial key withholds a family). |
-| `meta.page.hasMore` | The MCP capability states no count of the sites a power filter keeps, so under `min_kw` it cannot say whether there are more. One rule for every case rather than a rule per question. |
+| `meta.page.hasMore`, in a case that asks `min_kw` | The MCP capability states no count of the sites a power filter keeps, so under `min_kw` it cannot say whether there are more. Without `min_kw` it states the count of the circle, and the fact is compared. |
 | `meta.asOf` | Each side defines it differently: the API states the oldest `dataAsOf` of its families (ENV-004), the MCP capability the newest current point status, or its clock when none is current. Neither is a format of the other. |
 | `meta.attribution[*].` `domain`, `licence`, `licenceUrl`, `publisher`, `shareAlike`, `shareAlikeOffer`, `termsUrl`, `text` | The fixture's families carry synthetic register texts; the platform credits its own register rows for the sources the producer stores each family as, so the texts cannot be equal on these rows. Which families are credited (`meta.attribution[*].family`) is compared. |
+
+### Named differences
+
+| Fact | MCP | API | Why |
+|---|---|---|---|
+| `data[*].chargePoints[*].availability.state` | `occupied` | `reserved` | The MCP capability answers a reservation as occupied; the API keeps the reported state `reserved`, which says more (decided for the API, which keeps its richer state). |
 
 ## The questions
 
@@ -79,31 +94,65 @@ last report: older than the status age limit (30 minutes) and younger than
 its family's design threshold (an hour). Both sides must answer it `stale`,
 so a change of either side's limit fails here.
 
+`charging-reserved` is asked at the same place 7 minutes after a point
+reported `reserved`: the named difference above, shown by a live report.
+
+Both cases also reach the fixture row planted for crediting (generator
+0.2.0, edge `foreign_unknown_report`): the newest report of `cp-00000-1` is
+`unknown`, from another family (`src-beta-energy`) than its site's. It says
+nothing, so that family contributed nothing and neither side credits it.
+
 ## Charging rules both sides follow
 
-- **A point's status** (the MCP capability's `judgeStatus`, platform
-  `analysis/charging-status.ts`): a report older than the shorter of the
-  status age limit (`charging.status_max_age`, 30 minutes, the platform's
-  `STATUS_MAX_AGE_MS`) and its family's design threshold is answered with the
-  state `stale` and its `observedAt`, and is not counted in
+- **A point's status.** A report older than the shorter of the status age
+  limit (`charging.status_max_age`, 30 minutes, the platform's
+  `STATUS_MAX_AGE_MS`) and its family's design threshold is answered with
+  the state `stale` and its `observedAt`, and is not counted in
   `summary.availableNow`. A report of `unknown`, or of a code the service
   cannot map, says nothing and is answered as no report (`availability:
   null`).
+- **Credits.** An answer credits the family of each site it lists and of
+  each report that says something; a report that says nothing credits no
+  family.
 - **`min_kw`** keeps the sites with a point of at least that power, and of
   each site lists only those points; `summary.chargePoints` counts the
   listed points.
 
+**Where the status rule equals the MCP capability's.** The rule above is
+the platform's `judgeStatus` (`analysis/charging-status.ts`) on the domain
+the read contract holds: one stated instant per report, every report a
+snapshot statement, and no ledger of runs. On that domain `judgeStatus`
+dates a report by its own statement, judges it against
+`STATUS_MAX_AGE_MS`, and judges our pull of it against the poll window of
+its source. Outside it, `judgeStatus` has rules the contract cannot express,
+which are therefore differences that remain:
+
+- a change-only (delta) report older than its horizon is no report at all;
+- a report that arrived before its source's publications were skipped (a jump) is
+  stale, dated by its own statement;
+- an unchanged point of a snapshot source is confirmed by a later complete
+  snapshot that restated it, so it is dated by that publication;
+- an operation or opening status that blocks charging answers the point as
+  out of order, whatever its availability word;
+- the liveness half is the source's own poll window (its interval times the
+  freshness intervals), where the API uses the family's design threshold.
+
 ## Known differences that remain
 
-Platform 2.5.23 bundle: 9 facts in the two parking cases, all category A
-(platform issue #1262, fixed on the platform side): the SID terms note
-(`meta.notes.condition`) and `termsRequired` in both, and the occupancy of
-`pk-07-0012` in the accepted case. They are not excluded.
+Platform 2.5.23 bundle: 9 facts in the two parking cases. All have one
+cause: the MCP side reads the newest SID reading against the database's
+clock instead of the question's `now` (platform issue #1262, open, shipping
+in 2.5.24). On these rows it finds no reading, so it states no
+`sidOccupancy` block at all, and from that follows each fact:
 
-Two rule differences this fixture does not exercise: the MCP capability
-answers a `reserved` report as occupied, the API as `reserved`; and the MCP
-capability credits only the status families that answered, while the API
-also credits the family of a report it dropped as saying nothing.
+- `meta.notes.condition`, in both cases: the terms note goes with the block;
+- `data[pk-07-0012].termsRequired`, in both cases: the MCP projection
+  states it from the block (`shown: false` is true, `shown: true` is
+  false) and states nothing when there is no block;
+- `data[pk-07-0012].occupancy`, in the accepted case: the reading is the
+  block's.
+
+They are not excluded.
 
 ## What fails
 
@@ -114,6 +163,8 @@ also credits the family of a report it dropped as saying nothing.
   it is parsed.
 - An empty bundle, an unknown member, another format, platform or rule set,
   a producer other than `mcp` or `api`, or a case naming a fact twice.
+- A named difference that no case of an MCP bundle shows: one side changed,
+  or no question reaches it any more.
 - Fixture rows that are not the ones the bundle names.
 - A bundle that does not answer `test/parity/questions.json` exactly: a
   question left out, a case that is not a question, a case asked differently

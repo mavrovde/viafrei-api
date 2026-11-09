@@ -187,18 +187,31 @@ func compare(t *testing.T, name string) parity.Bundle {
 	}
 	a := open(t)
 	compared := map[string][]string{}
+	var seen []parity.Difference
 	for _, c := range b.Cases {
-		got, err := parity.Project(a.ask(t, c), parity.Default)
+		got, err := parity.Project(a.ask(t, c), parity.Default, c.Request)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if d := parity.Diff(c.Facts, got); len(d) > 0 {
+		d, named := parity.Compare(c.Facts, got, parity.Default)
+		if len(d) > 0 {
 			t.Errorf("case %s (%s, MCP %q): %d of %d facts differ:\n  %s", c.ID, c.Operation, c.Counterpart, len(d), len(c.Facts), strings.Join(d, "\n  "))
 		}
+		for _, n := range named {
+			t.Logf("case %s: named difference %s (%s vs %s): %s", c.ID, n.Pattern, n.Bundle, n.API, n.Reason)
+		}
+		seen = append(seen, named...)
 		compared[c.Operation] = append(compared[c.Operation], c.ID)
 	}
 	for op, ids := range compared {
 		t.Logf("compared %s: %d case(s): %s", op, len(ids), strings.Join(ids, ", "))
+	}
+	// A named difference stands for a fact the MCP side states otherwise; if
+	// no case shows it any more, one side changed and the rule must say so.
+	if b.Producer == parity.ProducerMCP {
+		for _, d := range parity.Default.Unseen(seen) {
+			t.Errorf("named difference %s (%s vs %s) is shown by no case: either side changed, or no question reaches it", d.Pattern, d.Bundle, d.API)
+		}
 	}
 	return b
 }
@@ -220,11 +233,11 @@ func TestParity(t *testing.T) {
 	a := open(t)
 	planted := parity.Default
 	planted.PositionDecimals = 4
-	got, err := parity.Project(a.ask(t, b.Cases[0]), planted)
+	got, err := parity.Project(a.ask(t, b.Cases[0]), planted, b.Cases[0].Request)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, err := parity.Project(a.ask(t, b.Cases[0]), parity.Default)
+	want, err := parity.Project(a.ask(t, b.Cases[0]), parity.Default, b.Cases[0].Request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,7 +302,7 @@ func recordBundle(t *testing.T) {
 	a := open(t)
 	for _, qq := range q.Cases {
 		c := parity.Case{ID: qq.ID, Operation: qq.Operation, Counterpart: qq.Counterpart, Request: qq.Request, Key: qq.Key, Now: qq.Now}
-		facts, err := parity.Project(a.ask(t, c), parity.Default)
+		facts, err := parity.Project(a.ask(t, c), parity.Default, c.Request)
 		if err != nil {
 			t.Fatal(err)
 		}

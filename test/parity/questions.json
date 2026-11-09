@@ -2,7 +2,7 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "3ceda198a6c900e357bc3c8b4e8230a5c55e475ad5616361bd9559f66a1612cc"
+    "sha256": "e6562a7bd002350e239f9e25cf501a7a2f1364395f7bc176a47aac7fe8b4b7d8"
   },
   "cases": [
     {
@@ -61,6 +61,25 @@
         "accepted": null
       },
       "now": "2026-03-29T21:50:00Z"
+    },
+    {
+      "id": "charging-reserved",
+      "operation": "listChargingOptions",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options?at=48.41,7.68&radius_m=25000&access=all&limit=2",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "src-alpha-energy",
+          "src-beta-energy",
+          "src-gamma-energy"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-29T22:10:00Z"
     },
     {
       "id": "parking-terms-pending",

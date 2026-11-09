@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io/fs"
 	"math"
+	"net/url"
 	"regexp"
 	"slices"
 	"sort"
@@ -115,24 +116,68 @@ type Rules struct {
 	// reason (docs/parity.md). Project drops them and Parse refuses a bundle
 	// that states one, so neither side can compare them by accident.
 	Excluded []Exclusion
+	// Differences are the facts both sides are known to state differently,
+	// each with its reason (docs/parity.md). They are compared all the same:
+	// a fact that differs in exactly the named way is reported as that
+	// difference, and a named difference no case shows any more fails, so a
+	// change of either side is seen.
+	Differences []Difference
 }
 
 // Exclusion is one fact, or family of facts, left out of the comparison.
 // Pattern is a fact name in which [*] stands for any element key; it covers
-// the name itself and every fact under it.
+// the name itself and every fact under it. When Asked names a request
+// parameter, the exclusion holds only in a case that asks it (Asks).
 type Exclusion struct {
 	Pattern string
+	Asked   string
 	Reason  string
 }
 
-// Excludes reports whether the fact name falls under one of r's exclusions.
-func (r Rules) Excludes(name string) bool {
+// Difference is one fact both sides state differently by design: Bundle is
+// the value the MCP side states, API the value this API states.
+type Difference struct {
+	Pattern string
+	Bundle  string
+	API     string
+	Reason  string
+}
+
+// Excludes reports whether the fact name falls under one of r's exclusions
+// in a case asking request.
+func (r Rules) Excludes(request, name string) bool {
 	for _, e := range r.Excluded {
-		if exclusionPattern(e.Pattern).MatchString(name) {
+		if exclusionPattern(e.Pattern).MatchString(name) && (e.Asked == "" || Asks(request, e.Asked)) {
 			return true
 		}
 	}
 	return false
+}
+
+// Asks reports whether request asks the parameter: it is present and its
+// value is not a number of 0 or less, which filters nothing.
+func Asks(request, param string) bool {
+	u, err := url.Parse(request)
+	if err != nil {
+		return false
+	}
+	v, ok := u.Query()[param]
+	if !ok {
+		return false
+	}
+	n, err := strconv.ParseFloat(v[0], 64)
+	return err != nil || n > 0
+}
+
+// Named returns the difference of r that a fact stated as bundle by the MCP
+// side and as api by this API is, if it is one.
+func (r Rules) Named(name, bundle, api string) (Difference, bool) {
+	for _, d := range r.Differences {
+		if exclusionPattern(d.Pattern).MatchString(name) && d.Bundle == bundle && d.API == api {
+			return d, true
+		}
+	}
+	return Difference{}, false
 }
 
 func exclusionPattern(p string) *regexp.Regexp {
@@ -149,20 +194,23 @@ var Default = Rules{
 	Identifiers:      []string{"sourceFamily"},
 	Meta:             []string{"asOf", "attribution", "freshness", "notes", "page", "warnings"},
 	Excluded: []Exclusion{
-		{"data[*].access", "the MCP capability has no access concept: no charging source of the platform publishes who may use a site"},
-		{"data[*].chargePoints[*].current", "the MCP capability states no current per point"},
-		{"meta.freshness", "API-only: the per-family freshness block of the read contract (ENV-003)"},
-		{"meta.warnings", "API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got"},
-		{"meta.page.hasMore", "the MCP capability states no count of the sites a power filter keeps, so it cannot say whether there are more"},
-		{"meta.asOf", "each side defines it differently: the API the oldest family dataAsOf (ENV-004), MCP the newest current status or its clock"},
-		{"meta.attribution[*].domain", attributionReason},
-		{"meta.attribution[*].licence", attributionReason},
-		{"meta.attribution[*].licenceUrl", attributionReason},
-		{"meta.attribution[*].publisher", attributionReason},
-		{"meta.attribution[*].shareAlike", attributionReason},
-		{"meta.attribution[*].shareAlikeOffer", attributionReason},
-		{"meta.attribution[*].termsUrl", attributionReason},
-		{"meta.attribution[*].text", attributionReason},
+		{"data[*].access", "", "the MCP capability has no access concept: no charging source of the platform publishes who may use a site"},
+		{"data[*].chargePoints[*].current", "", "the MCP capability states no current per point"},
+		{"meta.freshness", "", "API-only: the per-family freshness block of the read contract (ENV-003)"},
+		{"meta.warnings", "", "API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got"},
+		{"meta.page.hasMore", "min_kw", "the MCP capability states no count of the sites a power filter keeps, so it cannot say whether there are more"},
+		{"meta.asOf", "", "each side defines it differently: the API the oldest family dataAsOf (ENV-004), MCP the newest current status or its clock"},
+		{"meta.attribution[*].domain", "", attributionReason},
+		{"meta.attribution[*].licence", "", attributionReason},
+		{"meta.attribution[*].licenceUrl", "", attributionReason},
+		{"meta.attribution[*].publisher", "", attributionReason},
+		{"meta.attribution[*].shareAlike", "", attributionReason},
+		{"meta.attribution[*].shareAlikeOffer", "", attributionReason},
+		{"meta.attribution[*].termsUrl", "", attributionReason},
+		{"meta.attribution[*].text", "", attributionReason},
+	},
+	Differences: []Difference{
+		{"data[*].chargePoints[*].availability.state", "occupied", "reserved", "the MCP capability answers a reservation as occupied; the API keeps the reported state reserved, which says more"},
 	},
 }
 
@@ -257,7 +305,7 @@ func Parse(raw []byte, platform string) (Bundle, error) {
 			return Bundle{}, fmt.Errorf("%w: case %q names the fact %q more than once", ErrMalformed, c.ID, n)
 		}
 		for _, f := range c.Facts {
-			if Default.Excludes(f.Name) {
+			if Default.Excludes(c.Request, f.Name) {
 				return Bundle{}, fmt.Errorf("%w: case %q states %q, which %s excludes from the comparison", ErrMalformed, c.ID, f.Name, Default.ID)
 			}
 		}
@@ -400,10 +448,10 @@ func Inventory(doc []byte, b Bundle) ([]string, error) {
 // so one of them could not be compared.
 var ErrDuplicateFact = errors.New("parity: two values project onto one fact name")
 
-// Project turns a response body into its facts under r, sorted by name. Two
-// values under one name are an error: a comparison keeping either would hide
-// a difference in the other.
-func Project(body []byte, r Rules) ([]Fact, error) {
+// Project turns the response body of a case asking request into its facts
+// under r, sorted by name. Two values under one name are an error: a
+// comparison keeping either would hide a difference in the other.
+func Project(body []byte, r Rules, request string) ([]Fact, error) {
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.UseNumber()
 	var doc map[string]any
@@ -424,7 +472,7 @@ func Project(body []byte, r Rules) ([]Fact, error) {
 	}
 	kept := p.out[:0]
 	for _, f := range p.out {
-		if !r.Excludes(f.Name) {
+		if !r.Excludes(request, f.Name) {
 			kept = append(kept, f)
 		}
 	}
@@ -562,6 +610,42 @@ func Diff(want, got []Fact) []string {
 			out = append(out, fmt.Sprintf("extra   %s: got %q", n, gv))
 		case wv != gv:
 			out = append(out, fmt.Sprintf("changed %s: want %q, got %q", n, wv, gv))
+		}
+	}
+	return out
+}
+
+// Compare is Diff under r's named differences: a fact the bundle states as a
+// difference's Bundle value and this API as its API value is returned in
+// named, not in diff.
+func Compare(want, got []Fact, r Rules) (diff []string, named []Difference) {
+	g := index(got)
+	var w, kept []Fact
+	drop := map[string]bool{}
+	for _, f := range want {
+		if v, ok := g[f.Name]; ok && v != f.Value {
+			if d, ok := r.Named(f.Name, f.Value, v); ok {
+				named = append(named, d)
+				drop[f.Name] = true
+				continue
+			}
+		}
+		w = append(w, f)
+	}
+	for _, f := range got {
+		if !drop[f.Name] {
+			kept = append(kept, f)
+		}
+	}
+	return Diff(w, kept), named
+}
+
+// Unseen are the named differences of r that none of seen is.
+func (r Rules) Unseen(seen []Difference) []Difference {
+	var out []Difference
+	for _, d := range r.Differences {
+		if !slices.Contains(seen, d) {
+			out = append(out, d)
 		}
 	}
 	return out

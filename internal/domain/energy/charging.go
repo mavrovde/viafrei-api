@@ -147,11 +147,14 @@ type Site struct {
 }
 
 // Families returns the source family of the site and of every availability
-// report it carries: what the licence gate's post-check verifies.
+// report it carries that says something (Availability.Says): the families
+// that contributed a fact, which the answer credits and the licence gate's
+// post-check verifies. A report that says nothing is answered as no report,
+// so its family contributed nothing (the MCP capability's rule).
 func (s Site) Families() []string {
 	out := []string{s.Family}
 	for _, p := range s.Points {
-		if p.Availability != nil {
+		if p.Availability != nil && p.Availability.Says() {
 			out = append(out, p.Availability.Family)
 		}
 	}

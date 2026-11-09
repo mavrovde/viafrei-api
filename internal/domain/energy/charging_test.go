@@ -100,6 +100,11 @@ func TestFamilies(t *testing.T) {
 	if got := s.Families(); !reflect.DeepEqual(got, []string{"f1", "f2"}) {
 		t.Errorf("Families = %v", got)
 	}
+	// A report that says nothing contributed nothing: its family is not credited.
+	silent := energy.Site{Family: "f1", Points: []energy.ChargePoint{point(energy.StateUnknown, 0, nil), point(energy.StateOther, 0, nil)}}
+	if got := silent.Families(); !reflect.DeepEqual(got, []string{"f1"}) {
+		t.Errorf("Families = %v", got)
+	}
 }
 
 func TestAccessFilterCodes(t *testing.T) {

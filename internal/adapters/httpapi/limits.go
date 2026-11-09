@@ -54,14 +54,15 @@ func clientFrom(ctx context.Context) string {
 }
 
 // withClient records the client address: the immediate peer, or, when the
-// peer is one of server.trusted_proxies, the address the proxy names last in
-// X-Forwarded-For (RATE-001). The address is held for the request only.
+// peer is one of server.trusted_proxies, the rightmost address of
+// X-Forwarded-For that is not (RATE-001). The address is held for the
+// request only.
 func withClient(trusted []netip.Prefix) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			client := peer(r.RemoteAddr)
 			if isTrusted(client, trusted) {
-				if fwd, ok := parseForwarded(r.Header.Values("X-Forwarded-For")); ok {
+				if fwd, ok := parseForwarded(r.Header.Values("X-Forwarded-For"), trusted); ok {
 					client = fwd
 				}
 			}
@@ -85,8 +86,11 @@ func isTrusted(client string, trusted []netip.Prefix) bool {
 	if err != nil {
 		return false
 	}
-	a = a.Unmap()
-	for _, p := range trusted {
+	return inPrefixes(a.Unmap(), trusted)
+}
+
+func inPrefixes(a netip.Addr, prefixes []netip.Prefix) bool {
+	for _, p := range prefixes {
 		if p.Contains(a) {
 			return true
 		}
@@ -94,19 +98,29 @@ func isTrusted(client string, trusted []netip.Prefix) bool {
 	return false
 }
 
-// parseForwarded returns the last address of X-Forwarded-For: the one the
-// trusted proxy itself appended. Any earlier entry was written by the
-// client and proves nothing. ok is false when the last entry is no address.
-func parseForwarded(values []string) (string, bool) {
+// parseForwarded walks X-Forwarded-For from the right, the end each proxy
+// appends to, past every address inside trusted: the first one outside is
+// the client, as the nearest trusted proxy saw it. Entries left of it were
+// written by the client and prove nothing. When every entry is trusted, the
+// leftmost is the client. ok is false when the walk meets an entry that is
+// no address before it finds the client, or the header is absent.
+func parseForwarded(values []string, trusted []netip.Prefix) (string, bool) {
 	if len(values) == 0 {
 		return "", false
 	}
-	list := strings.Split(values[len(values)-1], ",")
-	a, err := netip.ParseAddr(strings.TrimSpace(list[len(list)-1]))
-	if err != nil {
-		return "", false
+	list := strings.Split(strings.Join(values, ","), ",")
+	var client netip.Addr
+	for i := len(list) - 1; i >= 0; i-- {
+		a, err := netip.ParseAddr(strings.TrimSpace(list[i]))
+		if err != nil {
+			return "", false
+		}
+		client = a.Unmap()
+		if !inPrefixes(client, trusted) {
+			break
+		}
 	}
-	return a.Unmap().String(), true
+	return client.String(), true
 }
 
 // TrustedProxies parses server.trusted_proxies; the declaration has already
@@ -121,15 +135,19 @@ func TrustedProxies(cidrs []string) []netip.Prefix {
 	return out
 }
 
-// limitAddress is gate 1 (RATE-001, SEC-051): a request that presents no
-// key, a service operation's included, takes a token of its client
-// address's bucket before anything else is done for it. A request that
-// presents a key is governed by its key's bucket instead, and by the
-// per-address limit on failed key checks when its key is refused (SEC-052).
-func limitAddress(gate AddressGate) func(http.Handler) http.Handler {
+// limitAddress is gate 1 (RATE-001, SEC-051): a request takes a token of
+// its client address's bucket before anything else is done for it, unless
+// it presents a key to an operation that checks one. keyed tells whether
+// the request routes to such an operation. A key presented there is
+// governed by its key's bucket instead, and by the per-address limit on
+// failed key checks when it is refused (SEC-052). A header presented
+// anywhere else (a service operation, an unknown path) is checked by
+// nothing, so it buys nothing: the address is charged.
+func limitAddress(gate AddressGate, keyed func(*http.Request) bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if gate != nil && r.Header.Get("Authorization") == "" && r.Header.Get(APIKeyHeader) == "" {
+			presents := r.Header.Get("Authorization") != "" || r.Header.Get(APIKeyHeader) != ""
+			if gate != nil && (!presents || !keyed(r)) {
 				if d := gate.Take(clientFrom(r.Context())); !d.Allowed {
 					writeProblem(w, newProblem(r.Context(), SlugRateLimited, "Too many requests without a key from this address.", limits.Seconds(d.RetryAfter)))
 					return

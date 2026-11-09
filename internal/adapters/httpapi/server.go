@@ -183,6 +183,17 @@ func build(d Deps, extra []operation) (http.Handler, []byte, error) {
 
 	base := strings.TrimRight(d.Config.Server.PublicBaseURL, "/")
 	router := chi.NewRouter()
+	// keyedRoutes are the routes whose operation checks a key: a keyed
+	// operation that is not disabled, on an instance with an access store.
+	// Gate 1 spares a request that presents a key only on them.
+	keyedRoutes := map[string]bool{}
+	keyed := func(r *http.Request) bool {
+		path := r.URL.RawPath
+		if path == "" {
+			path = r.URL.Path
+		}
+		return keyedRoutes[r.Method+" "+router.Find(chi.NewRouteContext(), r.Method, path)]
+	}
 	// recoverPanics runs inside withRequest, so a panic's problem and log
 	// line carry the request id, the instance and the absolute type, and
 	// inside accessLog, so the 500 it writes is logged like any answer.
@@ -194,7 +205,7 @@ func build(d Deps, extra []operation) (http.Handler, []byte, error) {
 		recoverPanics(s.log),
 		refuseKeyInQuery(access.Prefixes{Live: d.Config.Auth.KeyPrefixLive, Test: d.Config.Auth.KeyPrefixTest}),
 		limitURI(d.Config.Server.MaxURIBytes),
-		limitAddress(d.Addresses),
+		limitAddress(d.Addresses, keyed),
 		withDeadline(d.Config.Deadline.Request),
 	)
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
@@ -248,6 +259,7 @@ func build(d Deps, extra []operation) (http.Handler, []byte, error) {
 			hop.Tags = []string{op.tag}
 		}
 		if op.keyed {
+			keyedRoutes[op.method+" "+op.path] = d.Auth != nil
 			hop.Security = []map[string][]string{{schemeBearer: {}}, {schemeHeader: {}}}
 			hop.Responses = keyedResponses(api)
 		}

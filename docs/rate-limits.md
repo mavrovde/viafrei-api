@@ -18,22 +18,35 @@ Each refusal is an RFC 9457 problem; its type names the gate.
 
 A token bucket per client address, held in memory only and never stored
 (`ratelimit.anon_rps`, `ratelimit.anon_burst`; idle entries expire after
-`ratelimit.ip_state_ttl`, at most `ratelimit.ip_track_size` are held). It
-charges every request that carries neither `Authorization` nor
-`X-API-Key`, service endpoints included (SEC-051).
+`ratelimit.ip_state_ttl`, at most `ratelimit.ip_track_size` are held; when
+the table is full, the least recently seen address goes, at constant cost).
+An IPv6 address is counted by its prefix, `ratelimit.ipv6_prefix` (default
+64): one subscriber is routinely given a whole /64, so every address inside
+it shares one bucket and one table entry.
 
-RATE-001 reads "every request". A keyed request is not charged here: it is
-held by its own key's bucket (gate 2), and a request whose key fails is held
-by the failed-authentication limit per address (SEC-052). Charging keyed
-requests by address too would let one shared address (a company network, a
-carrier NAT) starve every key behind it, and the key gates already bound
-them. `ratelimit.anon_rps` of 0 switches the gate off.
+The gate is decided per operation. It charges every request to a service
+endpoint (`/healthz`, `/readyz`, `/v1/meta`), to an unknown path and to a
+switched-off operation, whatever headers it carries, and every request to a
+keyed operation that presents neither `Authorization` nor `X-API-Key`
+(SEC-051). A header sent where no key is checked is checked by nothing, so
+it buys no exemption.
+
+RATE-001 reads "every request". A key presented to a keyed operation is not
+charged here: it is held by its own key's bucket (gate 2), and a request
+whose key fails is held by the failed-authentication limit per address
+(SEC-052). Charging keyed requests by address too would let one shared
+address (a company network, a carrier NAT) starve every key behind it, and
+the key gates already bound them. Without an access store no operation
+checks a key, so every request is charged. `ratelimit.anon_rps` of 0
+switches the gate off.
 
 The client address is the TCP peer. Only when the peer is inside
-`server.trusted_proxies` is it the last entry of `X-Forwarded-For` instead:
-the one the proxy itself appended. Earlier entries were written by the
-client and are ignored. With the default empty list the header is never
-read.
+`server.trusted_proxies` is `X-Forwarded-For` read: it is walked from the
+right, the end each proxy appends to, past every address inside
+`server.trusted_proxies`, and the first address outside them is the client.
+Entries left of it were written by the client and are ignored; an entry on
+the way that is no address leaves the peer as the client. With the default
+empty list the header is never read.
 
 ## Gates 2 and 3: per key
 

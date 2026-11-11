@@ -71,26 +71,26 @@ func (s *server) attempt(w http.ResponseWriter, r *http.Request) bool {
 	wait, err := s.Guard.Attempt()
 	if err != nil {
 		retryAfter(w, wait)
-		s.refuse(w, r, http.StatusTooManyRequests, "too many sign-in attempts; try again later")
+		s.refuse(w, r, http.StatusTooManyRequests, refusedRateLimited, "too many sign-in attempts; try again later")
 		return false
 	}
 	return true
 }
 
 // failed answers a failed ceremony. The failure counts as an attempt; the
-// reason is logged, the answer says only that it failed.
+// reason's class is logged, the answer says only that it failed.
 func (s *server) failed(w http.ResponseWriter, r *http.Request, err error) {
 	_, _ = s.Guard.Attempt()
-	reason := "the passkey was not accepted"
+	class, reason := refusedPasskey, "the passkey was not accepted"
 	switch {
 	case errors.Is(err, console.ErrExpired):
-		reason = "the challenge has expired; start again"
+		class, reason = refusedChallengeExpiry, "the challenge has expired; start again"
 	case errors.Is(err, console.ErrUnknown):
-		reason = "unknown or already used challenge; start again"
+		class, reason = refusedChallengeUnused, "unknown or already used challenge; start again"
 	case errors.Is(err, console.ErrCode):
-		reason = "unknown, used or expired enrolment code"
+		class, reason = refusedEnrolmentCode, "unknown, used or expired enrolment code"
 	}
-	s.refuse(w, r, http.StatusUnauthorized, reason)
+	s.refuse(w, r, http.StatusUnauthorized, class, reason)
 }
 
 func (s *server) signInBegin(w http.ResponseWriter, r *http.Request) {
@@ -98,7 +98,7 @@ func (s *server) signInBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Header.Get("Content-Type") != "application/json" {
-		s.refuse(w, r, http.StatusUnsupportedMediaType, "send application/json")
+		s.refuse(w, r, http.StatusUnsupportedMediaType, refusedMediaType, "send application/json")
 		return
 	}
 	// Beginning a ceremony fails only on a configuration New has accepted.
@@ -120,7 +120,7 @@ func (s *server) begin(w http.ResponseWriter, r *http.Request, kind string, stat
 func (s *server) busy(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, console.ErrBusy) {
 		retryAfter(w, s.Settings.ChallengeTTL)
-		s.refuse(w, r, http.StatusServiceUnavailable, "too many pending ceremonies; try again shortly")
+		s.refuse(w, r, http.StatusServiceUnavailable, refusedBusy, "too many pending ceremonies; try again shortly")
 		return
 	}
 	s.unavailable(w, r, err)
@@ -129,7 +129,7 @@ func (s *server) busy(w http.ResponseWriter, r *http.Request, err error) {
 // unavailable answers an internal failure without its detail.
 func (s *server) unavailable(w http.ResponseWriter, r *http.Request, err error) {
 	s.Logger.Error("console request failed", "method", method(r), "route", s.route(r), "error", err.Error())
-	s.refuse(w, r, http.StatusInternalServerError, "the console could not complete the request")
+	s.refuse(w, r, http.StatusInternalServerError, refusedInternal, "the console could not complete the request")
 }
 
 func (s *server) signInFinish(w http.ResponseWriter, r *http.Request) {

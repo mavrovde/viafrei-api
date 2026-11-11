@@ -104,21 +104,21 @@ func (s *server) audit(w http.ResponseWriter, r *http.Request, sess console.Sess
 func (s *server) ask(w http.ResponseWriter, r *http.Request, sess console.Session) {
 	form, ok := formFor(r.PathValue("action"))
 	if !ok {
-		s.refuse(w, r, http.StatusNotFound, "no such change")
+		s.refuse(w, r, http.StatusNotFound, refusedNoSuchChange, "no such change")
 		return
 	}
 	change := &pendingChange{Action: form.Action, Title: form.Title, values: map[string]string{}}
 	for _, f := range form.Fields {
 		v := strings.TrimSpace(r.PostForm.Get(f.Name))
 		if f.Required && v == "" {
-			s.refuse(w, r, http.StatusBadRequest, f.Label+" is required")
+			s.refuse(w, r, http.StatusBadRequest, refusedMissingField, f.Label+" is required")
 			return
 		}
 		change.Fields = append(change.Fields, shownField{Name: f.Name, Label: f.Label, Value: v})
 		change.values[f.Name] = v
 	}
 	if _, err := build(change); err != nil {
-		s.refuse(w, r, http.StatusBadRequest, err.Error())
+		s.refuse(w, r, http.StatusBadRequest, refusedInvalidInput, err.Error())
 		return
 	}
 	id, err := s.Guard.PutConfirm(sess, change)
@@ -230,10 +230,10 @@ func (s *server) confirm(w http.ResponseWriter, r *http.Request, sess console.Se
 	held, err := s.Guard.TakeConfirm(sess, r.PostForm.Get("id"))
 	switch {
 	case errors.Is(err, console.ErrExpired):
-		s.refuse(w, r, http.StatusGone, "the confirmation has expired; ask for the change again")
+		s.refuse(w, r, http.StatusGone, refusedConfirmExpired, "the confirmation has expired; ask for the change again")
 		return
 	case err != nil:
-		s.refuse(w, r, http.StatusConflict, "unknown or already used confirmation")
+		s.refuse(w, r, http.StatusConflict, refusedConfirmUnknown, "unknown or already used confirmation")
 		return
 	}
 	change := held.(*pendingChange)
@@ -241,11 +241,11 @@ func (s *server) confirm(w http.ResponseWriter, r *http.Request, sess console.Se
 	message, key, err := do(r.Context(), s.Keys, console.ActorPrefix+sess.Owner)
 	if err != nil {
 		if errors.Is(err, auth.ErrInput) {
-			s.refuse(w, r, http.StatusBadRequest, err.Error())
+			s.refuse(w, r, http.StatusBadRequest, refusedInvalidInput, err.Error())
 			return
 		}
 		s.Logger.Warn("console change refused", "action", change.Action, "owner", sess.Owner, "error", err.Error())
-		s.refuse(w, r, http.StatusConflict, "the access store refused the change: "+publicReason(err))
+		s.refuse(w, r, http.StatusConflict, refusedByStore, "the access store refused the change: "+publicReason(err))
 		return
 	}
 	s.Logger.Info("console change", "action", change.Action, "owner", sess.Owner)

@@ -991,6 +991,74 @@ func TestNoLogLineCarriesTheClientsPathOrMethod(t *testing.T) {
 			t.Fatalf("%q %q: logged method %q route %q, want %q %q", c.method, c.path, line.Method, line.Route, c.wantMethod, c.route)
 		}
 	}
+
+	// lines checks every log line written since the last reset and returns
+	// them decoded.
+	type logLine struct{ Level, Method, Route, Class string }
+	lines := func(what string) []logLine {
+		t.Helper()
+		out := r.logs.String()
+		if strings.Contains(out, "FORGE") || strings.Contains(out, `\r`) {
+			t.Fatalf("%s: a log line carries what the client sent: %s", what, out)
+		}
+		var got []logLine
+		for _, s := range strings.Split(strings.TrimSpace(out), "\n") {
+			var l logLine
+			if err := json.Unmarshal([]byte(s), &l); err != nil {
+				t.Fatalf("%s: not a JSON log line: %v: %s", what, err, s)
+			}
+			got = append(got, l)
+		}
+		return got
+	}
+
+	// CONNECT: the mux answers a CONNECT with the request's own path as the
+	// pattern; the log still names no route the console did not register.
+	r.logs.Reset()
+	if w := plant(http.MethodConnect, "/audit", "192.0.2.10:1", false); w.Code != http.StatusForbidden {
+		t.Fatalf("CONNECT: %d", w.Code)
+	}
+	if l := lines("CONNECT"); len(l) != 1 || l[0].Method != "other" || l[0].Route != "unmatched" {
+		t.Fatalf("CONNECT logged %+v, want method other, route unmatched", l)
+	}
+
+	cookie, csrf := r.signIn(r.enrol("alice"))
+
+	// A 400 whose answer echoes a forged form value: the answer keeps the
+	// detail, the log names only the refusal's class.
+	r.logs.Reset()
+	w := r.do(request{method: http.MethodPost, path: "/act/issue", contentType: formType, cookie: cookie,
+		body: form(csrf, "plan", "p", "label", "l", "contact", "c", "expires", "1h"+forged)})
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "lifetime") {
+		t.Fatalf("forged form value: %d %s", w.Code, w.Body)
+	}
+	if l := lines("a 400"); len(l) != 1 || l[0].Class != "invalid-input" || l[0].Route != "POST /act/{action}" {
+		t.Fatalf("a 400 logged %+v, want class invalid-input on POST /act/{action}", l)
+	}
+
+	// An internal failure (unavailable) on a request carrying a forged query.
+	r.logs.Reset()
+	r.fail.passkeys = errors.New("down")
+	hr := httptest.NewRequest(http.MethodGet, "http://"+host+"/", nil)
+	hr.URL.RawQuery = "q=" + forged
+	hr.RequestURI = "/?q=" + forged
+	hr.RemoteAddr = peer
+	hr.AddCookie(&http.Cookie{Name: consoleweb.CookieName, Value: cookie})
+	w = httptest.NewRecorder()
+	r.h.ServeHTTP(w, hr)
+	r.fail.passkeys = nil
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("unavailable: %d", w.Code)
+	}
+	failed := false
+	for _, l := range lines("unavailable") {
+		if l.Level == "ERROR" && l.Route == "GET /{$}" && l.Method == http.MethodGet {
+			failed = true
+		}
+	}
+	if !failed {
+		t.Fatalf("unavailable logged no failure on GET /{$}: %s", r.logs)
+	}
 }
 
 // TestTheServerErrorLogCarriesNoAddress: net/http's own error lines (a

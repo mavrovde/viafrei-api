@@ -190,13 +190,13 @@ func (s *server) guard(next http.Handler) http.Handler {
 		h.Set("Cross-Origin-Resource-Policy", "same-origin")
 		switch {
 		case !Loopback(r.RemoteAddr):
-			s.refuse(w, r, http.StatusForbidden, "the console answers on the loopback only")
+			s.refuse(w, r, http.StatusForbidden, refusedNotLoopback, "the console answers on the loopback only")
 		case r.Host != s.host:
 			// A request naming another host is a DNS-rebinding page or a
 			// misrouted tunnel; neither may reach the console.
-			s.refuse(w, r, http.StatusMisdirectedRequest, "this request names another host")
+			s.refuse(w, r, http.StatusMisdirectedRequest, refusedOtherHost, "this request names another host")
 		case r.Method == http.MethodPost && !s.sameOrigin(r):
-			s.refuse(w, r, http.StatusForbidden, "a change must come from the console's own origin")
+			s.refuse(w, r, http.StatusForbidden, refusedCrossOrigin, "a change must come from the console's own origin")
 		default:
 			r.Body = http.MaxBytesReader(w, r.Body, maxBody)
 			next.ServeHTTP(w, r)
@@ -211,10 +211,39 @@ func (s *server) sameOrigin(r *http.Request) bool {
 	return r.Header.Get("Origin") == s.Settings.Origin && (site == "" || site == "same-origin")
 }
 
-// refuse answers a refusal and logs its reason: never the peer's address,
-// a cookie or a token.
-func (s *server) refuse(w http.ResponseWriter, r *http.Request, status int, reason string) {
-	s.Logger.Warn("console request refused", "method", method(r), "route", s.route(r), "status", status, "reason", reason)
+// refusal is the class of a refusal as the log names it: a closed set of
+// constants, so that no value the client sent or typed (a form field echoed
+// by an input error, a path) reaches a log line. The detailed reason goes to
+// the answer only.
+type refusal string
+
+const (
+	refusedNotLoopback     refusal = "not-loopback"
+	refusedOtherHost       refusal = "other-host"
+	refusedCrossOrigin     refusal = "cross-origin"
+	refusedSignedOut       refusal = "signed-out"
+	refusedUnreadableForm  refusal = "unreadable-form"
+	refusedCSRF            refusal = "csrf"
+	refusedRateLimited     refusal = "rate-limited"
+	refusedMediaType       refusal = "media-type"
+	refusedBusy            refusal = "busy"
+	refusedInternal        refusal = "internal"
+	refusedChallengeExpiry refusal = "challenge-expired"
+	refusedChallengeUnused refusal = "challenge-unknown"
+	refusedEnrolmentCode   refusal = "enrolment-code"
+	refusedPasskey         refusal = "passkey"
+	refusedNoSuchChange    refusal = "no-such-change"
+	refusedMissingField    refusal = "missing-field"
+	refusedInvalidInput    refusal = "invalid-input"
+	refusedConfirmExpired  refusal = "confirmation-expired"
+	refusedConfirmUnknown  refusal = "confirmation-unknown"
+	refusedByStore         refusal = "store-refused"
+)
+
+// refuse answers a refusal with its reason and logs only its class: never
+// the reason's text, the peer's address, a cookie or a token.
+func (s *server) refuse(w http.ResponseWriter, r *http.Request, status int, class refusal, reason string) {
+	s.Logger.Warn("console request refused", "method", method(r), "route", s.route(r), "status", status, "class", string(class))
 	if r.Header.Get("Content-Type") == "application/json" {
 		writeJSON(w, status, map[string]string{"error": reason})
 		return
@@ -275,7 +304,7 @@ func (s *server) withChange(next sessionHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sess, err := s.session(r)
 		if errors.Is(err, console.ErrNoSession) {
-			s.refuse(w, r, http.StatusUnauthorized, "sign in first")
+			s.refuse(w, r, http.StatusUnauthorized, refusedSignedOut, "sign in first")
 			return
 		}
 		if err != nil {
@@ -283,11 +312,11 @@ func (s *server) withChange(next sessionHandler) http.HandlerFunc {
 			return
 		}
 		if err := r.ParseForm(); err != nil {
-			s.refuse(w, r, http.StatusBadRequest, "the form could not be read")
+			s.refuse(w, r, http.StatusBadRequest, refusedUnreadableForm, "the form could not be read")
 			return
 		}
 		if err := console.CheckCSRF(sess, r.PostForm.Get("csrf")); err != nil {
-			s.refuse(w, r, http.StatusForbidden, "missing or wrong CSRF token")
+			s.refuse(w, r, http.StatusForbidden, refusedCSRF, "missing or wrong CSRF token")
 			return
 		}
 		next(w, r, sess)

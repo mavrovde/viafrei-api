@@ -186,6 +186,7 @@ func behaviours() map[string]behaviour {
 		"geo.default_radius_m":     {"750", featureAsk("/v1/charging-options?at=1,2")},
 		"pagination.default_limit": {"7", featureAsk("/v1/parking-options?at=1,2")},
 		"compose.per_part_limit":   {"3", featureAsk("/v1/places/pl-1/overview")},
+		"charging.status_max_age":  {"5m", chargingState},
 		"compose.part_deadline": {"300ms", func(t *testing.T, c *config.Config) string {
 			return wire.FeatureSettings(c).PartDeadline.String()
 		}},

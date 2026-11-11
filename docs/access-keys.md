@@ -139,7 +139,11 @@ How to reach it depends on where the service runs. In each case you open
 - **A container on a bridge network:** run a forwarder inside the
   container's own network namespace (for example a sidecar that shares it,
   `--network container:<name>`). It accepts the SSH-forwarded connection
-  and connects to the console's loopback address there.
+  and connects to the console's loopback address there. The forwarder must
+  accept connections from the host's loopback only: publish its own port
+  (not the console's) on the host's loopback, for example
+  `-p 127.0.0.1:8082:8082` on the container whose namespace it shares,
+  because the console sees every connection it forwards as a loopback peer.
 
 Publishing the console's port (`-p`, or `ports:` in Compose) does not work,
 and this is by design. A published port needs the listener on `0.0.0.0`,

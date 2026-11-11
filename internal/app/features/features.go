@@ -89,6 +89,11 @@ type Answer[T any] struct {
 	Families []provenance.Family
 	// Partial is set when a family that could answer was withheld.
 	Partial bool
+	// Withheld are the families listed with their gated data withheld (a
+	// parking family whose terms are not accepted). Their conditions are
+	// withheld with that data: Families carries none of them, and a composed
+	// answer that reads the families again must drop them too.
+	Withheld []string
 	// At is the instant the answer is computed at.
 	At time.Time
 }
@@ -125,6 +130,19 @@ func (s *Service) provenanceOf(ctx context.Context, contributed, consulted []str
 	fams = slices.Clone(fams)
 	slices.Sort(fams)
 	return s.repos.Register.Provenance(ctx, slices.Compact(fams), s.set.Language)
+}
+
+// withholdConditions drops the condition notes of the withheld families. A
+// condition note is stated only for a family whose data the answer shows
+// under it: a pending family's occupancy is withheld, so its conditions are
+// too, as the MCP capability does (docs/parity.md).
+func withholdConditions(fams []provenance.Family, withheld []string) []provenance.Family {
+	for i, f := range fams {
+		if slices.Contains(withheld, f.Source.Family) {
+			fams[i] = f.Without(provenance.Condition)
+		}
+	}
+	return fams
 }
 
 // Charging answers "where can I charge near here" for key (FR-ENERGY).
@@ -213,5 +231,5 @@ func (s *Service) parking(ctx context.Context, reg []access.Terms, gate access.G
 	if err != nil {
 		return Answer[parking.Site]{}, err
 	}
-	return Answer[parking.Site]{Items: sites, HasMore: more, Families: fams, Partial: partial, At: now}, nil
+	return Answer[parking.Site]{Items: sites, HasMore: more, Families: withholdConditions(fams, pending), Partial: partial, Withheld: pending, At: now}, nil
 }

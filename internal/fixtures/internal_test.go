@@ -28,6 +28,20 @@ func TestSourcePickerRefusesAMissingFamily(t *testing.T) {
 	t.Fatal("src returned without a source")
 }
 
+// TestOtherFamilyRefusesADomainOfOneFamily: the foreign report needs a second
+// live family; a domain without one is a generator bug, named.
+func TestOtherFamilyRefusesADomainOfOneFamily(t *testing.T) {
+	g := &gen{sources: map[string][]source{"energy": {{ref: "a", family: "alpha", domain: "energy"}, {ref: "a-stale", family: "beta", domain: "energy", stale: true}}}, family: map[string]string{"a": "alpha"}}
+	defer func() {
+		msg, _ := recover().(string)
+		if !strings.Contains(msg, "no second family for energy") {
+			t.Fatalf("recover() = %q, want a panic naming the domain", msg)
+		}
+	}()
+	g.otherFamily("energy", "a")
+	t.Fatal("otherFamily returned without a family")
+}
+
 // TestAlongEndsOnTheLastPoint: a fraction past the end of the road clamps to
 // its last point instead of running off the polyline.
 func TestAlongEndsOnTheLastPoint(t *testing.T) {

@@ -42,7 +42,7 @@ docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
 
 The configuration keys are the same as for the binary ([configuration.md](configuration.md)). Every key is set with a `VFAPI_` environment variable. An unknown variable or a value out of bounds stops the container at once with exit status 78.
 
-The owner console (`admin.enabled`) cannot be reached through a published port, and this is by design. It listens on a loopback address only. A published port would need it on `0.0.0.0`, which is refused at boot, and the console's peer would be the bridge gateway, which is refused on every request. To use the console with the container, run it with host networking (`--network host`, Linux), or run a forwarder inside the container's network namespace. See [The owner console](access-keys.md#the-owner-console).
+The owner console (`admin.enabled`) cannot be reached through a published port, and this is by design. It listens on a loopback address only. A published port would need it on `0.0.0.0`, which is refused at boot, and the console's peer would be the bridge gateway, which is refused on every request. To use the console with the container, run it with host networking (`--network host`, Linux), or run a forwarder inside the container's network namespace. The forwarder must accept connections from the host's loopback only (publish its own port, not the console's, on the host's loopback, for example `-p 127.0.0.1:8082:8082`), because the console sees every connection it forwards as a loopback peer. See [The owner console](access-keys.md#the-owner-console).
 
 Resource limits for one instance are design targets, not yet measured: 256 MiB of memory, one CPU and 128 processes. The benchmark plan replaces them with measured values.
 

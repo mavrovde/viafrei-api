@@ -39,6 +39,7 @@ type Config struct {
 	Sources    Sources    `koanf:"sources"`
 	Geo        Geo        `koanf:"geo"`
 	Pagination Pagination `koanf:"pagination"`
+	Charging   Charging   `koanf:"charging"`
 	Compose    Compose    `koanf:"compose"`
 	RateLimit  RateLimit  `koanf:"ratelimit"`
 	Quota      Quota      `koanf:"quota"`
@@ -157,6 +158,11 @@ type Geo struct {
 // Pagination holds the settings of list answers.
 type Pagination struct {
 	DefaultLimit int `koanf:"default_limit" default:"20" validate:"min=1,max=100" desc:"Items a list answer returns when the request names no limit (ENV-021). At most the limit maximum of the interface, 100."`
+}
+
+// Charging holds the settings of charging answers.
+type Charging struct {
+	StatusMaxAge time.Duration `koanf:"status_max_age" default:"30m" validate:"min=1m,max=24h" desc:"How old a charge point's reported state may be and still count; an older one, or one older than its family's freshness threshold, is answered as stale and not counted as available. The default is the MCP capability's own limit, 30 minutes. The parity harness runs on its own defaults, and its question charging-status-age-limit is asked 38 minutes after a report, so it fails only when the default is raised above 38 minutes."`
 }
 
 // Compose holds the settings of composed answers.

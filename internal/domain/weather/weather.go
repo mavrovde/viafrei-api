@@ -95,25 +95,37 @@ type Lamp string
 
 // The lamps.
 const (
-	LampGreen Lamp = "green"
-	LampAmber Lamp = "amber"
-	LampRed   Lamp = "red"
+	LampGreen   Lamp = "green"
+	LampAmber   Lamp = "amber"
+	LampRed     Lamp = "red"
+	LampUnknown Lamp = "unknown"
 )
 
-// LampOf is the weather lamp: red when a warning of level 3 or 4 is in
-// force, amber for level 2, green for level 1 or no warning. It reads every
+// RedLevel is the lowest level that makes the lamp red.
+const RedLevel Level = 3
+
+// MaxWarnings caps the warnings one answer reads. Warnings come worst first,
+// so the cap never hides the warning that decides the lamp.
+const MaxWarnings = 100
+
+// LampOf is the weather lamp, in the order of the roads lamp: red when a
+// warning of level 3 or 4 is in force; unknown when the answer is partial
+// (a family the key may not read could hold a severe warning); amber for a
+// warning of level 1 or 2; green when no warning is in force. It reads every
 // warning that answers the question.
-func LampOf(ws []Warning) Lamp {
+func LampOf(ws []Warning, partial bool) Lamp {
 	worst := Level(0)
 	for _, w := range ws {
 		worst = max(worst, w.Level)
 	}
-	switch {
-	case worst >= 3:
+	if worst >= RedLevel {
 		return LampRed
-	case worst == 2:
-		return LampAmber
-	default:
-		return LampGreen
 	}
+	if partial {
+		return LampUnknown
+	}
+	if worst >= MinLevel {
+		return LampAmber
+	}
+	return LampGreen
 }

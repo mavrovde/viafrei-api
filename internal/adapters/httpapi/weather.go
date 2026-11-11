@@ -16,40 +16,53 @@ import (
 
 // WeatherRiskInput is the input of getWeatherRisk.
 type WeatherRiskInput struct {
-	At       string   `query:"at" required:"true" pattern:"^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$" example:"52.52,13.405" doc:"The position: lat,lon in decimal degrees (WGS 84)."`
+	AtPosition
 	MinLevel int      `query:"min_level" minimum:"1" maximum:"4" default:"1" doc:"Only warnings at or above this official level."`
 	Hazards  []string `query:"hazards" enum:"thunderstorm,wind,rain,snow,ice,fog,heat,frost,uv,flood,other" doc:"Only these hazards, comma-separated; other keeps the hazards that cannot be mapped. Default: every hazard."`
-	point    Position
-}
-
-// Resolve reads the position (huma calls it after the schema checks).
-func (in *WeatherRiskInput) Resolve(ctx huma.Context) []error {
-	n := Near{At: in.At}
-	if errs := n.Resolve(ctx); errs != nil {
-		return errs
-	}
-	in.point = Position{Lat: n.point.Lat, Lon: n.point.Lon}
-	return nil
 }
 
 // WeatherWarning is one official weather warning, in the issuer's words.
 type WeatherWarning struct {
-	ID           string     `json:"id"`
-	Hazard       string     `json:"hazard" enum:"thunderstorm,wind,rain,snow,ice,fog,heat,frost,uv,flood,other" doc:"What it warns of. Open enumeration; treat an unknown value as other."`
-	Level        int        `json:"level" minimum:"1" maximum:"4" doc:"The official level, 1 (minor) to 4 (extreme), as issued; never re-graded."`
-	LevelName    string     `json:"levelName" doc:"The issuer's name of the level, as issued."`
-	Issuer       string     `json:"issuer" doc:"The issuing service."`
-	Headline     string     `json:"headline" doc:"The official wording, in textLanguage."`
-	TextLanguage string     `json:"textLanguage" doc:"The language of headline (BCP 47)."`
-	Validity     TimeWindow `json:"validity"`
-	Area         string     `json:"area" doc:"The name of the warning area that contains the position."`
-	SourceFamily string     `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
+	ID           string      `json:"id"`
+	Hazard       string      `json:"hazard" enum:"thunderstorm,wind,rain,snow,ice,fog,heat,frost,uv,flood,other" doc:"What it warns of. Open enumeration; treat an unknown value as other."`
+	Level        int         `json:"level" minimum:"1" maximum:"4" doc:"The official level, 1 (minor) to 4 (extreme), as issued; never re-graded."`
+	LevelName    string      `json:"levelName" doc:"The issuer's name of the level, as issued."`
+	Issuer       string      `json:"issuer" doc:"The issuing service."`
+	Headline     string      `json:"headline" doc:"The official wording, in textLanguage."`
+	TextLanguage string      `json:"textLanguage" doc:"The language of headline (BCP 47)."`
+	Validity     TimeWindow  `json:"validity"`
+	Area         WarningArea `json:"area"`
+	SourceFamily string      `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
+}
+
+// WarningArea is the area a warning is issued for.
+type WarningArea struct {
+	Name     string           `json:"name" doc:"The name of the warning area that contains the position."`
+	Geometry *GeoJSONGeometry `json:"geometry" doc:"The outline of the area as a GeoJSON geometry; null while the service does not serve area outlines."`
+}
+
+// GeoJSONGeometry is a GeoJSON geometry object (RFC 7946) in WGS 84.
+type GeoJSONGeometry struct {
+	Type        string `json:"type" enum:"Polygon,MultiPolygon" doc:"The GeoJSON geometry type."`
+	Coordinates any    `json:"coordinates" doc:"The GeoJSON coordinates of type, longitude before latitude."`
+}
+
+// RoadWeatherObservation is one road-weather station reading.
+type RoadWeatherObservation struct {
+	Location        Position `json:"location"`
+	SurfaceState    string   `json:"surfaceState" enum:"dry,wet,ice,snow,other" doc:"The state of the road surface. Open enumeration; treat an unknown value as other."`
+	SurfaceTempC    *float64 `json:"surfaceTempC" nullable:"true" doc:"Surface temperature in degrees Celsius; null when not measured."`
+	AirTempC        *float64 `json:"airTempC" nullable:"true" doc:"Air temperature in degrees Celsius; null when not measured."`
+	ObservedAt      string   `json:"observedAt" format:"date-time" doc:"When the reading was taken (UTC)."`
+	ObservedAtLocal string   `json:"observedAtLocal" format:"date-time" doc:"observedAt in Europe/Berlin time."`
+	SourceFamily    string   `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
 }
 
 // WeatherRiskData is the answer of getWeatherRisk.
 type WeatherRiskData struct {
-	Lamp     string           `json:"lamp" enum:"green,amber,red" doc:"red when a warning of level 3 or 4 is in force, amber for level 2, green for level 1 or no warning; over every warning that answers the question."`
-	Warnings []WeatherWarning `json:"warnings" doc:"Ordered by level descending, then validity.from ascending, then id."`
+	Lamp        string                   `json:"lamp" enum:"green,amber,red,unknown" doc:"Over every warning that answers the question, first match: red when a warning of level 3 or 4 is in force; unknown when a weather family the key may not read was left out (meta.partial); amber for a warning of level 1 or 2; green when no warning is in force."`
+	Warnings    []WeatherWarning         `json:"warnings" doc:"Ordered by level descending, then validity.from ascending, then id; at most 100."`
+	RoadWeather []RoadWeatherObservation `json:"roadWeather" doc:"Road-weather observations near a corridor; present for along questions only, so always empty on a question about one position."`
 }
 
 // WeatherRiskQuery is meta.query of getWeatherRisk.
@@ -102,11 +115,11 @@ func registerWeatherRisk(api huma.API, s *server, op huma.Operation) {
 			ws[i] = WeatherWarning{
 				ID: w.ID, Hazard: string(w.Hazard), Level: int(w.Level), LevelName: w.LevelName, Issuer: w.Issuer,
 				Headline: w.Headline, TextLanguage: w.TextLanguage, Validity: timeWindow(w.From, w.Until),
-				Area: w.AreaName, SourceFamily: w.Family,
+				Area: WarningArea{Name: w.AreaName}, SourceFamily: w.Family,
 			}
 		}
 		return &WeatherRiskOutput{CacheControl: noStore, Body: WeatherRiskEnvelope{
-			Data: WeatherRiskData{Lamp: string(a.Lamp), Warnings: ws},
+			Data: WeatherRiskData{Lamp: string(a.Lamp), Warnings: ws, RoadWeather: []RoadWeatherObservation{}},
 			Meta: WeatherRiskMeta{
 				DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
 				Query:    WeatherRiskQuery{At: position(q.At), MinLevel: in.MinLevel, Hazards: hazards},
@@ -135,7 +148,18 @@ type DrivingRulesData struct {
 	Title      string        `json:"title"`
 	Rules      []DrivingRule `json:"rules" doc:"In their curated order."`
 	ReviewedOn string        `json:"reviewedOn" format:"date" doc:"When the topic was last reviewed."`
-	Disclaimer string        `json:"disclaimer" doc:"Always: the rules are informational, not legal advice."`
+	Disclaimer Disclaimer    `json:"disclaimer"`
+}
+
+// Disclaimer is the sentence every rules answer carries. Its schema is an
+// enumeration of that one sentence, written by hand because the enum tag
+// splits on the comma in it.
+type Disclaimer string
+
+// Schema is the one-value enumeration of the disclaimer.
+func (Disclaimer) Schema(huma.Registry) *huma.Schema {
+	return &huma.Schema{Type: huma.TypeString, Enum: []any{rules.Disclaimer},
+		Description: "Always this sentence: the rules are informational, not legal advice."}
 }
 
 // DrivingRulesEnvelope is the enveloped answer of getDrivingRules.

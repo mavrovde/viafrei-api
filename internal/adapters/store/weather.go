@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -16,7 +17,8 @@ import (
 // WarningsAt reads the published, not cancelled warnings of the given
 // families in force at now whose area contains the position, at or above
 // the level floor, of the asked hazards; level descending, then start, then
-// id. A stored level outside 1 to 4 is refused rather than re-graded.
+// id; at most weather.MaxWarnings. A stored level outside 1 to 4 is refused
+// rather than re-graded.
 func (s *Store) WarningsAt(ctx context.Context, q weather.Query, families []string, now time.Time) ([]weather.Warning, error) {
 	var out []weather.Warning
 	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
@@ -40,7 +42,8 @@ where w.withdrawn_at is null and w.message_status <> 'cancelled'
   and st_intersects(r.boundary, st_setsrid(st_makepoint($4, $3), 4326))
   and w.warning_level >= $5
   and (w.hazard = any($6) or ($7 and not w.hazard = any($8)))
-order by w.warning_level desc, w.valid_from, w.warning_id`, families, now, q.At.Lat, q.At.Lon, int(q.MinLevel), hazards, other, every)
+order by w.warning_level desc, w.valid_from, w.warning_id
+limit $9`, families, now, q.At.Lat, q.At.Lon, int(q.MinLevel), hazards, other, every, weather.MaxWarnings)
 		var err error
 		out, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (weather.Warning, error) {
 			var (
@@ -56,8 +59,12 @@ order by w.warning_level desc, w.valid_from, w.warning_id`, families, now, q.At.
 				u := until.UTC()
 				v.Until = &u
 			}
-			// A level outside 1 to 4 is refused, never re-graded (FR-WEATHER-002).
+			// A level outside 1 to 4 is refused, never re-graded
+			// (FR-WEATHER-002); the error names the warning.
 			lvl, lerr := weather.CheckLevel(level)
+			if lerr != nil {
+				lerr = fmt.Errorf("weather warning %s, level %d: %w", v.ID, level, lerr)
+			}
 			v.Level = lvl
 			return v, errors.Join(err, lerr)
 		})

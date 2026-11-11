@@ -68,6 +68,16 @@ func TestWeatherRiskIsGatedAttributedAndLit(t *testing.T) {
 	if !r.Partial || len(r.Items) != 2 || !r.At.Equal(now) || r.Lamp != weather.LampRed || !slices.Equal(names(r.Families), []string{"w1"}) {
 		t.Errorf("answer %+v", r)
 	}
+	// Level 2 alone on the same partial answer: a withheld family could hold
+	// a severe warning, so the lamp is unknown, not amber.
+	f.warnings = f.warnings[1:]
+	if r, err = wxService(f).WeatherRisk(context.Background(), key("commercial", []access.Scope{"weather"}, "w1", "w2", "k1"), q); err != nil || !r.Partial || r.Lamp != weather.LampUnknown {
+		t.Errorf("a partial answer below red: %s %v", r.Lamp, err)
+	}
+	f = &wxFake{warnings: []weather.Warning{{ID: "b", Family: "w1", Level: 1}}}
+	if r, err = wxService(f).WeatherRisk(context.Background(), key("consumer", []access.Scope{"weather"}, "w1", "w2"), q); err != nil || r.Partial || r.Lamp != weather.LampAmber {
+		t.Errorf("a full answer at level 1: %s %v", r.Lamp, err)
+	}
 
 	f = &wxFake{}
 	r, err = wxService(f).WeatherRisk(context.Background(), key("consumer", []access.Scope{"weather"}, "w1", "w2"), weather.Query{})

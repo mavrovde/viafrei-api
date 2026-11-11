@@ -55,6 +55,7 @@ var nullableObjects = []struct{ schema, member string }{
 	{"RoadSituation", "location"},
 	{"RoadSituation", "lanes"},
 	{"RoadSituation", "position"},
+	{"WarningArea", "geometry"},
 }
 
 func amendNullableObjects(api huma.API) {
@@ -175,6 +176,11 @@ func (s *server) featureProblem(ctx context.Context, err error) *Problem {
 		return newProblem(ctx, SlugNotFound, "No situation with this id.", 0)
 	case errors.Is(err, rules.ErrUnknownTopic):
 		return newProblem(ctx, SlugNotFound, "No rule topic with this code.", 0)
+	case errors.Is(err, weather.ErrLevel):
+		// A stored level outside 1 to 4 is never re-graded (FR-WEATHER-002):
+		// the answer fails and the log names the warning.
+		s.log.ErrorContext(ctx, "a stored weather warning level is outside 1 to 4", "requestId", RequestIDFrom(ctx), "error", err)
+		return newProblem(ctx, SlugInternal, "An unexpected fault occurred; quote the request id.", 0)
 	default:
 		return s.storageProblem(ctx, err)
 	}
@@ -209,22 +215,27 @@ func (s *server) featuresOff(ctx context.Context) error {
 	return nil
 }
 
-// Near is the near-a-position input of the list operations.
-type Near struct {
-	At      string `query:"at" required:"true" pattern:"^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$" example:"52.52,13.405" doc:"The position to search around: lat,lon in decimal degrees (WGS 84)."`
-	RadiusM int    `query:"radius_m" minimum:"1" maximum:"50000" doc:"Search radius in metres. Default: geo.default_radius_m."`
-	Limit   int    `query:"limit" minimum:"1" maximum:"100" doc:"Most items to return. Default: pagination.default_limit."`
-	point   geo.Point
+// AtPosition is the at query parameter every position operation shares.
+type AtPosition struct {
+	At    string `query:"at" required:"true" pattern:"^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$" example:"52.52,13.405" doc:"The position: lat,lon in decimal degrees (WGS 84)."`
+	point geo.Point
 }
 
 // Resolve reads the position (huma calls it after the schema checks).
-func (n *Near) Resolve(huma.Context) []error {
-	p, err := geo.ParsePoint(n.At)
+func (a *AtPosition) Resolve(huma.Context) []error {
+	p, err := geo.ParsePoint(a.At)
 	if err != nil {
-		return []error{&huma.ErrorDetail{Location: "query.at", Message: err.Error(), Value: n.At}}
+		return []error{&huma.ErrorDetail{Location: "query.at", Message: err.Error(), Value: a.At}}
 	}
-	n.point = p
+	a.point = p
 	return nil
+}
+
+// Near is the near-a-position input of the list operations.
+type Near struct {
+	AtPosition
+	RadiusM int `query:"radius_m" minimum:"1" maximum:"50000" doc:"Search radius in metres. Default: geo.default_radius_m."`
+	Limit   int `query:"limit" minimum:"1" maximum:"100" doc:"Most items to return. Default: pagination.default_limit."`
 }
 
 func (s *server) radius(r int) int {

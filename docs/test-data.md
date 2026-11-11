@@ -65,8 +65,9 @@ name parses as syllables of the generator's own lists
   with no events, a road in two parts with one situation on each, a stale
   source per domain, an unmapped code value (and, on one road, an active
   situation with an unmapped value in each coded column: kind, severity,
-  direction and road class), zero and full occupancy, and the largest price
-  the price column holds.
+  direction and road class), a weather warning in force beside the same
+  warning cancelled and one withdrawn from publication, zero and full
+  occupancy, and the largest price the price column holds.
 
 The generator fails closed: an unknown profile is a usage error (exit 2), and
 a set with an empty table, a Land or family without rows, a missing licence

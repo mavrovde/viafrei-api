@@ -533,7 +533,10 @@
         "additionalProperties": false,
         "properties": {
           "disclaimer": {
-            "description": "Always: the rules are informational, not legal advice.",
+            "description": "Always this sentence: the rules are informational, not legal advice.",
+            "enum": [
+              "Informational, not legal advice."
+            ],
             "type": "string"
           },
           "reviewedOn": {
@@ -2088,6 +2091,65 @@
         ],
         "type": "object"
       },
+      "RoadWeatherObservation": {
+        "additionalProperties": false,
+        "properties": {
+          "airTempC": {
+            "description": "Air temperature in degrees Celsius; null when not measured.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "observedAt": {
+            "description": "When the reading was taken (UTC).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "observedAtLocal": {
+            "description": "observedAt in Europe/Berlin time.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "sourceFamily": {
+            "description": "The source family of the item; its attribution is in meta.attribution.",
+            "type": "string"
+          },
+          "surfaceState": {
+            "description": "The state of the road surface. Open enumeration; treat an unknown value as other.",
+            "enum": [
+              "dry",
+              "wet",
+              "ice",
+              "snow",
+              "other"
+            ],
+            "type": "string"
+          },
+          "surfaceTempC": {
+            "description": "Surface temperature in degrees Celsius; null when not measured.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "location",
+          "surfaceState",
+          "surfaceTempC",
+          "airTempC",
+          "observedAt",
+          "observedAtLocal",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
       "SituationEnvelope": {
         "additionalProperties": false,
         "properties": {
@@ -2167,20 +2229,67 @@
         ],
         "type": "object"
       },
+      "WarningArea": {
+        "additionalProperties": false,
+        "properties": {
+          "geometry": {
+            "additionalProperties": false,
+            "description": "The outline of the area as a GeoJSON geometry; null while the service does not serve area outlines.",
+            "properties": {
+              "coordinates": {
+                "description": "The GeoJSON coordinates of type, longitude before latitude."
+              },
+              "type": {
+                "description": "The GeoJSON geometry type.",
+                "enum": [
+                  "Polygon",
+                  "MultiPolygon"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "coordinates"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "The name of the warning area that contains the position.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "geometry"
+        ],
+        "type": "object"
+      },
       "WeatherRiskData": {
         "additionalProperties": false,
         "properties": {
           "lamp": {
-            "description": "red when a warning of level 3 or 4 is in force, amber for level 2, green for level 1 or no warning; over every warning that answers the question.",
+            "description": "Over every warning that answers the question, first match: red when a warning of level 3 or 4 is in force; unknown when a weather family the key may not read was left out (meta.partial); amber for a warning of level 1 or 2; green when no warning is in force.",
             "enum": [
               "green",
               "amber",
-              "red"
+              "red",
+              "unknown"
             ],
             "type": "string"
           },
+          "roadWeather": {
+            "description": "Road-weather observations near a corridor; present for along questions only, so always empty on a question about one position.",
+            "items": {
+              "$ref": "#/components/schemas/RoadWeatherObservation"
+            },
+            "type": "array"
+          },
           "warnings": {
-            "description": "Ordered by level descending, then validity.from ascending, then id.",
+            "description": "Ordered by level descending, then validity.from ascending, then id; at most 100.",
             "items": {
               "$ref": "#/components/schemas/WeatherWarning"
             },
@@ -2189,7 +2298,8 @@
         },
         "required": [
           "lamp",
-          "warnings"
+          "warnings",
+          "roadWeather"
         ],
         "type": "object"
       },
@@ -2307,8 +2417,7 @@
         "additionalProperties": false,
         "properties": {
           "area": {
-            "description": "The name of the warning area that contains the position.",
-            "type": "string"
+            "$ref": "#/components/schemas/WarningArea"
           },
           "hazard": {
             "description": "What it warns of. Open enumeration; treat an unknown value as other.",
@@ -2506,13 +2615,13 @@
         "operationId": "listChargingOptions",
         "parameters": [
           {
-            "description": "The position to search around: lat,lon in decimal degrees (WGS 84).",
+            "description": "The position: lat,lon in decimal degrees (WGS 84).",
             "explode": false,
             "in": "query",
             "name": "at",
             "required": true,
             "schema": {
-              "description": "The position to search around: lat,lon in decimal degrees (WGS 84).",
+              "description": "The position: lat,lon in decimal degrees (WGS 84).",
               "examples": [
                 "52.52,13.405"
               ],
@@ -3439,13 +3548,13 @@
         "operationId": "listParkingOptions",
         "parameters": [
           {
-            "description": "The position to search around: lat,lon in decimal degrees (WGS 84).",
+            "description": "The position: lat,lon in decimal degrees (WGS 84).",
             "explode": false,
             "in": "query",
             "name": "at",
             "required": true,
             "schema": {
-              "description": "The position to search around: lat,lon in decimal degrees (WGS 84).",
+              "description": "The position: lat,lon in decimal degrees (WGS 84).",
               "examples": [
                 "52.52,13.405"
               ],
@@ -3952,13 +4061,13 @@
         "operationId": "listRoadConditions",
         "parameters": [
           {
-            "description": "The position to search around: lat,lon in decimal degrees (WGS 84).",
+            "description": "The position: lat,lon in decimal degrees (WGS 84).",
             "explode": false,
             "in": "query",
             "name": "at",
             "required": true,
             "schema": {
-              "description": "The position to search around: lat,lon in decimal degrees (WGS 84).",
+              "description": "The position: lat,lon in decimal degrees (WGS 84).",
               "examples": [
                 "52.52,13.405"
               ],

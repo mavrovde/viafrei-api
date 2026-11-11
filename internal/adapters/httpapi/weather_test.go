@@ -75,9 +75,15 @@ func TestWeatherRiskAnswer(t *testing.T) {
 	w0, _ := ws[0].(map[string]any)
 	v0, _ := w0["validity"].(map[string]any)
 	if w0["id"] != "w-1" || w0["hazard"] != "snow" || w0["level"] != 3.0 || w0["levelName"] != "Unwetter" || w0["issuer"] != "Wetterdienst" ||
-		w0["headline"] != "Schneefall" || w0["textLanguage"] != "de" || w0["area"] != "Kreis A" || w0["sourceFamily"] != "src-alpha-weather" ||
+		w0["headline"] != "Schneefall" || w0["textLanguage"] != "de" || w0["sourceFamily"] != "src-alpha-weather" ||
 		v0["fromLocal"] != "2026-03-29T01:30:00+01:00" || v0["untilLocal"] != "2026-03-30T05:30:00+02:00" {
 		t.Errorf("first warning %v", w0)
+	}
+	if area, _ := w0["area"].(map[string]any); len(area) != 2 || area["name"] != "Kreis A" || area["geometry"] != nil {
+		t.Errorf("area %v", w0["area"])
+	}
+	if rw, ok := data["roadWeather"].([]any); !ok || len(rw) != 0 {
+		t.Errorf("roadWeather %v", data["roadWeather"])
 	}
 	w1, _ := ws[1].(map[string]any)
 	v1, _ := w1["validity"].(map[string]any)
@@ -91,11 +97,11 @@ func TestWeatherRiskAnswer(t *testing.T) {
 	}
 
 	f = everyAnswer()
-	f.risk = features.WeatherRisk{Answer: features.Answer[weather.Warning]{At: fixedNow}, Lamp: weather.LampGreen}
+	f.risk = features.WeatherRisk{Answer: features.Answer[weather.Warning]{At: fixedNow, Partial: true}, Lamp: weather.LampUnknown}
 	body = decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/weather-risk?at=52.52,13.405", bearer))
 	data, _ = body["data"].(map[string]any)
 	q, _ = meta(t, body)["query"].(map[string]any)
-	if ws, _ := data["warnings"].([]any); data["lamp"] != "green" || ws == nil || len(ws) != 0 || f.gotRisk.MinLevel != 1 || f.gotRisk.Hazards != nil {
+	if ws, _ := data["warnings"].([]any); data["lamp"] != "unknown" || ws == nil || len(ws) != 0 || f.gotRisk.MinLevel != 1 || f.gotRisk.Hazards != nil {
 		t.Errorf("defaults: data %v, asked %+v", data, f.gotRisk)
 	}
 	if hz, _ := q["hazards"].([]any); hz == nil || len(hz) != 0 {

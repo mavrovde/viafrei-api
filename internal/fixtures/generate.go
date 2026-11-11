@@ -17,7 +17,7 @@ import (
 
 // GeneratorVersion changes whenever the output for a given seed and profile
 // changes.
-const GeneratorVersion = "0.2.0"
+const GeneratorVersion = "0.3.0"
 
 // Profile sets the size of a generated set.
 type Profile struct {
@@ -914,6 +914,23 @@ func (g *gen) weather() {
 			n++
 		}
 	}
+	// Planted without a random draw, in one area over the same two days: a
+	// warning in force, the same warning cancelled, and one withdrawn from
+	// publication; only the first answers.
+	l := g.lands[0]
+	ref := g.fresh("weather", "eta")
+	from := g.day(0)
+	for _, w := range []struct{ id, status, withdrawn string }{
+		{"ww-planted-issued", "issued", null},
+		{"ww-planted-cancelled", "cancelled", null},
+		{"ww-planted-withdrawn", "issued", ts(from.Add(time.Hour))},
+	} {
+		g.w.row(str(w.id), str("ice"), num(2), str("Stufe 2"), str(w.status), str("Synthetischer Wetterdienst"),
+			str("Warnung vor Glätte (Stufe 2)"), str("de"), ts(from), ts(from.Add(48*time.Hour)),
+			ts(from.Add(-30*time.Minute)), str(l.code+"001"), str(ref), ts(from), w.withdrawn)
+		g.counted(l.code, ref)
+	}
+	g.edges["withdrawn_warning"] = 1
 }
 
 // ---------------------------------------------------------------- rules

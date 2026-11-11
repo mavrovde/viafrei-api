@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -441,6 +442,17 @@ func TestFeaturePostCheckAbortsTheAnswer(t *testing.T) {
 	assertProblem(t, w, 500, "internal")
 	if httpapi.GateViolations() != before+1 || !strings.Contains(log.String(), "licence gate post-check aborted an answer") {
 		t.Errorf("violations %d, log %s", httpapi.GateViolations()-before, log.String())
+	}
+}
+
+func TestAWarningLevelOutsideTheScaleIsLoggedByID(t *testing.T) {
+	req.Covers(t, "FR-WEATHER-002")
+	var log bytes.Buffer
+	err := fmt.Errorf("weather warning ww-x, level 7: %w", weather.ErrLevel)
+	w := do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: err}, &log), http.MethodGet, "/v1/weather-risk?at=52.52,13.405", bearer)
+	assertProblem(t, w, 500, "internal")
+	if !strings.Contains(log.String(), "outside 1 to 4") || !strings.Contains(log.String(), "ww-x") {
+		t.Errorf("log %s", log.String())
 	}
 }
 

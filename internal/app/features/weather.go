@@ -13,7 +13,8 @@ import (
 type Weather interface {
 	// WarningsAt returns every warning of the given families in force at
 	// now whose area contains q.At, at or above q.MinLevel, of the asked
-	// hazards: level descending, then start, then id.
+	// hazards: level descending, then start, then id; at most
+	// weather.MaxWarnings.
 	WarningsAt(ctx context.Context, q weather.Query, families []string, now time.Time) ([]weather.Warning, error)
 }
 
@@ -59,7 +60,7 @@ func (s *Service) WeatherRisk(ctx context.Context, key access.Record, q weather.
 	}
 	return WeatherRisk{
 		Answer: Answer[weather.Warning]{Items: ws, Families: fams, Partial: partial, At: now},
-		Lamp:   weather.LampOf(ws),
+		Lamp:   weather.LampOf(ws, partial),
 	}, nil
 }
 
@@ -79,6 +80,9 @@ func (s *Service) DrivingRules(ctx context.Context, key access.Record, code stri
 	if err != nil {
 		return rules.Topic{}, Answer[rules.Rule]{}, err
 	}
+	// Rule topics carry no source of their own: the curated content is
+	// published under every rules family, so the answer is attributed to
+	// each family the key may read (nil contributed means all permitted).
 	fams, err := s.provenanceOf(ctx, nil, permitted)
 	if err != nil {
 		return rules.Topic{}, Answer[rules.Rule]{}, err

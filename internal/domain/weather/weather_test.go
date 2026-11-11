@@ -60,21 +60,25 @@ func TestKnownHazards(t *testing.T) {
 func TestLampOf(t *testing.T) {
 	req.Covers(t, "FR-WEATHER-001")
 	for _, c := range []struct {
-		levels []weather.Level
-		want   weather.Lamp
+		levels  []weather.Level
+		partial bool
+		want    weather.Lamp
 	}{
-		{nil, weather.LampGreen},
-		{[]weather.Level{1, 1}, weather.LampGreen},
-		{[]weather.Level{1, 2}, weather.LampAmber},
-		{[]weather.Level{2, 3}, weather.LampRed},
-		{[]weather.Level{4, 1}, weather.LampRed},
+		{nil, false, weather.LampGreen},
+		{[]weather.Level{1, 1}, false, weather.LampAmber},
+		{[]weather.Level{1, 2}, false, weather.LampAmber},
+		{[]weather.Level{2, 3}, false, weather.LampRed},
+		{[]weather.Level{4, 1}, false, weather.LampRed},
+		{nil, true, weather.LampUnknown},
+		{[]weather.Level{2}, true, weather.LampUnknown},
+		{[]weather.Level{3}, true, weather.LampRed},
 	} {
 		ws := make([]weather.Warning, len(c.levels))
 		for i, l := range c.levels {
 			ws[i].Level = l
 		}
-		if got := weather.LampOf(ws); got != c.want {
-			t.Errorf("%v: %s, want %s", c.levels, got, c.want)
+		if got := weather.LampOf(ws, c.partial); got != c.want {
+			t.Errorf("%v partial %v: %s, want %s", c.levels, c.partial, got, c.want)
 		}
 	}
 }

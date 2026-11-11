@@ -1,3 +1,3 @@
 # Parity bundles pinned per platform version: platform, bundle, sha256.
 # Pinned by the version sync; see docs/parity.md.
-unsynced	bundles/unsynced.json	e333c46d2fba089cc6bfee03f0de2d7f0d2ddd45b21771d63eed2ac2a22ef054
+unsynced	bundles/unsynced.json	73055a3d6a67716b15665d5ba8bcf9410b992dfa1724acc9ce5ac04199d26af7

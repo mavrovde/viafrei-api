@@ -130,13 +130,13 @@ func TestTheWaitForASlotEndsWithTheContext(t *testing.T) {
 	}
 }
 
-// t0 is where the clock of a budgetedStore stands; deadlines are set from it
-// a second ahead, so the real waits between attempts fit in them.
-var t0 = time.Now()
-
 // budgetedStore is a store whose clock stands still at t0 unless step moves
-// it, with a 50ms reserve and floor.
-func budgetedStore(step *time.Duration) *Store {
+// it, with a 50ms reserve and floor. Each test takes its own t0 from the real
+// clock and sets its deadlines from it, so the real waits between attempts
+// fit in them however long ago the package started: a package-wide t0 had
+// expired its deadlines when the integration binary ran these tests after
+// starting a database.
+func budgetedStore(t0 time.Time, step *time.Duration) *Store {
 	return &Store{
 		reserve: 50 * time.Millisecond, floor: 50 * time.Millisecond, request: time.Second,
 		nowFn:  func() time.Time { return t0.Add(*step) },
@@ -146,17 +146,19 @@ func budgetedStore(step *time.Duration) *Store {
 
 func TestASlotTakenAtOnceKeepsTheStatementTimeout(t *testing.T) {
 	req.Covers(t, "NFR-CAP-002")
+	t0 := time.Now()
 	var step time.Duration
 	q := &slots{script: []error{nil}}
-	if err := budgetedStore(&step).WithSharedBudget(budget()).takeSlot(context.Background(), q); err != nil || len(q.execs) != 0 {
+	if err := budgetedStore(t0, &step).WithSharedBudget(budget()).takeSlot(context.Background(), q); err != nil || len(q.execs) != 0 {
 		t.Fatalf("err %v, statement timeout set again %d times", err, len(q.execs))
 	}
 }
 
 func TestAReadThatWaitedGetsWhatIsLeftOfItsDeadline(t *testing.T) {
 	req.Covers(t, "NFR-CAP-002", "NFR-PERF-004")
+	t0 := time.Now()
 	var step time.Duration
-	st := budgetedStore(&step)
+	st := budgetedStore(t0, &step)
 	ctx, cancel := context.WithDeadline(context.Background(), t0.Add(5*time.Second))
 	defer cancel()
 	q := &slots{script: []error{pgx.ErrNoRows, nil}}
@@ -171,8 +173,9 @@ func TestAReadThatWaitedGetsWhatIsLeftOfItsDeadline(t *testing.T) {
 
 func TestAReadThatWaitedPastItsFloorIsDeadlineExhausted(t *testing.T) {
 	req.Covers(t, "NFR-PERF-004")
+	t0 := time.Now()
 	var step time.Duration
-	st := budgetedStore(&step)
+	st := budgetedStore(t0, &step)
 	ctx, cancel := context.WithDeadline(context.Background(), t0.Add(5*time.Second))
 	defer cancel()
 	step = 4950 * time.Millisecond
@@ -184,23 +187,25 @@ func TestAReadThatWaitedPastItsFloorIsDeadlineExhausted(t *testing.T) {
 
 func TestAFailedSlotStatementIsStorageUnavailable(t *testing.T) {
 	req.Covers(t, "NFR-CAP-002")
+	t0 := time.Now()
 	var step time.Duration
 	boom := &pgconn.PgError{Code: "08006"}
-	if err := budgetedStore(&step).takeSlot(context.Background(), &slots{script: []error{boom}}); !errors.Is(err, ErrUnavailable) {
+	if err := budgetedStore(t0, &step).takeSlot(context.Background(), &slots{script: []error{boom}}); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("a failed slot attempt: %v", err)
 	}
 	ctx, cancel := context.WithDeadline(context.Background(), t0.Add(5*time.Second))
 	defer cancel()
 	q := &slots{script: []error{pgx.ErrNoRows, nil}, execErr: boom}
-	if err := budgetedStore(&step).takeSlot(ctx, q); !errors.Is(err, ErrUnavailable) {
+	if err := budgetedStore(t0, &step).takeSlot(ctx, q); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("a failed statement timeout: %v", err)
 	}
 }
 
 func TestARefusedSlotIsPassedOnAsOverloaded(t *testing.T) {
 	req.Covers(t, "NFR-CAP-003")
+	t0 := time.Now()
 	var step time.Duration
-	st := budgetedStore(&step)
+	st := budgetedStore(t0, &step)
 	st.budget.MaxWait = 0
 	var r *admission.Refusal
 	if err := st.takeSlot(context.Background(), &slots{}); !errors.As(err, &r) || r.RetryAfter != 3*time.Second {

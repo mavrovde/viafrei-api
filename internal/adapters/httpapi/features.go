@@ -17,6 +17,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/parking"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
+	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 )
 
 // Features is the port to the feature use cases.
@@ -24,6 +25,9 @@ type Features interface {
 	Charging(ctx context.Context, key access.Record, q energy.Query) (features.Answer[energy.Site], error)
 	Parking(ctx context.Context, key access.Record, q parking.Query) (features.Answer[parking.Site], error)
 	Overview(ctx context.Context, key access.Record, q features.OverviewQuery) (features.Overview, error)
+	MotorwayConditions(ctx context.Context, key access.Record, q roads.CorridorQuery) (features.Conditions, error)
+	RoadConditions(ctx context.Context, key access.Record, q roads.AreaQuery) (features.Conditions, error)
+	RoadSituation(ctx context.Context, key access.Record, id string) (features.Answer[roads.Situation], error)
 }
 
 // counterpartExtension names the MCP capability an operation answers the
@@ -44,6 +48,8 @@ const schemaPrefix = "#/components/schemas/"
 var nullableObjects = []struct{ schema, member string }{
 	{"ChargePoint", "availability"},
 	{"ParkingSite", "occupancy"},
+	{"RoadSituation", "location"},
+	{"RoadSituation", "lanes"},
 }
 
 func amendNullableObjects(api huma.API) {
@@ -158,6 +164,10 @@ func (s *server) featureProblem(ctx context.Context, err error) *Problem {
 		return newProblem(ctx, SlugInternal, "An unexpected fault occurred; quote the request id.", 0)
 	case errors.Is(err, places.ErrNotFound):
 		return newProblem(ctx, SlugNotFound, "No place with this id.", 0)
+	case errors.Is(err, roads.ErrUnknownRoad):
+		return newProblem(ctx, SlugNotFound, "No road with this reference.", 0)
+	case errors.Is(err, roads.ErrUnknownSituation):
+		return newProblem(ctx, SlugNotFound, "No situation with this id.", 0)
 	default:
 		return s.storageProblem(ctx, err)
 	}

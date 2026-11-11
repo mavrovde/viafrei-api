@@ -54,6 +54,7 @@ type Repositories struct {
 	Charging Charging
 	Parking  Parking
 	Places   Places
+	Roads    Roads
 }
 
 // Settings are the tunables of the use cases.

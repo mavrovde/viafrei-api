@@ -119,12 +119,32 @@ func seedFixtures(t *testing.T) {
 	}
 	defer func() { _ = conn.Close(ctx) }()
 	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, buf.String())
+		if _, err := tx.Exec(ctx, buf.String()); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, freshReports, now)
 		return err
 	}); err != nil {
 		t.Fatal(err)
 	}
 }
+
+// freshReports plants, on the charging sites the examples document, reports
+// made minutes before the examples' clock (now, the end of the fixture
+// window): the fixtures' own reports are spread over whole days, so at that
+// clock every one of them is older than the 30-minute status limit and the
+// examples would show only stale points. With these, each documented site
+// shows a live point beside its stale ones and a non-null availableNow. Each
+// report is credited to the source of the point's own newest fixture report.
+const freshReports = `
+insert into contract.charge_point_state_observation (point_id, observed_at, availability, source_ref)
+select p.point_id, $1::timestamptz - p.age, p.state,
+       (select o.source_ref from contract.charge_point_state_observation o
+         where o.point_id = p.point_id order by o.observed_at desc limit 1)
+from (values ('cp-00012-0', interval '5 minutes', 'available'),
+             ('cp-00012-1', interval '12 minutes', 'occupied'),
+             ('cp-00000-0', interval '8 minutes', 'available'))
+     as p(point_id, age, state)`
 
 // keyAuth admits every request as the example's key.
 type keyAuth struct{ p auth.Principal }

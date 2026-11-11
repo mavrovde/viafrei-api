@@ -12,8 +12,9 @@
 #   fragment;
 # - a link to any other file of the repository points at it on GitHub, since
 #   the portal does not carry it, and only when that file exists in the
-#   repository (this script's parent directory); a link to a file that does not exist becomes
-#   "missing-in-repo/<path>", which the build refuses;
+#   repository (this script's parent directory); a link to anything else
+#   becomes "missing-in-repo/<path>", and the script names it on stderr and
+#   exits 1 after printing the page;
 # - links with a scheme, fragment-only links and links to files the portal
 #   itself serves (DOCS_SITE_FILES) are left as they are;
 # - code blocks, and the wrapper each table is put in, scroll sideways when
@@ -61,6 +62,7 @@ sub resolve {
   return join '/', @parts;
 }
 
+my @missing;
 $html =~ s{href="([^"]*)"}{
   my $href = $1;
   my $out = $href;
@@ -77,8 +79,9 @@ $html =~ s{href="([^"]*)"}{
         $out = "$repo/$file$frag";
       } else {
         # Not a page and not a file of the repository: a misspelt link. It
-        # is left pointing nowhere on the site, so the build refuses it.
+        # points nowhere on the site, and the script fails once it is done.
         $out = "missing-in-repo/$file$frag";
+        push @missing, $file;
       }
     }
   }
@@ -90,3 +93,7 @@ $html =~ s{<table>(.*?)</table>}{<div class="table-wrap" tabindex="0"><table>$1<
 $html =~ s{<li><input([^>]*type="checkbox"[^>]*)>(.*?)</li>}{<li><label><input$1>$2</label></li>}gs;
 
 print $html;
+for my $file (@missing) {
+  print STDERR "FAIL: link to $file: neither a page of the portal nor a file of the repository\n";
+}
+exit(@missing ? 1 : 0);

@@ -60,7 +60,7 @@ clean "$s"; sed -i.bak 's/#part/#nowhere/' "$s/other.html"; cp "$s/index.html" "
 # the site as a link the check refuses; an existing script becomes GitHub's.
 rewrite() { # rewrite HREF: the href docs-html.pl makes of it, from docs/
   (cd "$tmp" && DOCS_PAGES="docs/errors.md=errors.html" DOCS_SITE_FILES="" \
-    perl "$here/docs-html.pl" docs <<<"<a href=\"$1\">x</a>" | sed -n 's/.*href="\([^"]*\)".*/\1/p')
+    perl "$here/docs-html.pl" docs <<<"<a href=\"$1\">x</a>" 2>/dev/null | sed -n 's/.*href="\([^"]*\)".*/\1/p')
 }
 clean "$s"; sed -i.bak "s#other.html\#part#$(rewrite eror.md)#" "$s/index.html"; expect 1 "a misspelt page link (docs/eror.md) fails" "$s" 'missing-in-repo/docs/eror.md'
 clean "$s"; sed -i.bak "s#other.html\#part#$(rewrite ../scripts/nope.sh)#" "$s/index.html"; expect 1 "a link to a missing script (../scripts/nope.sh) fails" "$s" 'missing-in-repo/scripts/nope.sh'

@@ -227,7 +227,7 @@ func TestReportsCarryTheRun(t *testing.T) {
 			t.Errorf("requirement report lacks %q:\n%s", want, rep.String())
 		}
 	}
-	for _, want := range []string{"## 1. Summary", "Verdict from the automated gates: not ready", "| unit | 1 | 1 | 0 | 0 | 0 |", "1 of 2", "## 10. Approval"} {
+	for _, want := range []string{"## 1. Summary", "Verdict from the automated gates: not ready", "| unit | 1 | 1 | 0 | 0 | 0 |", "1 of 2", "manual accessibility pass", "## 10. Approval"} {
 		if !strings.Contains(comp.String(), want) {
 			t.Errorf("completion draft lacks %q:\n%s", want, comp.String())
 		}

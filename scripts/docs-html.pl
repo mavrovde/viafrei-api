@@ -17,7 +17,12 @@
 #   becomes "missing-in-repo/<path>", and the script names it on stderr and
 #   exits 1 after printing the page;
 # - links with a scheme, fragment-only links and links to files the portal
-#   itself serves (DOCS_SITE_FILES) are left as they are.
+#   itself serves (DOCS_SITE_FILES) are left as they are;
+# - code blocks, and the wrapper each table is put in, scroll sideways when
+#   wide and can take the keyboard focus, so they can be scrolled without a
+#   mouse (WCAG 2.1.1); the table itself keeps its table layout, so its cells
+#   stay header-associated for assistive technology and for axe;
+# - a task-list item's checkbox is labelled by the item's text (WCAG 1.3.1).
 #
 # BASE_DIR is the directory the source file sits in, relative to the
 # repository root ("." for the root), against which its links resolve.
@@ -105,6 +110,10 @@ $html =~ s{href="([^"]*)"}{
   }
   qq{href="$out"};
 }ge;
+
+$html =~ s{<pre>}{<pre tabindex="0">}g;
+$html =~ s{<table>(.*?)</table>}{<div class="table-wrap" tabindex="0"><table>$1</table></div>}gs;
+$html =~ s{<li><input([^>]*type="checkbox"[^>]*)>(.*?)</li>}{<li><label><input$1>$2</label></li>}gs;
 
 print $html;
 for my $file (@missing) {

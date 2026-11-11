@@ -30,6 +30,8 @@ whose anchor is the code; today the URIs are identifiers only.
 The list below is the complete catalogue of this release, held equal to the
 code by a test.
 
+## Problem types
+
 ### invalid-parameter
 Status `400` · Invalid parameter · not retryable.
 A parameter is malformed, out of bounds, repeated or unknown. `errors` lists

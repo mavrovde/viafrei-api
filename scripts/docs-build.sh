@@ -16,7 +16,9 @@
 #
 # Fails when a page came out empty, the endpoints page misses an operation of
 # the document, or the reference does not carry the document's title: a site
-# with a missing page is not published.
+# with a missing page is not published. Fails as well on a broken internal
+# link, a duplicate id or a diagram without a text description
+# (scripts/docs-check.pl).
 set -euo pipefail
 
 out=${1:?usage: docs-build.sh OUT_DIR [VERSION]}
@@ -41,6 +43,7 @@ pages=(
   "docs/rate-limits.md|docs|rate-limits.html|Rate limits, quotas and priority|Rate limits"
   "docs/access-keys.md|docs|access-keys.html|API keys and the licence gate|Keys"
   "docs/examples.md|docs|examples.html|Examples|"
+  "docs/accessibility.md|docs|accessibility.html|Accessibility of the documentation portal|"
   "docs/configuration.md|docs|configuration.html|Configuration reference|"
   "docs/container.md|docs|container.html|Container image and local stack|"
   "docs/security-checks.md|docs|security-checks.html|Security checks|"
@@ -87,7 +90,7 @@ a{color:#0b57d0}a:focus-visible{outline:3px solid #0b57d0;outline-offset:2px}
 .skip{position:absolute;left:-999px}.skip:focus{left:1rem;top:1rem;background:#fff;padding:.5rem}
 nav ul{list-style:none;padding:0;margin:0 0 1rem;display:flex;flex-wrap:wrap;gap:.25rem 1rem}
 nav a[aria-current]{font-weight:700}
-table{border-collapse:collapse;display:block;overflow-x:auto}th,td{border:1px solid #767676;padding:.3rem .5rem;text-align:left}
+.table-wrap{overflow-x:auto}table{border-collapse:collapse}th,td{border:1px solid #767676;padding:.3rem .5rem;text-align:left;overflow-wrap:anywhere}
 code,pre{background:#f4f4f4}pre{padding:.5rem;overflow-x:auto}
 </style>
 </head>
@@ -112,12 +115,22 @@ while read -r id; do
 done < <(jq -r '.paths[][] | objects | .operationId // empty' api/openapi.json)
 
 cp api/openapi.json "$out/openapi.json"
-"${redocly[@]}" build-docs api/openapi.json --output "$out/reference.html" >/dev/null
+"${redocly[@]}" build-docs api/openapi.json --theme.openapi.jsonSamplesExpandLevel=all --output "$out/reference.html" >/dev/null
 title=$(jq -r '.info.title' api/openapi.json)
 grep -qF "$title" "$out/reference.html" || { echo "FAIL: reference.html does not carry the document title '$title'" >&2; exit 1; }
+# Two WCAG 2.2 AA repairs Redoc's theme cannot make (scripts/docs-a11y.sh):
+# its JSON expand buttons are 15 px, under the 24 px target size, and its
+# code samples scroll without being reachable by keyboard.
+perl -0pi -e '
+  s{</head>}{<style>.redoc-json .collapser{display:none!important}</style></head>};
+  s{</body>}{<script>(function(){function f(){document.querySelectorAll("pre:not([tabindex])").forEach(function(p){p.setAttribute("tabindex","0")})}document.addEventListener("DOMContentLoaded",f);new MutationObserver(f).observe(document.documentElement,{childList:true,subtree:true})})();</script></body>};
+' "$out/reference.html"
 touch "$out/.nojekyll"
 
 for f in "$out"/*.html "$out/openapi.json"; do
   [[ -s $f ]] || { echo "FAIL: $f is empty" >&2; exit 1; }
 done
+# Broken internal links, duplicate ids and diagrams without a text
+# description fail the build (#20). Accessibility: scripts/docs-a11y.sh.
+perl "$here/docs-check.pl" "$out"
 echo "built $(find "$out" -type f | wc -l | tr -d ' ') file(s) into $out for version $version"

@@ -147,6 +147,7 @@ The **developer documentation** is published with every release at [mavrovde.git
 - [Endpoints](https://mavrovde.github.io/viafrei-api/endpoints.html): every operation with a request, the recorded answer and its attribution rule, generated from [`api/openapi.json`](api/openapi.json); the full [API reference](https://mavrovde.github.io/viafrei-api/reference.html)
 - [Attribution and licence rules](docs/attribution.md) · [Error codes](docs/errors.md) · [Versioning and deprecation policy](docs/versioning.md) · [Rate limits](docs/rate-limits.md) · [API keys](docs/access-keys.md)
 - [Examples](docs/examples.md): how every example is recorded from synthetic fixtures and checked in CI
+- [Accessibility](docs/accessibility.md): the portal's WCAG 2.2 AA, link and diagram checks, and the manual pass per minor release
 
 The [wiki](https://github.com/mavrovde/viafrei-api/wiki) holds the full design:
 

@@ -28,7 +28,7 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `db.max_conn_lifetime` | `VFAPI_DB_MAX_CONN_LIFETIME` | duration | `30m` | 1m to 24h | A connection older than this is closed after use. |
 | `db.max_conn_idle` | `VFAPI_DB_MAX_CONN_IDLE` | duration | `5m` | 10s to 24h | An idle connection older than this is closed. |
 | `db.statement_timeout_floor` | `VFAPI_DB_STATEMENT_TIMEOUT_FLOOR` | duration | `50ms` | 10ms to 1s | Smallest useful remaining budget; below it a read is refused without touching storage. |
-| `db.cancel_grace` | `VFAPI_DB_CANCEL_GRACE` | duration | `100ms` | 10ms to 1s | Time a cancel request gets to land before the connection is abandoned. |
+| `db.cancel_grace` | `VFAPI_DB_CANCEL_GRACE` | duration | `100ms` | 10ms to 1s | Time the cancel request sent when a request's deadline ends a read has to reach the server. The read itself ends at the deadline and its connection is destroyed; the statement timeout stops the statement if the cancel never lands. |
 | `db.application_name` | `VFAPI_DB_APPLICATION_NAME` | string | `viafrei-api` | at most 63 characters | application_name reported to the database. |
 | `db.query_exec_mode` | `VFAPI_DB_QUERY_EXEC_MODE` | string | `cache_statement` | one of cache_statement, cache_describe, describe_exec, exec, simple_protocol | How statements are sent: cache_statement prepares each statement once per connection and reuses it; the others are the driver's fallbacks for a pooler that cannot keep prepared statements. |
 | `db.statement_cache_capacity` | `VFAPI_DB_STATEMENT_CACHE_CAPACITY` | int | `128` | 1 to 4096 | Prepared statements (or descriptions) cached per connection under cache_statement and cache_describe. |

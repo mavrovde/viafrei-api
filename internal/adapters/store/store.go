@@ -13,7 +13,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgconn/ctxwatch"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/store/contractdb"
@@ -77,15 +76,15 @@ func PoolConfig(cfg *config.Config) (*pgxpool.Config, error) {
 	pc.ConnConfig.DefaultQueryExecMode = execModes[cfg.DB.QueryExecMode]
 	pc.ConnConfig.StatementCacheCapacity = cfg.DB.StatementCacheCapacity
 	pc.ConnConfig.DescriptionCacheCapacity = cfg.DB.StatementCacheCapacity
-	grace := cfg.DB.CancelGrace
-	// When a request's context ends, send a PostgreSQL cancel request at once
-	// and give it the grace period to land before the connection is abandoned.
-	pc.ConnConfig.BuildContextWatcherHandler = func(c *pgconn.PgConn) ctxwatch.Handler {
-		return &pgconn.CancelRequestContextWatcherHandler{Conn: c, CancelRequestDelay: 0, DeadlineDelay: grace}
-	}
-	// A connection that comes back in any state other than idle is destroyed
-	// instead of being returned to the pool.
-	pc.AfterRelease = func(c *pgx.Conn) bool { return c.PgConn().TxStatus() == 'I' }
+	// When a request's context ends, the read ends with it: the connection
+	// is cut off at once and a cancel request, bounded by db.cancel_grace,
+	// stops the statement on the server (watcher.go).
+	gone := &abandoned{}
+	pc.ConnConfig.BuildContextWatcherHandler = watcherFor(cfg.DB.CancelGrace, gone)
+	// A connection that was cut off, or comes back in any state other than
+	// idle, is destroyed instead of being returned to the pool.
+	pc.AfterRelease = gone.reusable
+	pc.BeforeClose = func(c *pgx.Conn) { gone.forget(c.PgConn()) }
 	return pc, nil
 }
 
@@ -171,7 +170,9 @@ func (s *Store) Read(ctx context.Context, fn func(context.Context, pgx.Tx) error
 	if err != nil {
 		return classify(ctx, err)
 	}
-	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+	// The rollback is bounded by the request too: past its deadline the
+	// connection is cut off and destroyed rather than waited for.
+	defer func() { _ = tx.Rollback(ctx) }()
 	if err := fn(ctx, tx); err != nil {
 		return classify(ctx, err)
 	}

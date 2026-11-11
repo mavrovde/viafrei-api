@@ -416,9 +416,9 @@ func (s *server) cache(ctx huma.Context, next func(huma.Context)) {
 
 // sendProblem writes a problem from the cache layer.
 func sendProblem(ctx huma.Context, p *Problem) {
-	h := p.headers.Clone()
-	if h == nil {
-		h = http.Header{}
+	h := http.Header{}
+	for k, vs := range p.headers {
+		h[k] = vs
 	}
 	h.Set("Content-Type", ProblemContentType)
 	h.Set("Cache-Control", "no-store")

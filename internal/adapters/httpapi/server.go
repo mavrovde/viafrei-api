@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -126,7 +127,10 @@ func NewHandler(d Deps) (http.Handler, error) {
 // serve. `viafrei-api openapi` writes it to api/openapi.json.
 func OpenAPI(cfg *config.Config) ([]byte, error) {
 	_, doc, err := build(Deps{Config: cfg}, nil)
-	return doc, err
+	if err != nil {
+		return nil, err
+	}
+	return doc(), nil
 }
 
 // NewServer builds the http.Server with every server.* limit applied.
@@ -157,7 +161,7 @@ func logger(d Deps) *slog.Logger {
 
 // build makes the handler; extra operations are registered after the
 // catalogue (tests only).
-func build(d Deps, extra []operation) (http.Handler, []byte, error) {
+func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 	if d.Config == nil {
 		return nil, nil, errors.New("httpapi: no configuration")
 	}
@@ -287,18 +291,22 @@ func build(d Deps, extra []operation) (http.Handler, []byte, error) {
 		documentCaching(api)
 	}
 
-	// The document is a value of huma's own fixed types: marshalling it
-	// cannot fail for any configuration.
-	raw := invariant.Must(json.Marshal(api.OpenAPI()))
-	var doc bytes.Buffer
-	_ = json.Indent(&doc, raw, "", "  ") // raw is the output of json.Marshal
-	doc.WriteByte('\n')
-	served := doc.Bytes()
+	// The document is rendered once, when first asked for: a handler that is
+	// never asked for it does not pay for marshalling the whole document. It
+	// is a value of huma's own fixed types, complete once build returns:
+	// marshalling it cannot fail for any configuration.
+	served := sync.OnceValue(func() []byte {
+		raw := invariant.Must(json.Marshal(api.OpenAPI()))
+		var doc bytes.Buffer
+		_ = json.Indent(&doc, raw, "", "  ") // raw is the output of json.Marshal
+		doc.WriteByte('\n')
+		return doc.Bytes()
+	})
 
 	if d.Config.Docs.Enabled {
 		router.Get("/v1/openapi.json", func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", OpenAPIMediaType)
-			_, _ = w.Write(served)
+			_, _ = w.Write(served())
 		})
 		router.Get("/openapi.json", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/v1/openapi.json", http.StatusFound)

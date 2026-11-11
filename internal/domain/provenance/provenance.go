@@ -40,8 +40,10 @@ type Family struct {
 	Source access.Source
 	// StaleAfter is the family's design threshold: older data is stale.
 	StaleAfter time.Duration
-	// DataAsOf is the instant the family's data is current to; nil when
-	// the family has published none.
+	// DataAsOf is the instant of the family's last successful read from its
+	// publisher (contract.source_freshness.data_as_of), not of the last
+	// change in its data: a source that answers unchanged stays fresh. Nil
+	// when the family has never been read successfully.
 	DataAsOf *time.Time
 	Notes    []Note
 }

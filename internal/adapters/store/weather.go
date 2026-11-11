@@ -30,6 +30,7 @@ where w.withdrawn_at is null and w.message_status <> 'cancelled'
 // WarningsAt reads the warnings in the scope (warningScope) at or above the
 // level floor, of the asked hazards; level descending, then start, then id;
 // at most weather.MaxWarnings, and whether more answer. In the same snapshot
+// (Read is one repeatable-read transaction)
 // it reads the level of every warning in the scope, whatever the floor and
 // the hazards keep, for the lamp. A stored level outside 1 to 4 is refused
 // rather than re-graded.

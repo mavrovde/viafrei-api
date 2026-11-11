@@ -600,7 +600,7 @@
             ]
           },
           "dataAsOf": {
-            "description": "The instant the family's data is current to; null when it published none.",
+            "description": "The instant of the family's last successful read from its publisher (the read contract's source_freshness.data_as_of), not of the last change in its data: a source that answers unchanged stays fresh. Null when the family has never been read successfully.",
             "format": "date-time",
             "type": [
               "string",
@@ -2277,12 +2277,11 @@
         "additionalProperties": false,
         "properties": {
           "lamp": {
-            "description": "Over every warning in force at the position, whatever min_level and hazards keep (they filter only the list), first match: red when a warning of level 3 or 4 is in force; unknown when a weather family the key may not read was left out (meta.partial); amber for a warning of level 1 or 2, or, with no warning in force, when a weather family read has no data or stale data (meta.freshness), since no warning cannot then be told from none heard; green when no warning is in force and every family is fresh.",
+            "description": "Over every warning in force at the position, whatever min_level and hazards keep (they filter only the list), first match: red when a warning of level 3 or 4 is in force; amber for a warning of level 1 or 2, or, with no warning in force, when the sight is limited: a weather family the key may not read was left out (meta.partial), or a weather family read has no data or stale data (meta.freshness), since no warning cannot then be told from none heard; green when no warning is in force and every family is fresh.",
             "enum": [
               "green",
               "amber",
-              "red",
-              "unknown"
+              "red"
             ],
             "type": "string"
           },

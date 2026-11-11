@@ -95,10 +95,9 @@ type Lamp string
 
 // The lamps.
 const (
-	LampGreen   Lamp = "green"
-	LampAmber   Lamp = "amber"
-	LampRed     Lamp = "red"
-	LampUnknown Lamp = "unknown"
+	LampGreen Lamp = "green"
+	LampAmber Lamp = "amber"
+	LampRed   Lamp = "red"
 )
 
 // RedLevel is the lowest level that makes the lamp red.
@@ -115,11 +114,10 @@ const MaxWarnings = 100
 // read is missing or stale; first match from the top:
 //
 //   - red when a warning of level 3 or 4 is in force;
-//   - unknown when the answer is partial: a family the key may not read
-//     could hold a severe warning;
 //   - amber for a warning of level 1 or 2, or, with no warning in force,
-//     when a family read has no data or stale data: the sight is limited
-//     and "no warning" cannot be told from "not heard";
+//     when the sight is limited: the answer is partial (a family the key
+//     may not read was left out) or a family read has no data or stale
+//     data, so "no warning" cannot be told from "not heard";
 //   - green when no warning is in force and every family is fresh.
 func LampOf(levels []Level, partial, stale bool) Lamp {
 	worst := Level(0)
@@ -129,10 +127,7 @@ func LampOf(levels []Level, partial, stale bool) Lamp {
 	if worst >= RedLevel {
 		return LampRed
 	}
-	if partial {
-		return LampUnknown
-	}
-	if worst >= MinLevel || stale {
+	if worst >= MinLevel || partial || stale {
 		return LampAmber
 	}
 	return LampGreen

@@ -88,7 +88,7 @@ func position(p geo.Point) Position {
 // FreshnessEntry is one entry of meta.freshness.
 type FreshnessEntry struct {
 	Family      string     `json:"family" doc:"The source family."`
-	DataAsOf    *time.Time `json:"dataAsOf" nullable:"true" doc:"The instant the family's data is current to; null when it published none."`
+	DataAsOf    *time.Time `json:"dataAsOf" nullable:"true" doc:"The instant of the family's last successful read from its publisher (the read contract's source_freshness.data_as_of), not of the last change in its data: a source that answers unchanged stays fresh. Null when the family has never been read successfully."`
 	AgeS        *int64     `json:"ageS" nullable:"true" doc:"generatedAt minus dataAsOf, in whole seconds; null when dataAsOf is."`
 	StaleAfterS int64      `json:"staleAfterS" doc:"The family's design threshold: data older than this is stale."`
 	Stale       bool       `json:"stale" doc:"True when ageS is above staleAfterS, or dataAsOf is unknown."`

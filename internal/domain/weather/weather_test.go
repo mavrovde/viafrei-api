@@ -69,14 +69,14 @@ func TestLampOf(t *testing.T) {
 		{[]weather.Level{1, 2}, false, false, weather.LampAmber},
 		{[]weather.Level{2, 3}, false, false, weather.LampRed},
 		{[]weather.Level{4, 1}, false, false, weather.LampRed},
-		{nil, true, false, weather.LampUnknown},
-		{[]weather.Level{2}, true, false, weather.LampUnknown},
+		{nil, true, false, weather.LampAmber},
+		{[]weather.Level{2}, true, false, weather.LampAmber},
 		{[]weather.Level{3}, true, false, weather.LampRed},
 		// No warning heard from a stale or missing source: limited sight.
 		{nil, false, true, weather.LampAmber},
 		{[]weather.Level{1}, false, true, weather.LampAmber},
 		{[]weather.Level{3}, false, true, weather.LampRed},
-		{nil, true, true, weather.LampUnknown},
+		{nil, true, true, weather.LampAmber},
 	} {
 		if got := weather.LampOf(c.levels, c.partial, c.stale); got != c.want {
 			t.Errorf("%v partial %v stale %v: %s, want %s", c.levels, c.partial, c.stale, got, c.want)

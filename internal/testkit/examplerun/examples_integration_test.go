@@ -128,10 +128,15 @@ func seedFixtures(t *testing.T) {
 	}
 }
 
-// plantFreshReports runs freshReports and holds it to its word: exactly the
-// planted rows, each credited to a source (the subquery found the point).
+// plantFreshReports runs plantFreshSQL over freshReports and holds it to its
+// word: one row per planted report, each credited to a source (the subquery
+// found the point).
 func plantFreshReports(ctx context.Context, tx pgx.Tx) error {
-	rows, err := tx.Query(ctx, freshReports, now)
+	ids, ages, states := make([]string, 0, len(freshReports)), make([]string, 0, len(freshReports)), make([]string, 0, len(freshReports))
+	for _, r := range freshReports {
+		ids, ages, states = append(ids, r.point), append(ages, r.age), append(states, r.state)
+	}
+	rows, err := tx.Query(ctx, plantFreshSQL, now, ids, ages, states)
 	if err != nil {
 		return err
 	}
@@ -139,8 +144,8 @@ func plantFreshReports(ctx context.Context, tx pgx.Tx) error {
 	if err != nil {
 		return err
 	}
-	if len(planted) != freshPlanted {
-		return fmt.Errorf("planted %d fresh report(s), want %d", len(planted), freshPlanted)
+	if len(planted) != len(freshReports) {
+		return fmt.Errorf("planted %d fresh report(s), want %d", len(planted), len(freshReports))
 	}
 	for i, ref := range planted {
 		if ref == nil || *ref == "" {
@@ -150,25 +155,31 @@ func plantFreshReports(ctx context.Context, tx pgx.Tx) error {
 	return nil
 }
 
-// freshPlanted is the number of rows freshReports inserts.
-const freshPlanted = 3
+// freshReport is one report planted by plantFreshReports: a point, how long
+// before the examples' clock it was made, and the state it reported.
+type freshReport struct{ point, age, state string }
 
-// freshReports plants, on the charging sites the examples document, reports
+// freshReports are, on the charging sites the examples document, reports
 // made minutes before the examples' clock (now, the end of the fixture
 // window): the fixtures' own reports are spread over whole days, so at that
 // clock every one of them is older than the 30-minute status limit and the
 // examples would show only stale points. With these, each documented site
 // shows a live point beside its stale ones and a non-null availableNow. Each
 // report is credited to the source of the point's own newest fixture report.
-const freshReports = `
+var freshReports = []freshReport{
+	{"cp-00012-0", "5 minutes", "available"},
+	{"cp-00012-1", "12 minutes", "occupied"},
+	{"cp-00000-0", "8 minutes", "available"},
+}
+
+// plantFreshSQL inserts one report per element of its three arrays ($2
+// points, $3 ages, $4 states), made at the clock $1 minus the age.
+const plantFreshSQL = `
 insert into contract.charge_point_state_observation (point_id, observed_at, availability, source_ref)
-select p.point_id, $1::timestamptz - p.age, p.state,
+select p.point_id, $1::timestamptz - p.age::interval, p.state,
        (select o.source_ref from contract.charge_point_state_observation o
          where o.point_id = p.point_id order by o.observed_at desc limit 1)
-from (values ('cp-00012-0', interval '5 minutes', 'available'),
-             ('cp-00012-1', interval '12 minutes', 'occupied'),
-             ('cp-00000-0', interval '8 minutes', 'available'))
-     as p(point_id, age, state)
+from unnest($2::text[], $3::text[], $4::text[]) as p(point_id, age, state)
 returning source_ref`
 
 // keyAuth admits every request as the example's key.

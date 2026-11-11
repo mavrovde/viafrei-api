@@ -1,0 +1,101 @@
+{
+  "title": "Two parking sites within 50 km, with terms accepted",
+  "request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=50000\u0026limit=2",
+  "attribution": "Parking sites and their occupancy come from the source families of the parking domain the key is entitled to; a family whose terms need accepting answers only after the key has accepted them. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "parking"
+    ],
+    "sources": [
+      "src-alpha-parking",
+      "src-beta-parking",
+      "src-delta-parking"
+    ],
+    "accepted": [
+      {
+        "source": "src-delta-parking",
+        "version": "2026-03-01"
+      }
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": [
+      {
+        "id": "pk-07-0012",
+        "name": "Gienneisfeld Parken",
+        "operator": "Firgräng Parkraum",
+        "kind": "truck_parking",
+        "location": {
+          "lat": 50.387403,
+          "lon": 10.232051
+        },
+        "distanceM": 324,
+        "occupancy": {
+          "free": 93,
+          "total": 350,
+          "state": "free",
+          "observedAt": "2026-03-29T22:01:21Z"
+        },
+        "termsRequired": false,
+        "sourceFamily": "src-delta-parking"
+      }
+    ],
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": "2026-03-29T23:57:30Z",
+      "freshness": [
+        {
+          "family": "src-delta-parking",
+          "dataAsOf": "2026-03-29T23:57:30Z",
+          "ageS": 150,
+          "staleAfterS": 1800,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "src-delta-parking",
+          "domain": "parking",
+          "publisher": "Kleber Datenwerk",
+          "text": "Synthetic data from family delta, licence lic-delta.",
+          "licence": "Synthetic licence delta",
+          "licenceUrl": "https://licences.example/delta",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://delta.example/terms"
+        }
+      ],
+      "notes": {
+        "condition": [
+          "Use only after accepting the terms (synthetic)."
+        ],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ],
+      "page": {
+        "limit": 2,
+        "hasMore": false
+      },
+      "query": {
+        "at": {
+          "lat": 50.39,
+          "lon": 10.23
+        },
+        "radiusM": 50000,
+        "freeMin": 0
+      }
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/parking-options"
+    }
+  }
+}

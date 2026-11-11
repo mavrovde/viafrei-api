@@ -270,6 +270,9 @@ func build(d Deps, extra []operation) (http.Handler, []byte, error) {
 		op.register(api, s, hop)
 	}
 	amendNullableObjects(api)
+	if err := documentExamples(api.OpenAPI(), base); err != nil {
+		return nil, nil, err
+	}
 
 	if d.Config.RateLimit.Headers {
 		documentRateLimit(api)

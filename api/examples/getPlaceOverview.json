@@ -1,0 +1,201 @@
+{
+  "title": "Charging and parking around a place",
+  "request": "/v1/places/pl-01-0003/overview?needs=charging,parking\u0026radius_m=20000\u0026per_part_limit=2",
+  "attribution": "The place comes from the places domain, each part from its own domain (energy, parking), each under the licence gate on its own. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "places",
+      "energy",
+      "parking"
+    ],
+    "sources": [
+      "src-alpha-places",
+      "src-zeta-places",
+      "src-alpha-energy",
+      "src-beta-energy",
+      "src-alpha-parking",
+      "src-beta-parking"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": {
+      "place": {
+        "id": "pl-01-0003",
+        "name": "Kofüßwerder",
+        "kind": "municipality",
+        "location": {
+          "lat": 48.437771,
+          "lon": 7.687209
+        },
+        "sourceFamily": "src-zeta-places"
+      },
+      "charging": {
+        "sites": [
+          {
+            "id": "cs-01-0000",
+            "name": "Kofüßwerder Laden",
+            "operator": "Wickmel Strom",
+            "location": {
+              "lat": 48.404524,
+              "lon": 7.659936
+            },
+            "distanceM": 4212,
+            "access": "public",
+            "summary": {
+              "chargePoints": 3,
+              "availableNow": null,
+              "maxPowerKw": 150
+            },
+            "chargePoints": [
+              {
+                "id": "cp-00000-0",
+                "current": "ac",
+                "maxPowerKw": 22,
+                "availability": {
+                  "state": "occupied",
+                  "observedAt": "2026-03-29T21:11:57Z"
+                }
+              },
+              {
+                "id": "cp-00000-1",
+                "current": "ac",
+                "maxPowerKw": 22,
+                "availability": {
+                  "state": "available",
+                  "observedAt": "2026-03-29T15:46:18Z"
+                }
+              },
+              {
+                "id": "cp-00000-2",
+                "current": "dc",
+                "maxPowerKw": 150,
+                "availability": {
+                  "state": "reserved",
+                  "observedAt": "2026-03-29T09:34:59Z"
+                }
+              }
+            ],
+            "sourceFamily": "src-alpha-energy"
+          }
+        ]
+      },
+      "parking": {
+        "sites": [
+          {
+            "id": "pk-01-0000",
+            "name": "Kofüßwerder Parken",
+            "operator": "Sänür Parkraum",
+            "kind": "garage",
+            "location": {
+              "lat": 48.433324,
+              "lon": 7.681788
+            },
+            "distanceM": 637,
+            "occupancy": {
+              "free": 34,
+              "total": 43,
+              "state": "free",
+              "observedAt": "2026-03-29T12:02:49Z"
+            },
+            "termsRequired": false,
+            "sourceFamily": "src-alpha-parking"
+          }
+        ]
+      }
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": "2026-03-29T12:00:00Z",
+      "freshness": [
+        {
+          "family": "src-alpha-energy",
+          "dataAsOf": "2026-03-29T23:55:00Z",
+          "ageS": 300,
+          "staleAfterS": 3600,
+          "stale": false
+        },
+        {
+          "family": "src-alpha-parking",
+          "dataAsOf": "2026-03-29T23:57:30Z",
+          "ageS": 150,
+          "staleAfterS": 1800,
+          "stale": false
+        },
+        {
+          "family": "src-zeta-places",
+          "dataAsOf": "2026-03-29T12:00:00Z",
+          "ageS": 43200,
+          "staleAfterS": 604800,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "src-alpha-energy",
+          "domain": "energy",
+          "publisher": "Nimbruß Datenwerk",
+          "text": "Synthetic data from family alpha, licence lic-alpha.",
+          "licence": "Synthetic licence alpha",
+          "licenceUrl": "https://licences.example/alpha",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://alpha.example/terms"
+        },
+        {
+          "family": "src-alpha-parking",
+          "domain": "parking",
+          "publisher": "Nimbruß Datenwerk",
+          "text": "Synthetic data from family alpha, licence lic-alpha.",
+          "licence": "Synthetic licence alpha",
+          "licenceUrl": "https://licences.example/alpha",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://alpha.example/terms"
+        },
+        {
+          "family": "src-zeta-places",
+          "domain": "places",
+          "publisher": "Deingmeir Datenwerk",
+          "text": "Synthetic data from family zeta, licence lic-zeta.",
+          "licence": "Synthetic licence zeta",
+          "licenceUrl": "https://licences.example/zeta",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://zeta.example/terms"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ],
+      "parts": [
+        {
+          "part": "charging",
+          "status": "ok"
+        },
+        {
+          "part": "parking",
+          "status": "ok"
+        }
+      ],
+      "query": {
+        "placeId": "pl-01-0003",
+        "radiusM": 20000,
+        "perPartLimit": 2
+      }
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/places/pl-01-0003/overview"
+    }
+  }
+}

@@ -1353,6 +1353,14 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The process answers",
+                    "value": {
+                      "status": "ok"
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/HealthBody"
                 }
@@ -1381,7 +1389,16 @@
         "summary": "Liveness",
         "tags": [
           "service"
-        ]
+        ],
+        "x-attribution": "No source data: this answer carries no attribution.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/healthz\""
+          }
+        ],
+        "x-example-request": "/healthz"
       }
     },
     "/readyz": {
@@ -1392,6 +1409,14 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "Storage answers with a compatible read contract",
+                    "value": {
+                      "status": "ready"
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/ReadinessBody"
                 }
@@ -1437,7 +1462,16 @@
         "summary": "Readiness",
         "tags": [
           "service"
-        ]
+        ],
+        "x-attribution": "No source data: this answer carries no attribution.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/readyz\""
+          }
+        ],
+        "x-example-request": "/readyz"
       }
     },
     "/v1/charging-options": {
@@ -1520,6 +1554,124 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "Two charging sites within 20 km",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "cs-05-0012",
+                          "name": "Gielfürau Laden",
+                          "operator": "Weimweing Strom",
+                          "location": {
+                            "lat": 50.829574,
+                            "lon": 6.034346
+                          },
+                          "distanceM": 2644,
+                          "access": "public",
+                          "summary": {
+                            "chargePoints": 4,
+                            "availableNow": null,
+                            "maxPowerKw": 300
+                          },
+                          "chargePoints": [
+                            {
+                              "id": "cp-00012-0",
+                              "current": "dc",
+                              "maxPowerKw": 150,
+                              "availability": {
+                                "state": "reserved",
+                                "observedAt": "2026-03-29T03:23:03Z"
+                              }
+                            },
+                            {
+                              "id": "cp-00012-1",
+                              "current": "dc",
+                              "maxPowerKw": 150,
+                              "availability": {
+                                "state": "occupied",
+                                "observedAt": "2026-03-29T14:51:34Z"
+                              }
+                            },
+                            {
+                              "id": "cp-00012-2",
+                              "current": "ac",
+                              "maxPowerKw": 11,
+                              "availability": {
+                                "state": "reserved",
+                                "observedAt": "2026-03-29T18:57:01Z"
+                              }
+                            },
+                            {
+                              "id": "cp-00012-3",
+                              "current": "dc",
+                              "maxPowerKw": 300,
+                              "availability": {
+                                "state": "reserved",
+                                "observedAt": "2026-03-29T06:47:06Z"
+                              }
+                            }
+                          ],
+                          "sourceFamily": "src-beta-energy"
+                        }
+                      ],
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:55:00Z",
+                        "freshness": [
+                          {
+                            "family": "src-beta-energy",
+                            "dataAsOf": "2026-03-29T23:55:00Z",
+                            "ageS": 300,
+                            "staleAfterS": 3600,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "src-beta-energy",
+                            "domain": "energy",
+                            "publisher": "Stönwän Datenwerk",
+                            "text": "Synthetic data from family beta, licence lic-beta.",
+                            "licence": "Synthetic licence beta",
+                            "licenceUrl": "https://licences.example/beta",
+                            "shareAlike": true,
+                            "shareAlikeOffer": "https://beta.example/share-alike/energy",
+                            "termsUrl": "https://beta.example/terms"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 2,
+                          "hasMore": false
+                        },
+                        "query": {
+                          "at": {
+                            "lat": 50.82,
+                            "lon": 6
+                          },
+                          "radiusM": 20000,
+                          "minKw": 0,
+                          "access": "public"
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/charging-options"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/ChargingEnvelope"
                 }
@@ -1707,6 +1859,15 @@
         "tags": [
           "energy"
         ],
+        "x-attribution": "Charging sites and the availability of their charge points come from the source families of the energy domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/charging-options?at=50.82,6.0\u0026radius_m=20000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/charging-options?at=50.82,6.0\u0026radius_m=20000\u0026limit=2",
         "x-mcp-counterpart": "charging station search",
         "x-required-scope": "energy"
       }
@@ -1719,6 +1880,83 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The presenting key, its plan and the source families it may receive",
+                    "value": {
+                      "data": {
+                        "keyId": "examplekey",
+                        "environment": "live",
+                        "plan": {
+                          "name": "example",
+                          "useClass": "commercial",
+                          "tier": "standard",
+                          "scopes": [
+                            "energy",
+                            "parking",
+                            "places"
+                          ]
+                        },
+                        "expiresAt": "2026-06-28T00:00:00Z",
+                        "sources": [
+                          {
+                            "family": "src-alpha-energy",
+                            "domain": "energy",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          },
+                          {
+                            "family": "src-alpha-parking",
+                            "domain": "parking",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          },
+                          {
+                            "family": "src-alpha-places",
+                            "domain": "places",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          },
+                          {
+                            "family": "src-zeta-places",
+                            "domain": "places",
+                            "publisher": "Deingmeir Datenwerk",
+                            "text": "Synthetic data from family zeta, licence lic-zeta.",
+                            "licence": "Synthetic licence zeta",
+                            "licenceUrl": "https://licences.example/zeta",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://zeta.example/terms"
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "warnings": []
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/key"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/KeyEnvelope"
                 }
@@ -1828,7 +2066,16 @@
         "summary": "The presenting key",
         "tags": [
           "access"
-        ]
+        ],
+        "x-attribution": "No source data is returned. data.sources lists the source families the key may receive, each with the publisher, licence and attribution text a client must show wherever it displays their data.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/key\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/key"
       }
     },
     "/v1/meta": {
@@ -1839,6 +2086,31 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "Versions of the running service",
+                    "value": {
+                      "data": {
+                        "apiVersion": "1.0.0-example",
+                        "buildSha": "0123456789ab",
+                        "contractVersion": "0.1",
+                        "platformVersion": null,
+                        "openapi": "https://api.viafrei.de/v1/openapi.json",
+                        "languages": [
+                          "en"
+                        ]
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en"
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/meta"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/MetaEnvelope"
                 }
@@ -1867,7 +2139,16 @@
         "summary": "Service metadata",
         "tags": [
           "service"
-        ]
+        ],
+        "x-attribution": "No source data: this answer carries no attribution.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/meta\""
+          }
+        ],
+        "x-example-request": "/v1/meta"
       }
     },
     "/v1/parking-options": {
@@ -1934,6 +2215,89 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "Two parking sites within 50 km, with terms accepted",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "pk-07-0012",
+                          "name": "Gienneisfeld Parken",
+                          "operator": "Firgräng Parkraum",
+                          "kind": "truck_parking",
+                          "location": {
+                            "lat": 50.387403,
+                            "lon": 10.232051
+                          },
+                          "distanceM": 324,
+                          "occupancy": {
+                            "free": 93,
+                            "total": 350,
+                            "state": "free",
+                            "observedAt": "2026-03-29T22:01:21Z"
+                          },
+                          "termsRequired": false,
+                          "sourceFamily": "src-delta-parking"
+                        }
+                      ],
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:57:30Z",
+                        "freshness": [
+                          {
+                            "family": "src-delta-parking",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 1800,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "src-delta-parking",
+                            "domain": "parking",
+                            "publisher": "Kleber Datenwerk",
+                            "text": "Synthetic data from family delta, licence lic-delta.",
+                            "licence": "Synthetic licence delta",
+                            "licenceUrl": "https://licences.example/delta",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://delta.example/terms"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [
+                            "Use only after accepting the terms (synthetic)."
+                          ],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 2,
+                          "hasMore": false
+                        },
+                        "query": {
+                          "at": {
+                            "lat": 50.39,
+                            "lon": 10.23
+                          },
+                          "radiusM": 50000,
+                          "freeMin": 0
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/parking-options"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/ParkingEnvelope"
                 }
@@ -2121,6 +2485,15 @@
         "tags": [
           "parking"
         ],
+        "x-attribution": "Parking sites and their occupancy come from the source families of the parking domain the key is entitled to; a family whose terms need accepting answers only after the key has accepted them. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/parking-options?at=50.39,10.23\u0026radius_m=50000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=50000\u0026limit=2",
         "x-mcp-counterpart": "parking search",
         "x-required-scope": "parking"
       }
@@ -2193,6 +2566,190 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "Charging and parking around a place",
+                    "value": {
+                      "data": {
+                        "place": {
+                          "id": "pl-01-0003",
+                          "name": "Kofüßwerder",
+                          "kind": "municipality",
+                          "location": {
+                            "lat": 48.437771,
+                            "lon": 7.687209
+                          },
+                          "sourceFamily": "src-zeta-places"
+                        },
+                        "charging": {
+                          "sites": [
+                            {
+                              "id": "cs-01-0000",
+                              "name": "Kofüßwerder Laden",
+                              "operator": "Wickmel Strom",
+                              "location": {
+                                "lat": 48.404524,
+                                "lon": 7.659936
+                              },
+                              "distanceM": 4212,
+                              "access": "public",
+                              "summary": {
+                                "chargePoints": 3,
+                                "availableNow": null,
+                                "maxPowerKw": 150
+                              },
+                              "chargePoints": [
+                                {
+                                  "id": "cp-00000-0",
+                                  "current": "ac",
+                                  "maxPowerKw": 22,
+                                  "availability": {
+                                    "state": "occupied",
+                                    "observedAt": "2026-03-29T21:11:57Z"
+                                  }
+                                },
+                                {
+                                  "id": "cp-00000-1",
+                                  "current": "ac",
+                                  "maxPowerKw": 22,
+                                  "availability": {
+                                    "state": "available",
+                                    "observedAt": "2026-03-29T15:46:18Z"
+                                  }
+                                },
+                                {
+                                  "id": "cp-00000-2",
+                                  "current": "dc",
+                                  "maxPowerKw": 150,
+                                  "availability": {
+                                    "state": "reserved",
+                                    "observedAt": "2026-03-29T09:34:59Z"
+                                  }
+                                }
+                              ],
+                              "sourceFamily": "src-alpha-energy"
+                            }
+                          ]
+                        },
+                        "parking": {
+                          "sites": [
+                            {
+                              "id": "pk-01-0000",
+                              "name": "Kofüßwerder Parken",
+                              "operator": "Sänür Parkraum",
+                              "kind": "garage",
+                              "location": {
+                                "lat": 48.433324,
+                                "lon": 7.681788
+                              },
+                              "distanceM": 637,
+                              "occupancy": {
+                                "free": 34,
+                                "total": 43,
+                                "state": "free",
+                                "observedAt": "2026-03-29T12:02:49Z"
+                              },
+                              "termsRequired": false,
+                              "sourceFamily": "src-alpha-parking"
+                            }
+                          ]
+                        }
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T12:00:00Z",
+                        "freshness": [
+                          {
+                            "family": "src-alpha-energy",
+                            "dataAsOf": "2026-03-29T23:55:00Z",
+                            "ageS": 300,
+                            "staleAfterS": 3600,
+                            "stale": false
+                          },
+                          {
+                            "family": "src-alpha-parking",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 1800,
+                            "stale": false
+                          },
+                          {
+                            "family": "src-zeta-places",
+                            "dataAsOf": "2026-03-29T12:00:00Z",
+                            "ageS": 43200,
+                            "staleAfterS": 604800,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "src-alpha-energy",
+                            "domain": "energy",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          },
+                          {
+                            "family": "src-alpha-parking",
+                            "domain": "parking",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          },
+                          {
+                            "family": "src-zeta-places",
+                            "domain": "places",
+                            "publisher": "Deingmeir Datenwerk",
+                            "text": "Synthetic data from family zeta, licence lic-zeta.",
+                            "licence": "Synthetic licence zeta",
+                            "licenceUrl": "https://licences.example/zeta",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://zeta.example/terms"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "parts": [
+                          {
+                            "part": "charging",
+                            "status": "ok"
+                          },
+                          {
+                            "part": "parking",
+                            "status": "ok"
+                          }
+                        ],
+                        "query": {
+                          "placeId": "pl-01-0003",
+                          "radiusM": 20000,
+                          "perPartLimit": 2
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/places/pl-01-0003/overview"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/OverviewEnvelope"
                 }
@@ -2380,6 +2937,15 @@
         "tags": [
           "places"
         ],
+        "x-attribution": "The place comes from the places domain, each part from its own domain (energy, parking), each under the licence gate on its own. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/places/pl-01-0003/overview?needs=charging,parking\u0026radius_m=20000\u0026per_part_limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/places/pl-01-0003/overview?needs=charging,parking\u0026radius_m=20000\u0026per_part_limit=2",
         "x-required-scope": "places"
       }
     }

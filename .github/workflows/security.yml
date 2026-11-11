@@ -132,8 +132,10 @@ jobs:
           allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, Unicode-3.0, Zlib, CC0-1.0, 0BSD
           # pa11y and pa11y-ci (LGPL-3.0) are the documentation portal's
           # accessibility checker (scripts/a11y-tools), run in CI only and never
-          # built into or shipped with the binary or the image. The exception
-          # names the pinned versions, so an upgrade is reviewed again.
+          # built into or shipped with the binary or the image. The action
+          # matches these entries by name and ignores the version, so the
+          # versions are held by scripts/docs-a11y-pins.sh in the CI docs
+          # job: an upgrade fails there until this exception is reviewed.
           allow-dependencies-licenses: pkg:npm/pa11y@10.0.0, pkg:npm/pa11y-ci@5.0.0
           comment-summary-in-pr: on-failure
 

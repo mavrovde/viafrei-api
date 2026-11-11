@@ -209,17 +209,26 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0 # the baseline is compared with the base's
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22" # pa11y-ci 5 needs ^22.13
+      - name: Self-test of the pin and baseline guards
+        run: bash scripts/docs-a11y-guards.test.sh
+      - name: The checker is at the versions the licence exception names (security.yml)
+        run: scripts/docs-a11y-pins.sh scripts/a11y-tools/package-lock.json
+      - name: The reference baseline only goes down
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: scripts/docs-a11y-ratchet.sh "$BASE_REF"
       - name: Self-test of the link and diagram check
         run: bash scripts/docs-check.test.sh
       - name: Docs build, with the link, id and diagram checks (#20)
         run: scripts/docs-build.sh site
-      - name: Accessibility, WCAG 2.2 AA, every page (NFR-A11Y-001)
-        run: scripts/docs-a11y.sh site
       - name: Self-test of the accessibility check
         run: bash scripts/docs-a11y.test.sh
+      - name: Accessibility, WCAG 2.2 AA, every page (NFR-A11Y-001)
+        run: scripts/docs-a11y.sh site
 
   vulncheck:
     name: govulncheck

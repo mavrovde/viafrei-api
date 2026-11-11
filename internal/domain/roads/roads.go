@@ -292,24 +292,28 @@ const JamRedMin = 30
 //
 // A situation the service cannot grade (severity other) is never green.
 func signal(s Signal) (Lamp, Reason) {
-	switch {
-	case s.Severity == SeverityRoadClosed:
+	if s.Severity == SeverityRoadClosed {
 		return LampRed, ReasonRoadClosed
-	case s.Kind == KindHazard, s.Kind == KindAccident && s.Severity == SeverityMajor:
-		return LampRed, ReasonSafety
-	case s.Kind == KindJam && s.DelayMin != nil && *s.DelayMin >= JamRedMin:
-		return LampRed, ReasonLongJam
-	case s.Kind == KindWeather && s.Severity == SeverityMajor:
-		return LampRed, ReasonSevereWeather
-	case s.Kind == KindJam:
-		return LampAmber, ReasonJam
-	case s.Kind == KindRoadworks && (s.Severity == SeverityLaneClosed || s.Severity == SeverityMajor):
-		return LampAmber, ReasonNarrowing
-	case s.Kind == KindRoadworks && s.Severity != SeverityOther:
-		return "", ""
-	default:
-		return LampAmber, ReasonWarning
 	}
+	if s.Kind == KindHazard || s.Kind == KindAccident && s.Severity == SeverityMajor {
+		return LampRed, ReasonSafety
+	}
+	if s.Kind == KindJam && s.DelayMin != nil && *s.DelayMin >= JamRedMin {
+		return LampRed, ReasonLongJam
+	}
+	if s.Kind == KindWeather && s.Severity == SeverityMajor {
+		return LampRed, ReasonSevereWeather
+	}
+	if s.Kind == KindJam {
+		return LampAmber, ReasonJam
+	}
+	if s.Kind == KindRoadworks && (s.Severity == SeverityLaneClosed || s.Severity == SeverityMajor) {
+		return LampAmber, ReasonNarrowing
+	}
+	if s.Kind == KindRoadworks && s.Severity != SeverityOther {
+		return "", ""
+	}
+	return LampAmber, ReasonWarning
 }
 
 // LampOf is the lamp rule (FR-ROAD-004), the platform's motorway lamp. It
@@ -327,29 +331,24 @@ func signal(s Signal) (Lamp, Reason) {
 //
 // The reason is the first in Reasons that decided the colour; nil for green.
 func LampOf(signals []Signal, partial, stale bool) (Lamp, *Reason) {
-	best := -1
+	found := map[Reason]Lamp{}
 	for _, s := range signals {
-		lamp, reason := signal(s)
-		if lamp == "" {
-			continue
-		}
-		if i := slices.Index(Reasons, reason); best < 0 || i < best {
-			best = i
+		if lamp, reason := signal(s); lamp != "" {
+			found[reason] = lamp
 		}
 	}
-	pick := func(lamp Lamp, r Reason) (Lamp, *Reason) { return lamp, &r }
-	switch {
-	case best >= 0 && best < slices.Index(Reasons, ReasonPartial):
-		return pick(LampRed, Reasons[best])
-	case partial:
-		return pick(LampUnknown, ReasonPartial)
-	case best >= 0:
-		return pick(LampAmber, Reasons[best])
-	case stale:
-		return pick(LampAmber, ReasonStaleSource)
-	default:
-		return LampGreen, nil
+	if partial {
+		found[ReasonPartial] = LampUnknown
 	}
+	if stale {
+		found[ReasonStaleSource] = LampAmber
+	}
+	for _, r := range Reasons {
+		if lamp, ok := found[r]; ok {
+			return lamp, &r
+		}
+	}
+	return LampGreen, nil
 }
 
 // Filter narrows the situations a question reads.

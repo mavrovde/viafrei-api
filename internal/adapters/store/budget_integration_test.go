@@ -157,7 +157,11 @@ func TestTheCriticalReserveIsKeptFromLowerTiers(t *testing.T) {
 	if err := st.Read(standard, func(context.Context, pgx.Tx) error { return nil }); !errors.Is(err, admission.ErrOverloaded) {
 		t.Fatalf("a standard read took the reserved slot: %v", err)
 	}
-	if err := st.Read(ctx, func(context.Context, pgx.Tx) error { return nil }); err != nil {
+	if err := st.Read(ctx, func(context.Context, pgx.Tx) error { return nil }); !errors.Is(err, admission.ErrOverloaded) {
+		t.Fatalf("a read without a caller took the reserved slot: %v", err)
+	}
+	critical := admission.WithCaller(ctx, admission.Caller{Tier: admission.Critical, Key: "k"})
+	if err := st.Read(critical, func(context.Context, pgx.Tx) error { return nil }); err != nil {
 		t.Fatalf("a critical read is refused the reserved slot: %v", err)
 	}
 }

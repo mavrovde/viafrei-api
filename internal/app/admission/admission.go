@@ -114,6 +114,19 @@ func callerFrom(ctx context.Context) Caller {
 // caller's, or critical for a read without one.
 func TierOf(ctx context.Context) Tier { return callerFrom(ctx).Tier }
 
+// SlotTierOf returns the tier the storage reads under ctx take a slot of the
+// shared budget in (NFR-CAP-002): the caller's, or standard for a read
+// without one. A service read with no caller (readiness, which anyone may
+// ask for without a key, and background reads) must not take the slots the
+// budget keeps for critical callers, which the other readers of the store
+// rely on too.
+func SlotTierOf(ctx context.Context) Tier {
+	if c, ok := ctx.Value(callerKey{}).(Caller); ok {
+		return c.Tier
+	}
+	return Standard
+}
+
 type tallyKey struct{}
 
 // WithTally returns ctx counting the storage time of its reads, for usage

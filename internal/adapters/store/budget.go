@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"math/rand/v2"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -37,8 +38,20 @@ type SharedBudget struct {
 }
 
 // slotSQL takes the first free slot of 1..$1 in lock space $2 and returns
-// its number, or no row when every one is held. The filter runs row by row
-// and LIMIT stops at the first lock taken, so a read holds one slot at most.
+// its number, or no row when every one is held.
+//
+// That a read holds one slot at most rests on how PostgreSQL evaluates this
+// exact shape: the WHERE filter runs lazily, row by row, under LIMIT 1, so
+// the scan stops at the first lock taken and tries no later one. The
+// PostgreSQL manual warns that advisory locks taken in a query with LIMIT
+// are not guaranteed this way in general: an ORDER BY, a materialised CTE,
+// a subquery the planner evaluates first, or any plan that runs the filter
+// on more rows than it returns would take several locks and hold them all
+// to the end of the transaction. Every reader of the budget, this one and
+// any other, must therefore send exactly this statement, with no ORDER BY
+// and no CTE (docs/rate-limits.md, gate 5, step 1).
+// TestAReadHoldsOneSharedSlotUntilItsTransactionEnds pins it against a real
+// server: a read holds exactly one slot while it runs.
 const slotSQL = `select s from generate_series(1, $1::int) s where pg_try_advisory_xact_lock($2::int, s) limit 1`
 
 // rowQuerier is the part of a transaction a slot is taken through.
@@ -59,8 +72,15 @@ func (s *Store) WithSharedBudget(b SharedBudget) *Store {
 	return s
 }
 
+// jittered spreads a retry interval over ±50 %: frac in [0, 1) maps to
+// [d/2, 3d/2), so readers that found every slot held at the same moment do
+// not try again in lockstep.
+func jittered(d time.Duration, frac float64) time.Duration {
+	return d/2 + time.Duration(frac*float64(d))
+}
+
 // take holds one slot of the budget for the transaction q runs in. It
-// retries every RetryInterval while all slots open to tier are held, and
+// retries after RetryInterval, ±50 %, while all slots open to tier are held, and
 // gives up with an *admission.Refusal once another attempt would end after
 // MaxWait. waited reports whether a first attempt failed, so the caller
 // knows the statement budget has shrunk.
@@ -76,11 +96,12 @@ func (b SharedBudget) take(ctx context.Context, q rowQuerier, tier admission.Tie
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return waited, err
 		}
-		if now().Sub(start)+b.RetryInterval > b.MaxWait {
+		pause := jittered(b.RetryInterval, rand.Float64()) //nolint:gosec // jitter, not a secret
+		if now().Sub(start)+pause > b.MaxWait {
 			return waited, &admission.Refusal{RetryAfter: b.RetryAfter}
 		}
 		waited = true
-		timer := time.NewTimer(b.RetryInterval)
+		timer := time.NewTimer(pause)
 		select {
 		case <-ctx.Done():
 			timer.Stop()

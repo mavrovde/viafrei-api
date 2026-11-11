@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"math/rand/v2"
 	"strconv"
 	"sync"
 	"testing"
@@ -210,5 +211,66 @@ func TestARefusedSlotIsPassedOnAsOverloaded(t *testing.T) {
 	var r *admission.Refusal
 	if err := st.takeSlot(context.Background(), &slots{}); !errors.As(err, &r) || r.RetryAfter != 3*time.Second {
 		t.Fatalf("err %v", err)
+	}
+}
+
+func TestTheRetryIntervalIsJitteredByHalf(t *testing.T) {
+	req.Covers(t, "NFR-CAP-002")
+	const d = 10 * time.Millisecond
+	if got := jittered(d, 0); got != d/2 {
+		t.Errorf("the shortest pause is %s, want %s", got, d/2)
+	}
+	if got := jittered(d, 0.5); got != d {
+		t.Errorf("the middle pause is %s, want %s", got, d)
+	}
+	if got := jittered(d, 0.999999); got >= d*3/2 || got < d*3/2-time.Microsecond {
+		t.Errorf("the longest pause is %s, want just under %s", got, d*3/2)
+	}
+	seen := map[time.Duration]bool{}
+	for range 1000 {
+		got := jittered(d, rand.Float64())
+		if got < d/2 || got >= d*3/2 {
+			t.Fatalf("a pause of %s is outside [%s, %s)", got, d/2, d*3/2)
+		}
+		seen[got] = true
+	}
+	if len(seen) < 100 {
+		t.Errorf("only %d distinct pauses in 1000 draws: the interval is not spread", len(seen))
+	}
+}
+
+func TestTheWaitForASlotNeverOutlivesMaxWaitWithJitter(t *testing.T) {
+	req.Covers(t, "NFR-CAP-002")
+	b := budget()
+	b.MaxWait, b.RetryInterval = 30*time.Millisecond, 10*time.Millisecond
+	for range 20 {
+		start := time.Now()
+		if _, err := b.take(context.Background(), &slots{}, admission.Standard, time.Now); !errors.Is(err, admission.ErrOverloaded) {
+			t.Fatalf("err %v", err)
+		}
+		if took := time.Since(start); took > b.MaxWait+20*time.Millisecond {
+			t.Fatalf("the wait ran %s against max_wait %s", took, b.MaxWait)
+		}
+	}
+}
+
+func TestAServiceReadTakesItsSlotBelowTheCriticalReserve(t *testing.T) {
+	req.Covers(t, "NFR-CAP-002")
+	t0 := time.Now()
+	var step time.Duration
+	for name, tc := range map[string]struct {
+		ctx  context.Context
+		want int
+	}{
+		"no caller (readiness, background)": {context.Background(), 3},
+		"a critical caller":                 {admission.WithCaller(context.Background(), admission.Caller{Tier: admission.Critical, Key: "k"}), 5},
+	} {
+		q := &slots{script: []error{nil}}
+		if err := budgetedStore(t0, &step).takeSlot(tc.ctx, q); err != nil {
+			t.Fatal(err)
+		}
+		if q.asked[0][0] != tc.want {
+			t.Errorf("%s asks %v slots, want %d", name, q.asked[0][0], tc.want)
+		}
 	}
 }

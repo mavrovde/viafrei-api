@@ -110,12 +110,23 @@ form `(lock_space, n)`, `n` from 1 to `slots`, and every reader that shares
 it follows the same protocol:
 
 1. inside its read-only transaction, before its first statement, take the
-   first free slot:
-   `select s from generate_series(1, <open>) s where pg_try_advisory_xact_lock(<lock_space>, s) limit 1`;
+   first free slot with exactly this statement:
+   `select s from generate_series(1, <open>) s where pg_try_advisory_xact_lock(<lock_space>, s) limit 1`.
+   That it takes one lock at most rests on PostgreSQL evaluating the WHERE
+   filter lazily, row by row, and stopping at LIMIT 1. The PostgreSQL manual
+   warns that advisory locks in a query with LIMIT are not guaranteed to
+   behave so in general: an `ORDER BY`, a materialised CTE, or any other
+   shape whose plan runs the filter on more rows than it returns would take
+   several slots and hold them to the end of the transaction. Use no other
+   shape. The integration test
+   `TestAReadHoldsOneSharedSlotUntilItsTransactionEnds` pins it: a read
+   holds exactly one slot while it runs;
 2. `<open>` is `slots` for a critical read and `slots - critical_reserved`
    for any other, so the highest `critical_reserved` slots stay free for
-   critical reads;
+   critical reads. A service read with no caller (readiness, which needs no
+   key, and background reads) counts as standard here, never critical;
 3. no row means every open slot is held: try again after `retry_interval`,
+   spread at random over ±50 % so waiting readers do not retry in step,
    for at most `max_wait`, then refuse the request as overloaded with
    `Retry-After: retry_after`;
 4. the slot is released when the transaction ends, or with the session if

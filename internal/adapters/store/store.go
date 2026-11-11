@@ -177,7 +177,7 @@ func (s *Store) Read(ctx context.Context, fn func(context.Context, pgx.Tx) error
 // that had to wait for its slot gets the statement timeout set again to
 // what is left of its budget.
 func (s *Store) takeSlot(ctx context.Context, tx slotTx) error {
-	waited, err := s.budget.take(ctx, tx, admission.TierOf(ctx), s.nowFn)
+	waited, err := s.budget.take(ctx, tx, admission.SlotTierOf(ctx), s.nowFn)
 	if errors.Is(err, admission.ErrOverloaded) {
 		return err
 	}

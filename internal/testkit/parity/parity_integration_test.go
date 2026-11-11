@@ -34,9 +34,10 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
-// record rewrites the pinned bundle from the questions below. It is how a
-// bundle is made until the MCP side produces one; see docs/parity.md.
-var record = flag.Bool("parity.record", false, "record the parity bundle of this platform version from the questions in the harness")
+// record rewrites the API's own recording of the questions, the unsynced
+// bundle (the regression lock); see docs/parity.md. A platform version's
+// bundle is produced on the MCP side.
+var record = flag.Bool("parity.record", false, "record the API's answers to test/parity/questions.json as the unsynced bundle")
 
 // dir is the parity directory, relative to this package.
 const dir = "../../../test/parity"
@@ -102,8 +103,9 @@ func seed(t *testing.T, fx parity.Fixture) string {
 
 // asker answers a case through the real handler, store and use cases.
 type asker struct {
-	cfg *config.Config
-	st  *store.Store
+	cfg    *config.Config
+	st     *store.Store
+	owners parity.Owners
 }
 
 type keyAuth struct{ p auth.Principal }
@@ -163,49 +165,109 @@ func open(t *testing.T) asker {
 		t.Fatal(err)
 	}
 	t.Cleanup(st.Close)
-	return asker{cfg: cfg, st: st}
+	return asker{cfg: cfg, st: st, owners: noteOwners(t)}
 }
 
-// TestParity asks every case of the pinned bundle and compares the facts.
-func TestParity(t *testing.T) {
-	req.Covers(t, "TEST-009", "FR-GEN-002", "CON-007")
-	if *record {
-		recordBundle(t)
-	}
-	b, err := parity.Load(os.DirFS(dir), platform())
+// noteOwners reads which families' condition notes carry each text, from the
+// fixture rows: the API states its notes as texts, and rules/4 states a
+// condition note by its family. A kind the service does not know is a
+// condition (provenance.MapNoteKind), so every kind but purpose is read.
+func noteOwners(t *testing.T) parity.Owners {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), testBound)
+	defer cancel()
+	conn, err := db.Owner(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if b.Producer == parity.ProducerAPI {
-		t.Logf("bundle %s was recorded by the API itself: it is a regression lock, not parity evidence; parity needs a bundle the MCP side produced", platform())
+	defer func() { _ = conn.Close(ctx) }()
+	rows, _ := conn.Query(ctx, `select body, source_ref from contract.source_note where note_kind <> 'purpose' order by body, source_ref`)
+	pairs, err := pgx.CollectRows(rows, pgx.RowToStructByPos[struct{ Body, Family string }])
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := parity.Owners{}
+	for _, p := range pairs {
+		out[p.Body] = append(out[p.Body], p.Family)
+	}
+	return out
+}
+
+// compare asks every case of the bundle pinned under name and compares the
+// facts; it returns the bundle.
+func compare(t *testing.T, name string) parity.Bundle {
+	t.Helper()
+	b, err := parity.Load(os.DirFS(dir), name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q, err := parity.LoadQuestions(os.DirFS(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := parity.Answers(b, q); len(d) > 0 {
+		t.Fatalf("bundle %s does not answer %s:\n  %s", name, parity.QuestionsFile, strings.Join(d, "\n  "))
 	}
 	if got := seed(t, b.Fixture); got != b.Fixture.SHA256 {
 		t.Fatalf("the fixture rows are %s, the bundle was recorded on %s: re-record the bundle", got, b.Fixture.SHA256)
 	}
 	a := open(t)
 	compared := map[string][]string{}
+	var seen []parity.Difference
 	for _, c := range b.Cases {
-		got, err := parity.Project(a.ask(t, c), parity.Default)
+		got, err := parity.Project(a.ask(t, c), parity.Default, c.Request, a.owners)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if d := parity.Diff(c.Facts, got); len(d) > 0 {
+		d, named := parity.Compare(c.Facts, got, parity.Default)
+		if len(d) > 0 {
 			t.Errorf("case %s (%s, MCP %q): %d of %d facts differ:\n  %s", c.ID, c.Operation, c.Counterpart, len(d), len(c.Facts), strings.Join(d, "\n  "))
 		}
+		for _, n := range named {
+			t.Logf("case %s: named difference %s (%s vs %s): %s", c.ID, n.Pattern, n.Bundle, n.API, n.Reason)
+		}
+		seen = append(seen, named...)
 		compared[c.Operation] = append(compared[c.Operation], c.ID)
 	}
 	for op, ids := range compared {
 		t.Logf("compared %s: %d case(s): %s", op, len(ids), strings.Join(ids, ", "))
 	}
+	// A named difference stands for a fact the MCP side states otherwise; if
+	// no case shows it any more, one side changed and the rule must say so.
+	if b.Producer == parity.ProducerMCP {
+		for _, d := range parity.Default.Unseen(seen) {
+			t.Errorf("named difference %s (%s vs %s) is shown by no case: either side changed, or no question reaches it", d.Pattern, d.Bundle, d.API)
+		}
+	}
+	return b
+}
+
+// TestParity asks every case of the bundle pinned for the platform version
+// and compares the facts. Only a bundle the MCP side produced is parity
+// evidence.
+func TestParity(t *testing.T) {
+	req.Covers(t, "TEST-009", "FR-GEN-002", "CON-007")
+	b := compare(t, platform())
+	switch b.Producer {
+	case parity.ProducerAPI:
+		t.Logf("bundle %s was recorded by the API itself: it is a regression lock, not parity evidence; parity needs a bundle the MCP side produced", platform())
+	case parity.ProducerMCP:
+		t.Logf("bundle %s was produced by the MCP side at platform commit %s: parity evidence", platform(), b.Commit)
+	}
 
 	// A planted change in one projection rule must fail and name the fact.
+	a := open(t)
 	planted := parity.Default
 	planted.PositionDecimals = 4
-	got, err := parity.Project(a.ask(t, b.Cases[0]), planted)
+	got, err := parity.Project(a.ask(t, b.Cases[0]), planted, b.Cases[0].Request, a.owners)
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := parity.Diff(b.Cases[0].Facts, got)
+	want, err := parity.Project(a.ask(t, b.Cases[0]), parity.Default, b.Cases[0].Request, a.owners)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := parity.Diff(want, got)
 	if len(d) == 0 {
 		t.Error("a position rounded to four decimals compared equal")
 	}
@@ -213,6 +275,19 @@ func TestParity(t *testing.T) {
 		if !strings.HasPrefix(line, "changed data[") || !strings.Contains(line, "].location.la") && !strings.Contains(line, "].location.lo") {
 			t.Errorf("a position rounded to four decimals named another fact: %s", line)
 		}
+	}
+}
+
+// TestRegressionLock compares the API's own recording (the unsynced bundle,
+// -parity.record): it locks the API's answers against regressions and is no
+// evidence of parity.
+func TestRegressionLock(t *testing.T) {
+	req.Covers(t, "TEST-009")
+	if *record {
+		recordBundle(t)
+	}
+	if b := compare(t, buildinfo.Unsynced); b.Producer != parity.ProducerAPI {
+		t.Errorf("the regression lock %s is produced by %q; it is the API's own recording", buildinfo.Unsynced, b.Producer)
 	}
 }
 
@@ -236,63 +311,53 @@ func TestInventory(t *testing.T) {
 	}
 }
 
-// questions are the parity questions; record mode answers them.
-var questions = []parity.Case{
-	{
-		ID: "charging-public-commercial", Operation: "listChargingOptions", Counterpart: "charging station search",
-		Request: "/v1/charging-options?at=50.82,6.0&radius_m=20000",
-		Key:     parity.Key{UseClass: "commercial", Scopes: []string{"energy"}, Sources: []string{"src-alpha-energy", "src-beta-energy", "src-gamma-energy"}},
-	},
-	{
-		ID: "charging-all-consumer-fast", Operation: "listChargingOptions", Counterpart: "charging station search",
-		Request: "/v1/charging-options?at=48.41,7.68&radius_m=30000&access=all&min_kw=50&limit=3",
-		Key:     parity.Key{UseClass: "consumer", Scopes: []string{"energy"}, Sources: []string{"src-alpha-energy", "src-beta-energy", "src-gamma-energy"}},
-	},
-	{
-		ID: "parking-terms-pending", Operation: "listParkingOptions", Counterpart: "parking search",
-		Request: "/v1/parking-options?at=50.39,10.23&radius_m=50000",
-		Key:     parity.Key{UseClass: "commercial", Scopes: []string{"parking"}, Sources: []string{"src-alpha-parking", "src-beta-parking", "src-delta-parking"}},
-	},
-	{
-		ID: "parking-terms-accepted", Operation: "listParkingOptions", Counterpart: "parking search",
-		Request: "/v1/parking-options?at=50.39,10.23&radius_m=50000",
-		Key: parity.Key{UseClass: "commercial", Scopes: []string{"parking"}, Sources: []string{"src-alpha-parking", "src-beta-parking", "src-delta-parking"},
-			Accepted: []parity.Acceptance{{Source: "src-delta-parking", Version: "2026-03-01"}}},
-	},
-}
-
+// recordBundle records the API's own answers to the questions as the
+// unsynced bundle, the regression lock. It never writes the bundle of a
+// platform version: that one is the MCP side's.
 func recordBundle(t *testing.T) {
 	t.Helper()
-	b := parity.Bundle{Format: parity.Format, Platform: platform(), Producer: parity.ProducerAPI, Rules: parity.Default.ID, Fixture: parity.Fixture{Profile: "tiny", Seed: 1}}
-	b.Fixture.SHA256 = seed(t, b.Fixture)
+	q, err := parity.LoadQuestions(os.DirFS(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := buildinfo.Unsynced
+	b := parity.Bundle{Format: parity.Format, Platform: name, Producer: parity.ProducerAPI, Rules: parity.Default.ID, Fixture: q.Fixture}
+	if got := seed(t, b.Fixture); got != q.Fixture.SHA256 {
+		t.Fatalf("the fixture rows are %s, %s names %s", got, parity.QuestionsFile, q.Fixture.SHA256)
+	}
 	a := open(t)
-	for _, q := range questions {
-		q.Now = fixtures.ReferenceInstant.AddDate(0, 0, 2)
-		facts, err := parity.Project(a.ask(t, q), parity.Default)
+	for _, qq := range q.Cases {
+		c := parity.Case{ID: qq.ID, Operation: qq.Operation, Counterpart: qq.Counterpart, Request: qq.Request, Key: qq.Key, Now: qq.Now}
+		facts, err := parity.Project(a.ask(t, c), parity.Default, c.Request, a.owners)
 		if err != nil {
 			t.Fatal(err)
 		}
-		q.Facts = facts
-		b.Cases = append(b.Cases, q)
+		c.Facts = facts
+		b.Cases = append(b.Cases, c)
 	}
 	raw, err := json.MarshalIndent(b, "", "  ")
 	if err != nil {
 		t.Fatal(err)
 	}
 	raw = append(raw, '\n')
-	name := filepath.Join("bundles", platform()+".json")
-	if err := os.WriteFile(filepath.Join(dir, name), raw, 0o600); err != nil {
+	file := filepath.Join("bundles", name+".json")
+	if err := os.WriteFile(filepath.Join(dir, file), raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	lock := "# Parity bundles pinned per platform version: platform, bundle, sha256.\n" +
-		"# Pinned by the version sync; see docs/parity.md.\n"
+	// Every other line is kept where it stands, its comments too: only the
+	// regression lock's own line is rewritten.
+	lock := ""
 	old, _ := os.ReadFile(filepath.Join(dir, parity.LockFile))
 	for _, line := range strings.Split(string(old), "\n") {
-		if line != "" && !strings.HasPrefix(line, "#") && !strings.HasPrefix(line, platform()+"\t") {
+		if line != "" && !strings.HasPrefix(line, name+"\t") {
 			lock += line + "\n"
 		}
 	}
-	lock += platform() + "\t" + name + "\t" + parity.Checksum(raw) + "\n"
+	if lock == "" {
+		lock = "# Parity bundles pinned per platform version: platform, bundle, sha256.\n" +
+			"# Pinned by the version sync; see docs/parity.md.\n"
+	}
+	lock += name + "\t" + file + "\t" + parity.Checksum(raw) + "\n"
 	if err := os.WriteFile(filepath.Join(dir, parity.LockFile), []byte(lock), 0o600); err != nil {
 		t.Fatal(err)
 	}

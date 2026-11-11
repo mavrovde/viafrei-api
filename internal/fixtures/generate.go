@@ -17,7 +17,7 @@ import (
 
 // GeneratorVersion changes whenever the output for a given seed and profile
 // changes.
-const GeneratorVersion = "0.3.0"
+const GeneratorVersion = "0.2.0"
 
 // Profile sets the size of a generated set.
 type Profile struct {
@@ -99,9 +99,16 @@ type gen struct {
 // It fails closed: an unknown profile, an empty table, a family without rows
 // or any coverage gap is an error, never an empty success.
 func Generate(out io.Writer, profile string, seed uint64, contractVersion string) (*Manifest, error) {
+	_, m, err := generate(out, profile, seed, contractVersion)
+	return m, err
+}
+
+// generate writes the seed rows and returns the generator's state with the
+// manifest, so Planted can place its rows on the generated world.
+func generate(out io.Writer, profile string, seed uint64, contractVersion string) (*gen, *Manifest, error) {
 	i := slices.IndexFunc(profiles, func(p Profile) bool { return p.Name == profile })
 	if i < 0 {
-		return nil, fmt.Errorf("fixtures: unknown profile %q (known: %s)", profile, strings.Join(Profiles(), ", "))
+		return nil, nil, fmt.Errorf("fixtures: unknown profile %q (known: %s)", profile, strings.Join(Profiles(), ", "))
 	}
 	r := rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15)) // #nosec G404 -- reproducible test data, not security
 	g := &gen{
@@ -124,7 +131,7 @@ func Generate(out io.Writer, profile string, seed uint64, contractVersion string
 	g.w.end()
 	sum, err := g.w.close()
 	if err != nil {
-		return nil, fmt.Errorf("fixtures: write: %w", err)
+		return nil, nil, fmt.Errorf("fixtures: write: %w", err)
 	}
 	m := &Manifest{
 		GeneratorVersion: GeneratorVersion, Seed: seed, Profile: profile, ContractVersion: contractVersion,
@@ -142,9 +149,9 @@ func Generate(out io.Writer, profile string, seed uint64, contractVersion string
 		m.LicenceClasses[f.Name] = f.Category
 	}
 	if gaps := m.Check(); len(gaps) > 0 {
-		return m, errors.New("fixtures: coverage gaps: " + strings.Join(gaps, "; "))
+		return g, m, errors.New("fixtures: coverage gaps: " + strings.Join(gaps, "; "))
 	}
-	return m, nil
+	return g, m, nil
 }
 
 func (g *gen) day(d int) time.Time { return ReferenceInstant.AddDate(0, 0, d) }
@@ -195,17 +202,6 @@ func (g *gen) src(domain string, families ...string) string {
 		}
 	}
 	panic("fixtures: no source " + fam + " for " + domain)
-}
-
-// fresh is the first fresh source of a family, chosen without a random
-// draw, so a planted row leaves every row after it unchanged.
-func (g *gen) fresh(domain, family string) string {
-	for _, s := range g.sources[domain] {
-		if s.family == family && !s.stale {
-			return s.ref
-		}
-	}
-	panic("fixtures: no source " + family + " for " + domain)
 }
 
 // ------------------------------------------------------------- provenance
@@ -418,19 +414,10 @@ var (
 	directions = []string{"north", "east", "south", "west", "both", "unknown"}
 )
 
-// twoPartRef is the reference of the road in two parts.
-const twoPartRef = "A 990"
-
-// twoPartRoad is the line of the road in two parts, each a straight
-// segment: the first across land 06 from west to east, the second across
-// land 07, with a gap between them.
-func (g *gen) twoPartRoad() [][]lonLat {
-	part := func(c bbox) []lonLat {
-		lat := (c.s + c.n) / 2
-		return []lonLat{{c.w + (c.e-c.w)*0.2, lat}, {c.w + (c.e-c.w)*0.8, lat}}
-	}
-	return [][]lonLat{part(g.land("06").cell), part(g.land("07").cell)}
-}
+// eventColumns are the columns of a traffic event row.
+var eventColumns = []string{"event_id", "event_kind", "severity", "road_ref", "road_class", "direction", "direction_label",
+	"location", "valid_from", "valid_to", "lanes_closed", "lanes_total", "delay_min", "affected_length_m",
+	"headline", "description", "text_lang", "source_ref", "origin_key", "published_at", "recorded_at", "changed_at", "withdrawn_at"}
 
 func (g *gen) roadsAndEvents() {
 	n := 6 + g.p.Scale/4
@@ -460,24 +447,6 @@ func (g *gen) roadsAndEvents() {
 		g.roads = append(g.roads, rd)
 		g.w.row(str(rd.ref), str(class), null, dec(rd.length, 1), line(pts), array(states...))
 	}
-	// The road in two parts (a motorway with a gap), planted without a
-	// random draw: its chainage runs over both parts in their order.
-	twoPart := g.twoPartRoad()
-	var twoStates []string
-	for _, part := range twoPart {
-		for _, p := range part {
-			if s := landOf(p); !slices.Contains(twoStates, s) {
-				twoStates = append(twoStates, s)
-			}
-		}
-	}
-	slices.Sort(twoStates)
-	twoLength := 0.0
-	for _, part := range twoPart {
-		twoLength += haversineKm(part[0], part[1])
-	}
-	g.w.row(str(twoPartRef), str("motorway"), null, dec(twoLength, 1), lines(twoPart...), array(twoStates...))
-	g.edges["road_in_two_parts"] = 1
 
 	g.w.begin("junction", "junction_id", "road_ref", "number", "name", "junction_kind", "chainage_km", "location")
 	for i, rd := range g.roads {
@@ -502,9 +471,7 @@ func (g *gen) roadsAndEvents() {
 		at       time.Time
 	}
 	var events []event
-	g.w.begin("traffic_event", "event_id", "event_kind", "severity", "road_ref", "road_class", "direction", "direction_label",
-		"location", "valid_from", "valid_to", "lanes_closed", "lanes_total", "delay_min", "affected_length_m",
-		"headline", "description", "text_lang", "source_ref", "origin_key", "published_at", "recorded_at", "changed_at", "withdrawn_at")
+	g.w.begin("traffic_event", eventColumns...)
 	emit := func(rd road, kind string, from time.Time, edge string) {
 		id := fmt.Sprintf("ev-%05d", len(events))
 		at := rd.along(g.r.Float64())
@@ -558,32 +525,6 @@ func (g *gen) roadsAndEvents() {
 	edge("month_end", time.Date(2026, 3, 31, 21, 59, 59, 0, time.UTC), time.Date(2026, 3, 31, 22, 0, 0, 0, time.UTC))
 	edge("year_end", time.Date(2025, 12, 31, 22, 59, 59, 0, time.UTC), time.Date(2025, 12, 31, 23, 0, 0, 0, time.UTC))
 	emit(g.roads[1], unknownCode, g.day(0).Add(time.Hour), "unknown_code")
-
-	// Planted without a random draw, active over the whole window and never
-	// withdrawn: one unmapped value in each coded column of a situation on
-	// road 1 (ENV-051), and one situation in the middle of each part of the
-	// road in two parts.
-	plant := func(id, kind, sev, roadRef, class, dir string, at lonLat) {
-		ref := g.fresh("roads", "alpha")
-		g.w.row(str(id), str(kind), str(sev), str(roadRef), str(class), str(dir), null, point(at),
-			ts(g.day(0)), null, null, null, null, null, str(capitalise(kind)+" (planted)"), null, str("de"),
-			str(ref), str("o-"+id), ts(g.day(0)), ts(g.day(0)), ts(g.day(0)), null)
-		g.counted(landOf(at), ref)
-		g.edges["unknown_code"]++
-	}
-	plant("ev-u-kind", unknownCode, "minor", g.roads[1].ref, "motorway", "both", g.roads[1].along(0.2))
-	plant("ev-u-severity", "restriction", unknownCode, g.roads[1].ref, "motorway", "both", g.roads[1].along(0.4))
-	plant("ev-u-direction", "restriction", "minor", g.roads[1].ref, "motorway", unknownCode, g.roads[1].along(0.6))
-	plant("ev-u-class", "restriction", "minor", g.roads[1].ref, unknownCode, "both", g.roads[1].along(0.8))
-	for i, part := range g.twoPartRoad() {
-		mid := lonLat{(part[0].lon + part[1].lon) / 2, (part[0].lat + part[1].lat) / 2}
-		ref := g.fresh("roads", "alpha")
-		id := fmt.Sprintf("ev-two-%d", i+1)
-		g.w.row(str(id), str("roadworks"), str("minor"), str(twoPartRef), str("motorway"), str("both"), null, point(mid),
-			ts(g.day(0)), null, null, null, null, null, str("Baustelle (planted)"), null, str("de"),
-			str(ref), str("o-"+id), ts(g.day(0)), ts(g.day(0)), ts(g.day(0)), null)
-		g.counted(landOf(mid), ref)
-	}
 
 	g.w.begin("traffic_event_observation", "event_id", "observed_at", "version_no")
 	for _, e := range events {
@@ -702,6 +643,24 @@ func (g *gen) energy() {
 			g.counted("", p.ref)
 		}
 	}
+	// One point's newest report comes from another family than its site's, and
+	// says nothing (unknown): that family contributed no fact and is not
+	// credited. Drawn from no random number, so no other row moves.
+	other := g.otherFamily("energy", points[1].ref)
+	g.w.row(str(points[1].id), ts(g.end().Add(-140*time.Minute)), str("unknown"), str(other))
+	g.counted("", other)
+	g.edges["foreign_unknown_report"]++
+}
+
+// otherFamily is the first live source of domain whose family is not ref's.
+func (g *gen) otherFamily(domain, ref string) string {
+	fam := g.family[ref]
+	for _, s := range g.sources[domain] {
+		if s.family != fam && !s.stale {
+			return s.ref
+		}
+	}
+	panic("fixtures: no second family for " + domain)
 }
 
 // ---------------------------------------------------------------- parking
@@ -892,9 +851,12 @@ func (g *gen) transit() {
 
 var hazards = []string{"thunderstorm", "wind", "rain", "snow", "ice", "fog", "heat", "frost", "uv", "flood", "other"}
 
+// warningColumns are the columns of a weather warning row.
+var warningColumns = []string{"warning_id", "hazard", "warning_level", "level_label", "message_status", "issuer_name",
+	"headline", "text_lang", "valid_from", "valid_to", "published_at", "region_code", "source_ref", "recorded_at", "withdrawn_at"}
+
 func (g *gen) weather() {
-	g.w.begin("weather_warning", "warning_id", "hazard", "warning_level", "level_label", "message_status", "issuer_name",
-		"headline", "text_lang", "valid_from", "valid_to", "published_at", "region_code", "source_ref", "recorded_at", "withdrawn_at")
+	g.w.begin("weather_warning", warningColumns...)
 	n := 0
 	for _, l := range g.lands {
 		for range 2 * g.p.Scale {
@@ -914,23 +876,6 @@ func (g *gen) weather() {
 			n++
 		}
 	}
-	// Planted without a random draw, in one area over the same two days: a
-	// warning in force, the same warning cancelled, and one withdrawn from
-	// publication; only the first answers.
-	l := g.lands[0]
-	ref := g.fresh("weather", "eta")
-	from := g.day(0)
-	for _, w := range []struct{ id, status, withdrawn string }{
-		{"ww-planted-issued", "issued", null},
-		{"ww-planted-cancelled", "cancelled", null},
-		{"ww-planted-withdrawn", "issued", ts(from.Add(time.Hour))},
-	} {
-		g.w.row(str(w.id), str("ice"), num(2), str("Stufe 2"), str(w.status), str("Synthetischer Wetterdienst"),
-			str("Warnung vor Glätte (Stufe 2)"), str("de"), ts(from), ts(from.Add(48*time.Hour)),
-			ts(from.Add(-30*time.Minute)), str(l.code+"001"), str(ref), ts(from), w.withdrawn)
-		g.counted(l.code, ref)
-	}
-	g.edges["withdrawn_warning"] = 1
 }
 
 // ---------------------------------------------------------------- rules

@@ -49,3 +49,53 @@ func TestReleasedDocumentIsCompared(t *testing.T) {
 		t.Fatalf("scripts/openapi-released.sh is missing or not executable: %v", err)
 	}
 }
+
+// TestBreakingLevelsFollowTheSpecification holds the breaking-change check to
+// the specification's table (Spec-Compatibility-and-Versioning, section 2):
+// both oasdiff calls read api/oasdiff-levels.txt, which makes a value added to
+// a response enum info (every enumeration is open, ENV-050) and a value
+// removed from one an error (VER-002), and changes no other check.
+func TestBreakingLevelsFollowTheSpecification(t *testing.T) {
+	req.Covers(t, "TEST-004")
+	script, err := os.ReadFile(filepath.Join(root, "scripts", "openapi-diff.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, call := range []string{"$OASDIFF changelog", "$OASDIFF breaking"} {
+		line := ""
+		for _, l := range strings.Split(string(script), "\n") {
+			if strings.HasPrefix(strings.TrimSpace(l), call) {
+				line = l
+			}
+		}
+		if !strings.Contains(line, `--severity-levels "$levels"`) {
+			t.Errorf("%q does not read the levels file: %q", call, line)
+		}
+	}
+	levels, err := os.ReadFile(filepath.Join(root, "api", "oasdiff-levels.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{
+		"response-property-enum-value-added":    "info",
+		"response-mediatype-enum-value-added":   "info",
+		"response-property-enum-value-removed":  "err",
+		"response-mediatype-enum-value-removed": "err",
+	}
+	got := map[string]string{}
+	for _, l := range strings.Split(strings.TrimSpace(string(levels)), "\n") {
+		f := strings.Fields(l)
+		if len(f) != 2 {
+			t.Fatalf("malformed line %q", l)
+		}
+		got[f[0]] = f[1]
+	}
+	if len(got) != len(want) {
+		t.Errorf("levels file sets %d checks, want exactly %d: %v", len(got), len(want), got)
+	}
+	for id, level := range want {
+		if got[id] != level {
+			t.Errorf("%s is %q, want %q", id, got[id], level)
+		}
+	}
+}

@@ -26,3 +26,6 @@ sarif/
 
 # Built documentation portal (make docs)
 /site/
+
+# The pinned a11y toolchain (scripts/docs-a11y.sh installs it)
+/scripts/a11y-tools/node_modules/

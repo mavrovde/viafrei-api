@@ -55,6 +55,22 @@ clean "$s"; sed -i.bak 's#<title>A described drawing</title>##' "$s/other.html";
 clean "$s"; cp "$s/other.html" "$s/reference.html"; sed -i.bak 's#<title>A described drawing</title>##' "$s/reference.html"; expect 0 "the reference's icons are not diagrams" "$s"
 clean "$s"; sed -i.bak 's/#part/#nowhere/' "$s/other.html"; cp "$s/index.html" "$s/reference.html"; sed -i.bak 's/#top/#gone/' "$s/reference.html"; expect 1 "the reference's links are checked" "$s" 'reference.html: link'
 
+# A link written in a Markdown source, through the build's link rewrite
+# (docs-html.pl, from docs/): a misspelt page or a missing script must reach
+# the site as a link the check refuses; an existing script becomes GitHub's.
+rewrite() { # rewrite HREF: the href docs-html.pl makes of it, from docs/
+  (cd "$tmp" && DOCS_PAGES="docs/errors.md=errors.html" DOCS_SITE_FILES="" \
+    perl "$here/docs-html.pl" docs <<<"<a href=\"$1\">x</a>" | sed -n 's/.*href="\([^"]*\)".*/\1/p')
+}
+clean "$s"; sed -i.bak "s#other.html\#part#$(rewrite eror.md)#" "$s/index.html"; expect 1 "a misspelt page link (docs/eror.md) fails" "$s" 'missing-in-repo/docs/eror.md'
+clean "$s"; sed -i.bak "s#other.html\#part#$(rewrite ../scripts/nope.sh)#" "$s/index.html"; expect 1 "a link to a missing script (../scripts/nope.sh) fails" "$s" 'missing-in-repo/scripts/nope.sh'
+clean "$s"; sed -i.bak "s#other.html\#part#$(rewrite ../scripts/docs-check.pl)#" "$s/index.html"; expect 0 "a link to an existing script goes to GitHub" "$s"
+if [[ $(rewrite ../scripts/docs-check.pl) == https://github.com/*/blob/main/scripts/docs-check.pl ]]; then
+  echo "ok: the GitHub link names the file"; pass=$((pass + 1))
+else
+  echo "not ok: the GitHub link names the file: $(rewrite ../scripts/docs-check.pl)"; fail=$((fail + 1))
+fi
+
 rm -rf "$s" && mkdir -p "$s"; expect 2 "a site without pages is refused" "$s" 'no page found'
 expect 2 "a missing site is refused" "$tmp/none" 'cannot read'
 

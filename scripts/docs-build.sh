@@ -95,7 +95,7 @@ a{color:#0b57d0}a:focus-visible{outline:3px solid #0b57d0;outline-offset:2px}
 .skip{position:absolute;left:-999px}.skip:focus{left:1rem;top:1rem;background:#fff;padding:.5rem}
 nav ul{list-style:none;padding:0;margin:0 0 1rem;display:flex;flex-wrap:wrap;gap:.25rem 1rem}
 nav a[aria-current]{font-weight:700}
-table{border-collapse:collapse;display:block;overflow-x:auto}th,td{border:1px solid #767676;padding:.3rem .5rem;text-align:left}
+.table-wrap{overflow-x:auto}table{border-collapse:collapse}th,td{border:1px solid #767676;padding:.3rem .5rem;text-align:left;overflow-wrap:anywhere}
 code,pre{background:#f4f4f4}pre{padding:.5rem;overflow-x:auto}
 </style>
 </head>

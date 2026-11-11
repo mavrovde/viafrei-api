@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
-# docs-a11y.test.sh: the self-test of scripts/docs-a11y.sh. A site without
-# pages is refused before any browser starts; a planted critical finding (an
-# image without a text alternative) fails; a clean page passes and is named.
-# Needs the Chrome docs-a11y.sh finds (CHROME_PATH or on PATH).
+# docs-a11y.test.sh: the self-test of scripts/docs-a11y.sh.
+#
+# With Chrome (CHROME_PATH or on PATH): a site without pages is refused
+# before any browser starts, a clean page passes and is named, and a planted
+# critical finding (an image without a text alternative) and a planted
+# moderate one (a skipped heading level) each fail.
+#
+# With a stub in place of pa11y-ci (DOCS_A11Y_PA11Y), every fail-closed path
+# and the classification: a page that did not load, fewer pages reported
+# than the site has, an unreadable report, an unreadable baseline, a
+# needs-review result, a moderate and a minor result on a guide page, and
+# reference.html's notes held against the baseline in each direction.
 set -uo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -25,17 +33,93 @@ page() { # page FILE BODY
   printf '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Planted page</title></head><body><main><h1>Planted page</h1>%s</main></body></html>\n' "$2" > "$1"
 }
 
+# --- with Chrome --------------------------------------------------------
+
 mkdir -p "$tmp/empty"
 expect 2 "a site without pages is refused" "$tmp/empty" "no page found"
 
 mkdir -p "$tmp/clean"
 page "$tmp/clean/index.html" '<p>Nothing to find here.</p>'
-expect 0 "a clean page passes and is named" "$tmp/clean" "docs a11y: read index.html"
+expect 0 "a clean page passes and is named" "$tmp/clean" "docs a11y: found index.html"
 
 mkdir -p "$tmp/broken"
 page "$tmp/broken/index.html" '<p>Nothing to find here.</p>'
 page "$tmp/broken/diagram.html" '<img src="diagram.png">'
 expect 1 "an image without alt fails" "$tmp/broken" "FAIL: diagram.html: image-alt"
+
+mkdir -p "$tmp/moderate"
+page "$tmp/moderate/index.html" '<h3>A skipped level</h3><p>Text.</p>'
+expect 1 "a moderate finding on a guide page fails" "$tmp/moderate" "FAIL: index.html: heading-order"
+
+# --- with a stub in place of pa11y-ci -----------------------------------
+
+cat > "$tmp/stub" <<'EOF'
+#!/usr/bin/env bash
+cat "$STUB_REPORT"
+EOF
+chmod +x "$tmp/stub"
+export DOCS_A11Y_PA11Y=$tmp/stub STUB_REPORT=$tmp/report.json
+printf '{"reference.html": {"color-contrast": 2}}\n' > "$tmp/baseline.json"
+export DOCS_A11Y_BASELINE=$tmp/baseline.json
+
+s=$tmp/stubsite
+mkdir -p "$s"
+page "$s/index.html" '<p>Guide.</p>'
+page "$s/reference.html" '<p>Reference.</p>'
+s=$(cd "$s" && pwd)
+
+issue() { # issue TYPE CODE NEEDS_REVIEW
+  jq -n --arg t "$1" --arg c "$2" --argjson r "$3" \
+    '{type: $t, code: $c, message: "planted", selector: "p", runner: "axe", runnerExtras: {needsFurtherReview: $r}}'
+}
+report() { # report GUIDE_ISSUES_JSON REFERENCE_ISSUES_JSON
+  jq -n --arg g "file://$s/index.html" --arg r "file://$s/reference.html" --argjson gi "$1" --argjson ri "$2" \
+    '{total: 2, passes: 0, errors: 0, results: {($g): $gi, ($r): $ri}}' > "$STUB_REPORT"
+}
+cc=$(issue error color-contrast true)
+
+report '[]' "[$cc, $cc]"
+expect 0 "reference.html's notes at the baseline pass" "$s" "reference.html: 2 note(s) within the baseline"
+
+report '[]' "[$cc]"
+expect 0 "a count below the baseline passes and asks to lower it" "$s" "below the baseline of 2: lower it"
+
+report '[]' "[$cc, $cc, $cc]"
+expect 1 "a count above the baseline fails" "$s" "FAIL: reference.html: color-contrast: 3 result(s), above the baseline of 2"
+
+report '[]' "[$(issue warning region false)]"
+expect 1 "a rule not in the baseline fails" "$s" "FAIL: reference.html: region: 1 result(s), a rule not in the baseline"
+
+report '[{"message": "net::ERR_FILE_NOT_FOUND"}]' '[]'
+expect 1 "a guide page that did not load fails" "$s" "FAIL: index.html: could not be checked: net::ERR_FILE_NOT_FOUND"
+
+report '[]' '[{"message": "timed out"}]'
+expect 1 "reference.html not loading fails" "$s" "FAIL: reference.html: could not be checked: timed out"
+
+report "[$cc]" '[]'
+expect 1 "a needs-review result on a guide page fails" "$s" "FAIL: index.html: color-contrast (review)"
+
+report "[$(issue warning heading-order false)]" '[]'
+expect 1 "a moderate result on a guide page fails" "$s" "FAIL: index.html: heading-order (warning)"
+
+report "[$(issue notice region false)]" '[]'
+expect 1 "a minor result on a guide page fails" "$s" "FAIL: index.html: region (notice)"
+
+jq -n --arg g "file://$s/index.html" '{results: {($g): []}}' > "$STUB_REPORT"
+expect 2 "fewer pages reported than the site has is refused" "$s" "pa11y-ci reported 1 page(s) of 2"
+
+jq -n --arg g "file://$s/index.html" --arg o "file://$s/other.html" '{results: {($g): [], ($o): []}}' > "$STUB_REPORT"
+expect 2 "a report about another page is refused" "$s" "not reported:"
+
+echo 'not a report' > "$STUB_REPORT"
+expect 2 "an unreadable report is refused" "$s" "pa11y-ci wrote no readable report"
+
+jq -n --arg g "file://$s/index.html" --arg r "file://$s/reference.html" '{results: {($g): {}, ($r): []}}' > "$STUB_REPORT"
+expect 2 "a report whose page entry is not a list is refused" "$s" "pa11y-ci wrote no readable report"
+
+report '[]' '[]'
+echo '{"reference.html": {"color-contrast": "two"}}' > "$tmp/baseline.json"
+expect 2 "an unreadable baseline is refused" "$s" "is not readable as {page: {rule: count}}"
 
 echo "docs-a11y self-test: $pass passed, $fail failed"
 (( fail == 0 ))

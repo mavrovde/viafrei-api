@@ -94,9 +94,11 @@ could answer, in order. If the family is not in your key's plan, its licence
 review is not signed off, or your use class is not permitted, the family is
 withheld. Otherwise, if its terms must be accepted and your key has not
 accepted them, its items are listed without the restricted values. In every
-other case the family is served, with its attribution. A family that could have answered but was withheld is
-named by the warning `partial` in `meta.warnings`; when no family may answer,
-the request is refused with `403 source-not-permitted` or
+other case the family is served, with its attribution.
+
+A family that could have answered but was withheld is named by the warning
+`partial` in `meta.warnings`; when no family may answer, the request is
+refused with `403 source-not-permitted` or
 `403 terms-not-accepted` ([error codes](errors.md)). `GET /v1/key` lists the
 families your key may receive.
 

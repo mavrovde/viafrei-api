@@ -40,6 +40,7 @@ type Store struct {
 	nowFn   func() time.Time
 	admit   *admission.Controller
 	budget  SharedBudget
+	pace    pace
 }
 
 // WithAdmission puts the priority admission in front of every read: a read
@@ -95,6 +96,7 @@ func New(pool *pgxpool.Pool, cfg *config.Config) *Store {
 		reserve: cfg.Deadline.Reserve,
 		floor:   cfg.DB.StatementTimeoutFloor,
 		nowFn:   time.Now,
+		pace:    realPace,
 	}
 }
 
@@ -177,7 +179,7 @@ func (s *Store) Read(ctx context.Context, fn func(context.Context, pgx.Tx) error
 // that had to wait for its slot gets the statement timeout set again to
 // what is left of its budget.
 func (s *Store) takeSlot(ctx context.Context, tx slotTx) error {
-	waited, err := s.budget.take(ctx, tx, admission.SlotTierOf(ctx), s.nowFn)
+	waited, err := s.budget.take(ctx, tx, admission.SlotTierOf(ctx), s.nowFn, s.pace)
 	if errors.Is(err, admission.ErrOverloaded) {
 		return err
 	}

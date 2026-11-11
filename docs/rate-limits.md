@@ -124,7 +124,12 @@ it follows the same protocol:
 2. `<open>` is `slots` for a critical read and `slots - critical_reserved`
    for any other, so the highest `critical_reserved` slots stay free for
    critical reads. A service read with no caller (readiness, which needs no
-   key, and background reads) counts as standard here, never critical;
+   key, and background reads) counts as standard here, never critical.
+   Readiness therefore takes a standard slot of the shared budget: when no
+   standard slot frees within `max_wait` (or within `health.ready_timeout`,
+   whichever ends first), its storage read is refused and `/readyz` reports
+   the `storage` check as failed, the same answer it gives when storage does
+   not answer at all;
 3. no row means every open slot is held: try again after `retry_interval`,
    spread at random over ±50 % so waiting readers do not retry in step,
    for at most `max_wait`, then refuse the request as overloaded with

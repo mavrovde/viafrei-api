@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/rand/v2"
+	"slices"
 	"strconv"
 	"sync"
 	"testing"
@@ -62,7 +63,7 @@ func budget() SharedBudget {
 func TestASlotIsTakenAtOnceWhenOneIsFree(t *testing.T) {
 	req.Covers(t, "NFR-CAP-002")
 	q := &slots{script: []error{nil}}
-	waited, err := budget().take(context.Background(), q, admission.Critical, time.Now)
+	waited, err := budget().take(context.Background(), q, admission.Critical, time.Now, realPace)
 	if err != nil || waited || len(q.asked) != 1 {
 		t.Fatalf("waited %v, err %v, attempts %d", waited, err, len(q.asked))
 	}
@@ -75,7 +76,7 @@ func TestOnlyACriticalReadMayTakeTheReservedSlots(t *testing.T) {
 	req.Covers(t, "NFR-CAP-002")
 	for _, tier := range []admission.Tier{admission.Standard, admission.Bulk} {
 		q := &slots{script: []error{nil}}
-		if _, err := budget().take(context.Background(), q, tier, time.Now); err != nil {
+		if _, err := budget().take(context.Background(), q, tier, time.Now, realPace); err != nil {
 			t.Fatal(err)
 		}
 		if q.asked[0][0] != 3 {
@@ -87,7 +88,7 @@ func TestOnlyACriticalReadMayTakeTheReservedSlots(t *testing.T) {
 func TestAReadWaitsForAFreedSlot(t *testing.T) {
 	req.Covers(t, "NFR-CAP-002")
 	q := &slots{script: []error{pgx.ErrNoRows, pgx.ErrNoRows, nil}}
-	waited, err := budget().take(context.Background(), q, admission.Standard, time.Now)
+	waited, err := budget().take(context.Background(), q, admission.Standard, time.Now, realPace)
 	if err != nil || !waited || len(q.asked) != 3 {
 		t.Fatalf("waited %v, err %v, attempts %d", waited, err, len(q.asked))
 	}
@@ -97,7 +98,7 @@ func TestAReadWithNoFreeSlotInMaxWaitIsShed(t *testing.T) {
 	req.Covers(t, "NFR-CAP-002", "NFR-CAP-003")
 	b := budget()
 	start := time.Now()
-	waited, err := b.take(context.Background(), &slots{}, admission.Standard, time.Now)
+	waited, err := b.take(context.Background(), &slots{}, admission.Standard, time.Now, realPace)
 	var r *admission.Refusal
 	if !errors.As(err, &r) || r.RetryAfter != 3*time.Second || !waited {
 		t.Fatalf("waited %v, err %v", waited, err)
@@ -106,7 +107,7 @@ func TestAReadWithNoFreeSlotInMaxWaitIsShed(t *testing.T) {
 		t.Errorf("the wait ran %v past max_wait %v", took, b.MaxWait)
 	}
 	b.MaxWait = 0
-	if waited, err := b.take(context.Background(), &slots{}, admission.Critical, time.Now); !errors.Is(err, admission.ErrOverloaded) || waited {
+	if waited, err := b.take(context.Background(), &slots{}, admission.Critical, time.Now, realPace); !errors.Is(err, admission.ErrOverloaded) || waited {
 		t.Errorf("max_wait 0 refuses after one attempt: waited %v, err %v", waited, err)
 	}
 }
@@ -114,7 +115,7 @@ func TestAReadWithNoFreeSlotInMaxWaitIsShed(t *testing.T) {
 func TestAFailedAttemptIsReturned(t *testing.T) {
 	req.Covers(t, "NFR-CAP-002")
 	boom := errors.New("boom")
-	if _, err := budget().take(context.Background(), &slots{script: []error{boom}}, admission.Critical, time.Now); !errors.Is(err, boom) {
+	if _, err := budget().take(context.Background(), &slots{script: []error{boom}}, admission.Critical, time.Now, realPace); !errors.Is(err, boom) {
 		t.Fatalf("err %v", err)
 	}
 }
@@ -125,7 +126,7 @@ func TestTheWaitForASlotEndsWithTheContext(t *testing.T) {
 	b.MaxWait, b.RetryInterval = time.Second, 500*time.Millisecond
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	waited, err := b.take(ctx, &slots{}, admission.Critical, time.Now)
+	waited, err := b.take(ctx, &slots{}, admission.Critical, time.Now, realPace)
 	if !errors.Is(err, context.DeadlineExceeded) || !waited {
 		t.Fatalf("waited %v, err %v", waited, err)
 	}
@@ -142,6 +143,7 @@ func budgetedStore(t0 time.Time, step *time.Duration) *Store {
 		reserve: 50 * time.Millisecond, floor: 50 * time.Millisecond, request: time.Second,
 		nowFn:  func() time.Time { return t0.Add(*step) },
 		budget: budget(),
+		pace:   realPace,
 	}
 }
 
@@ -242,15 +244,56 @@ func TestTheRetryIntervalIsJitteredByHalf(t *testing.T) {
 func TestTheWaitForASlotNeverOutlivesMaxWaitWithJitter(t *testing.T) {
 	req.Covers(t, "NFR-CAP-002")
 	b := budget()
-	b.MaxWait, b.RetryInterval = 30*time.Millisecond, 10*time.Millisecond
-	for range 20 {
-		start := time.Now()
-		if _, err := b.take(context.Background(), &slots{}, admission.Standard, time.Now); !errors.Is(err, admission.ErrOverloaded) {
-			t.Fatalf("err %v", err)
+	b.MaxWait, b.RetryInterval = 25*time.Millisecond, 10*time.Millisecond
+	for name, tc := range map[string]struct {
+		frac     float64
+		pauses   []time.Duration
+		attempts int
+	}{
+		// Near the top of the jitter a pause is 14.9 ms: one fits in 25 ms,
+		// a second would end at 29.8 ms, so the third attempt never happens.
+		// Bounding against the un-jittered 10 ms would allow it.
+		"long pauses": {0.99, []time.Duration{14900 * time.Microsecond}, 2},
+		// Near the bottom a pause is 5 ms: five of them fit exactly.
+		"short pauses": {0, []time.Duration{5 * time.Millisecond, 5 * time.Millisecond, 5 * time.Millisecond, 5 * time.Millisecond, 5 * time.Millisecond}, 6},
+	} {
+		t0 := time.Now()
+		var clock time.Duration
+		var slept []time.Duration
+		p := pace{
+			frac: func() float64 { return tc.frac },
+			sleep: func(_ context.Context, d time.Duration) error {
+				slept = append(slept, d)
+				clock += d
+				return nil
+			},
 		}
-		if took := time.Since(start); took > b.MaxWait+20*time.Millisecond {
-			t.Fatalf("the wait ran %s against max_wait %s", took, b.MaxWait)
+		q := &slots{}
+		waited, err := b.take(context.Background(), q, admission.Standard, func() time.Time { return t0.Add(clock) }, p)
+		if !errors.Is(err, admission.ErrOverloaded) || !waited {
+			t.Fatalf("%s: waited %v err %v", name, waited, err)
 		}
+		if len(q.asked) != tc.attempts || !slices.Equal(slept, tc.pauses) {
+			t.Errorf("%s: %d attempts, pauses %v; want %d, %v", name, len(q.asked), slept, tc.attempts, tc.pauses)
+		}
+		if clock > b.MaxWait {
+			t.Errorf("%s: the wait ran %s against max_wait %s", name, clock, b.MaxWait)
+		}
+	}
+}
+
+func TestARealPauseEndsWithTheRequest(t *testing.T) {
+	req.Covers(t, "NFR-CAP-002")
+	if err := realPace.sleep(context.Background(), time.Millisecond); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := realPace.sleep(ctx, time.Hour); !errors.Is(err, context.Canceled) {
+		t.Fatalf("err %v", err)
+	}
+	if f := realPace.frac(); f < 0 || f >= 1 {
+		t.Fatalf("frac %v", f)
 	}
 }
 

@@ -79,12 +79,35 @@ func jittered(d time.Duration, frac float64) time.Duration {
 	return d/2 + time.Duration(frac*float64(d))
 }
 
+// pace is where a wait for a slot draws its jitter and spends its pauses, so
+// a test can drive the retries with a fake clock.
+type pace struct {
+	frac  func() float64
+	sleep func(ctx context.Context, d time.Duration) error
+}
+
+// realPace jitters with math/rand and pauses on a timer that the request's
+// end cuts short.
+var realPace = pace{
+	frac: rand.Float64,
+	sleep: func(ctx context.Context, d time.Duration) error {
+		timer := time.NewTimer(d)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+			return nil
+		}
+	},
+}
+
 // take holds one slot of the budget for the transaction q runs in. It
 // retries after RetryInterval, ±50 %, while all slots open to tier are held, and
 // gives up with an *admission.Refusal once another attempt would end after
 // MaxWait. waited reports whether a first attempt failed, so the caller
 // knows the statement budget has shrunk.
-func (b SharedBudget) take(ctx context.Context, q rowQuerier, tier admission.Tier, now func() time.Time) (waited bool, err error) {
+func (b SharedBudget) take(ctx context.Context, q rowQuerier, tier admission.Tier, now func() time.Time, p pace) (waited bool, err error) {
 	open := b.Slots
 	if tier != admission.Critical {
 		open -= b.CriticalReserved
@@ -96,17 +119,13 @@ func (b SharedBudget) take(ctx context.Context, q rowQuerier, tier admission.Tie
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return waited, err
 		}
-		pause := jittered(b.RetryInterval, rand.Float64()) //nolint:gosec // jitter, not a secret
+		pause := jittered(b.RetryInterval, p.frac())
 		if now().Sub(start)+pause > b.MaxWait {
 			return waited, &admission.Refusal{RetryAfter: b.RetryAfter}
 		}
 		waited = true
-		timer := time.NewTimer(pause)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return waited, ctx.Err()
-		case <-timer.C:
+		if err := p.sleep(ctx, pause); err != nil {
+			return waited, err
 		}
 	}
 }

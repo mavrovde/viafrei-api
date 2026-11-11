@@ -100,7 +100,8 @@ type callerKey struct{}
 
 // WithCaller returns ctx carrying the caller of its storage reads. A read
 // without a caller (a service operation such as readiness) is admitted as
-// critical and under no key's share.
+// critical and under no key's share (in-process admission; its shared slot
+// is standard, SlotTierOf).
 func WithCaller(ctx context.Context, c Caller) context.Context {
 	return context.WithValue(ctx, callerKey{}, c)
 }
@@ -111,7 +112,8 @@ func callerFrom(ctx context.Context) Caller {
 }
 
 // TierOf returns the tier the storage reads under ctx are admitted in: the
-// caller's, or critical for a read without one.
+// caller's, or critical for a read without one (in-process admission; its
+// shared slot is standard, SlotTierOf).
 func TierOf(ctx context.Context) Tier { return callerFrom(ctx).Tier }
 
 // SlotTierOf returns the tier the storage reads under ctx take a slot of the

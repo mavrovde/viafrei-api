@@ -14,11 +14,14 @@ var roleSQL string
 //go:embed 0003_limits.sql
 var limitsSQL string
 
+//go:embed 0004_console.sql
+var consoleSQL string
+
 // Role is the name of the API's own access-store role.
 const Role = "api_access"
 
 // Version is the schema version this build expects.
-const Version = 2
+const Version = 3
 
 // SchemaSQL returns the statements that build the access store.
 func SchemaSQL() string { return schemaSQL }
@@ -30,3 +33,7 @@ func RoleSQL() string { return roleSQL }
 // LimitsSQL returns the statements of schema version 2: the plans' limits
 // and the usage records. They run after RoleSQL, whose role they grant to.
 func LimitsSQL() string { return limitsSQL }
+
+// ConsoleSQL returns the statements of schema version 3: the owner console's
+// passkeys and enrolment codes. They run after LimitsSQL.
+func ConsoleSQL() string { return consoleSQL }

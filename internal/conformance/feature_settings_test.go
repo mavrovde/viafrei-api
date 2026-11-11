@@ -14,6 +14,8 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/energy"
 	"github.com/mavrovde/viafrei-api/internal/domain/parking"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
+	"github.com/mavrovde/viafrei-api/internal/domain/rules"
+	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
 
@@ -70,4 +72,14 @@ func (f *askedFeatures) RoadConditions(_ context.Context, _ access.Record, q roa
 func (f *askedFeatures) RoadSituation(_ context.Context, _ access.Record, id string) (features.Answer[roads.Situation], error) {
 	f.asked = id
 	return features.Answer[roads.Situation]{}, roads.ErrUnknownSituation
+}
+
+func (f *askedFeatures) WeatherRisk(_ context.Context, _ access.Record, q weather.Query) (features.WeatherRisk, error) {
+	f.asked = fmt.Sprintf("min_level=%d", q.MinLevel)
+	return features.WeatherRisk{}, access.ErrNonePermitted
+}
+
+func (f *askedFeatures) DrivingRules(_ context.Context, _ access.Record, topic string) (rules.Topic, features.Answer[rules.Rule], error) {
+	f.asked = topic
+	return rules.Topic{}, features.Answer[rules.Rule]{}, rules.ErrUnknownTopic
 }

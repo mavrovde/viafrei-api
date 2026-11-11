@@ -55,6 +55,8 @@ type Repositories struct {
 	Parking  Parking
 	Places   Places
 	Roads    Roads
+	Weather  Weather
+	Rules    Rules
 }
 
 // Settings are the tunables of the use cases.

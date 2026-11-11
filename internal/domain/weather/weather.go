@@ -1,0 +1,119 @@
+// Package weather is the weather-risk context: the official weather
+// warnings in force at a position, and the lamp that sums them up.
+package weather
+
+import (
+	"errors"
+	"slices"
+	"time"
+
+	"github.com/mavrovde/viafrei-api/internal/domain/geo"
+)
+
+// Other is the hazard of a stored code the service cannot map (ENV-051).
+const Other = "other"
+
+// ErrLevel is the error of a stored warning level outside 1 to 4.
+var ErrLevel = errors.New("weather: level outside 1 to 4")
+
+// Hazard is what a warning warns of.
+type Hazard string
+
+// Hazards lists every hazard an answer can carry; every one but the last is
+// a stored code the service maps one to one.
+var Hazards = []Hazard{"thunderstorm", "wind", "rain", "snow", "ice", "fog", "heat", "frost", "uv", "flood", Other}
+
+// MapHazard maps a stored hazard code.
+func MapHazard(raw string) Hazard {
+	if i := slices.Index(Hazards[:len(Hazards)-1], Hazard(raw)); i >= 0 {
+		return Hazards[i]
+	}
+	return Other
+}
+
+// Level is the issuer's warning level, 1 (minor) to 4 (extreme), as issued
+// (FR-WEATHER-002): the service never re-grades it.
+type Level int
+
+// The bounds of a level.
+const (
+	MinLevel Level = 1
+	MaxLevel Level = 4
+)
+
+// CheckLevel refuses a stored level outside 1 to 4 rather than grading it.
+func CheckLevel(raw int) (Level, error) {
+	if raw < int(MinLevel) || raw > int(MaxLevel) {
+		return 0, ErrLevel
+	}
+	return Level(raw), nil
+}
+
+// Warning is one official weather warning.
+type Warning struct {
+	ID        string
+	Family    string
+	Hazard    Hazard
+	Level     Level
+	LevelName string
+	Issuer    string
+	Headline  string
+	// TextLanguage is the language of Headline, as issued.
+	TextLanguage string
+	From         time.Time
+	// Until is nil when the warning is open-ended.
+	Until    *time.Time
+	AreaName string
+}
+
+// Query asks for the warnings in force at a position.
+type Query struct {
+	At       geo.Point
+	MinLevel Level
+	// Hazards keeps the warnings of these hazards; empty keeps every
+	// hazard. Other keeps the hazards that cannot be mapped.
+	Hazards []Hazard
+}
+
+// KnownHazards returns the mapped hazards the query keeps, and whether it
+// keeps the hazards that cannot be mapped. No hazards keeps every hazard.
+func (q Query) KnownHazards() ([]Hazard, bool) {
+	if len(q.Hazards) == 0 {
+		return slices.Clone(Hazards[:len(Hazards)-1]), true
+	}
+	known := []Hazard{}
+	for _, h := range q.Hazards {
+		if h != Other {
+			known = append(known, h)
+		}
+	}
+	return known, slices.Contains(q.Hazards, Other)
+}
+
+// Lamp sums up the warnings at a position.
+type Lamp string
+
+// The lamps.
+const (
+	LampGreen Lamp = "green"
+	LampAmber Lamp = "amber"
+	LampRed   Lamp = "red"
+)
+
+// LampOf is the weather lamp: red when a warning of level 3 or 4 is in
+// force, amber for level 2, green for level 1 or no warning. It reads every
+// warning that answers the question.
+func LampOf(ws []Warning) Lamp {
+	worst := Level(0)
+	for _, w := range ws {
+		worst = max(worst, w.Level)
+	}
+	switch {
+	case worst >= 3:
+		return LampRed
+	case worst == 2:
+		return LampAmber
+	default:
+		return LampGreen
+	}
+}

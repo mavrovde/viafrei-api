@@ -18,6 +18,8 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
+	"github.com/mavrovde/viafrei-api/internal/domain/rules"
+	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 )
 
 // Features is the port to the feature use cases.
@@ -28,6 +30,8 @@ type Features interface {
 	MotorwayConditions(ctx context.Context, key access.Record, q roads.CorridorQuery) (features.Conditions, error)
 	RoadConditions(ctx context.Context, key access.Record, q roads.AreaQuery) (features.Conditions, error)
 	RoadSituation(ctx context.Context, key access.Record, id string) (features.Answer[roads.Situation], error)
+	WeatherRisk(ctx context.Context, key access.Record, q weather.Query) (features.WeatherRisk, error)
+	DrivingRules(ctx context.Context, key access.Record, topic string) (rules.Topic, features.Answer[rules.Rule], error)
 }
 
 // counterpartExtension names the MCP capability an operation answers the
@@ -168,6 +172,8 @@ func (s *server) featureProblem(ctx context.Context, err error) *Problem {
 		return newProblem(ctx, SlugNotFound, "No road with this reference.", 0)
 	case errors.Is(err, roads.ErrUnknownSituation):
 		return newProblem(ctx, SlugNotFound, "No situation with this id.", 0)
+	case errors.Is(err, rules.ErrUnknownTopic):
+		return newProblem(ctx, SlugNotFound, "No rule topic with this code.", 0)
 	default:
 		return s.storageProblem(ctx, err)
 	}

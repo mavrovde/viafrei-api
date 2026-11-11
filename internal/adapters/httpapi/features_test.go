@@ -23,6 +23,8 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
+	"github.com/mavrovde/viafrei-api/internal/domain/rules"
+	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/runtime/logging"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
@@ -36,6 +38,10 @@ type fakeFeatures struct {
 	overview   features.Overview
 	conditions features.Conditions
 	situation  features.Answer[roads.Situation]
+	risk       features.WeatherRisk
+	topic      rules.Topic
+	gotRisk    weather.Query
+	gotTopic   string
 	err        error
 	gotRoad    roads.CorridorQuery
 	gotArea    roads.AreaQuery
@@ -128,12 +134,12 @@ func overviewAnswer() features.Overview {
 }
 
 func everyAnswer() *fakeFeatures {
-	return &fakeFeatures{charging: chargingAnswer(), parking: parkingAnswer(), overview: overviewAnswer(), conditions: conditionsAnswer(), situation: situationAnswer()}
+	return &fakeFeatures{charging: chargingAnswer(), parking: parkingAnswer(), overview: overviewAnswer(), conditions: conditionsAnswer(), situation: situationAnswer(), risk: riskAnswer(), topic: topicAnswer()}
 }
 
 func featureScopes() auth.Principal {
 	p := principal("commercial")
-	p.Key.Plan.Scopes = []access.Scope{"places", "energy", "parking", "roads"}
+	p.Key.Plan.Scopes = []access.Scope{"places", "energy", "parking", "roads", "weather", "rules"}
 	return p
 }
 
@@ -400,6 +406,7 @@ func TestFeatureRefusals(t *testing.T) {
 	targets := []string{
 		"/v1/charging-options?at=52.52,13.405", "/v1/parking-options?at=52.52,13.405", "/v1/places/pl-01-0001/overview",
 		"/v1/motorways/A8/conditions", "/v1/road-conditions?at=52.52,13.405", "/v1/road-situations/ev-1",
+		"/v1/weather-risk?at=52.52,13.405", "/v1/driving-rules?topic=winter_tyres",
 	}
 	cases := []struct {
 		err    error
@@ -542,6 +549,7 @@ func TestFeatureOperationsListTheirRefusals(t *testing.T) {
 	for _, path := range []string{
 		"/v1/charging-options", "/v1/parking-options", "/v1/places/{placeId}/overview",
 		"/v1/motorways/{road}/conditions", "/v1/road-conditions", "/v1/road-situations/{situationId}",
+		"/v1/weather-risk", "/v1/driving-rules",
 	} {
 		for _, status := range []string{"403", "404", "503"} {
 			if _, ok := d.Paths[path]["get"].Responses[status].Content["application/problem+json"]; !ok {

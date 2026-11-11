@@ -15,7 +15,7 @@ expect() { # expect WANT_EXIT NAME DIR WANT_TEXT
   out=$("$here/docs-a11y.sh" "$3" 2>&1)
   status=$?
   if [[ $status != "$1" ]] || ! grep -qF -- "$4" <<<"$out"; then
-    echo "not ok: $2 (exit $status, want $1)"; echo "$out" | sed 's/^/    /'; fail=$((fail + 1))
+    echo "not ok: $2 (exit $status, want $1)"; while IFS= read -r l; do echo "    $l"; done <<<"$out"; fail=$((fail + 1))
   else
     echo "ok: $2"; pass=$((pass + 1))
   fi

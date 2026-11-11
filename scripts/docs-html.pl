@@ -13,7 +13,10 @@
 # - a link to any other file of the repository points at it on GitHub, since
 #   the portal does not carry it;
 # - links with a scheme, fragment-only links and links to files the portal
-#   itself serves (DOCS_SITE_FILES) are left as they are.
+#   itself serves (DOCS_SITE_FILES) are left as they are;
+# - code blocks and tables, which scroll sideways when wide, can take the
+#   keyboard focus, so they can be scrolled without a mouse (WCAG 2.1.1);
+# - a task-list item's checkbox is labelled by the item's text (WCAG 1.3.1).
 #
 # BASE_DIR is the directory the source file sits in, relative to the
 # repository root ("." for the root), against which its links resolve.
@@ -71,5 +74,8 @@ $html =~ s{href="([^"]*)"}{
   }
   qq{href="$out"};
 }ge;
+
+$html =~ s{<(pre|table)>}{<$1 tabindex="0">}g;
+$html =~ s{<li><input([^>]*type="checkbox"[^>]*)>(.*?)</li>}{<li><label><input$1>$2</label></li>}gs;
 
 print $html;

@@ -75,7 +75,9 @@ and merge release pull requests.
    `index.html`, `reference.html` and `openapi.json` back and fails unless
    they serve that version. Only the newest final release publishes; an rc
    or a backported patch never replaces the site. CI builds the same site on
-   every pull request (`OpenAPI lint and breaking changes` job).
+   every pull request (`OpenAPI lint and breaking changes` job) and checks
+   its links, diagrams and accessibility (`Documentation portal` job,
+   [accessibility](accessibility.md)).
 
 ### When CI failed on the release commit
 
@@ -161,6 +163,7 @@ git checkout internal/buildinfo/platform-version.txt
 - [ ] CI is green on the release pull request, including the image and compose jobs.
 - [ ] The Coverage gate job shows 100 % for every package, and every line of `test/coverage-exclusions.txt` carries its reason ([coverage](coverage.md)).
 - [ ] The `Requirement report` job is green on `main` at the release commit; its `requirement-report` artifact holds the requirement report and the draft test completion report, which the maintainers complete and attach to the release (TEST-002).
+- [ ] For a minor release (`X.Y.0`): the manual accessibility pass of the documentation portal is done on the portal built from the release commit, and its result is recorded in section 6 of the test completion report ([accessibility](accessibility.md#manual-pass-once-per-minor-release)). The automated check (`Documentation portal` job) is green on every release.
 - [ ] The CHANGELOG section reads correctly; every user-visible change has a line.
 - [ ] Every breaking change is intended and is described with a migration note.
 - [ ] `api/openapi.json` on `main` is the contract you mean to publish.

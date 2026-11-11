@@ -197,6 +197,28 @@ jobs:
       - name: Docs build (the site release.yml publishes to GitHub Pages)
         run: scripts/docs-build.sh site
 
+  docs-portal:
+    name: Documentation portal (links, diagrams, accessibility)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22" # pa11y-ci 5 needs ^22.13
+      - name: Self-test of the link and diagram check
+        run: bash scripts/docs-check.test.sh
+      - name: Docs build, with the link, id and diagram checks (#20)
+        run: scripts/docs-build.sh site
+      - name: Accessibility, WCAG 2.2 AA, every page (NFR-A11Y-001)
+        run: scripts/docs-a11y.sh site
+      - name: Self-test of the accessibility check
+        run: bash scripts/docs-a11y.test.sh
+
   vulncheck:
     name: govulncheck
     runs-on: ubuntu-24.04

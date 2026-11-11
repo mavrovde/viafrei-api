@@ -129,6 +129,8 @@ func TestTheLampRule(t *testing.T) {
 		"ungraded roadworks":      {[]roads.Signal{sig(roads.KindRoadworks, roads.SeverityOther)}, false, false, roads.LampAmber, why(roads.ReasonWarning)},
 		"ungraded closure":        {[]roads.Signal{sig(roads.KindClosure, roads.SeverityOther)}, false, false, roads.LampAmber, why(roads.ReasonWarning)},
 		"first reason wins":       {[]roads.Signal{sig(roads.KindOther, roads.SeverityInfo), jam(nil), sig(roads.KindWeather, roads.SeverityMajor), sig(roads.KindHazard, roads.SeverityInfo)}, false, false, roads.LampRed, why(roads.ReasonSafety)},
+		"light, then a jam":       {[]roads.Signal{sig(roads.KindRoadworks, roads.SeverityMinor), jam(nil)}, false, false, roads.LampAmber, why(roads.ReasonJam)},
+		"closure, then a hazard":  {[]roads.Signal{sig(roads.KindClosure, roads.SeverityRoadClosed), sig(roads.KindHazard, roads.SeverityInfo)}, false, false, roads.LampRed, why(roads.ReasonRoadClosed)},
 		"amber order":             {[]roads.Signal{sig(roads.KindOther, roads.SeverityInfo), sig(roads.KindRoadworks, roads.SeverityMajor)}, false, false, roads.LampAmber, why(roads.ReasonNarrowing)},
 		"stale alone":             {nil, false, true, roads.LampAmber, why(roads.ReasonStaleSource)},
 		"amber beats stale":       {[]roads.Signal{jam(nil)}, false, true, roads.LampAmber, why(roads.ReasonJam)},

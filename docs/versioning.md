@@ -49,8 +49,8 @@ breaking change inside `/v1` fails it.
 1. A breaking change ships as a new major path (`/v2`), served **beside** the
    old one.
 2. The old major is then deprecated: its answers carry the `Deprecation` and
-   `Sunset` headers (*planned*) for at least the notice period,
-   `deprecation.min_notice`, designed as 183 days.
+   `Sunset` headers (*planned*) for at least the notice period, designed as
+   183 days (*planned* as a setting).
 3. After the sunset date, every operation of the old major answers
    `404 not-found` with a `Link` to its successor for at least 90 further
    days (*planned*).
@@ -63,7 +63,9 @@ start of the notice period (*planned*).
 
 ## Stability of operations
 
-A new operation may first be offered as beta, marked `x-stability: beta` and
-reachable only with keys that opted in; it may change without notice. Stable
-operations are marked `x-stability: stable` (*planned*). The
-[endpoints](endpoints.html) page lists every operation with its marker.
+*Planned:* a new operation may first be offered as beta, marked
+`x-stability: beta` and reachable only with keys that opted in; it may
+change without notice. Stable operations will be marked
+`x-stability: stable`. No operation carries a marker yet; the
+[endpoints](endpoints.html) page lists every operation with its marker once
+it has one.

@@ -11,7 +11,9 @@
 #   page (DOCS_PAGES: space-separated "source=page" pairs), keeping its
 #   fragment;
 # - a link to any other file of the repository points at it on GitHub, since
-#   the portal does not carry it;
+#   the portal does not carry it, and only when that file exists (run from
+#   the repository root); a link to a file that does not exist becomes
+#   "missing-in-repo/<path>", which the build refuses;
 # - links with a scheme, fragment-only links and links to files the portal
 #   itself serves (DOCS_SITE_FILES) are left as they are;
 # - code blocks and tables, which scroll sideways when wide, can take the
@@ -67,8 +69,12 @@ $html =~ s{href="([^"]*)"}{
       my $file = resolve($path);
       if (exists $page{$file}) {
         $out = $page{$file} . $frag;
-      } else {
+      } elsif ($file ne '' && -e $file) {
         $out = "$repo/$file$frag";
+      } else {
+        # Not a page and not a file of the repository: a misspelt link. It
+        # is left pointing nowhere on the site, so the build refuses it.
+        $out = "missing-in-repo/$file$frag";
       }
     }
   }

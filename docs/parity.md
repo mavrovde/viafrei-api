@@ -151,7 +151,8 @@ which are therefore differences that remain:
 
 ## Known differences that remain
 
-None in the platform 2.5.24 bundle: `TestParity` passes.
+None in the platform 2.6.8 bundle: `TestParity` passes. Its facts are the
+2.5.24 bundle's, fact for fact; only `platform` and `commit` differ.
 
 The 2.5.23 bundle differed in 9 facts. All 9 are closed:
 
@@ -245,6 +246,25 @@ TEST_DATABASE_URL=... npx tsx packages/mcp/scripts/parity-bundle.ts \
 ```
 
 It prints the lock line on stdout; add it to `test/parity/lock.tsv`.
+
+### Why the producer and not the public server
+
+The public MCP server answers from the platform's live rows, not from the
+fixture, so its answers cannot be compared with what the API answers on the
+fixture; a bundle of them would also publish live figures. The producer runs
+the same handlers on the fixture rows instead. That it is the same code is
+checked against the public server before a bundle is pinned:
+
+1. `initialize` on the public endpoint: `serverInfo.version` is the
+   platform version of the bundle.
+2. `tools/list`: every tool's description and input-schema fingerprint
+   (`npm run mcp:contract -- --fingerprints` in the platform checkout at the
+   bundle's `commit`, the same hash applied to the public answer) is equal.
+3. `tools/call` of each case's tool with that case's arguments: the answer is
+   not an error. Only its member names are compared with the producer's
+   answer, never its values. A member stated only where the data has it (a
+   register caveat, a list of mapped facilities) may be on one side only.
+4. The session is deleted.
 
 ## Recording the regression lock
 

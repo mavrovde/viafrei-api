@@ -10,7 +10,9 @@
 # and the classification: a page that did not load, fewer pages reported
 # than the site has, an unreadable report, an unreadable baseline, a
 # needs-review result, a moderate and a minor result on a guide page, and
-# reference.html's notes held against the baseline in each direction.
+# reference.html's notes held against the baseline in each direction,
+# counted as distinct failures: one per colour pair for color-contrast, one
+# per selector with its nth-child parts and numbers removed for other rules.
 set -uo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -68,27 +70,47 @@ page "$s/index.html" '<p>Guide.</p>'
 page "$s/reference.html" '<p>Reference.</p>'
 s=$(cd "$s" && pwd)
 
-issue() { # issue TYPE CODE NEEDS_REVIEW
-  jq -n --arg t "$1" --arg c "$2" --argjson r "$3" \
-    '{type: $t, code: $c, message: "planted", selector: "p", runner: "axe", runnerExtras: {needsFurtherReview: $r}}'
+issue() { # issue TYPE CODE NEEDS_REVIEW [TARGET [FG BG]]
+  jq -n --arg t "$1" --arg c "$2" --argjson r "$3" --arg target "${4:-p}" --arg fg "${5:-}" --arg bg "${6:-}" \
+    '{type: $t, code: $c, message: "planted", selector: "p", runner: "axe",
+      runnerExtras: ({needsFurtherReview: $r, target: $target}
+        + (if $fg == "" then {} else {fgColor: $fg, bgColor: $bg} end))}'
 }
 report() { # report GUIDE_ISSUES_JSON REFERENCE_ISSUES_JSON
   jq -n --arg g "file://$s/index.html" --arg r "file://$s/reference.html" --argjson gi "$1" --argjson ri "$2" \
     '{total: 2, passes: 0, errors: 0, results: {($g): $gi, ($r): $ri}}' > "$STUB_REPORT"
 }
 cc=$(issue error color-contrast true)
+green=$(issue error color-contrast true 'span' 'rgb(160, 251, 170)' 'rgb(17, 23, 26)')
+green2=$(issue error color-contrast true 'pre > span:nth-child(3)' 'rgb(160, 251, 170)' 'rgb(17, 23, 26)')
+red=$(issue error color-contrast true 'span' 'rgb(212, 31, 28)' 'rgb(17, 23, 26)')
+white=$(issue error color-contrast true 'span' 'rgb(255, 255, 255)' 'rgb(17, 23, 26)')
 
-report '[]' "[$cc, $cc]"
-expect 0 "reference.html's notes at the baseline pass" "$s" "reference.html: 2 note(s) within the baseline"
+report '[]' "[$green, $red]"
+expect 0 "reference.html's notes at the baseline pass" "$s" "reference.html: 2 distinct failure(s) (2 result(s)) within the baseline"
 
-report '[]' "[$cc]"
+report '[]' "[$green, $green2, $green, $red, $red]"
+expect 0 "results of one colour pair are one failure, wherever they are" "$s" "reference.html: 2 distinct failure(s) (5 result(s)) within the baseline"
+
+report '[]' "[$cc, $cc, $green]"
+expect 0 "results whose colours axe could not tell are one failure" "$s" "reference.html: 2 distinct failure(s) (3 result(s)) within the baseline"
+
+report '[]' "[$red]"
 expect 0 "a count below the baseline passes and asks to lower it" "$s" "below the baseline of 2: lower it"
 
-report '[]' "[$cc, $cc, $cc]"
-expect 1 "a count above the baseline fails" "$s" "FAIL: reference.html: color-contrast: 3 result(s), above the baseline of 2"
+report '[]' "[$green, $red, $white]"
+expect 1 "a new colour pair above the baseline fails" "$s" "FAIL: reference.html: color-contrast: 3 distinct failure(s), above the baseline of 2"
+
+printf '{"reference.html": {"color-contrast": 2, "region": 1}}\n' > "$tmp/baseline.json"
+row() { issue warning region false "#operation\\/getKey > div > table > tbody > tr:nth-child($1) > td.sc-x$1"; }
+report '[]' "[$(row 1), $(row 2), $(row 10)]"
+expect 0 "rows of one table are one failure (nth-child and numbers removed)" "$s" "reference.html: 1 distinct failure(s) (3 result(s)) within the baseline"
+report '[]' "[$(row 1), $(issue warning region false '#operation\\/getMeta > div')]"
+expect 1 "a region failure in another place is a new failure" "$s" "FAIL: reference.html: region: 2 distinct failure(s), above the baseline of 1"
+printf '{"reference.html": {"color-contrast": 2}}\n' > "$tmp/baseline.json"
 
 report '[]' "[$(issue warning region false)]"
-expect 1 "a rule not in the baseline fails" "$s" "FAIL: reference.html: region: 1 result(s), a rule not in the baseline"
+expect 1 "a rule not in the baseline fails" "$s" "FAIL: reference.html: region: 1 distinct failure(s), a rule not in the baseline"
 
 report '[{"message": "net::ERR_FILE_NOT_FOUND"}]' '[]'
 expect 1 "a guide page that did not load fails" "$s" "FAIL: index.html: could not be checked: net::ERR_FILE_NOT_FOUND"
@@ -122,4 +144,4 @@ echo '{"reference.html": {"color-contrast": "two"}}' > "$tmp/baseline.json"
 expect 2 "an unreadable baseline is refused" "$s" "is not readable as {page: {rule: count}}"
 
 echo "docs-a11y self-test: $pass passed, $fail failed"
-(( fail == 0 ))
+(( fail == 0 && pass >= 22 ))

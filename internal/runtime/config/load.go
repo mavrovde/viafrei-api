@@ -355,6 +355,7 @@ func crossField(c *Config) Errors {
 	}
 	out = append(out, crossFieldAuth(c)...)
 	out = append(out, crossFieldBudget(c)...)
+	out = append(out, crossFieldAdmin(c)...)
 	return append(out, crossFieldTiers(c)...)
 }
 

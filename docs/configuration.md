@@ -92,3 +92,17 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `metering.max_keys_buffered` | `VFAPI_METERING_MAX_KEYS_BUFFERED` | int | `100000` | 100 to 1000000 | Largest number of (key, hour, operation) counters held between flushes; the counts of a new counter beyond it are dropped and the drop is logged. |
 | `metering.write_timeout` | `VFAPI_METERING_WRITE_TIMEOUT` | duration | `1s` | 100ms to 10s | Deadline of one usage write; a failed write keeps its counts for the next flush. |
 | `metering.retention_days` | `VFAPI_METERING_RETENTION_DAYS` | int | `400` | 30 to 1825 | Days a usage record is kept; keys prune removes older ones. |
+| `admin.enabled` | `VFAPI_ADMIN_ENABLED` | bool | `false` | — | Run the owner console on admin.listen_addr. Needs access.url. Off by default. |
+| `admin.listen_addr` | `VFAPI_ADMIN_LISTEN_ADDR` | string | `127.0.0.1:8081` | — | Address of the console listener: a loopback IP address (127.0.0.0/8 or ::1) and a port. Any other address is refused at boot; reach the console through a tunnel to the host. |
+| `admin.origin` | `VFAPI_ADMIN_ORIGIN` | string | `http://localhost:8081` | absolute URL | The console's origin as the browser sees it: scheme, host and port, no path. Every request must name its host, every change must come from it, and passkeys are bound to it. http is accepted for localhost and loopback addresses only. |
+| `admin.rp_id` | `VFAPI_ADMIN_RP_ID` | string | `localhost` | at most 253 characters; hostname_rfc1123 | WebAuthn relying-party id: the host of admin.origin or a parent domain of it. A passkey works only under the id it was enrolled with. |
+| `admin.rp_name` | `VFAPI_ADMIN_RP_NAME` | string | `ViaFrei API console` | at most 64 characters | Name of the relying party the authenticator shows when a passkey is enrolled. |
+| `admin.session_ttl` | `VFAPI_ADMIN_SESSION_TTL` | duration | `15m` | 1m to 1h | Lifetime of a console session from sign-in; it is not extended by use. Sessions are held in memory only, so a restart signs everyone out. |
+| `admin.challenge_ttl` | `VFAPI_ADMIN_CHALLENGE_TTL` | duration | `1m` | 10s to 5m | Lifetime of a sign-in or enrolment challenge. A challenge is single-use: it is gone after its first answer, right or wrong. |
+| `admin.confirm_ttl` | `VFAPI_ADMIN_CONFIRM_TTL` | duration | `2m` | 10s to 10m | Time between asking for a change and confirming it. The confirmation is single-use and bound to the session that asked. At most admin.session_ttl. |
+| `admin.enrolment_ttl` | `VFAPI_ADMIN_ENROLMENT_TTL` | duration | `30m` | 5m to 24h | Lifetime of an enrolment code printed by console enrol. The code is single-use and stored only as its MAC. |
+| `admin.signin_limit` | `VFAPI_ADMIN_SIGNIN_LIMIT` | int | `10` | 1 to 100 | Sign-in and enrolment attempts (begun or failed) the console accepts per admin.signin_window, from all browsers together; one more is answered 429. |
+| `admin.signin_window` | `VFAPI_ADMIN_SIGNIN_WINDOW` | duration | `5m` | 1m to 1h | The window admin.signin_limit counts in. |
+| `admin.max_pending` | `VFAPI_ADMIN_MAX_PENDING` | int | `32` | 4 to 256 | Challenges and pending confirmations held at once; when full, expired ones are dropped first and a new one is refused. |
+| `admin.max_sessions` | `VFAPI_ADMIN_MAX_SESSIONS` | int | `4` | 1 to 16 | Console sessions held at once; a new sign-in beyond it ends the oldest session. |
+| `admin.audit_page` | `VFAPI_ADMIN_AUDIT_PAGE` | int | `100` | 10 to 1000 | Audit records the console's audit view shows, newest first. |

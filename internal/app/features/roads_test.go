@@ -9,6 +9,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
@@ -25,7 +26,9 @@ type roadFake struct {
 	road                 roads.Road
 	roadErr, readErr     error
 	sits                 []roads.Situation
-	sevs                 []roads.Severity
+	sigs                 []roads.Signal
+	stale                []string
+	gotSince             time.Time
 	gotRoad              roads.CorridorQuery
 	gotArea              roads.AreaQuery
 	gotFamilies          []string
@@ -39,21 +42,33 @@ func (f *roadFake) Road(_ context.Context, ref string) (roads.Road, error) {
 	return f.road, f.roadErr
 }
 
-func (f *roadFake) SituationsOnRoad(_ context.Context, q roads.CorridorQuery, fams []string, at time.Time) ([]roads.Situation, []roads.Severity, bool, error) {
+func (f *roadFake) SituationsOnRoad(_ context.Context, q roads.CorridorQuery, fams []string, at time.Time) ([]roads.Situation, []roads.Signal, bool, error) {
 	f.readCalls++
 	f.gotRoad, f.gotFamilies, f.gotNow = q, fams, at
-	return f.sits, f.sevs, true, f.readErr
+	return f.sits, f.sigs, true, f.readErr
 }
 
-func (f *roadFake) SituationsNear(_ context.Context, q roads.AreaQuery, fams []string, at time.Time) ([]roads.Situation, []roads.Severity, bool, error) {
+func (f *roadFake) SituationsNear(_ context.Context, q roads.AreaQuery, fams []string, at time.Time) ([]roads.Situation, []roads.Signal, bool, error) {
 	f.readCalls++
 	f.gotArea, f.gotFamilies, f.gotNow = q, fams, at
-	return f.sits, f.sevs, false, f.readErr
+	return f.sits, f.sigs, false, f.readErr
 }
 
-func (f *roadFake) Situation(_ context.Context, id string, fams []string) (roads.Situation, error) {
+// Provenance answers every family fresh at now, except those in f.stale.
+func (f *roadFake) Provenance(ctx context.Context, fams []string, lang string) ([]provenance.Family, error) {
+	out, err := f.fake.Provenance(ctx, fams, lang)
+	for i := range out {
+		out[i].StaleAfter = time.Minute
+		if !slices.Contains(f.stale, out[i].Source.Family) {
+			out[i].DataAsOf = &now
+		}
+	}
+	return out, err
+}
+
+func (f *roadFake) Situation(_ context.Context, id string, fams []string, endedSince time.Time) (roads.Situation, error) {
 	f.readCalls++
-	f.gotFamilies = fams
+	f.gotFamilies, f.gotSince = fams, endedSince
 	if len(f.sits) == 0 {
 		return roads.Situation{}, f.readErr
 	}
@@ -68,7 +83,7 @@ func roadService(f *roadFake) *features.Service {
 	}
 	f.reg = roadRegister
 	return features.New(features.Repositories{Register: f, Roads: f},
-		features.Settings{Language: "en"}, func() time.Time { return now })
+		features.Settings{Language: "en", EndedRetention: 24 * time.Hour}, func() time.Time { return now })
 }
 
 var roadsScope = []access.Scope{"roads"}
@@ -89,7 +104,7 @@ func TestMotorwayConditionsAreGatedAttributedAndLit(t *testing.T) {
 	f := &roadFake{
 		road: roads.Road{Ref: "A8", Class: roads.ClassMotorway},
 		sits: []roads.Situation{{ID: "a", Family: "r1"}, {ID: "b", Family: "r1"}},
-		sevs: []roads.Severity{roads.SeverityMinor, roads.SeverityLaneClosed},
+		sigs: []roads.Signal{{Kind: roads.KindRoadworks, Severity: roads.SeverityMinor}, {Kind: roads.KindRoadworks, Severity: roads.SeverityLaneClosed}},
 	}
 	c, err := roadService(f).MotorwayConditions(context.Background(), key("commercial", roadsScope, "r1", "r2", "e1"), roads.CorridorQuery{Road: "A8", Limit: 1})
 	if err != nil {
@@ -101,8 +116,18 @@ func TestMotorwayConditionsAreGatedAttributedAndLit(t *testing.T) {
 	if !c.Partial || !c.HasMore || !c.At.Equal(now) || len(c.Items) != 2 || !slices.Equal(names(c.Families), []string{"r1"}) {
 		t.Errorf("answer %+v", c.Answer)
 	}
-	if c.Lamp != roads.LampAmber || c.Reason == nil || *c.Reason != roads.SeverityLaneClosed {
+	// r2 is withheld from a commercial key, so the narrowing is not enough
+	// to say amber: a closure could be among r2's situations.
+	if c.Lamp != roads.LampUnknown || c.Reason == nil || *c.Reason != roads.ReasonPartial {
 		t.Errorf("lamp %s %v", c.Lamp, c.Reason)
+	}
+	f.sigs = append(f.sigs, roads.Signal{Kind: roads.KindHazard, Severity: roads.SeverityInfo})
+	if c, _ = roadService(f).MotorwayConditions(context.Background(), key("commercial", roadsScope, "r1", "r2", "e1"), roads.CorridorQuery{Road: "A8"}); c.Lamp != roads.LampRed || *c.Reason != roads.ReasonSafety {
+		t.Errorf("a hazard is red even on a partial answer: %s %v", c.Lamp, c.Reason)
+	}
+	f.sigs = f.sigs[:2]
+	if c, _ = roadService(f).MotorwayConditions(context.Background(), key("consumer", roadsScope, "r1", "r2"), roads.CorridorQuery{Road: "A8"}); c.Partial || c.Lamp != roads.LampAmber || *c.Reason != roads.ReasonNarrowing {
+		t.Errorf("a full answer with a narrowing: %s %v %v", c.Lamp, c.Reason, c.Partial)
 	}
 
 	f = &roadFake{road: roads.Road{Ref: "A8"}}
@@ -114,7 +139,7 @@ func TestMotorwayConditionsAreGatedAttributedAndLit(t *testing.T) {
 
 func TestRoadConditionsAnswerAnArea(t *testing.T) {
 	req.Covers(t, "FR-ROAD-006")
-	f := &roadFake{sits: []roads.Situation{{ID: "a", Family: "r2"}}, sevs: []roads.Severity{roads.SeverityRoadClosed}}
+	f := &roadFake{sits: []roads.Situation{{ID: "a", Family: "r2"}}, sigs: []roads.Signal{{Kind: roads.KindClosure, Severity: roads.SeverityRoadClosed}}}
 	q := roads.AreaQuery{RadiusM: 900, Classes: []roads.Class{roads.ClassUrban}}
 	c, err := roadService(f).RoadConditions(context.Background(), key("consumer", roadsScope, "r1", "r2"), q)
 	if err != nil {
@@ -122,6 +147,24 @@ func TestRoadConditionsAnswerAnArea(t *testing.T) {
 	}
 	if c.Road != nil || c.Lamp != roads.LampRed || c.HasMore || f.gotArea.RadiusM != 900 || !slices.Equal(names(c.Families), []string{"r2"}) {
 		t.Errorf("answer %+v, asked %+v", c, f.gotArea)
+	}
+}
+
+func TestTheLampSeesStaleFamilies(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004", "ENV-003")
+	// r1 contributed nothing and is stale: the sight is limited, so amber,
+	// while the attribution names only the family that answered.
+	f := &roadFake{sits: []roads.Situation{{ID: "a", Family: "r2"}}, stale: []string{"r1"}}
+	c, err := roadService(f).RoadConditions(context.Background(), key("consumer", roadsScope, "r1", "r2"), roads.AreaQuery{})
+	if err != nil || c.Lamp != roads.LampAmber || c.Reason == nil || *c.Reason != roads.ReasonStaleSource || !slices.Equal(names(c.Families), []string{"r2"}) {
+		t.Errorf("a stale family: %s %v %v, %v", c.Lamp, c.Reason, names(c.Families), err)
+	}
+	f = &roadFake{}
+	if c, err = roadService(f).RoadConditions(context.Background(), key("consumer", roadsScope, "r1", "r2"), roads.AreaQuery{}); err != nil || c.Lamp != roads.LampGreen || c.Reason != nil {
+		t.Errorf("every family fresh and nothing reported: %s %v, %v", c.Lamp, c.Reason, err)
+	}
+	if !slices.Equal(f.gotProv[0], []string{"r1", "r2"}) || len(f.gotProv) != 1 {
+		t.Errorf("the register was asked %v", f.gotProv)
 	}
 }
 
@@ -162,6 +205,10 @@ func TestOneSituationIsNeverPartial(t *testing.T) {
 	a, err := roadService(f).RoadSituation(ctx, key("commercial", roadsScope, "r1", "r2"), "ev-1")
 	if err != nil || len(a.Items) != 1 || a.Items[0].ID != "ev-1" || a.Partial || !slices.Equal(f.gotFamilies, []string{"r1"}) || !slices.Equal(names(a.Families), []string{"r1"}) || !a.At.Equal(now) {
 		t.Fatalf("answer %+v, asked %v, %v", a, f.gotFamilies, err)
+	}
+	// An ended situation answers for roads.ended_retention_h, then not.
+	if !f.gotSince.Equal(now.Add(-24 * time.Hour)) {
+		t.Errorf("asked for situations ended since %v", f.gotSince)
 	}
 	full := key("commercial", roadsScope, "r1")
 	for name, c := range map[string]struct {

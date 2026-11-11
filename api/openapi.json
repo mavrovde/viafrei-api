@@ -861,7 +861,7 @@
             "$ref": "#/components/schemas/Corridor"
           },
           "lamp": {
-            "description": "The lamp over every situation that answers the question, not only this page: red when one closes the road; amber when the worst is major or lane_closed, or one cannot be graded; green otherwise, also when there is none.",
+            "description": "The lamp over every situation that answers the question, not only this page, by the platform's motorway rule, first match: red for a closed carriageway, a safety message (a hazard, a major accident), a jam with a delay of 30 minutes or more, or severe weather (graded major); unknown when a roads family the key may not read was left out (meta.partial); amber for any other jam, narrowing roadworks, any other reported situation (also one that cannot be mapped or graded) or a missing or stale source (meta.freshness); green when nothing is reported and every source is fresh, which is no guarantee that the road is free.",
             "enum": [
               "green",
               "amber",
@@ -871,14 +871,17 @@
             "type": "string"
           },
           "lampReason": {
-            "description": "The severity that decided the lamp; null for green with no situation.",
+            "description": "Why the lamp has its colour, the first reason of the rule that applies; null for green. Open enumeration.",
             "enum": [
-              "info",
-              "minor",
-              "lane_closed",
-              "major",
               "road_closed",
-              "other",
+              "safety",
+              "long_jam",
+              "severe_weather",
+              "partial",
+              "jam",
+              "narrowing",
+              "warning",
+              "stale_source",
               null
             ],
             "type": [
@@ -1664,7 +1667,7 @@
             "$ref": "#/components/schemas/Area"
           },
           "lamp": {
-            "description": "The lamp over every situation that answers the question, not only this page: red when one closes the road; amber when the worst is major or lane_closed, or one cannot be graded; green otherwise, also when there is none.",
+            "description": "The lamp over every situation that answers the question, not only this page, by the platform's motorway rule, first match: red for a closed carriageway, a safety message (a hazard, a major accident), a jam with a delay of 30 minutes or more, or severe weather (graded major); unknown when a roads family the key may not read was left out (meta.partial); amber for any other jam, narrowing roadworks, any other reported situation (also one that cannot be mapped or graded) or a missing or stale source (meta.freshness); green when nothing is reported and every source is fresh, which is no guarantee that the road is free.",
             "enum": [
               "green",
               "amber",
@@ -1674,14 +1677,17 @@
             "type": "string"
           },
           "lampReason": {
-            "description": "The severity that decided the lamp; null for green with no situation.",
+            "description": "Why the lamp has its colour, the first reason of the rule that applies; null for green. Open enumeration.",
             "enum": [
-              "info",
-              "minor",
-              "lane_closed",
-              "major",
               "road_closed",
-              "other",
+              "safety",
+              "long_jam",
+              "severe_weather",
+              "partial",
+              "jam",
+              "narrowing",
+              "warning",
+              "stale_source",
               null
             ],
             "type": [
@@ -1835,11 +1841,6 @@
       "RoadSituation": {
         "additionalProperties": false,
         "properties": {
-          "atKm": {
-            "description": "Position along the road in kilometres, one decimal. Present on a road's conditions when the situation can be placed on the road.",
-            "format": "double",
-            "type": "number"
-          },
           "delayMin": {
             "description": "The published delay in minutes; null when not published.",
             "format": "int64",
@@ -1966,6 +1967,52 @@
               "null"
             ]
           },
+          "position": {
+            "additionalProperties": false,
+            "description": "Chainage along the road; null when the situation cannot be placed on its road, and on answers that are not about one road.",
+            "properties": {
+              "fromKm": {
+                "description": "Kilometre of the situation along the road, one decimal. A projection of its location onto the road's line, measured over the road's parts in their order and scaled to the road's published length; not a signed chainage.",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "junctionFrom": {
+                "description": "The junction before the situation; null while the service does not name junctions.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "junctionTo": {
+                "description": "The junction after the situation; null while the service does not name junctions.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "toKm": {
+                "description": "Kilometre where the situation ends; null while the service holds no extent along the road.",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "fromKm",
+              "toKm",
+              "junctionFrom",
+              "junctionTo"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "road": {
             "description": "The road reference without spaces (A8); null when the situation is on no numbered road.",
             "type": [
@@ -2036,6 +2083,7 @@
           "textLanguage",
           "updatedAt",
           "updatedAtLocal",
+          "position",
           "sourceFamily"
         ],
         "type": "object"

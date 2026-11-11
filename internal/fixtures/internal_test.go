@@ -28,6 +28,21 @@ func TestSourcePickerRefusesAMissingFamily(t *testing.T) {
 	t.Fatal("src returned without a source")
 }
 
+// TestFreshPickerRefusesAFamilyWithNoFreshSource: a planted row asks for a
+// fresh source of its family without a draw; a family whose only source is
+// stale stops the run by name.
+func TestFreshPickerRefusesAFamilyWithNoFreshSource(t *testing.T) {
+	g := &gen{sources: map[string][]source{"roads": {{ref: "src-alpha-roads-stale", family: "alpha", stale: true}}}}
+	defer func() {
+		msg, _ := recover().(string)
+		if !strings.Contains(msg, "no source alpha for roads") {
+			t.Fatalf("recover() = %q, want a panic naming the family and domain", msg)
+		}
+	}()
+	g.fresh("roads", "alpha")
+	t.Fatal("fresh returned without a source")
+}
+
 // TestAlongEndsOnTheLastPoint: a fraction past the end of the road clamps to
 // its last point instead of running off the polyline.
 func TestAlongEndsOnTheLastPoint(t *testing.T) {

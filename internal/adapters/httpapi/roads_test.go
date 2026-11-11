@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
@@ -52,7 +53,7 @@ func conditionsAnswer() features.Conditions {
 		Direction: roads.DirectionUnknown, From: fixedNow.Add(-time.Hour), Headline: "Hinweis", TextLanguage: "de",
 		UpdatedAt: fixedNow.Add(-time.Hour), DistanceM: ip(800),
 	}
-	reason := roads.SeverityRoadClosed
+	reason := roads.ReasonRoadClosed
 	return features.Conditions{
 		Answer: features.Answer[roads.Situation]{Items: []roads.Situation{closure(), bare}, HasMore: true, Families: []provenance.Family{roadFamily}, At: fixedNow},
 		Road:   &roads.Road{Ref: "A8", Class: roads.ClassMotorway, States: []string{"DE-BW", "DE-BY"}},
@@ -87,7 +88,7 @@ func TestMotorwayConditionsAnswer(t *testing.T) {
 	val, _ := s0["validity"].(map[string]any)
 	lanes, _ := s0["lanes"].(map[string]any)
 	loc, _ := s0["location"].(map[string]any)
-	if s0["kind"] != "closure" || s0["severity"] != "road_closed" || s0["road"] != "A8" || s0["directionText"] != "Salzburg" || s0["atKm"] != 41.3 ||
+	if s0["kind"] != "closure" || s0["severity"] != "road_closed" || s0["road"] != "A8" || s0["directionText"] != "Salzburg" ||
 		val["fromLocal"] != "2026-03-29T01:30:00+01:00" || val["untilLocal"] != "2026-03-30T05:30:00+02:00" ||
 		lanes["closed"] != 2.0 || loc["lat"] != 48.1 || s0["updatedAtLocal"] != "2026-03-29T03:28:00+02:00" || s0["sourceFamily"] != "src-alpha-roads" {
 		t.Errorf("first situation %v", s0)
@@ -95,8 +96,12 @@ func TestMotorwayConditionsAnswer(t *testing.T) {
 	if _, has := s0["distanceM"]; has {
 		t.Error("a corridor situation carries a distance")
 	}
+	pos, _ := s0["position"].(map[string]any)
+	if v, has := pos["junctionTo"]; pos["fromKm"] != 41.3 || pos["toKm"] != nil || pos["junctionFrom"] != nil || !has || v != nil {
+		t.Errorf("position %v", s0["position"])
+	}
 	v1, _ := s1["validity"].(map[string]any)
-	if s1["kind"] != "other" || s1["road"] != nil || s1["location"] != nil || s1["lanes"] != nil || v1["until"] != nil || v1["untilLocal"] != nil {
+	if p, has := s1["position"]; !has || p != nil || s1["kind"] != "other" || s1["road"] != nil || s1["location"] != nil || s1["lanes"] != nil || v1["until"] != nil || v1["untilLocal"] != nil {
 		t.Errorf("bare situation %v", s1)
 	}
 	m := meta(t, body)
@@ -185,5 +190,23 @@ func TestRoadInputsAreChecked(t *testing.T) {
 		"/v1/road-conditions", "/v1/road-conditions?at=48,11&road_class=lane", "/v1/road-situations/ev%201",
 	} {
 		assertProblem(t, do(t, h, http.MethodGet, target, bearer), 400, "invalid-parameter")
+	}
+}
+
+func TestMotorwayReferencesAreNormalised(t *testing.T) {
+	req.Covers(t, "FR-ROAD-001")
+	f := everyAnswer()
+	h := featureHandler(t, config.Defaults(), f, nil)
+	for _, target := range []string{"/v1/motorways/A08/conditions", "/v1/motorways/a%20008/conditions", "/v1/motorways/A8/conditions"} {
+		f.gotRoad = roads.CorridorQuery{}
+		if w := do(t, h, http.MethodGet, target, bearer); w.Code != http.StatusOK || f.gotRoad.Road != "A8" {
+			t.Errorf("%s: status %d, asked %q", target, w.Code, f.gotRoad.Road)
+		}
+	}
+	// The path pattern admits only what ParseRoad reads; Resolve refuses the
+	// rest on its own all the same.
+	in := &httpapi.MotorwayInput{Road: "C8"}
+	if errs := in.Resolve(nil); len(errs) != 1 {
+		t.Errorf("C8 resolved: %v", errs)
 	}
 }

@@ -148,10 +148,19 @@ func ParseRoad(s string) (string, error) {
 	return Canonical(s), nil
 }
 
-// Canonical writes a road reference without spaces and in upper case. A
+// Canonical writes a road reference without spaces, in upper case and
+// without leading zeros in its number (CONV-011: a08 and A 8 are A8). A
 // stored reference is shown in this form too.
 func Canonical(s string) string {
-	return strings.ToUpper(strings.ReplaceAll(s, " ", ""))
+	s = strings.ToUpper(strings.ReplaceAll(s, " ", ""))
+	if s == "" {
+		return s
+	}
+	number := strings.TrimLeft(s[1:], "0")
+	if number == "" && len(s) > 1 {
+		number = "0"
+	}
+	return s[:1] + number
 }
 
 // Road is a road the service holds.
@@ -190,7 +199,8 @@ type Situation struct {
 	TextLanguage string
 	UpdatedAt    time.Time
 	// AtKm is the situation's position along its road in kilometres, one
-	// decimal; nil where it cannot be placed on the road.
+	// decimal, projected onto the road's line; nil where it cannot be
+	// placed on the road.
 	AtKm *float64
 	// DistanceM is the distance from an asked position; nil when the
 	// question asked for none.
@@ -211,41 +221,134 @@ const (
 // Lamps lists every lamp an answer can carry.
 var Lamps = []Lamp{LampGreen, LampAmber, LampRed, LampUnknown}
 
-// LampOf is the lamp rule (FR-ROAD-004). It reads the severities of every
-// situation that answers the question, not only those on the page:
+// Signal is what the lamp reads of one situation that answers the question.
+type Signal struct {
+	Kind     Kind
+	Severity Severity
+	// DelayMin is the published delay; nil when none is published.
+	DelayMin *int
+}
+
+// SignalOf is the lamp's view of a situation.
+func SignalOf(s Situation) Signal {
+	return Signal{Kind: s.Kind, Severity: s.Severity, DelayMin: s.DelayMin}
+}
+
+// Reason says why the lamp has its colour. Open enumeration.
+type Reason string
+
+// The reasons, red ones first, each colour's in the order the rule tests
+// them.
+const (
+	// ReasonRoadClosed: a closure of the carriageway (severity road_closed,
+	// whatever the kind).
+	ReasonRoadClosed Reason = "road_closed"
+	// ReasonSafety: a safety message: a hazard on the road (a wrong-way
+	// driver, an object, a person or an animal), or an accident graded major.
+	ReasonSafety Reason = "safety"
+	// ReasonLongJam: a jam with a published delay of JamRedMin or more.
+	ReasonLongJam Reason = "long_jam"
+	// ReasonSevereWeather: a weather situation graded major, which stands
+	// for an official warning of level 3 or 4.
+	ReasonSevereWeather Reason = "severe_weather"
+	// ReasonPartial: a roads family the key may not read was left out, so
+	// the service cannot say the road is clear (lamp unknown).
+	ReasonPartial Reason = "partial"
+	// ReasonJam: a shorter jam, or one with no published delay.
+	ReasonJam Reason = "jam"
+	// ReasonNarrowing: roadworks that close a lane or more (lane_closed or
+	// major).
+	ReasonNarrowing Reason = "narrowing"
+	// ReasonWarning: any other situation the publisher reports, including
+	// one whose kind or severity cannot be mapped.
+	ReasonWarning Reason = "warning"
+	// ReasonStaleSource: a roads family the answer read has no data or
+	// stale data, so the sight is limited.
+	ReasonStaleSource Reason = "stale_source"
+)
+
+// Reasons lists every reason, in the order above.
+var Reasons = []Reason{ReasonRoadClosed, ReasonSafety, ReasonLongJam, ReasonSevereWeather, ReasonPartial,
+	ReasonJam, ReasonNarrowing, ReasonWarning, ReasonStaleSource}
+
+// JamRedMin is the delay from which a jam makes the lamp red, in minutes;
+// the platform's motorway lamp uses the same threshold.
+const JamRedMin = 30
+
+// signal returns the colour one situation gives on its own and why; the
+// empty lamp when it gives none (roadworks that narrow no lane). This is the
+// documented mapping of the service's codes onto the platform's motorway
+// lamp:
 //
-//   - red when any situation closes the road (road_closed);
-//   - amber when the worst is major or lane_closed, or when a situation's
-//     severity cannot be graded (other), since an effect the service cannot
-//     grade is never shown as green;
-//   - green when the worst is minor or info, or when there is none.
+//	severity road_closed                 red    road_closed
+//	kind hazard                          red    safety
+//	kind accident, severity major        red    safety
+//	kind jam, delay >= JamRedMin         red    long_jam
+//	kind weather, severity major         red    severe_weather
+//	kind jam, otherwise                  amber  jam
+//	kind roadworks, lane_closed or major amber  narrowing
+//	kind roadworks, info or minor        none
+//	anything else, also unmapped codes   amber  warning
 //
-// The reason is the severity that decided the lamp: the worst graded one, or
-// other when an ungraded one made the lamp amber; nil for a green lamp with
-// no situation.
-func LampOf(severities []Severity) (Lamp, *Severity) {
-	var worst *Severity
-	ungraded := false
-	for _, s := range severities {
-		if s.Rank() == 0 {
-			ungraded = true
+// A situation the service cannot grade (severity other) is never green.
+func signal(s Signal) (Lamp, Reason) {
+	switch {
+	case s.Severity == SeverityRoadClosed:
+		return LampRed, ReasonRoadClosed
+	case s.Kind == KindHazard, s.Kind == KindAccident && s.Severity == SeverityMajor:
+		return LampRed, ReasonSafety
+	case s.Kind == KindJam && s.DelayMin != nil && *s.DelayMin >= JamRedMin:
+		return LampRed, ReasonLongJam
+	case s.Kind == KindWeather && s.Severity == SeverityMajor:
+		return LampRed, ReasonSevereWeather
+	case s.Kind == KindJam:
+		return LampAmber, ReasonJam
+	case s.Kind == KindRoadworks && (s.Severity == SeverityLaneClosed || s.Severity == SeverityMajor):
+		return LampAmber, ReasonNarrowing
+	case s.Kind == KindRoadworks && s.Severity != SeverityOther:
+		return "", ""
+	default:
+		return LampAmber, ReasonWarning
+	}
+}
+
+// LampOf is the lamp rule (FR-ROAD-004), the platform's motorway lamp. It
+// reads every situation that answers the question, not only those on the
+// page, whether the answer is partial and whether a family it read is stale;
+// first match from the top:
+//
+//   - red when a situation gives red (see signal);
+//   - unknown when the answer is partial: a family the key may not read
+//     could hold a closure, so the road is never shown amber or green;
+//   - amber when a situation gives amber, or when a family read is missing
+//     or stale (limited sight);
+//   - green otherwise: nothing reported and every family fresh. Green is
+//     never a guarantee that the road is free.
+//
+// The reason is the first in Reasons that decided the colour; nil for green.
+func LampOf(signals []Signal, partial, stale bool) (Lamp, *Reason) {
+	best := -1
+	for _, s := range signals {
+		lamp, reason := signal(s)
+		if lamp == "" {
 			continue
 		}
-		if worst == nil || s.Rank() > worst.Rank() {
-			v := s
-			worst = &v
+		if i := slices.Index(Reasons, reason); best < 0 || i < best {
+			best = i
 		}
 	}
+	pick := func(lamp Lamp, r Reason) (Lamp, *Reason) { return lamp, &r }
 	switch {
-	case worst != nil && *worst == SeverityRoadClosed:
-		return LampRed, worst
-	case worst != nil && worst.Rank() >= SeverityLaneClosed.Rank():
-		return LampAmber, worst
-	case ungraded:
-		other := SeverityOther
-		return LampAmber, &other
+	case best >= 0 && best < slices.Index(Reasons, ReasonPartial):
+		return pick(LampRed, Reasons[best])
+	case partial:
+		return pick(LampUnknown, ReasonPartial)
+	case best >= 0:
+		return pick(LampAmber, Reasons[best])
+	case stale:
+		return pick(LampAmber, ReasonStaleSource)
 	default:
-		return LampGreen, worst
+		return LampGreen, nil
 	}
 }
 

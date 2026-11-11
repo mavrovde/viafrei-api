@@ -2,9 +2,11 @@ package features
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 )
 
@@ -15,17 +17,17 @@ type Roads interface {
 	Road(ctx context.Context, ref string) (roads.Road, error)
 	// SituationsOnRoad returns up to q.Limit active situations on the road
 	// of the given families, in the order of their position along it, the
-	// severities of every situation that answers the question, and whether
-	// there are more.
-	SituationsOnRoad(ctx context.Context, q roads.CorridorQuery, families []string, now time.Time) ([]roads.Situation, []roads.Severity, bool, error)
+	// lamp's signals of every situation that answers the question, and
+	// whether there are more.
+	SituationsOnRoad(ctx context.Context, q roads.CorridorQuery, families []string, now time.Time) ([]roads.Situation, []roads.Signal, bool, error)
 	// SituationsNear returns up to q.Limit active situations within the
-	// radius of the given families, by severity then distance, the
-	// severities of every situation that answers the question, and whether
+	// radius of the given families, by severity then distance, the lamp's
+	// signals of every situation that answers the question, and whether
 	// there are more.
-	SituationsNear(ctx context.Context, q roads.AreaQuery, families []string, now time.Time) ([]roads.Situation, []roads.Severity, bool, error)
-	// Situation returns one situation of the given families, active or
-	// ended, or roads.ErrUnknownSituation.
-	Situation(ctx context.Context, id string, families []string) (roads.Situation, error)
+	SituationsNear(ctx context.Context, q roads.AreaQuery, families []string, now time.Time) ([]roads.Situation, []roads.Signal, bool, error)
+	// Situation returns one situation of the given families that is active
+	// or ended after endedSince, or roads.ErrUnknownSituation.
+	Situation(ctx context.Context, id string, families []string, endedSince time.Time) (roads.Situation, error)
 }
 
 // Conditions is the answer about the situations of a road or an area: the
@@ -35,12 +37,14 @@ type Conditions struct {
 	// Road is the road asked about; nil for an area.
 	Road   *roads.Road
 	Lamp   roads.Lamp
-	Reason *roads.Severity
+	Reason *roads.Reason
 }
 
 // conditions reads a page of situations of the permitted roads families,
-// post-checks and attributes it, and computes the lamp.
-func (s *Service) conditions(ctx context.Context, key access.Record, read func(families []string, now time.Time) ([]roads.Situation, []roads.Severity, bool, error)) (Conditions, error) {
+// post-checks and attributes it, and computes the lamp over every situation
+// that answers, whether the answer is partial and whether any permitted
+// family is missing or stale.
+func (s *Service) conditions(ctx context.Context, key access.Record, read func(families []string, now time.Time) ([]roads.Situation, []roads.Signal, bool, error)) (Conditions, error) {
 	reg, gate, err := s.gate(ctx, key)
 	if err != nil {
 		return Conditions{}, err
@@ -50,7 +54,7 @@ func (s *Service) conditions(ctx context.Context, key access.Record, read func(f
 		return Conditions{}, err
 	}
 	now := s.now()
-	sits, severities, more, err := read(permitted, now)
+	sits, signals, more, err := read(permitted, now)
 	if err != nil {
 		return Conditions{}, err
 	}
@@ -61,11 +65,23 @@ func (s *Service) conditions(ctx context.Context, key access.Record, read func(f
 	if err := gate.Check(contributed); err != nil {
 		return Conditions{}, err
 	}
-	fams, err := s.provenanceOf(ctx, contributed, permitted)
+	// Every permitted family is read once: all of them for the lamp's
+	// freshness, those that contributed (or all, when none did) for the
+	// attribution. The post-check above keeps contributed inside permitted.
+	consulted := slices.Clone(permitted)
+	slices.Sort(consulted)
+	all, err := s.repos.Register.Provenance(ctx, slices.Compact(consulted), s.set.Language)
 	if err != nil {
 		return Conditions{}, err
 	}
-	lamp, reason := roads.LampOf(severities)
+	stale, fams := false, []provenance.Family{}
+	for _, f := range all {
+		stale = stale || f.Assess(now).Stale
+		if len(contributed) == 0 || slices.Contains(contributed, f.Source.Family) {
+			fams = append(fams, f)
+		}
+	}
+	lamp, reason := roads.LampOf(signals, partial, stale)
 	return Conditions{
 		Answer: Answer[roads.Situation]{Items: sits, HasMore: more, Families: fams, Partial: partial, At: now},
 		Lamp:   lamp, Reason: reason,
@@ -81,7 +97,7 @@ func (s *Service) MotorwayConditions(ctx context.Context, key access.Record, q r
 		return Conditions{}, err
 	}
 	q.Road = road.Ref
-	c, err := s.conditions(ctx, key, func(fams []string, now time.Time) ([]roads.Situation, []roads.Severity, bool, error) {
+	c, err := s.conditions(ctx, key, func(fams []string, now time.Time) ([]roads.Situation, []roads.Signal, bool, error) {
 		return s.repos.Roads.SituationsOnRoad(ctx, q, fams, now)
 	})
 	if err != nil {
@@ -94,13 +110,14 @@ func (s *Service) MotorwayConditions(ctx context.Context, key access.Record, q r
 // RoadConditions answers "what is happening on the roads near here" for key
 // (FR-ROAD-006).
 func (s *Service) RoadConditions(ctx context.Context, key access.Record, q roads.AreaQuery) (Conditions, error) {
-	return s.conditions(ctx, key, func(fams []string, now time.Time) ([]roads.Situation, []roads.Severity, bool, error) {
+	return s.conditions(ctx, key, func(fams []string, now time.Time) ([]roads.Situation, []roads.Signal, bool, error) {
 		return s.repos.Roads.SituationsNear(ctx, q, fams, now)
 	})
 }
 
-// RoadSituation answers "what is this situation" for key: one situation,
-// active or ended, of a permitted roads family.
+// RoadSituation answers "what is this situation" for key: one situation of
+// a permitted roads family, active or ended less than
+// Settings.EndedRetention ago; one ended longer ago is not found.
 func (s *Service) RoadSituation(ctx context.Context, key access.Record, id string) (Answer[roads.Situation], error) {
 	reg, gate, err := s.gate(ctx, key)
 	if err != nil {
@@ -112,7 +129,8 @@ func (s *Service) RoadSituation(ctx context.Context, key access.Record, id strin
 	if err != nil {
 		return Answer[roads.Situation]{}, err
 	}
-	sit, err := s.repos.Roads.Situation(ctx, id, permitted)
+	now := s.now()
+	sit, err := s.repos.Roads.Situation(ctx, id, permitted, now.Add(-s.set.EndedRetention))
 	if err != nil {
 		return Answer[roads.Situation]{}, err
 	}
@@ -123,5 +141,5 @@ func (s *Service) RoadSituation(ctx context.Context, key access.Record, id strin
 	if err != nil {
 		return Answer[roads.Situation]{}, err
 	}
-	return Answer[roads.Situation]{Items: []roads.Situation{sit}, Families: fams, At: s.now()}, nil
+	return Answer[roads.Situation]{Items: []roads.Situation{sit}, Families: fams, At: now}, nil
 }

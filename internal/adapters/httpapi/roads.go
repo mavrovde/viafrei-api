@@ -45,28 +45,36 @@ type Lanes struct {
 	Total  *int `json:"total" nullable:"true" doc:"Lanes in total; null when not published."`
 }
 
+// RoadPosition is where a situation lies along its road (chainage).
+type RoadPosition struct {
+	FromKm       *float64 `json:"fromKm" nullable:"true" doc:"Kilometre of the situation along the road, one decimal. A projection of its location onto the road's line, measured over the road's parts in their order and scaled to the road's published length; not a signed chainage."`
+	ToKm         *float64 `json:"toKm" nullable:"true" doc:"Kilometre where the situation ends; null while the service holds no extent along the road."`
+	JunctionFrom *string  `json:"junctionFrom" nullable:"true" doc:"The junction before the situation; null while the service does not name junctions."`
+	JunctionTo   *string  `json:"junctionTo" nullable:"true" doc:"The junction after the situation; null while the service does not name junctions."`
+}
+
 // RoadSituation is anything that affects travel on a road.
 type RoadSituation struct {
-	ID             string     `json:"id"`
-	Kind           string     `json:"kind" enum:"closure,roadworks,jam,accident,hazard,restriction,weather,other" doc:"What it is. Open enumeration; treat an unknown value as other."`
-	Severity       string     `json:"severity" enum:"info,minor,lane_closed,major,road_closed,other" doc:"Effect on traffic, ordered info < minor < lane_closed < major < road_closed; other when it cannot be graded. Open enumeration."`
-	Road           *string    `json:"road" nullable:"true" doc:"The road reference without spaces (A8); null when the situation is on no numbered road."`
-	RoadType       string     `json:"roadType" enum:"motorway,federal,state,urban,other" doc:"The class of the road. Open enumeration; treat an unknown value as other."`
-	Direction      string     `json:"direction" enum:"north,east,south,west,both,unknown" doc:"The affected carriageway."`
-	DirectionText  *string    `json:"directionText" nullable:"true" doc:"The signed destination of the carriageway, as published."`
-	Location       *Position  `json:"location" doc:"Where it is; null when not published."`
-	Validity       TimeWindow `json:"validity"`
-	Lanes          *Lanes     `json:"lanes" doc:"Closed and total lanes; null when neither is published."`
-	DelayMin       *int       `json:"delayMin" nullable:"true" doc:"The published delay in minutes; null when not published."`
-	LengthM        *int       `json:"lengthM" nullable:"true" doc:"The published length in metres; null when not published."`
-	Headline       string     `json:"headline" doc:"Plain text, in textLanguage."`
-	Description    *string    `json:"description" nullable:"true" doc:"Plain text, in textLanguage; null when not published."`
-	TextLanguage   string     `json:"textLanguage" doc:"The language of headline and description (BCP 47)."`
-	UpdatedAt      time.Time  `json:"updatedAt" doc:"When the situation last changed."`
-	UpdatedAtLocal string     `json:"updatedAtLocal" format:"date-time" doc:"updatedAt in Europe/Berlin time."`
-	AtKm           *float64   `json:"atKm,omitempty" doc:"Position along the road in kilometres, one decimal. Present on a road's conditions when the situation can be placed on the road."`
-	DistanceM      *int       `json:"distanceM,omitempty" doc:"Distance from the asked position in metres. Present on the conditions near a position."`
-	SourceFamily   string     `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
+	ID             string        `json:"id"`
+	Kind           string        `json:"kind" enum:"closure,roadworks,jam,accident,hazard,restriction,weather,other" doc:"What it is. Open enumeration; treat an unknown value as other."`
+	Severity       string        `json:"severity" enum:"info,minor,lane_closed,major,road_closed,other" doc:"Effect on traffic, ordered info < minor < lane_closed < major < road_closed; other when it cannot be graded. Open enumeration."`
+	Road           *string       `json:"road" nullable:"true" doc:"The road reference without spaces (A8); null when the situation is on no numbered road."`
+	RoadType       string        `json:"roadType" enum:"motorway,federal,state,urban,other" doc:"The class of the road. Open enumeration; treat an unknown value as other."`
+	Direction      string        `json:"direction" enum:"north,east,south,west,both,unknown" doc:"The affected carriageway."`
+	DirectionText  *string       `json:"directionText" nullable:"true" doc:"The signed destination of the carriageway, as published."`
+	Location       *Position     `json:"location" doc:"Where it is; null when not published."`
+	Validity       TimeWindow    `json:"validity"`
+	Lanes          *Lanes        `json:"lanes" doc:"Closed and total lanes; null when neither is published."`
+	DelayMin       *int          `json:"delayMin" nullable:"true" doc:"The published delay in minutes; null when not published."`
+	LengthM        *int          `json:"lengthM" nullable:"true" doc:"The published length in metres; null when not published."`
+	Headline       string        `json:"headline" doc:"Plain text, in textLanguage."`
+	Description    *string       `json:"description" nullable:"true" doc:"Plain text, in textLanguage; null when not published."`
+	TextLanguage   string        `json:"textLanguage" doc:"The language of headline and description (BCP 47)."`
+	UpdatedAt      time.Time     `json:"updatedAt" doc:"When the situation last changed."`
+	UpdatedAtLocal string        `json:"updatedAtLocal" format:"date-time" doc:"updatedAt in Europe/Berlin time."`
+	Position       *RoadPosition `json:"position" doc:"Chainage along the road; null when the situation cannot be placed on its road, and on answers that are not about one road."`
+	DistanceM      *int          `json:"distanceM,omitempty" doc:"Distance from the asked position in metres. Present on the conditions near a position."`
+	SourceFamily   string        `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
 }
 
 func roadSituation(v roads.Situation) RoadSituation {
@@ -75,7 +83,10 @@ func roadSituation(v roads.Situation) RoadSituation {
 		Direction: string(v.Direction), DirectionText: v.Towards, Validity: timeWindow(v.From, v.Until),
 		DelayMin: v.DelayMin, LengthM: v.LengthM, Headline: v.Headline, Description: v.Description,
 		TextLanguage: v.TextLanguage, UpdatedAt: v.UpdatedAt.UTC(), UpdatedAtLocal: local(v.UpdatedAt),
-		AtKm: v.AtKm, DistanceM: v.DistanceM, SourceFamily: v.Family,
+		DistanceM: v.DistanceM, SourceFamily: v.Family,
+	}
+	if v.AtKm != nil {
+		out.Position = &RoadPosition{FromKm: v.AtKm}
 	}
 	if v.Location != nil {
 		p := position(*v.Location)
@@ -95,7 +106,7 @@ func roadSituations(list []roads.Situation) []RoadSituation {
 	return out
 }
 
-func lampReason(r *roads.Severity) *string {
+func lampReason(r *roads.Reason) *string {
 	if r == nil {
 		return nil
 	}
@@ -139,6 +150,18 @@ type MotorwayInput struct {
 	Direction string `query:"direction" enum:"north,east,south,west,both" default:"both" doc:"The carriageway; both keeps every situation. A direction keeps that carriageway's situations, those on both and those whose direction is unknown."`
 	SituationFilters
 	Limit int `query:"limit" minimum:"1" maximum:"100" doc:"Most situations to return. Default: pagination.default_limit."`
+	road  string
+}
+
+// Resolve reads the road reference into its canonical form (CONV-011; huma
+// calls it after the schema checks).
+func (in *MotorwayInput) Resolve(huma.Context) []error {
+	road, err := roads.ParseRoad(in.Road)
+	if err != nil {
+		return []error{&huma.ErrorDetail{Location: "path.road", Message: err.Error(), Value: in.Road}}
+	}
+	in.road = road
+	return nil
 }
 
 // Corridor is the road a conditions answer is about.
@@ -152,8 +175,8 @@ type Corridor struct {
 // MotorwayData is the answer of getMotorwayConditions.
 type MotorwayData struct {
 	Corridor   Corridor        `json:"corridor"`
-	Lamp       string          `json:"lamp" enum:"green,amber,red,unknown" doc:"The lamp over every situation that answers the question, not only this page: red when one closes the road; amber when the worst is major or lane_closed, or one cannot be graded; green otherwise, also when there is none."`
-	LampReason *string         `json:"lampReason" nullable:"true" enum:"info,minor,lane_closed,major,road_closed,other" doc:"The severity that decided the lamp; null for green with no situation."`
+	Lamp       string          `json:"lamp" enum:"green,amber,red,unknown" doc:"The lamp over every situation that answers the question, not only this page, by the platform's motorway rule, first match: red for a closed carriageway, a safety message (a hazard, a major accident), a jam with a delay of 30 minutes or more, or severe weather (graded major); unknown when a roads family the key may not read was left out (meta.partial); amber for any other jam, narrowing roadworks, any other reported situation (also one that cannot be mapped or graded) or a missing or stale source (meta.freshness); green when nothing is reported and every source is fresh, which is no guarantee that the road is free."`
+	LampReason *string         `json:"lampReason" nullable:"true" enum:"road_closed,safety,long_jam,severe_weather,partial,jam,narrowing,warning,stale_source" doc:"Why the lamp has its colour, the first reason of the rule that applies; null for green. Open enumeration."`
 	Situations []RoadSituation `json:"situations" doc:"Ordered by position along the road (those that cannot be placed last), then severity descending, then id."`
 }
 
@@ -192,8 +215,7 @@ func registerMotorwayConditions(api huma.API, s *server, op huma.Operation) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
-		road, _ := roads.ParseRoad(in.Road) // the path pattern admits only references ParseRoad reads
-		q := roads.CorridorQuery{Road: road, Direction: roads.Direction(in.Direction), Filter: in.filter(), Limit: s.limit(in.Limit)}
+		q := roads.CorridorQuery{Road: in.road, Direction: roads.Direction(in.Direction), Filter: in.filter(), Limit: s.limit(in.Limit)}
 		c, err := s.features.MotorwayConditions(ctx, principalFrom(ctx).Key, q)
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
@@ -233,8 +255,8 @@ type Area struct {
 // RoadConditionsData is the answer of listRoadConditions.
 type RoadConditionsData struct {
 	Area       Area            `json:"area"`
-	Lamp       string          `json:"lamp" enum:"green,amber,red,unknown" doc:"The lamp over every situation that answers the question, not only this page: red when one closes the road; amber when the worst is major or lane_closed, or one cannot be graded; green otherwise, also when there is none."`
-	LampReason *string         `json:"lampReason" nullable:"true" enum:"info,minor,lane_closed,major,road_closed,other" doc:"The severity that decided the lamp; null for green with no situation."`
+	Lamp       string          `json:"lamp" enum:"green,amber,red,unknown" doc:"The lamp over every situation that answers the question, not only this page, by the platform's motorway rule, first match: red for a closed carriageway, a safety message (a hazard, a major accident), a jam with a delay of 30 minutes or more, or severe weather (graded major); unknown when a roads family the key may not read was left out (meta.partial); amber for any other jam, narrowing roadworks, any other reported situation (also one that cannot be mapped or graded) or a missing or stale source (meta.freshness); green when nothing is reported and every source is fresh, which is no guarantee that the road is free."`
+	LampReason *string         `json:"lampReason" nullable:"true" enum:"road_closed,safety,long_jam,severe_weather,partial,jam,narrowing,warning,stale_source" doc:"Why the lamp has its colour, the first reason of the rule that applies; null for green. Open enumeration."`
 	Situations []RoadSituation `json:"situations" doc:"Ordered by severity descending, then distance, then id."`
 }
 

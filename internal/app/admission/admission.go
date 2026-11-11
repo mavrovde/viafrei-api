@@ -110,6 +110,10 @@ func callerFrom(ctx context.Context) Caller {
 	return c
 }
 
+// TierOf returns the tier the storage reads under ctx are admitted in: the
+// caller's, or critical for a read without one.
+func TierOf(ctx context.Context) Tier { return callerFrom(ctx).Tier }
+
 type tallyKey struct{}
 
 // WithTally returns ctx counting the storage time of its reads, for usage

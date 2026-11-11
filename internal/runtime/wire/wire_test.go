@@ -33,3 +33,15 @@ func TestFeatureSettings(t *testing.T) {
 		t.Fatal("IsTimeout is not the store's deadline test")
 	}
 }
+
+func TestSharedBudget(t *testing.T) {
+	cfg := config.Defaults()
+	if b := wire.SharedBudget(cfg); b.Slots != 0 || b.LockSpace != 7301 || b.CriticalReserved != 1 || b.MaxWait != 200*time.Millisecond ||
+		b.RetryInterval != 10*time.Millisecond || b.RetryAfter != time.Second {
+		t.Fatalf("defaults: %+v", b)
+	}
+	cfg.DB.SharedBudget.Slots, cfg.DB.SharedBudget.LockSpace = 12, 99
+	if b := wire.SharedBudget(cfg); b.Slots != 12 || b.LockSpace != 99 {
+		t.Fatalf("carried: %+v", b)
+	}
+}

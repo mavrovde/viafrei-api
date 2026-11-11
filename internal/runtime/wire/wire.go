@@ -54,3 +54,16 @@ func FeatureSettings(cfg *config.Config) features.Settings {
 // Language is the language of every answer's texts until language
 // negotiation arrives.
 const Language = "en"
+
+// SharedBudget reads the db.shared_budget.* settings (NFR-CAP-002).
+func SharedBudget(cfg *config.Config) store.SharedBudget {
+	b := cfg.DB.SharedBudget
+	return store.SharedBudget{
+		Slots:            b.Slots,
+		LockSpace:        int32(b.LockSpace), // #nosec G115 -- bounded 1..2147483647 by the declaration
+		CriticalReserved: b.CriticalReserved,
+		MaxWait:          b.MaxWait,
+		RetryInterval:    b.RetryInterval,
+		RetryAfter:       b.RetryAfter,
+	}
+}

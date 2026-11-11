@@ -43,3 +43,20 @@ func TestAFloatKeyReadsEveryNumberShape(t *testing.T) {
 	_, err = config.Load(config.Options{Environ: []string{"VFAPI_ADMISSION_EWMA_ALPHA=half"}})
 	assertRefused(t, err, `admission.ewma_alpha: "half" is not a number`)
 }
+
+func TestTheSharedBudgetLeavesASlotAndEndsInsideTheDeadline(t *testing.T) {
+	req.Covers(t, "CFG-004", "NFR-CAP-002")
+	_, err := config.Load(config.Options{Environ: []string{
+		"VFAPI_DB_SHARED_BUDGET_SLOTS=2",
+		"VFAPI_DB_SHARED_BUDGET_CRITICAL_RESERVED=2",
+		"VFAPI_DEADLINE_REQUEST=1s",
+		"VFAPI_DB_SHARED_BUDGET_MAX_WAIT=1s",
+	}})
+	assertRefused(t, err,
+		"db.shared_budget.critical_reserved: 2 leaves no slot of db.shared_budget.slots 2 to the other tiers",
+		"db.shared_budget.max_wait: 1s must be less than deadline.request 1s",
+	)
+	if _, err := config.Load(config.Options{Environ: []string{"VFAPI_DB_SHARED_BUDGET_CRITICAL_RESERVED=5"}}); err != nil {
+		t.Errorf("a reserve is not checked while the budget is off: %v", err)
+	}
+}

@@ -28,6 +28,12 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `db.statement_timeout_floor` | `VFAPI_DB_STATEMENT_TIMEOUT_FLOOR` | duration | `50ms` | 10ms to 1s | Smallest useful remaining budget; below it a read is refused without touching storage. |
 | `db.cancel_grace` | `VFAPI_DB_CANCEL_GRACE` | duration | `100ms` | 10ms to 1s | Time a cancel request gets to land before the connection is abandoned. |
 | `db.application_name` | `VFAPI_DB_APPLICATION_NAME` | string | `viafrei-api` | at most 63 characters | application_name reported to the database. |
+| `db.shared_budget.slots` | `VFAPI_DB_SHARED_BUDGET_SLOTS` | int | `0` | 0 to 1024 | Statements all readers sharing db.shared_budget.lock_space may run at once; each read of this service holds one slot to the end of its transaction. 0 switches the shared budget off. |
+| `db.shared_budget.lock_space` | `VFAPI_DB_SHARED_BUDGET_LOCK_SPACE` | int | `7301` | 1 to 2147483647 | First key of the two-key advisory locks the slots are (the second is the slot number, 1 to db.shared_budget.slots). Every reader sharing the budget names the same value. |
+| `db.shared_budget.critical_reserved` | `VFAPI_DB_SHARED_BUDGET_CRITICAL_RESERVED` | int | `1` | 0 to 1024 | The highest-numbered slots, which only a read of the critical tier may take. Less than db.shared_budget.slots. |
+| `db.shared_budget.max_wait` | `VFAPI_DB_SHARED_BUDGET_MAX_WAIT` | duration | `200ms` | 0s to 2s | Longest time a read waits for a free slot before it is refused overloaded with Retry-After. Less than deadline.request. |
+| `db.shared_budget.retry_interval` | `VFAPI_DB_SHARED_BUDGET_RETRY_INTERVAL` | duration | `10ms` | 1ms to 500ms | Pause between two attempts to take a slot while every slot is held. |
+| `db.shared_budget.retry_after` | `VFAPI_DB_SHARED_BUDGET_RETRY_AFTER` | duration | `1s` | 1s to 60s | Retry-After of a read refused because no slot came free in db.shared_budget.max_wait. |
 | `deadline.request` | `VFAPI_DEADLINE_REQUEST` | duration | `2s` | 200ms to 2s | Hard deadline of every request (NFR-PERF-001). |
 | `deadline.reserve` | `VFAPI_DEADLINE_RESERVE` | duration | `50ms` | 0s to 500ms | Margin kept back from the deadline when the statement timeout is set. Less than deadline.request. |
 | `contract.expected` | `VFAPI_CONTRACT_EXPECTED` | string | empty | major.minor | Read-contract version (major.minor) this instance requires; empty means the version built in. Readiness fails on another major or an older minor. |

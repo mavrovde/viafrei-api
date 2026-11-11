@@ -20,7 +20,7 @@ case "$*" in
 *"state <> 'idle'"*) echo 0 ;;
 *pg_stat_activity*) echo "2|0" ;;
 *"ps -q api"*) echo c1 ;;
-*"top c1"*) printf 'RSS\n2048\n' ;;
+*"top c1"*) printf 'PID RSS\n7 2048\n' ;;
 esac
 `
 

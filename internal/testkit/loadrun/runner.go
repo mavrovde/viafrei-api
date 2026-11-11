@@ -264,15 +264,20 @@ func (r *runner) rss(ctx context.Context) (int64, error) {
 	if id = strings.TrimSpace(id); id == "" {
 		return 0, fmt.Errorf("docker compose ps: %w: no api container", errNoSample)
 	}
-	// docker compose top takes no ps options; the plain docker top does.
-	out, err := r.host(ctx, "top", id, "-o", "rss")
+	// docker compose top takes no ps options; the plain docker top does,
+	// and it needs the pid column to map the processes.
+	out, err := r.host(ctx, "top", id, "-o", "pid,rss")
 	if err != nil {
 		return 0, err
 	}
 	var total int64
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	for _, l := range lines[1:] {
-		kb, err := strconv.ParseInt(strings.TrimSpace(l), 10, 64)
+		f := strings.Fields(l)
+		if len(f) != 2 {
+			return 0, fmt.Errorf("docker top: %w %q", errNoSample, l)
+		}
+		kb, err := strconv.ParseInt(f[1], 10, 64)
 		if err != nil {
 			return 0, fmt.Errorf("docker top: %w %q", errNoSample, l)
 		}

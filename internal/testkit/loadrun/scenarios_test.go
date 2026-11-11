@@ -80,7 +80,7 @@ func TestSoakFailsWithoutItsReadings(t *testing.T) {
 	rss.Store(1000)
 	w.dock.answer = func(a string) (string, error) {
 		if strings.HasPrefix(a, "top") {
-			return "RSS\n" + strconv.FormatInt(rss.Add(100), 10) + "\n", nil
+			return "PID RSS\n7 " + strconv.FormatInt(rss.Add(100), 10) + "\n", nil
 		}
 		return healthyDocker(a)
 	}
@@ -125,11 +125,20 @@ func lockedWorld(t *testing.T, shed func(http.ResponseWriter)) *world {
 		healthyAPI(rw, r)
 	}, nil)
 	w.dock.answer = func(a string) (string, error) {
-		if strings.Contains(a, "begin; lock table") {
+		switch {
+		case strings.Contains(a, "begin; lock table"):
+			// Held well past the scenario's 40 ms of load, so a slow
+			// runner still sends every request under the lock.
 			locked.Store(true)
-			time.Sleep(60 * time.Millisecond)
+			time.Sleep(150 * time.Millisecond)
 			locked.Store(false)
 			return "", nil
+		case strings.Contains(a, "pg_locks"):
+			// The lock is seen only once it is taken, as in the database.
+			if locked.Load() {
+				return "1\n", nil
+			}
+			return "0\n", nil
 		}
 		return healthyDocker(a)
 	}

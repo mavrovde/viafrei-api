@@ -73,8 +73,8 @@ func healthyDocker(a string) (string, error) {
 		return "", nil
 	case a == "ps -q api":
 		return "c1\n", nil
-	case a == "top c1 -o rss":
-		return "RSS\n2048\n1024\n", nil
+	case a == "top c1 -o pid,rss":
+		return "PID RSS\n7 2048\n9 1024\n", nil
 	}
 	return "", nil
 }

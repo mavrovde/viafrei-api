@@ -118,7 +118,8 @@ func TestDatabaseReads(t *testing.T) {
 
 	for name, answer := range map[string]func(string) (string, error){
 		"docker fails": func(string) (string, error) { return "", errFake },
-		"garbage":      func(string) (string, error) { return "RSS\nmany\n", nil },
+		"garbage":      func(string) (string, error) { return "PID RSS\n7 many\n", nil },
+		"one column":   func(string) (string, error) { return "PID RSS\n2048\n", nil },
 	} {
 		w.dock.answer = answer
 		if _, err := w.r.backends(ctx); err == nil {
@@ -143,7 +144,7 @@ func TestDatabaseReads(t *testing.T) {
 			if a == "ps -q api" {
 				return "c1", nil
 			}
-			return "RSS\n", nil
+			return "PID RSS\n", nil
 		},
 	} {
 		w.dock.answer = top

@@ -60,9 +60,10 @@ func poolConfig(t *testing.T, cfg *config.Config) string {
 		t.Fatal(err)
 	}
 	h := pc.ConnConfig.BuildContextWatcherHandler(nil)
-	return fmt.Sprintf("%s:%d max=%d min=%d connect=%s life=%s idle=%s app=%s watcher=%+v",
+	return fmt.Sprintf("%s:%d max=%d min=%d connect=%s life=%s idle=%s app=%s watcher=%+v mode=%s statements=%d descriptions=%d",
 		pc.ConnConfig.Host, pc.ConnConfig.Port, pc.MaxConns, pc.MinConns, pc.ConnConfig.ConnectTimeout,
-		pc.MaxConnLifetime, pc.MaxConnIdleTime, pc.ConnConfig.RuntimeParams["application_name"], h)
+		pc.MaxConnLifetime, pc.MaxConnIdleTime, pc.ConnConfig.RuntimeParams["application_name"], h,
+		pc.ConnConfig.DefaultQueryExecMode, pc.ConnConfig.StatementCacheCapacity, pc.ConnConfig.DescriptionCacheCapacity)
 }
 
 type slowReader struct{ delay time.Duration }
@@ -222,6 +223,9 @@ func TestEveryKeyChangesBehaviour(t *testing.T) {
 	req.Covers(t, "CFG-006")
 	all := behaviours()
 	for k, b := range limitBehaviours() {
+		all[k] = b
+	}
+	for k, b := range perfBehaviours() {
 		all[k] = b
 	}
 	for _, f := range config.Fields() {

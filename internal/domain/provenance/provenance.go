@@ -43,7 +43,10 @@ type Family struct {
 	// DataAsOf is the instant the family's data is current to; nil when
 	// the family has published none.
 	DataAsOf *time.Time
-	Notes    []Note
+	// Version changes whenever the family's data changes; empty when the
+	// family has published none. An answer's ETag is built from it.
+	Version string
+	Notes   []Note
 }
 
 // Freshness is one entry of meta.freshness (ENV-003).

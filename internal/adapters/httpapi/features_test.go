@@ -174,7 +174,8 @@ func TestChargingOptionsAnswer(t *testing.T) {
 	req.Covers(t, "FR-ENERGY-004", "FR-ENERGY-005", "ENV-003", "ENV-004", "ENV-011", "ENV-040", "ENV-041")
 	f := everyAnswer()
 	w := do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/charging-options?at=52.52,13.405", bearer)
-	if w.Code != http.StatusOK || w.Header().Get("Cache-Control") != "no-store" {
+	// A data answer is cacheable by the asking client for its domain's max-age.
+	if w.Code != http.StatusOK || w.Header().Get("Cache-Control") != "private, max-age=60" {
 		t.Fatalf("status %d, cache %q: %s", w.Code, w.Header().Get("Cache-Control"), w.Body)
 	}
 	if f.gotCharge != (energy.Query{At: geo.Point{Lat: 52.52, Lon: 13.405}, RadiusM: 2000, Access: energy.FilterPublic, Limit: 20}) || f.gotKey.ID != "abcdefghij" {

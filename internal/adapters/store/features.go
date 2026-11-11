@@ -27,6 +27,7 @@ func (s *Store) Provenance(ctx context.Context, families []string, lang string) 
 		rows, _ := tx.Query(ctx, `
 select s.source_ref, s.domain, p.display_name, s.attribution_text, l.licence_name, l.licence_url,
        l.share_alike, s.share_alike_offer_url, s.terms_url, s.stale_after_s, f.data_as_of,
+       coalesce(f.freshness_version, ''),
        array(select n.note_kind from contract.source_note n
              where n.source_ref = s.source_ref and n.lang = $2 order by n.note_kind, n.body),
        array(select n.body from contract.source_note n
@@ -46,7 +47,7 @@ order by s.source_ref`, families, lang)
 				kinds, texts []string
 			)
 			err := r.Scan(&v.Family, &v.Domain, &v.Publisher, &v.AttributionText, &v.Licence, &v.LicenceURL,
-				&v.ShareAlike, &v.ShareAlikeOffer, &v.TermsURL, &staleAfter, &f.DataAsOf, &kinds, &texts)
+				&v.ShareAlike, &v.ShareAlikeOffer, &v.TermsURL, &staleAfter, &f.DataAsOf, &f.Version, &kinds, &texts)
 			f.Source, f.StaleAfter = v, time.Duration(staleAfter)*time.Second
 			for i := range min(len(kinds), len(texts)) {
 				f.Notes = append(f.Notes, provenance.Note{Kind: provenance.MapNoteKind(kinds[i]), Text: texts[i]})

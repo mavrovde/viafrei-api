@@ -127,6 +127,7 @@ const (
 
 func (s *server) dataMeta(ctx context.Context, fams []provenance.Family, at time.Time, partial bool, partialText string) DataMeta {
 	m := DataMeta{ResponseMeta: s.envelopeMeta(ctx), Freshness: []FreshnessEntry{}, Attribution: []Attribution{}, Warnings: []DataWarning{}}
+	noteFamilies(ctx, fams)
 	var fs []provenance.Freshness
 	for _, f := range fams {
 		fr := f.Assess(at)

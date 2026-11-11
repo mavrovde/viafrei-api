@@ -6,7 +6,7 @@
 
 *The German Real-Time Mobility Context Platform for AI*
 
-[Website](https://viafrei.de) · [Wiki](https://github.com/mavrovde/viafrei-api/wiki) · [Roadmap](https://github.com/mavrovde/viafrei-api/wiki/Roadmap) · [MCP server](https://github.com/mavrovde/viafrei-mcp)
+[Website](https://viafrei.de) · [Documentation](https://mavrovde.github.io/viafrei-api/) · [Wiki](https://github.com/mavrovde/viafrei-api/wiki) · [Roadmap](https://github.com/mavrovde/viafrei-api/wiki/Roadmap) · [MCP server](https://github.com/mavrovde/viafrei-mcp)
 
 ![status](https://img.shields.io/badge/status-skeleton-blue)
 ![api](https://img.shields.io/badge/API-v1%20planned-lightgrey)
@@ -30,7 +30,7 @@ ViaFrei API gives applications keyed, read-only access to live mobility informat
 | Weather risk | Official weather warnings for a place or along a route |
 | Places | Search and resolve places and addresses across Germany |
 
-ViaFrei already serves this data to AI assistants through its [MCP server](https://github.com/mavrovde/viafrei-mcp). The API makes the same facts available to any software, through stable, documented HTTP endpoints.
+ViaFrei already serves this data to AI assistants through its [MCP server](https://github.com/mavrovde/viafrei-mcp), which is live ([releases](https://github.com/mavrovde/viafrei-mcp/releases)). The API will make the same facts available to any software, through stable, documented HTTP endpoints; it is not deployed yet.
 
 ## Design principles
 
@@ -65,7 +65,7 @@ Standards we build on: OpenAPI 3.1, RFC 9457 problem details for errors, cursor 
 
 ## Status
 
-ViaFrei API has a **service skeleton** in Go with its first data endpoints. Nothing is deployed yet.
+ViaFrei API has a **service skeleton** in Go with its first data endpoints. The API is not deployed yet; the [MCP server](https://github.com/mavrovde/viafrei-mcp) is live ([releases](https://github.com/mavrovde/viafrei-mcp/releases)).
 
 | Step | State |
 |---|---|
@@ -83,7 +83,7 @@ ViaFrei API has a **service skeleton** in Go with its first data endpoints. Noth
 | CI, security checks and release pipeline | 🔄 In review — CI on every pull request; SAST, secrets, dependency, licence and DAST checks ([docs/security-checks.md](docs/security-checks.md)); release-please, signed images and release pages ([docs/RELEASING.md](docs/RELEASING.md)) |
 | Keys and the licence gate: hashed keys, scopes, rotation, revocation, audit log, `GET /v1/key` | 🔄 In review (milestone 0.4.0) — [docs/access-keys.md](docs/access-keys.md) |
 | Rate limits, quotas, priority tiers, deadlines, load shedding, usage metering | 🔄 In review (milestone 0.5.0) — [docs/rate-limits.md](docs/rate-limits.md) |
-| Rate limits and priority tiers | ⏳ Planned |
+| Developer documentation: guide, endpoints with recorded examples, attribution rules, error codes, versioning policy | 🔄 In review — [documentation portal](https://mavrovde.github.io/viafrei-api/), built from [docs/](docs/getting-started.md) |
 | v1 feature endpoints | 🔄 In progress (milestone 0.6.0) — first slice: `GET /v1/charging-options`, `GET /v1/parking-options`, `GET /v1/places/{placeId}/overview` |
 
 Follow progress in the [Roadmap](https://github.com/mavrovde/viafrei-api/wiki/Roadmap) and in [Issues](https://github.com/mavrovde/viafrei-api/issues).
@@ -141,6 +141,13 @@ make down               # or: make reset to drop the database volume
 
 ## Documentation
 
+The **developer documentation** is published with every release at [mavrovde.github.io/viafrei-api](https://mavrovde.github.io/viafrei-api/) (`make docs` builds it locally into `site/`):
+
+- [Getting started](docs/getting-started.md): from nothing to a first answer
+- [Endpoints](https://mavrovde.github.io/viafrei-api/endpoints.html): every operation with a request, the recorded answer and its attribution rule, generated from [`api/openapi.json`](api/openapi.json); the full [API reference](https://mavrovde.github.io/viafrei-api/reference.html)
+- [Attribution and licence rules](docs/attribution.md) · [Error codes](docs/errors.md) · [Versioning and deprecation policy](docs/versioning.md) · [Rate limits](docs/rate-limits.md) · [API keys](docs/access-keys.md)
+- [Examples](docs/examples.md): how every example is recorded from synthetic fixtures and checked in CI
+
 The [wiki](https://github.com/mavrovde/viafrei-api/wiki) holds the full design:
 
 - [Vision and Goals](https://github.com/mavrovde/viafrei-api/wiki/Vision-and-Goals) · [Principles](https://github.com/mavrovde/viafrei-api/wiki/Principles)
@@ -171,7 +178,7 @@ Ideas and questions are welcome in [Issues](https://github.com/mavrovde/viafrei-
 ## Related
 
 - [viafrei.de](https://viafrei.de): the live site
-- [viafrei-mcp](https://github.com/mavrovde/viafrei-mcp): connect ViaFrei to AI assistants through the Model Context Protocol
+- [viafrei-mcp](https://github.com/mavrovde/viafrei-mcp): connect ViaFrei to AI assistants through the Model Context Protocol; live ([releases](https://github.com/mavrovde/viafrei-mcp/releases))
 
 ---
 

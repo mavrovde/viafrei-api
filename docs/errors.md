@@ -25,8 +25,10 @@ served as `application/problem+json`:
 - An answer never carries a stack trace, a query or an internal name.
 
 *Planned:* each problem type URI will resolve to its section on this page,
-whose anchor is the code; today the URIs are identifiers only. The list below is the complete catalogue of this release,
-held equal to the code by a test.
+whose anchor is the code; today the URIs are identifiers only.
+
+The list below is the complete catalogue of this release, held equal to the
+code by a test.
 
 ### invalid-parameter
 Status `400` · Invalid parameter · not retryable.

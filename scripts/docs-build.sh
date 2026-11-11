@@ -65,12 +65,7 @@ for p in "${pages[@]}"; do
   [[ -s $src ]] || { echo "FAIL: $src is missing or empty" >&2; exit 1; }
   body=$("${marked[@]}" -i "$src")
   [[ -n $body ]] || { echo "FAIL: $src rendered to nothing" >&2; exit 1; }
-  body=$(perl "$here/docs-html.pl" "$base" <<<"$body")
-  if grep -q 'href="missing-in-repo/' <<<"$body"; then
-    echo "FAIL: $src links to files that are neither a page nor in the repository:" >&2
-    grep -o 'href="missing-in-repo/[^"]*"' <<<"$body" | sed 's#href="missing-in-repo/#  #; s#"$##' >&2
-    exit 1
-  fi
+  body=$(perl "$here/docs-html.pl" "$base" <<<"$body") || { echo "FAIL: $src has the link(s) above" >&2; exit 1; }
   nav=''
   for q in "${pages[@]}" "|.|reference.html||API reference" "|.|openapi.json||openapi.json"; do
     IFS='|' read -r _ _ target _ label <<<"$q"

@@ -1572,7 +1572,7 @@
                           "access": "public",
                           "summary": {
                             "chargePoints": 4,
-                            "availableNow": null,
+                            "availableNow": 1,
                             "maxPowerKw": 300
                           },
                           "chargePoints": [
@@ -1581,8 +1581,8 @@
                               "current": "dc",
                               "maxPowerKw": 150,
                               "availability": {
-                                "state": "stale",
-                                "observedAt": "2026-03-29T03:23:03Z"
+                                "state": "available",
+                                "observedAt": "2026-03-29T23:55:00Z"
                               }
                             },
                             {
@@ -1590,8 +1590,8 @@
                               "current": "dc",
                               "maxPowerKw": 150,
                               "availability": {
-                                "state": "stale",
-                                "observedAt": "2026-03-29T14:51:34Z"
+                                "state": "occupied",
+                                "observedAt": "2026-03-29T23:48:00Z"
                               }
                             },
                             {
@@ -2596,7 +2596,7 @@
                               "access": "public",
                               "summary": {
                                 "chargePoints": 3,
-                                "availableNow": null,
+                                "availableNow": 1,
                                 "maxPowerKw": 150
                               },
                               "chargePoints": [
@@ -2605,8 +2605,8 @@
                                   "current": "ac",
                                   "maxPowerKw": 22,
                                   "availability": {
-                                    "state": "stale",
-                                    "observedAt": "2026-03-29T21:11:57Z"
+                                    "state": "available",
+                                    "observedAt": "2026-03-29T23:52:00Z"
                                   }
                                 },
                                 {

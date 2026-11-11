@@ -293,4 +293,8 @@ func TestExecDocker(t *testing.T) {
 	if _, err := run(context.Background(), "fail"); err == nil || !strings.Contains(err.Error(), "broken") {
 		t.Errorf("a failing docker: %v", err)
 	}
+	// docker compose top takes no ps options, so docker top is the plain CLI.
+	if out, err := execHost(bin)(context.Background(), "top", "c1", "-o", "rss"); err != nil || strings.TrimSpace(out) != "top c1 -o rss" {
+		t.Errorf("plain docker: %q %v", out, err)
+	}
 }

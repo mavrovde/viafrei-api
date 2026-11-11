@@ -73,7 +73,7 @@ var catalogue = []scenario{
 	{name: "stress", fault: "none", expect: "a ramp past the knee: throughput flat above it; excess refused 429 within 50 ms", run: stress},
 	{name: "slow-storage", fault: "latency on every storage byte, beyond the deadline", expect: "503 deadline-exhausted by the deadline; storage idle within the cancel grace plus 100 ms", run: slowStorage},
 	{name: "hanging-query", fault: "every feature table locked, so each read hangs in storage", expect: "cut at the deadline; afterwards no poisoned connection", run: hangingQuery},
-	{name: "pool-exhausted", fault: "every permit held by hanging reads, plus bursts", expect: "the admission refuses at once (RATE-011)", run: poolExhausted},
+	{name: "pool-exhausted", fault: "every permit held by hanging reads, plus bursts", expect: "the admission refuses, each refusal by the tier's queue_max_wait (RATE-011)", run: poolExhausted},
 	{name: "composed-part-timeout", fault: "the parking tables locked", expect: "200 with the parking part timeout and the charging part ok", run: composedPart},
 	{
 		name: "storage-killed", fault: "the storage route of the fault proxy cut", expect: "503 upstream-unavailable with Retry-After within 50 ms; 2xx again after the repair", run: storageKilled,
@@ -135,7 +135,8 @@ func (r *runner) runScenario(ctx context.Context, s scenario) *outcome {
 func (r *runner) shared(o *outcome) {
 	o.add("requests sent (a scenario that sent none fails)", len(o.results) > 0, "%d", len(o.results))
 	worst := percentile(took(o.results, anyResult), 1)
-	o.add(fmt.Sprintf("no request completes later than %s (NFR-PERF-001)", r.limit), worst <= r.limit, "slowest %s", worst.Round(time.Millisecond))
+	late := count(o.results, func(x result) bool { return x.took > r.limit })
+	o.add(fmt.Sprintf("no request completes later than %s (NFR-PERF-001)", r.limit), late == 0, "%d late, slowest %s", late, worst.Round(time.Millisecond))
 	conns, overdue := 0, 0
 	for _, s := range o.samples {
 		conns, overdue = max(conns, s.conns), max(overdue, s.overdue)
@@ -333,7 +334,10 @@ func poolExhausted(ctx context.Context, r *runner, o *outcome) {
 	shed := took(rs, refused)
 	o.add("the admission refuses while every permit is held (RATE-011)", len(shed) > 0, "%d of %d refused", len(shed), len(rs))
 	p95 := percentile(shed, 0.95)
-	o.add("each refusal comes at once: p95 within 50 ms (NFR-CAP-003)", len(shed) > 0 && p95 <= r.fast, "p95 %s", p95.Round(time.Millisecond))
+	// A request is refused at once when its estimated wait does not fit,
+	// else it waits in its tier's queue at most queue_max_wait
+	// (docs/rate-limits.md, gate 4): no refusal may come later than that.
+	o.add(fmt.Sprintf("each refusal within the tier's queue_max_wait plus 50 ms: p95 within %s (RATE-011)", r.queued+r.fast), len(shed) > 0 && p95 <= r.queued+r.fast, "p95 %s", p95.Round(time.Millisecond))
 	err = wait()
 	o.add("lock released", err == nil, "%v", err)
 	r.recovered(ctx, o, r.charging())

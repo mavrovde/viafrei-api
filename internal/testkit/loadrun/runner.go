@@ -59,8 +59,10 @@ type runner struct {
 	limit    time.Duration // the deadline plus 50 ms (NFR-PERF-001)
 	overdue  time.Duration // the deadline plus the cancel grace plus 100 ms (NFR-PERF-002)
 	fast     time.Duration // a refusal is fast within this (NFR-CAP-003)
+	queued   time.Duration // the standard tier's queue_max_wait: a waiter is shed by then (RATE-011)
 	http     *http.Client
-	docker   func(context.Context, ...string) (string, error)
+	docker   func(context.Context, ...string) (string, error) // docker compose on the stack's project
+	host     func(context.Context, ...string) (string, error) // the plain docker CLI (docker top)
 	pollRSS  bool
 	readyURL string
 }
@@ -262,7 +264,8 @@ func (r *runner) rss(ctx context.Context) (int64, error) {
 	if id = strings.TrimSpace(id); id == "" {
 		return 0, fmt.Errorf("docker compose ps: %w: no api container", errNoSample)
 	}
-	out, err := r.docker(ctx, "top", id, "-o", "rss")
+	// docker compose top takes no ps options; the plain docker top does.
+	out, err := r.host(ctx, "top", id, "-o", "rss")
 	if err != nil {
 		return 0, err
 	}

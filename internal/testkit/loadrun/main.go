@@ -110,6 +110,7 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		poolMax  = fs.Int("pool-max", 4, "db.pool_max of the instance under test (NFR-CAP-002)")
 		deadline = fs.Duration("deadline", 2*time.Second, "deadline.request of the instance under test (NFR-PERF-001)")
 		grace    = fs.Duration("cancel-grace", 100*time.Millisecond, "db.cancel_grace of the instance under test (NFR-PERF-002)")
+		queued   = fs.Duration("queue-max-wait", 400*time.Millisecond, "tiers.standard.queue_max_wait of the instance under test (RATE-011)")
 	)
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -152,6 +153,8 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	}
 	r := newRunner(p, b, strings.TrimRight(*api, "/"), strings.TrimRight(*proxy, "/"), key, cold, *place, *poolMax, *deadline, *grace)
 	r.docker = execDocker(*docker, *project, strings.Split(*files, ","))
+	r.host = execHost(*docker)
+	r.queued = *queued
 	outs := r.runAll(context.Background(), sel)
 	text := renderReport(*prof, outs)
 	if err := os.WriteFile(*report, []byte(text), 0o600); err != nil {
@@ -275,6 +278,15 @@ func execDocker(bin, project string, files []string) func(context.Context, ...st
 	for _, f := range files {
 		base = append(base, "-f", f)
 	}
+	return execWith(bin, base)
+}
+
+// execHost runs the plain docker CLI, for what compose does not offer.
+func execHost(bin string) func(context.Context, ...string) (string, error) {
+	return execWith(bin, nil)
+}
+
+func execWith(bin string, base []string) func(context.Context, ...string) (string, error) {
 	return func(ctx context.Context, args ...string) (string, error) {
 		cmd := exec.CommandContext(ctx, bin, append(slices.Clone(base), args...)...) //nolint:gosec // G204: the operator's docker CLI on the runner's own arguments
 		var stderr strings.Builder

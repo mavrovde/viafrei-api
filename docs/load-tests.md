@@ -52,7 +52,7 @@ never skipped.
 | `stress` | a ramp doubling the rate past the knee | the knee is reached; throughput above it stays at least 80 % of the peak; refusals are `429` with `Retry-After` within 50 ms (NFR-CAP-003) |
 | `slow-storage` | latency beyond the deadline on every storage byte | `503 deadline-exhausted` by the deadline; 2xx after the repair |
 | `hanging-query` | every feature table locked | reads cut at the deadline; afterwards a run of requests without a poisoned connection |
-| `pool-exhausted` | every permit held, plus bursts | the admission refuses at once (`429 overloaded` with `Retry-After`) |
+| `pool-exhausted` | every permit held, plus bursts | the admission refuses (`429 overloaded` with `Retry-After`), each refusal within the tier's `queue_max_wait` plus 50 ms (`-queue-max-wait`, default 400 ms) |
 | `composed-part-timeout` | the parking tables locked | `200` with the parking part `timeout` and the charging part `ok` |
 | `storage-killed` | the storage route cut | `503 upstream-unavailable` with `Retry-After`, p95 within 50 ms; 2xx after the repair |
 | `access-store-down` | the access-store route cut | a cached key keeps working; an uncached key is `503 upstream-unavailable`; both work after the repair |

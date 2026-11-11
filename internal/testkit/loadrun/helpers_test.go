@@ -148,6 +148,7 @@ func newWorld(t *testing.T, api http.HandlerFunc, dock func(string) (string, err
 	t.Cleanup(ps.Close)
 	w.r = newRunner(tiny, testBudgets, w.api.URL, ps.URL, "vf_test_warm", "vf_test_cold", "pl-1", 4, 100*time.Millisecond, 20*time.Millisecond)
 	w.r.docker = w.dock.run
+	w.r.host = w.dock.run
 	return w
 }
 

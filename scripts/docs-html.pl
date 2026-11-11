@@ -11,8 +11,9 @@
 #   page (DOCS_PAGES: space-separated "source=page" pairs), keeping its
 #   fragment;
 # - a link to any other file of the repository points at it on GitHub, since
-#   the portal does not carry it, and only when that file exists in the
-#   repository (this script's parent directory); a link to anything else
+#   the portal does not carry it, and only when git tracks that file or
+#   directory in the repository (this script's parent directory; no git is
+#   a refusal, exit 2); a link to anything else
 #   becomes "missing-in-repo/<path>", and the script names it on stderr and
 #   exits 1 after printing the page;
 # - links with a scheme, fragment-only links and links to files the portal
@@ -62,6 +63,28 @@ sub resolve {
   return join '/', @parts;
 }
 
+# The repository's tracked files and their directories, read once from git:
+# a file that exists only in this checkout (untracked, ignored, a build
+# output) would be a broken link on GitHub. Without git the script cannot
+# tell, and refuses rather than guesses.
+my %tracked;
+sub tracked {
+  my ($file) = @_;
+  unless (%tracked) {
+    open(my $ls, '-|', 'git', '-C', $root, 'ls-files', '-z')
+      or do { print STDERR "FAIL: cannot run git to list the repository's files: $!\n"; exit 2 };
+    local $/ = "\0";
+    while (my $f = <$ls>) {
+      chomp $f;
+      $tracked{$f} = 1;
+      $tracked{$1} = 1 while $f =~ s{/[^/]*$}{} && $f =~ m{^(.+)$};
+    }
+    close($ls) && %tracked
+      or do { print STDERR "FAIL: git could not list the files of the repository at $root\n"; exit 2 };
+  }
+  return exists $tracked{$file};
+}
+
 my @missing;
 $html =~ s{href="([^"]*)"}{
   my $href = $1;
@@ -75,7 +98,7 @@ $html =~ s{href="([^"]*)"}{
       my $file = resolve($path);
       if (exists $page{$file}) {
         $out = $page{$file} . $frag;
-      } elsif ($file ne '' && -e "$root/$file") {
+      } elsif ($file ne '' && tracked($file)) {
         $out = "$repo/$file$frag";
       } else {
         # Not a page and not a file of the repository: a misspelt link. It

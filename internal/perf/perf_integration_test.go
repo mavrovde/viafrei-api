@@ -552,7 +552,17 @@ func explain(ctx context.Context, conn *pgx.Conn, s statement, mode string) (any
 			return err
 		}
 		if mode == "generic" {
-			return tx.QueryRow(ctx, "explain (generic_plan, format json) "+s.sql, pgx.QueryExecModeSimpleProtocol).Scan(&raw)
+			// The raw simple protocol: the driver would otherwise bind (or
+			// substitute) the $n placeholders a generic plan keeps.
+			res, err := tx.Conn().PgConn().Exec(ctx, "explain (generic_plan, format json) "+s.sql).ReadAll()
+			if err != nil {
+				return err
+			}
+			if len(res) != 1 || len(res[0].Rows) != 1 {
+				return fmt.Errorf("explain answered %d results", len(res))
+			}
+			raw = res[0].Rows[0][0]
+			return nil
 		}
 		return tx.QueryRow(ctx, "explain (format json) "+s.sql, s.args...).Scan(&raw)
 	})

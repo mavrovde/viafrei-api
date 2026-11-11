@@ -17,3 +17,5 @@ CLAUDE.md
 .idea
 .vscode
 compose.yaml
+scripts/a11y-tools
+site

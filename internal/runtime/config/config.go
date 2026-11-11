@@ -84,6 +84,21 @@ type DB struct {
 	ApplicationName        string        `koanf:"application_name" default:"viafrei-api" validate:"required,max=63" desc:"application_name reported to the database."`
 	QueryExecMode          string        `koanf:"query_exec_mode" default:"cache_statement" validate:"oneof=cache_statement cache_describe describe_exec exec simple_protocol" desc:"How statements are sent: cache_statement prepares each statement once per connection and reuses it; the others are the driver's fallbacks for a pooler that cannot keep prepared statements."`
 	StatementCacheCapacity int           `koanf:"statement_cache_capacity" default:"128" validate:"min=1,max=4096" desc:"Prepared statements (or descriptions) cached per connection under cache_statement and cache_describe."`
+	SharedBudget           SharedBudget  `koanf:"shared_budget"`
+}
+
+// SharedBudget is the storage concurrency budget this service shares with
+// the other readers of the store, the MCP server first (NFR-CAP-002): a read
+// runs only while it holds one of the budget's slots, a transaction-scoped
+// advisory lock in the store, so every reader that takes its slots from the
+// same lock space counts against one number.
+type SharedBudget struct {
+	Slots            int           `koanf:"slots" default:"0" validate:"min=0,max=1024" desc:"Statements all readers sharing db.shared_budget.lock_space may run at once; each read of this service holds one slot to the end of its transaction. 0 switches the shared budget off."`
+	LockSpace        int           `koanf:"lock_space" default:"7301" validate:"min=1,max=2147483647" desc:"First key of the two-key advisory locks the slots are (the second is the slot number, 1 to db.shared_budget.slots). Every reader sharing the budget names the same value."`
+	CriticalReserved int           `koanf:"critical_reserved" default:"1" validate:"min=0,max=1024" desc:"The highest-numbered slots, which only a read of the critical tier may take. Less than db.shared_budget.slots."`
+	MaxWait          time.Duration `koanf:"max_wait" default:"200ms" validate:"min=0s,max=2s" desc:"Longest time a read waits for a free slot before it is refused overloaded with Retry-After. Less than deadline.request."`
+	RetryInterval    time.Duration `koanf:"retry_interval" default:"10ms" validate:"min=1ms,max=500ms" desc:"Pause between two attempts to take a slot while every slot is held, spread at random over ±50 %."`
+	RetryAfter       time.Duration `koanf:"retry_after" default:"1s" validate:"min=1s,max=60s" desc:"Retry-After of a read refused because no slot came free in db.shared_budget.max_wait."`
 }
 
 // Deadline holds the request budget.

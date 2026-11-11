@@ -159,8 +159,11 @@ func logger(d Deps) *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-// build makes the handler; extra operations are registered after the
-// catalogue (tests only).
+// build makes the handler and the document it serves; extra operations are
+// registered after the catalogue (tests only). The document is marshalled on
+// first use, once: it is ~100 KB with its examples, and a handler built for
+// a request path that never asks for it (every test, most processes until
+// the first /v1/openapi.json) should not pay for it.
 func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 	if d.Config == nil {
 		return nil, nil, errors.New("httpapi: no configuration")
@@ -283,6 +286,9 @@ func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 		op.register(api, s, hop)
 	}
 	amendNullableObjects(api)
+	if err := documentExamples(api.OpenAPI(), base); err != nil {
+		return nil, nil, err
+	}
 
 	if d.Config.RateLimit.Headers {
 		documentRateLimit(api)
@@ -291,10 +297,8 @@ func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 		documentCaching(api)
 	}
 
-	// The document is rendered once, when first asked for: a handler that is
-	// never asked for it does not pay for marshalling the whole document. It
-	// is a value of huma's own fixed types, complete once build returns:
-	// marshalling it cannot fail for any configuration.
+	// The document is a value of huma's own fixed types: marshalling it
+	// cannot fail for any configuration. Nothing changes it after build.
 	served := sync.OnceValue(func() []byte {
 		raw := invariant.Must(json.Marshal(api.OpenAPI()))
 		var doc bytes.Buffer

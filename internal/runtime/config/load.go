@@ -355,8 +355,24 @@ func crossField(c *Config) Errors {
 	}
 	out = append(out, crossFieldAuth(c)...)
 	out = append(out, crossFieldCache(c)...)
+	out = append(out, crossFieldBudget(c)...)
 	out = append(out, crossFieldAdmin(c)...)
 	return append(out, crossFieldTiers(c)...)
+}
+
+// crossFieldBudget keeps the shared budget usable: a read below the
+// critical tier needs at least one slot, and a wait for a slot must end
+// inside the deadline (NFR-CAP-002).
+func crossFieldBudget(c *Config) Errors {
+	var out Errors
+	b := c.DB.SharedBudget
+	if b.Slots > 0 && b.CriticalReserved >= b.Slots {
+		out = append(out, fmt.Sprintf("db.shared_budget.critical_reserved: %d leaves no slot of db.shared_budget.slots %d to the other tiers", b.CriticalReserved, b.Slots))
+	}
+	if b.MaxWait >= c.Deadline.Request {
+		out = append(out, fmt.Sprintf("db.shared_budget.max_wait: %s must be less than deadline.request %s", b.MaxWait, c.Deadline.Request))
+	}
+	return out
 }
 
 // crossFieldTiers holds the admission tiers inside the permit pool and the

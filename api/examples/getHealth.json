@@ -1,0 +1,9 @@
+{
+  "title": "The process answers",
+  "request": "/healthz",
+  "attribution": "No source data: this answer carries no attribution.",
+  "status": 200,
+  "response": {
+    "status": "ok"
+  }
+}

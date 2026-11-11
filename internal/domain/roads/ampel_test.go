@@ -336,6 +336,7 @@ func TestTheSortIsThePlatformsOrder(t *testing.T) {
 		{Kind: roads.SignalSlippery},
 		{Kind: roads.SignalDWD, Level: 1},
 		{Kind: roads.SignalJam},
+		{Kind: roads.SignalJam, DelayS: secs(0)},
 		{Kind: roads.SignalJam, DelayS: secs(60)},
 		{Kind: roads.SignalDWD, Level: 3},
 		{Kind: roads.SignalJam, DelayS: secs(600)},
@@ -354,10 +355,22 @@ func TestTheSortIsThePlatformsOrder(t *testing.T) {
 		}
 		got = append(got, fmt.Sprintf("%s/%s/%d/%s", s.Kind, d, s.Level, s.Word))
 	}
-	want := []string{"closure/-/0/", "safety/-/0/", "bridgeWind/-/0/", "jam/600/0/", "jam/60/0/", "jam/60/0/", "jam/-/0/",
+	want := []string{"closure/-/0/", "safety/-/0/", "bridgeWind/-/0/", "jam/600/0/", "jam/60/0/", "jam/60/0/", "jam/0/0/", "jam/-/0/",
 		"dwd/-/3/", "dwd/-/1/", "slippery/-/0/", "warning/-/0/a", "warning/-/0/b", "roadworks/-/0/"}
 	if !slices.Equal(got, want) {
 		t.Errorf("order\n got %v\nwant %v", got, want)
+	}
+}
+
+// TestALineScopeSkipsAnAbsentLine: an absent line is skipped, never the end
+// of the description.
+func TestALineScopeSkipsAnAbsentLine(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004")
+	if s, ok := roads.LineScope([]*string{nil, str("Auffahrt auf die A9: gesperrt")}); !ok || s != roads.ScopeRamp {
+		t.Errorf("a ramp line after an absent one: %v %v", s, ok)
+	}
+	if _, ok := roads.LineScope([]*string{nil, str("Stau")}); ok {
+		t.Error("no location line gave a scope")
 	}
 }
 

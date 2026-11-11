@@ -1,22 +1,44 @@
-package roads
+// Package ampel is the platform's motorway Ampel: the lamp over what is held
+// about a road now, its signals, its sight and its text rules. It is pure (no
+// storage, no clock but the instant it is given, no language) and is read by
+// every domain that shows a lamp, so two answers cannot give one road two
+// colours.
+package ampel
 
 import (
 	"cmp"
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 )
 
 // This file is a port of the platform's motorway Ampel, line for line:
 // motorway-ampel.ts of its analysis module (signalLamp, ampelOf,
 // reasonKeyOf, safetyWordOf, closureScopeOf, messageScopeOf, worksSignal,
-// autobahnEventSignal, dwdSightOf, messageSignal) and the order of the
-// reasons inside a colour of packages/mcp/src/tools/autobahn-ampel.ts
-// (ORDER in toolAmpel). The regular expressions are copied verbatim. The
-// platform's yellow is the service's amber; nothing else is renamed.
+// autobahnEventSignal, dwdSightOf, messageSignal, bridgeStateOf,
+// bridgeSignal, feedSightOf, policeSightOf), checkAlive of its feed-alive.ts,
+// and the order of the reasons inside a colour of the MCP server's
+// autobahn-ampel.ts (ORDER in toolAmpel). The regular expressions are copied
+// verbatim. The platform's yellow is the service's amber; nothing else is
+// renamed.
+
+// Lamp is the colour: the platform's motorway Ampel, whose yellow is amber
+// here.
+type Lamp string
+
+// The lamps.
+const (
+	LampGreen Lamp = "green"
+	LampAmber Lamp = "amber"
+	LampRed   Lamp = "red"
+)
+
+// Lamps lists every lamp.
+var Lamps = []Lamp{LampGreen, LampAmber, LampRed}
 
 // The thresholds (AMPEL_JAM_RED_S, AMPEL_DWD_RED_LEVEL,
-// AMPEL_DWD_YELLOW_LEVEL).
+// AMPEL_DWD_YELLOW_LEVEL, AMPEL_ON_ROAD_M).
 const (
 	// JamRedS is the delay, in seconds, from which a jam is red; a shorter
 	// one, or one with no stated delay, is amber.
@@ -27,6 +49,10 @@ const (
 	// DWDAmberLevel is the DWD warning level from which a warning below red
 	// is amber (levels 1 and 2). Level 0 is a pre-information: no colour.
 	DWDAmberLevel = 1
+	// OnRoadM is the distance, in metres, within which a position is on a
+	// motorway. The service's lamps do not use it (their scope is the road,
+	// or the radius asked); it is kept so every threshold is the platform's.
+	OnRoadM = 2000
 )
 
 // SafetyWord is a safety message by its words.
@@ -90,16 +116,28 @@ const (
 	SightMissing Sight = "missing"
 )
 
-// SightEntry is one group's sight (AmpelSightEntry).
+// The groups whose sight green depends on (AmpelGroup).
+const (
+	// GroupAutobahn is the Autobahn GmbH's events.
+	GroupAutobahn = "autobahn"
+	// GroupDWD is the DWD warnings.
+	GroupDWD = "dwd"
+	// GroupPolice is the police and Land messages, one entry per state.
+	GroupPolice = "police"
+)
+
+// SightEntry is one group's sight (AmpelSightEntry); Land is the state of a
+// group judged per state, empty for any other.
 type SightEntry struct {
 	Group string
 	State Sight
+	Land  string
 }
 
-// AmpelReason is why a lamp: a signal and the colour it gives on its own, or
-// a group whose sight is limited (always amber). Exactly one of Signal and
+// Reason is why a lamp: a signal and the colour it gives on its own, or a
+// group whose sight is limited (always amber). Exactly one of Signal and
 // Sight is set.
-type AmpelReason struct {
+type Reason struct {
 	Lamp   Lamp
 	Signal *Signal
 	Sight  *SightEntry
@@ -109,7 +147,7 @@ type AmpelReason struct {
 // signals inside each colour; empty exactly when green.
 type Ampel struct {
 	Lamp    Lamp
-	Reasons []AmpelReason
+	Reasons []Reason
 }
 
 // SignalLamp is the colour one signal gives on its own; false: it gives none
@@ -129,13 +167,7 @@ func SignalLamp(s Signal) (Lamp, bool) {
 		}
 		return LampAmber, true
 	case SignalDWD:
-		if s.Level >= DWDRedLevel {
-			return LampRed, true
-		}
-		if s.Level >= DWDAmberLevel {
-			return LampAmber, true
-		}
-		return "", false
+		return DWDLamp(s.Level)
 	case SignalRoadworks:
 		// Works on a ramp narrow no carriageway; a closed ramp is a closure.
 		if s.Scope == ScopeCarriageway {
@@ -148,29 +180,42 @@ func SignalLamp(s Signal) (Lamp, bool) {
 	return "", false
 }
 
-// AmpelOf is the lamp: the first match from the top of the platform's table.
-// sight lists the safety-relevant groups read and how fresh each is; a group
-// that is not fresh is an amber reason of its own, so green needs every one
-// fresh. An empty sight cannot be green: a lamp that read nothing has seen
-// nothing.
-func AmpelOf(signals []Signal, sight []SightEntry) Ampel {
-	var red, amber []AmpelReason
+// DWDLamp is the colour a DWD warning of a level gives on its own (the dwd
+// row of signalLamp): red from DWDRedLevel, amber from DWDAmberLevel, none
+// below (a level-0 pre-information, or any lower value).
+func DWDLamp(level int) (Lamp, bool) {
+	if level >= DWDRedLevel {
+		return LampRed, true
+	}
+	if level >= DWDAmberLevel {
+		return LampAmber, true
+	}
+	return "", false
+}
+
+// Of is the lamp (ampelOf): the first match from the top of the platform's
+// table. sight lists the safety-relevant groups read and how fresh each is;
+// a group that is not fresh is an amber reason of its own, so green needs
+// every one fresh. An empty sight cannot be green: a lamp that read nothing
+// has seen nothing.
+func Of(signals []Signal, sight []SightEntry) Ampel {
+	var red, amber []Reason
 	for i := range signals {
 		s := signals[i]
 		switch l, _ := SignalLamp(s); l {
 		case LampRed:
-			red = append(red, AmpelReason{Lamp: LampRed, Signal: &s})
+			red = append(red, Reason{Lamp: LampRed, Signal: &s})
 		case LampAmber:
-			amber = append(amber, AmpelReason{Lamp: LampAmber, Signal: &s})
+			amber = append(amber, Reason{Lamp: LampAmber, Signal: &s})
 		}
 	}
 	for _, g := range sight {
 		if g.State != SightFresh {
-			amber = append(amber, AmpelReason{Lamp: LampAmber, Sight: &SightEntry{Group: g.Group, State: g.State}})
+			amber = append(amber, Reason{Lamp: LampAmber, Sight: &SightEntry{Group: g.Group, State: g.State, Land: g.Land}})
 		}
 	}
 	if len(sight) == 0 && len(red) == 0 && len(amber) == 0 {
-		amber = append(amber, AmpelReason{Lamp: LampAmber, Sight: &SightEntry{Group: "autobahn", State: SightMissing}})
+		amber = append(amber, Reason{Lamp: LampAmber, Sight: &SightEntry{Group: GroupAutobahn, State: SightMissing}})
 	}
 	reasons := append(red, amber...)
 	lamp := LampGreen
@@ -189,7 +234,7 @@ var signalOrder = map[SignalKind]int{
 	SignalDWD: 4, SignalSlippery: 5, SignalWarning: 6, SignalRoadworks: 7,
 }
 
-// SortSignals orders the signals as toolAmpel does before AmpelOf, stably:
+// SortSignals orders the signals as toolAmpel does before ampelOf, stably:
 // by kind (signalOrder), jams by delay descending (none last), DWD warnings
 // by level descending.
 func SortSignals(signals []Signal) {
@@ -226,7 +271,7 @@ const (
 )
 
 // ReasonKeyOf is a reason's key (reasonKeyOf).
-func ReasonKeyOf(r AmpelReason) ReasonKey {
+func ReasonKeyOf(r Reason) ReasonKey {
 	if r.Sight != nil {
 		return KeySight
 	}
@@ -242,7 +287,7 @@ func ReasonKeyOf(r AmpelReason) ReasonKey {
 
 // jsSpace is the set of characters JavaScript's \s and String.prototype.trim
 // match: the folded text is the platform's, character for character.
-const jsSpace = "\t\n\v\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
+const jsSpace = "\t\n\v\f\r                  　﻿"
 
 var jsSpaces = regexp.MustCompile(`[` + regexp.QuoteMeta(jsSpace) + `]+`)
 
@@ -250,10 +295,30 @@ var umlauts = strings.NewReplacer("ä", "ae", "ö", "oe", "ü", "ue", "ß", "ss"
 
 // fold lower-cases the text, writes the umlauts out and collapses every run
 // of white space to one space. The one rune whose JavaScript lower case is
-// two runes (İ) is written as JavaScript writes it.
+// two runes (İ) is written as JavaScript writes it. A rune outside the Basic
+// Multilingual Plane is two UTF-16 code units in JavaScript, and the
+// platform's patterns (no u flag) count code units: each such rune becomes
+// two U+FFFD, which no pattern names and which are neither "|" nor ".", so
+// every bounded repetition counts the text as JavaScript counts it.
 func fold(s string) string {
-	s = strings.ToLower(strings.ReplaceAll(s, "\u0130", "i\u0307"))
-	return jsSpaces.ReplaceAllString(umlauts.Replace(s), " ")
+	s = strings.ToLower(strings.ReplaceAll(s, "İ", "i̇"))
+	return codeUnits(jsSpaces.ReplaceAllString(umlauts.Replace(s), " "))
+}
+
+// codeUnits writes every rune above U+FFFF as two U+FFFD runes.
+func codeUnits(s string) string {
+	if !strings.ContainsFunc(s, func(r rune) bool { return r > 0xFFFF }) {
+		return s
+	}
+	var b strings.Builder
+	for _, r := range s {
+		if r > 0xFFFF {
+			b.WriteString("��")
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 // trim removes leading and trailing white space as JavaScript's trim does.
@@ -312,32 +377,23 @@ var carriagewayLine = regexp.MustCompile(`^(von )?a ?\d{1,3}[a-z]?: `)
 
 var ausRichtung = regexp.MustCompile(`\(aus richtung `)
 
-// LineScope is the scope the first description line that names a ramp or
-// the carriageway gives (nil: absent, skipped); false when no line names
-// either.
-func LineScope(description []*string) (ClosureScope, bool) {
+// ClosureScopeOf is whether a closure (or roadworks) of the Autobahn GmbH is
+// the carriageway's or a ramp's (closureScopeOf): the publisher's location
+// line decides (the first description line, nil skipped, that names
+// either), else a subtitle "AS X (aus Richtung Y)", else the carriageway,
+// the conservative reading.
+func ClosureScopeOf(description []*string, subtitle *string) ClosureScope {
 	for _, raw := range description {
 		if raw == nil {
 			continue
 		}
 		l := fold(trim(*raw))
 		if rampLine.MatchString(l) {
-			return ScopeRamp, true
+			return ScopeRamp
 		}
 		if carriagewayLine.MatchString(l) {
-			return ScopeCarriageway, true
+			return ScopeCarriageway
 		}
-	}
-	return "", false
-}
-
-// ClosureScopeOf is whether a closure (or roadworks) of the Autobahn GmbH is
-// the carriageway's or a ramp's (closureScopeOf): the publisher's location
-// line decides, else a subtitle "AS X (aus Richtung Y)", else the
-// carriageway, the conservative reading.
-func ClosureScopeOf(description []*string, subtitle *string) ClosureScope {
-	if s, ok := LineScope(description); ok {
-		return s
 	}
 	if subtitle != nil && ausRichtung.MatchString(fold(*subtitle)) {
 		return ScopeRamp
@@ -403,22 +459,8 @@ func AutobahnEventSignal(r AutobahnRow) Signal {
 	return Signal{Kind: SignalWarning}
 }
 
-// DWDSightOf is the DWD group's sight (dwdSightOf): missing when the
-// warnings read did not answer; fresh when it holds a warning, or when the
-// warnings source itself is fresh (a quiet read of a live source); missing
-// otherwise: a quiet read of a dead source is no sight.
-func DWDSightOf(readOK bool, warnings int, source Sight) Sight {
-	if !readOK {
-		return SightMissing
-	}
-	if warnings > 0 || source == SightFresh {
-		return SightFresh
-	}
-	return SightMissing
-}
-
-// AmpelMessage is what a police or Land message is judged by (AmpelMessage).
-type AmpelMessage struct {
+// Message is what a police or Land message is judged by (AmpelMessage).
+type Message struct {
 	// Kind is closure, accident, jam, roadworks, restriction, warning or
 	// other.
 	Kind       string
@@ -433,7 +475,7 @@ type AmpelMessage struct {
 // (messageSignal): a safety message only by its words; a closure by its
 // scope; a jam by its delay; works and lane restrictions as roadworks by
 // their scope; anything else an ordinary warning.
-func MessageSignal(m AmpelMessage) Signal {
+func MessageSignal(m Message) Signal {
 	texts := []*string{&m.What, m.PlaceText, m.DetailText}
 	if w := SafetyWordOf(texts); w != WordNone {
 		return Signal{Kind: SignalSafety, Word: w}
@@ -447,4 +489,182 @@ func MessageSignal(m AmpelMessage) Signal {
 		return Signal{Kind: SignalRoadworks, Scope: MessageScopeOf(texts)}
 	}
 	return Signal{Kind: SignalWarning}
+}
+
+// BridgeState is a bridge's state by its words (BridgeState): closed,
+// restricted (a wind warning with a limit), or BridgeNone.
+type BridgeState string
+
+// The bridge states.
+const (
+	BridgeNone       BridgeState = ""
+	BridgeClosed     BridgeState = "closed"
+	BridgeRestricted BridgeState = "restricted"
+)
+
+var (
+	undefinedState = regexp.MustCompile(`^undefiniert\b`)
+	bridgeClosing  = regexp.MustCompile(`(gesperrt|sperrung)`)
+	bridgeLifted   = regexp.MustCompile(`(nicht gesperrt|aufgehoben|freigegeben|wieder (frei|befahrbar|offen)|keine sperrung)`)
+	bridgeLimit    = regexp.MustCompile(`(windwarnung|km\/h|beschraenk|verbot|nur fuer|gewicht|\d ?t\b)`)
+)
+
+// BridgeStateOf is the state of a bridge record from its state text and
+// nothing else (bridgeStateOf; nil: no text): "undefiniert" is no state;
+// closed only when the words close it and do not lift a closure; a wind
+// warning, a speed, weight or vehicle limit is a restriction.
+func BridgeStateOf(text *string) BridgeState {
+	if text == nil {
+		return BridgeNone
+	}
+	t := fold(trim(*text))
+	if t == "" || undefinedState.MatchString(t) {
+		return BridgeNone
+	}
+	if bridgeClosing.MatchString(t) && !bridgeLifted.MatchString(t) {
+		return BridgeClosed
+	}
+	if bridgeLimit.MatchString(t) {
+		return BridgeRestricted
+	}
+	return BridgeNone
+}
+
+// BridgeSignal is the signal of a bridge in force (bridgeSignal): red only
+// when closed; a restriction is a warning (amber); false: no state, no
+// signal.
+func BridgeSignal(state BridgeState) (Signal, bool) {
+	switch state {
+	case BridgeClosed:
+		return Signal{Kind: SignalBridgeWind}, true
+	case BridgeRestricted:
+		return Signal{Kind: SignalWarning}, true
+	}
+	return Signal{}, false
+}
+
+// ---------------------------------------------------------------------------
+// The sight
+// ---------------------------------------------------------------------------
+
+// FeedCheck is a feed's newest check (FeedCheckLike): CheckedAt nil when it
+// was never checked, CadenceS nil when it states no cadence.
+type FeedCheck struct {
+	CheckedAt *time.Time
+	CadenceS  *float64
+	Paused    bool
+}
+
+// CheckAlive is the platform's one alive-or-paused rule (checkAlive): true
+// when the check is inside cadences of its cadence before now (inclusive),
+// or the refresh is paused and the feed was checked. A check without a
+// cadence is judged against defaultCadenceS; with none (nil), it is never
+// inside.
+func CheckAlive(c *FeedCheck, now time.Time, cadences float64, defaultCadenceS *float64) bool {
+	if c == nil || c.CheckedAt == nil {
+		return false
+	}
+	if c.Paused {
+		return true
+	}
+	cadence := c.CadenceS
+	if cadence == nil {
+		cadence = defaultCadenceS
+	}
+	if cadence == nil {
+		return false
+	}
+	return float64(now.Sub(*c.CheckedAt).Milliseconds()) <= cadences**cadence*1000
+}
+
+// defaultCadenceS is the cadence a check without one is judged against
+// (feedSightOf's default, 600 s).
+var defaultCadenceS = 600.0
+
+// FeedSightOf is a feed's sight from its newest check (feedSightOf): fresh
+// inside three cadences (600 s when it states none) or while paused, stale
+// after, missing with no check.
+func FeedSightOf(c *FeedCheck, now time.Time) Sight {
+	if c == nil || c.CheckedAt == nil {
+		return SightMissing
+	}
+	if CheckAlive(c, now, 3, &defaultCadenceS) {
+		return SightFresh
+	}
+	return SightStale
+}
+
+// DWDSightOf is the DWD group's sight (dwdSightOf): missing when the
+// warnings read did not answer; fresh when it holds a warning, or when the
+// warnings feed was checked inside three cadences (a quiet read of a live
+// feed); missing otherwise: a quiet read of a dead feed is no sight.
+func DWDSightOf(readOK bool, warnings int, check *FeedCheck, now time.Time) Sight {
+	if !readOK {
+		return SightMissing
+	}
+	if warnings > 0 || FeedSightOf(check, now) == SightFresh {
+		return SightFresh
+	}
+	return SightMissing
+}
+
+// PoliceFeeds are the feeds that tell the lamp one state's police and Land
+// messages are seen: the state's own message feeds (Land), the relay where
+// it was measured to carry the state (Relay; the platform's inventory), and
+// the own feeds whose rows are answered only while current (CurrentOnly).
+type PoliceFeeds struct {
+	Land        []string
+	Relay       []string
+	CurrentOnly []string
+}
+
+var sightRank = map[Sight]int{SightFresh: 0, SightStale: 1, SightMissing: 2}
+
+// PoliceSightOf is the police sight of each state in scope (policeSightOf):
+// the best of the state's own message feeds and its relay; a state with
+// neither is missing; an own feed answered only while current caps the
+// state's sight. In the states' order, each once.
+func PoliceSightOf(lands []string, feeds map[string]PoliceFeeds, sightOfFeed func(feed string) Sight) []SightEntry {
+	var out []SightEntry
+	seen := map[string]bool{}
+	for _, land := range lands {
+		if seen[land] {
+			continue
+		}
+		seen[land] = true
+		f := feeds[land]
+		best := SightMissing
+		for _, k := range append(slices.Clone(f.Land), f.Relay...) {
+			if s := sightOfFeed(k); sightRank[s] < sightRank[best] {
+				best = s
+			}
+		}
+		for _, k := range f.Land {
+			if !slices.Contains(f.CurrentOnly, k) {
+				continue
+			}
+			if s := sightOfFeed(k); sightRank[s] > sightRank[best] {
+				best = s
+			}
+		}
+		out = append(out, SightEntry{Group: GroupPolice, State: best, Land: land})
+	}
+	return out
+}
+
+// PoliceSight is the police sight of the states in scope as the tool reads
+// it (policeSightFromChecks): one missing entry when no state is in scope,
+// else PoliceSightOf with each feed's sight from its newest check
+// (FeedSightOf; a feed with no check is missing).
+func PoliceSight(lands []string, feeds map[string]PoliceFeeds, checks map[string]FeedCheck, now time.Time) []SightEntry {
+	if len(lands) == 0 {
+		return []SightEntry{{Group: GroupPolice, State: SightMissing}}
+	}
+	return PoliceSightOf(lands, feeds, func(feed string) Sight {
+		c, ok := checks[feed]
+		if !ok {
+			return SightMissing
+		}
+		return FeedSightOf(&c, now)
+	})
 }

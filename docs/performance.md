@@ -64,43 +64,80 @@ CI fixture profile and `-perf.assert`.
 - a database much larger than the fixtures;
 - the open arrival model of a load generator.
 
-Its percentiles are the service boundary's on a CI runner. They are a
-regression guard, not a capacity statement.
+Its percentiles are the service boundary's on a CI runner. With the `ci`
+profile they are a regression guard, not a capacity statement. The
+measurement that counts for a release is the run with the release profile,
+`-perf.profile=benchmark`, whose data volume is the one the budgets are set
+for.
 
 Flags (after `-args`): `-perf.assert`, `-perf.samples` (timed requests per
 operation) and `-perf.profile` (`tiny`, `ci` or `benchmark`).
 
 ## Conditional requests and the result cache (NFR-PERF-005, NFR-PERF-006)
 
-**Validators.** A data answer carries an `ETag` derived from two things:
+**Validators.** A data answer carries an `ETag` derived from four things:
 
 - the request: the operation, path, query, `Accept`, `Accept-Language` and the caller's licence permissions;
 - the version of every data family the answer was read from.
 
-A repeated request with `If-None-Match` is answered `304 Not Modified`, as
-long as no family it read has a new version. That costs no storage read: the
-family versions are read once per `cache.versions_ttl` for all requests.
+- the licence register the answer was read under: a fingerprint of every
+  family's terms (use classes, acceptance, register version), attribution,
+  licence, publisher and notes;
+- what the answer states that the clock alone changes: each family's
+  `stale` flag, each charge point's shown state, and the sites a `free_min`
+  filter kept.
+
+The versions and the register fingerprint are read in one snapshot,
+**before** the operation reads its data, and the answer is tagged with
+them. An answer is therefore never tagged with versions newer than its data:
+at worst it is tagged with older ones, and the next check reads it again.
+
+A repeated request with `If-None-Match` is answered `304 Not Modified` while
+all of these hold:
+
+- no family it read has a new version;
+- the register fingerprint is the same;
+- the clock has not reached the instant the answer changes by itself: a
+  family turning stale (its data older than `staleAfterS`), a charge point's
+  report passing the status age limit (`charging.status_max_age` or its
+  family's threshold), or a site's report leaving a `free_min` filter.
+
+A 304 runs no feature read. The versions are read once per
+`cache.versions_ttl` for all requests, as the service's own read: it carries
+no caller, so it is admitted as a service read and never under the tier of
+the request that happened to ask. It does take a storage permit like any
+other read.
 
 **The result cache.** A full answer is kept in memory, within these limits:
 
-- `cache.max_bytes` for the whole cache;
-- `cache.max_entry_bytes` for one entry.
+- `cache.max_bytes` for the whole cache, counting each entry's key,
+  validator, versions, headers and body, plus a fixed overhead per entry;
+- `cache.max_entry_bytes` for one body;
+- `cache.max_entries` entries, with or without a body.
 
-A repeat with no validator is served from memory while its families are
-unchanged.
+The least recently used entry goes first. A body is kept until its max-age
+ends; the entry stays without it, so its validator still answers a 304.
+
+A repeat with no validator is served from memory under the same conditions
+as a 304.
 
 **Identical concurrent requests** share one storage read. The first runs it,
-and the others wait for its answer within their own deadline.
+and the others wait for its answer within their own deadline. A request
+whose deadline ends while it waits is answered `deadline-exhausted`; it
+starts no read of its own.
 
 **What is never stored or validated:**
 
 - an error;
-- an answer from a family without a version.
+- an answer from a family without a version;
+- an answer read when the versions could not be read first;
+- an overview with a part that is not ok (meta.parts).
 
 **Headers on a data answer:**
 
 - `Cache-Control: private, max-age=N`, where N is the smallest
-  `cache.max_age.<domain>` among the domains it answers from;
+  `cache.max_age.<domain>` among the domains it answers from, and never
+  past the instant the answer changes by itself;
 - `Last-Modified` from the newest data instant;
 - `Vary` on the credentials, `Accept`, `Accept-Language` and `Accept-Encoding`.
 
@@ -134,6 +171,12 @@ of these:
 
 - a sequential scan of a time partition;
 - no statement reading a time series at all.
+
+It explains with `enable_seqscan = off`, which prices sequential scans out:
+the planner then takes one only when no other path exists. The test
+therefore proves that an index path exists for every read of a time series,
+not that the planner picks it at normal prices. On the small fixture tables
+a sequential scan is often the cheaper plan.
 
 **Pool settings.** `db.query_exec_mode` and `db.statement_cache_capacity`
 choose how statements are prepared and how many prepared statements are

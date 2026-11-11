@@ -93,6 +93,7 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `cache.enabled` | `VFAPI_CACHE_ENABLED` | bool | `true` | — | Send ETag and Cache-Control on data answers, answer a matching If-None-Match with 304, and keep the result cache. false sends Cache-Control: no-store and caches nothing. |
 | `cache.max_bytes` | `VFAPI_CACHE_MAX_BYTES` | int | `33554432` | 0 to 1073741824 | Byte budget of the result cache's stored bodies; the least recently used entry is dropped first. 0 stores no body (ETag and 304 still work). |
 | `cache.max_entry_bytes` | `VFAPI_CACHE_MAX_ENTRY_BYTES` | int | `524288` | 1024 to 16777216 | Largest body the result cache stores, in bytes. At most cache.max_bytes when that is above 0. |
+| `cache.max_entries` | `VFAPI_CACHE_MAX_ENTRIES` | int | `10000` | 1 to 1000000 | Most entries the result cache holds, with or without a body; the least recently used entry is dropped first. Each entry also counts against cache.max_bytes with its key, validator, versions and headers. |
 | `cache.versions_ttl` | `VFAPI_CACHE_VERSIONS_TTL` | duration | `1s` | 100ms to 60s | How long one read of the source families' freshness versions is reused to answer If-None-Match before the handler runs; it is read only while requests arrive. |
 | `cache.max_age.places` | `VFAPI_CACHE_MAX_AGE_PLACES` | duration | `24h` | 1s to 168h | max-age of place answers. |
 | `cache.max_age.roads` | `VFAPI_CACHE_MAX_AGE_ROADS` | duration | `60s` | 1s to 168h | max-age of road-condition answers. |

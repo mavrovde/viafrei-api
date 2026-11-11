@@ -11,9 +11,12 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/parking"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
+	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
 // docAPI is the part of huma.API documentCaching reads.
@@ -75,8 +78,49 @@ func TestSendWritesHeadersThenStatus(t *testing.T) {
 func TestAnAnswerReadTwiceFromOneFamilyCountsItOnce(t *testing.T) {
 	s := &server{cfg: config.Defaults(), now: time.Now}
 	f := provenance.Family{Source: access.Source{Family: "f", Domain: "energy"}, Version: "1"}
-	e := s.newEntry(context.Background(), "k", []provenance.Family{f, f}, &bufferedContext{header: http.Header{}})
-	if len(e.families) != 1 || e.maxAge != time.Minute {
+	vs := provenance.Versions{Families: map[string]string{"f": "1"}, Register: "r"}
+	e := s.newEntry(context.Background(), "k", &cacheNote{fams: []provenance.Family{f, f}}, vs, true, &bufferedContext{header: http.Header{}})
+	if len(e.families) != 1 || e.maxAge != time.Minute || e.unversioned {
 		t.Fatalf("families %v, max-age %s", e.families, e.maxAge)
+	}
+}
+
+func TestAnEntryIsTaggedWithTheVersionsReadBeforeIt(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005")
+	s := &server{cfg: config.Defaults(), now: time.Now}
+	// The operation read newer data (version 2) than the versions read
+	// before it (version 1): the entry carries 1, so the next check, which
+	// reads 2, finds it not current.
+	f := provenance.Family{Source: access.Source{Family: "f", Domain: "energy"}, Version: "2"}
+	before := provenance.Versions{Families: map[string]string{"f": "1"}}
+	e := s.newEntry(context.Background(), "k", &cacheNote{fams: []provenance.Family{f}}, before, true, &bufferedContext{header: http.Header{}})
+	if e.families[0].version != "1" || e.current(provenance.Versions{Families: map[string]string{"f": "2"}}, time.Now()) {
+		t.Fatalf("tagged %v", e.families)
+	}
+	if e := s.newEntry(context.Background(), "k", &cacheNote{fams: []provenance.Family{f}}, provenance.Versions{}, false, &bufferedContext{header: http.Header{}}); !e.unversioned {
+		t.Fatal("an answer with no versions read before it was versioned from its own read")
+	}
+}
+
+func TestAFreeMinAnswerEndsWhenAKeptReportAges(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005", "FR-PARK-001")
+	observed := time.Date(2026, 3, 29, 1, 0, 0, 0, time.UTC)
+	a := features.Answer[parking.Site]{
+		Items: []parking.Site{
+			{ID: "p1", Occupancy: &parking.Occupancy{ObservedAt: observed, Family: "f"}},
+			{ID: "p2", Occupancy: &parking.Occupancy{ObservedAt: observed.Add(time.Minute), Family: "f"}},
+		},
+		Families: []provenance.Family{{Source: access.Source{Family: "f"}, StaleAfter: 10 * time.Minute}},
+	}
+	note := &cacheNote{}
+	ctx := context.WithValue(context.Background(), cacheNoteKey{}, note)
+	noteFreeMin(ctx, a, 1)
+	if want := observed.Add(10*time.Minute + time.Microsecond); !note.until.Equal(want) || len(note.shown) != 2 {
+		t.Fatalf("until %s (want %s), shown %v", note.until, want, note.shown)
+	}
+	none := &cacheNote{}
+	noteFreeMin(context.WithValue(context.Background(), cacheNoteKey{}, none), a, 0)
+	if !none.until.IsZero() || len(none.shown) != 0 {
+		t.Fatal("an answer without free_min does not change with the clock")
 	}
 }

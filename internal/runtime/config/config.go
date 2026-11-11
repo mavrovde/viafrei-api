@@ -251,6 +251,7 @@ type Cache struct {
 	Enabled       bool          `koanf:"enabled" default:"true" desc:"Send ETag and Cache-Control on data answers, answer a matching If-None-Match with 304, and keep the result cache. false sends Cache-Control: no-store and caches nothing."`
 	MaxBytes      int           `koanf:"max_bytes" default:"33554432" validate:"min=0,max=1073741824" desc:"Byte budget of the result cache's stored bodies; the least recently used entry is dropped first. 0 stores no body (ETag and 304 still work)."`
 	MaxEntryBytes int           `koanf:"max_entry_bytes" default:"524288" validate:"min=1024,max=16777216" desc:"Largest body the result cache stores, in bytes. At most cache.max_bytes when that is above 0."`
+	MaxEntries    int           `koanf:"max_entries" default:"10000" validate:"min=1,max=1000000" desc:"Most entries the result cache holds, with or without a body; the least recently used entry is dropped first. Each entry also counts against cache.max_bytes with its key, validator, versions and headers."`
 	VersionsTTL   time.Duration `koanf:"versions_ttl" default:"1s" validate:"min=100ms,max=60s" desc:"How long one read of the source families' freshness versions is reused to answer If-None-Match before the handler runs; it is read only while requests arrive."`
 	MaxAge        CacheMaxAge   `koanf:"max_age"`
 }

@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"io"
 	"net/http"
 	"slices"
@@ -21,20 +22,37 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
 
-// VersionReader reads the freshness version of every source family.
+// VersionReader reads, in one snapshot, the freshness version of every source
+// family and the fingerprint of the licence register.
 type VersionReader interface {
-	FreshnessVersions(ctx context.Context) (map[string]string, error)
+	FreshnessVersions(ctx context.Context) (provenance.Versions, error)
 }
 
 // varyOn are the request headers a cached answer depends on; the
 // compression layer adds Accept-Encoding.
 const varyOn = "Authorization, X-API-Key, Accept, Accept-Language"
 
-// cacheNote collects, while a data operation runs, the source families its
-// answer was built from (dataMeta records them).
+// cacheNote collects, while a data operation runs, what its answer depends
+// on besides the request: the source families it was built from (dataMeta
+// records them), the earliest instant it changes with the clock alone, what
+// it shows that the clock changes, and whether it is degraded.
 type cacheNote struct {
 	mu   sync.Mutex
 	fams []provenance.Family
+	// until is the earliest instant the answer would change with no family
+	// changing its version: a family turning stale, a charging report
+	// ageing past its limit, a parking report leaving a free_min filter.
+	// Zero when nothing in it changes with the clock.
+	until time.Time
+	// shown is what the answer states that changes with the clock (each
+	// family's stale flag, each charge point's shown state, the sites a
+	// filter on live reports kept); it is part of the ETag, so an answer
+	// built after until is never validated by one built before.
+	shown []string
+	// degraded is set when a part of the answer is missing for a reason
+	// that may pass (a part timed out or was unavailable): such an answer
+	// is never stored and carries no ETag.
+	degraded bool
 }
 
 type cacheNoteKey struct{}
@@ -49,39 +67,80 @@ func noteFamilies(ctx context.Context, fams []provenance.Family) {
 	}
 }
 
+// noteChangesAt records that the answer changes at t with the clock alone.
+func noteChangesAt(ctx context.Context, t time.Time) {
+	if n, ok := ctx.Value(cacheNoteKey{}).(*cacheNote); ok {
+		n.mu.Lock()
+		if n.until.IsZero() || t.Before(n.until) {
+			n.until = t
+		}
+		n.mu.Unlock()
+	}
+}
+
+// noteShown records what the answer states that the clock changes.
+func noteShown(ctx context.Context, shown ...string) {
+	if n, ok := ctx.Value(cacheNoteKey{}).(*cacheNote); ok {
+		n.mu.Lock()
+		n.shown = append(n.shown, shown...)
+		n.mu.Unlock()
+	}
+}
+
+// noteDegraded records that a part of the answer is missing for a reason
+// that may pass.
+func noteDegraded(ctx context.Context) {
+	if n, ok := ctx.Value(cacheNoteKey{}).(*cacheNote); ok {
+		n.mu.Lock()
+		n.degraded = true
+		n.mu.Unlock()
+	}
+}
+
 // familyVersion is one family an answer was read from, at the version read.
 type familyVersion struct{ family, version string }
 
-// entry is one answer of the result cache. The body is kept only while the
-// answer is younger than its max-age and fits the budget; the ETag and the
-// family versions stay while the entry is in the cache, so a matching
-// If-None-Match is answered without the handler for as long as no family
-// changed.
+// entry is one answer of the result cache. Its body is kept while it is
+// younger than its max-age and fits the budget; get drops an expired body.
+// The ETag, the family versions and the register fingerprint stay while the
+// entry is in the cache, so a matching If-None-Match is answered without the
+// handler for as long as nothing the answer rests on changed. A stored entry
+// is never written again: get replaces it with a copy, so a request still
+// sending it reads what it was given.
 type entry struct {
-	key       string
-	etag      string
-	families  []familyVersion
+	key      string
+	etag     string
+	families []familyVersion
+	// register is the licence register's fingerprint the answer was read
+	// under: the gate's decision, the attribution and the notes rest on it.
+	register  string
+	until     time.Time // cacheNote.until
 	maxAge    time.Duration
 	modified  *time.Time
-	header    http.Header
+	header    http.Header // nil when the entry keeps no body
 	body      []byte
 	requestID string
 	expires   time.Time
 	elem      *list.Element
-	// unversioned is set when a family carried no freshness version: nothing
-	// can tell when the answer changes, so it gets no ETag, is never stored
-	// and is never current; it keeps its max-age.
+	// unversioned is set when nothing can tell when the answer changes: a
+	// family carried no freshness version, the versions could not be read
+	// before the answer, or the answer is degraded. It gets no ETag, is
+	// never stored and is never current; it keeps its max-age.
 	unversioned bool
 }
 
-// current reports whether every family of e still has the version it was
-// read at.
-func (e *entry) current(versions map[string]string) bool {
-	if e.unversioned {
+// current reports whether e still answers at now under versions: every
+// family has the version it was read at, the register is the one it was read
+// under, and the clock has not reached the instant it changes.
+func (e *entry) current(versions provenance.Versions, now time.Time) bool {
+	if e.unversioned || versions.Register != e.register {
+		return false
+	}
+	if !e.until.IsZero() && !now.Before(e.until) {
 		return false
 	}
 	for _, f := range e.families {
-		if versions[f.family] != f.version {
+		if versions.Families[f.family] != f.version {
 			return false
 		}
 	}
@@ -89,15 +148,15 @@ func (e *entry) current(versions map[string]string) bool {
 }
 
 // resultCache is the in-process cache of encoded answers: a byte budget over
-// the stored bodies, least recently used dropped first, and single-flight so
-// identical concurrent requests cause one read.
+// the entries and a cap on their number, least recently used dropped first,
+// and single-flight so identical concurrent requests cause one read.
 type resultCache struct {
-	maxBytes, maxEntry int
-	mu                 sync.Mutex
-	entries            map[string]*entry
-	lru                list.List
-	bytes              int
-	flights            map[string]*flight
+	maxBytes, maxEntry, maxEntries int
+	mu                             sync.Mutex
+	entries                        map[string]*entry
+	lru                            list.List
+	bytes                          int
+	flights                        map[string]*flight
 }
 
 // flight is one handler run that identical requests wait for.
@@ -107,35 +166,55 @@ type flight struct {
 }
 
 func newResultCache(c config.Cache) *resultCache {
-	return &resultCache{maxBytes: c.MaxBytes, maxEntry: c.MaxEntryBytes, entries: map[string]*entry{}, flights: map[string]*flight{}}
+	return &resultCache{
+		maxBytes: c.MaxBytes, maxEntry: c.MaxEntryBytes, maxEntries: c.MaxEntries,
+		entries: map[string]*entry{}, flights: map[string]*flight{},
+	}
 }
 
-func (c *resultCache) get(key string) *entry {
+// get returns the entry of key, the most recently used from now on. An entry
+// whose body has expired at now is replaced by its bodiless copy first.
+func (c *resultCache) get(key string, now time.Time) *entry {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	e := c.entries[key]
-	if e != nil {
-		c.lru.MoveToFront(e.elem)
+	if e == nil {
+		return nil
 	}
+	if e.body != nil && !now.Before(e.expires) {
+		bare := *e
+		bare.body, bare.header = nil, nil
+		c.remove(e)
+		c.insert(&bare)
+		return &bare
+	}
+	c.lru.MoveToFront(e.elem)
 	return e
 }
 
-// put stores e under its key, dropping the oldest bodies past the budget.
-// An entry keeps its body only when it fits maxEntry; the bodiless rest of
-// an entry is small and counts as its key and ETag.
+// put stores e under its key, dropping the least recently used entries past
+// the budget or the cap. An entry keeps its body (and the headers it is
+// replayed with) only when the body fits maxEntry.
 func (c *resultCache) put(e *entry) {
 	if len(e.body) > c.maxEntry || c.maxBytes == 0 {
 		e.body = nil
+	}
+	if e.body == nil {
+		e.header = nil
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if old := c.entries[e.key]; old != nil {
 		c.remove(old)
 	}
+	c.insert(e)
+}
+
+func (c *resultCache) insert(e *entry) {
 	e.elem = c.lru.PushFront(e)
 	c.entries[e.key] = e
 	c.bytes += e.size()
-	for c.bytes > c.maxBytes && c.lru.Len() > 0 {
+	for (c.bytes > c.maxBytes || c.lru.Len() > c.maxEntries) && c.lru.Len() > 0 {
 		c.remove(c.lru.Back().Value.(*entry))
 	}
 }
@@ -146,7 +225,25 @@ func (c *resultCache) remove(e *entry) {
 	c.bytes -= e.size()
 }
 
-func (e *entry) size() int { return len(e.body) + len(e.key) + len(e.etag) }
+// entryOverhead is what an entry holds besides its strings and body: the
+// struct, its list element and its map slot, rounded up.
+const entryOverhead = 256
+
+// size is what e holds in memory, as the budget counts it: every string,
+// the stored headers and the body, plus the fixed overhead.
+func (e *entry) size() int {
+	n := entryOverhead + len(e.key) + len(e.etag) + len(e.register) + len(e.requestID) + len(e.body)
+	for _, f := range e.families {
+		n += len(f.family) + len(f.version)
+	}
+	for name, vs := range e.header {
+		n += len(name)
+		for _, v := range vs {
+			n += len(v)
+		}
+	}
+	return n
+}
 
 // join makes the caller the leader of the flight for key, or returns the
 // flight already running.
@@ -172,29 +269,32 @@ func (c *resultCache) land(key string, f *flight, e *entry) {
 	close(f.done)
 }
 
-// versionCache holds the last read of every family's freshness version for
-// cache.versions_ttl. It reads only when a request asks and the last read is
-// older; while one request reads, the others wait for that read, so a burst
-// of identical requests neither reads the versions twice nor falls through
-// to the operation.
+// versionCache holds the last read of the family versions and the register
+// fingerprint for cache.versions_ttl. It reads only when a request asks and
+// the last read is older; while one request reads, the others wait for that
+// read, so a burst of identical requests neither reads the versions twice nor
+// falls through to the operation.
 type versionCache struct {
 	reader  VersionReader
 	ttl     time.Duration
 	now     func() time.Time
 	mu      sync.Mutex
 	at      time.Time
-	vs      map[string]string
+	vs      provenance.Versions
+	read    bool          // vs holds a read
 	failed  bool          // the last read failed
 	reading chan struct{} // closed when the running read ends; nil when none runs
 }
 
-// get returns versions not older than the TTL, or ok false.
-func (v *versionCache) get(ctx context.Context) (map[string]string, bool) {
+// get returns versions not older than the TTL, or ok false. Every value it
+// returns was read before it returns, so versions taken before an operation
+// runs are never newer than the data the operation reads.
+func (v *versionCache) get(ctx context.Context) (provenance.Versions, bool) {
 	if v.reader == nil {
-		return nil, false
+		return provenance.Versions{}, false
 	}
 	v.mu.Lock()
-	if v.vs != nil && v.now().Sub(v.at) < v.ttl {
+	if v.read && v.now().Sub(v.at) < v.ttl {
 		vs := v.vs
 		v.mu.Unlock()
 		return vs, true
@@ -204,25 +304,40 @@ func (v *versionCache) get(ctx context.Context) (map[string]string, bool) {
 		select {
 		case <-wait:
 		case <-ctx.Done():
-			return nil, false
+			return provenance.Versions{}, false
 		}
 		v.mu.Lock()
 		defer v.mu.Unlock()
-		return v.vs, !v.failed
+		return v.vs, v.read && !v.failed
 	}
 	done := make(chan struct{})
 	v.reading = done
 	v.mu.Unlock()
-	vs, err := v.reader.FreshnessVersions(ctx)
+	rctx, cancel := serviceRead(ctx)
+	vs, err := v.reader.FreshnessVersions(rctx)
+	cancel()
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.reading, v.failed = nil, err != nil
 	close(done)
 	if err != nil {
-		return nil, false
+		return provenance.Versions{}, false
 	}
-	v.vs, v.at = vs, v.now()
+	v.vs, v.at, v.read = vs, v.now(), true
 	return vs, true
+}
+
+// serviceRead is the context of a read the service makes for every request,
+// not for the one that happened to ask: it carries none of that request's
+// values, so no caller rides on it and it is admitted as the service's own
+// read, never in the asking caller's tier (a shed bulk caller would otherwise
+// fail the read for everyone waiting on it). It ends at the asking request's
+// deadline at the latest.
+func serviceRead(ctx context.Context) (context.Context, context.CancelFunc) {
+	if d, ok := ctx.Deadline(); ok {
+		return context.WithDeadline(context.Background(), d)
+	}
+	return context.WithCancel(context.Background())
 }
 
 // humaContext names the embedded context: a field called Context would hide
@@ -255,8 +370,12 @@ func cacheable(op *huma.Operation) bool {
 
 // cache is the HTTP cache of the data operations (Performance-and-Caching).
 // It runs after the key gates, so a 304 counts against the quota and is
-// metered, and before the operation, so a 304 or a stored answer takes no
-// storage permit.
+// metered, and before the operation, so a 304 or a stored answer runs no
+// feature read. Both read the versions, which the service reads as its own
+// read once per cache.versions_ttl (serviceRead), never under the caller's
+// tier. The versions are read before the operation runs and its answer is
+// tagged with them: an answer is never tagged with versions newer than its
+// data.
 func (s *server) cache(ctx huma.Context, next func(huma.Context)) {
 	if !s.cfg.Cache.Enabled || !cacheable(ctx.Operation()) {
 		next(ctx)
@@ -264,16 +383,16 @@ func (s *server) cache(ctx huma.Context, next func(huma.Context)) {
 	}
 	key := cacheKey(ctx)
 	inm := ctx.Header("If-None-Match")
-	if e := s.results.get(key); e != nil {
-		if vs, ok := s.versions.get(ctx.Context()); ok && e.current(vs) {
-			if etagMatch(inm, e.etag) {
-				s.sendNotModified(ctx, e)
-				return
-			}
-			if e.body != nil && s.now().Before(e.expires) {
-				s.sendEntry(ctx, e, inm)
-				return
-			}
+	vs, versioned := s.versions.get(ctx.Context())
+	now := s.now()
+	if e := s.results.get(key, now); e != nil && versioned && e.current(vs, now) {
+		if etagMatch(inm, e.etag) {
+			s.sendNotModified(ctx, e)
+			return
+		}
+		if e.body != nil {
+			s.sendEntry(ctx, e, inm)
+			return
 		}
 	}
 	f, leader := s.results.join(key)
@@ -285,17 +404,33 @@ func (s *server) cache(ctx huma.Context, next func(huma.Context)) {
 				return
 			}
 		case <-ctx.Context().Done():
+			// The request ended while waiting: it runs no read of its own.
+			sendProblem(ctx, newProblem(ctx.Context(), SlugDeadlineExhausted, "The request ended while an identical request was being answered.", 1))
+			return
 		}
-		s.run(ctx, next, key, inm, nil)
+		s.run(ctx, next, key, inm, nil, vs, versioned)
 		return
 	}
-	s.run(ctx, next, key, inm, f)
+	s.run(ctx, next, key, inm, f, vs, versioned)
+}
+
+// sendProblem writes a problem from the cache layer.
+func sendProblem(ctx huma.Context, p *Problem) {
+	h := p.headers.Clone()
+	if h == nil {
+		h = http.Header{}
+	}
+	h.Set("Content-Type", ProblemContentType)
+	h.Set("Cache-Control", "no-store")
+	body, _ := json.Marshal(p)
+	send(ctx, p.Status, h, body)
 }
 
 // run answers through the operation and, when the answer is a 200 built from
 // source families, gives it an ETag and Cache-Control and stores it. f is the
-// flight the run leads, if any.
-func (s *server) run(ctx huma.Context, next func(huma.Context), key, inm string, f *flight) {
+// flight the run leads, if any; vs are the versions read before it, when
+// versioned.
+func (s *server) run(ctx huma.Context, next func(huma.Context), key, inm string, f *flight, vs provenance.Versions, versioned bool) {
 	note := &cacheNote{}
 	b := &bufferedContext{humaContext: huma.WithValue(ctx, cacheNoteKey{}, note), header: http.Header{}}
 	var stored *entry
@@ -309,7 +444,7 @@ func (s *server) run(ctx huma.Context, next func(huma.Context), key, inm string,
 		send(ctx, b.status, b.header, b.body.Bytes())
 		return
 	}
-	e := s.newEntry(ctx.Context(), key, note.fams, b)
+	e := s.newEntry(ctx.Context(), key, note, vs, versioned, b)
 	if !e.unversioned {
 		stored = e
 	}
@@ -321,16 +456,23 @@ func (s *server) run(ctx huma.Context, next func(huma.Context), key, inm string,
 	send(ctx, b.status, b.header, b.body.Bytes())
 }
 
-func (s *server) newEntry(ctx context.Context, key string, fams []provenance.Family, b *bufferedContext) *entry {
-	e := &entry{key: key, header: b.header.Clone(), body: slices.Clone(b.body.Bytes()), requestID: RequestIDFrom(ctx)}
+// newEntry builds the entry of an answer. Its family versions and register
+// fingerprint are vs, read before the operation ran; without them nothing can
+// tell when the answer changes and the entry is unversioned.
+func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs provenance.Versions, versioned bool, b *bufferedContext) *entry {
+	e := &entry{
+		key: key, header: b.header.Clone(), body: slices.Clone(b.body.Bytes()), requestID: RequestIDFrom(ctx),
+		register: vs.Register, until: note.until, unversioned: !versioned || note.degraded,
+	}
 	seen := map[string]bool{}
-	for _, f := range fams {
+	for _, f := range note.fams {
 		if seen[f.Source.Family] {
 			continue
 		}
 		seen[f.Source.Family] = true
-		e.families = append(e.families, familyVersion{family: f.Source.Family, version: f.Version})
-		if f.Version == "" {
+		version := vs.Families[f.Source.Family]
+		e.families = append(e.families, familyVersion{family: f.Source.Family, version: version})
+		if version == "" {
 			e.unversioned = true
 		}
 		age := maxAge(s.cfg.Cache.MaxAge, f.Source.Domain)
@@ -342,6 +484,10 @@ func (s *server) newEntry(ctx context.Context, key string, fams []provenance.Fam
 		}
 	}
 	slices.SortFunc(e.families, func(a, b familyVersion) int { return strings.Compare(a.family, b.family) })
+	now := s.now()
+	if !e.until.IsZero() && e.until.Sub(now) < e.maxAge {
+		e.maxAge = max(e.until.Sub(now), 0)
+	}
 	h := sha256.New()
 	h.Write([]byte(key))
 	for _, f := range e.families {
@@ -350,8 +496,14 @@ func (s *server) newEntry(ctx context.Context, key string, fams []provenance.Fam
 		h.Write([]byte{0})
 		h.Write([]byte(f.version))
 	}
+	h.Write([]byte{1})
+	h.Write([]byte(e.register))
+	for _, v := range note.shown {
+		h.Write([]byte{2})
+		h.Write([]byte(v))
+	}
 	e.etag = `W/"` + base64.RawURLEncoding.EncodeToString(h.Sum(nil)[:18]) + `"`
-	e.expires = s.now().Add(e.maxAge)
+	e.expires = now.Add(e.maxAge)
 	return e
 }
 

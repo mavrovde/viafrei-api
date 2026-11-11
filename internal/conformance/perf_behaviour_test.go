@@ -49,12 +49,12 @@ func (f *cachedFeatures) Overview(context.Context, access.Record, features.Overv
 // its reads.
 type countedVersions struct{ reads atomic.Int32 }
 
-func (v *countedVersions) FreshnessVersions(context.Context) (map[string]string, error) {
+func (v *countedVersions) FreshnessVersions(context.Context) (provenance.Versions, error) {
 	v.reads.Add(1)
-	return map[string]string{
+	return provenance.Versions{Families: map[string]string{
 		"fam-places": "1", "fam-roads": "1", "fam-energy": "1", "fam-parking": "1", "fam-transit": "1",
 		"fam-accessibility": "1", "fam-weather": "1", "fam-rules": "1", "fam-other": "1",
-	}, nil
+	}}, nil
 }
 
 // cacheRun sends the same charging request n times, pause apart, and
@@ -82,6 +82,26 @@ func cacheRun(domain string, sites, n int, pause time.Duration) func(t *testing.
 		return fmt.Sprintf("cache-control=%q etag=%t reads=%d version-reads=%d",
 			w.Header().Get("Cache-Control"), w.Header().Get("ETag") != "", f.reads.Load(), v.reads.Load())
 	}
+}
+
+// cacheAlternate asks two different charging requests, then the first
+// again, and reports the operation's reads: with room for one entry the
+// first is dropped and read again.
+func cacheAlternate(t *testing.T, c *config.Config) string {
+	t.Helper()
+	f, v := &cachedFeatures{domain: "energy", sites: 1}, &countedVersions{}
+	h, err := httpapi.NewHandler(httpapi.Deps{Config: c, ContractVersion: "0.1", Auth: everyScope{}, Features: f, Versions: v})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, at := range []string{"1,2", "3,4", "1,2"} {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/charging-options?at="+at, nil))
+		if w.Code != http.StatusOK {
+			t.Fatalf("status %d: %s", w.Code, w.Body)
+		}
+	}
+	return fmt.Sprintf("reads=%d", f.reads.Load())
 }
 
 // compressed fetches the OpenAPI document gzip-encoded and reports the coding
@@ -114,6 +134,9 @@ func perfBehaviours() map[string]behaviour {
 		// Three requests 150ms apart read the versions once within 1s, twice
 		// within 100ms.
 		"cache.versions_ttl": {"100ms", cacheRun("energy", 1, 3, 150*time.Millisecond)},
+		// Room for one entry: the first request's entry is dropped by the
+		// second and read again by the third.
+		"cache.max_entries": {"1", cacheAlternate},
 	}
 	for _, d := range []string{"places", "roads", "energy", "parking", "transit", "accessibility", "weather", "rules", "default"} {
 		domain := d

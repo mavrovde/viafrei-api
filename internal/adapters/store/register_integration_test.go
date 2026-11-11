@@ -104,3 +104,40 @@ func TestRegisterAndSourcesReportStorageFaults(t *testing.T) {
 		t.Error("Sources on an ended context succeeded")
 	}
 }
+
+func TestTheRegisterFingerprintMovesWithEveryLicenceInput(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005", "SEC-030")
+	st := seeded(t)
+	ctx := bounded(t)
+	conn, err := db.Owner(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	base, err := st.FreshnessVersions(ctx)
+	if err != nil || base.Register == "" || len(base.Families) == 0 {
+		t.Fatalf("versions %+v, %v", base, err)
+	}
+	for _, change := range []struct{ name, do, undo string }{
+		{"register_version", `update contract.source set register_version = register_version + 1 where source_ref = 'src-delta-parking'`,
+			`update contract.source set register_version = register_version - 1 where source_ref = 'src-delta-parking'`},
+		{"use_classes", `update contract.source set use_classes = use_classes || '{probe}' where source_ref = 'src-gamma-energy'`,
+			`update contract.source set use_classes = array_remove(use_classes, 'probe') where source_ref = 'src-gamma-energy'`},
+		{"a note", `update contract.source_note set body = body || ' (probe)' where source_ref = 'src-gamma-energy'`,
+			`update contract.source_note set body = left(body, -8) where source_ref = 'src-gamma-energy'`},
+	} {
+		if _, err := conn.Exec(ctx, change.do); err != nil {
+			t.Fatal(err)
+		}
+		got, err := st.FreshnessVersions(ctx)
+		if _, uerr := conn.Exec(ctx, change.undo); uerr != nil {
+			t.Fatal(uerr)
+		}
+		if err != nil || got.Register == base.Register {
+			t.Errorf("%s changed and the fingerprint did not: %v", change.name, err)
+		}
+		if back, err := st.FreshnessVersions(ctx); err != nil || back.Register != base.Register {
+			t.Errorf("after undoing %s the fingerprint is %q, want %q (%v)", change.name, back.Register, base.Register, err)
+		}
+	}
+}

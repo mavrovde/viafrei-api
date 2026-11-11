@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -24,29 +25,37 @@ import (
 
 // fakeVersions is the freshness-version register the cache validates with.
 type fakeVersions struct {
-	mu  sync.Mutex
-	vs  map[string]string
-	err error
+	mu       sync.Mutex
+	vs       map[string]string
+	register string
+	err      error
 }
 
-func (f *fakeVersions) FreshnessVersions(context.Context) (map[string]string, error) {
+func (f *fakeVersions) FreshnessVersions(context.Context) (provenance.Versions, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return map[string]string{"src-alpha-energy": f.vs["src-alpha-energy"]}, f.err
+	vs := map[string]string{}
+	for k, v := range f.vs {
+		vs[k] = v
+	}
+	return provenance.Versions{Families: vs, Register: f.register}, f.err
 }
 
 func (f *fakeVersions) set(v string) {
 	f.mu.Lock()
-	f.vs = map[string]string{"src-alpha-energy": v}
+	f.vs["src-alpha-energy"] = v
 	f.mu.Unlock()
 }
 
-// countingFeatures counts the charging reads and can hold them.
+// countingFeatures counts the charging and overview reads, can hold the
+// charging reads, and answers at the rig's clock as the service does.
 type countingFeatures struct {
 	*fakeFeatures
-	calls atomic.Int32
-	hold  chan struct{}
-	mu    sync.Mutex
+	calls     atomic.Int32
+	overviews atomic.Int32
+	hold      chan struct{}
+	mu        sync.Mutex
+	now       func() time.Time
 }
 
 func (c *countingFeatures) Charging(ctx context.Context, key access.Record, q energy.Query) (features.Answer[energy.Site], error) {
@@ -56,7 +65,16 @@ func (c *countingFeatures) Charging(ctx context.Context, key access.Record, q en
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.fakeFeatures.Charging(ctx, key, q)
+	a, err := c.fakeFeatures.Charging(ctx, key, q)
+	a.At = c.now()
+	return a, err
+}
+
+func (c *countingFeatures) Overview(ctx context.Context, key access.Record, q features.OverviewQuery) (features.Overview, error) {
+	c.overviews.Add(1)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.fakeFeatures.Overview(ctx, key, q)
 }
 
 // clock is a test clock the cache's expiry and the version TTL read.
@@ -99,11 +117,12 @@ func newCacheRig(t *testing.T, cfg *config.Config, version string) *cacheRig {
 	fam.Version = version
 	answer.Families = []provenance.Family{fam}
 	r := &cacheRig{
-		features: &countingFeatures{fakeFeatures: &fakeFeatures{charging: answer}},
-		versions: &fakeVersions{vs: map[string]string{"src-alpha-energy": version}},
+		features: &countingFeatures{fakeFeatures: &fakeFeatures{charging: answer, overview: overviewAnswer()}},
+		versions: &fakeVersions{vs: map[string]string{"src-alpha-energy": version, "src-delta-parking": "p1", "src-zeta-places": "z1"}, register: "reg-1"},
 		clock:    &clock{t: fixedNow},
 		auth:     &lockedAuth{p: featureScopes()},
 	}
+	r.features.now = r.clock.now
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Config: cfg, Build: buildinfo.Info{Version: "t", Commit: "c"}, ContractVersion: "0.1", Now: r.clock.now,
 		Auth: r.auth, Sources: &fakeSources{register: fixtureRegister},
@@ -276,21 +295,37 @@ func TestAFollowerRunsItselfWhenTheLeaderStoredNothing(t *testing.T) {
 }
 
 func TestAFollowerGivesUpWaitingWithItsRequest(t *testing.T) {
+	req.Covers(t, "NFR-PERF-006")
 	r := newCacheRig(t, config.Defaults(), "v1")
 	r.features.hold = make(chan struct{})
-	go r.h.ServeHTTP(httptest.NewRecorder(), authed(context.Background()))
+	leader := make(chan struct{})
+	go func() { r.h.ServeHTTP(httptest.NewRecorder(), authed(context.Background())); close(leader) }()
 	for r.features.calls.Load() == 0 {
 		time.Sleep(time.Millisecond)
 	}
+	// The follower's request has ended: it answers at once, without a read
+	// of its own, while the leader still reads.
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	done := make(chan struct{})
-	go func() { r.h.ServeHTTP(httptest.NewRecorder(), authed(ctx)); close(done) }()
-	for r.features.calls.Load() < 2 {
-		time.Sleep(time.Millisecond)
+	w := httptest.NewRecorder()
+	answered := make(chan struct{})
+	go func() { r.h.ServeHTTP(w, authed(ctx)); close(answered) }()
+	select {
+	case <-answered:
+	case <-time.After(time.Second):
+		close(r.features.hold)
+		<-answered
+		<-leader
+		t.Fatal("the follower did not answer at once: it waited for a read")
+	}
+	if w.Code != http.StatusServiceUnavailable || !strings.Contains(w.Body.String(), "deadline-exhausted") {
+		t.Fatalf("the follower answered %d %s", w.Code, w.Body)
+	}
+	if n := r.features.calls.Load(); n != 1 {
+		t.Fatalf("the follower ran the operation itself: %d reads", n)
 	}
 	close(r.features.hold)
-	<-done
+	<-leader
 }
 
 func authed(ctx context.Context) *http.Request {
@@ -310,6 +345,7 @@ func TestAnUnversionedFamilyIsNeitherValidatedNorStored(t *testing.T) {
 }
 
 func TestUnreadableVersionsReadTheAnswer(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005")
 	r := newCacheRig(t, config.Defaults(), "v1")
 	first := r.get(t, nil)
 	r.versions.mu.Lock()
@@ -317,9 +353,101 @@ func TestUnreadableVersionsReadTheAnswer(t *testing.T) {
 	r.versions.mu.Unlock()
 	r.clock.add(2 * time.Second)
 	again := r.get(t, http.Header{"If-None-Match": {first.Header().Get("ETag")}})
-	// The answer is read again and still validated by its own versions.
-	if again.Code != http.StatusNotModified || r.features.calls.Load() != 2 {
-		t.Fatalf("%d after %d reads", again.Code, r.features.calls.Load())
+	// The answer is read again; with no versions read before it, nothing
+	// tells when it changes, so it is neither validated nor stored.
+	if again.Code != http.StatusOK || again.Header().Get("ETag") != "" || r.features.calls.Load() != 2 {
+		t.Fatalf("%d (etag %q) after %d reads", again.Code, again.Header().Get("ETag"), r.features.calls.Load())
+	}
+}
+
+func TestAnAnswerTurningStaleIsANewAnswer(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005", "ENV-003")
+	r := newCacheRig(t, config.Defaults(), "v1")
+	first := r.get(t, nil)
+	etag := first.Header().Get("ETag")
+	// The family's data is 5 minutes old with a 1-hour threshold: it turns
+	// stale 55 minutes and one second on. The version never changes.
+	r.clock.add(55 * time.Minute)
+	if w := r.get(t, http.Header{"If-None-Match": {etag}}); w.Code != http.StatusOK || r.features.calls.Load() != 2 {
+		// The charge point's report turned stale at 29 minutes: a new answer.
+		t.Fatalf("after the report aged: %d, %d reads", w.Code, r.features.calls.Load())
+	}
+	before := r.get(t, nil)
+	r.clock.add(time.Second)
+	w := r.get(t, http.Header{"If-None-Match": {before.Header().Get("ETag")}})
+	fr := meta(t, decode(t, w))["freshness"].([]any)[0].(map[string]any)
+	if w.Code != http.StatusOK || fr["stale"] != true || w.Header().Get("ETag") == before.Header().Get("ETag") ||
+		!slices.Contains(warningCodes(meta(t, decode(t, w))), "data_stale") {
+		t.Fatalf("past stale_after: %d, freshness %v, etag %q (was %q)", w.Code, fr, w.Header().Get("ETag"), before.Header().Get("ETag"))
+	}
+	if n := r.features.calls.Load(); n != 3 {
+		t.Fatalf("%d reads; the answer must be read again once the family turned stale", n)
+	}
+}
+
+func TestAChargingReportAgingPastItsLimitIsANewAnswer(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005", "FR-ENERGY-004")
+	r := newCacheRig(t, config.Defaults(), "v1")
+	first := r.get(t, nil)
+	// The report is a minute old against the 30-minute status limit.
+	r.clock.add(29 * time.Minute)
+	if w := r.get(t, http.Header{"If-None-Match": {first.Header().Get("ETag")}}); w.Code != http.StatusNotModified {
+		t.Fatalf("at the limit: %d", w.Code)
+	}
+	r.clock.add(time.Nanosecond)
+	w := r.get(t, http.Header{"If-None-Match": {first.Header().Get("ETag")}})
+	if w.Code != http.StatusOK || w.Header().Get("ETag") == first.Header().Get("ETag") || !strings.Contains(w.Body.String(), `"state":"stale"`) {
+		t.Fatalf("past the limit: %d, etag %q, %s", w.Code, w.Header().Get("ETag"), w.Body)
+	}
+}
+
+func TestTheMaxAgeNeverReachesPastTheChange(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005")
+	r := newCacheRig(t, config.Defaults(), "v1")
+	// 28 minutes and 30 seconds on, the report has 30 seconds left.
+	r.clock.add(28*time.Minute + 30*time.Second)
+	if cc := r.get(t, nil).Header().Get("Cache-Control"); cc != "private, max-age=30" {
+		t.Fatalf("cache-control %q, want the 30 seconds left", cc)
+	}
+}
+
+func TestARegisterChangeEndsEveryCachedAnswer(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005", "SEC-030")
+	r := newCacheRig(t, config.Defaults(), "v1")
+	first := r.get(t, nil)
+	// The register changes (a family's use classes, its terms, its register
+	// version): every answer must pass the licence gate again.
+	r.versions.mu.Lock()
+	r.versions.register = "reg-2"
+	r.versions.mu.Unlock()
+	r.clock.add(2 * time.Second)
+	if w := r.get(t, nil); w.Code != http.StatusOK || r.features.calls.Load() != 2 {
+		t.Fatalf("a stored answer was replayed under another register: %d reads", r.features.calls.Load())
+	}
+	if w := r.get(t, http.Header{"If-None-Match": {first.Header().Get("ETag")}}); w.Code != http.StatusOK {
+		t.Fatalf("a validator from another register was honoured: %d", w.Code)
+	}
+}
+
+func TestADegradedOverviewIsNeitherStoredNorValidated(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005", "NFR-RES-003")
+	const url = "/v1/places/pl-01-0001/overview"
+	bearer := http.Header{"Authorization": {"Bearer x"}}
+	r := newCacheRig(t, config.Defaults(), "v1")
+	// Every part ok: the second request is served from the cache.
+	do(t, r.h, http.MethodGet, url, bearer)
+	if do(t, r.h, http.MethodGet, url, bearer); r.features.overviews.Load() != 1 {
+		t.Fatalf("a whole overview was not cached: %d reads", r.features.overviews.Load())
+	}
+	r = newCacheRig(t, config.Defaults(), "v1")
+	r.features.overview.Parking = nil
+	r.features.overview.Parts[1] = features.PartResult{Part: features.PartParking, Status: features.StatusTimeout, Err: context.DeadlineExceeded}
+	w := do(t, r.h, http.MethodGet, url, bearer)
+	if w.Code != http.StatusOK || w.Header().Get("ETag") != "" {
+		t.Fatalf("a degraded overview: %d, etag %q", w.Code, w.Header().Get("ETag"))
+	}
+	if do(t, r.h, http.MethodGet, url, http.Header{"Authorization": {"Bearer x"}, "If-None-Match": {"*"}}); r.features.overviews.Load() != 2 {
+		t.Fatalf("a degraded overview was served again: %d reads", r.features.overviews.Load())
 	}
 }
 

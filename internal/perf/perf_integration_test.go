@@ -493,6 +493,12 @@ func TestIdenticalConcurrentRequestsReadStorageOnce(t *testing.T) {
 // every read statement the service sent, as a custom plan with its real
 // arguments and as a generic plan, with sequential scans priced out, and
 // fails on a sequential scan of any time partition (NFR-PERF-004).
+//
+// With enable_seqscan off the planner takes a sequential scan only when no
+// other path exists, so the test proves that an index path exists for every
+// read of a time series. It does not prove the planner picks that path with
+// sequential scans priced normally: on the small fixture tables a
+// sequential scan is often cheaper, and the planner rightly takes it.
 func TestNoSequentialScanOfTimeSeries(t *testing.T) {
 	req.Covers(t, "NFR-PERF-004")
 	r := open(t)
@@ -544,7 +550,8 @@ func TestNoSequentialScanOfTimeSeries(t *testing.T) {
 	}
 }
 
-// explain returns the JSON plan of s with sequential scans priced out.
+// explain returns the JSON plan of s with sequential scans priced out
+// (enable_seqscan = off): a sequential scan in it means no other path exists.
 func explain(ctx context.Context, conn *pgx.Conn, s statement, mode string) (any, error) {
 	var raw []byte
 	err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {

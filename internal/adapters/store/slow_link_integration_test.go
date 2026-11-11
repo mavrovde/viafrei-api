@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
@@ -118,16 +119,29 @@ func TestASlowLinkNeverHoldsAReadPastItsDeadline(t *testing.T) {
 	}
 	link := newSlowLink(t, u.Host, 1500*time.Millisecond)
 	u.Host = link.ln.Addr().String()
-	st, err := store.Open(ctx, configFor(t, u.String(), "VFAPI_DB_CANCEL_GRACE=400ms"))
+	cfg := configFor(t, u.String(), "VFAPI_DB_CANCEL_GRACE=400ms")
+	pc, err := store.PoolConfig(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// One connection: the read after the cut-off gets the cut-off one
+	// unless it was destroyed.
+	pc.MaxConns, pc.MinConns = 1, 0
+	pool, err := pgxpool.NewWithConfig(ctx, pc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := store.New(pool, cfg)
 	t.Cleanup(st.Close)
 	const deadline = 500 * time.Millisecond
 	short, cancel := context.WithTimeout(ctx, deadline)
 	defer cancel()
 	start := time.Now()
+	var cut int32
 	err = st.Read(short, func(ctx context.Context, tx pgx.Tx) error {
+		if err := tx.QueryRow(ctx, "select pg_backend_pid()").Scan(&cut); err != nil {
+			return err
+		}
 		link.slow.Store(true)
 		var one int
 		return tx.QueryRow(ctx, "select 1").Scan(&one)
@@ -142,12 +156,15 @@ func TestASlowLinkNeverHoldsAReadPastItsDeadline(t *testing.T) {
 		t.Fatalf("the read returned %s after start; its deadline was %s", took, deadline)
 	}
 	// The cut-off connection is never handed out again: the next read gets a
-	// fresh one and succeeds.
-	var one int
+	// fresh one, with another server process, and succeeds.
+	var next int32
 	if err := st.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		return tx.QueryRow(ctx, "select 1").Scan(&one)
-	}); err != nil || one != 1 {
+		return tx.QueryRow(ctx, "select pg_backend_pid()").Scan(&next)
+	}); err != nil || next == 0 {
 		t.Fatalf("the read after a cut-off failed: %v", err)
+	}
+	if cut == 0 || next == cut {
+		t.Fatalf("the cut-off connection (process %d) was handed out again", cut)
 	}
 }
 

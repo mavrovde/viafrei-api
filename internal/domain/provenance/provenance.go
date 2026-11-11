@@ -115,3 +115,13 @@ func (f Family) Without(kind NoteKind) Family {
 func AnyStale(fs []Freshness) bool {
 	return slices.ContainsFunc(fs, func(f Freshness) bool { return f.Stale })
 }
+
+// Versions is one read of what an answer's validity rests on: the version of
+// every source family's data and a fingerprint of the licence register (each
+// family's terms, attribution, licence, publisher and notes). An answer read
+// under one Versions is current while a later read finds the same family
+// versions and the same fingerprint.
+type Versions struct {
+	Families map[string]string
+	Register string
+}

@@ -14,8 +14,11 @@ import (
 
 	"github.com/andybalholm/brotli"
 
+	"github.com/mavrovde/viafrei-api/internal/app/admission"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
+	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
 func TestNegotiateCoding(t *testing.T) {
@@ -229,40 +232,98 @@ func TestPermissionsSeparateEveryLicenceInput(t *testing.T) {
 
 func slicesClone(s []string) []string { return append([]string(nil), s...) }
 
+// one is the size of an entry of key "a".."z" with etag "e" and an n-byte
+// body and no headers.
+func one(n int) int { return entryOverhead + 2 + n }
+
 func TestResultCacheKeepsItsBudget(t *testing.T) {
-	c := newResultCache(config.Cache{MaxBytes: 100, MaxEntryBytes: 40})
+	req.Covers(t, "NFR-PERF-005")
+	now := time.Unix(0, 0)
+	c := newResultCache(config.Cache{MaxBytes: 3*one(30) + 10, MaxEntryBytes: 40, MaxEntries: 100})
 	put := func(key string, n int) *entry {
-		e := &entry{key: key, etag: "e", body: bytes.Repeat([]byte("x"), n)}
+		e := &entry{key: key, etag: "e", body: bytes.Repeat([]byte("x"), n), expires: now.Add(time.Hour)}
 		c.put(e)
 		return e
 	}
 	put("a", 30)
 	put("b", 30)
-	if c.get("a") == nil { // a is now the most recently used
+	if c.get("a", now) == nil { // a is now the most recently used
 		t.Fatal("a dropped too early")
 	}
-	put("c", 30) // 3 × 32 = 96 bytes: all fit
+	put("c", 30) // all three fit
 	put("d", 30) // over: the least recently used, b, goes
-	if c.get("b") != nil || c.get("a") == nil || c.bytes > 100 {
+	if c.get("b", now) != nil || c.get("a", now) == nil || c.bytes > c.maxBytes {
 		t.Fatalf("LRU order not kept: bytes %d", c.bytes)
 	}
-	if e := put("big", 50); e.body != nil || c.get("big") == nil {
+	if e := put("big", 50); e.body != nil || c.get("big", now) == nil {
 		t.Fatal("an entry above max_entry_bytes kept its body or was not kept at all")
 	}
 	before := c.bytes
 	put("a", 10) // replacing a key does not count it twice
-	if c.bytes != before-32+12 {
-		t.Fatalf("replacing an entry: %d bytes, want %d", c.bytes, before-32+12)
+	if c.bytes != before-one(30)+one(10) {
+		t.Fatalf("replacing an entry: %d bytes, want %d", c.bytes, before-one(30)+one(10))
 	}
-	none := newResultCache(config.Cache{MaxBytes: 0, MaxEntryBytes: 1024})
+	none := newResultCache(config.Cache{MaxBytes: 0, MaxEntryBytes: 1024, MaxEntries: 100})
 	none.put(&entry{key: "k", body: []byte("x")})
-	if none.get("k") != nil {
+	if none.get("k", now) != nil {
 		t.Fatal("max_bytes 0 kept an entry")
 	}
 }
 
+func TestAnEntryCountsEverythingItHolds(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005")
+	bare := &entry{key: "k", etag: "e"}
+	full := &entry{key: "k", etag: "e", register: "rrrr", requestID: "id",
+		families: []familyVersion{{"fam", "v1"}}, header: http.Header{"Content-Type": {"application/json"}}, body: []byte("xyz")}
+	if bare.size() != entryOverhead+2 {
+		t.Fatalf("a bodiless entry counts %d", bare.size())
+	}
+	want := entryOverhead + 2 + 4 + 2 + len("fam") + len("v1") + len("Content-Type") + len("application/json") + 3
+	if full.size() != want {
+		t.Fatalf("size %d, want %d: a part of the entry is not counted", full.size(), want)
+	}
+	// A bodiless entry keeps no headers.
+	c := newResultCache(config.Cache{MaxBytes: 1 << 20, MaxEntryBytes: 2, MaxEntries: 100})
+	e := &entry{key: "k", header: http.Header{"A": {"b"}}, body: []byte("too long")}
+	c.put(e)
+	if e.body != nil || e.header != nil || c.bytes != e.size() {
+		t.Fatalf("a bodiless entry kept %v, %v; bytes %d", e.body, e.header, c.bytes)
+	}
+}
+
+func TestTheResultCacheCapsItsEntries(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005")
+	now := time.Unix(0, 0)
+	c := newResultCache(config.Cache{MaxBytes: 1 << 20, MaxEntryBytes: 1024, MaxEntries: 2})
+	for _, k := range []string{"a", "b", "c"} {
+		c.put(&entry{key: k}) // bodiless: only the cap can drop them
+	}
+	if c.lru.Len() != 2 || c.get("a", now) != nil || c.get("c", now) == nil {
+		t.Fatalf("%d entries kept; the oldest must go", c.lru.Len())
+	}
+}
+
+func TestAnExpiredBodyIsDropped(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005")
+	now := time.Unix(0, 0)
+	c := newResultCache(config.Cache{MaxBytes: 1 << 20, MaxEntryBytes: 1024, MaxEntries: 100})
+	stored := &entry{key: "k", etag: "e", header: http.Header{"A": {"b"}}, body: []byte("body"), expires: now.Add(time.Minute)}
+	c.put(stored)
+	if e := c.get("k", now.Add(time.Minute-time.Nanosecond)); e != stored || e.body == nil {
+		t.Fatal("a body was dropped before it expired")
+	}
+	e := c.get("k", now.Add(time.Minute))
+	if e == nil || e.body != nil || e.header != nil || e.etag != "e" || c.bytes != e.size() {
+		t.Fatalf("an expired body is still counted or kept: %+v, bytes %d", e, c.bytes)
+	}
+	// The stored entry a request may still be sending is not written.
+	if stored.body == nil {
+		t.Fatal("dropping the body wrote the entry a request may be sending")
+	}
+}
+
 func TestResultCacheFlights(t *testing.T) {
-	c := newResultCache(config.Cache{MaxBytes: 1 << 20, MaxEntryBytes: 1 << 10})
+	c := newResultCache(config.Cache{MaxBytes: 1 << 20, MaxEntryBytes: 1 << 10, MaxEntries: 100})
 	f, leader := c.join("k")
 	g, second := c.join("k")
 	if !leader || second || f != g {
@@ -270,7 +331,7 @@ func TestResultCacheFlights(t *testing.T) {
 	}
 	c.land("k", f, nil)
 	<-f.done
-	if f.e != nil || c.get("k") != nil {
+	if f.e != nil || c.get("k", time.Unix(0, 0)) != nil {
 		t.Fatal("a flight with nothing cacheable stored something")
 	}
 	if _, again := c.join("k"); !again {
@@ -283,14 +344,16 @@ type versionsFake struct {
 	err   error
 	calls int
 	wait  chan struct{}
+	ctx   context.Context // the context of the last read
 }
 
-func (v *versionsFake) FreshnessVersions(context.Context) (map[string]string, error) {
+func (v *versionsFake) FreshnessVersions(ctx context.Context) (provenance.Versions, error) {
 	v.calls++
+	v.ctx = ctx
 	if v.wait != nil {
 		<-v.wait
 	}
-	return v.vs, v.err
+	return provenance.Versions{Families: v.vs}, v.err
 }
 
 func TestVersionCache(t *testing.T) {
@@ -302,7 +365,7 @@ func TestVersionCache(t *testing.T) {
 	fake := &versionsFake{vs: map[string]string{"f": "1"}}
 	v := &versionCache{reader: fake, ttl: time.Second, now: func() time.Time { return now }}
 	for range 3 {
-		if vs, ok := v.get(context.Background()); !ok || vs["f"] != "1" {
+		if vs, ok := v.get(context.Background()); !ok || vs.Families["f"] != "1" {
 			t.Fatal("versions not read")
 		}
 	}
@@ -354,12 +417,57 @@ func waitReading(v *versionCache) {
 }
 
 func TestEntryWithoutAVersionIsNeverCurrent(t *testing.T) {
+	now := time.Unix(0, 0)
+	v := func(f string) provenance.Versions { return provenance.Versions{Families: map[string]string{"f": f}} }
 	e := &entry{families: []familyVersion{{"f", "1"}}}
-	if !e.current(map[string]string{"f": "1"}) || e.current(map[string]string{"f": "2"}) {
+	if !e.current(v("1"), now) || e.current(v("2"), now) {
 		t.Fatal("current does not compare versions")
 	}
 	e.unversioned = true
-	if e.current(map[string]string{"f": "1"}) {
+	if e.current(v("1"), now) {
 		t.Fatal("an unversioned entry is current")
+	}
+}
+
+func TestAnEntryEndsWhenItsAnswerChangesWithTheClock(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005")
+	now := time.Unix(0, 0)
+	vs := provenance.Versions{Families: map[string]string{"f": "1"}}
+	e := &entry{families: []familyVersion{{"f", "1"}}, until: now.Add(time.Minute)}
+	if !e.current(vs, now.Add(time.Minute-time.Nanosecond)) || e.current(vs, now.Add(time.Minute)) {
+		t.Fatal("an entry is current past the instant its answer changes, or not before")
+	}
+}
+
+func TestAnEntryIsCurrentOnlyUnderItsRegister(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005", "SEC-030")
+	now := time.Unix(0, 0)
+	e := &entry{families: []familyVersion{{"f", "1"}}, register: "r1"}
+	if !e.current(provenance.Versions{Families: map[string]string{"f": "1"}, Register: "r1"}, now) ||
+		e.current(provenance.Versions{Families: map[string]string{"f": "1"}, Register: "r2"}, now) {
+		t.Fatal("current does not compare the register fingerprint")
+	}
+}
+
+type probeKey struct{}
+
+func TestTheVersionsAreReadAsTheServicesOwnRead(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005")
+	fake := &versionsFake{vs: map[string]string{"f": "1"}}
+	v := &versionCache{reader: fake, ttl: time.Second, now: time.Now}
+	deadline := time.Now().Add(time.Hour)
+	asking := admission.WithCaller(context.WithValue(context.Background(), probeKey{}, "request"), admission.Caller{Tier: admission.Bulk, Key: "k"})
+	ctx, cancel := context.WithDeadline(asking, deadline)
+	defer cancel()
+	if _, ok := v.get(ctx); !ok {
+		t.Fatal("no versions")
+	}
+	// The read carries none of the request's values, the caller among them,
+	// so the admission sees no caller: the service's own read.
+	if fake.ctx.Value(probeKey{}) != nil {
+		t.Fatal("the shared version read ran under the asking request's values, its caller among them")
+	}
+	if d, ok := fake.ctx.Deadline(); !ok || !d.Equal(deadline) {
+		t.Fatalf("the version read's deadline is %v, want the request's", d)
 	}
 }

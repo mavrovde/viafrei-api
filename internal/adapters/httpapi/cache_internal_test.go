@@ -255,7 +255,10 @@ func TestResultCacheKeepsItsBudget(t *testing.T) {
 	if c.get("b", now) != nil || c.get("a", now) == nil || c.bytes > c.maxBytes {
 		t.Fatalf("LRU order not kept: bytes %d", c.bytes)
 	}
-	if e := put("big", 50); e.body != nil || c.get("big", now) == nil {
+	if e := put("big", 50); e.body == nil {
+		t.Fatal("storing an entry above max_entry_bytes dropped the body a waiting request is handed")
+	}
+	if e := c.get("big", now); e == nil || e.body != nil {
 		t.Fatal("an entry above max_entry_bytes kept its body or was not kept at all")
 	}
 	before := c.bytes
@@ -284,9 +287,8 @@ func TestAnEntryCountsEverythingItHolds(t *testing.T) {
 	}
 	// A bodiless entry keeps no headers.
 	c := newResultCache(config.Cache{MaxBytes: 1 << 20, MaxEntryBytes: 2, MaxEntries: 100})
-	e := &entry{key: "k", header: http.Header{"A": {"b"}}, body: []byte("too long")}
-	c.put(e)
-	if e.body != nil || e.header != nil || c.bytes != e.size() {
+	c.put(&entry{key: "k", header: http.Header{"A": {"b"}}, body: []byte("too long")})
+	if e := c.get("k", time.Unix(0, 0)); e.body != nil || e.header != nil || c.bytes != e.size() {
 		t.Fatalf("a bodiless entry kept %v, %v; bytes %d", e.body, e.header, c.bytes)
 	}
 }
@@ -329,7 +331,7 @@ func TestResultCacheFlights(t *testing.T) {
 	if !leader || second || f != g {
 		t.Fatal("a second request did not join the running flight")
 	}
-	c.land("k", f, nil)
+	c.land("k", f, nil, nil)
 	<-f.done
 	if f.e != nil || c.get("k", time.Unix(0, 0)) != nil {
 		t.Fatal("a flight with nothing cacheable stored something")

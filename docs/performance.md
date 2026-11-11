@@ -78,8 +78,7 @@ operation) and `-perf.profile` (`tiny`, `ci` or `benchmark`).
 **Validators.** A data answer carries an `ETag` derived from four things:
 
 - the request: the operation, path, query, `Accept`, `Accept-Language` and the caller's licence permissions;
-- the version of every data family the answer was read from.
-
+- the version of every data family the answer was read from;
 - the licence register the answer was read under: a fingerprint of every
   family's terms (use classes, acceptance, register version), attribution,
   licence, publisher and notes;
@@ -100,13 +99,19 @@ all of these hold:
 - the clock has not reached the instant the answer changes by itself: a
   family turning stale (its data older than `staleAfterS`), a charge point's
   report passing the status age limit (`charging.status_max_age` or its
-  family's threshold), or a site's report leaving a `free_min` filter.
+  family's threshold), a site's report leaving a `free_min` filter, or a
+  report dated after the read taking effect (storage reads no report dated
+  after now; the earliest such report of the points shown, or of any
+  parking site within the radius whether `free_min` keeps it or not, ends
+  the answer).
 
 A 304 runs no feature read. The versions are read once per
 `cache.versions_ttl` for all requests, as the service's own read: it carries
 no caller, so it is admitted as a service read and never under the tier of
 the request that happened to ask. It does take a storage permit like any
-other read.
+other read, and in the storage budget shared with other readers it is a
+standard read (NFR-CAP-002), the same as readiness: see
+[rate-limits.md](rate-limits.md), Gate 5, step 2.
 
 **The result cache.** A full answer is kept in memory, within these limits:
 
@@ -119,12 +124,16 @@ The least recently used entry goes first. A body is kept until its max-age
 ends; the entry stays without it, so its validator still answers a 304.
 
 A repeat with no validator is served from memory under the same conditions
-as a 304.
+as a 304. A replayed answer carries its own `requestId`, but the
+`generatedAt` and `ageS` of the request that built it.
 
 **Identical concurrent requests** share one storage read. The first runs it,
 and the others wait for its answer within their own deadline. A request
 whose deadline ends while it waits is answered `deadline-exhausted`; it
-starts no read of its own.
+starts no read of its own. The others take the first one's answer whether it
+is stored or not: an answer that is never stored (below) or whose body is
+over `cache.max_entry_bytes` still answers every request that waited for it,
+each under its own `requestId`.
 
 **What is never stored or validated:**
 
@@ -133,9 +142,13 @@ starts no read of its own.
 - an answer read when the versions could not be read first;
 - an overview with a part that is not ok (meta.parts).
 
+Such an answer carries no `ETag` and `Cache-Control: no-store`, so no cache
+downstream keeps it either, and an `If-None-Match` never matches it.
+
 **Headers on a data answer:**
 
-- `Cache-Control: private, max-age=N`, where N is the smallest
+- `Cache-Control: private, max-age=N` (or `no-store` for an answer that is
+  never stored, above), where N is the smallest
   `cache.max_age.<domain>` among the domains it answers from, and never
   past the instant the answer changes by itself;
 - `Last-Modified` from the newest data instant;

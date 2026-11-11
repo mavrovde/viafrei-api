@@ -319,6 +319,7 @@ type ChargingOutput struct {
 }
 
 func chargingSites(ctx context.Context, a features.Answer[energy.Site], maxAge time.Duration) []ChargingSite {
+	noteNextReport(ctx, a.NextReport)
 	// Each report is judged by the status age limit and its own family's
 	// threshold, whichever is shorter (energy.StatusLimit); every family that
 	// contributed is in a.Families (ENV-003).
@@ -456,6 +457,14 @@ func parkingSites(a features.Answer[parking.Site]) ([]ParkingSite, bool) {
 	return out, withheld
 }
 
+// noteNextReport tells the cache that the answer may change when a report
+// dated after the read takes effect: storage reads no report dated after now.
+func noteNextReport(ctx context.Context, next *time.Time) {
+	if next != nil {
+		noteChangesAt(ctx, *next)
+	}
+}
+
 // noteFreeMin tells the cache how a free_min answer changes with the clock:
 // a site is kept only while its report is no older than its family's
 // threshold, so each kept site leaves the answer once its report passes it
@@ -492,6 +501,7 @@ func registerParking(api huma.API, s *server, op huma.Operation) {
 			return nil, s.featureProblem(ctx, err)
 		}
 		data, withheld := parkingSites(a)
+		noteNextReport(ctx, a.NextReport)
 		noteFreeMin(ctx, a, q.FreeMin)
 		detail := partialDetail
 		if withheld {
@@ -664,6 +674,7 @@ func registerOverview(api huma.API, s *server, op huma.Operation) {
 		if o.Parking != nil {
 			var sites []ParkingSite
 			sites, withheld = parkingSites(*o.Parking)
+			noteNextReport(ctx, o.Parking.NextReport)
 			data.Parking = &ParkingPart{Sites: sites}
 		}
 		// A part asked for and not ok makes the answer partial as well

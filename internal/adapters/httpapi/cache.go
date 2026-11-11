@@ -125,7 +125,8 @@ type entry struct {
 	// unversioned is set when nothing can tell when the answer changes: a
 	// family carried no freshness version, the versions could not be read
 	// before the answer, or the answer is degraded. It gets no ETag, is
-	// never stored and is never current; it keeps its max-age.
+	// never stored, is never current and is sent with no-store, so no cache
+	// downstream keeps it either.
 	unversioned bool
 }
 
@@ -159,10 +160,12 @@ type resultCache struct {
 	flights                        map[string]*flight
 }
 
-// flight is one handler run that identical requests wait for.
+// flight is one handler run that identical requests wait for. Its answer is
+// handed to them whether or not it is stored: an unversioned answer, or one
+// too large to keep, still answers every request that waited for it.
 type flight struct {
 	done chan struct{}
-	e    *entry // nil when the run produced nothing cacheable
+	e    *entry // the leader's answer; nil when it had no 200 from source families
 }
 
 func newResultCache(c config.Cache) *resultCache {
@@ -194,13 +197,13 @@ func (c *resultCache) get(key string, now time.Time) *entry {
 
 // put stores e under its key, dropping the least recently used entries past
 // the budget or the cap. An entry keeps its body (and the headers it is
-// replayed with) only when the body fits maxEntry.
+// replayed with) only when the body fits maxEntry; otherwise a bodiless copy
+// is stored, so e itself still answers the requests waiting on its flight.
 func (c *resultCache) put(e *entry) {
-	if len(e.body) > c.maxEntry || c.maxBytes == 0 {
-		e.body = nil
-	}
-	if e.body == nil {
-		e.header = nil
+	if e.body == nil || len(e.body) > c.maxEntry || c.maxBytes == 0 {
+		bare := *e
+		bare.body, bare.header = nil, nil
+		e = &bare
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -258,14 +261,16 @@ func (c *resultCache) join(key string) (f *flight, leader bool) {
 	return f, true
 }
 
-func (c *resultCache) land(key string, f *flight, e *entry) {
-	if e != nil {
-		c.put(e)
+// land ends the flight for key: stored, when set, is kept in the cache, and
+// answer is handed to the requests that waited.
+func (c *resultCache) land(key string, f *flight, stored, answer *entry) {
+	if stored != nil {
+		c.put(stored)
 	}
 	c.mu.Lock()
 	delete(c.flights, key)
 	c.mu.Unlock()
-	f.e = e
+	f.e = answer
 	close(f.done)
 }
 
@@ -399,7 +404,7 @@ func (s *server) cache(ctx huma.Context, next func(huma.Context)) {
 	if !leader {
 		select {
 		case <-f.done:
-			if f.e != nil && f.e.body != nil {
+			if f.e != nil {
 				s.sendEntry(ctx, f.e, inm)
 				return
 			}
@@ -428,15 +433,16 @@ func sendProblem(ctx huma.Context, p *Problem) {
 
 // run answers through the operation and, when the answer is a 200 built from
 // source families, gives it an ETag and Cache-Control and stores it. f is the
-// flight the run leads, if any; vs are the versions read before it, when
-// versioned.
+// flight the run leads, if any, and every such answer is handed to the
+// requests waiting on it, stored or not; vs are the versions read before it,
+// when versioned.
 func (s *server) run(ctx huma.Context, next func(huma.Context), key, inm string, f *flight, vs provenance.Versions, versioned bool) {
 	note := &cacheNote{}
 	b := &bufferedContext{humaContext: huma.WithValue(ctx, cacheNoteKey{}, note), header: http.Header{}}
-	var stored *entry
+	var stored, answer *entry
 	defer func() {
 		if f != nil {
-			s.results.land(key, f, stored)
+			s.results.land(key, f, stored, answer)
 		}
 	}()
 	next(b)
@@ -445,6 +451,7 @@ func (s *server) run(ctx huma.Context, next func(huma.Context), key, inm string,
 		return
 	}
 	e := s.newEntry(ctx.Context(), key, note, vs, versioned, b)
+	answer = e
 	if !e.unversioned {
 		stored = e
 	}
@@ -532,12 +539,15 @@ func maxAge(m config.CacheMaxAge, domain string) time.Duration {
 }
 
 // setCacheHeaders puts the validator and the freshness of e on h, replacing
-// the operation's own Cache-Control.
+// the operation's own Cache-Control. An unversioned answer gets no validator
+// and no-store: nothing can tell when it changes, so no one may keep it.
 func setCacheHeaders(h http.Header, e *entry) {
-	if !e.unversioned {
+	if e.unversioned {
+		h.Set("Cache-Control", "no-store")
+	} else {
 		h.Set("ETag", e.etag)
+		h.Set("Cache-Control", "private, max-age="+strconv.Itoa(int(e.maxAge.Seconds())))
 	}
-	h.Set("Cache-Control", "private, max-age="+strconv.Itoa(int(e.maxAge.Seconds())))
 	h.Set("Vary", varyOn)
 	if e.modified != nil {
 		h.Set("Last-Modified", e.modified.UTC().Format(http.TimeFormat))
@@ -553,7 +563,7 @@ func (s *server) sendNotModified(ctx huma.Context, e *entry) {
 // sendEntry replays a stored answer under this request's id, or a 304 when
 // it matches inm.
 func (s *server) sendEntry(ctx huma.Context, e *entry, inm string) {
-	if etagMatch(inm, e.etag) {
+	if !e.unversioned && etagMatch(inm, e.etag) {
 		s.sendNotModified(ctx, e)
 		return
 	}

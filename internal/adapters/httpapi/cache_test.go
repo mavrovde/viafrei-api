@@ -13,11 +13,13 @@ import (
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
+	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/energy"
+	"github.com/mavrovde/viafrei-api/internal/domain/parking"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
@@ -53,6 +55,7 @@ type countingFeatures struct {
 	*fakeFeatures
 	calls     atomic.Int32
 	overviews atomic.Int32
+	parkCalls atomic.Int32
 	hold      chan struct{}
 	mu        sync.Mutex
 	now       func() time.Time
@@ -68,6 +71,13 @@ func (c *countingFeatures) Charging(ctx context.Context, key access.Record, q en
 	a, err := c.fakeFeatures.Charging(ctx, key, q)
 	a.At = c.now()
 	return a, err
+}
+
+func (c *countingFeatures) Parking(ctx context.Context, key access.Record, q parking.Query) (features.Answer[parking.Site], error) {
+	c.parkCalls.Add(1)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.fakeFeatures.Parking(ctx, key, q)
 }
 
 func (c *countingFeatures) Overview(ctx context.Context, key access.Record, q features.OverviewQuery) (features.Overview, error) {
@@ -274,14 +284,15 @@ func TestAFollowerWithAMatchingValidatorGetsANotModified(t *testing.T) {
 	}
 }
 
-func TestAFollowerRunsItselfWhenTheLeaderStoredNothing(t *testing.T) {
-	cfg := config.Defaults()
-	cfg.Cache.MaxBytes = 0 // nothing keeps a body
-	r := newCacheRig(t, cfg, "v1")
+// followTheLeader sends n identical requests while the read is held, so all
+// but the first wait on its flight, and returns their answers.
+func followTheLeader(t *testing.T, r *cacheRig, n int, h http.Header) []*httptest.ResponseRecorder {
+	t.Helper()
 	r.features.hold = make(chan struct{})
+	ws := make([]*httptest.ResponseRecorder, n)
 	var wg sync.WaitGroup
-	for range 2 {
-		wg.Go(func() { r.get(t, nil) })
+	for i := range ws {
+		wg.Go(func() { ws[i] = r.get(t, h) })
 	}
 	for r.features.calls.Load() == 0 {
 		time.Sleep(time.Millisecond)
@@ -289,8 +300,62 @@ func TestAFollowerRunsItselfWhenTheLeaderStoredNothing(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 	close(r.features.hold)
 	wg.Wait()
+	return ws
+}
+
+// assertOneAnswer checks that every request had the leader's answer, under
+// its own request id, from one read.
+func assertOneAnswer(t *testing.T, r *cacheRig, ws []*httptest.ResponseRecorder, cacheControl string) {
+	t.Helper()
+	if n := r.features.calls.Load(); n != 1 {
+		t.Fatalf("%d reads; the requests waiting on the flight must take the leader's answer", n)
+	}
+	ids := map[any]bool{}
+	for _, w := range ws {
+		if w.Code != http.StatusOK || w.Header().Get("Cache-Control") != cacheControl {
+			t.Fatalf("a request answered %d %q: %s", w.Code, w.Header().Get("Cache-Control"), w.Body)
+		}
+		id := meta(t, decode(t, w))["requestId"]
+		if id != w.Header().Get("X-Request-Id") {
+			t.Fatalf("body id %v, header %q", id, w.Header().Get("X-Request-Id"))
+		}
+		ids[id] = true
+	}
+	if len(ids) != len(ws) {
+		t.Fatalf("%d distinct request ids for %d requests", len(ids), len(ws))
+	}
+}
+
+func TestFollowersTakeAnAnswerTooLargeToStore(t *testing.T) {
+	req.Covers(t, "NFR-PERF-006")
+	cfg := config.Defaults()
+	cfg.Cache.MaxBytes = 0 // nothing keeps a body
+	r := newCacheRig(t, cfg, "v1")
+	assertOneAnswer(t, r, followTheLeader(t, r, 3, nil), "private, max-age=60")
+}
+
+func TestFollowersTakeAnUnversionedAnswer(t *testing.T) {
+	req.Covers(t, "NFR-PERF-006")
+	r := newCacheRig(t, config.Defaults(), "")
+	// A follower's validator cannot match an answer that has none.
+	ws := followTheLeader(t, r, 3, http.Header{"If-None-Match": {"*"}})
+	assertOneAnswer(t, r, ws, "no-store")
+	for _, w := range ws {
+		if w.Header().Get("ETag") != "" {
+			t.Fatalf("an unversioned answer carried ETag %q", w.Header().Get("ETag"))
+		}
+	}
+}
+
+func TestAFollowerRunsItselfWhenTheLeaderHadNoAnswer(t *testing.T) {
+	req.Covers(t, "NFR-PERF-006")
+	r := newCacheRig(t, config.Defaults(), "v1")
+	r.features.err = store.ErrUnavailable // a refusal is never handed on
+	for _, w := range followTheLeader(t, r, 2, nil) {
+		assertProblem(t, w, http.StatusServiceUnavailable, "upstream-unavailable")
+	}
 	if n := r.features.calls.Load(); n != 2 {
-		t.Fatalf("%d reads; a follower without a stored body must read itself", n)
+		t.Fatalf("%d reads; a follower of a leader without an answer must read itself", n)
 	}
 }
 
@@ -338,7 +403,7 @@ func TestAnUnversionedFamilyIsNeitherValidatedNorStored(t *testing.T) {
 	r := newCacheRig(t, config.Defaults(), "")
 	first := r.get(t, nil)
 	again := r.get(t, http.Header{"If-None-Match": {"*"}})
-	if first.Header().Get("ETag") != "" || first.Header().Get("Cache-Control") != "private, max-age=60" ||
+	if first.Header().Get("ETag") != "" || first.Header().Get("Cache-Control") != "no-store" ||
 		again.Code != http.StatusOK || r.features.calls.Load() != 2 {
 		t.Fatalf("an unversioned answer: %v, then %d after %d reads", first.Header(), again.Code, r.features.calls.Load())
 	}
@@ -398,6 +463,97 @@ func TestAChargingReportAgingPastItsLimitIsANewAnswer(t *testing.T) {
 	w := r.get(t, http.Header{"If-None-Match": {first.Header().Get("ETag")}})
 	if w.Code != http.StatusOK || w.Header().Get("ETag") == first.Header().Get("ETag") || !strings.Contains(w.Body.String(), `"state":"stale"`) {
 		t.Fatalf("past the limit: %d, etag %q, %s", w.Code, w.Header().Get("ETag"), w.Body)
+	}
+}
+
+func TestAFreeMinSiteAgingPastItsLimitIsANewAnswer(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005")
+	r := newCacheRig(t, config.Defaults(), "v1")
+	fam := terms
+	fam.Version = "p1"
+	site := func() features.Answer[parking.Site] {
+		return features.Answer[parking.Site]{
+			Items: []parking.Site{{ID: "pk-01-0000", Family: fam.Source.Family, Kind: parking.KindGarage,
+				Occupancy: &parking.Occupancy{Free: ip(3), Total: ip(40), State: parking.StateFree, ObservedAt: fixedNow.Add(-time.Minute), Family: fam.Source.Family}}},
+			Families: []provenance.Family{fam}, At: fixedNow,
+		}
+	}
+	r.features.parking = site()
+	const url = "/v1/parking-options?at=52.52,13.405&free_min=1"
+	get := func(inm string) *httptest.ResponseRecorder {
+		return do(t, r.h, http.MethodGet, url, http.Header{"Authorization": {"Bearer x"}, "If-None-Match": {inm}})
+	}
+	first := get("")
+	etag := first.Header().Get("ETag")
+	if first.Code != http.StatusOK || etag == "" {
+		t.Fatalf("first: %d %v", first.Code, first.Header())
+	}
+	// The report is a minute old against the family's 30-minute threshold:
+	// the site is kept until 29 minutes on and leaves the answer just after.
+	r.clock.add(29 * time.Minute)
+	if w := get(etag); w.Code != http.StatusNotModified {
+		t.Fatalf("within the threshold: %d", w.Code)
+	}
+	r.features.parking = features.Answer[parking.Site]{Families: []provenance.Family{fam}, At: fixedNow}
+	r.clock.add(time.Microsecond)
+	w := get(etag)
+	if w.Code != http.StatusOK || w.Header().Get("ETag") == etag || strings.Contains(w.Body.String(), "pk-01-0000") {
+		t.Fatalf("past the threshold: %d, etag %q (was %q): %s", w.Code, w.Header().Get("ETag"), etag, w.Body)
+	}
+}
+
+func TestAnAnswerEndsWhenALaterReportTakesEffect(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005")
+	next := fixedNow.Add(10 * time.Minute)
+	for _, c := range []struct {
+		name, url string
+		set       func(*cacheRig)
+		reads     func(*cacheRig) int
+	}{
+		{"charging", chargingURL,
+			func(r *cacheRig) { r.features.charging.NextReport = &next },
+			func(r *cacheRig) int { return int(r.features.calls.Load()) }},
+		{"parking", "/v1/parking-options?at=52.52,13.405",
+			func(r *cacheRig) {
+				r.features.parking = parkingAnswer()
+				r.features.parking.Families[0].Version = "p1"
+				r.features.parking.NextReport = &next
+			},
+			func(r *cacheRig) int { return int(r.features.parkCalls.Load()) }},
+		{"overview", "/v1/places/pl-01-0001/overview?needs=parking",
+			func(r *cacheRig) {
+				p := parkingAnswer()
+				p.Families[0].Version = "p1"
+				p.NextReport = &next
+				r.features.overview = features.Overview{Place: overviewAnswer().Place, Parking: &p,
+					Parts:    []features.PartResult{{Part: features.PartCharging, Status: features.StatusNotRequested}, {Part: features.PartParking, Status: features.StatusOK}},
+					Families: []provenance.Family{p.Families[0], place}}
+			},
+			func(r *cacheRig) int { return int(r.features.overviews.Load()) }},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			r := newCacheRig(t, config.Defaults(), "v1")
+			c.set(r)
+			get := func(inm string) *httptest.ResponseRecorder {
+				return do(t, r.h, http.MethodGet, c.url, http.Header{"Authorization": {"Bearer x"}, "If-None-Match": {inm}})
+			}
+			first := get("")
+			etag := first.Header().Get("ETag")
+			if first.Code != http.StatusOK || etag == "" {
+				t.Fatalf("first: %d %v %s", first.Code, first.Header(), first.Body)
+			}
+			// The later report is dated 10 minutes on: until then the cached
+			// answer stands, from then on the read is made again.
+			r.clock.add(10*time.Minute - time.Nanosecond)
+			if w := get(etag); w.Code != http.StatusNotModified || c.reads(r) != 1 {
+				t.Fatalf("before the report: %d after %d reads", w.Code, c.reads(r))
+			}
+			r.clock.add(time.Nanosecond)
+			get(etag)
+			if n := c.reads(r); n != 2 {
+				t.Fatalf("%d reads; the answer must be read again once a later report takes effect", n)
+			}
+		})
 	}
 }
 

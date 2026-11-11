@@ -174,8 +174,10 @@ func TestChargingOptionsAnswer(t *testing.T) {
 	req.Covers(t, "FR-ENERGY-004", "FR-ENERGY-005", "ENV-003", "ENV-004", "ENV-011", "ENV-040", "ENV-041")
 	f := everyAnswer()
 	w := do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/charging-options?at=52.52,13.405", bearer)
-	// A data answer is cacheable by the asking client for its domain's max-age.
-	if w.Code != http.StatusOK || w.Header().Get("Cache-Control") != "private, max-age=60" {
+	// This handler reads no freshness versions, so nothing tells when the
+	// answer changes and no one may keep it (the versioned max-age is
+	// TestARepeatedRequestIsANotModified's).
+	if w.Code != http.StatusOK || w.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("status %d, cache %q: %s", w.Code, w.Header().Get("Cache-Control"), w.Body)
 	}
 	if f.gotCharge != (energy.Query{At: geo.Point{Lat: 52.52, Lon: 13.405}, RadiusM: 2000, Access: energy.FilterPublic, Limit: 20}) || f.gotKey.ID != "abcdefghij" {
@@ -403,11 +405,18 @@ func TestFeatureRefusals(t *testing.T) {
 		{store.ErrDeadlineExhausted, 503, "deadline-exhausted"},
 		{store.ErrUnavailable, 503, "upstream-unavailable"},
 	}
-	for _, target := range targets {
-		for _, c := range cases {
-			assertProblem(t, do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: c.err}, nil), http.MethodGet, target, bearer), c.status, c.slug)
+	// One handler per case, shared by the three targets: building a handler
+	// registers the whole contract and is the cost of this test (TST-012's 2 s
+	// bound was crossed under -race and coverage with fifteen builds).
+	for _, c := range cases {
+		h := featureHandler(t, config.Defaults(), &fakeFeatures{err: c.err}, nil)
+		for _, target := range targets {
+			assertProblem(t, do(t, h, http.MethodGet, target, bearer), c.status, c.slug)
 		}
-		assertProblem(t, do(t, featureHandler(t, config.Defaults(), nil, nil), http.MethodGet, target, bearer), 404, "feature-disabled")
+	}
+	disabled := featureHandler(t, config.Defaults(), nil, nil)
+	for _, target := range targets {
+		assertProblem(t, do(t, disabled, http.MethodGet, target, bearer), 404, "feature-disabled")
 	}
 	assertProblem(t, do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: places.ErrNotFound}, nil), http.MethodGet, targets[2], bearer), 404, "not-found")
 }

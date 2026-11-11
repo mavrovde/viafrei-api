@@ -14,9 +14,9 @@ import (
 
 func withExamples(t *testing.T, fsys fstest.MapFS) {
 	t.Helper()
-	old := exampleFiles
-	exampleFiles = fsys
-	t.Cleanup(func() { exampleFiles = old })
+	old := loadExamples
+	loadExamples = func() (map[string]api.Example, error) { return api.ReadExamples(fsys) }
+	t.Cleanup(func() { loadExamples = old })
 }
 
 // TestEveryExampleNamesAnOperation: a committed example of an operation that

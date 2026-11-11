@@ -2,10 +2,10 @@ package httpapi
 
 import (
 	"fmt"
-	"io/fs"
 	"maps"
 	"slices"
 	"strconv"
+	"sync"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -26,8 +26,12 @@ const (
 	ExampleRequestExtension = "x-example-request"
 )
 
-// exampleFiles are the examples the document carries; tests replace them.
-var exampleFiles fs.FS = api.Examples
+// loadExamples reads the examples the document carries, once per process:
+// every handler build attaches them, and reading them again each time cost
+// tests that build many handlers their time bound. Tests replace it.
+var loadExamples = sync.OnceValues(func() (map[string]api.Example, error) {
+	return api.ReadExamples(api.Examples)
+})
 
 // CodeSample is one entry of x-codeSamples.
 type CodeSample struct {
@@ -52,7 +56,7 @@ func curlSample(base, target string, keyed bool) string {
 // example file is left as it is, so the docs lint names it; an example whose
 // status the operation does not document as JSON is an error.
 func documentExamples(oapi *huma.OpenAPI, base string) error {
-	examples, err := api.ReadExamples(exampleFiles)
+	examples, err := loadExamples()
 	if err != nil {
 		return err
 	}

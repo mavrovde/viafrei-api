@@ -51,6 +51,9 @@ expect "a tracked file of the repository becomes its GitHub URL" "../scripts/tra
 expect "an untracked file is refused" "../scripts/untracked.sh" 1 "missing-in-repo/scripts/untracked.sh" \
   "FAIL: link to scripts/untracked.sh"
 rm -rf "$repo/.git"
+# No repository above $tmp may answer for it, even when TMPDIR lies inside a
+# checkout.
+export GIT_CEILING_DIRECTORIES=$(cd "$tmp" && pwd -P)
 expect "outside a git repository the script refuses" "../scripts/tracked.sh" 2 "" \
   "git could not list the files of the repository"
 script=$here/docs-html.pl run_path=/nonexistent

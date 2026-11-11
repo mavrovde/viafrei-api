@@ -1,0 +1,92 @@
+{
+  "title": "The presenting key, its plan and the source families it may receive",
+  "request": "/v1/key",
+  "attribution": "No source data is returned. data.sources lists the source families the key may receive, each with the publisher, licence and attribution text a client must show wherever it displays their data.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "energy",
+      "parking",
+      "places"
+    ],
+    "sources": [
+      "src-alpha-energy",
+      "src-alpha-parking",
+      "src-alpha-places",
+      "src-zeta-places"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": {
+      "keyId": "examplekey",
+      "environment": "live",
+      "plan": {
+        "name": "example",
+        "useClass": "commercial",
+        "tier": "standard",
+        "scopes": [
+          "energy",
+          "parking",
+          "places"
+        ]
+      },
+      "expiresAt": "2026-06-28T00:00:00Z",
+      "sources": [
+        {
+          "family": "src-alpha-energy",
+          "domain": "energy",
+          "publisher": "Nimbruß Datenwerk",
+          "text": "Synthetic data from family alpha, licence lic-alpha.",
+          "licence": "Synthetic licence alpha",
+          "licenceUrl": "https://licences.example/alpha",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://alpha.example/terms"
+        },
+        {
+          "family": "src-alpha-parking",
+          "domain": "parking",
+          "publisher": "Nimbruß Datenwerk",
+          "text": "Synthetic data from family alpha, licence lic-alpha.",
+          "licence": "Synthetic licence alpha",
+          "licenceUrl": "https://licences.example/alpha",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://alpha.example/terms"
+        },
+        {
+          "family": "src-alpha-places",
+          "domain": "places",
+          "publisher": "Nimbruß Datenwerk",
+          "text": "Synthetic data from family alpha, licence lic-alpha.",
+          "licence": "Synthetic licence alpha",
+          "licenceUrl": "https://licences.example/alpha",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://alpha.example/terms"
+        },
+        {
+          "family": "src-zeta-places",
+          "domain": "places",
+          "publisher": "Deingmeir Datenwerk",
+          "text": "Synthetic data from family zeta, licence lic-zeta.",
+          "licence": "Synthetic licence zeta",
+          "licenceUrl": "https://licences.example/zeta",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://zeta.example/terms"
+        }
+      ]
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "warnings": []
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/key"
+    }
+  }
+}

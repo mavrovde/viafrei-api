@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -120,7 +121,10 @@ func NewHandler(d Deps) (http.Handler, error) {
 // serve. `viafrei-api openapi` writes it to api/openapi.json.
 func OpenAPI(cfg *config.Config) ([]byte, error) {
 	_, doc, err := build(Deps{Config: cfg}, nil)
-	return doc, err
+	if err != nil {
+		return nil, err
+	}
+	return doc(), nil
 }
 
 // NewServer builds the http.Server with every server.* limit applied.
@@ -149,9 +153,12 @@ func logger(d Deps) *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-// build makes the handler; extra operations are registered after the
-// catalogue (tests only).
-func build(d Deps, extra []operation) (http.Handler, []byte, error) {
+// build makes the handler and the document it serves; extra operations are
+// registered after the catalogue (tests only). The document is marshalled on
+// first use, once: it is ~100 KB with its examples, and a handler built for
+// a request path that never asks for it (every test, most processes until
+// the first /v1/openapi.json) should not pay for it.
+func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 	if d.Config == nil {
 		return nil, nil, errors.New("httpapi: no configuration")
 	}
@@ -270,23 +277,28 @@ func build(d Deps, extra []operation) (http.Handler, []byte, error) {
 		op.register(api, s, hop)
 	}
 	amendNullableObjects(api)
+	if err := documentExamples(api.OpenAPI(), base); err != nil {
+		return nil, nil, err
+	}
 
 	if d.Config.RateLimit.Headers {
 		documentRateLimit(api)
 	}
 
 	// The document is a value of huma's own fixed types: marshalling it
-	// cannot fail for any configuration.
-	raw := invariant.Must(json.Marshal(api.OpenAPI()))
-	var doc bytes.Buffer
-	_ = json.Indent(&doc, raw, "", "  ") // raw is the output of json.Marshal
-	doc.WriteByte('\n')
-	served := doc.Bytes()
+	// cannot fail for any configuration. Nothing changes it after build.
+	served := sync.OnceValue(func() []byte {
+		raw := invariant.Must(json.Marshal(api.OpenAPI()))
+		var doc bytes.Buffer
+		_ = json.Indent(&doc, raw, "", "  ") // raw is the output of json.Marshal
+		doc.WriteByte('\n')
+		return doc.Bytes()
+	})
 
 	if d.Config.Docs.Enabled {
 		router.Get("/v1/openapi.json", func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", OpenAPIMediaType)
-			_, _ = w.Write(served)
+			_, _ = w.Write(served())
 		})
 		router.Get("/openapi.json", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/v1/openapi.json", http.StatusFound)

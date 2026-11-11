@@ -23,3 +23,6 @@ test-integration.json
 requirement-report.md
 test-completion-report.md
 sarif/
+
+# Built documentation portal (make docs)
+/site/

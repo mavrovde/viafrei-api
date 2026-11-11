@@ -68,8 +68,9 @@ and merge release pull requests.
    it is open, or lists the open issues in the job summary.
 7. The `pages` job builds the documentation site from the tag
    (`scripts/docs-build.sh`: the guide from `README.md` and the guide pages
-   under `docs/`, the OpenAPI reference rendered from `api/openapi.json`, and
-   the document itself) and deploys it to GitHub Pages,
+   under `docs/`, the endpoints page generated from `api/openapi.json` with its
+   recorded examples, the changelog, the OpenAPI reference rendered from
+   `api/openapi.json`, and the document itself) and deploys it to GitHub Pages,
    <https://mavrovde.github.io/viafrei-api/>, then reads the published
    `index.html`, `reference.html` and `openapi.json` back and fails unless
    they serve that version. Only the newest final release publishes; an rc

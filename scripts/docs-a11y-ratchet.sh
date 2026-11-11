@@ -80,4 +80,9 @@ if (( failed )); then
   echo "FAIL: the baseline may only go down (compared with $base), unless a raise is declared with its reason" >&2
   exit 1
 fi
-echo "docs a11y baseline: $(jq '[.[] | length] | add // 0' "$file") rule count(s), none above $base but $accepted declared raise(s)"
+n=$(jq '[.[] | length] | add // 0' "$file")
+if (( accepted > 0 )); then
+  echo "docs a11y baseline: $n rule count(s), above $base only by the $accepted declared raise(s) above"
+else
+  echo "docs a11y baseline: $n rule count(s), none above $base"
+fi

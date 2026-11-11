@@ -93,8 +93,10 @@ func TestNoLiteralTunables(t *testing.T) {
 		// generator's durations are the shape of synthetic data (validity
 		// windows, delays), not tunables of the running service; the
 		// requirement report's test bound is TST-012's fixed ceiling on a
-		// test, a rule of the specification and not of the service.
-		if p := filepath.ToSlash(path); strings.Contains(p, "internal/runtime/config/") || strings.Contains(p, "internal/fixtures/") || strings.Contains(p, "internal/reqreport/") {
+		// test, a rule of the specification and not of the service; the
+		// load runner's profiles are the Performance Test Plan's run lengths
+		// and rates, a tool's own flags, not tunables of the service.
+		if p := filepath.ToSlash(path); strings.Contains(p, "internal/runtime/config/") || strings.Contains(p, "internal/fixtures/") || strings.Contains(p, "internal/reqreport/") || strings.Contains(p, "internal/testkit/loadrun/") {
 			continue
 		}
 		file, err := parser.ParseFile(fset, path, nil, 0)

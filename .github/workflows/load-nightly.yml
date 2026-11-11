@@ -1,0 +1,56 @@
+# Nightly load and fault runs (TST-007, issue #19): the soak (design load for
+# one hour), the stress ramp past the knee, the spike, and every fault of the
+# Performance Test Plan through the fault proxy and container control, on the
+# test stack this job starts. Nothing but that stack's loopback is a target
+# (TST-010): the runner refuses every host not on test/load/allow-list.txt.
+#
+# The report names every scenario, its assertions and its counts; it is the
+# job summary and an artifact kept for the release evidence. A scenario that
+# sent no request fails.
+name: Load nightly
+
+on:
+  schedule:
+    - cron: "41 3 * * *"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Budget (pr for a quick check, nightly for the full run)
+        default: nightly
+
+permissions:
+  contents: read
+
+concurrency:
+  group: load-nightly
+  cancel-in-progress: false
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  load:
+    name: Soak, stress, spike and faults (nightly budget)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: Every scenario on the test stack
+        env:
+          PROFILE: ${{ inputs.profile || 'nightly' }}
+        run: scripts/load-test.sh "$PROFILE" load-report.md
+      - name: Report in the job summary
+        if: always() && hashFiles('load-report.md') != ''
+        run: cat load-report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: load-nightly
+          path: load-report.md
+          retention-days: 90
+          if-no-files-found: error

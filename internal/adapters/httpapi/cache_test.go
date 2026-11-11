@@ -549,9 +549,10 @@ func TestAnAnswerEndsWhenALaterReportTakesEffect(t *testing.T) {
 				t.Fatalf("before the report: %d after %d reads", w.Code, c.reads(r))
 			}
 			r.clock.add(time.Nanosecond)
-			get(etag)
-			if n := c.reads(r); n != 2 {
-				t.Fatalf("%d reads; the answer must be read again once a later report takes effect", n)
+			// The read is made again and, the fake answering the same, gives
+			// the same tag: the client's copy is still good.
+			if w := get(etag); w.Code != http.StatusNotModified || c.reads(r) != 2 {
+				t.Fatalf("after the report: %d after %d reads; the answer must be read again once a later report takes effect", w.Code, c.reads(r))
 			}
 		})
 	}

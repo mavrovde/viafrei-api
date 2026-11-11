@@ -305,6 +305,40 @@ where p.site_id = '`+id+`' and o.source_ref = any(`+in+`) and o.observed_at > '`
 		t.Errorf("charging with no later report: %v, %v", next, err)
 	}
 
+	// The site past the limit only tells that there are more: its later
+	// report does not end the answer. Two sites, the nearer with no report
+	// after now, the next one with one.
+	var (
+		near, far string
+		radius    int
+	)
+	owner(t, `with s as (
+  select site_id, location from contract.charging_site where withdrawn_at is null and source_ref = any(`+in+`)),
+ranked as (
+  select a.site_id a, b.site_id b, ceil(st_distance(a.location::geography, b.location::geography))::int + 1 r,
+         row_number() over (partition by a.site_id
+           order by round(st_distance(a.location::geography, b.location::geography))::int, b.site_id) rk
+  from s a cross join s b),
+last as (
+  select p.site_id, max(o.observed_at) at from contract.charge_point p
+  join contract.charge_point_state_observation o using (point_id)
+  where o.source_ref = any(`+in+`) group by 1)
+select r2.a, st_y(c.location), st_x(c.location), r2.r, l.at, r2.b
+from ranked r1 join ranked r2 on r2.a = r1.a and r1.rk = 1 and r2.rk = 2 and r1.b = r1.a
+join contract.charging_site c on c.site_id = r2.a
+join last l on l.site_id = r2.a
+where exists (select 1 from contract.charge_point p join contract.charge_point_state_observation o using (point_id)
+              where p.site_id = r2.b and o.source_ref = any(`+in+`) and o.observed_at > l.at)
+order by r2.a limit 1`, &near, &at.Lat, &at.Lon, &radius, &now, &far)
+	two := energy.Query{At: at, RadiusM: radius, Access: energy.FilterAll, Limit: 2}
+	if sites, _, next, err := st.ChargingNear(bounded(t), two, fams, now); err != nil || len(sites) != 2 || sites[0].ID != near || sites[1].ID != far || next == nil {
+		t.Fatalf("limit 2 (%s, %s): %+v, next %v, %v", near, far, sites, next, err)
+	}
+	two.Limit = 1
+	if sites, more, next, err := st.ChargingNear(bounded(t), two, fams, now); err != nil || len(sites) != 1 || sites[0].ID != near || !more || next != nil {
+		t.Errorf("limit 1: %+v, more %v, next %v (the site past the limit), %v", sites, more, next, err)
+	}
+
 	listed := families(t, st, "parking")
 	pin := "'{" + strings.Join(listed, ",") + "}'::text[]"
 	var fid string

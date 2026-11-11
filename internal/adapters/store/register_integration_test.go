@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"slices"
-	"sync"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -18,29 +17,29 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
-var seedOnce sync.Once
+// seed loads the tiny fixture set into the shared test database. TestMain
+// runs it once, as setup: generating and loading the fixtures is outside
+// every test body's bound, which it would otherwise spend in whichever test
+// happened to ask first.
+func seed(ctx context.Context) error {
+	var buf bytes.Buffer
+	if _, err := fixtures.Generate(&buf, "tiny", 1, contract.Version()); err != nil {
+		return err
+	}
+	conn, err := db.Owner(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = conn.Close(ctx) }()
+	return pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, buf.String())
+		return err
+	})
+}
 
-// seeded loads the tiny fixture set once into the shared test database.
+// seeded opens a store on the shared test database, which TestMain seeded.
 func seeded(t *testing.T) *store.Store {
 	t.Helper()
-	seedOnce.Do(func() {
-		var buf bytes.Buffer
-		if _, err := fixtures.Generate(&buf, "tiny", 1, contract.Version()); err != nil {
-			t.Fatal(err)
-		}
-		ctx := context.Background()
-		conn, err := db.Owner(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() { _ = conn.Close(ctx) }()
-		if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-			_, err := tx.Exec(ctx, buf.String())
-			return err
-		}); err != nil {
-			t.Fatal(err)
-		}
-	})
 	st, err := store.Open(context.Background(), readerConfig(t))
 	if err != nil {
 		t.Fatal(err)

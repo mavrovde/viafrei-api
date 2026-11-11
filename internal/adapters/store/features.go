@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -173,8 +174,10 @@ func earliest(a, b *time.Time) *time.Time {
 func (s *Store) ParkingNear(ctx context.Context, q parking.Query, listed, occupancy []string, now time.Time) (sites []parking.Site, more bool, next *time.Time, err error) {
 	err = s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
 		// The earliest future report, before the free_min filter: a site it
-		// leaves out may qualify once a later report takes effect.
-		if err := tx.QueryRow(ctx, `
+		// leaves out may qualify once a later report takes effect. A failure
+		// aborts the transaction, so the next statement fails too and both
+		// surface together.
+		nextErr := tx.QueryRow(ctx, `
 with here as (select st_setsrid(st_makepoint($2, $1), 4326)::geography g)
 select min(nx.next_at)
 from contract.parking_facility f
@@ -185,9 +188,7 @@ cross join lateral (
   where o.facility_id = f.facility_id and o.source_ref = any($4) and o.observed_at > $6) nx
 where f.withdrawn_at is null
   and f.source_ref = any($3)
-  and st_dwithin(f.location::geography, here.g, $5)`, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, now).Scan(&next); err != nil {
-			return err
-		}
+  and st_dwithin(f.location::geography, here.g, $5)`, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, now).Scan(&next)
 		rows, _ := tx.Query(ctx, `
 with here as (select st_setsrid(st_makepoint($2, $1), 4326)::geography g)
 select f.facility_id, f.source_ref, f.name, f.operator_name, f.parking_kind,
@@ -227,7 +228,7 @@ limit $8`, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, q.FreeMin, now, q.L
 			}
 			return v, err
 		})
-		return err
+		return errors.Join(nextErr, err)
 	})
 	if len(sites) > q.Limit {
 		sites, more = sites[:q.Limit], true

@@ -60,7 +60,7 @@ test('axe runs on the document with the WCAG 2.0/2.1 A/AA tags, best practices a
     rules: {'target-size': {enabled: true}, region: {enabled: false}}
   });
   page({violations: [], incomplete: []});
-  await runner.run(opts);
+  assert.deepEqual(await runner.run(opts), []);
 });
 
 test('the impact maps to the pa11y type, an unknown impact is an error, and needs-review is kept', async () => {
@@ -81,6 +81,18 @@ test('a frame or shadow target is joined into one string, and an unresolvable on
   assert.equal(joined.runnerExtras.target, '#frame p span');
   assert.equal(joined.element, null);
   assert.equal(bad.element, null);
+});
+
+test('a shadow target is never resolved in the light DOM, even when its joined string matches there', async () => {
+  const light = el({...opaque, color: 'rgb(1, 1, 1)'});
+  page({incomplete: [contrast({target: [['host', 'inner']]}), contrast({target: ['host', 'inner']})]},
+    {'host inner': light, host: light, inner: light});
+  const [shadow, frame] = await runner.run(opts);
+  assert.equal(shadow.runnerExtras.target, 'host inner');
+  assert.equal(shadow.element, null);
+  assert.equal(shadow.runnerExtras.undeterminedBy, 'no element');
+  assert.equal(frame.element, null);
+  assert.equal(frame.runnerExtras.undeterminedBy, 'no element');
 });
 
 test('axe colours win over the computed ones, and messageKey is kept', async () => {
@@ -149,14 +161,17 @@ test('the alpha of each colour syntax: zero is transparent, one is painted, betw
     ['oklch(0.5 0.1 20 / 100%)', 'oklch(0.5 0.1 20 / 100%)'],
     ['color(srgb 1 0 0)', 'color(srgb 1 0 0)'],
     ['white', 'white'],
-    ['oklch(0.5 0.1 20 / 40%)', null],
-    ['rgb(0 0 0 / 0.5)', null]
+    ['oklch(0.5 0.1 20 / 40%)', null, 'translucent background'],
+    ['rgb(0 0 0 / 0.5)', null, 'translucent background'],
+    ['oklch(0.5 0.1 20 / none)', null, 'unreadable alpha'],
+    ['rgba(0, 0, 0, none)', null, 'unreadable alpha']
   ];
-  for (const [bg, want] of cases) {
-    const span = el({color: 'red', backgroundColor: bg, opacity: '1'});
+  for (const [bg, want, by = null] of cases) {
+    const span = el({color: 'red', backgroundColor: bg, opacity: '1'}, el(opaque));
     page({incomplete: [contrast(node(['span']))]}, {span});
     const [i] = await runner.run(opts);
-    assert.equal(i.runnerExtras.bgColor, want, `background ${JSON.stringify(bg)}`);
+    assert.equal(i.runnerExtras.bgColor, want === 'canvas' ? 'rgb(255, 255, 255)' : want, `background ${JSON.stringify(bg)}`);
+    assert.equal(i.runnerExtras.undeterminedBy, by, `background ${JSON.stringify(bg)}`);
   }
 });
 

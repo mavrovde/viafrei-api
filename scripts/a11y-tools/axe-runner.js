@@ -42,7 +42,8 @@ const run = async options => {
   // The alpha of a CSS colour as getComputedStyle writes it: "transparent",
   // rgb()/rgba() with commas, or any function with a "/ alpha" part
   // (rgb(0 0 0 / 0.5), color(srgb 1 0 0 / 0), oklch(0.5 0.1 20 / 50%)).
-  // A colour with no alpha part is opaque.
+  // A colour with no alpha part is opaque. An alpha that does not parse
+  // (CSS Color 4 "none", say) is NaN, which the walk treats as unreadable.
   const alpha = c => {
     if (!c || c === 'transparent') return 0;
     const inner = /^[a-z-]+\((.*)\)$/i.exec(c.trim());
@@ -66,6 +67,7 @@ const run = async options => {
       if (style.backgroundImage && style.backgroundImage !== 'none') return {source: 'undetermined', by: 'background image'};
       if (Number.parseFloat(style.opacity) < 1) return {source: 'undetermined', by: 'opacity'};
       const a = alpha(style.backgroundColor);
+      if (Number.isNaN(a)) return {source: 'undetermined', by: 'unreadable alpha'};
       if (a > 0 && a < 1) return {source: 'undetermined', by: 'translucent background'};
       if (a >= 1) return {source: 'computed', fg, bg: style.backgroundColor};
     }
@@ -80,11 +82,17 @@ const run = async options => {
       const datas = checks.map(c => c.data).filter(d => d && typeof d === 'object');
       const axeColours = datas.find(d => d.fgColor && d.bgColor);
       const why = datas.find(d => d.messageKey);
+      // Only a plain selector in the page's own document is resolved. A frame
+      // or shadow-root target is a list of selectors, one per document; its
+      // joined string is a descendant selector of the light DOM that may
+      // match another element, so such a node has no element here.
       let element = null;
-      try {
-        element = window.document.querySelector(target);
-      } catch {
-        element = null;
+      if (node.target.length === 1 && typeof node.target[0] === 'string') {
+        try {
+          element = window.document.querySelector(node.target[0]);
+        } catch {
+          element = null;
+        }
       }
       const extras = {impact: result.impact, needsFurtherReview, target, messageKey: why ? why.messageKey : null};
       if (result.id === 'color-contrast') {

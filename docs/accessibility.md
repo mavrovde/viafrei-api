@@ -63,8 +63,9 @@ A11y-Baseline-Raise: reference.html color-contrast 12 — Redoc 3 highlights enu
 The line is read anywhere in the message, so it survives a squash merge,
 where it lands in a middle paragraph. The ratchet accepts a raise only when
 such a line matches it, prints each accepted raise with its reason, and
-fails a raise with no line, a line for another count, or one with no reason. A base that already has the check but no
-baseline file is refused rather than treated as the first baseline.
+fails a raise with no line, a line for another count, or one with no
+reason. A base that already has the check but no baseline file is refused
+rather than treated as the first baseline.
 
 The checker is pinned by `scripts/a11y-tools/package-lock.json` (pa11y-ci,
 pa11y, axe-core) and installed there with `npm ci --ignore-scripts`, so no

@@ -24,8 +24,8 @@ served as `application/problem+json`:
   `retryAfter` is present it equals the `Retry-After` header, in seconds.
 - An answer never carries a stack trace, a query or an internal name.
 
-Each problem type URI is meant to resolve to its section on this page; the
-anchor is the code. The list below is the complete catalogue of this release,
+*Planned:* each problem type URI will resolve to its section on this page,
+whose anchor is the code; today the URIs are identifiers only. The list below is the complete catalogue of this release,
 held equal to the code by a test.
 
 ### invalid-parameter

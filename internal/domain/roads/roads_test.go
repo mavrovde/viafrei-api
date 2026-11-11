@@ -77,7 +77,7 @@ func TestSeveritiesAreOrdered(t *testing.T) {
 
 func TestRoadReferencesAreCanonical(t *testing.T) {
 	req.Covers(t, "FR-ROAD-001")
-	for in, want := range map[string]string{"A8": "A8", "a8": "A8", "a 8": "A8", "A 100": "A100", "b27": "B27", "B 2700": "B2700"} {
+	for in, want := range map[string]string{"A8": "A8", "a8": "A8", "a 8": "A8", "A 100": "A100", "b27": "B27", "B 2700": "B2700", "A08": "A8", "a 008": "A8", "A0": "A0", "A000": "A0", "B 0270": "B270"} {
 		got, err := roads.ParseRoad(in)
 		if err != nil || got != want {
 			t.Errorf("%q -> %q, %v; want %q", in, got, err, want)
@@ -88,35 +88,63 @@ func TestRoadReferencesAreCanonical(t *testing.T) {
 			t.Errorf("%q read without error", in)
 		}
 	}
-	if roads.Canonical("a 101") != "A101" {
+	if roads.Canonical("a 101") != "A101" || roads.Canonical("") != "" || roads.Canonical("A") != "A" {
 		t.Error("a stored reference is not shown canonically")
 	}
 }
 
-func sev(s roads.Severity) *roads.Severity { return &s }
+func why(r roads.Reason) *roads.Reason { return &r }
+
+func delay(m int) *int { return &m }
 
 func TestTheLampRule(t *testing.T) {
-	req.Covers(t, "FR-ROAD-004")
+	req.Covers(t, "FR-ROAD-004", "ENV-051")
+	sig := func(k roads.Kind, s roads.Severity) roads.Signal { return roads.Signal{Kind: k, Severity: s} }
+	jam := func(d *int) roads.Signal {
+		return roads.Signal{Kind: roads.KindJam, Severity: roads.SeverityMinor, DelayMin: d}
+	}
 	for name, c := range map[string]struct {
-		in     []roads.Severity
-		lamp   roads.Lamp
-		reason *roads.Severity
+		in             []roads.Signal
+		partial, stale bool
+		lamp           roads.Lamp
+		reason         *roads.Reason
 	}{
-		"nothing":                     {nil, roads.LampGreen, nil},
-		"info":                        {[]roads.Severity{roads.SeverityInfo}, roads.LampGreen, sev(roads.SeverityInfo)},
-		"minor beats info":            {[]roads.Severity{roads.SeverityInfo, roads.SeverityMinor, roads.SeverityInfo}, roads.LampGreen, sev(roads.SeverityMinor)},
-		"lane closed":                 {[]roads.Severity{roads.SeverityMinor, roads.SeverityLaneClosed}, roads.LampAmber, sev(roads.SeverityLaneClosed)},
-		"major":                       {[]roads.Severity{roads.SeverityMajor, roads.SeverityLaneClosed}, roads.LampAmber, sev(roads.SeverityMajor)},
-		"road closed":                 {[]roads.Severity{roads.SeverityMajor, roads.SeverityRoadClosed, roads.SeverityInfo}, roads.LampRed, sev(roads.SeverityRoadClosed)},
-		"ungraded alone":              {[]roads.Severity{roads.SeverityOther}, roads.LampAmber, sev(roads.SeverityOther)},
-		"ungraded beats minor":        {[]roads.Severity{roads.SeverityMinor, roads.SeverityOther}, roads.LampAmber, sev(roads.SeverityOther)},
-		"major beats ungraded":        {[]roads.Severity{roads.SeverityOther, roads.SeverityMajor}, roads.LampAmber, sev(roads.SeverityMajor)},
-		"closed beats ungraded first": {[]roads.Severity{roads.SeverityOther, roads.SeverityRoadClosed}, roads.LampRed, sev(roads.SeverityRoadClosed)},
+		"nothing":                 {nil, false, false, roads.LampGreen, nil},
+		"light roadworks":         {[]roads.Signal{sig(roads.KindRoadworks, roads.SeverityMinor), sig(roads.KindRoadworks, roads.SeverityInfo)}, false, false, roads.LampGreen, nil},
+		"narrowing":               {[]roads.Signal{sig(roads.KindRoadworks, roads.SeverityLaneClosed)}, false, false, roads.LampAmber, why(roads.ReasonNarrowing)},
+		"major roadworks":         {[]roads.Signal{sig(roads.KindRoadworks, roads.SeverityMajor)}, false, false, roads.LampAmber, why(roads.ReasonNarrowing)},
+		"closed roadworks":        {[]roads.Signal{sig(roads.KindRoadworks, roads.SeverityRoadClosed)}, false, false, roads.LampRed, why(roads.ReasonRoadClosed)},
+		"closure of the road":     {[]roads.Signal{sig(roads.KindClosure, roads.SeverityRoadClosed)}, false, false, roads.LampRed, why(roads.ReasonRoadClosed)},
+		"closure of a lane":       {[]roads.Signal{sig(roads.KindClosure, roads.SeverityLaneClosed)}, false, false, roads.LampAmber, why(roads.ReasonWarning)},
+		"hazard":                  {[]roads.Signal{sig(roads.KindHazard, roads.SeverityInfo)}, false, false, roads.LampRed, why(roads.ReasonSafety)},
+		"major accident":          {[]roads.Signal{sig(roads.KindAccident, roads.SeverityMajor)}, false, false, roads.LampRed, why(roads.ReasonSafety)},
+		"minor accident":          {[]roads.Signal{sig(roads.KindAccident, roads.SeverityLaneClosed)}, false, false, roads.LampAmber, why(roads.ReasonWarning)},
+		"jam at the threshold":    {[]roads.Signal{jam(delay(roads.JamRedMin))}, false, false, roads.LampRed, why(roads.ReasonLongJam)},
+		"jam under the threshold": {[]roads.Signal{jam(delay(roads.JamRedMin - 1))}, false, false, roads.LampAmber, why(roads.ReasonJam)},
+		"jam without a delay":     {[]roads.Signal{jam(nil)}, false, false, roads.LampAmber, why(roads.ReasonJam)},
+		"severe weather":          {[]roads.Signal{sig(roads.KindWeather, roads.SeverityMajor)}, false, false, roads.LampRed, why(roads.ReasonSevereWeather)},
+		"weather":                 {[]roads.Signal{sig(roads.KindWeather, roads.SeverityLaneClosed)}, false, false, roads.LampAmber, why(roads.ReasonWarning)},
+		"restriction":             {[]roads.Signal{sig(roads.KindRestriction, roads.SeverityInfo)}, false, false, roads.LampAmber, why(roads.ReasonWarning)},
+		"unmapped kind":           {[]roads.Signal{sig(roads.KindOther, roads.SeverityInfo)}, false, false, roads.LampAmber, why(roads.ReasonWarning)},
+		"ungraded roadworks":      {[]roads.Signal{sig(roads.KindRoadworks, roads.SeverityOther)}, false, false, roads.LampAmber, why(roads.ReasonWarning)},
+		"ungraded closure":        {[]roads.Signal{sig(roads.KindClosure, roads.SeverityOther)}, false, false, roads.LampAmber, why(roads.ReasonWarning)},
+		"first reason wins":       {[]roads.Signal{sig(roads.KindOther, roads.SeverityInfo), jam(nil), sig(roads.KindWeather, roads.SeverityMajor), sig(roads.KindHazard, roads.SeverityInfo)}, false, false, roads.LampRed, why(roads.ReasonSafety)},
+		"amber order":             {[]roads.Signal{sig(roads.KindOther, roads.SeverityInfo), sig(roads.KindRoadworks, roads.SeverityMajor)}, false, false, roads.LampAmber, why(roads.ReasonNarrowing)},
+		"stale alone":             {nil, false, true, roads.LampAmber, why(roads.ReasonStaleSource)},
+		"amber beats stale":       {[]roads.Signal{jam(nil)}, false, true, roads.LampAmber, why(roads.ReasonJam)},
+		"partial alone":           {nil, true, true, roads.LampUnknown, why(roads.ReasonPartial)},
+		"partial beats amber":     {[]roads.Signal{jam(nil)}, true, false, roads.LampUnknown, why(roads.ReasonPartial)},
+		"red beats partial":       {[]roads.Signal{jam(nil), sig(roads.KindClosure, roads.SeverityRoadClosed)}, true, true, roads.LampRed, why(roads.ReasonRoadClosed)},
 	} {
-		lamp, reason := roads.LampOf(c.in)
+		lamp, reason := roads.LampOf(c.in, c.partial, c.stale)
 		if lamp != c.lamp || (reason == nil) != (c.reason == nil) || reason != nil && *reason != *c.reason {
 			t.Errorf("%s: %s %v, want %s %v", name, lamp, reason, c.lamp, c.reason)
 		}
+	}
+	d := 40
+	s := roads.Situation{Kind: roads.KindJam, Severity: roads.SeverityMajor, DelayMin: &d}
+	if got := roads.SignalOf(s); got.Kind != roads.KindJam || got.Severity != roads.SeverityMajor || got.DelayMin != &d {
+		t.Errorf("signal %+v", got)
 	}
 }
 

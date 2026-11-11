@@ -17,7 +17,7 @@ import (
 
 // GeneratorVersion changes whenever the output for a given seed and profile
 // changes.
-const GeneratorVersion = "0.1.0"
+const GeneratorVersion = "0.2.0"
 
 // Profile sets the size of a generated set.
 type Profile struct {
@@ -195,6 +195,17 @@ func (g *gen) src(domain string, families ...string) string {
 		}
 	}
 	panic("fixtures: no source " + fam + " for " + domain)
+}
+
+// fresh is the first fresh source of a family, chosen without a random
+// draw, so a planted row leaves every row after it unchanged.
+func (g *gen) fresh(domain, family string) string {
+	for _, s := range g.sources[domain] {
+		if s.family == family && !s.stale {
+			return s.ref
+		}
+	}
+	panic("fixtures: no source " + family + " for " + domain)
 }
 
 // ------------------------------------------------------------- provenance
@@ -407,6 +418,20 @@ var (
 	directions = []string{"north", "east", "south", "west", "both", "unknown"}
 )
 
+// twoPartRef is the reference of the road in two parts.
+const twoPartRef = "A 990"
+
+// twoPartRoad is the line of the road in two parts, each a straight
+// segment: the first across land 06 from west to east, the second across
+// land 07, with a gap between them.
+func (g *gen) twoPartRoad() [][]lonLat {
+	part := func(c bbox) []lonLat {
+		lat := (c.s + c.n) / 2
+		return []lonLat{{c.w + (c.e-c.w)*0.2, lat}, {c.w + (c.e-c.w)*0.8, lat}}
+	}
+	return [][]lonLat{part(g.land("06").cell), part(g.land("07").cell)}
+}
+
 func (g *gen) roadsAndEvents() {
 	n := 6 + g.p.Scale/4
 	g.w.begin("road", "road_ref", "road_class", "name", "length_km", "geometry", "states")
@@ -435,6 +460,24 @@ func (g *gen) roadsAndEvents() {
 		g.roads = append(g.roads, rd)
 		g.w.row(str(rd.ref), str(class), null, dec(rd.length, 1), line(pts), array(states...))
 	}
+	// The road in two parts (a motorway with a gap), planted without a
+	// random draw: its chainage runs over both parts in their order.
+	twoPart := g.twoPartRoad()
+	var twoStates []string
+	for _, part := range twoPart {
+		for _, p := range part {
+			if s := landOf(p); !slices.Contains(twoStates, s) {
+				twoStates = append(twoStates, s)
+			}
+		}
+	}
+	slices.Sort(twoStates)
+	twoLength := 0.0
+	for _, part := range twoPart {
+		twoLength += haversineKm(part[0], part[1])
+	}
+	g.w.row(str(twoPartRef), str("motorway"), null, dec(twoLength, 1), lines(twoPart...), array(twoStates...))
+	g.edges["road_in_two_parts"] = 1
 
 	g.w.begin("junction", "junction_id", "road_ref", "number", "name", "junction_kind", "chainage_km", "location")
 	for i, rd := range g.roads {
@@ -515,6 +558,32 @@ func (g *gen) roadsAndEvents() {
 	edge("month_end", time.Date(2026, 3, 31, 21, 59, 59, 0, time.UTC), time.Date(2026, 3, 31, 22, 0, 0, 0, time.UTC))
 	edge("year_end", time.Date(2025, 12, 31, 22, 59, 59, 0, time.UTC), time.Date(2025, 12, 31, 23, 0, 0, 0, time.UTC))
 	emit(g.roads[1], unknownCode, g.day(0).Add(time.Hour), "unknown_code")
+
+	// Planted without a random draw, active over the whole window and never
+	// withdrawn: one unmapped value in each coded column of a situation on
+	// road 1 (ENV-051), and one situation in the middle of each part of the
+	// road in two parts.
+	plant := func(id, kind, sev, roadRef, class, dir string, at lonLat) {
+		ref := g.fresh("roads", "alpha")
+		g.w.row(str(id), str(kind), str(sev), str(roadRef), str(class), str(dir), null, point(at),
+			ts(g.day(0)), null, null, null, null, null, str(capitalise(kind)+" (planted)"), null, str("de"),
+			str(ref), str("o-"+id), ts(g.day(0)), ts(g.day(0)), ts(g.day(0)), null)
+		g.counted(landOf(at), ref)
+		g.edges["unknown_code"]++
+	}
+	plant("ev-u-kind", unknownCode, "minor", g.roads[1].ref, "motorway", "both", g.roads[1].along(0.2))
+	plant("ev-u-severity", "restriction", unknownCode, g.roads[1].ref, "motorway", "both", g.roads[1].along(0.4))
+	plant("ev-u-direction", "restriction", "minor", g.roads[1].ref, "motorway", unknownCode, g.roads[1].along(0.6))
+	plant("ev-u-class", "restriction", "minor", g.roads[1].ref, unknownCode, "both", g.roads[1].along(0.8))
+	for i, part := range g.twoPartRoad() {
+		mid := lonLat{(part[0].lon + part[1].lon) / 2, (part[0].lat + part[1].lat) / 2}
+		ref := g.fresh("roads", "alpha")
+		id := fmt.Sprintf("ev-two-%d", i+1)
+		g.w.row(str(id), str("roadworks"), str("minor"), str(twoPartRef), str("motorway"), str("both"), null, point(mid),
+			ts(g.day(0)), null, null, null, null, null, str("Baustelle (planted)"), null, str("de"),
+			str(ref), str("o-"+id), ts(g.day(0)), ts(g.day(0)), ts(g.day(0)), null)
+		g.counted(landOf(mid), ref)
+	}
 
 	g.w.begin("traffic_event_observation", "event_id", "observed_at", "version_no")
 	for _, e := range events {

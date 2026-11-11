@@ -63,6 +63,8 @@ type Settings struct {
 	Language string
 	// PartDeadline bounds each part of a composed answer.
 	PartDeadline time.Duration
+	// EndedRetention is how long an ended road situation still answers.
+	EndedRetention time.Duration
 	// Disabled are the families the licence gate always denies.
 	Disabled []string
 	// IsTimeout reports whether a repository error means the time ran out.

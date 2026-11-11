@@ -2238,7 +2238,9 @@
             "description": "The outline of the area as a GeoJSON geometry; null while the service does not serve area outlines.",
             "properties": {
               "coordinates": {
-                "description": "The GeoJSON coordinates of type, longitude before latitude."
+                "description": "The GeoJSON coordinates of type, nested arrays of positions, longitude before latitude.",
+                "items": {},
+                "type": "array"
               },
               "type": {
                 "description": "The GeoJSON geometry type.",
@@ -2273,7 +2275,7 @@
         "additionalProperties": false,
         "properties": {
           "lamp": {
-            "description": "Over every warning that answers the question, first match: red when a warning of level 3 or 4 is in force; unknown when a weather family the key may not read was left out (meta.partial); amber for a warning of level 1 or 2; green when no warning is in force.",
+            "description": "Over every warning in force at the position, whatever min_level and hazards keep (they filter only the list), first match: red when a warning of level 3 or 4 is in force; unknown when a weather family the key may not read was left out (meta.partial); amber for a warning of level 1 or 2, or, with no warning in force, when a weather family read has no data or stale data (meta.freshness), since no warning cannot then be told from none heard; green when no warning is in force and every family is fresh.",
             "enum": [
               "green",
               "amber",
@@ -2289,8 +2291,12 @@
             },
             "type": "array"
           },
+          "truncated": {
+            "description": "True when more than 100 warnings answer and only the first 100 are listed; the lamp reads them all.",
+            "type": "boolean"
+          },
           "warnings": {
-            "description": "Ordered by level descending, then validity.from ascending, then id; at most 100.",
+            "description": "The warnings min_level and hazards keep, ordered by level descending, then validity.from ascending, then id; at most 100.",
             "items": {
               "$ref": "#/components/schemas/WeatherWarning"
             },
@@ -2300,6 +2306,7 @@
         "required": [
           "lamp",
           "warnings",
+          "truncated",
           "roadWeather"
         ],
         "type": "object"
@@ -4575,7 +4582,7 @@
     },
     "/v1/weather-risk": {
       "get": {
-        "description": "Every official weather warning in force now whose area contains the position, with the issuer's level and wording unchanged, and the lamp over them. MCP counterpart: weather warnings check. Needs the scope weather.",
+        "description": "Every official weather warning in force now whose area contains the position, with the issuer's level and wording unchanged, and the lamp over every warning in force there, whatever min_level and hazards keep. MCP counterpart: weather warnings check. Needs the scope weather.",
         "operationId": "getWeatherRisk",
         "parameters": [
           {

@@ -14,13 +14,30 @@ import (
 
 // The weather-risk and driving-rules repositories (anti-corruption layer).
 
-// WarningsAt reads the published, not cancelled warnings of the given
-// families in force at now whose area contains the position, at or above
-// the level floor, of the asked hazards; level descending, then start, then
-// id; at most weather.MaxWarnings. A stored level outside 1 to 4 is refused
+// warningScope is the condition of the lamp's scope: a published, not
+// cancelled warning of the given families in force at now whose area
+// contains the position. $1 families, $2 now, $3 latitude, $4 longitude. A
+// warning stored with no area (a null region_code) cannot be placed, so it
+// contains no position and answers no question: the inner join leaves it
+// out, as a left join would (its null boundary intersects nothing).
+const warningScope = `from contract.weather_warning w
+join contract.admin_region r on r.region_code = w.region_code
+where w.withdrawn_at is null and w.message_status <> 'cancelled'
+  and w.source_ref = any($1)
+  and w.valid_from <= $2 and (w.valid_to is null or w.valid_to > $2)
+  and st_intersects(r.boundary, st_setsrid(st_makepoint($4, $3), 4326))`
+
+// WarningsAt reads the warnings in the scope (warningScope) at or above the
+// level floor, of the asked hazards; level descending, then start, then id;
+// at most weather.MaxWarnings, and whether more answer. In the same snapshot
+// it reads the level of every warning in the scope, whatever the floor and
+// the hazards keep, for the lamp. A stored level outside 1 to 4 is refused
 // rather than re-graded.
-func (s *Store) WarningsAt(ctx context.Context, q weather.Query, families []string, now time.Time) ([]weather.Warning, error) {
-	var out []weather.Warning
+func (s *Store) WarningsAt(ctx context.Context, q weather.Query, families []string, now time.Time) ([]weather.Warning, []weather.Level, bool, error) {
+	var (
+		out    []weather.Warning
+		levels []weather.Level
+	)
 	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
 		known, other := q.KnownHazards()
 		hazards := make([]string, len(known))
@@ -34,16 +51,11 @@ func (s *Store) WarningsAt(ctx context.Context, q weather.Query, families []stri
 		rows, _ := tx.Query(ctx, `
 select w.warning_id, w.source_ref, w.hazard, w.warning_level, w.level_label, w.issuer_name, w.headline,
        w.text_lang, w.valid_from, w.valid_to, r.name
-from contract.weather_warning w
-join contract.admin_region r on r.region_code = w.region_code
-where w.withdrawn_at is null and w.message_status <> 'cancelled'
-  and w.source_ref = any($1)
-  and w.valid_from <= $2 and (w.valid_to is null or w.valid_to > $2)
-  and st_intersects(r.boundary, st_setsrid(st_makepoint($4, $3), 4326))
+`+warningScope+`
   and w.warning_level >= $5
   and (w.hazard = any($6) or ($7 and not w.hazard = any($8)))
 order by w.warning_level desc, w.valid_from, w.warning_id
-limit $9`, families, now, q.At.Lat, q.At.Lon, int(q.MinLevel), hazards, other, every, weather.MaxWarnings)
+limit $9`, families, now, q.At.Lat, q.At.Lon, int(q.MinLevel), hazards, other, every, weather.MaxWarnings+1)
 		var err error
 		out, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (weather.Warning, error) {
 			var (
@@ -68,9 +80,31 @@ limit $9`, families, now, q.At.Lat, q.At.Lon, int(q.MinLevel), hazards, other, e
 			v.Level = lvl
 			return v, errors.Join(err, lerr)
 		})
+		if err != nil {
+			return err
+		}
+		rows, _ = tx.Query(ctx, `select w.warning_id, w.warning_level `+warningScope, families, now, q.At.Lat, q.At.Lon)
+		levels, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (weather.Level, error) {
+			var (
+				id    string
+				level int
+			)
+			err := r.Scan(&id, &level)
+			lvl, lerr := weather.CheckLevel(level)
+			if lerr != nil {
+				lerr = fmt.Errorf("weather warning %s, level %d: %w", id, level, lerr)
+			}
+			return lvl, errors.Join(err, lerr)
+		})
 		return err
 	})
-	return out, err
+	if err != nil {
+		return nil, nil, false, err
+	}
+	if len(out) > weather.MaxWarnings {
+		return out[:weather.MaxWarnings], levels, true, nil
+	}
+	return out, levels, false, nil
 }
 
 // Topic reads one rule topic and its rules in their order.

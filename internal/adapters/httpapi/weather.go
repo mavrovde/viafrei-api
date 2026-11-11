@@ -44,7 +44,7 @@ type WarningArea struct {
 // GeoJSONGeometry is a GeoJSON geometry object (RFC 7946) in WGS 84.
 type GeoJSONGeometry struct {
 	Type        string `json:"type" enum:"Polygon,MultiPolygon" doc:"The GeoJSON geometry type."`
-	Coordinates any    `json:"coordinates" doc:"The GeoJSON coordinates of type, longitude before latitude."`
+	Coordinates []any  `json:"coordinates" doc:"The GeoJSON coordinates of type, nested arrays of positions, longitude before latitude."`
 }
 
 // RoadWeatherObservation is one road-weather station reading.
@@ -60,8 +60,9 @@ type RoadWeatherObservation struct {
 
 // WeatherRiskData is the answer of getWeatherRisk.
 type WeatherRiskData struct {
-	Lamp        string                   `json:"lamp" enum:"green,amber,red,unknown" doc:"Over every warning that answers the question, first match: red when a warning of level 3 or 4 is in force; unknown when a weather family the key may not read was left out (meta.partial); amber for a warning of level 1 or 2; green when no warning is in force."`
-	Warnings    []WeatherWarning         `json:"warnings" doc:"Ordered by level descending, then validity.from ascending, then id; at most 100."`
+	Lamp        string                   `json:"lamp" enum:"green,amber,red,unknown" doc:"Over every warning in force at the position, whatever min_level and hazards keep (they filter only the list), first match: red when a warning of level 3 or 4 is in force; unknown when a weather family the key may not read was left out (meta.partial); amber for a warning of level 1 or 2, or, with no warning in force, when a weather family read has no data or stale data (meta.freshness), since no warning cannot then be told from none heard; green when no warning is in force and every family is fresh."`
+	Warnings    []WeatherWarning         `json:"warnings" doc:"The warnings min_level and hazards keep, ordered by level descending, then validity.from ascending, then id; at most 100."`
+	Truncated   bool                     `json:"truncated" doc:"True when more than 100 warnings answer and only the first 100 are listed; the lamp reads them all."`
 	RoadWeather []RoadWeatherObservation `json:"roadWeather" doc:"Road-weather observations near a corridor; present for along questions only, so always empty on a question about one position."`
 }
 
@@ -93,7 +94,7 @@ type WeatherRiskOutput struct {
 
 func registerWeatherRisk(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "The official weather warnings at a position"
-	op.Description = "Every official weather warning in force now whose area contains the position, with the issuer's level and wording unchanged, and the lamp over them. MCP counterpart: weather warnings check. Needs the scope weather."
+	op.Description = "Every official weather warning in force now whose area contains the position, with the issuer's level and wording unchanged, and the lamp over every warning in force there, whatever min_level and hazards keep. MCP counterpart: weather warnings check. Needs the scope weather."
 	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, in *WeatherRiskInput) (*WeatherRiskOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
@@ -119,7 +120,7 @@ func registerWeatherRisk(api huma.API, s *server, op huma.Operation) {
 			}
 		}
 		return &WeatherRiskOutput{CacheControl: noStore, Body: WeatherRiskEnvelope{
-			Data: WeatherRiskData{Lamp: string(a.Lamp), Warnings: ws, RoadWeather: []RoadWeatherObservation{}},
+			Data: WeatherRiskData{Lamp: string(a.Lamp), Warnings: ws, Truncated: a.HasMore, RoadWeather: []RoadWeatherObservation{}},
 			Meta: WeatherRiskMeta{
 				DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
 				Query:    WeatherRiskQuery{At: position(q.At), MinLevel: in.MinLevel, Hazards: hazards},

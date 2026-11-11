@@ -11,11 +11,13 @@ import (
 
 // Weather is the port to the weather-warning store.
 type Weather interface {
-	// WarningsAt returns every warning of the given families in force at
-	// now whose area contains q.At, at or above q.MinLevel, of the asked
+	// WarningsAt returns the warnings of the given families in force at now
+	// whose area contains q.At, at or above q.MinLevel, of the asked
 	// hazards: level descending, then start, then id; at most
-	// weather.MaxWarnings.
-	WarningsAt(ctx context.Context, q weather.Query, families []string, now time.Time) ([]weather.Warning, error)
+	// weather.MaxWarnings, and whether more answer. It also returns the
+	// level of every warning of the families in force at q.At, whatever
+	// the floor and the hazards keep, for the lamp.
+	WarningsAt(ctx context.Context, q weather.Query, families []string, now time.Time) ([]weather.Warning, []weather.Level, bool, error)
 }
 
 // Rules is the port to the driving-rules store.
@@ -32,7 +34,9 @@ type WeatherRisk struct {
 }
 
 // WeatherRisk answers "is there a weather warning here" for key
-// (FR-WEATHER-001).
+// (FR-WEATHER-001). The lamp reads every warning in force at the position,
+// whatever the floor and the hazards keep, and the freshness of every
+// permitted weather family.
 func (s *Service) WeatherRisk(ctx context.Context, key access.Record, q weather.Query) (WeatherRisk, error) {
 	reg, gate, err := s.gate(ctx, key)
 	if err != nil {
@@ -43,7 +47,7 @@ func (s *Service) WeatherRisk(ctx context.Context, key access.Record, q weather.
 		return WeatherRisk{}, err
 	}
 	now := s.now()
-	ws, err := s.repos.Weather.WarningsAt(ctx, q, permitted, now)
+	ws, levels, more, err := s.repos.Weather.WarningsAt(ctx, q, permitted, now)
 	if err != nil {
 		return WeatherRisk{}, err
 	}
@@ -54,13 +58,13 @@ func (s *Service) WeatherRisk(ctx context.Context, key access.Record, q weather.
 	if err := gate.Check(contributed); err != nil {
 		return WeatherRisk{}, err
 	}
-	fams, err := s.provenanceOf(ctx, contributed, permitted)
+	fams, stale, err := s.sight(ctx, permitted, contributed, now)
 	if err != nil {
 		return WeatherRisk{}, err
 	}
 	return WeatherRisk{
-		Answer: Answer[weather.Warning]{Items: ws, Families: fams, Partial: partial, At: now},
-		Lamp:   weather.LampOf(ws, partial),
+		Answer: Answer[weather.Warning]{Items: ws, HasMore: more, Families: fams, Partial: partial, At: now},
+		Lamp:   weather.LampOf(levels, partial, stale),
 	}, nil
 }
 

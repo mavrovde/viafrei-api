@@ -47,19 +47,15 @@ func warningIDs(ws []weather.Warning) []string {
 	return out
 }
 
-func quoted(xs []string) string {
-	return "'" + strings.Join(xs, "','") + "'"
-}
-
 func TestWarningsAtReadTheAreaInForce(t *testing.T) {
 	req.Covers(t, "FR-WEATHER-001", "FR-WEATHER-002", "SEC-031")
 	st := seeded(t)
 	fams := families(t, st, "weather")
 	id, region, at, level, from, until := unmappedWarning(t)
 
-	ws, err := st.WarningsAt(bounded(t), weather.Query{At: at, MinLevel: 1}, fams, from)
-	if err != nil {
-		t.Fatal(err)
+	ws, levels, more, err := st.WarningsAt(bounded(t), weather.Query{At: at, MinLevel: 1}, fams, from)
+	if err != nil || more || len(levels) != len(ws) {
+		t.Fatalf("%d warnings, %d levels, more %v: %v", len(ws), len(levels), more, err)
 	}
 	var want string
 	owner(t, fmt.Sprintf(`select coalesce(string_agg(warning_id, ',' order by warning_level desc, valid_from, warning_id), '')
@@ -83,7 +79,7 @@ from contract.weather_warning where region_code = '%s' and withdrawn_at is null 
 	only := func(q weather.Query, now time.Time) []string {
 		t.Helper()
 		q.At = at
-		ws, err := st.WarningsAt(bounded(t), q, fams, now)
+		ws, _, _, err := st.WarningsAt(bounded(t), q, fams, now)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -111,8 +107,8 @@ from contract.weather_warning where region_code = '%s' and withdrawn_at is null 
 	if got := only(weather.Query{MinLevel: 1}, from.Add(-time.Nanosecond)); slices.Contains(got, id) {
 		t.Errorf("before its start: %v already holds %s", got, id)
 	}
-	if ws, err := st.WarningsAt(bounded(t), weather.Query{At: at, MinLevel: 1}, []string{"src-none"}, from); err != nil || len(ws) != 0 {
-		t.Errorf("a family not asked for answered: %v %v", warningIDs(ws), err)
+	if ws, levels, _, err := st.WarningsAt(bounded(t), weather.Query{At: at, MinLevel: 1}, []string{"src-none"}, from); err != nil || len(ws) != 0 || len(levels) != 0 {
+		t.Errorf("a family not asked for answered: %v %v %v", warningIDs(ws), levels, err)
 	}
 }
 
@@ -140,10 +136,79 @@ where w.warning_id like 'ww-planted-%' and w.source_ref in (`+quoted(fams)+`)
 	if unfiltered != "ww-planted-cancelled,ww-planted-issued,ww-planted-withdrawn" {
 		t.Fatalf("the planted warnings without the filter: %s", unfiltered)
 	}
-	ws, err := st.WarningsAt(bounded(t), weather.Query{At: at, MinLevel: 1}, fams, from)
+	ws, levels, _, err := st.WarningsAt(bounded(t), weather.Query{At: at, MinLevel: 1}, fams, from)
 	got := warningIDs(ws)
-	if err != nil || !slices.Contains(got, "ww-planted-issued") || slices.Contains(got, "ww-planted-cancelled") || slices.Contains(got, "ww-planted-withdrawn") {
-		t.Errorf("answered %v, %v", got, err)
+	if err != nil || !slices.Contains(got, "ww-planted-issued") || slices.Contains(got, "ww-planted-cancelled") || slices.Contains(got, "ww-planted-withdrawn") || len(levels) != len(ws) {
+		t.Errorf("answered %v (%d levels), %v", got, len(levels), err)
+	}
+}
+
+// plantedAt is the centre of the planted warning's area, the area's code
+// and the warning's start.
+func plantedAt(t *testing.T) (at geo.Point, region string, from time.Time) {
+	t.Helper()
+	owner(t, `select st_y(st_centroid(r.boundary)), st_x(st_centroid(r.boundary)), r.region_code, w.valid_from
+from contract.weather_warning w join contract.admin_region r on r.region_code = w.region_code
+where w.warning_id = 'ww-planted-issued'`, &at.Lat, &at.Lon, &region, &from)
+	return at, region, from
+}
+
+// TestTheLampLevelsIgnoreTheFilters: the planted level-2 ice warning is
+// left out of the list by min_level=3 and by hazards=rain, and its level is
+// still read for the lamp, with every other warning in force there.
+func TestTheLampLevelsIgnoreTheFilters(t *testing.T) {
+	req.Covers(t, "FR-WEATHER-001")
+	st := seeded(t)
+	fams := families(t, st, "weather")
+	at, region, from := plantedAt(t)
+	var want int
+	owner(t, `select count(*) from contract.weather_warning
+where region_code = '`+region+`' and withdrawn_at is null and message_status <> 'cancelled' and source_ref in (`+quoted(fams)+`)
+  and valid_from <= '`+from.Format(time.RFC3339Nano)+`' and (valid_to is null or valid_to > '`+from.Format(time.RFC3339Nano)+`')`, &want)
+	for name, q := range map[string]weather.Query{
+		"min_level=3":  {At: at, MinLevel: 3},
+		"hazards=rain": {At: at, MinLevel: 1, Hazards: []weather.Hazard{"rain"}},
+	} {
+		ws, levels, more, err := st.WarningsAt(bounded(t), q, fams, from)
+		if err != nil || more || slices.Contains(warningIDs(ws), "ww-planted-issued") || len(levels) != want || !slices.Contains(levels, 2) {
+			t.Errorf("%s: listed %v, levels %v (want %d with a 2), more %v: %v", name, warningIDs(ws), levels, want, more, err)
+		}
+		if weather.LampOf(levels, false, false) == weather.LampGreen {
+			t.Errorf("%s: the lamp is green over %v", name, levels)
+		}
+	}
+}
+
+// TestAWarningWithNoAreaAnswersNoPosition plants, far after the fixture's
+// window, two level-3 warnings: one in the planted area and one stored with
+// no area (a null region_code). Only the first is listed or read for the
+// lamp: a warning with no area cannot be placed.
+func TestAWarningWithNoAreaAnswersNoPosition(t *testing.T) {
+	req.Covers(t, "FR-WEATHER-001")
+	st := seeded(t)
+	fams := families(t, st, "weather")
+	at, region, _ := plantedAt(t)
+	var n int
+	owner(t, `with ins as (
+  insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
+    valid_from, valid_to, published_at, region_code, source_ref, recorded_at, withdrawn_at)
+  select v.id, 'ice', 3, 'Stufe 3', 'issued', 'Synthetischer Wetterdienst', 'Glätte', 'de',
+    '2103-01-01T00:00:00Z', '2103-01-02T00:00:00Z', null, v.region, w.source_ref, '2103-01-01T00:00:00Z', null
+  from contract.weather_warning w, (values ('ww-area-here', '`+region+`'), ('ww-area-none', null)) v(id, region)
+  where w.warning_id = 'ww-planted-issued'
+  returning 1)
+select count(*) from ins`, &n)
+	t.Cleanup(func() {
+		var gone int
+		owner(t, `with del as (delete from contract.weather_warning where warning_id like 'ww-area-%' returning 1) select count(*) from del`, &gone)
+	})
+	if n != 2 {
+		t.Fatalf("planted %d of 2", n)
+	}
+	ws, levels, _, err := st.WarningsAt(bounded(t), weather.Query{At: at, MinLevel: 1}, fams, time.Date(2103, 1, 1, 1, 0, 0, 0, time.UTC))
+	got := warningIDs(ws)
+	if err != nil || !slices.Contains(got, "ww-area-here") || slices.Contains(got, "ww-area-none") || len(levels) != len(ws) {
+		t.Errorf("answered %v, levels %v: %v", got, levels, err)
 	}
 }
 
@@ -170,9 +235,15 @@ returning warning_id`, &id)
 		var gone string
 		owner(t, `delete from contract.weather_warning where warning_id = 'ww-level-7' returning warning_id`, &gone)
 	})
-	_, err := st.WarningsAt(bounded(t), weather.Query{At: at, MinLevel: 1}, fams, from)
+	_, _, _, err := st.WarningsAt(bounded(t), weather.Query{At: at, MinLevel: 1}, fams, from)
 	if !errors.Is(err, weather.ErrLevel) || !strings.Contains(err.Error(), id) || !strings.Contains(err.Error(), "level 7") {
 		t.Errorf("a level of 7: %v", err)
+	}
+	// Left out of the list by the hazards, it is still read for the lamp,
+	// and still refused.
+	_, _, _, err = st.WarningsAt(bounded(t), weather.Query{At: at, MinLevel: 1, Hazards: []weather.Hazard{"rain"}}, fams, from)
+	if !errors.Is(err, weather.ErrLevel) || !strings.Contains(err.Error(), id) || !strings.Contains(err.Error(), "level 7") {
+		t.Errorf("a level of 7 outside the list: %v", err)
 	}
 }
 
@@ -198,9 +269,9 @@ select count(*) from ins`, &n)
 		var gone int
 		owner(t, `with del as (delete from contract.weather_warning where warning_id like 'ww-cap-%' returning 1) select count(*) from del`, &gone)
 	})
-	ws, err := st.WarningsAt(bounded(t), weather.Query{At: at, MinLevel: 1}, fams, time.Date(2101, 1, 1, 0, 0, 0, 0, time.UTC))
-	if err != nil || n != weather.MaxWarnings+1 || len(ws) != weather.MaxWarnings {
-		t.Errorf("%d of %d planted, %v", len(ws), n, err)
+	ws, levels, more, err := st.WarningsAt(bounded(t), weather.Query{At: at, MinLevel: 1}, fams, time.Date(2101, 1, 1, 0, 0, 0, 0, time.UTC))
+	if err != nil || n != weather.MaxWarnings+1 || len(ws) != weather.MaxWarnings || !more || len(levels) < n {
+		t.Errorf("%d of %d planted (%d levels), more %v: %v", len(ws), n, len(levels), more, err)
 	}
 }
 
@@ -238,7 +309,7 @@ func TestWeatherAndRulesReadsReportStorageFaults(t *testing.T) {
 	st := seeded(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := st.WarningsAt(ctx, weather.Query{MinLevel: 1}, []string{"x"}, time.Now()); err == nil {
+	if _, _, _, err := st.WarningsAt(ctx, weather.Query{MinLevel: 1}, []string{"x"}, time.Now()); err == nil {
 		t.Error("WarningsAt on an ended context succeeded")
 	}
 	if _, err := st.Topic(ctx, "winter_tyres"); err == nil || errors.Is(err, rules.ErrUnknownTopic) {

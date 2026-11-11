@@ -9,6 +9,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
@@ -24,6 +25,10 @@ var wxRegister = []access.Terms{
 type wxFake struct {
 	*fake
 	warnings    []weather.Warning
+	levels      []weather.Level // the levels in force; those of warnings when nil
+	more        bool
+	stale       []string
+	missing     []string
 	topic       rules.Topic
 	readErr     error
 	gotQuery    weather.Query
@@ -33,10 +38,30 @@ type wxFake struct {
 	readCalls   int
 }
 
-func (f *wxFake) WarningsAt(_ context.Context, q weather.Query, fams []string, at time.Time) ([]weather.Warning, error) {
+func (f *wxFake) WarningsAt(_ context.Context, q weather.Query, fams []string, at time.Time) ([]weather.Warning, []weather.Level, bool, error) {
 	f.readCalls++
 	f.gotQuery, f.gotFamilies, f.gotNow = q, fams, at
-	return f.warnings, f.readErr
+	levels := f.levels
+	if levels == nil {
+		for _, w := range f.warnings {
+			levels = append(levels, w.Level)
+		}
+	}
+	return f.warnings, levels, f.more, f.readErr
+}
+
+// Provenance answers every family fresh at now, except those in f.stale,
+// and leaves out those in f.missing.
+func (f *wxFake) Provenance(ctx context.Context, fams []string, lang string) ([]provenance.Family, error) {
+	out, err := f.fake.Provenance(ctx, fams, lang)
+	out = slices.DeleteFunc(out, func(p provenance.Family) bool { return slices.Contains(f.missing, p.Source.Family) })
+	for i := range out {
+		out[i].StaleAfter = time.Minute
+		if !slices.Contains(f.stale, out[i].Source.Family) {
+			out[i].DataAsOf = &now
+		}
+	}
+	return out, err
 }
 
 func (f *wxFake) Topic(_ context.Context, code string) (rules.Topic, error) {
@@ -81,8 +106,47 @@ func TestWeatherRiskIsGatedAttributedAndLit(t *testing.T) {
 
 	f = &wxFake{}
 	r, err = wxService(f).WeatherRisk(context.Background(), key("consumer", []access.Scope{"weather"}, "w1", "w2"), weather.Query{})
-	if err != nil || r.Partial || r.Lamp != weather.LampGreen || !slices.Equal(names(r.Families), []string{"w1", "w2"}) {
+	if err != nil || r.Partial || r.Lamp != weather.LampGreen || r.HasMore || !slices.Equal(names(r.Families), []string{"w1", "w2"}) {
 		t.Errorf("an empty answer is green and names the consulted families: %+v %v", r, err)
+	}
+}
+
+func TestTheWeatherLampReadsEveryWarningInForce(t *testing.T) {
+	req.Covers(t, "FR-WEATHER-001")
+	both := key("consumer", []access.Scope{"weather"}, "w1", "w2")
+	// min_level=3 keeps nothing of a level-2 ice warning in force: the list
+	// is empty, the lamp still amber.
+	f := &wxFake{levels: []weather.Level{2}}
+	r, err := wxService(f).WeatherRisk(context.Background(), both, weather.Query{MinLevel: 3})
+	if err != nil || len(r.Items) != 0 || r.Lamp != weather.LampAmber {
+		t.Errorf("min_level 3 over a level-2 warning: %d listed, %s, %v", len(r.Items), r.Lamp, err)
+	}
+	// More warnings than the cap: the answer says so.
+	f = &wxFake{warnings: []weather.Warning{{ID: "a", Family: "w1", Level: 1}}, more: true}
+	if r, err = wxService(f).WeatherRisk(context.Background(), both, weather.Query{}); err != nil || !r.HasMore {
+		t.Errorf("a capped list: %+v %v", r, err)
+	}
+}
+
+func TestTheWeatherLampSeesStaleAndMissingFamilies(t *testing.T) {
+	req.Covers(t, "FR-WEATHER-001", "ENV-003")
+	both := key("consumer", []access.Scope{"weather"}, "w1", "w2")
+	for name, f := range map[string]*wxFake{
+		"stale":   {stale: []string{"w2"}},
+		"missing": {missing: []string{"w2"}},
+	} {
+		r, err := wxService(f).WeatherRisk(context.Background(), both, weather.Query{})
+		if err != nil || r.Lamp != weather.LampAmber {
+			t.Errorf("%s, no warning: %s %v", name, r.Lamp, err)
+		}
+		if !slices.Equal(f.gotProv[0], []string{"w1", "w2"}) || len(f.gotProv) != 1 {
+			t.Errorf("%s: the register was asked %v", name, f.gotProv)
+		}
+	}
+	// A severe warning heard from the fresh family is still red.
+	f := &wxFake{warnings: []weather.Warning{{ID: "a", Family: "w1", Level: 4}}, stale: []string{"w2"}}
+	if r, err := wxService(f).WeatherRisk(context.Background(), both, weather.Query{}); err != nil || r.Lamp != weather.LampRed || !slices.Equal(names(r.Families), []string{"w1"}) {
+		t.Errorf("stale and a level-4 warning: %s %v %v", r.Lamp, names(r.Families), err)
 	}
 }
 

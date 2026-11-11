@@ -2,11 +2,9 @@ package features
 
 import (
 	"context"
-	"slices"
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
-	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 )
 
@@ -65,23 +63,9 @@ func (s *Service) conditions(ctx context.Context, key access.Record, read func(f
 	if err := gate.Check(contributed); err != nil {
 		return Conditions{}, err
 	}
-	// Every permitted family is read once: all of them for the lamp's
-	// freshness, those that contributed (or all, when none did) for the
-	// attribution. The post-check above keeps contributed inside permitted.
-	consulted := slices.Clone(permitted)
-	slices.Sort(consulted)
-	consulted = slices.Compact(consulted)
-	all, err := s.repos.Register.Provenance(ctx, consulted, s.set.Language)
+	fams, stale, err := s.sight(ctx, permitted, contributed, now)
 	if err != nil {
 		return Conditions{}, err
-	}
-	// A permitted family with no provenance row is missing: limited sight.
-	stale, fams := len(all) < len(consulted), []provenance.Family{}
-	for _, f := range all {
-		stale = stale || f.Assess(now).Stale
-		if len(contributed) == 0 || slices.Contains(contributed, f.Source.Family) {
-			fams = append(fams, f)
-		}
 	}
 	lamp, reason := roads.LampOf(signals, partial, stale)
 	return Conditions{

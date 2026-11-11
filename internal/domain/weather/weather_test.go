@@ -60,25 +60,26 @@ func TestKnownHazards(t *testing.T) {
 func TestLampOf(t *testing.T) {
 	req.Covers(t, "FR-WEATHER-001")
 	for _, c := range []struct {
-		levels  []weather.Level
-		partial bool
-		want    weather.Lamp
+		levels         []weather.Level
+		partial, stale bool
+		want           weather.Lamp
 	}{
-		{nil, false, weather.LampGreen},
-		{[]weather.Level{1, 1}, false, weather.LampAmber},
-		{[]weather.Level{1, 2}, false, weather.LampAmber},
-		{[]weather.Level{2, 3}, false, weather.LampRed},
-		{[]weather.Level{4, 1}, false, weather.LampRed},
-		{nil, true, weather.LampUnknown},
-		{[]weather.Level{2}, true, weather.LampUnknown},
-		{[]weather.Level{3}, true, weather.LampRed},
+		{nil, false, false, weather.LampGreen},
+		{[]weather.Level{1, 1}, false, false, weather.LampAmber},
+		{[]weather.Level{1, 2}, false, false, weather.LampAmber},
+		{[]weather.Level{2, 3}, false, false, weather.LampRed},
+		{[]weather.Level{4, 1}, false, false, weather.LampRed},
+		{nil, true, false, weather.LampUnknown},
+		{[]weather.Level{2}, true, false, weather.LampUnknown},
+		{[]weather.Level{3}, true, false, weather.LampRed},
+		// No warning heard from a stale or missing source: limited sight.
+		{nil, false, true, weather.LampAmber},
+		{[]weather.Level{1}, false, true, weather.LampAmber},
+		{[]weather.Level{3}, false, true, weather.LampRed},
+		{nil, true, true, weather.LampUnknown},
 	} {
-		ws := make([]weather.Warning, len(c.levels))
-		for i, l := range c.levels {
-			ws[i].Level = l
-		}
-		if got := weather.LampOf(ws, c.partial); got != c.want {
-			t.Errorf("%v partial %v: %s, want %s", c.levels, c.partial, got, c.want)
+		if got := weather.LampOf(c.levels, c.partial, c.stale); got != c.want {
+			t.Errorf("%v partial %v stale %v: %s, want %s", c.levels, c.partial, c.stale, got, c.want)
 		}
 	}
 }

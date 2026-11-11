@@ -108,15 +108,23 @@ const RedLevel Level = 3
 // so the cap never hides the warning that decides the lamp.
 const MaxWarnings = 100
 
-// LampOf is the weather lamp, in the order of the roads lamp: red when a
-// warning of level 3 or 4 is in force; unknown when the answer is partial
-// (a family the key may not read could hold a severe warning); amber for a
-// warning of level 1 or 2; green when no warning is in force. It reads every
-// warning that answers the question.
-func LampOf(ws []Warning, partial bool) Lamp {
+// LampOf is the weather lamp, the platform's warning lamp (its dwd signal
+// and sight), in the order of the roads lamp. It reads the levels of every
+// warning in force at the position, whatever the list's level floor and
+// hazards keep, whether the answer is partial and whether a weather family
+// read is missing or stale; first match from the top:
+//
+//   - red when a warning of level 3 or 4 is in force;
+//   - unknown when the answer is partial: a family the key may not read
+//     could hold a severe warning;
+//   - amber for a warning of level 1 or 2, or, with no warning in force,
+//     when a family read has no data or stale data: the sight is limited
+//     and "no warning" cannot be told from "not heard";
+//   - green when no warning is in force and every family is fresh.
+func LampOf(levels []Level, partial, stale bool) Lamp {
 	worst := Level(0)
-	for _, w := range ws {
-		worst = max(worst, w.Level)
+	for _, l := range levels {
+		worst = max(worst, l)
 	}
 	if worst >= RedLevel {
 		return LampRed
@@ -124,7 +132,7 @@ func LampOf(ws []Warning, partial bool) Lamp {
 	if partial {
 		return LampUnknown
 	}
-	if worst >= MinLevel {
+	if worst >= MinLevel || stale {
 		return LampAmber
 	}
 	return LampGreen

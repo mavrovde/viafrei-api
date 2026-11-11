@@ -137,6 +137,28 @@ func (s *Service) provenanceOf(ctx context.Context, contributed, consulted []str
 	return s.repos.Register.Provenance(ctx, slices.Compact(fams), s.set.Language)
 }
 
+// sight reads every permitted family's provenance once: for a lamp, whether
+// one is missing (no provenance row) or stale, which limits the sight; for
+// the attribution, those that contributed, or all of them when none did. The
+// gate's post-check keeps contributed inside permitted.
+func (s *Service) sight(ctx context.Context, permitted, contributed []string, now time.Time) ([]provenance.Family, bool, error) {
+	consulted := slices.Clone(permitted)
+	slices.Sort(consulted)
+	consulted = slices.Compact(consulted)
+	all, err := s.repos.Register.Provenance(ctx, consulted, s.set.Language)
+	if err != nil {
+		return nil, false, err
+	}
+	stale, fams := len(all) < len(consulted), []provenance.Family{}
+	for _, f := range all {
+		stale = stale || f.Assess(now).Stale
+		if len(contributed) == 0 || slices.Contains(contributed, f.Source.Family) {
+			fams = append(fams, f)
+		}
+	}
+	return fams, stale, nil
+}
+
 // withholdConditions drops the condition notes of the withheld families. A
 // condition note is stated only for a family whose data the answer shows
 // under it: a pending family's occupancy is withheld, so its conditions are

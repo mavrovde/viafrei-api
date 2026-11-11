@@ -120,7 +120,8 @@ func (s *Store) Budget(ctx context.Context) (time.Duration, bool) {
 	return StatementBudget(now, deadline, s.reserve, s.floor)
 }
 
-// Read runs fn in one read-only transaction bounded by the context's
+// Read runs fn in one read-only, repeatable-read transaction (one
+// snapshot for every statement of fn) bounded by the context's
 // deadline (or deadline.request when the context has none). The statement
 // timeout is set to the remaining budget, so the server stops on its own even
 // if the client-side cancel were lost.
@@ -151,8 +152,11 @@ func (s *Store) Read(ctx context.Context, fn func(context.Context, pgx.Tx) error
 	}
 	// One round trip opens the read-only transaction and sets its statement
 	// timeout; the budget is an integer of milliseconds, never caller text.
+	// The isolation is repeatable read, so every statement of fn reads one
+	// snapshot (under read committed each statement takes its own): a page
+	// and the lamp over its scope cannot disagree.
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{
-		BeginQuery: "begin transaction read only; set local statement_timeout = " + strconv.FormatInt(budget.Milliseconds(), 10),
+		BeginQuery: "begin transaction isolation level repeatable read read only; set local statement_timeout = " + strconv.FormatInt(budget.Milliseconds(), 10),
 	})
 	if err != nil {
 		return classify(ctx, err)

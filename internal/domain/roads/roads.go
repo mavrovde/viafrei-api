@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 )
 
 // Other is the value of every open enumeration for a stored code the service
@@ -207,150 +208,214 @@ type Situation struct {
 	DistanceM *int
 }
 
-// Lamp sums up the situations of a road or an area.
+// Lamp sums up the situations of a road or an area: the platform's motorway
+// Ampel, whose yellow is amber here.
 type Lamp string
 
 // The lamps.
 const (
-	LampGreen   Lamp = "green"
-	LampAmber   Lamp = "amber"
-	LampRed     Lamp = "red"
-	LampUnknown Lamp = "unknown"
+	LampGreen Lamp = "green"
+	LampAmber Lamp = "amber"
+	LampRed   Lamp = "red"
 )
 
 // Lamps lists every lamp an answer can carry.
-var Lamps = []Lamp{LampGreen, LampAmber, LampRed, LampUnknown}
+var Lamps = []Lamp{LampGreen, LampAmber, LampRed}
 
-// Signal is what the lamp reads of one situation in the question's scope.
-type Signal struct {
-	Kind     Kind
-	Severity Severity
+// Message is what the lamp reads of one situation in the question's scope.
+type Message struct {
+	Kind        Kind
+	Headline    string
+	Description *string
+	// TextLanguage is the language of Headline and Description.
+	TextLanguage string
 	// DelayMin is the published delay; nil when none is published.
 	DelayMin *int
 }
 
-// SignalOf is the lamp's view of a situation.
-func SignalOf(s Situation) Signal {
-	return Signal{Kind: s.Kind, Severity: s.Severity, DelayMin: s.DelayMin}
+// MessageOf is the lamp's view of a situation.
+func MessageOf(s Situation) Message {
+	return Message{Kind: s.Kind, Headline: s.Headline, Description: s.Description, TextLanguage: s.TextLanguage, DelayMin: s.DelayMin}
 }
 
-// Reason says why the lamp has its colour. Open enumeration.
-type Reason string
-
-// The reasons, red ones first, each colour's in the order the rule tests
-// them.
-const (
-	// ReasonRoadClosed: a closure of the carriageway: a situation graded
-	// road_closed, whatever its kind, or a closure that is not graded as one
-	// closed lane. The service holds no scope for a closure, so it takes the
-	// platform's reading of an unknown scope: the carriageway.
-	ReasonRoadClosed Reason = "road_closed"
-	// ReasonSafety: a safety message: a hazard on the road (a wrong-way
-	// driver, an object, a person or an animal).
-	ReasonSafety Reason = "safety"
-	// ReasonLongJam: a jam with a published delay of JamRedMin or more.
-	ReasonLongJam Reason = "long_jam"
-	// ReasonSevereWeather: severe weather reported as a traffic situation (a
-	// weather situation graded major). The official weather warnings are
-	// answered by the weather risk, not read here.
-	ReasonSevereWeather Reason = "severe_weather"
-	// ReasonPartial: a roads family the key may not read was left out, so
-	// the service cannot say the road is clear (lamp unknown).
-	ReasonPartial Reason = "partial"
-	// ReasonJam: a shorter jam, or one with no published delay.
-	ReasonJam Reason = "jam"
-	// ReasonNarrowing: roadworks of any severity, a lane restriction, or a
-	// closure graded as one closed lane: the carriageway is narrowed.
-	ReasonNarrowing Reason = "narrowing"
-	// ReasonWarning: any other situation the publisher reports, including an
-	// accident with no closure and one whose kind cannot be mapped.
-	ReasonWarning Reason = "warning"
-	// ReasonStaleSource: a roads family the answer read has no data or
-	// stale data, so the sight is limited.
-	ReasonStaleSource Reason = "stale_source"
-)
-
-// Reasons lists every reason, in the order above.
-var Reasons = []Reason{ReasonRoadClosed, ReasonSafety, ReasonLongJam, ReasonSevereWeather, ReasonPartial,
-	ReasonJam, ReasonNarrowing, ReasonWarning, ReasonStaleSource}
-
-// JamRedMin is the delay from which a jam makes the lamp red, in minutes;
-// the platform's motorway lamp uses the same threshold.
-const JamRedMin = 30
-
-// signal returns the colour one situation gives on its own and why: the
-// platform's motorway lamp (signalLamp) over the service's codes. Every
-// situation gives a colour; the service holds no scope (carriageway or
-// ramp), so every situation is read as the carriageway's, the platform's
-// reading of an unknown scope:
-//
-//	severity road_closed                  red    road_closed
-//	kind closure, not lane_closed         red    road_closed
-//	kind hazard                           red    safety
-//	kind jam, delay >= JamRedMin          red    long_jam
-//	kind weather, severity major          red    severe_weather
-//	kind jam, otherwise                   amber  jam
-//	kind roadworks or restriction,
-//	  or closure graded lane_closed       amber  narrowing
-//	anything else, also unmapped codes    amber  warning
-//
-// An accident is a warning: an accident that closes the road is graded
-// road_closed. A situation the service cannot grade is never green.
-func signal(s Signal) (Lamp, Reason) {
-	if s.Severity == SeverityRoadClosed || s.Kind == KindClosure && s.Severity != SeverityLaneClosed {
-		return LampRed, ReasonRoadClosed
-	}
-	if s.Kind == KindHazard {
-		return LampRed, ReasonSafety
-	}
-	if s.Kind == KindJam && s.DelayMin != nil && *s.DelayMin >= JamRedMin {
-		return LampRed, ReasonLongJam
-	}
-	if s.Kind == KindWeather && s.Severity == SeverityMajor {
-		return LampRed, ReasonSevereWeather
-	}
-	if s.Kind == KindJam {
-		return LampAmber, ReasonJam
-	}
-	if s.Kind == KindRoadworks || s.Kind == KindRestriction || s.Kind == KindClosure {
-		return LampAmber, ReasonNarrowing
-	}
-	return LampAmber, ReasonWarning
+// german reports whether a text language is German: the platform's word
+// rules are keyword rules over the publisher's German.
+func german(lang string) bool {
+	lang = strings.ToLower(lang)
+	return lang == "de" || strings.HasPrefix(lang, "de-")
 }
 
-// LampOf is the lamp rule (FR-ROAD-004), the platform's motorway lamp
-// (ampelOf). It reads every situation in the question's scope (the road and
-// direction, or the radius), whatever the list's filters keep, whether the
-// answer is partial and whether a family it read is missing or stale; first
-// match from the top:
-//
-//   - red when a situation gives red (see signal);
-//   - unknown when the answer is partial: a family the key may not read
-//     could hold a closure, so the road is never shown amber or green;
-//   - amber when a situation gives amber, or when a family read is missing
-//     or stale (limited sight);
-//   - green otherwise: nothing reported and every family fresh. Green is
-//     never a guarantee that the road is free.
-//
-// The reason is the first in Reasons that decided the colour; nil for green.
-func LampOf(signals []Signal, partial, stale bool) (Lamp, *Reason) {
-	found := map[Reason]Lamp{}
-	for _, s := range signals {
-		lamp, reason := signal(s)
-		found[reason] = lamp
+// Signal is the platform's signal of the situation. The read contract
+// carries every publisher's situation in one shape (a kind, a headline, a
+// description, a delay), the shape of the platform's police and Land
+// message, so it is judged by MessageSignal over the headline and the
+// description (What and DetailText), the delay in seconds. A closure or
+// roadworks whose description carries the Autobahn GmbH's location line
+// ("Auffahrt auf die A9: …", "A45: Hagen -> Gießen, …") takes that line's
+// scope, as closureScopeOf reads it. The words are read only in a German
+// text; any other is matched by no word, the platform's reading of an
+// unmatched text: no safety word, the carriageway's scope.
+func (m Message) Signal() Signal {
+	am := AmpelMessage{Kind: string(m.Kind)}
+	if m.DelayMin != nil {
+		d := float64(*m.DelayMin) * 60
+		am.DelayS = &d
 	}
-	if partial {
-		found[ReasonPartial] = LampUnknown
+	de := german(m.TextLanguage)
+	if de {
+		am.What, am.DetailText = m.Headline, m.Description
 	}
-	if stale {
-		found[ReasonStaleSource] = LampAmber
-	}
-	for _, r := range Reasons {
-		if lamp, ok := found[r]; ok {
-			return lamp, &r
+	s := MessageSignal(am)
+	if de && m.Description != nil && (s.Kind == SignalClosure || s.Kind == SignalRoadworks) {
+		var lines []*string
+		for _, l := range strings.Split(*m.Description, "\n") {
+			lines = append(lines, &l)
+		}
+		if scope, ok := LineScope(lines); ok {
+			s.Scope = scope
 		}
 	}
-	return LampGreen, nil
+	return s
+}
+
+// Reason says why the lamp has its colour: the key of the lamp's first
+// reason (reasonKeyOf), a jam split by its colour. Open enumeration.
+type Reason string
+
+// The reasons.
+const (
+	// ReasonRoadClosed: a closure of the carriageway (red).
+	ReasonRoadClosed Reason = "road_closed"
+	// ReasonSafety: a safety message by its words, on any kind: a wrong-way
+	// driver, an object, a person or an animal on the road, an accident
+	// with a closure of the road (red).
+	ReasonSafety Reason = "safety"
+	// ReasonBridgeClosed: a bridge closed for wind (red). The read contract
+	// holds no bridge states, so it is never given today.
+	ReasonBridgeClosed Reason = "bridge_closed"
+	// ReasonLongJam: a jam with a delay of 30 minutes or more (red).
+	ReasonLongJam Reason = "long_jam"
+	// ReasonWeatherWarning: a DWD warning in force on the road or within
+	// the radius: red from level 3, amber at levels 1 and 2.
+	ReasonWeatherWarning Reason = "weather_warning"
+	// ReasonRampClosed: an entry, an exit or a junction's link closed
+	// (amber).
+	ReasonRampClosed Reason = "ramp_closed"
+	// ReasonJam: a shorter jam, or one with no delay (amber).
+	ReasonJam Reason = "jam"
+	// ReasonSlippery: slippery road from the road weather (amber). The read
+	// contract holds no road-weather forecast, so it is never given today.
+	ReasonSlippery Reason = "slippery"
+	// ReasonWarning: any other message of the publisher, including an
+	// accident with no closure of the road (amber).
+	ReasonWarning Reason = "warning"
+	// ReasonNarrowing: roadworks or a lane restriction on the carriageway
+	// (amber); works on a ramp give no colour.
+	ReasonNarrowing Reason = "narrowing"
+	// ReasonLimitedSight: a group the lamp reads is stale or missing (a
+	// roads family stale or without data, a roads family the key may not
+	// read, the DWD warnings unread or their source not fresh) (amber).
+	ReasonLimitedSight Reason = "limited_sight"
+)
+
+// Reasons lists every reason: red ones in the platform's order, then amber
+// ones.
+var Reasons = []Reason{ReasonRoadClosed, ReasonSafety, ReasonBridgeClosed, ReasonLongJam, ReasonWeatherWarning,
+	ReasonRampClosed, ReasonJam, ReasonSlippery, ReasonWarning, ReasonNarrowing, ReasonLimitedSight}
+
+// reasonOfKey names a reason by its key; a jam is named by its colour.
+var reasonOfKey = map[ReasonKey]Reason{
+	ReasonKey(SignalClosure): ReasonRoadClosed, ReasonKey(SignalSafety): ReasonSafety,
+	ReasonKey(SignalBridgeWind): ReasonBridgeClosed, ReasonKey(SignalDWD): ReasonWeatherWarning,
+	KeyRampClosure: ReasonRampClosed, ReasonKey(SignalSlippery): ReasonSlippery,
+	ReasonKey(SignalWarning): ReasonWarning, ReasonKey(SignalRoadworks): ReasonNarrowing, KeySight: ReasonLimitedSight,
+}
+
+// ReasonOf names one reason of the lamp.
+func ReasonOf(r AmpelReason) Reason {
+	if r.Signal != nil && r.Signal.Kind == SignalJam {
+		if r.Lamp == LampRed {
+			return ReasonLongJam
+		}
+		return ReasonJam
+	}
+	return reasonOfKey[ReasonKeyOf(r)]
+}
+
+// The sight groups of the service's lamp.
+const (
+	// GroupRoads is the sight of one roads family.
+	GroupRoads = "roads"
+	// GroupDWD is the sight of the DWD warnings.
+	GroupDWD = "dwd"
+)
+
+// SourceSight is a family's sight from its freshness (feedSightOf): missing
+// when it has published no data, stale when its data is older than its
+// threshold, fresh otherwise.
+func SourceSight(f provenance.Freshness) Sight {
+	if f.DataAsOf == nil {
+		return SightMissing
+	}
+	if f.Stale {
+		return SightStale
+	}
+	return SightFresh
+}
+
+// LampOf is the lamp rule (FR-ROAD-004), the platform's motorway Ampel as
+// check_autobahn_traffic judges it (toolAmpel): the signal of every
+// situation in the question's scope (the road and direction, or the
+// radius), whatever the list's filters keep, and of every DWD warning in
+// force there (levels), ordered as the platform orders them, judged with
+// the sight of every group read (ampelOf): red when a signal gives red;
+// amber when a signal gives amber or a group's sight is limited; green
+// otherwise, which is never a guarantee that the road is free. The reason
+// names the first of the lamp's reasons; nil for green.
+func LampOf(messages []Message, levels []int, sight []SightEntry) (Lamp, *Reason) {
+	signals := make([]Signal, 0, len(messages)+len(levels))
+	for _, m := range messages {
+		signals = append(signals, m.Signal())
+	}
+	for _, l := range levels {
+		signals = append(signals, Signal{Kind: SignalDWD, Level: l})
+	}
+	SortSignals(signals)
+	a := AmpelOf(signals, sight)
+	if a.Lamp == LampGreen {
+		return LampGreen, nil
+	}
+	r := ReasonOf(a.Reasons[0])
+	return a.Lamp, &r
+}
+
+// Families are the source families a conditions question reads: the roads
+// families of its situations and the weather families of its DWD warnings.
+type Families struct {
+	Roads   []string
+	Weather []string
+}
+
+// Warning is a DWD warning in force in a question's scope, as the lamp
+// reads it.
+type Warning struct {
+	Family string
+	Level  int
+}
+
+// Page is the answer of one conditions read, from one snapshot: a page of
+// situations and what the lamp reads over the whole scope.
+type Page struct {
+	Items   []Situation
+	HasMore bool
+	// Messages is the lamp's view of every situation in the scope, whatever
+	// the list's filters keep.
+	Messages []Message
+	// Warnings are the DWD warnings in force in the scope; nil when no
+	// weather family was read.
+	Warnings []Warning
+	// Sources are the freshness of every family read.
+	Sources []provenance.Family
 }
 
 // Filter narrows the situations a question reads.

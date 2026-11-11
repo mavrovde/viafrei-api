@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
-	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 )
 
@@ -15,16 +14,18 @@ type Roads interface {
 	// Road returns the road with a canonical reference, or
 	// roads.ErrUnknownRoad.
 	Road(ctx context.Context, ref string) (roads.Road, error)
-	// SituationsOnRoad returns up to q.Limit active situations on the road
-	// of the given families, in the order of their position along it, the
-	// lamp's signals of every situation in the scope (the road and
-	// direction, whatever the filters keep), and whether there are more.
-	SituationsOnRoad(ctx context.Context, q roads.CorridorQuery, families []string, now time.Time) ([]roads.Situation, []roads.Signal, bool, error)
-	// SituationsNear returns up to q.Limit active situations within the
-	// radius of the given families, by severity then distance, the lamp's
-	// signals of every situation in the radius, whatever the filters keep,
-	// and whether there are more.
-	SituationsNear(ctx context.Context, q roads.AreaQuery, families []string, now time.Time) ([]roads.Situation, []roads.Signal, bool, error)
+	// SituationsOnRoad returns, from one snapshot, up to q.Limit active
+	// situations on the road of the roads families, in the order of their
+	// position along it, and whether there are more; the lamp's view of
+	// every situation in the scope (the road and direction, whatever the
+	// filters keep); the DWD warnings of the weather families in force in
+	// an area the road crosses (none read when no weather family is given);
+	// and the freshness of every family given.
+	SituationsOnRoad(ctx context.Context, q roads.CorridorQuery, fams roads.Families, now time.Time) (roads.Page, error)
+	// SituationsNear is SituationsOnRoad for the radius of a position, by
+	// severity then distance; the warnings are those of an area within the
+	// radius.
+	SituationsNear(ctx context.Context, q roads.AreaQuery, fams roads.Families, now time.Time) (roads.Page, error)
 	// Situation returns one situation of the given families that is active
 	// or ended after endedSince, or roads.ErrUnknownSituation.
 	Situation(ctx context.Context, id string, families []string, endedSince time.Time) (roads.Situation, error)
@@ -40,11 +41,48 @@ type Conditions struct {
 	Reason *roads.Reason
 }
 
-// conditions reads a page of situations of the permitted roads families,
+// sights are the sight of every group the lamp reads (ampelOf's sight):
+// one entry per permitted roads family (missing without a freshness row or
+// data, stale past its threshold); one missing entry when a roads family
+// the key may not read was left out (partial); and the DWD warnings'
+// sight (dwdSightOf), whose read answered only when every weather family
+// was permitted and read, and whose source is fresh only when every
+// weather family read is.
+func sights(p roads.Page, fams roads.Families, partial, weatherRead bool, now time.Time) []roads.SightEntry {
+	fresh := map[string]roads.Sight{}
+	for _, f := range p.Sources {
+		fresh[f.Source.Family] = roads.SourceSight(f.Assess(now))
+	}
+	of := func(family string) roads.Sight {
+		if s, ok := fresh[family]; ok {
+			return s
+		}
+		return roads.SightMissing
+	}
+	var out []roads.SightEntry
+	for _, f := range fams.Roads {
+		out = append(out, roads.SightEntry{Group: roads.GroupRoads, State: of(f)})
+	}
+	if partial {
+		out = append(out, roads.SightEntry{Group: roads.GroupRoads, State: roads.SightMissing})
+	}
+	source := roads.SightMissing
+	if len(fams.Weather) > 0 {
+		source = roads.SightFresh
+	}
+	for _, f := range fams.Weather {
+		if of(f) != roads.SightFresh {
+			source = of(f)
+		}
+	}
+	return append(out, roads.SightEntry{Group: roads.GroupDWD, State: roads.DWDSightOf(weatherRead, len(p.Warnings), source)})
+}
+
+// conditions reads a page of situations of the permitted roads families and
+// the DWD warnings of the permitted weather families in one snapshot,
 // post-checks and attributes it, and computes the lamp over every situation
-// in the scope, whether the answer is partial and whether any permitted
-// family is missing or stale.
-func (s *Service) conditions(ctx context.Context, key access.Record, read func(families []string, now time.Time) ([]roads.Situation, []roads.Signal, bool, error)) (Conditions, error) {
+// and warning in the scope with the sight of every group read.
+func (s *Service) conditions(ctx context.Context, key access.Record, read func(fams roads.Families, now time.Time) (roads.Page, error)) (Conditions, error) {
 	reg, gate, err := s.gate(ctx, key)
 	if err != nil {
 		return Conditions{}, err
@@ -53,39 +91,50 @@ func (s *Service) conditions(ctx context.Context, key access.Record, read func(f
 	if err != nil {
 		return Conditions{}, err
 	}
+	// A key without the weather scope, or that may read no weather family,
+	// reads no warning: the DWD group is then missing, never an error of
+	// the roads question.
+	var weather []string
+	weatherRead := false
+	if key.Plan.Has("weather") {
+		w, wpartial, werr := gate.Answer(access.Answering(reg, "weather"))
+		weather, weatherRead = w, werr == nil && !wpartial
+	}
+	fams := roads.Families{Roads: permitted, Weather: weather}
 	now := s.now()
-	sits, signals, more, err := read(permitted, now)
+	p, err := read(fams, now)
 	if err != nil {
 		return Conditions{}, err
 	}
-	contributed := make([]string, len(sits))
-	for i, v := range sits {
-		contributed[i] = v.Family
+	contributed := make([]string, 0, len(p.Items)+len(p.Warnings))
+	for _, v := range p.Items {
+		contributed = append(contributed, v.Family)
+	}
+	for _, w := range p.Warnings {
+		contributed = append(contributed, w.Family)
 	}
 	if err := gate.Check(contributed); err != nil {
 		return Conditions{}, err
 	}
-	// Every permitted family is read once: all of them for the lamp's
-	// freshness, those that contributed (or all, when none did) for the
-	// attribution. The post-check above keeps contributed inside permitted.
-	consulted := slices.Clone(permitted)
+	// The attribution: the families that contributed a situation or a
+	// warning, or every permitted roads family when none did.
+	consulted := slices.Clone(contributed)
+	if len(consulted) == 0 {
+		consulted = slices.Clone(permitted)
+	}
 	slices.Sort(consulted)
 	consulted = slices.Compact(consulted)
-	all, err := s.repos.Register.Provenance(ctx, consulted, s.set.Language)
+	attributed, err := s.repos.Register.Provenance(ctx, consulted, s.set.Language)
 	if err != nil {
 		return Conditions{}, err
 	}
-	// A permitted family with no provenance row is missing: limited sight.
-	stale, fams := len(all) < len(consulted), []provenance.Family{}
-	for _, f := range all {
-		stale = stale || f.Assess(now).Stale
-		if len(contributed) == 0 || slices.Contains(contributed, f.Source.Family) {
-			fams = append(fams, f)
-		}
+	levels := make([]int, len(p.Warnings))
+	for i, w := range p.Warnings {
+		levels[i] = w.Level
 	}
-	lamp, reason := roads.LampOf(signals, partial, stale)
+	lamp, reason := roads.LampOf(p.Messages, levels, sights(p, fams, partial, weatherRead, now))
 	return Conditions{
-		Answer: Answer[roads.Situation]{Items: sits, HasMore: more, Families: fams, Partial: partial, At: now},
+		Answer: Answer[roads.Situation]{Items: p.Items, HasMore: p.HasMore, Families: attributed, Partial: partial, At: now},
 		Lamp:   lamp, Reason: reason,
 	}, nil
 }
@@ -99,7 +148,7 @@ func (s *Service) MotorwayConditions(ctx context.Context, key access.Record, q r
 		return Conditions{}, err
 	}
 	q.Road = road.Ref
-	c, err := s.conditions(ctx, key, func(fams []string, now time.Time) ([]roads.Situation, []roads.Signal, bool, error) {
+	c, err := s.conditions(ctx, key, func(fams roads.Families, now time.Time) (roads.Page, error) {
 		return s.repos.Roads.SituationsOnRoad(ctx, q, fams, now)
 	})
 	if err != nil {
@@ -112,7 +161,7 @@ func (s *Service) MotorwayConditions(ctx context.Context, key access.Record, q r
 // RoadConditions answers "what is happening on the roads near here" for key
 // (FR-ROAD-006).
 func (s *Service) RoadConditions(ctx context.Context, key access.Record, q roads.AreaQuery) (Conditions, error) {
-	return s.conditions(ctx, key, func(fams []string, now time.Time) ([]roads.Situation, []roads.Signal, bool, error) {
+	return s.conditions(ctx, key, func(fams roads.Families, now time.Time) (roads.Page, error) {
 		return s.repos.Roads.SituationsNear(ctx, q, fams, now)
 	})
 }

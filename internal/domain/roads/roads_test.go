@@ -4,7 +4,9 @@ import (
 	"errors"
 	"slices"
 	"testing"
+	"time"
 
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
@@ -44,7 +46,7 @@ func TestStoredCodesMapToTheDomain(t *testing.T) {
 			t.Errorf("class %q -> %q, want %q", raw, got, want)
 		}
 	}
-	if len(roads.Kinds) != 8 || len(roads.Severities) != 6 || len(roads.Directions) != 6 || len(roads.Classes) != 5 || len(roads.Lamps) != 4 {
+	if len(roads.Kinds) != 8 || len(roads.Severities) != 6 || len(roads.Directions) != 6 || len(roads.Classes) != 5 || len(roads.Lamps) != 3 {
 		t.Error("an enumeration lost or gained a value")
 	}
 }
@@ -97,59 +99,124 @@ func why(r roads.Reason) *roads.Reason { return &r }
 
 func delay(m int) *int { return &m }
 
+func msg(k roads.Kind, headline string) roads.Message {
+	return roads.Message{Kind: k, Headline: headline, TextLanguage: "de"}
+}
+
+var allFresh = []roads.SightEntry{{Group: roads.GroupRoads, State: roads.SightFresh}, {Group: roads.GroupDWD, State: roads.SightFresh}}
+
+// TestTheLampRule: the service's situations judged by the platform's rule
+// (messageSignal over the headline and the description, ampelOf with the
+// sight of every group), first reason named.
 func TestTheLampRule(t *testing.T) {
 	req.Covers(t, "FR-ROAD-004", "ENV-051")
-	sig := func(k roads.Kind, s roads.Severity) roads.Signal { return roads.Signal{Kind: k, Severity: s} }
-	jam := func(d *int) roads.Signal {
-		return roads.Signal{Kind: roads.KindJam, Severity: roads.SeverityMinor, DelayMin: d}
-	}
+	jam := func(d *int) roads.Message { m := msg(roads.KindJam, "Stau"); m.DelayMin = d; return m }
+	desc := func(m roads.Message, d string) roads.Message { m.Description = &d; return m }
+	lang := func(m roads.Message, l string) roads.Message { m.TextLanguage = l; return m }
+	stale := []roads.SightEntry{{Group: roads.GroupRoads, State: roads.SightStale}, {Group: roads.GroupDWD, State: roads.SightFresh}}
+	partial := []roads.SightEntry{{Group: roads.GroupRoads, State: roads.SightFresh}, {Group: roads.GroupRoads, State: roads.SightMissing}, {Group: roads.GroupDWD, State: roads.SightFresh}}
 	for name, c := range map[string]struct {
-		in             []roads.Signal
-		partial, stale bool
-		lamp           roads.Lamp
-		reason         *roads.Reason
+		in     []roads.Message
+		levels []int
+		sight  []roads.SightEntry
+		lamp   roads.Lamp
+		reason *roads.Reason
 	}{
-		"nothing":                 {nil, false, false, roads.LampGreen, nil},
-		"light roadworks":         {[]roads.Signal{sig(roads.KindRoadworks, roads.SeverityMinor), sig(roads.KindRoadworks, roads.SeverityInfo)}, false, false, roads.LampAmber, why(roads.ReasonNarrowing)},
-		"narrowing":               {[]roads.Signal{sig(roads.KindRoadworks, roads.SeverityLaneClosed)}, false, false, roads.LampAmber, why(roads.ReasonNarrowing)},
-		"major roadworks":         {[]roads.Signal{sig(roads.KindRoadworks, roads.SeverityMajor)}, false, false, roads.LampAmber, why(roads.ReasonNarrowing)},
-		"closed roadworks":        {[]roads.Signal{sig(roads.KindRoadworks, roads.SeverityRoadClosed)}, false, false, roads.LampRed, why(roads.ReasonRoadClosed)},
-		"closure of the road":     {[]roads.Signal{sig(roads.KindClosure, roads.SeverityRoadClosed)}, false, false, roads.LampRed, why(roads.ReasonRoadClosed)},
-		"closure of a lane":       {[]roads.Signal{sig(roads.KindClosure, roads.SeverityLaneClosed)}, false, false, roads.LampAmber, why(roads.ReasonNarrowing)},
-		"closure, minor":          {[]roads.Signal{sig(roads.KindClosure, roads.SeverityMinor)}, false, false, roads.LampRed, why(roads.ReasonRoadClosed)},
-		"hazard":                  {[]roads.Signal{sig(roads.KindHazard, roads.SeverityInfo)}, false, false, roads.LampRed, why(roads.ReasonSafety)},
-		"major accident":          {[]roads.Signal{sig(roads.KindAccident, roads.SeverityMajor)}, false, false, roads.LampAmber, why(roads.ReasonWarning)},
-		"accident with a closure": {[]roads.Signal{sig(roads.KindAccident, roads.SeverityRoadClosed)}, false, false, roads.LampRed, why(roads.ReasonRoadClosed)},
-		"minor accident":          {[]roads.Signal{sig(roads.KindAccident, roads.SeverityLaneClosed)}, false, false, roads.LampAmber, why(roads.ReasonWarning)},
-		"jam at the threshold":    {[]roads.Signal{jam(delay(roads.JamRedMin))}, false, false, roads.LampRed, why(roads.ReasonLongJam)},
-		"jam under the threshold": {[]roads.Signal{jam(delay(roads.JamRedMin - 1))}, false, false, roads.LampAmber, why(roads.ReasonJam)},
-		"jam without a delay":     {[]roads.Signal{jam(nil)}, false, false, roads.LampAmber, why(roads.ReasonJam)},
-		"severe weather":          {[]roads.Signal{sig(roads.KindWeather, roads.SeverityMajor)}, false, false, roads.LampRed, why(roads.ReasonSevereWeather)},
-		"weather":                 {[]roads.Signal{sig(roads.KindWeather, roads.SeverityLaneClosed)}, false, false, roads.LampAmber, why(roads.ReasonWarning)},
-		"restriction":             {[]roads.Signal{sig(roads.KindRestriction, roads.SeverityInfo)}, false, false, roads.LampAmber, why(roads.ReasonNarrowing)},
-		"unmapped kind":           {[]roads.Signal{sig(roads.KindOther, roads.SeverityInfo)}, false, false, roads.LampAmber, why(roads.ReasonWarning)},
-		"ungraded roadworks":      {[]roads.Signal{sig(roads.KindRoadworks, roads.SeverityOther)}, false, false, roads.LampAmber, why(roads.ReasonNarrowing)},
-		"ungraded closure":        {[]roads.Signal{sig(roads.KindClosure, roads.SeverityOther)}, false, false, roads.LampRed, why(roads.ReasonRoadClosed)},
-		"first reason wins":       {[]roads.Signal{sig(roads.KindOther, roads.SeverityInfo), jam(nil), sig(roads.KindWeather, roads.SeverityMajor), sig(roads.KindHazard, roads.SeverityInfo)}, false, false, roads.LampRed, why(roads.ReasonSafety)},
-		"light, then a jam":       {[]roads.Signal{sig(roads.KindRoadworks, roads.SeverityMinor), jam(nil)}, false, false, roads.LampAmber, why(roads.ReasonJam)},
-		"warning, then works":     {[]roads.Signal{sig(roads.KindAccident, roads.SeverityMinor), sig(roads.KindRoadworks, roads.SeverityInfo)}, false, false, roads.LampAmber, why(roads.ReasonNarrowing)},
-		"closure, then a hazard":  {[]roads.Signal{sig(roads.KindClosure, roads.SeverityRoadClosed), sig(roads.KindHazard, roads.SeverityInfo)}, false, false, roads.LampRed, why(roads.ReasonRoadClosed)},
-		"amber order":             {[]roads.Signal{sig(roads.KindOther, roads.SeverityInfo), sig(roads.KindRoadworks, roads.SeverityMajor)}, false, false, roads.LampAmber, why(roads.ReasonNarrowing)},
-		"stale alone":             {nil, false, true, roads.LampAmber, why(roads.ReasonStaleSource)},
-		"amber beats stale":       {[]roads.Signal{jam(nil)}, false, true, roads.LampAmber, why(roads.ReasonJam)},
-		"partial alone":           {nil, true, true, roads.LampUnknown, why(roads.ReasonPartial)},
-		"partial beats amber":     {[]roads.Signal{jam(nil)}, true, false, roads.LampUnknown, why(roads.ReasonPartial)},
-		"red beats partial":       {[]roads.Signal{jam(nil), sig(roads.KindClosure, roads.SeverityRoadClosed)}, true, true, roads.LampRed, why(roads.ReasonRoadClosed)},
+		"nothing":                     {nil, nil, allFresh, roads.LampGreen, nil},
+		"no sight at all":             {nil, nil, nil, roads.LampAmber, why(roads.ReasonLimitedSight)},
+		"roadworks":                   {[]roads.Message{msg(roads.KindRoadworks, "Baustelle")}, nil, allFresh, roads.LampAmber, why(roads.ReasonNarrowing)},
+		"restriction":                 {[]roads.Message{msg(roads.KindRestriction, "Fahrbahnverengung")}, nil, allFresh, roads.LampAmber, why(roads.ReasonNarrowing)},
+		"works on a ramp give none":   {[]roads.Message{desc(msg(roads.KindRoadworks, "Baustelle"), "Ausfahrt gesperrt")}, nil, allFresh, roads.LampGreen, nil},
+		"closure":                     {[]roads.Message{msg(roads.KindClosure, "A7 gesperrt")}, nil, allFresh, roads.LampRed, why(roads.ReasonRoadClosed)},
+		"ramp closure":                {[]roads.Message{desc(msg(roads.KindClosure, "A7"), "Anschlussstelle Soltau-Ost: Auffahrt gesperrt")}, nil, allFresh, roads.LampAmber, why(roads.ReasonRampClosed)},
+		"ramp by the location line":   {[]roads.Message{desc(msg(roads.KindClosure, "A9"), "Zeitraum dieser Bauphase:\nAuffahrt auf die A9: AS Weißenfels")}, nil, allFresh, roads.LampAmber, why(roads.ReasonRampClosed)},
+		"road by the location line":   {[]roads.Message{desc(msg(roads.KindClosure, "Auffahrt gesperrt"), "A45: Hagen -> Gießen, zwischen AS A und AS B")}, nil, allFresh, roads.LampRed, why(roads.ReasonRoadClosed)},
+		"works by the location line":  {[]roads.Message{desc(msg(roads.KindRoadworks, "Baustelle"), "Abfahrt von der A92: AK Neufahrn")}, nil, allFresh, roads.LampGreen, nil},
+		"wrong-way on any kind":       {[]roads.Message{msg(roads.KindWeather, "Falschfahrer")}, nil, allFresh, roads.LampRed, why(roads.ReasonSafety)},
+		"object in the description":   {[]roads.Message{desc(msg(roads.KindOther, "Gefahr"), "Gegenstände auf der Fahrbahn")}, nil, allFresh, roads.LampRed, why(roads.ReasonSafety)},
+		"accident with a closure":     {[]roads.Message{desc(msg(roads.KindAccident, "Unfall"), "Fahrbahn voll gesperrt")}, nil, allFresh, roads.LampRed, why(roads.ReasonSafety)},
+		"accident with a closed lane": {[]roads.Message{desc(msg(roads.KindAccident, "Unfall"), "rechter Fahrstreifen gesperrt")}, nil, allFresh, roads.LampAmber, why(roads.ReasonWarning)},
+		"hazard without words":        {[]roads.Message{msg(roads.KindHazard, "Gefahr")}, nil, allFresh, roads.LampAmber, why(roads.ReasonWarning)},
+		"weather situation":           {[]roads.Message{msg(roads.KindWeather, "Glätte")}, nil, allFresh, roads.LampAmber, why(roads.ReasonWarning)},
+		"unmapped kind":               {[]roads.Message{msg(roads.KindOther, "Hinweis")}, nil, allFresh, roads.LampAmber, why(roads.ReasonWarning)},
+		"words only in German":        {[]roads.Message{lang(msg(roads.KindHazard, "Falschfahrer"), "en")}, nil, allFresh, roads.LampAmber, why(roads.ReasonWarning)},
+		"a regional German":           {[]roads.Message{lang(msg(roads.KindHazard, "Falschfahrer"), "DE-at")}, nil, allFresh, roads.LampRed, why(roads.ReasonSafety)},
+		"ramp words only in German":   {[]roads.Message{lang(desc(msg(roads.KindClosure, "A7"), "Auffahrt auf die A7: gesperrt"), "en")}, nil, allFresh, roads.LampRed, why(roads.ReasonRoadClosed)},
+		"jam at the threshold":        {[]roads.Message{jam(delay(30))}, nil, allFresh, roads.LampRed, why(roads.ReasonLongJam)},
+		"jam under the threshold":     {[]roads.Message{jam(delay(29))}, nil, allFresh, roads.LampAmber, why(roads.ReasonJam)},
+		"jam without a delay":         {[]roads.Message{jam(nil)}, nil, allFresh, roads.LampAmber, why(roads.ReasonJam)},
+		"DWD level 3":                 {nil, []int{3}, allFresh, roads.LampRed, why(roads.ReasonWeatherWarning)},
+		"DWD level 1":                 {nil, []int{1}, allFresh, roads.LampAmber, why(roads.ReasonWeatherWarning)},
+		"DWD level 0":                 {nil, []int{0}, allFresh, roads.LampGreen, nil},
+		"closure before safety":       {[]roads.Message{msg(roads.KindHazard, "Falschfahrer"), msg(roads.KindClosure, "gesperrt")}, nil, allFresh, roads.LampRed, why(roads.ReasonRoadClosed)},
+		"safety before a long jam":    {[]roads.Message{jam(delay(90)), msg(roads.KindHazard, "Falschfahrer")}, nil, allFresh, roads.LampRed, why(roads.ReasonSafety)},
+		"long jam before DWD red":     {[]roads.Message{jam(delay(90))}, []int{4}, allFresh, roads.LampRed, why(roads.ReasonLongJam)},
+		"ramp before a jam":           {[]roads.Message{jam(nil), desc(msg(roads.KindClosure, "A7"), "Ausfahrt gesperrt")}, nil, allFresh, roads.LampAmber, why(roads.ReasonRampClosed)},
+		"jam before DWD amber":        {[]roads.Message{jam(nil)}, []int{2}, allFresh, roads.LampAmber, why(roads.ReasonJam)},
+		"DWD before a warning":        {[]roads.Message{msg(roads.KindOther, "Hinweis")}, []int{1}, allFresh, roads.LampAmber, why(roads.ReasonWeatherWarning)},
+		"warning before roadworks":    {[]roads.Message{msg(roads.KindRoadworks, "Baustelle"), msg(roads.KindOther, "Hinweis")}, nil, allFresh, roads.LampAmber, why(roads.ReasonWarning)},
+		"roadworks before sight":      {[]roads.Message{msg(roads.KindRoadworks, "Baustelle")}, nil, stale, roads.LampAmber, why(roads.ReasonNarrowing)},
+		"stale alone":                 {nil, nil, stale, roads.LampAmber, why(roads.ReasonLimitedSight)},
+		"partial is limited sight":    {nil, nil, partial, roads.LampAmber, why(roads.ReasonLimitedSight)},
+		"red beats a partial answer":  {[]roads.Message{msg(roads.KindClosure, "gesperrt")}, nil, partial, roads.LampRed, why(roads.ReasonRoadClosed)},
 	} {
-		lamp, reason := roads.LampOf(c.in, c.partial, c.stale)
+		lamp, reason := roads.LampOf(c.in, c.levels, c.sight)
 		if lamp != c.lamp || (reason == nil) != (c.reason == nil) || reason != nil && *reason != *c.reason {
 			t.Errorf("%s: %s %v, want %s %v", name, lamp, reason, c.lamp, c.reason)
 		}
 	}
-	d := 40
-	s := roads.Situation{Kind: roads.KindJam, Severity: roads.SeverityMajor, DelayMin: &d}
-	if got := roads.SignalOf(s); got.Kind != roads.KindJam || got.Severity != roads.SeverityMajor || got.DelayMin != &d {
-		t.Errorf("signal %+v", got)
+	d, text := 40, "Stau"
+	s := roads.Situation{Kind: roads.KindJam, Headline: "A1", Description: &text, TextLanguage: "de", DelayMin: &d}
+	if got := roads.MessageOf(s); got.Kind != roads.KindJam || got.Headline != "A1" || got.Description != &text || got.TextLanguage != "de" || got.DelayMin != &d {
+		t.Errorf("message %+v", got)
+	}
+}
+
+// TestEveryReasonIsNamed: each reason key and colour has its name, and the
+// list of reasons holds each once.
+func TestEveryReasonIsNamed(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004")
+	for _, c := range []struct {
+		r    roads.AmpelReason
+		want roads.Reason
+	}{
+		{roads.AmpelReason{Lamp: roads.LampRed, Signal: &roads.Signal{Kind: roads.SignalClosure, Scope: roads.ScopeCarriageway}}, roads.ReasonRoadClosed},
+		{roads.AmpelReason{Lamp: roads.LampAmber, Signal: &roads.Signal{Kind: roads.SignalClosure, Scope: roads.ScopeRamp}}, roads.ReasonRampClosed},
+		{roads.AmpelReason{Lamp: roads.LampRed, Signal: &roads.Signal{Kind: roads.SignalSafety}}, roads.ReasonSafety},
+		{roads.AmpelReason{Lamp: roads.LampRed, Signal: &roads.Signal{Kind: roads.SignalBridgeWind}}, roads.ReasonBridgeClosed},
+		{roads.AmpelReason{Lamp: roads.LampRed, Signal: &roads.Signal{Kind: roads.SignalJam}}, roads.ReasonLongJam},
+		{roads.AmpelReason{Lamp: roads.LampAmber, Signal: &roads.Signal{Kind: roads.SignalJam}}, roads.ReasonJam},
+		{roads.AmpelReason{Lamp: roads.LampRed, Signal: &roads.Signal{Kind: roads.SignalDWD}}, roads.ReasonWeatherWarning},
+		{roads.AmpelReason{Lamp: roads.LampAmber, Signal: &roads.Signal{Kind: roads.SignalSlippery}}, roads.ReasonSlippery},
+		{roads.AmpelReason{Lamp: roads.LampAmber, Signal: &roads.Signal{Kind: roads.SignalWarning}}, roads.ReasonWarning},
+		{roads.AmpelReason{Lamp: roads.LampAmber, Signal: &roads.Signal{Kind: roads.SignalRoadworks}}, roads.ReasonNarrowing},
+		{roads.AmpelReason{Lamp: roads.LampAmber, Sight: &roads.SightEntry{Group: roads.GroupDWD, State: roads.SightMissing}}, roads.ReasonLimitedSight},
+	} {
+		if got := roads.ReasonOf(c.r); got != c.want {
+			t.Errorf("%+v: %q, want %q", c.r, got, c.want)
+		}
+	}
+	if len(roads.Reasons) != 11 || len(slices.Compact(slices.Sorted(slices.Values(roads.Reasons)))) != 11 {
+		t.Errorf("reasons %v", roads.Reasons)
+	}
+}
+
+// TestASourcesSightIsItsFreshness (feedSightOf): no data is missing, past
+// its threshold stale, otherwise fresh.
+func TestASourcesSightIsItsFreshness(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004")
+	at := time.Date(2026, 11, 1, 10, 0, 0, 0, time.UTC)
+	for _, c := range []struct {
+		f    provenance.Freshness
+		want roads.Sight
+	}{
+		{provenance.Freshness{Stale: true}, roads.SightMissing},
+		{provenance.Freshness{DataAsOf: &at, Stale: true}, roads.SightStale},
+		{provenance.Freshness{DataAsOf: &at}, roads.SightFresh},
+	} {
+		if got := roads.SourceSight(c.f); got != c.want {
+			t.Errorf("%+v: %q, want %q", c.f, got, c.want)
+		}
 	}
 }
 

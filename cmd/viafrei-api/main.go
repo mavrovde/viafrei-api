@@ -10,6 +10,7 @@
 //	viafrei-api openapi            print the OpenAPI document (api/openapi.json)
 //	viafrei-api version            print the build's version facts
 //	viafrei-api keys COMMAND       the operator's key tool (plan, issue, rotate, revoke, move, accept, prune)
+//	viafrei-api console COMMAND    the owner console's passkeys (enrol, passkeys, remove)
 package main
 
 import (
@@ -28,16 +29,20 @@ import (
 
 	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/adapters/accessstore"
+	consoleweb "github.com/mavrovde/viafrei-api/internal/adapters/console"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/admission"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
+	"github.com/mavrovde/viafrei-api/internal/app/console"
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/app/health"
 	"github.com/mavrovde/viafrei-api/internal/app/metering"
 	"github.com/mavrovde/viafrei-api/internal/app/ratelimit"
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
+	"github.com/mavrovde/viafrei-api/internal/invariant"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
+	"github.com/mavrovde/viafrei-api/internal/runtime/consolecli"
 	"github.com/mavrovde/viafrei-api/internal/runtime/keyscli"
 	"github.com/mavrovde/viafrei-api/internal/runtime/logging"
 	"github.com/mavrovde/viafrei-api/internal/runtime/wire"
@@ -65,11 +70,13 @@ func run(args, environ []string, stdout, stderr io.Writer) int {
 		return openapiCmd(environ, stdout, stderr)
 	case "keys":
 		return keysCmd(args, environ, stdout, stderr)
+	case "console":
+		return consoleCmd(args, environ, stdout, stderr)
 	case "version":
 		_ = json.NewEncoder(stdout).Encode(buildinfo.Get())
 		return 0
 	default:
-		fmt.Fprintf(stderr, "unknown command %q; known: serve, healthcheck, meta-check, config {check,show,docs}, openapi, keys, version\n", cmd)
+		fmt.Fprintf(stderr, "unknown command %q; known: serve, healthcheck, meta-check, config {check,show,docs}, openapi, keys, console, version\n", cmd)
 		return 2
 	}
 }
@@ -140,6 +147,14 @@ func serve(environ []string, stderr io.Writer) int {
 		metered := make(chan struct{})
 		go func() { meter.Run(mctx, reportUsage(log)); close(metered) }()
 		defer func() { stopMeter(); <-metered }()
+		if addr, on := wire.ConsoleListener(cfg); on {
+			stopConsole, err := startConsole(ctx, cfg, addr, as, log)
+			if err != nil {
+				fmt.Fprintln(stderr, err)
+				return config.ExitCode
+			}
+			defer stopConsole()
+		}
 	} else {
 		log.Warn("no access store configured: keyed operations are switched off")
 	}
@@ -283,6 +298,53 @@ func keysCmd(args, environ []string, stdout, stderr io.Writer) int {
 	}
 	defer as.Close()
 	return keyscli.Run(ctx, args, auth.NewKeys(wire.AuthSettings(cfg), as, nil, nil), stdout, stderr)
+}
+
+// consoleCmd runs the owner console's passkey tool against the access store.
+func consoleCmd(args, environ []string, stdout, stderr io.Writer) int {
+	cfg, ok := load(environ, false, stderr)
+	if !ok {
+		return config.ExitCode
+	}
+	if !cfg.Access.URL.IsSet() || !cfg.Auth.Pepper.IsSet() {
+		fmt.Fprintln(stderr, "console: access.url and auth.pepper must be set; the enrolment code is stored as its MAC")
+		return config.ExitCode
+	}
+	ctx := context.Background()
+	as, err := accessstore.Open(ctx, cfg)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return config.ExitCode
+	}
+	defer as.Close()
+	return consolecli.Run(ctx, args, console.NewOwners(wire.ConsoleOwners(cfg), as, nil, nil), stdout, stderr)
+}
+
+// startConsole serves the owner console on admin.listen_addr, which must be
+// a loopback address, and returns the function that stops it.
+func startConsole(ctx context.Context, cfg *config.Config, addr string, as *accessstore.Store, log *slog.Logger) (func(), error) {
+	clog := log.With("listener", "console")
+	// The settings New checks are the ones config.Load has validated.
+	h := invariant.Must(consoleweb.New(consoleweb.Deps{
+		Settings: wire.ConsoleWeb(cfg),
+		Guard:    console.NewGuard(wire.ConsoleGuard(cfg), nil, nil),
+		Owners:   console.NewOwners(wire.ConsoleOwners(cfg), as, nil, nil),
+		Keys:     auth.NewKeys(wire.AuthSettings(cfg), as, nil, nil),
+		Logger:   clog,
+	}))
+	l, err := consoleweb.Listen(ctx, addr)
+	if err != nil {
+		return nil, fmt.Errorf("admin.listen_addr: %w", err)
+	}
+	// The console's connections are held to the public listener's timeouts.
+	srv := &http.Server{
+		Handler: h, ReadHeaderTimeout: cfg.Server.ReadHeaderTimeout, ReadTimeout: cfg.Server.ReadTimeout,
+		WriteTimeout: cfg.Server.WriteTimeout, IdleTimeout: cfg.Server.IdleTimeout, MaxHeaderBytes: cfg.Server.MaxHeaderBytes,
+		ErrorLog: consoleweb.ErrorLog(clog),
+	}
+	go func() { _ = srv.Serve(l) }()
+	log.Info("console listening", "addr", l.Addr().String())
+	return func() { _ = srv.Close() }, nil
 }
 
 // reportUsage logs a usage flush that failed or dropped counts; a clean

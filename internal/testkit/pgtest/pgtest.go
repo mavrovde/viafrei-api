@@ -107,6 +107,7 @@ func prepare(ctx context.Context, ownerURL, readerPassword, accessPassword strin
 		{sql: accessdb.SchemaSQL()},
 		{sql: accessdb.RoleSQL()},
 		{sql: accessdb.LimitsSQL()},
+		{sql: accessdb.ConsoleSQL()},
 		{sql: fmt.Sprintf("alter role %s password '%s'", accessdb.Role, accessPassword)},
 	}
 	for _, st := range steps {

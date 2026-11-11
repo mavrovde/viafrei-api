@@ -42,6 +42,7 @@ const (
 // Ledger is the write side of the access store the lifecycle needs.
 type Ledger interface {
 	Store
+	Directory
 	PutPlan(ctx context.Context, c Change, p access.Plan) error
 	Issue(ctx context.Context, c Change, rec access.Record, label, contact string) error
 	Rotate(ctx context.Context, c Change, mac []byte, previousUntil time.Time) error

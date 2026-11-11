@@ -354,6 +354,7 @@ func crossField(c *Config) Errors {
 		out = append(out, fmt.Sprintf("compose.part_deadline: %s × %d parts is longer than deadline.request minus deadline.reserve", c.Compose.PartDeadline, parts))
 	}
 	out = append(out, crossFieldAuth(c)...)
+	out = append(out, crossFieldAdmin(c)...)
 	return append(out, crossFieldTiers(c)...)
 }
 

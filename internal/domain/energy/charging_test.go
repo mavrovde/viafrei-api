@@ -35,7 +35,7 @@ func TestMappings(t *testing.T) {
 	if energy.MapCurrent(nil) != nil {
 		t.Error("an unpublished current is not nil")
 	}
-	if energy.Other != "other" || len(energy.Accesses) != 4 || len(energy.States) != 6 || len(energy.Currents) != 3 {
+	if energy.Other != "other" || len(energy.Accesses) != 4 || len(energy.States) != 7 || len(energy.Currents) != 3 {
 		t.Error("the enumerations changed")
 	}
 }
@@ -100,6 +100,11 @@ func TestFamilies(t *testing.T) {
 	if got := s.Families(); !reflect.DeepEqual(got, []string{"f1", "f2"}) {
 		t.Errorf("Families = %v", got)
 	}
+	// A report that says nothing contributed nothing: its family is not credited.
+	silent := energy.Site{Family: "f1", Points: []energy.ChargePoint{point(energy.StateUnknown, 0, nil), point(energy.StateOther, 0, nil)}}
+	if got := silent.Families(); !reflect.DeepEqual(got, []string{"f1"}) {
+		t.Errorf("Families = %v", got)
+	}
 }
 
 func TestAccessFilterCodes(t *testing.T) {
@@ -137,5 +142,45 @@ func TestSummariseJudgesEachReportByItsOwnFamily(t *testing.T) {
 	})
 	if got.AvailableNow == nil || *got.AvailableNow != 1 || !reflect.DeepEqual(asked, []string{"fast", "slow"}) {
 		t.Errorf("available %v, thresholds asked for %v", show(got)[1], asked)
+	}
+}
+
+func TestAReportOlderThanTheShorterLimitIsShownStale(t *testing.T) {
+	req.Covers(t, "ENV-041", "FR-ENERGY-004")
+	// The status age limit and the family's threshold: the shorter one rules.
+	if got := energy.StatusLimit(30*time.Minute, time.Hour); got != 30*time.Minute {
+		t.Errorf("limit %v under a longer family threshold", got)
+	}
+	if got := energy.StatusLimit(30*time.Minute, 10*time.Minute); got != 10*time.Minute {
+		t.Errorf("limit %v under a shorter family threshold", got)
+	}
+	const limit = 30 * time.Minute
+	for _, c := range []struct {
+		age  time.Duration
+		want energy.State
+	}{{0, energy.StateReserved}, {limit, energy.StateReserved}, {limit + time.Second, energy.StateStale}, {10 * time.Hour, energy.StateStale}} {
+		a := point(energy.StateReserved, c.age, nil).Availability
+		if got := a.Shown(now, limit); got != c.want || a.Live(now, limit) != (c.want != energy.StateStale) {
+			t.Errorf("a report %v old: shown %q, want %q", c.age, got, c.want)
+		}
+	}
+	if energy.MapState("stale") != energy.StateOther {
+		t.Error("a stored code maps to stale; only the age makes a report stale")
+	}
+}
+
+func TestAReportOfUnknownSaysNothing(t *testing.T) {
+	req.Covers(t, "ENV-041", "ENV-051")
+	for _, st := range energy.States {
+		a := energy.Availability{State: st}
+		if want := st != energy.StateUnknown && st != energy.StateOther; a.Says() != want {
+			t.Errorf("%s says %v", st, a.Says())
+		}
+	}
+	// A live report of unknown is not counted: nothing current is known.
+	got := energy.Site{Points: []energy.ChargePoint{point(energy.StateUnknown, 0, nil), point(energy.StateOther, 0, nil)}}.
+		Summarise(now, func(string) time.Duration { return time.Hour })
+	if got.AvailableNow != nil {
+		t.Errorf("available %v from reports that say nothing", *got.AvailableNow)
 	}
 }

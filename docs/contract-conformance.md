@@ -62,3 +62,10 @@ CI compares the generated document with the main branch
 `vX.Y.Z` tag reachable from HEAD. A removed operation, member or enum value,
 or a tightened parameter, fails. Before the first release there is nothing to
 compare, and the job says so. A shallow clone is a refusal, never a pass.
+
+Both comparisons read `api/oasdiff-levels.txt`, which sets oasdiff's levels
+to the specification's table of what is breaking: a value added to an enum in
+a response is not breaking, because every enumeration is open (ENV-050), and a
+value removed from one is (oasdiff's own level for it is info). Every other
+check keeps oasdiff's level. `TestBreakingLevelsFollowTheSpecification` holds
+the file and the script to that.

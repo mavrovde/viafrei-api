@@ -17,7 +17,7 @@ import (
 
 // GeneratorVersion changes whenever the output for a given seed and profile
 // changes.
-const GeneratorVersion = "0.1.0"
+const GeneratorVersion = "0.2.0"
 
 // Profile sets the size of a generated set.
 type Profile struct {
@@ -633,6 +633,24 @@ func (g *gen) energy() {
 			g.counted("", p.ref)
 		}
 	}
+	// One point's newest report comes from another family than its site's, and
+	// says nothing (unknown): that family contributed no fact and is not
+	// credited. Drawn from no random number, so no other row moves.
+	other := g.otherFamily("energy", points[1].ref)
+	g.w.row(str(points[1].id), ts(g.end().Add(-140*time.Minute)), str("unknown"), str(other))
+	g.counted("", other)
+	g.edges["foreign_unknown_report"]++
+}
+
+// otherFamily is the first live source of domain whose family is not ref's.
+func (g *gen) otherFamily(domain, ref string) string {
+	fam := g.family[ref]
+	for _, s := range g.sources[domain] {
+		if s.family != fam && !s.stale {
+			return s.ref
+		}
+	}
+	panic("fixtures: no second family for " + domain)
 }
 
 // ---------------------------------------------------------------- parking

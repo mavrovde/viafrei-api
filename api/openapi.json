@@ -68,7 +68,7 @@
         "properties": {
           "availability": {
             "additionalProperties": false,
-            "description": "The last report; null when none is published.",
+            "description": "The last report; null when none is published, or when the last one says nothing (its state unknown or not a known code).",
             "properties": {
               "observedAt": {
                 "description": "When the state was reported.",
@@ -76,14 +76,15 @@
                 "type": "string"
               },
               "state": {
-                "description": "Open enumeration; treat an unknown value as other.",
+                "description": "Open enumeration; treat an unknown value as other. stale: the report is older than the status age limit (30 minutes by default) or than its family's freshness threshold, and is not counted in summary.availableNow.",
                 "enum": [
                   "available",
                   "occupied",
                   "reserved",
                   "out_of_order",
                   "unknown",
-                  "other"
+                  "other",
+                  "stale"
                 ],
                 "type": "string"
               }
@@ -336,7 +337,7 @@
         "additionalProperties": false,
         "properties": {
           "availableNow": {
-            "description": "Points reported available within the family's freshness threshold; null when no point has such a report.",
+            "description": "Listed points whose report is available and not stale; null when no listed point has a report that says something and is not stale.",
             "format": "int64",
             "type": [
               "integer",
@@ -344,7 +345,7 @@
             ]
           },
           "chargePoints": {
-            "description": "How many points the site has.",
+            "description": "How many points are listed: every point of the site, or under min_kw those of at least that power.",
             "format": "int64",
             "type": "integer"
           },
@@ -1521,12 +1522,12 @@
             }
           },
           {
-            "description": "Only sites with at least one point of at least this power, in kW. Default 0.",
+            "description": "Only sites with at least one point of at least this power, in kW, and of each only those points. Default 0.",
             "explode": false,
             "in": "query",
             "name": "min_kw",
             "schema": {
-              "description": "Only sites with at least one point of at least this power, in kW. Default 0.",
+              "description": "Only sites with at least one point of at least this power, in kW, and of each only those points. Default 0.",
               "format": "double",
               "maximum": 1000,
               "minimum": 0,

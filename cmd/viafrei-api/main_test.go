@@ -106,6 +106,12 @@ func TestCommands(t *testing.T) {
 		{"keys bad access URL", []string{"keys"}, []string{pepperEnv, "VFAPI_ACCESS_URL=postgres://u:p@h:notaport/x"}, config.ExitCode, ""},
 		{"keys usage", []string{"keys"}, []string{pepperEnv, accessURL(t)}, 2, ""},
 		{"keys store unreachable", []string{"keys", "revoke", "-id", "abcdefghij", "-reason", "r", "-actor", "a"}, []string{pepperEnv, accessURL(t)}, 1, ""},
+		{"console refused", []string{"console"}, []string{"VFAPI_NOPE=1"}, config.ExitCode, ""},
+		{"console without an access store", []string{"console"}, []string{pepperEnv}, config.ExitCode, ""},
+		{"console without a pepper", []string{"console"}, []string{accessURL(t)}, config.ExitCode, ""},
+		{"console bad access URL", []string{"console"}, []string{pepperEnv, "VFAPI_ACCESS_URL=postgres://u:p@h:notaport/x"}, config.ExitCode, ""},
+		{"console usage", []string{"console"}, []string{pepperEnv, accessURL(t)}, 2, ""},
+		{"console store unreachable", []string{"console", "passkeys"}, []string{pepperEnv, accessURL(t)}, 1, ""},
 	}
 	for _, c := range cases {
 		code, stdout, stderr := runCmd(c.args, c.environ)
@@ -211,6 +217,71 @@ func TestServeWithAnAccessStore(t *testing.T) {
 	})
 	if code != 0 {
 		t.Fatalf("exit %d", code)
+	}
+}
+
+// consoleEnv enables the console on addr.
+func consoleEnv(addr string) []string {
+	_, port, _ := net.SplitHostPort(addr)
+	return []string{pepperEnv, "VFAPI_ADMIN_ENABLED=true", "VFAPI_ADMIN_LISTEN_ADDR=" + addr, "VFAPI_ADMIN_ORIGIN=http://localhost:" + port}
+}
+
+func get(t *testing.T, url, host string) int {
+	t.Helper()
+	r, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, url, nil)
+	r.Host = host
+	resp, err := http.DefaultClient.Do(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode
+}
+
+func TestServeRunsTheConsoleOnTheLoopbackWhenEnabled(t *testing.T) {
+	req.Covers(t, "THR-018", "CFG-001")
+	admin := freeAddr(t)
+	_, port, _ := net.SplitHostPort(admin)
+	code := serveUntilTerm(t, append(consoleEnv(admin), accessURL(t)), func(addr string) {
+		if got := get(t, "http://"+admin+"/signin", "localhost:"+port); got != http.StatusOK {
+			t.Errorf("the console's sign-in page: %d", got)
+		}
+		if got := get(t, "http://"+admin+"/signin", admin); got != http.StatusMisdirectedRequest {
+			t.Errorf("another host name: %d", got)
+		}
+		if got := get(t, "http://"+addr+"/signin", addr); got != http.StatusNotFound {
+			t.Errorf("the console on the public listener: %d", got)
+		}
+	})
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+}
+
+func TestTheConsoleIsOffUnlessEnabled(t *testing.T) {
+	req.Covers(t, "THR-018", "CFG-001")
+	admin := freeAddr(t)
+	code := serveUntilTerm(t, []string{pepperEnv, "VFAPI_ADMIN_LISTEN_ADDR=" + admin, accessURL(t)}, func(string) {
+		if conn, err := net.DialTimeout("tcp", admin, 200*time.Millisecond); err == nil {
+			_ = conn.Close()
+			t.Error("the console listens although admin.enabled is off")
+		}
+	})
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+}
+
+func TestServeRefusesATakenConsoleAddress(t *testing.T) {
+	req.Covers(t, "THR-018")
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = l.Close() }()
+	env := append(consoleEnv(l.Addr().String()), dbURL(t), accessURL(t), "VFAPI_SERVER_LISTEN_ADDR="+freeAddr(t))
+	if code, _, stderr := runCmd([]string{"serve"}, env); code != config.ExitCode || !strings.Contains(stderr, "admin.listen_addr") {
+		t.Fatalf("exit %d, %q", code, stderr)
 	}
 }
 

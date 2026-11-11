@@ -45,6 +45,7 @@ type Config struct {
 	Tiers      Tiers      `koanf:"tiers"`
 	Admission  Admission  `koanf:"admission"`
 	Metering   Metering   `koanf:"metering"`
+	Admin      Admin      `koanf:"admin"`
 }
 
 // Server holds the public HTTP listener settings.

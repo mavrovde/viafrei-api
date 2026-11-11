@@ -43,7 +43,8 @@ The owner of the store applies the files once, in order, then sets the
 role's password:
 
 ```sh
-psql "$OWNER_URL" -v ON_ERROR_STOP=1 -f db/access/0001_access.sql -f db/access/0002_access_role.sql -f db/access/0003_limits.sql
+psql "$OWNER_URL" -v ON_ERROR_STOP=1 -f db/access/0001_access.sql -f db/access/0002_access_role.sql -f db/access/0003_limits.sql \
+                                     -f db/access/0004_console.sql
 psql "$OWNER_URL" -c "alter role api_access password '…'"
 ```
 
@@ -60,9 +61,14 @@ and no quota until `keys plan` sets the real values. The role may add to
 usage rows but not delete them; `keys prune` removes those older than
 `metering.retention_days`, never younger than 30 days.
 
+`0004_console.sql` (schema version 3) adds the owner console's passkeys
+(public keys and counters only) and its enrolment codes (stored as their MAC
+under `auth.pepper`), and lets the audit record the console's actions.
+
 Pepper rotation: set the new value as `auth.pepper` and the old one as
 `auth.pepper_previous`. A key that still matches under the old pepper is
-re-MACed under the new one on its first use.
+re-MACed under the new one on its first use. An open console enrolment code
+does not survive a pepper rotation; print a new one.
 
 ## The licence gate
 
@@ -112,3 +118,77 @@ front of storage. See [rate limits](rate-limits.md).
 
 Exit status: 0 done, 1 refused by the store, 2 a usage or input error, 78 a
 configuration error.
+
+## The owner console
+
+The same key lifecycle runs in a browser: the owner console, a small
+server-rendered site on a second listener. It is off unless `admin.enabled`
+is set, needs `access.url`, and listens on `admin.listen_addr`, which must
+be a loopback address (`127.0.0.0/8` or `::1`); any other address is
+refused at boot, and the listener checks again when it opens. It is never
+on the public listener. Reach it from your machine through an SSH tunnel to
+the host and open `admin.origin` (`http://localhost:8081` by default) in
+the browser. Every `admin.*` key is in the
+[configuration reference](configuration.md).
+
+The owner signs in with a passkey (WebAuthn, user verification required,
+discoverable credentials). A passkey is enrolled with a one-time code:
+
+```sh
+viafrei-api console enrol    -owner alice -actor ops   # prints the code once; valid once, for admin.enrolment_ttl
+viafrei-api console passkeys                           # owner, id, fingerprint, enrolled, last used
+viafrei-api console remove   -id <id> -actor ops       # removes one passkey
+```
+
+Open `/enrol` on the console, enter the code and create the passkey; then
+sign in at `/signin`. A second passkey for the same owner is enrolled the
+same way, under the owner's existing user handle.
+
+The console shows the keys, plans and passkeys and the newest
+`admin.audit_page` audit records, and offers every change of the key tool:
+create or change a plan, issue (the key is shown once, on the page that
+answers the issue), rotate (likewise), revoke with a reason, move, record a
+terms acceptance, prune. Each change is asked for, shown on a confirmation
+page, and made only when confirmed. It runs the same use cases as
+`viafrei-api keys`, audited in the same transaction, with `console:<owner>`
+as the actor. Enrolments, added and removed passkeys and sign-ins are
+audited too.
+
+What the console holds every request to:
+
+- **The loopback and its own host.** A request from any other address is
+  refused, and so is a request whose `Host` is not the host of
+  `admin.origin`, which keeps a DNS-rebinding page out.
+- **Its own origin for every change.** A `POST` without an `Origin` header
+  equal to `admin.origin`, or with `Sec-Fetch-Site` other than
+  `same-origin`, is refused.
+- **A session and its CSRF token.** The session is a `__Host-` cookie
+  (`Secure`, `HttpOnly`, `SameSite=Strict`) that lasts `admin.session_ttl`
+  from sign-in and is held in memory only, so a restart signs everyone
+  out; at most `admin.max_sessions` exist. Every change form carries the
+  session's CSRF token, compared in constant time.
+- **Single-use challenges and confirmations.** A sign-in or enrolment
+  challenge lives `admin.challenge_ttl` and is gone after its first answer,
+  right or wrong; a confirmation lives `admin.confirm_ttl`, is bound to
+  the session that asked and is used once. At most `admin.max_pending` are
+  held.
+- **A sign-in limit.** At most `admin.signin_limit` sign-in and enrolment
+  attempts (begun or failed) per `admin.signin_window`, from all browsers
+  together; one more is answered `429` with `Retry-After`.
+- **A passkey that verifies.** The client data must name `admin.origin`,
+  the authenticator data `admin.rp_id`, the user must be verified, the
+  user handle must be the passkey owner's, and a signature counter that
+  goes backwards (a cloned authenticator) is refused.
+- **A strict page.** `Content-Security-Policy` allows only the console's
+  own script and style and no framing; every answer is `no-store` and
+  sends no referrer.
+
+No page, log line or audit record of the console carries the pepper, a
+MAC, an enrolment code, a session or CSRF token, or a client address; the
+full key appears once, on the page that answers its issue or rotation.
+
+Browsers treat `http://localhost` as a secure context, so the default
+origin works through a tunnel. For another name, serve the console behind
+TLS on the loopback, set `admin.origin` to its `https://` origin and
+`admin.rp_id` to that host or a parent domain. A passkey works only under
+the relying-party id it was enrolled with.

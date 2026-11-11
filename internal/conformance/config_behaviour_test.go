@@ -167,9 +167,25 @@ func behaviours() map[string]behaviour {
 		"auth.failure_window":         {"10s", authSettings},
 		"auth.failure_track_size":     {"20", authSettings},
 		"audit.retention_days":        {"90", authSettings},
-		"geo.default_radius_m":        {"750", featureAsk("/v1/charging-options?at=1,2")},
-		"pagination.default_limit":    {"7", featureAsk("/v1/parking-options?at=1,2")},
-		"compose.per_part_limit":      {"3", featureAsk("/v1/places/pl-1/overview")},
+		"admin.enabled":               {"true", consoleSettings},
+		"admin.listen_addr":           {"[::1]:9091", consoleSettings},
+		"admin.origin":                {"http://localhost:9090", consoleSettings},
+		"admin.rp_id": {"example.test", func(t *testing.T, c *config.Config) string {
+			return wire.ConsoleWeb(c).RPID
+		}},
+		"admin.rp_name":            {"Another console", consoleSettings},
+		"admin.session_ttl":        {"30m", consoleSettings},
+		"admin.challenge_ttl":      {"2m", consoleSettings},
+		"admin.confirm_ttl":        {"5m", consoleSettings},
+		"admin.enrolment_ttl":      {"1h", consoleSettings},
+		"admin.signin_limit":       {"3", consoleSettings},
+		"admin.signin_window":      {"10m", consoleSettings},
+		"admin.max_pending":        {"8", consoleSettings},
+		"admin.max_sessions":       {"2", consoleSettings},
+		"admin.audit_page":         {"20", consoleSettings},
+		"geo.default_radius_m":     {"750", featureAsk("/v1/charging-options?at=1,2")},
+		"pagination.default_limit": {"7", featureAsk("/v1/parking-options?at=1,2")},
+		"compose.per_part_limit":   {"3", featureAsk("/v1/places/pl-1/overview")},
 		"compose.part_deadline": {"300ms", func(t *testing.T, c *config.Config) string {
 			return wire.FeatureSettings(c).PartDeadline.String()
 		}},
@@ -245,6 +261,12 @@ func TestEveryKeyChangesBehaviour(t *testing.T) {
 			if f.Key == "access.url" {
 				env = append(env, "VFAPI_AUTH_PEPPER="+strings.Repeat("e", 32))
 			}
+			if f.Key == "admin.enabled" { // the console needs an access store
+				env = append(env, "VFAPI_ACCESS_URL=postgres://access:pw@db.invalid:6002/x", "VFAPI_AUTH_PEPPER="+strings.Repeat("e", 32))
+			}
+			if f.Key == "admin.rp_id" { // the id must cover the origin's host
+				env = append(env, "VFAPI_ADMIN_ORIGIN=https://console.example.test")
+			}
 			changed, err := config.Load(config.Options{Environ: append(env, f.Env+"="+b.value)})
 			if err != nil {
 				t.Fatal(err)
@@ -265,6 +287,14 @@ func TestEveryKeyChangesBehaviour(t *testing.T) {
 func authSettings(t *testing.T, c *config.Config) string {
 	t.Helper()
 	return fmt.Sprintf("%+v", wire.AuthSettings(c))
+}
+
+// consoleSettings is what the owner console is built with; the console's
+// own tests prove each setting drives its behaviour. The pepper is left out.
+func consoleSettings(t *testing.T, c *config.Config) string {
+	t.Helper()
+	addr, on := wire.ConsoleListener(c)
+	return fmt.Sprintf("%s %v %+v %v %+v", addr, on, wire.ConsoleGuard(c), wire.ConsoleOwners(c).EnrolmentTTL, wire.ConsoleWeb(c))
 }
 
 func accessPool(t *testing.T, c *config.Config) string {

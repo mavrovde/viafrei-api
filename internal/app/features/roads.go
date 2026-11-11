@@ -17,13 +17,13 @@ type Roads interface {
 	Road(ctx context.Context, ref string) (roads.Road, error)
 	// SituationsOnRoad returns up to q.Limit active situations on the road
 	// of the given families, in the order of their position along it, the
-	// lamp's signals of every situation that answers the question, and
-	// whether there are more.
+	// lamp's signals of every situation in the scope (the road and
+	// direction, whatever the filters keep), and whether there are more.
 	SituationsOnRoad(ctx context.Context, q roads.CorridorQuery, families []string, now time.Time) ([]roads.Situation, []roads.Signal, bool, error)
 	// SituationsNear returns up to q.Limit active situations within the
 	// radius of the given families, by severity then distance, the lamp's
-	// signals of every situation that answers the question, and whether
-	// there are more.
+	// signals of every situation in the radius, whatever the filters keep,
+	// and whether there are more.
 	SituationsNear(ctx context.Context, q roads.AreaQuery, families []string, now time.Time) ([]roads.Situation, []roads.Signal, bool, error)
 	// Situation returns one situation of the given families that is active
 	// or ended after endedSince, or roads.ErrUnknownSituation.
@@ -42,7 +42,7 @@ type Conditions struct {
 
 // conditions reads a page of situations of the permitted roads families,
 // post-checks and attributes it, and computes the lamp over every situation
-// that answers, whether the answer is partial and whether any permitted
+// in the scope, whether the answer is partial and whether any permitted
 // family is missing or stale.
 func (s *Service) conditions(ctx context.Context, key access.Record, read func(families []string, now time.Time) ([]roads.Situation, []roads.Signal, bool, error)) (Conditions, error) {
 	reg, gate, err := s.gate(ctx, key)
@@ -70,11 +70,13 @@ func (s *Service) conditions(ctx context.Context, key access.Record, read func(f
 	// attribution. The post-check above keeps contributed inside permitted.
 	consulted := slices.Clone(permitted)
 	slices.Sort(consulted)
-	all, err := s.repos.Register.Provenance(ctx, slices.Compact(consulted), s.set.Language)
+	consulted = slices.Compact(consulted)
+	all, err := s.repos.Register.Provenance(ctx, consulted, s.set.Language)
 	if err != nil {
 		return Conditions{}, err
 	}
-	stale, fams := false, []provenance.Family{}
+	// A permitted family with no provenance row is missing: limited sight.
+	stale, fams := len(all) < len(consulted), []provenance.Family{}
 	for _, f := range all {
 		stale = stale || f.Assess(now).Stale
 		if len(contributed) == 0 || slices.Contains(contributed, f.Source.Family) {

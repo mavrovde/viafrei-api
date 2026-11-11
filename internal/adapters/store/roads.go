@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -55,24 +56,32 @@ limit 1`, ref)
 }
 
 // situationColumns are the columns every situation read selects, in the
-// order scanSituation reads them, followed by its three question-dependent
-// columns: the position along the road, the distance and the lamp's signals
-// of every situation that answers the question (signalsColumn).
+// order scanSituation reads them, followed by its two question-dependent
+// columns: the position along the road and the distance.
 const situationColumns = `e.event_id, e.source_ref, e.event_kind, e.severity, e.road_ref, e.road_class,
        e.direction, e.direction_label, st_y(e.location), st_x(e.location), e.valid_from, e.valid_to,
        e.lanes_closed, e.lanes_total, e.delay_min, e.affected_length_m, e.headline, e.description,
        e.text_lang, e.changed_at`
 
-// situationFilter is the condition every list read applies: an active,
-// published situation of the given families, of the asked kinds, at or above
-// the asked severity floor. $1 families, $2 now, $3 kinds kept, $4 whether
+// scopeFilter is the condition of the lamp's scope: an active, published
+// situation of the given families. $1 families, $2 now. The lamp reads every
+// situation in the scope (the road and direction, or the radius), whatever
+// the list's filters keep.
+const scopeFilter = `e.withdrawn_at is null
+  and e.source_ref = any($1)
+  and e.valid_from <= $2 and (e.valid_to is null or e.valid_to > $2)`
+
+// situationFilter is the condition every list read applies: the scope's,
+// then the asked kinds and the severity floor. $3 kinds kept, $4 whether
 // unmapped kinds are kept, $5 every mapped kind, $6 the ordered severities,
 // $7 the floor.
-const situationFilter = `e.withdrawn_at is null
-  and e.source_ref = any($1)
-  and e.valid_from <= $2 and (e.valid_to is null or e.valid_to > $2)
+const situationFilter = scopeFilter + `
   and (e.event_kind = any($3) or ($4 and not e.event_kind = any($5)))
   and coalesce(array_position($6::text[], e.severity), 0) >= $7`
+
+// canonicalRef is a stored road reference compared in its canonical form,
+// as Road compares it.
+const canonicalRef = `upper(replace(%s, ' ', ''))`
 
 // filterArgs are the arguments $1 to $7 of situationFilter.
 func filterArgs(f roads.Filter, families []string, now time.Time) []any {
@@ -80,10 +89,12 @@ func filterArgs(f roads.Filter, families []string, now time.Time) []any {
 	return []any{families, now, codes(kinds), other, codes(roads.Kinds[:len(roads.Kinds)-1]), codes(roads.Ordered()), f.MinSeverity.Floor()}
 }
 
-// signalsColumn aggregates the lamp's view of every answering situation as
-// a JSON array of {"k": kind, "s": severity, "d": delay}; null when none
-// answers.
-const signalsColumn = `(select jsonb_agg(distinct jsonb_build_object('k', a.event_kind, 's', a.severity, 'd', a.delay_min)) from answering a)`
+// signalsSelect aggregates the lamp's view of every situation in the scope
+// as a JSON array of {"k": kind, "s": severity, "d": delay}; null when the
+// scope holds none.
+const signalsSelect = `select jsonb_agg(distinct jsonb_build_object('k', e.event_kind, 's', e.severity, 'd', e.delay_min))
+from contract.traffic_event e
+where ` + scopeFilter
 
 // storedSignal is one element of signalsColumn, in stored codes.
 type storedSignal struct {
@@ -92,15 +103,9 @@ type storedSignal struct {
 	DelayMin *int   `json:"d"`
 }
 
-// situationRow is one situation read with its question-dependent columns.
-type situationRow struct {
-	sit     roads.Situation
-	signals []storedSignal
-}
-
-func scanSituation(r pgx.CollectableRow) (situationRow, error) {
+func scanSituation(r pgx.CollectableRow) (roads.Situation, error) {
 	var (
-		v                                      situationRow
+		v                                      roads.Situation
 		kind, severity, class, direction       string
 		road                                   *string
 		lat, lon                               *float64
@@ -109,11 +114,11 @@ func scanSituation(r pgx.CollectableRow) (situationRow, error) {
 		headline, lang                         string
 		lanesClosed, lanesTotal, delay, length *int
 	)
-	err := r.Scan(&v.sit.ID, &v.sit.Family, &kind, &severity, &road, &class,
-		&direction, &v.sit.Towards, &lat, &lon, &from, &until,
-		&lanesClosed, &lanesTotal, &delay, &length, &headline, &v.sit.Description,
-		&lang, &updated, &v.sit.AtKm, &v.sit.DistanceM, &v.signals)
-	s := &v.sit
+	err := r.Scan(&v.ID, &v.Family, &kind, &severity, &road, &class,
+		&direction, &v.Towards, &lat, &lon, &from, &until,
+		&lanesClosed, &lanesTotal, &delay, &length, &headline, &v.Description,
+		&lang, &updated, &v.AtKm, &v.DistanceM)
+	s := &v
 	s.Kind, s.Severity, s.Class, s.Direction = roads.MapKind(kind), roads.MapSeverity(severity), roads.MapClass(class), roads.MapDirection(direction)
 	if road != nil {
 		c := roads.Canonical(*road)
@@ -133,22 +138,33 @@ func scanSituation(r pgx.CollectableRow) (situationRow, error) {
 }
 
 // page cuts the rows to the limit and maps the signals of every situation
-// that answers the question through the domain's codes.
-func page(rows []situationRow, limit int) ([]roads.Situation, []roads.Signal, bool) {
+// in the scope through the domain's codes.
+func page(rows []roads.Situation, stored []storedSignal, limit int) ([]roads.Situation, []roads.Signal, bool) {
 	var signals []roads.Signal
-	if len(rows) > 0 {
-		for _, s := range rows[0].signals {
-			signals = append(signals, roads.Signal{Kind: roads.MapKind(s.Kind), Severity: roads.MapSeverity(s.Severity), DelayMin: s.DelayMin})
+	for _, s := range stored {
+		signals = append(signals, roads.Signal{Kind: roads.MapKind(s.Kind), Severity: roads.MapSeverity(s.Severity), DelayMin: s.DelayMin})
+	}
+	if len(rows) > limit {
+		return rows[:limit], signals, true
+	}
+	return rows, signals, false
+}
+
+// read runs the page query and the scope's signals query in one snapshot.
+func (s *Store) read(ctx context.Context, list string, listArgs []any, signals string, signalArgs []any) ([]roads.Situation, []storedSignal, error) {
+	var (
+		rows   []roads.Situation
+		stored []storedSignal
+	)
+	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		res, _ := tx.Query(ctx, list, listArgs...)
+		var err error
+		if rows, err = pgx.CollectRows(res, scanSituation); err != nil {
+			return err
 		}
-	}
-	out := make([]roads.Situation, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, r.sit)
-	}
-	if len(out) > limit {
-		return out[:limit], signals, true
-	}
-	return out, signals, false
+		return tx.QueryRow(ctx, signals, signalArgs...).Scan(&stored)
+	})
+	return rows, stored, err
 }
 
 // SituationsOnRoad reads the active situations on one road in the order of
@@ -161,16 +177,17 @@ func page(rows []situationRow, limit int) ([]roads.Situation, []roads.Signal, bo
 // own ends (a road whose last part ends further north than its first part
 // starts is driven north with rising chainage). Those that cannot be placed
 // come last, then severity descending, then id; and it returns the signals
-// of every situation that answers the question, for the lamp.
+// of every situation in the scope (the road and direction), for the lamp.
+// A situation's road reference is compared in its canonical form, as the
+// road's is: A1 and A 1 are one road.
 func (s *Store) SituationsOnRoad(ctx context.Context, q roads.CorridorQuery, families []string, now time.Time) ([]roads.Situation, []roads.Signal, bool, error) {
-	var rows []situationRow
-	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		args := append(filterArgs(q.Filter, families, now), q.Road, string(q.Direction), codes(roads.Compass()), q.Limit+1)
-		res, _ := tx.Query(ctx, `
+	args := append(filterArgs(q.Filter, families, now), q.Road, string(q.Direction), codes(roads.Compass()), q.Limit+1)
+	rows, stored, err := s.read(ctx, `
 with parts as (
   select r.road_ref, d.path[1] n, d.geom g, st_length(d.geom::geography) len, r.length_km::float8 km
   from contract.road r, st_dump(r.geometry) d
-  where upper(replace(r.road_ref, ' ', '')) = $8),
+  where r.road_ref = (select road_ref from contract.road
+                      where `+fmt.Sprintf(canonicalRef, "road_ref")+` = $8 order by road_ref limit 1)),
 line as (
   select road_ref, max(km) km, sum(len) total,
          st_startpoint((array_agg(g order by n))[1]) first_point,
@@ -186,9 +203,9 @@ travel as (
   from line),
 answering as (
   select e.*, line.km road_km, line.total road_total
-  from contract.traffic_event e
-  join line on line.road_ref = e.road_ref
+  from contract.traffic_event e, line
   where `+situationFilter+`
+    and `+fmt.Sprintf(canonicalRef, "e.road_ref")+` = $8
     and ($9::text = 'both' or e.direction = $9::text or not e.direction = any($10))),
 placed as (
   select a.*, at.share
@@ -203,30 +220,30 @@ placed as (
 select `+situationColumns+`,
        case when e.share is null or e.road_km is null then null
             else round((e.share * e.road_km)::numeric, 1)::float8 end km,
-       null::int,
-       `+signalsColumn+`
+       null::int
 from placed e
 order by case when coalesce((select falling from travel), false) then -1 else 1 end * e.share nulls last,
          coalesce(array_position($6::text[], e.severity), 0) desc, e.event_id
-limit $11`, args...)
-		var err error
-		rows, err = pgx.CollectRows(res, scanSituation)
-		return err
-	})
-	sits, sigs, more := page(rows, q.Limit)
-	return sits, sigs, more, err
+limit $11`, args,
+		signalsSelect+`
+  and `+fmt.Sprintf(canonicalRef, "e.road_ref")+` = $3
+  and ($4::text = 'both' or e.direction = $4::text or not e.direction = any($5))`,
+		[]any{families, now, q.Road, string(q.Direction), codes(roads.Compass())})
+	if err != nil {
+		return nil, nil, false, err
+	}
+	sits, sigs, more := page(rows, stored, q.Limit)
+	return sits, sigs, more, nil
 }
 
 // SituationsNear reads the active situations within the radius of a
 // position, by severity descending, then distance, then id; and the
-// signals of every situation that answers the question, for the lamp.
+// signals of every situation in the scope (the radius), for the lamp.
 func (s *Store) SituationsNear(ctx context.Context, q roads.AreaQuery, families []string, now time.Time) ([]roads.Situation, []roads.Signal, bool, error) {
-	var rows []situationRow
-	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		classes, other := q.KnownClasses()
-		args := append(filterArgs(q.Filter, families, now), q.At.Lat, q.At.Lon, q.RadiusM,
-			codes(classes), other, codes(roads.Classes[:len(roads.Classes)-1]), q.Limit+1)
-		res, _ := tx.Query(ctx, `
+	classes, other := q.KnownClasses()
+	args := append(filterArgs(q.Filter, families, now), q.At.Lat, q.At.Lon, q.RadiusM,
+		codes(classes), other, codes(roads.Classes[:len(roads.Classes)-1]), q.Limit+1)
+	rows, stored, err := s.read(ctx, `
 with here as (select st_setsrid(st_makepoint($9, $8), 4326)::geography g),
 answering as (
   select e.*, round(st_distance(e.location::geography, here.g))::int dist
@@ -235,26 +252,28 @@ answering as (
     and e.location is not null
     and st_dwithin(e.location::geography, here.g, $10)
     and (e.road_class = any($11) or ($12 and not e.road_class = any($13))))
-select `+situationColumns+`, null::float8, e.dist,
-       `+signalsColumn+`
+select `+situationColumns+`, null::float8, e.dist
 from answering e
 order by coalesce(array_position($6::text[], e.severity), 0) desc, e.dist, e.event_id
-limit $14`, args...)
-		var err error
-		rows, err = pgx.CollectRows(res, scanSituation)
-		return err
-	})
-	sits, sigs, more := page(rows, q.Limit)
-	return sits, sigs, more, err
+limit $14`, args,
+		signalsSelect+`
+  and e.location is not null
+  and st_dwithin(e.location::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`,
+		[]any{families, now, q.At.Lat, q.At.Lon, q.RadiusM})
+	if err != nil {
+		return nil, nil, false, err
+	}
+	sits, sigs, more := page(rows, stored, q.Limit)
+	return sits, sigs, more, nil
 }
 
 // Situation reads one published situation of the given families that is
 // active or ended after endedSince (roads.ended_retention_h).
 func (s *Store) Situation(ctx context.Context, id string, families []string, endedSince time.Time) (roads.Situation, error) {
-	var rows []situationRow
+	var rows []roads.Situation
 	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
 		res, _ := tx.Query(ctx, `
-select `+situationColumns+`, null::float8, null::int, null::jsonb
+select `+situationColumns+`, null::float8, null::int
 from contract.traffic_event e
 where e.event_id = $1 and e.withdrawn_at is null and e.source_ref = any($2)
   and (e.valid_to is null or e.valid_to > $3)`, id, families, endedSince)
@@ -268,5 +287,5 @@ where e.event_id = $1 and e.withdrawn_at is null and e.source_ref = any($2)
 	if err != nil {
 		return roads.Situation{}, err
 	}
-	return rows[0].sit, nil
+	return rows[0], nil
 }

@@ -88,8 +88,9 @@ expect 1 "a rise over the parent commit fails on the fallback path" "color-contr
 # Deliberate raises: a trailer naming the page, rule and exact count.
 g reset -q --hard "$base"
 raise() { # raise COUNT TRAILER: commit the baseline at COUNT with TRAILER
-  echo "{\"reference.html\": {\"color-contrast\": $1, \"region\": 2}}" > "$repo/$f"
-  g add "$f" && g commit -q -m "raise" -m "$2"
+  local count=$1 trailer=$2
+  echo "{\"reference.html\": {\"color-contrast\": $count, \"region\": 2}}" > "$repo/$f"
+  g add "$f" && g commit -q -m "raise" -m "$trailer"
 }
 raise 7 'A11y-Baseline-Raise: reference.html color-contrast 7 — Redoc 3 draws two new code colours'
 expect 0 "a raise with a matching trailer passes" "accepted raise: reference.html: color-contrast: 7 (above the base's 5): Redoc 3 draws two new code colours" r "$base"

@@ -71,13 +71,15 @@ page "$s/reference.html" '<p>Reference.</p>'
 s=$(cd "$s" && pwd)
 
 issue() { # issue TYPE CODE NEEDS_REVIEW [TARGET [FG BG]]
-  jq -n --arg t "$1" --arg c "$2" --argjson r "$3" --arg target "${4:-p}" --arg fg "${5:-}" --arg bg "${6:-}" \
+  local type=$1 code=$2 review=$3 target=${4:-p} fg=${5:-} bg=${6:-}
+  jq -n --arg t "$type" --arg c "$code" --argjson r "$review" --arg target "$target" --arg fg "$fg" --arg bg "$bg" \
     '{type: $t, code: $c, message: "planted", selector: "p", runner: "axe",
       runnerExtras: ({needsFurtherReview: $r, target: $target}
         + (if $fg == "" then {} else {fgColor: $fg, bgColor: $bg} end))}'
 }
 report() { # report GUIDE_ISSUES_JSON REFERENCE_ISSUES_JSON
-  jq -n --arg g "file://$s/index.html" --arg r "file://$s/reference.html" --argjson gi "$1" --argjson ri "$2" \
+  local guide=$1 reference=$2
+  jq -n --arg g "file://$s/index.html" --arg r "file://$s/reference.html" --argjson gi "$guide" --argjson ri "$reference" \
     '{total: 2, passes: 0, errors: 0, results: {($g): $gi, ($r): $ri}}' > "$STUB_REPORT"
 }
 cc=$(issue error color-contrast true)
@@ -102,7 +104,10 @@ report '[]' "[$green, $red, $white]"
 expect 1 "a new colour pair above the baseline fails" "$s" "FAIL: reference.html: color-contrast: 3 distinct failure(s), above the baseline of 2"
 
 printf '{"reference.html": {"color-contrast": 2, "region": 1}}\n' > "$tmp/baseline.json"
-row() { issue warning region false "#operation\\/getKey > div > table > tbody > tr:nth-child($1) > td.sc-x$1"; }
+row() { # row N: a region result in the Nth row of one table
+  local n=$1
+  issue warning region false "#operation\\/getKey > div > table > tbody > tr:nth-child($n) > td.sc-x$n"
+}
 report '[]' "[$(row 1), $(row 2), $(row 10)]"
 expect 0 "rows of one table are one failure (nth-child and numbers removed)" "$s" "reference.html: 1 distinct failure(s) (3 result(s)) within the baseline"
 report '[]' "[$(row 1), $(issue warning region false '#operation\\/getMeta > div')]"

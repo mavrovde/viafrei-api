@@ -16,7 +16,7 @@
 //
 // The run function is stringified by pa11y and evaluated in the page, so it
 // may use nothing from this module's scope.
-const path = require('path');
+const path = require('node:path');
 
 const axePath = path.dirname(require.resolve('axe-core'));
 
@@ -37,7 +37,7 @@ const run = async options => {
     if (!element) return [null, null];
     const fg = window.getComputedStyle(element).color;
     let bg = null;
-    for (let e = element; e && e.nodeType === 1 && bg === null; e = e.parentElement) {
+    for (let e = element; e?.nodeType === 1 && bg === null; e = e.parentElement) {
       const c = window.getComputedStyle(e).backgroundColor;
       if (!transparent(c)) bg = c;
     }

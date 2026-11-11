@@ -12,8 +12,10 @@
 #
 #   A11y-Baseline-Raise: reference.html color-contrast 12 — <reason>
 #
-# The accepted raises are printed with their reasons. A raise with no such
-# trailer, or a trailer for another count, fails.
+# The line is read anywhere in the message, not only in its last paragraph,
+# so it survives a squash merge. The accepted raises are printed with their
+# reasons. A raise with no such line, a line for another count, or one with
+# no reason fails.
 #
 # Fails closed: a base ref that is not a commit here (a shallow clone), a
 # base file or a baseline that cannot be read as {page: {rule: count}} is
@@ -58,16 +60,19 @@ rises=$(jq -r --slurpfile b "$tmp/base.json" '
     elif $n > $was then [$page, $rule, $n, "above the base'"'"'s \($was)"]
     else empty end | @tsv' "$file")
 
-# The raise trailers of the commits in BASE..HEAD that change the file.
-git log --format='%(trailers:key=A11y-Baseline-Raise,valueonly,unfold)' "$base..HEAD" -- "$file" |
-  grep -v '^$' > "$tmp/trailers" || true
+# The raise lines of the commits in BASE..HEAD that change the file, read
+# from the whole message and not through git's trailer parser: a squash
+# merge puts each commit's lines in a middle paragraph of one message, where
+# the parser does not look.
+git log --format=%B "$base..HEAD" -- "$file" |
+  sed -n 's/^A11y-Baseline-Raise: *//p' > "$tmp/trailers"
 
 failed=0 accepted=0
 while IFS=$'\t' read -r page rule n why; do
   [[ -n $page ]] || continue
   reason=$(awk -v p="$page" -v r="$rule" -v n="$n" '
     { prefix = p " " r " " n " \342\200\224 " }
-    index($0, prefix) == 1 && length($0) > length(prefix) { print substr($0, length(prefix) + 1); exit }' "$tmp/trailers")
+    index($0, prefix) == 1 && substr($0, length(prefix) + 1) ~ /[^ \t]/ { print substr($0, length(prefix) + 1); exit }' "$tmp/trailers")
   if [[ -n $reason ]]; then
     echo "accepted raise: $page: $rule: $n ($why): $reason"
     accepted=$((accepted + 1))

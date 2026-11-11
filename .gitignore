@@ -5,6 +5,7 @@
 *.out
 /coverage.*
 /coverage-summary.txt
+/coverage-a11y-runner.lcov
 
 # Local configuration and secrets
 .env

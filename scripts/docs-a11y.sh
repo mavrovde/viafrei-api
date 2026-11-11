@@ -102,17 +102,25 @@ fi
 # could not be loaded is an object with a message and no type.
 #
 # The key is what reference.html is counted by, so that the example content
-# Redoc renders does not move the count: one failure per colour pair for
-# color-contrast (fg/bg as axe compared them, "undetermined" when axe could
-# not), and for any other rule axe's selector (else pa11y's) with its
-# nth-child/nth-of-type parts removed and every number replaced by N, so that
-# the tenth row of a table is the same failure as the first.
+# Redoc renders does not move the count. The place of a result is axe's
+# selector (else pa11y's) with its nth-child/nth-of-type parts removed and
+# every number replaced by N, so that the tenth row of a table is the same
+# failure as the first; a selector the page cannot resolve (a frame or a
+# shadow root) is keyed by its joined string like any other.
+# - color-contrast: one failure per colour pair and where it came from,
+#   "axe:fg/bg" or "computed:fg/bg" (see scripts/a11y-tools/axe-runner.js).
+#   A result whose pair could not be read ("undetermined": no element, a
+#   background image, an opacity below 1, a translucent background), or one
+#   that carries no source, is keyed "undetermined:" and its place.
+# - any other rule: its place.
 jq -r --arg site "$site/" '
+  def place: (.runnerExtras.target // .selector // "-")
+    | gsub(":nth-(last-)?(child|of-type)\\([^)]*\\)"; "") | gsub("[0-9]+"; "N");
   def key: if .code == "color-contrast" then
-      (if (.runnerExtras.fgColor // null) == null or (.runnerExtras.bgColor // null) == null
-       then "undetermined" else "\(.runnerExtras.fgColor)/\(.runnerExtras.bgColor)" end)
-    else ((.runnerExtras.target // .selector // "-")
-      | gsub(":nth-(last-)?(child|of-type)\\([^)]*\\)"; "") | gsub("[0-9]+"; "N")) end;
+      (.runnerExtras // {}) as $x
+      | if ($x.colourSource == "axe" or $x.colourSource == "computed") and ($x.fgColor // null) != null and ($x.bgColor // null) != null
+        then "\($x.colourSource):\($x.fgColor)/\($x.bgColor)" else "undetermined:\(place)" end
+    else place end;
   .results | to_entries[] | (.key | sub("^file://"; "") | ltrimstr($site)) as $page | .value[]
   | if (.type == null) then [$page, "load", "-", "could not be checked: \(.message)", "-", "-"]
     else [$page, (if .runnerExtras.needsFurtherReview then "review" else .type end), .code, .message, (.selector // "-"), key] end

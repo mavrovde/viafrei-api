@@ -215,6 +215,14 @@ jobs:
           node-version: "22" # pa11y-ci 5 needs ^22.13
       - name: Self-test of the pin and baseline guards
         run: bash scripts/docs-a11y-guards.test.sh
+      - name: Unit test of the accessibility runner (100 % coverage)
+        run: bash scripts/docs-a11y-runner.test.sh coverage-a11y-runner.lcov
+      - name: Upload the runner's coverage for SonarCloud
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-a11y-runner
+          path: coverage-a11y-runner.lcov
+          if-no-files-found: error
       - name: The checker is at the versions the licence exception names (security.yml)
         run: scripts/docs-a11y-pins.sh scripts/a11y-tools/package-lock.json
       - name: The reference baseline only goes down
@@ -364,7 +372,7 @@ jobs:
 
   sonar:
     name: SonarCloud analysis
-    needs: [test, coverage]
+    needs: [test, coverage, docs-portal]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -391,8 +399,11 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: coverage
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-a11y-runner
       - name: The merged coverage report is there
-        run: test -s coverage.out && test -s test-unit.json
+        run: test -s coverage.out && test -s test-unit.json && test -s coverage-a11y-runner.lcov
       - uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

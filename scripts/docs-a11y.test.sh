@@ -70,12 +70,12 @@ page "$s/index.html" '<p>Guide.</p>'
 page "$s/reference.html" '<p>Reference.</p>'
 s=$(cd "$s" && pwd)
 
-issue() { # issue TYPE CODE NEEDS_REVIEW [TARGET [FG BG]]
-  local type=$1 code=$2 review=$3 target=${4:-p} fg=${5:-} bg=${6:-}
-  jq -n --arg t "$type" --arg c "$code" --argjson r "$review" --arg target "$target" --arg fg "$fg" --arg bg "$bg" \
+issue() { # issue TYPE CODE NEEDS_REVIEW [TARGET [FG BG [SOURCE]]]
+  local type=$1 code=$2 review=$3 target=${4:-p} fg=${5:-} bg=${6:-} source=${7:-computed}
+  jq -n --arg t "$type" --arg c "$code" --argjson r "$review" --arg target "$target" --arg fg "$fg" --arg bg "$bg" --arg src "$source" \
     '{type: $t, code: $c, message: "planted", selector: "p", runner: "axe",
       runnerExtras: ({needsFurtherReview: $r, target: $target}
-        + (if $fg == "" then {} else {fgColor: $fg, bgColor: $bg} end))}'
+        + (if $fg == "" then {} else {fgColor: $fg, bgColor: $bg, colourSource: $src} end))}'
 }
 report() { # report GUIDE_ISSUES_JSON REFERENCE_ISSUES_JSON
   local guide=$1 reference=$2
@@ -95,7 +95,23 @@ report '[]' "[$green, $green2, $green, $red, $red]"
 expect 0 "results of one colour pair are one failure, wherever they are" "$s" "reference.html: 2 distinct failure(s) (5 result(s)) within the baseline"
 
 report '[]' "[$cc, $cc, $green]"
-expect 0 "results whose colours axe could not tell are one failure" "$s" "reference.html: 2 distinct failure(s) (3 result(s)) within the baseline"
+expect 0 "undetermined results in one place are one failure" "$s" "reference.html: 2 distinct failure(s) (3 result(s)) within the baseline"
+
+undet() { # undet TARGET: a contrast result whose pair could not be read
+  local target=$1
+  jq -n --arg target "$target" '{type: "error", code: "color-contrast", message: "planted", selector: "p",
+    runnerExtras: {needsFurtherReview: true, target: $target, colourSource: "undetermined", fgColor: null, bgColor: null}}'
+}
+report '[]' "[$(undet '#a > span:nth-child(1)'), $(undet '#a > span:nth-child(4)'), $(undet '#b > span')]"
+expect 0 "undetermined results are counted per place, not as one bucket" "$s" "reference.html: 2 distinct failure(s) (3 result(s)) within the baseline"
+report '[]' "[$(undet '#a > span'), $(undet '#b > span'), $(undet '#c > span')]"
+expect 1 "a third undetermined place is above the baseline" "$s" "FAIL: reference.html: color-contrast: 3 distinct failure(s), above the baseline of 2"
+
+frame=$(issue error color-contrast true '#frame span' 'rgb(1, 1, 1)' 'rgb(2, 2, 2)' axe)
+report '[]' "[$frame, $(issue error color-contrast true '#x' 'rgb(1, 1, 1)' 'rgb(2, 2, 2)')]"
+expect 0 "the same colours from axe and from the styles are two failures" "$s" "reference.html: 2 distinct failure(s) (2 result(s)) within the baseline"
+report '[]' "[$frame, $(issue error color-contrast true '#y' 'rgb(1, 1, 1)' 'rgb(2, 2, 2)'), $(issue error color-contrast true '#z' 'rgb(1, 1, 1)' 'rgb(2, 2, 2)' undetermined)]"
+expect 1 "colours whose source is undetermined are not counted as a pair" "$s" "FAIL: reference.html: color-contrast: 3 distinct failure(s), above the baseline of 2"
 
 report '[]' "[$red]"
 expect 0 "a count below the baseline passes and asks to lower it" "$s" "below the baseline of 2: lower it"
@@ -149,4 +165,4 @@ echo '{"reference.html": {"color-contrast": "two"}}' > "$tmp/baseline.json"
 expect 2 "an unreadable baseline is refused" "$s" "is not readable as {page: {rule: count}}"
 
 echo "docs-a11y self-test: $pass passed, $fail failed"
-(( fail == 0 && pass >= 22 ))
+(( fail == 0 && pass >= 26 ))

@@ -104,6 +104,19 @@ g reset -q --hard "$base"
 raise 7 'A11y-Baseline-Raise: reference.html color-contrast 7 — '
 expect 1 "a trailer with no reason fails" "(no A11y-Baseline-Raise" r "$base"
 g reset -q --hard "$base"
+echo '{"reference.html": {"color-contrast": 7, "region": 2}}' > "$repo/$f"
+g add "$f" && g commit -q --cleanup=verbatim -m raise -m 'A11y-Baseline-Raise: reference.html color-contrast 7 —    '
+expect 1 "a reason of blanks is no reason" "(no A11y-Baseline-Raise" r "$base"
+g reset -q --hard "$base"
+# A squash merge: the raise line sits in a middle paragraph, with later
+# "* commit" blocks after it, where git's trailer parser does not look.
+raise 7 "$(printf '%s\n\n%s\n\n%s\n\n%s\n\n%s' '* fix(docs): upgrade Redoc' \
+  'A11y-Baseline-Raise: reference.html color-contrast 7 — Redoc 3 draws two new code colours' \
+  '* test(docs): adjust the self-test' 'More words.' 'Co-authored-by: Someone <someone@example.org>')"
+[[ -z $(g log -1 --format='%(trailers:key=A11y-Baseline-Raise,valueonly)') ]] ||
+  { echo "not ok: the squash fixture's raise line is a trailer git would parse"; fail=$((fail + 1)); }
+expect 0 "a raise line in a middle paragraph of a squash message passes" "accepted raise: reference.html: color-contrast: 7" r "$base"
+g reset -q --hard "$base"
 echo other > "$repo/OTHER"
 g add OTHER && g commit -q -m other -m 'A11y-Baseline-Raise: reference.html color-contrast 7 — on a commit that does not touch the file'
 echo '{"reference.html": {"color-contrast": 7, "region": 2}}' > "$repo/$f"
@@ -127,4 +140,4 @@ echo '{"reference.html": {"color-contrast": 5}}' > "$repo/$f"
 expect 2 "an unreadable base file is refused" "at $broken is not readable" r "$broken"
 
 echo "docs-a11y guards self-test: $pass passed, $fail failed"
-(( fail == 0 && pass >= 27 ))
+(( fail == 0 && pass >= 29 ))

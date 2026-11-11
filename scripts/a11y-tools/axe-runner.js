@@ -4,18 +4,24 @@
 // enabled or disabled by name), with additions in runnerExtras that the
 // built-in runner drops:
 //
-// - target: axe's selector for the node, the key a non-colour result is
-//   counted by (docs-a11y.sh strips its nth-child parts and indices);
-// - fgColor and bgColor: the colour pair a color-contrast result is counted
-//   by. When axe computed them they are axe's (colourSource "axe"). When axe
-//   could not (a "needs review" result: a background gradient, an element
-//   partly obscured), they are the element's computed text colour and the
-//   background colour of the nearest element at or above it that paints one
-//   (colourSource "computed"); null when the node has no element;
+// - target: axe's selector for the node, joined into one string (a node in a
+//   frame or a shadow root has an array of selectors). docs-a11y.sh counts a
+//   non-colour result by it, with nth-child parts and numbers removed.
+// - for color-contrast, colourSource and the colour pair it is counted by:
+//   - "axe": the text and background colour axe compared;
+//   - "computed": axe could not compare them (a "needs review" result, such
+//     as text partly obscured), so the element's computed text colour and the
+//     background colour of the nearest element at or above it that paints
+//     one, or "canvas" when none does;
+//   - "undetermined": no pair can be read off the styles: the node has no
+//     element, or the walk met a background image, an opacity below 1 or a
+//     partly transparent background colour. fgColor and bgColor are null,
+//     and undeterminedBy says which.
 // - messageKey: why axe could not decide, when it says.
 //
 // The run function is stringified by pa11y and evaluated in the page, so it
-// may use nothing from this module's scope.
+// may use nothing from this module's scope. scripts/a11y-tools/
+// axe-runner.test.js runs it under node:test against a fake window.
 const path = require('node:path');
 
 const axePath = path.dirname(require.resolve('axe-core'));
@@ -32,17 +38,40 @@ const run = async options => {
     rules
   });
   const level = {critical: 'error', serious: 'error', moderate: 'warning', minor: 'notice'};
-  const transparent = c => !c || c === 'transparent' || /^rgba\(.*,\s*0\)$/.test(c);
-  const computedPair = element => {
-    if (!element) return [null, null];
-    const fg = window.getComputedStyle(element).color;
-    let bg = null;
-    for (let e = element; e?.nodeType === 1 && bg === null; e = e.parentElement) {
-      const c = window.getComputedStyle(e).backgroundColor;
-      if (!transparent(c)) bg = c;
-    }
-    return [fg, bg || 'canvas'];
+
+  // The alpha of a CSS colour as getComputedStyle writes it: "transparent",
+  // rgb()/rgba() with commas, or any function with a "/ alpha" part
+  // (rgb(0 0 0 / 0.5), color(srgb 1 0 0 / 0), oklch(0.5 0.1 20 / 50%)).
+  // A colour with no alpha part is opaque.
+  const alpha = c => {
+    if (!c || c === 'transparent') return 0;
+    const inner = /^[a-z-]+\((.*)\)$/i.exec(c.trim());
+    if (!inner) return 1;
+    const slash = inner[1].split('/');
+    const commas = inner[1].split(',');
+    let a;
+    if (slash.length > 1) a = slash.at(-1);
+    else if (commas.length === 4) a = commas[3];
+    else return 1;
+    a = a.trim();
+    return a.endsWith('%') ? Number.parseFloat(a) / 100 : Number.parseFloat(a);
   };
+
+  // The colour pair of an element, read off the computed styles.
+  const computedPair = element => {
+    if (!element) return {source: 'undetermined', by: 'no element'};
+    const fg = window.getComputedStyle(element).color;
+    for (let e = element; e?.nodeType === 1; e = e.parentElement) {
+      const style = window.getComputedStyle(e);
+      if (style.backgroundImage && style.backgroundImage !== 'none') return {source: 'undetermined', by: 'background image'};
+      if (Number.parseFloat(style.opacity) < 1) return {source: 'undetermined', by: 'opacity'};
+      const a = alpha(style.backgroundColor);
+      if (a > 0 && a < 1) return {source: 'undetermined', by: 'translucent background'};
+      if (a >= 1) return {source: 'computed', fg, bg: style.backgroundColor};
+    }
+    return {source: 'computed', fg, bg: 'canvas'};
+  };
+
   const issues = [];
   const add = (result, needsFurtherReview) => {
     for (const node of result.nodes) {
@@ -54,13 +83,18 @@ const run = async options => {
       let element = null;
       try {
         element = window.document.querySelector(target);
-      } catch (e) {
+      } catch {
         element = null;
       }
       const extras = {impact: result.impact, needsFurtherReview, target, messageKey: why ? why.messageKey : null};
       if (result.id === 'color-contrast') {
-        const [fg, bg] = axeColours ? [axeColours.fgColor, axeColours.bgColor] : computedPair(element);
-        Object.assign(extras, {fgColor: fg, bgColor: bg, colourSource: axeColours ? 'axe' : 'computed'});
+        const pair = axeColours ? {source: 'axe', fg: axeColours.fgColor, bg: axeColours.bgColor} : computedPair(element);
+        Object.assign(extras, {
+          colourSource: pair.source,
+          fgColor: pair.fg || null,
+          bgColor: pair.bg || null,
+          undeterminedBy: pair.by || null
+        });
       }
       issues.push({
         element,

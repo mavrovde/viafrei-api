@@ -9,7 +9,7 @@ LDFLAGS   := -s -w \
 	-X github.com/mavrovde/viafrei-api/internal/buildinfo.commit=$(COMMIT)
 
 .PHONY: build test test-integration coverage lint generate check-generated fixtures fixtures-verify catalogue report run clean \
-	image image-multiarch up down logs reset compose-test docs docs-examples
+	image image-multiarch up down logs reset compose-test docs docs-a11y docs-examples
 
 build: ## Build the binary into bin/
 	CGO_ENABLED=0 $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/viafrei-api
@@ -42,6 +42,9 @@ SITE ?= site
 
 docs: ## Build the documentation portal into SITE (default site/), as CI and the Pages release do
 	scripts/docs-build.sh $(SITE)
+
+docs-a11y: docs ## Check every page of the built portal against WCAG 2.2 AA (needs Chrome; CHROME_PATH to choose one)
+	scripts/docs-a11y.sh $(SITE)
 
 docs-examples: ## Run every documented example against the synthetic fixtures; RECORD=1 rewrites api/examples (DX-003)
 	$(GO) test -count=1 -tags integration ./internal/testkit/examplerun $(if $(RECORD),-args -examples.record)

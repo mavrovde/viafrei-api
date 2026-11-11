@@ -53,7 +53,8 @@ expect "an untracked file is refused" "../scripts/untracked.sh" 1 "missing-in-re
 rm -rf "$repo/.git"
 # No repository above $tmp may answer for it, even when TMPDIR lies inside a
 # checkout.
-export GIT_CEILING_DIRECTORIES=$(cd "$tmp" && pwd -P)
+GIT_CEILING_DIRECTORIES=$(cd "$tmp" && pwd -P)
+export GIT_CEILING_DIRECTORIES
 expect "outside a git repository the script refuses" "../scripts/tracked.sh" 2 "" \
   "git could not list the files of the repository"
 script=$here/docs-html.pl run_path=/nonexistent

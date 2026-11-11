@@ -1,5 +1,8 @@
 # Parity bundles pinned per platform version: platform, bundle, sha256.
 # Pinned by the version sync; see docs/parity.md.
+# 2.5.23 and 2.5.24 were answered from producer commits made after those
+# versions' tags (each named in its bundle's commit): records only, not
+# parity evidence. 2.6.8 was answered at its tag's commit.
 # 2.5.23 is projected with viafrei.parity.rules/3: kept as that version's record,
 # Load refuses it under rules/4 (lock_test.go). It is compared only by a
 # checkout of its own time.

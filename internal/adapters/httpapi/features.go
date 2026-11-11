@@ -256,7 +256,7 @@ type ChargePoint struct {
 // ChargingSummary sums up a site.
 type ChargingSummary struct {
 	ChargePoints int      `json:"chargePoints" doc:"How many points are listed: every point of the site, or under min_kw those of at least that power."`
-	AvailableNow *int     `json:"availableNow" nullable:"true" doc:"Listed points whose report is available and not stale; null when no listed point has a report that is not stale."`
+	AvailableNow *int     `json:"availableNow" nullable:"true" doc:"Listed points whose report is available and not stale; null when no listed point has a report that says something and is not stale."`
 	MaxPowerKw   *float64 `json:"maxPowerKw" nullable:"true" doc:"The highest power of any point, in kW; null when none is published."`
 }
 

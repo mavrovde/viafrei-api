@@ -71,7 +71,9 @@ const (
 	StateStale State = "stale"
 )
 
-// States lists every availability state an answer can carry.
+// States lists every availability state of the contract. unknown and other
+// stay in the enum but are never sent: a report of either says nothing
+// (Availability.Says), so its point is answered as availability: null.
 var States = []State{StateAvailable, StateOccupied, StateReserved, StateOutOfOrder, StateUnknown, StateOther, StateStale}
 
 // MapState maps a stored availability code.

@@ -117,8 +117,8 @@ nothing, so that family contributed nothing and neither side credits it.
 ## Charging rules both sides follow
 
 - **A point's status.** A report older than the shorter of the status age
-  limit (`charging.status_max_age`, 30 minutes, the platform's
-  `STATUS_MAX_AGE_MS`) and its family's design threshold is answered with
+  limit (`charging.status_max_age`; the MCP capability's status age limit,
+  30 minutes) and its family's design threshold is answered with
   the state `stale` and its `observedAt`, and is not counted in
   `summary.availableNow`. A report of `unknown`, or of a code the service
   cannot map, says nothing and is answered as no report (`availability:
@@ -130,24 +130,8 @@ nothing, so that family contributed nothing and neither side credits it.
   each site lists only those points; `summary.chargePoints` counts the
   listed points.
 
-**Where the status rule equals the MCP capability's.** The rule above is
-the platform's `judgeStatus` (`analysis/charging-status.ts`) on the domain
-the read contract holds: one stated instant per report, every report a
-snapshot statement, and no ledger of runs. On that domain `judgeStatus`
-dates a report by its own statement, judges it against
-`STATUS_MAX_AGE_MS`, and judges our pull of it against the poll window of
-its source. Outside it, `judgeStatus` has rules the contract cannot express,
-which are therefore differences that remain:
-
-- a change-only (delta) report older than its horizon is no report at all;
-- a report that arrived before its source's publications were skipped (a jump) is
-  stale, dated by its own statement;
-- an unchanged point of a snapshot source is confirmed by a later complete
-  snapshot that restated it, so it is dated by that publication;
-- an operation or opening status that blocks charging answers the point as
-  out of order, whatever its availability word;
-- the liveness half is the source's own poll window (its interval times the
-  freshness intervals), where the API uses the family's design threshold.
+The MCP side has further rules, specific to its sources, that the read
+contract cannot express; they are not compared here.
 
 ## Known differences that remain
 
@@ -157,8 +141,8 @@ None in the platform 2.6.8 bundle: `TestParity` passes. Its facts are the
 The 2.5.23 bundle differed in 9 facts. All 9 are closed:
 
 - Seven came from the MCP side reading the SID reading against the
-  database's clock instead of the question's `now` (platform issue #1262,
-  fixed in 2.5.24): `termsRequired` in both parking cases, and the four
+  database's clock instead of the question's `now` (fixed in platform
+  2.5.24): `termsRequired` in both parking cases, and the four
   `occupancy` facts of `pk-07-0012` in the accepted case.
 - `meta.notes.condition` in parking-terms-pending: the API stated the gated
   family's condition while it withheld that family's occupancy. The API now
@@ -174,6 +158,11 @@ The 2.5.23 bundle differed in 9 facts. All 9 are closed:
   condition, with the fixture's synthetic text on one side and the
   platform register's text on the other. Rules/4 compares the family and the
   count, not the text.
+
+The 2.5.23 and 2.5.24 bundles were answered from producer commits made after
+those versions' tags (each names its commit in `commit`). They are records
+only, not parity evidence; the evidence is the 2.6.8 bundle, answered at the
+2.6.8 tag's commit.
 
 The 2.5.23 bundle stays pinned as the record of that version. It was
 projected with rules/3, which this harness no longer reads (`Load` refuses
@@ -222,30 +211,22 @@ produced the bundle it compared.
 
 ## Producing the MCP bundle
 
-The platform repository carries the producer,
-`packages/mcp/scripts/parity-bundle.ts`. It reads `questions.json` and the
-fixture SQL this repository generates, loads them into a throwaway platform
-database (`scripts/test-db.sh up <name>`) in one transaction it rolls back,
-asks the real MCP tool handlers each question in-process, and projects each
-answer to the facts above. The projection translates format only (units,
-the field names, the platform's storage names back to the fixture's
-families); a value the tool states differently stays different, and a
-parameter the tool has no argument for is named on stderr. It refuses fixture
-SQL whose checksum is not the questions', and a platform tree with
-uncommitted changes, because the bundle names the commit it answered from.
+The platform's parity producer makes the MCP side's bundle.
 
-```sh
-# here: the fixture SQL the questions name (testdata/fixtures/tiny/seed.sql)
-make fixtures PROFILE=tiny SEED=1
-# in the platform checkout, with its throwaway test database configured
-npx tsx packages/mcp/scripts/parity-bundle.ts \
-  --questions <api>/test/parity/questions.json \
-  --contract <api>/db/contract/0001_contract.sql \
-  --seed <api>/testdata/fixtures/tiny/seed.sql \
-  --platform X.Y.Z --out <api>/test/parity/bundles/X.Y.Z.json
-```
-
-It prints the lock line on stdout; add it to `test/parity/lock.tsv`.
+- **Inputs:** `test/parity/questions.json`, the read-contract schema
+  (`db/contract/0001_contract.sql`), the fixture SQL the questions name
+  (`make fixtures PROFILE=tiny SEED=1` writes it to
+  `testdata/fixtures/tiny/seed.sql`) and the platform version.
+- **What it does:** it loads the fixture rows into a throwaway database, asks
+  the MCP capability each question with the question's `now`, and projects
+  each answer to the facts above. The projection translates format only
+  (units, field names, the fixture's families); a value the capability
+  states differently stays different.
+- **Refusals:** fixture SQL whose checksum is not the questions', and a
+  platform tree with uncommitted changes, because the bundle names the
+  commit it answered from.
+- **Outputs:** `test/parity/bundles/X.Y.Z.json`, and its line for
+  `test/parity/lock.tsv`.
 
 ### Why the producer and not the public server
 
@@ -257,9 +238,8 @@ checked against the public server before a bundle is pinned:
 
 1. `initialize` on the public endpoint: `serverInfo.version` is the
    platform version of the bundle.
-2. `tools/list`: every tool's description and input-schema fingerprint
-   (`npm run mcp:contract -- --fingerprints` in the platform checkout at the
-   bundle's `commit`, the same hash applied to the public answer) is equal.
+2. `tools/list`: every tool's description and input schema, hashed the same
+   way on both sides, equal the platform's at the bundle's `commit`.
 3. `tools/call` of each case's tool with that case's arguments: the answer is
    not an error. Only its member names are compared with the producer's
    answer, never its values. A member stated only where the data has it (a

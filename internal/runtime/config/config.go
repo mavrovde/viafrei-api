@@ -161,7 +161,7 @@ type Pagination struct {
 
 // Charging holds the settings of charging answers.
 type Charging struct {
-	StatusMaxAge time.Duration `koanf:"status_max_age" default:"30m" validate:"min=1m,max=24h" desc:"How old a charge point's reported state may be and still count; an older one, or one older than its family's freshness threshold, is answered as stale and not counted as available. The MCP capability's own limit, 30 minutes; the parity question charging-status-age-limit fails when the two differ."`
+	StatusMaxAge time.Duration `koanf:"status_max_age" default:"30m" validate:"min=1m,max=24h" desc:"How old a charge point's reported state may be and still count; an older one, or one older than its family's freshness threshold, is answered as stale and not counted as available. The default is the MCP capability's own limit, 30 minutes. The parity harness runs on its own defaults, and its question charging-status-age-limit is asked 38 minutes after a report, so it fails only when the default is raised above 38 minutes."`
 }
 
 // Compose holds the settings of composed answers.

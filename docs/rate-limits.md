@@ -98,6 +98,51 @@ before its deadline is refused with `503 deadline-exhausted` without
 touching storage, and the statement timeout of every read is what is left of
 the deadline: no query runs past it, on the server either (NFR-PERF-004).
 
+## Gate 5: the storage budget shared with other readers
+
+The permits of gate 4 count this service's reads only. The store has other
+readers, and together they must not run more statements at once than it can
+serve (NFR-CAP-002). `db.shared_budget.slots` is that number for all readers
+together; `0` (the default) switches the gate off.
+
+The budget is a set of transaction-scoped advisory locks with the two-key
+form `(lock_space, n)`, `n` from 1 to `slots`, and every reader that shares
+it follows the same protocol:
+
+1. inside its read-only transaction, before its first statement, take the
+   first free slot with exactly this statement:
+   `select s from generate_series(1, <open>) s where pg_try_advisory_xact_lock(<lock_space>, s) limit 1`.
+   That it takes one lock at most rests on PostgreSQL evaluating the WHERE
+   filter lazily, row by row, and stopping at LIMIT 1. The PostgreSQL manual
+   warns that advisory locks in a query with LIMIT are not guaranteed to
+   behave so in general: an `ORDER BY`, a materialised CTE, or any other
+   shape whose plan runs the filter on more rows than it returns would take
+   several slots and hold them to the end of the transaction. Use no other
+   shape. The integration test
+   `TestAReadHoldsOneSharedSlotUntilItsTransactionEnds` pins it: a read
+   holds exactly one slot while it runs;
+2. `<open>` is `slots` for a critical read and `slots - critical_reserved`
+   for any other, so the highest `critical_reserved` slots stay free for
+   critical reads. A service read with no caller (readiness, which needs no
+   key, and background reads) counts as standard here, never critical.
+   Readiness therefore takes a standard slot of the shared budget: when no
+   standard slot frees within `max_wait` (or within `health.ready_timeout`,
+   whichever ends first), its storage read is refused and `/readyz` reports
+   the `storage` check as failed, the same answer it gives when storage does
+   not answer at all;
+3. no row means every open slot is held: try again after `retry_interval`,
+   spread at random over ±50 % so waiting readers do not retry in step,
+   for at most `max_wait`, then refuse the request as overloaded with
+   `Retry-After: retry_after`;
+4. the slot is released when the transaction ends, or with the session if
+   the reader dies, so a slot is never lost.
+
+A reader joins the budget by using the same `lock_space` and `slots`; it needs
+no table, no grant beyond connecting, and no change to the data contract. A
+read that waited for a slot sets its statement timeout again to what is left
+of its deadline, and `max_wait` must be less than `deadline.request`, so the
+wait for a slot never outlives the request.
+
 ## Usage metering
 
 Each keyed request is counted per key, hour (its start, UTC) and operation:

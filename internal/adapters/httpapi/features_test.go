@@ -411,17 +411,18 @@ func TestFeatureRefusals(t *testing.T) {
 		{store.ErrDeadlineExhausted, 503, "deadline-exhausted"},
 		{store.ErrUnavailable, 503, "upstream-unavailable"},
 	}
-	// One handler per refusal, asked every target: building a handler is
-	// the cost of this test (TST-012).
+	// One handler per case, shared by the three targets: building a handler
+	// registers the whole contract and is the cost of this test (TST-012's 2 s
+	// bound was crossed under -race and coverage with fifteen builds).
 	for _, c := range cases {
 		h := featureHandler(t, config.Defaults(), &fakeFeatures{err: c.err}, nil)
 		for _, target := range targets {
 			assertProblem(t, do(t, h, http.MethodGet, target, bearer), c.status, c.slug)
 		}
 	}
-	off := featureHandler(t, config.Defaults(), nil, nil)
+	disabled := featureHandler(t, config.Defaults(), nil, nil)
 	for _, target := range targets {
-		assertProblem(t, do(t, off, http.MethodGet, target, bearer), 404, "feature-disabled")
+		assertProblem(t, do(t, disabled, http.MethodGet, target, bearer), 404, "feature-disabled")
 	}
 	assertProblem(t, do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: places.ErrNotFound}, nil), http.MethodGet, targets[2], bearer), 404, "not-found")
 }

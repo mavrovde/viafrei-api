@@ -39,6 +39,8 @@ type Store struct {
 	floor   time.Duration
 	nowFn   func() time.Time
 	admit   *admission.Controller
+	budget  SharedBudget
+	pace    pace
 }
 
 // WithAdmission puts the priority admission in front of every read: a read
@@ -94,6 +96,7 @@ func New(pool *pgxpool.Pool, cfg *config.Config) *Store {
 		reserve: cfg.Deadline.Reserve,
 		floor:   cfg.DB.StatementTimeoutFloor,
 		nowFn:   time.Now,
+		pace:    realPace,
 	}
 }
 
@@ -162,10 +165,39 @@ func (s *Store) Read(ctx context.Context, fn func(context.Context, pgx.Tx) error
 		return classify(ctx, err)
 	}
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+	if s.budget.Slots > 0 {
+		if err := s.takeSlot(ctx, tx); err != nil {
+			return err
+		}
+	}
 	if err := fn(ctx, tx); err != nil {
 		return classify(ctx, err)
 	}
 	if err := tx.Commit(ctx); err != nil {
+		return classify(ctx, err)
+	}
+	return nil
+}
+
+// takeSlot holds a slot of the shared budget for tx (NFR-CAP-002). A read
+// that had to wait for its slot gets the statement timeout set again to
+// what is left of its budget.
+func (s *Store) takeSlot(ctx context.Context, tx slotTx) error {
+	waited, err := s.budget.take(ctx, tx, admission.SlotTierOf(ctx), s.nowFn, s.pace)
+	if errors.Is(err, admission.ErrOverloaded) {
+		return err
+	}
+	if err != nil {
+		return classify(ctx, err)
+	}
+	if !waited {
+		return nil
+	}
+	budget, ok := s.Budget(ctx)
+	if !ok {
+		return ErrDeadlineExhausted
+	}
+	if _, err := tx.Exec(ctx, "select set_config('statement_timeout', $1, true)", strconv.FormatInt(budget.Milliseconds(), 10)); err != nil {
 		return classify(ctx, err)
 	}
 	return nil

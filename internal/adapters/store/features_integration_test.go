@@ -159,13 +159,24 @@ where o.availability = 'x_unmapped' order by o.observed_at limit 1`, &id, &fam, 
 	if err != nil {
 		t.Fatal(err)
 	}
+	all := map[string]int{}
+	for _, s := range sites {
+		all[s.ID] = len(s.Points)
+	}
+	dropped := 0
 	for _, s := range fast {
-		if !slices.ContainsFunc(s.Points, func(p energy.ChargePoint) bool { return *p.MaxPowerKw >= 150 }) {
+		// Of a site the filter keeps, only the points it asks for are read
+		// (the MCP capability's rule).
+		if len(s.Points) == 0 || slices.ContainsFunc(s.Points, func(p energy.ChargePoint) bool { return p.MaxPowerKw == nil || *p.MaxPowerKw < 150 }) {
 			t.Errorf("min_kw 150 read %+v", s)
 		}
+		dropped += all[s.ID] - len(s.Points)
 	}
 	if len(fast) >= len(sites) {
 		t.Errorf("min_kw filtered nothing: %d of %d", len(fast), len(sites))
+	}
+	if dropped == 0 {
+		t.Error("min_kw dropped no slower point of a kept site; the fixture no longer proves the point filter")
 	}
 	other, _, err := st.ChargingNear(bounded(t), q, []string{"src-alpha-parking"}, unknown)
 	if err != nil || len(other) != 0 {

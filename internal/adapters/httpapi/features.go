@@ -235,13 +235,13 @@ type NearQuery struct {
 // ChargingInput is the input of listChargingOptions.
 type ChargingInput struct {
 	Near
-	MinKw  float64 `query:"min_kw" minimum:"0" maximum:"1000" doc:"Only sites with at least one point of at least this power, in kW. Default 0."`
+	MinKw  float64 `query:"min_kw" minimum:"0" maximum:"1000" doc:"Only sites with at least one point of at least this power, in kW, and of each only those points. Default 0."`
 	Access string  `query:"access" enum:"public,restricted,all" default:"public" doc:"Who may use the site."`
 }
 
 // Availability is the last reported state of a charge point.
 type Availability struct {
-	State      string    `json:"state" enum:"available,occupied,reserved,out_of_order,unknown,other" doc:"Open enumeration; treat an unknown value as other."`
+	State      string    `json:"state" enum:"available,occupied,reserved,out_of_order,unknown,other,stale" doc:"Open enumeration; treat an unknown value as other. stale: the report is older than the status age limit (30 minutes by default) or than its family's freshness threshold, and is not counted in summary.availableNow."`
 	ObservedAt time.Time `json:"observedAt" doc:"When the state was reported."`
 }
 
@@ -250,13 +250,13 @@ type ChargePoint struct {
 	ID           string        `json:"id"`
 	Current      *string       `json:"current" nullable:"true" enum:"ac,dc,other" doc:"The current delivered; null when not published."`
 	MaxPowerKw   *float64      `json:"maxPowerKw" nullable:"true" doc:"The point's highest power in kW; null when not published."`
-	Availability *Availability `json:"availability" doc:"The last report; null when none is published."`
+	Availability *Availability `json:"availability" doc:"The last report; null when none is published, or when the last one says nothing (its state unknown or not a known code)."`
 }
 
 // ChargingSummary sums up a site.
 type ChargingSummary struct {
-	ChargePoints int      `json:"chargePoints" doc:"How many points the site has."`
-	AvailableNow *int     `json:"availableNow" nullable:"true" doc:"Points reported available within the family's freshness threshold; null when no point has such a report."`
+	ChargePoints int      `json:"chargePoints" doc:"How many points are listed: every point of the site, or under min_kw those of at least that power."`
+	AvailableNow *int     `json:"availableNow" nullable:"true" doc:"Listed points whose report is available and not stale; null when no listed point has a report that says something and is not stale."`
 	MaxPowerKw   *float64 `json:"maxPowerKw" nullable:"true" doc:"The highest power of any point, in kW; null when none is published."`
 }
 
@@ -300,17 +300,18 @@ type ChargingOutput struct {
 	Body         ChargingEnvelope
 }
 
-func chargingSites(a features.Answer[energy.Site]) []ChargingSite {
-	// Each report is judged by its own family's threshold; every family that
+func chargingSites(a features.Answer[energy.Site], maxAge time.Duration) []ChargingSite {
+	// Each report is judged by the status age limit and its own family's
+	// threshold, whichever is shorter (energy.StatusLimit); every family that
 	// contributed is in a.Families (ENV-003).
 	thresholds := map[string]time.Duration{}
 	for _, f := range a.Families {
 		thresholds[f.Source.Family] = f.StaleAfter
 	}
-	staleAfter := func(family string) time.Duration { return thresholds[family] }
+	limit := func(family string) time.Duration { return energy.StatusLimit(maxAge, thresholds[family]) }
 	out := make([]ChargingSite, len(a.Items))
 	for i, v := range a.Items {
-		sum := v.Summarise(a.At, staleAfter)
+		sum := v.Summarise(a.At, limit)
 		item := ChargingSite{
 			ID: v.ID, Name: v.Name, Operator: v.Operator, Location: position(v.Location), DistanceM: v.DistanceM,
 			Access: string(v.Access), ChargePoints: []ChargePoint{}, SourceFamily: v.Family,
@@ -322,8 +323,8 @@ func chargingSites(a features.Answer[energy.Site]) []ChargingSite {
 				c := string(*p.Current)
 				cp.Current = &c
 			}
-			if p.Availability != nil {
-				cp.Availability = &Availability{State: string(p.Availability.State), ObservedAt: p.Availability.ObservedAt.UTC()}
+			if r := p.Availability; r != nil && r.Says() {
+				cp.Availability = &Availability{State: string(r.Shown(a.At, limit(r.Family))), ObservedAt: r.ObservedAt.UTC()}
 			}
 			item.ChargePoints = append(item.ChargePoints, cp)
 		}
@@ -347,7 +348,7 @@ func registerCharging(api huma.API, s *server, op huma.Operation) {
 			return nil, s.featureProblem(ctx, err)
 		}
 		return &ChargingOutput{CacheControl: noStore, Body: ChargingEnvelope{
-			Data: chargingSites(a),
+			Data: chargingSites(a, s.cfg.Charging.StatusMaxAge),
 			Meta: ChargingMeta{
 				DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
 				Page:     Page{Limit: q.Limit, HasMore: a.HasMore},
@@ -611,7 +612,7 @@ func registerOverview(api huma.API, s *server, op huma.Operation) {
 		}}
 		withheld := false
 		if o.Charging != nil {
-			data.Charging = &ChargingPart{Sites: chargingSites(*o.Charging)}
+			data.Charging = &ChargingPart{Sites: chargingSites(*o.Charging, s.cfg.Charging.StatusMaxAge)}
 		}
 		if o.Parking != nil {
 			var sites []ParkingSite

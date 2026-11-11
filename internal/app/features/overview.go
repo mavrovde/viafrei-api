@@ -53,7 +53,8 @@ type Overview struct {
 	Charging *Answer[energy.Site]
 	Parking  *Answer[parking.Site]
 	Parts    []PartResult
-	// Families are the families of the place and of every part that is ok.
+	// Families are the families of the place and of every part that is ok,
+	// without the conditions of a family a part withheld the data of.
 	Families []provenance.Family
 	Partial  bool
 }
@@ -97,11 +98,12 @@ func (s *Service) Overview(ctx context.Context, key access.Record, q OverviewQue
 	}
 	out := Overview{Place: place}
 	families := []string{place.Family}
+	var hidden []string
 	ok := false
 	for _, part := range Parts {
 		res := PartResult{Part: part, Status: StatusNotRequested}
 		if len(q.Needs) == 0 || slices.Contains(q.Needs, part) {
-			fams, partial, err := s.runPart(ctx, key, reg, gate, part, place, q, &out)
+			fams, withheld, partial, err := s.runPart(ctx, key, reg, gate, part, place, q, &out)
 			res.Status, res.Err = s.status(err), err
 			if errors.Is(err, ErrGateViolation) {
 				return Overview{}, err
@@ -112,6 +114,7 @@ func (s *Service) Overview(ctx context.Context, key access.Record, q OverviewQue
 				for _, f := range fams {
 					families = append(families, f.Source.Family)
 				}
+				hidden = append(hidden, withheld...)
 			}
 		}
 		out.Parts = append(out.Parts, res)
@@ -120,32 +123,35 @@ func (s *Service) Overview(ctx context.Context, key access.Record, q OverviewQue
 		return out, ErrNoPart
 	}
 	slices.Sort(families)
-	out.Families, err = s.repos.Register.Provenance(ctx, slices.Compact(families), s.set.Language)
+	fams, err := s.repos.Register.Provenance(ctx, slices.Compact(families), s.set.Language)
+	// The place's family passed the gate check above, so it is never one a
+	// part withheld: only the parts' withheld families lose their conditions.
+	out.Families = withholdConditions(fams, hidden)
 	return out, err
 }
 
 // runPart runs one part within its sub-deadline and stores its answer in out.
 // The register and gate are the overview's own, read once for every part.
-func (s *Service) runPart(ctx context.Context, key access.Record, reg []access.Terms, gate access.Gate, part Part, place places.Place, q OverviewQuery, out *Overview) ([]provenance.Family, bool, error) {
+func (s *Service) runPart(ctx context.Context, key access.Record, reg []access.Terms, gate access.Gate, part Part, place places.Place, q OverviewQuery, out *Overview) ([]provenance.Family, []string, bool, error) {
 	if !key.Plan.Has(scopeOf[part]) {
-		return nil, false, ErrScopeDenied
+		return nil, nil, false, ErrScopeDenied
 	}
 	pctx, cancel := context.WithTimeout(ctx, s.set.PartDeadline)
 	defer cancel()
 	if part == PartCharging {
 		a, err := s.charging(pctx, reg, gate, energy.Query{At: place.Location, RadiusM: q.RadiusM, Access: energy.FilterPublic, Limit: q.PerPartLimit})
 		if err != nil {
-			return nil, false, err
+			return nil, nil, false, err
 		}
 		out.Charging = &a
-		return a.Families, a.Partial, nil
+		return a.Families, a.Withheld, a.Partial, nil
 	}
 	a, err := s.parking(pctx, reg, gate, parking.Query{At: place.Location, RadiusM: q.RadiusM, Limit: q.PerPartLimit})
 	if err != nil {
-		return nil, false, err
+		return nil, nil, false, err
 	}
 	out.Parking = &a
-	return a.Families, a.Partial, nil
+	return a.Families, a.Withheld, a.Partial, nil
 }
 
 // status is the outcome a part's error stands for.

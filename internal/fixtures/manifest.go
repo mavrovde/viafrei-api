@@ -49,6 +49,7 @@ var EdgeCases = []string{
 	"empty_area", "road_without_events", "bbox_edge", "land_border",
 	"stale_family", "unknown_code",
 	"zero_occupancy", "full_occupancy", "max_decimal_price",
+	"foreign_unknown_report",
 }
 
 // LandCodes are the sixteen Land codes.

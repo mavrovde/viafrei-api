@@ -60,8 +60,9 @@ order by s.source_ref`, families, lang)
 }
 
 // ChargingNear reads the charging sites of the given families within the
-// radius, nearest first, then by id, each with its charge points and their
-// last availability report from the same families.
+// radius, nearest first, then by id, each with its charge points (under a
+// minimum power only those of at least that power) and their last
+// availability report from the same families.
 func (s *Store) ChargingNear(ctx context.Context, q energy.Query, families []string, now time.Time) ([]energy.Site, bool, error) {
 	var accessCodes []string
 	for _, a := range q.Access.Codes() {
@@ -95,7 +96,7 @@ sites as (
 select s.site_id, s.source_ref, s.name, s.operator_name, s.access, s.lat, s.lon, s.dist,
        p.point_id, p.current_kind, p.power_max_kw::float8, o.availability, o.observed_at, o.source_ref
 from sites s
-left join contract.charge_point p using (site_id)
+left join contract.charge_point p on p.site_id = s.site_id and ($6::float8 <= 0 or p.power_max_kw >= $6)
 left join lateral (
   select availability, observed_at, source_ref
   from contract.charge_point_state_observation o

@@ -111,3 +111,19 @@ func deref(p *int64) any {
 	}
 	return *p
 }
+
+func TestWithoutDropsOneKindAndLeavesTheFamily(t *testing.T) {
+	c := provenance.Note{Kind: provenance.Condition, Text: "c"}
+	p := provenance.Note{Kind: provenance.Purpose, Text: "p"}
+	f := provenance.Family{Source: access.Source{Family: "x"}, Notes: []provenance.Note{c, p, c}}
+	got := f.Without(provenance.Condition)
+	if got.Source.Family != "x" || len(got.Notes) != 1 || got.Notes[0] != p {
+		t.Errorf("without conditions: %+v", got)
+	}
+	if len(f.Notes) != 3 || f.Notes[0] != c {
+		t.Errorf("the original was changed: %+v", f.Notes)
+	}
+	if got := f.Without(provenance.Purpose); len(got.Notes) != 2 || got.Notes[0] != c || got.Notes[1] != c {
+		t.Errorf("without purposes: %+v", got)
+	}
+}

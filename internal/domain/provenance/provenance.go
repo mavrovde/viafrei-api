@@ -103,6 +103,14 @@ func Notes(fams []Family, kind NoteKind) []string {
 	return out
 }
 
+// Without returns the family without its notes of kind. A family whose gated
+// data an answer withholds keeps its credit but states no condition of that
+// data: the condition goes with the data it conditions.
+func (f Family) Without(kind NoteKind) Family {
+	f.Notes = slices.DeleteFunc(slices.Clone(f.Notes), func(n Note) bool { return n.Kind == kind })
+	return f
+}
+
 // AnyStale reports whether any entry is stale.
 func AnyStale(fs []Freshness) bool {
 	return slices.ContainsFunc(fs, func(f Freshness) bool { return f.Stale })

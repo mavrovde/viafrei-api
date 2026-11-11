@@ -16,6 +16,8 @@ import (
 	"fmt"
 	"io/fs"
 	"math"
+	"net/url"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -45,10 +47,15 @@ type Bundle struct {
 	// facts the MCP capability gave, ProducerAPI for facts this API recorded
 	// itself. An api bundle is a regression lock, not parity evidence: the
 	// API agrees with it by construction.
-	Producer string  `json:"producer"`
-	Rules    string  `json:"rules"`
-	Fixture  Fixture `json:"fixture"`
-	Cases    []Case  `json:"cases"`
+	Producer string `json:"producer"`
+	// Commit is the platform commit the MCP side answered from (40 hex
+	// digits). It is required of an mcp bundle, because a platform version
+	// alone does not name the code that answered, and absent from an api
+	// bundle, which no platform code answered.
+	Commit  string  `json:"commit,omitempty"`
+	Rules   string  `json:"rules"`
+	Fixture Fixture `json:"fixture"`
+	Cases   []Case  `json:"cases"`
 }
 
 // Fixture names the generated seed rows the facts were taken on.
@@ -105,17 +112,126 @@ type Rules struct {
 	// Meta are the members of meta that are facts; the rest describe the
 	// request, not the answer.
 	Meta []string
+	// Excluded are the facts left out of the comparison, each with its
+	// reason (docs/parity.md). Project drops them and Parse refuses a bundle
+	// that states one, so neither side can compare them by accident.
+	Excluded []Exclusion
+	// Differences are the facts both sides are known to state differently,
+	// each with its reason (docs/parity.md). They are compared all the same:
+	// a fact that differs in exactly the named way is reported as that
+	// difference, and a named difference no case shows any more fails, so a
+	// change of either side is seen.
+	Differences []Difference
+	// OwnedNotes are the note kinds of meta.notes whose text is not
+	// compared: each is stated per family that owns a note of it, as
+	// meta.notes.<kind>[<family>] = how many distinct notes it owns, and as
+	// meta.notes.<kind> = [] when the answer states none (docs/parity.md).
+	// The count and the family are compared; the text is not.
+	OwnedNotes []string
+}
+
+// Owners maps a note's text to the families whose notes carry it. The API's
+// answer states its notes as texts only; the harness reads who owns each
+// from the fixture rows.
+type Owners map[string][]string
+
+// Exclusion is one fact, or family of facts, left out of the comparison.
+// Pattern is a fact name in which [*] stands for any element key; it covers
+// the name itself and every fact under it. When Asked names a request
+// parameter, the exclusion holds only in a case that asks it (Asks).
+type Exclusion struct {
+	Pattern string
+	Asked   string
+	Reason  string
+}
+
+// Difference is one fact both sides state differently by design: Bundle is
+// the value the MCP side states, API the value this API states.
+type Difference struct {
+	Pattern string
+	Bundle  string
+	API     string
+	Reason  string
+}
+
+// Excludes reports whether the fact name falls under one of r's exclusions
+// in a case asking request.
+func (r Rules) Excludes(request, name string) bool {
+	for _, e := range r.Excluded {
+		if exclusionPattern(e.Pattern).MatchString(name) && (e.Asked == "" || Asks(request, e.Asked)) {
+			return true
+		}
+	}
+	return false
+}
+
+// Asks reports whether request asks the parameter: it is present and its
+// value is not a number of 0 or less, which filters nothing.
+func Asks(request, param string) bool {
+	u, err := url.Parse(request)
+	if err != nil {
+		return false
+	}
+	v, ok := u.Query()[param]
+	if !ok {
+		return false
+	}
+	n, err := strconv.ParseFloat(v[0], 64)
+	return err != nil || n > 0
+}
+
+// Named returns the difference of r that a fact stated as bundle by the MCP
+// side and as api by this API is, if it is one.
+func (r Rules) Named(name, bundle, api string) (Difference, bool) {
+	for _, d := range r.Differences {
+		if exclusionPattern(d.Pattern).MatchString(name) && d.Bundle == bundle && d.API == api {
+			return d, true
+		}
+	}
+	return Difference{}, false
+}
+
+func exclusionPattern(p string) *regexp.Regexp {
+	q := strings.ReplaceAll(regexp.QuoteMeta(p), `\[\*\]`, `\[[^\]]*\]`)
+	return regexp.MustCompile(`^` + q + `(?:$|[.\[])`)
 }
 
 // Default is the projection rule set of this format.
 var Default = Rules{
-	ID:               "viafrei.parity.rules/2",
+	ID:               "viafrei.parity.rules/4",
 	PositionDecimals: 5,
 	Positions:        []string{"lat", "lon"},
 	Keys:             []string{"id", "family", "code"},
 	Identifiers:      []string{"sourceFamily"},
 	Meta:             []string{"asOf", "attribution", "freshness", "notes", "page", "warnings"},
+	Excluded: []Exclusion{
+		{"data[*].access", "", "the MCP capability has no access concept: no charging source of the platform publishes who may use a site"},
+		{"data[*].chargePoints[*].current", "", "the MCP capability states no current per point"},
+		{"meta.freshness", "", "API-only: the per-family freshness block of the read contract (ENV-003)"},
+		{"meta.warnings", "", "API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got"},
+		{"meta.page.hasMore", "min_kw", "the MCP capability states no count of the sites a power filter keeps, so it cannot say whether there are more"},
+		{"meta.asOf", "", "each side defines it differently: the API the oldest family dataAsOf (ENV-004), MCP the newest current status or its clock"},
+		{"meta.attribution[*].domain", "", attributionReason},
+		{"meta.attribution[*].licence", "", attributionReason},
+		{"meta.attribution[*].licenceUrl", "", attributionReason},
+		{"meta.attribution[*].publisher", "", attributionReason},
+		{"meta.attribution[*].shareAlike", "", attributionReason},
+		{"meta.attribution[*].shareAlikeOffer", "", attributionReason},
+		{"meta.attribution[*].termsUrl", "", attributionReason},
+		{"meta.attribution[*].text", "", attributionReason},
+	},
+	Differences: []Difference{
+		{"data[*].chargePoints[*].availability.state", "occupied", "reserved", "the MCP capability answers a reservation as occupied; the API keeps the reported state reserved, which says more"},
+	},
+	// The fixture's condition notes are synthetic register texts and the
+	// platform states its own register's (attributionReason): which family
+	// a condition belongs to and how many it has are compared, the text is not.
+	OwnedNotes: []string{"condition"},
 }
+
+// attributionReason is why only the credited family of an attribution entry
+// is compared.
+const attributionReason = "the fixture's families carry synthetic register texts, the platform credits its own register rows for the sources the families are stored as; which families are credited is compared"
 
 // Errors of loading a bundle.
 var (
@@ -124,6 +240,10 @@ var (
 	ErrEmpty     = errors.New("parity bundle has no cases")
 	ErrMalformed = errors.New("parity bundle is malformed")
 )
+
+// ErrUnownedNote means an answer states a note no family owns, so it could
+// not be stated by its family and would not be compared.
+var ErrUnownedNote = errors.New("parity: a note no family owns")
 
 // Load reads the bundle pinned for platform in the lock file of fsys, after
 // verifying its checksum.
@@ -187,6 +307,10 @@ func Parse(raw []byte, platform string) (Bundle, error) {
 		return Bundle{}, fmt.Errorf("%w: rules %q, want %q", ErrMalformed, b.Rules, Default.ID)
 	case b.Producer != ProducerAPI && b.Producer != ProducerMCP:
 		return Bundle{}, fmt.Errorf("%w: producer %q, want %q or %q", ErrMalformed, b.Producer, ProducerAPI, ProducerMCP)
+	case b.Producer == ProducerMCP && !commitPattern.MatchString(b.Commit):
+		return Bundle{}, fmt.Errorf("%w: an mcp bundle names the platform commit it answered from, 40 hex digits; got %q", ErrMalformed, b.Commit)
+	case b.Producer == ProducerAPI && b.Commit != "":
+		return Bundle{}, fmt.Errorf("%w: an api bundle was answered by no platform commit, got %q", ErrMalformed, b.Commit)
 	case len(b.Cases) == 0:
 		return Bundle{}, ErrEmpty
 	}
@@ -199,8 +323,144 @@ func Parse(raw []byte, platform string) (Bundle, error) {
 		if n, ok := repeated(c.Facts); ok {
 			return Bundle{}, fmt.Errorf("%w: case %q names the fact %q more than once", ErrMalformed, c.ID, n)
 		}
+		for _, f := range c.Facts {
+			if Default.Excludes(c.Request, f.Name) {
+				return Bundle{}, fmt.Errorf("%w: case %q states %q, which %s excludes from the comparison", ErrMalformed, c.ID, f.Name, Default.ID)
+			}
+			if !Default.ownedNoteFact(f) {
+				return Bundle{}, fmt.Errorf("%w: case %q states %q as %q; %s states a note of that kind as [] or as a count per family, never its text", ErrMalformed, c.ID, f.Name, f.Value, Default.ID)
+			}
+		}
+		if k, ok := Default.bothWays(c.Facts); ok {
+			return Bundle{}, fmt.Errorf("%w: case %q states meta.notes.%s both as [] and per family", ErrMalformed, c.ID, k)
+		}
 	}
 	return b, nil
+}
+
+var commitPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
+
+var countPattern = regexp.MustCompile(`^[1-9][0-9]*$`)
+
+// ownedNoteFact reports whether f, if it names a note kind of r.OwnedNotes,
+// is stated the way r states that kind: [] for none, or a positive count
+// under one family. Any other fact is not one and is accepted.
+func (r Rules) ownedNoteFact(f Fact) bool {
+	for _, k := range r.OwnedNotes {
+		base := "meta.notes." + k
+		switch {
+		case f.Name == base:
+			return f.Value == "[]"
+		case strings.HasPrefix(f.Name, base+"["):
+			fam, ok := strings.CutSuffix(strings.TrimPrefix(f.Name, base+"["), "]")
+			return ok && fam != "" && fam == normalise(fam) && !strings.ContainsAny(fam, "[]") && countPattern.MatchString(f.Value)
+		}
+	}
+	return true
+}
+
+// bothWays returns a note kind of r.OwnedNotes that facts state both as []
+// (none) and as a count under a family (some): one of the two is false.
+func (r Rules) bothWays(facts []Fact) (string, bool) {
+	for _, k := range r.OwnedNotes {
+		base := "meta.notes." + k
+		none := slices.ContainsFunc(facts, func(f Fact) bool { return f.Name == base })
+		some := slices.ContainsFunc(facts, func(f Fact) bool { return strings.HasPrefix(f.Name, base+"[") })
+		if none && some {
+			return k, true
+		}
+	}
+	return "", false
+}
+
+// Question is a case without its answer: what both sides are asked.
+type Question struct {
+	ID          string    `json:"id"`
+	Operation   string    `json:"operation"`
+	Counterpart string    `json:"counterpart"`
+	Request     string    `json:"request"`
+	Key         Key       `json:"key"`
+	Now         time.Time `json:"now"`
+}
+
+// Questions are the parity questions and the fixture rows they are asked on.
+// Both producers read them from one file (test/parity/questions.json): the
+// API's recorder and the MCP side's producer.
+type Questions struct {
+	Fixture Fixture    `json:"fixture"`
+	Cases   []Question `json:"cases"`
+}
+
+// QuestionsFile is the name of the questions file in a parity directory.
+const QuestionsFile = "questions.json"
+
+// LoadQuestions reads the questions file of fsys; it fails closed on an
+// empty or malformed file.
+func LoadQuestions(fsys fs.FS) (Questions, error) {
+	raw, err := fs.ReadFile(fsys, QuestionsFile)
+	if err != nil {
+		return Questions{}, err
+	}
+	var q Questions
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&q); err != nil {
+		return Questions{}, fmt.Errorf("%w: %s: %w", ErrMalformed, QuestionsFile, err)
+	}
+	if len(q.Cases) == 0 {
+		return Questions{}, fmt.Errorf("%w: %s", ErrEmpty, QuestionsFile)
+	}
+	seen := map[string]bool{}
+	for _, c := range q.Cases {
+		if c.ID == "" || seen[c.ID] || c.Operation == "" || c.Request == "" || c.Now.IsZero() {
+			return Questions{}, fmt.Errorf("%w: %s: question %q needs a unique id, an operation, a request and a now", ErrMalformed, QuestionsFile, c.ID)
+		}
+		seen[c.ID] = true
+	}
+	return q, nil
+}
+
+// QuestionOf is the question a case answers.
+func QuestionOf(c Case) Question {
+	return Question{ID: c.ID, Operation: c.Operation, Counterpart: c.Counterpart, Request: c.Request, Key: c.Key, Now: c.Now}
+}
+
+// Answers states every way in which b does not answer exactly q: a question
+// it leaves out, one it adds, one it asks differently, or other fixture rows.
+// None means the bundle answers the questions.
+func Answers(b Bundle, q Questions) []string {
+	var out []string
+	if fx := b.Fixture; fx != q.Fixture {
+		out = append(out, fmt.Sprintf("fixture: the bundle was answered on %+v, the questions are asked on %+v", fx, q.Fixture))
+	}
+	asked := map[string]Question{}
+	for _, c := range q.Cases {
+		asked[c.ID] = c
+	}
+	answered := map[string]bool{}
+	for _, c := range b.Cases {
+		answered[c.ID] = true
+		want, ok := asked[c.ID]
+		switch {
+		case !ok:
+			out = append(out, "case "+c.ID+": not a question")
+		case !sameQuestion(QuestionOf(c), want):
+			out = append(out, "case "+c.ID+": asked differently from the question")
+		}
+	}
+	for _, c := range q.Cases {
+		if !answered[c.ID] {
+			out = append(out, "question "+c.ID+": no case answers it")
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func sameQuestion(a, b Question) bool {
+	ja := invariant.Must(json.Marshal(a)) // a question always encodes
+	jb := invariant.Must(json.Marshal(b))
+	return bytes.Equal(ja, jb)
 }
 
 // Inventory states every operation of an OpenAPI document that declares an
@@ -246,10 +506,12 @@ func Inventory(doc []byte, b Bundle) ([]string, error) {
 // so one of them could not be compared.
 var ErrDuplicateFact = errors.New("parity: two values project onto one fact name")
 
-// Project turns a response body into its facts under r, sorted by name. Two
-// values under one name are an error: a comparison keeping either would hide
-// a difference in the other.
-func Project(body []byte, r Rules) ([]Fact, error) {
+// Project turns the response body of a case asking request into its facts
+// under r, sorted by name. Two values under one name are an error: a
+// comparison keeping either would hide a difference in the other. A note of
+// a kind in r.OwnedNotes is stated by the families owners names for its text;
+// a note owners names no family for is an error (ErrUnownedNote).
+func Project(body []byte, r Rules, request string, owners Owners) ([]Fact, error) {
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.UseNumber()
 	var doc map[string]any
@@ -260,15 +522,29 @@ func Project(body []byte, r Rules) ([]Fact, error) {
 	p.walk("data", "data", doc["data"])
 	meta, _ := doc["meta"].(map[string]any)
 	for _, m := range r.Meta {
-		if v, ok := meta[m]; ok {
-			p.walk("meta."+m, m, v)
+		v, ok := meta[m]
+		if !ok {
+			continue
 		}
+		if notes, isMap := v.(map[string]any); m == "notes" && isMap {
+			if err := p.notes(notes, owners); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		p.walk("meta."+m, m, v)
 	}
 	sort.Slice(p.out, func(i, j int) bool { return p.out[i].Name < p.out[j].Name })
 	if n, ok := repeated(p.out); ok {
 		return nil, fmt.Errorf("%w: %q", ErrDuplicateFact, n)
 	}
-	return p.out, nil
+	kept := p.out[:0]
+	for _, f := range p.out {
+		if !r.Excludes(request, f.Name) {
+			kept = append(kept, f)
+		}
+	}
+	return kept, nil
 }
 
 // repeated returns a fact name that occurs more than once in fs.
@@ -289,6 +565,47 @@ type projector struct {
 }
 
 func (p *projector) add(name, value string) { p.out = append(p.out, Fact{name, value}) }
+
+// notes states meta.notes: an owned kind per family as a count, every other
+// member as walk states it.
+func (p *projector) notes(notes map[string]any, owners Owners) error {
+	if len(notes) == 0 {
+		p.add("meta.notes", "{}")
+	}
+	for k, v := range notes {
+		path := "meta.notes." + k
+		if !slices.Contains(p.r.OwnedNotes, k) {
+			p.walk(path, k, v)
+			continue
+		}
+		xs, isList := v.([]any)
+		texts, ok := stringList(xs)
+		if !isList || !ok {
+			return fmt.Errorf("%w: %s is not a list of texts", ErrMalformed, path)
+		}
+		count := map[string]map[string]bool{}
+		for _, text := range texts {
+			fams := owners[text]
+			if len(fams) == 0 {
+				return fmt.Errorf("%w: %s, %d character(s)", ErrUnownedNote, path, len(text))
+			}
+			for _, f := range fams {
+				f = normalise(f)
+				if count[f] == nil {
+					count[f] = map[string]bool{}
+				}
+				count[f][text] = true
+			}
+		}
+		if len(count) == 0 {
+			p.add(path, "[]")
+		}
+		for f, ts := range count {
+			p.add(path+"["+f+"]", strconv.Itoa(len(ts)))
+		}
+	}
+	return nil
+}
 
 func (p *projector) walk(path, member string, v any) {
 	switch x := v.(type) {
@@ -402,6 +719,42 @@ func Diff(want, got []Fact) []string {
 			out = append(out, fmt.Sprintf("extra   %s: got %q", n, gv))
 		case wv != gv:
 			out = append(out, fmt.Sprintf("changed %s: want %q, got %q", n, wv, gv))
+		}
+	}
+	return out
+}
+
+// Compare is Diff under r's named differences: a fact the bundle states as a
+// difference's Bundle value and this API as its API value is returned in
+// named, not in diff.
+func Compare(want, got []Fact, r Rules) (diff []string, named []Difference) {
+	g := index(got)
+	var w, kept []Fact
+	drop := map[string]bool{}
+	for _, f := range want {
+		if v, ok := g[f.Name]; ok && v != f.Value {
+			if d, ok := r.Named(f.Name, f.Value, v); ok {
+				named = append(named, d)
+				drop[f.Name] = true
+				continue
+			}
+		}
+		w = append(w, f)
+	}
+	for _, f := range got {
+		if !drop[f.Name] {
+			kept = append(kept, f)
+		}
+	}
+	return Diff(w, kept), named
+}
+
+// Unseen are the named differences of r that none of seen is.
+func (r Rules) Unseen(seen []Difference) []Difference {
+	var out []Difference
+	for _, d := range r.Differences {
+		if !slices.Contains(seen, d) {
+			out = append(out, d)
 		}
 	}
 	return out

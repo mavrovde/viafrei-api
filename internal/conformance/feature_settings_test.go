@@ -2,10 +2,12 @@ package conformance_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
@@ -13,6 +15,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/energy"
 	"github.com/mavrovde/viafrei-api/internal/domain/parking"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
@@ -70,4 +73,40 @@ func (f *askedFeatures) RoadConditions(_ context.Context, _ access.Record, q roa
 func (f *askedFeatures) RoadSituation(_ context.Context, _ access.Record, id string) (features.Answer[roads.Situation], error) {
 	f.asked = id
 	return features.Answer[roads.Situation]{}, roads.ErrUnknownSituation
+}
+
+// tenMinutesOld answers one charging site whose one point was reported
+// occupied ten minutes before the answer, by a family whose design threshold
+// is an hour: only the status age limit can make it stale.
+type tenMinutesOld struct{ askedFeatures }
+
+func (*tenMinutesOld) Charging(context.Context, access.Record, energy.Query) (features.Answer[energy.Site], error) {
+	at := time.Date(2026, 3, 30, 0, 0, 0, 0, time.UTC)
+	site := energy.Site{ID: "cs-1", Family: "src-a", Points: []energy.ChargePoint{{ID: "cp-1", Availability: &energy.Availability{
+		State: energy.StateOccupied, ObservedAt: at.Add(-10 * time.Minute), Family: "src-a",
+	}}}}
+	fam := provenance.Family{Source: access.Source{Family: "src-a"}, StaleAfter: time.Hour}
+	return features.Answer[energy.Site]{Items: []energy.Site{site}, Families: []provenance.Family{fam}, At: at}, nil
+}
+
+// chargingState is the state the one point of tenMinutesOld is answered as.
+func chargingState(t *testing.T, c *config.Config) string {
+	t.Helper()
+	h, err := httpapi.NewHandler(httpapi.Deps{Config: c, ContractVersion: "0.1", Auth: everyScope{}, Features: &tenMinutesOld{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/charging-options?at=1,2", nil))
+	var body struct {
+		Data []struct {
+			ChargePoints []struct {
+				Availability struct{ State string } `json:"availability"`
+			} `json:"chargePoints"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil || len(body.Data) != 1 || len(body.Data[0].ChargePoints) != 1 {
+		t.Fatalf("%d %s: %v", w.Code, w.Body, err)
+	}
+	return body.Data[0].ChargePoints[0].Availability.State
 }

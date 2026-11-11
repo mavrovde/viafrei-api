@@ -62,11 +62,18 @@ name parses as syllables of the generator's own lists
   UTC and Berlin midnight, month and year end, umlauts, ß, a hyphen and a long
   compound word, one name in two Länder, points on the outer corners of the
   bounding box and on a Land border, an area with no position at all, a road
-  with no events, a road in two parts with one situation on each, a stale
-  source per domain, an unmapped code value (and, on one road, an active
-  situation with an unmapped value in each coded column: kind, severity,
-  direction and road class), zero and full occupancy, and the largest price
-  the price column holds.
+  with no events, a stale source per domain, an unmapped code value, zero and
+  full occupancy, and the largest price the price column holds.
+
+The store's integration tests also load a few planted rows after `seed.sql`
+(`fixtures.Planted`, drawn without a random number from the same seed and
+profile). They are kept out of `seed.sql`, because the parity bundles were
+answered on that file and must stay valid:
+
+- a road in two parts, `A 990`, with one active situation in the middle of
+  each part;
+- on one road, an active situation with an unmapped value in each coded
+  column: kind, severity, direction and road class.
 
 The generator fails closed: an unknown profile is a usage error (exit 2), and
 a set with an empty table, a Land or family without rows, a missing licence

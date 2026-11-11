@@ -46,9 +46,10 @@ var Families = []struct{ Name, Category string }{
 var EdgeCases = []string{
 	"dst_spring", "dst_autumn", "utc_midnight", "berlin_midnight", "month_end", "year_end",
 	"umlaut_eszett", "long_compound_name", "ambiguous_place",
-	"empty_area", "road_without_events", "road_in_two_parts", "bbox_edge", "land_border",
+	"empty_area", "road_without_events", "bbox_edge", "land_border",
 	"stale_family", "unknown_code",
 	"zero_occupancy", "full_occupancy", "max_decimal_price",
+	"foreign_unknown_report",
 }
 
 // LandCodes are the sixteen Land codes.

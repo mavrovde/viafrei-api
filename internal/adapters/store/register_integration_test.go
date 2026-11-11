@@ -20,12 +20,16 @@ import (
 
 var seedOnce sync.Once
 
-// seeded loads the tiny fixture set once into the shared test database.
+// seeded loads the tiny fixture set and its planted rows once into the
+// shared test database.
 func seeded(t *testing.T) *store.Store {
 	t.Helper()
 	seedOnce.Do(func() {
 		var buf bytes.Buffer
 		if _, err := fixtures.Generate(&buf, "tiny", 1, contract.Version()); err != nil {
+			t.Fatal(err)
+		}
+		if err := fixtures.Planted(&buf, "tiny", 1, contract.Version()); err != nil {
 			t.Fatal(err)
 		}
 		ctx := context.Background()

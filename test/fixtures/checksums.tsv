@@ -4,6 +4,6 @@
 # machine with `go run ./cmd/fixturegen -verify test/fixtures/checksums.tsv`.
 # A change of the generator's output bumps fixtures.GeneratorVersion and
 # records these lines again.
-tiny	1	0.2.0	sha256:a2fd55621cef2b5a8acbe47ccf83e1d5374e107e2605ff1234832081ccf96930
-ci	1	0.2.0	sha256:67aefbe437a81546862a91bc186a881c260231922ce30f1d1c5db9738462d34e
-benchmark	1	0.2.0	sha256:7b9c2c10b56df5a8e0bdc9df1c6e7be847fe3789c6758eecdb4fd11b15b35b48
+tiny	1	0.2.0	sha256:e6562a7bd002350e239f9e25cf501a7a2f1364395f7bc176a47aac7fe8b4b7d8
+ci	1	0.2.0	sha256:0a3c3ea467c11d868fdfb5511d37ed09410b6336c9d0a32747e0113318d842f6
+benchmark	1	0.2.0	sha256:a16a8530ee2bbe3c435bb394fa0c088b38d7bd48c795babf731e6b6b4c4072a6

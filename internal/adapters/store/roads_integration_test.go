@@ -5,6 +5,7 @@ package store_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"slices"
 	"testing"
@@ -230,14 +231,21 @@ func TestSituationsNearAreBySeverityThenDistance(t *testing.T) {
 	st := seeded(t)
 	id, at, now := otherSituation(t)
 	fams := families(t, st, "roads")
-	q := roads.AreaQuery{At: at, RadiusM: everywhere, Filter: roads.Filter{MinSeverity: roads.SeverityInfo}, Limit: 100}
+	// Wide enough that the radius holds several situations at that instant.
+	const wide = 1_000_000
+	q := roads.AreaQuery{At: at, RadiusM: wide, Filter: roads.Filter{MinSeverity: roads.SeverityInfo}, Limit: 100}
 	sits, sigs, _, err := st.SituationsNear(bounded(t), q, fams, now)
-	if err != nil || len(sits) == 0 || len(sigs) == 0 {
-		t.Fatalf("read %d: %v", len(sits), err)
+	var want int
+	owner(t, `select count(*) from contract.traffic_event e
+where e.withdrawn_at is null and e.source_ref in (`+quoted(fams)+`) and e.location is not null
+  and e.valid_from <= '`+now.UTC().Format(time.RFC3339Nano)+`' and (e.valid_to is null or e.valid_to > '`+now.UTC().Format(time.RFC3339Nano)+`')
+  and st_dwithin(e.location::geography, st_setsrid(st_makepoint(`+fmt.Sprint(at.Lon)+`, `+fmt.Sprint(at.Lat)+`), 4326)::geography, `+fmt.Sprint(wide)+`)`, &want)
+	if err != nil || want < 2 || len(sits) != want || len(sigs) == 0 {
+		t.Fatalf("read %d of %d (at least 2 are needed to see an order): %v", len(sits), want, err)
 	}
 	found := false
 	for i, s := range sits {
-		if s.DistanceM == nil || *s.DistanceM > everywhere || s.AtKm != nil || s.Location == nil {
+		if s.DistanceM == nil || *s.DistanceM > wide || s.AtKm != nil || s.Location == nil {
 			t.Errorf("situation %+v", s)
 		}
 		if s.ID == id {
@@ -258,7 +266,7 @@ func TestSituationsNearAreBySeverityThenDistance(t *testing.T) {
 	cq := roads.AreaQuery{RadiusM: 1_000_000, Filter: q.Filter, Limit: 100}
 	owner(t, `select st_y(location), st_x(location) from contract.traffic_event where event_id = 'ev-u-class'`, &cq.At.Lat, &cq.At.Lon)
 	busy, _ := busiest(t)
-	around, _, _, err := st.SituationsNear(bounded(t), cq, fams, busy)
+	around, aroundSigs, _, err := st.SituationsNear(bounded(t), cq, fams, busy)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,12 +286,93 @@ func TestSituationsNearAreBySeverityThenDistance(t *testing.T) {
 		t.Errorf("motorway class: %v, want %v, %v", ids(mw), motorway, err)
 	}
 	cq.Classes = []roads.Class{roads.ClassFederal, roads.ClassOther}
-	if oth, sigs, _, err := st.SituationsNear(bounded(t), cq, fams, busy); err != nil || !slices.Equal(ids(oth), other) || len(sigs) != 1 || oth[0].Class != roads.ClassOther {
+	// The lamp reads the radius whatever classes the list keeps.
+	if oth, sigs, _, err := st.SituationsNear(bounded(t), cq, fams, busy); err != nil || !slices.Equal(ids(oth), other) || len(sigs) != len(aroundSigs) || oth[0].Class != roads.ClassOther {
 		t.Errorf("federal or other class: %v %v, %v", ids(oth), sigs, err)
 	}
 	q.Classes, q.Limit = nil, 1
 	if page, _, more, err := st.SituationsNear(bounded(t), q, fams, now); err != nil || len(page) != 1 || more != (len(sits) > 1) {
 		t.Errorf("a page of one: %d, %v, %v", len(page), more, err)
+	}
+}
+
+// quoted writes a list of families as SQL string literals.
+func quoted(fams []string) string {
+	out := ""
+	for i, f := range fams {
+		if i > 0 {
+			out += ", "
+		}
+		out += "'" + f + "'"
+	}
+	return out
+}
+
+// TestTheLampReadsTheScopeNotTheFilters plants, far after the fixture's
+// window, a second spelling of road "A 101" ("A101", without the space), a
+// minor hazard (a wrong-way driver) stored on that spelling, and a short jam
+// on "A 101": the list keeps what the filters keep, the lamp reads both, and
+// the two spellings are one road.
+func TestTheLampReadsTheScopeNotTheFilters(t *testing.T) {
+	req.Covers(t, "FR-ROAD-003", "FR-ROAD-004", "FR-ROAD-006")
+	st := seeded(t)
+	fams := families(t, st, "roads")
+	var spelling string
+	owner(t, `insert into contract.road (road_ref, road_class, name, length_km, geometry, states)
+select 'A101', road_class, name, length_km, geometry, states from contract.road where road_ref = 'A 101'
+returning road_ref`, &spelling)
+	t.Cleanup(func() {
+		var gone string
+		owner(t, `delete from contract.road where road_ref = 'A101' returning road_ref`, &gone)
+	})
+	var n int
+	owner(t, `with ins as (
+  insert into contract.traffic_event (event_id, event_kind, severity, road_ref, road_class, direction, direction_label,
+    location, valid_from, valid_to, lanes_closed, lanes_total, delay_min, affected_length_m,
+    headline, description, text_lang, source_ref, origin_key, published_at, recorded_at, changed_at, withdrawn_at)
+  select v.id, v.kind, 'minor', v.ref, 'motorway', 'both', null,
+    e.location, '2102-01-01T00:00:00Z', null, null, null, v.delay, null,
+    v.headline, null, 'de', e.source_ref, 'o-' || v.id, '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z', null
+  from contract.traffic_event e,
+    (values ('ev-scope-hazard', 'hazard', 'A101', null::int, 'Falschfahrer'), ('ev-scope-jam', 'jam', 'A 101', 5, 'Stau')) v(id, kind, ref, delay, headline)
+  where e.event_id = 'ev-u-kind'
+  returning 1)
+select count(*) from ins`, &n)
+	t.Cleanup(func() {
+		var gone int
+		owner(t, `with del as (delete from contract.traffic_event where event_id like 'ev-scope-%' returning 1) select count(*) from del`, &gone)
+	})
+	if n != 2 {
+		t.Fatalf("planted %d of 2", n)
+	}
+	at := time.Date(2102, 1, 1, 1, 0, 0, 0, time.UTC)
+	// The lamp reads the hazard (red on its own) whatever the list keeps.
+	reads := func(sigs []roads.Signal) bool {
+		l, _ := roads.LampOf(sigs, false, false)
+		return l == roads.LampRed && slices.ContainsFunc(sigs, func(g roads.Signal) bool {
+			return g.Kind == roads.KindHazard && g.Severity == roads.SeverityMinor
+		})
+	}
+	both := roads.CorridorQuery{Road: "A101", Direction: roads.DirectionBoth, Filter: roads.Filter{MinSeverity: roads.SeverityInfo}, Limit: 100}
+	all, _, _, err := st.SituationsOnRoad(bounded(t), both, fams, at)
+	if err != nil || !slices.Contains(ids(all), "ev-scope-hazard") || !slices.Contains(ids(all), "ev-scope-jam") {
+		t.Fatalf("A101 and A 101 as one road: %v, %v", ids(all), err)
+	}
+	both.Kinds = []roads.Kind{roads.KindJam}
+	jams, sigs, _, err := st.SituationsOnRoad(bounded(t), both, fams, at)
+	if err != nil || !slices.Contains(ids(jams), "ev-scope-jam") || slices.ContainsFunc(jams, func(s roads.Situation) bool { return s.Kind != roads.KindJam }) || !reads(sigs) {
+		t.Errorf("kinds=jam: %v, signals %v, %v", ids(jams), sigs, err)
+	}
+	both.Filter = roads.Filter{MinSeverity: roads.SeverityMajor}
+	major, sigs, _, err := st.SituationsOnRoad(bounded(t), both, fams, at)
+	if err != nil || slices.Contains(ids(major), "ev-scope-hazard") || !reads(sigs) {
+		t.Errorf("min_severity=major: %v, signals %v, %v", ids(major), sigs, err)
+	}
+	var here geo.Point
+	owner(t, `select st_y(location), st_x(location) from contract.traffic_event where event_id = 'ev-scope-hazard'`, &here.Lat, &here.Lon)
+	near, sigs, _, err := st.SituationsNear(bounded(t), roads.AreaQuery{At: here, RadiusM: 1_000, Filter: roads.Filter{Kinds: []roads.Kind{roads.KindJam}, MinSeverity: roads.SeverityMajor}, Limit: 100}, fams, at)
+	if err != nil || slices.Contains(ids(near), "ev-scope-hazard") || !reads(sigs) {
+		t.Errorf("near, jams of major: %v, signals %v, %v", ids(near), sigs, err)
 	}
 }
 
@@ -333,5 +422,9 @@ func TestRoadReadsReportStorageFaults(t *testing.T) {
 	}
 	if _, err := st.Situation(ctx, "x", []string{"x"}, time.Now()); err == nil || errors.Is(err, roads.ErrUnknownSituation) {
 		t.Errorf("Situation on an ended context: %v", err)
+	}
+	// A page the database refuses (a negative limit) inside the snapshot.
+	if _, _, _, err := st.SituationsNear(bounded(t), roads.AreaQuery{Limit: -2}, []string{"x"}, time.Now()); err == nil {
+		t.Error("SituationsNear with a limit the database refuses succeeded")
 	}
 }

@@ -76,6 +76,19 @@ func (l *fakeLedger) Usage(_ context.Context, id string, since time.Time) ([]met
 	return []metering.Row{{Key: id}}, l.err
 }
 
+func (l *fakeLedger) KeyList(context.Context) ([]auth.KeyView, error) {
+	return []auth.KeyView{{ID: "abcdefghij"}}, l.err
+}
+
+func (l *fakeLedger) PlanList(context.Context) ([]access.Plan, error) {
+	return []access.Plan{{Name: "standard"}}, l.err
+}
+
+func (l *fakeLedger) AuditList(_ context.Context, limit int) ([]auth.AuditEntry, error) {
+	l.kept = append(l.kept, limit)
+	return []auth.AuditEntry{{Change: auth.Change{Action: auth.ActionIssue}}}, l.err
+}
+
 func newKeys(l *fakeLedger) *auth.Keys {
 	return auth.NewKeys(settings(), l, nil, func() time.Time { return t0 })
 }
@@ -264,5 +277,29 @@ func TestUsageReadAndPrune(t *testing.T) {
 	}
 	if _, err := k.Usage(ctx, "", -time.Hour); !errors.Is(err, auth.ErrInput) {
 		t.Errorf("a negative window: %v", err)
+	}
+}
+
+func TestTheDirectoryReadsThroughTheLedger(t *testing.T) {
+	req.Covers(t, "SEC-044")
+	l := &fakeLedger{}
+	k := newKeys(l)
+	ctx := context.Background()
+	keys, err := k.KeyList(ctx)
+	if err != nil || len(keys) != 1 || keys[0].ID != "abcdefghij" {
+		t.Fatalf("keys %v %v", keys, err)
+	}
+	plans, err := k.PlanList(ctx)
+	if err != nil || len(plans) != 1 {
+		t.Fatalf("plans %v %v", plans, err)
+	}
+	audit, err := k.AuditList(ctx, 50)
+	if err != nil || len(audit) != 1 || l.kept[0] != 50 {
+		t.Fatalf("audit %v %v %v", audit, err, l.kept)
+	}
+	for _, n := range []int{0, 1001} {
+		if _, err := k.AuditList(ctx, n); !errors.Is(err, auth.ErrInput) {
+			t.Errorf("page %d: %v", n, err)
+		}
 	}
 }

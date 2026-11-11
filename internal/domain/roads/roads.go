@@ -221,7 +221,7 @@ const (
 // Lamps lists every lamp an answer can carry.
 var Lamps = []Lamp{LampGreen, LampAmber, LampRed, LampUnknown}
 
-// Signal is what the lamp reads of one situation that answers the question.
+// Signal is what the lamp reads of one situation in the question's scope.
 type Signal struct {
 	Kind     Kind
 	Severity Severity
@@ -240,27 +240,30 @@ type Reason string
 // The reasons, red ones first, each colour's in the order the rule tests
 // them.
 const (
-	// ReasonRoadClosed: a closure of the carriageway (severity road_closed,
-	// whatever the kind).
+	// ReasonRoadClosed: a closure of the carriageway: a situation graded
+	// road_closed, whatever its kind, or a closure that is not graded as one
+	// closed lane. The service holds no scope for a closure, so it takes the
+	// platform's reading of an unknown scope: the carriageway.
 	ReasonRoadClosed Reason = "road_closed"
 	// ReasonSafety: a safety message: a hazard on the road (a wrong-way
-	// driver, an object, a person or an animal), or an accident graded major.
+	// driver, an object, a person or an animal).
 	ReasonSafety Reason = "safety"
 	// ReasonLongJam: a jam with a published delay of JamRedMin or more.
 	ReasonLongJam Reason = "long_jam"
-	// ReasonSevereWeather: a weather situation graded major, which stands
-	// for an official warning of level 3 or 4.
+	// ReasonSevereWeather: severe weather reported as a traffic situation (a
+	// weather situation graded major). The official weather warnings are
+	// answered by the weather risk, not read here.
 	ReasonSevereWeather Reason = "severe_weather"
 	// ReasonPartial: a roads family the key may not read was left out, so
 	// the service cannot say the road is clear (lamp unknown).
 	ReasonPartial Reason = "partial"
 	// ReasonJam: a shorter jam, or one with no published delay.
 	ReasonJam Reason = "jam"
-	// ReasonNarrowing: roadworks that close a lane or more (lane_closed or
-	// major).
+	// ReasonNarrowing: roadworks of any severity, a lane restriction, or a
+	// closure graded as one closed lane: the carriageway is narrowed.
 	ReasonNarrowing Reason = "narrowing"
-	// ReasonWarning: any other situation the publisher reports, including
-	// one whose kind or severity cannot be mapped.
+	// ReasonWarning: any other situation the publisher reports, including an
+	// accident with no closure and one whose kind cannot be mapped.
 	ReasonWarning Reason = "warning"
 	// ReasonStaleSource: a roads family the answer read has no data or
 	// stale data, so the sight is limited.
@@ -275,27 +278,29 @@ var Reasons = []Reason{ReasonRoadClosed, ReasonSafety, ReasonLongJam, ReasonSeve
 // the platform's motorway lamp uses the same threshold.
 const JamRedMin = 30
 
-// signal returns the colour one situation gives on its own and why; the
-// empty lamp when it gives none (roadworks that narrow no lane). This is the
-// documented mapping of the service's codes onto the platform's motorway
-// lamp:
+// signal returns the colour one situation gives on its own and why: the
+// platform's motorway lamp (signalLamp) over the service's codes. Every
+// situation gives a colour; the service holds no scope (carriageway or
+// ramp), so every situation is read as the carriageway's, the platform's
+// reading of an unknown scope:
 //
-//	severity road_closed                 red    road_closed
-//	kind hazard                          red    safety
-//	kind accident, severity major        red    safety
-//	kind jam, delay >= JamRedMin         red    long_jam
-//	kind weather, severity major         red    severe_weather
-//	kind jam, otherwise                  amber  jam
-//	kind roadworks, lane_closed or major amber  narrowing
-//	kind roadworks, info or minor        none
-//	anything else, also unmapped codes   amber  warning
+//	severity road_closed                  red    road_closed
+//	kind closure, not lane_closed         red    road_closed
+//	kind hazard                           red    safety
+//	kind jam, delay >= JamRedMin          red    long_jam
+//	kind weather, severity major          red    severe_weather
+//	kind jam, otherwise                   amber  jam
+//	kind roadworks or restriction,
+//	  or closure graded lane_closed       amber  narrowing
+//	anything else, also unmapped codes    amber  warning
 //
-// A situation the service cannot grade (severity other) is never green.
+// An accident is a warning: an accident that closes the road is graded
+// road_closed. A situation the service cannot grade is never green.
 func signal(s Signal) (Lamp, Reason) {
-	if s.Severity == SeverityRoadClosed {
+	if s.Severity == SeverityRoadClosed || s.Kind == KindClosure && s.Severity != SeverityLaneClosed {
 		return LampRed, ReasonRoadClosed
 	}
-	if s.Kind == KindHazard || s.Kind == KindAccident && s.Severity == SeverityMajor {
+	if s.Kind == KindHazard {
 		return LampRed, ReasonSafety
 	}
 	if s.Kind == KindJam && s.DelayMin != nil && *s.DelayMin >= JamRedMin {
@@ -307,19 +312,17 @@ func signal(s Signal) (Lamp, Reason) {
 	if s.Kind == KindJam {
 		return LampAmber, ReasonJam
 	}
-	if s.Kind == KindRoadworks && (s.Severity == SeverityLaneClosed || s.Severity == SeverityMajor) {
+	if s.Kind == KindRoadworks || s.Kind == KindRestriction || s.Kind == KindClosure {
 		return LampAmber, ReasonNarrowing
-	}
-	if s.Kind == KindRoadworks && s.Severity != SeverityOther {
-		return "", ""
 	}
 	return LampAmber, ReasonWarning
 }
 
-// LampOf is the lamp rule (FR-ROAD-004), the platform's motorway lamp. It
-// reads every situation that answers the question, not only those on the
-// page, whether the answer is partial and whether a family it read is stale;
-// first match from the top:
+// LampOf is the lamp rule (FR-ROAD-004), the platform's motorway lamp
+// (ampelOf). It reads every situation in the question's scope (the road and
+// direction, or the radius), whatever the list's filters keep, whether the
+// answer is partial and whether a family it read is missing or stale; first
+// match from the top:
 //
 //   - red when a situation gives red (see signal);
 //   - unknown when the answer is partial: a family the key may not read
@@ -333,9 +336,8 @@ func signal(s Signal) (Lamp, Reason) {
 func LampOf(signals []Signal, partial, stale bool) (Lamp, *Reason) {
 	found := map[Reason]Lamp{}
 	for _, s := range signals {
-		if lamp, reason := signal(s); lamp != "" {
-			found[reason] = lamp
-		}
+		lamp, reason := signal(s)
+		found[reason] = lamp
 	}
 	if partial {
 		found[ReasonPartial] = LampUnknown

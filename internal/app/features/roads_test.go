@@ -27,7 +27,7 @@ type roadFake struct {
 	roadErr, readErr     error
 	sits                 []roads.Situation
 	sigs                 []roads.Signal
-	stale                []string
+	stale, missing       []string
 	gotSince             time.Time
 	gotRoad              roads.CorridorQuery
 	gotArea              roads.AreaQuery
@@ -54,9 +54,11 @@ func (f *roadFake) SituationsNear(_ context.Context, q roads.AreaQuery, fams []s
 	return f.sits, f.sigs, false, f.readErr
 }
 
-// Provenance answers every family fresh at now, except those in f.stale.
+// Provenance answers every family fresh at now, except those in f.stale,
+// and leaves out those in f.missing.
 func (f *roadFake) Provenance(ctx context.Context, fams []string, lang string) ([]provenance.Family, error) {
 	out, err := f.fake.Provenance(ctx, fams, lang)
+	out = slices.DeleteFunc(out, func(p provenance.Family) bool { return slices.Contains(f.missing, p.Source.Family) })
 	for i := range out {
 		out[i].StaleAfter = time.Minute
 		if !slices.Contains(f.stale, out[i].Source.Family) {
@@ -165,6 +167,11 @@ func TestTheLampSeesStaleFamilies(t *testing.T) {
 	}
 	if !slices.Equal(f.gotProv[0], []string{"r1", "r2"}) || len(f.gotProv) != 1 {
 		t.Errorf("the register was asked %v", f.gotProv)
+	}
+	// r1 has no provenance row at all: a missing source limits the sight too.
+	f = &roadFake{sits: []roads.Situation{{ID: "a", Family: "r2"}}, missing: []string{"r1"}}
+	if c, err = roadService(f).RoadConditions(context.Background(), key("consumer", roadsScope, "r1", "r2"), roads.AreaQuery{}); err != nil || c.Lamp != roads.LampAmber || c.Reason == nil || *c.Reason != roads.ReasonStaleSource {
+		t.Errorf("a missing family: %s %v, %v", c.Lamp, c.Reason, err)
 	}
 }
 

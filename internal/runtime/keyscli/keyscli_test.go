@@ -47,6 +47,10 @@ func (l *ledger) Usage(_ context.Context, id string, since time.Time) ([]meterin
 		Counts: metering.Counts{Requests: 3, NotModified: 1, RateLimited: 2, Storage: 1500 * time.Microsecond}}}, l.err
 }
 
+func (l *ledger) KeyList(context.Context) ([]auth.KeyView, error)           { return nil, l.err }
+func (l *ledger) PlanList(context.Context) ([]access.Plan, error)           { return nil, l.err }
+func (l *ledger) AuditList(context.Context, int) ([]auth.AuditEntry, error) { return nil, l.err }
+
 func run(l *ledger, args ...string) (int, string, string) {
 	s := auth.Settings{
 		Environment: access.Live, Prefixes: access.Prefixes{Live: "vf_live_", Test: "vf_test_"},

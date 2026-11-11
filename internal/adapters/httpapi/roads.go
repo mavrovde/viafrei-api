@@ -175,7 +175,7 @@ type Corridor struct {
 // MotorwayData is the answer of getMotorwayConditions.
 type MotorwayData struct {
 	Corridor   Corridor        `json:"corridor"`
-	Lamp       string          `json:"lamp" enum:"green,amber,red,unknown" doc:"The lamp over every situation that answers the question, not only this page, by the platform's motorway rule, first match: red for a closed carriageway, a safety message (a hazard, a major accident), a jam with a delay of 30 minutes or more, or severe weather (graded major); unknown when a roads family the key may not read was left out (meta.partial); amber for any other jam, narrowing roadworks, any other reported situation (also one that cannot be mapped or graded) or a missing or stale source (meta.freshness); green when nothing is reported and every source is fresh, which is no guarantee that the road is free."`
+	Lamp       string          `json:"lamp" enum:"green,amber,red,unknown" doc:"The lamp over every situation in the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway rule, first match: red for a closed carriageway (a situation graded road_closed, or a closure not graded as one closed lane), a hazard on the road, a jam with a delay of 30 minutes or more, or severe weather reported as a traffic situation (graded major); unknown when a roads family the key may not read was left out (meta.partial); amber for any other jam, roadworks or a lane restriction of any severity, any other reported situation (an accident without a closure, also one that cannot be mapped or graded) or a missing or stale source (meta.freshness); green when nothing is reported and every source is fresh, which is no guarantee that the road is free. The official weather warnings are not read here; they are answered by getWeatherRisk."`
 	LampReason *string         `json:"lampReason" nullable:"true" enum:"road_closed,safety,long_jam,severe_weather,partial,jam,narrowing,warning,stale_source" doc:"Why the lamp has its colour, the first reason of the rule that applies; null for green. Open enumeration."`
 	Situations []RoadSituation `json:"situations" doc:"Ordered by position along the road (those that cannot be placed last), then severity descending, then id."`
 }
@@ -209,7 +209,7 @@ type MotorwayOutput struct {
 
 func registerMotorwayConditions(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "What is happening on a motorway"
-	op.Description = "The active situations on one road, ordered by their position along it, with the lamp over every situation that answers the question. MCP counterpart: road status. Needs the scope roads."
+	op.Description = "The active situations on one road, ordered by their position along it, with the lamp over every situation on the road in the asked direction. MCP counterpart: road status. Needs the scope roads."
 	featureResponses(api, &op, "No road with this reference (not-found), or the operation is switched off on this instance (feature-disabled).")
 	huma.Register(api, op, func(ctx context.Context, in *MotorwayInput) (*MotorwayOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
@@ -255,7 +255,7 @@ type Area struct {
 // RoadConditionsData is the answer of listRoadConditions.
 type RoadConditionsData struct {
 	Area       Area            `json:"area"`
-	Lamp       string          `json:"lamp" enum:"green,amber,red,unknown" doc:"The lamp over every situation that answers the question, not only this page, by the platform's motorway rule, first match: red for a closed carriageway, a safety message (a hazard, a major accident), a jam with a delay of 30 minutes or more, or severe weather (graded major); unknown when a roads family the key may not read was left out (meta.partial); amber for any other jam, narrowing roadworks, any other reported situation (also one that cannot be mapped or graded) or a missing or stale source (meta.freshness); green when nothing is reported and every source is fresh, which is no guarantee that the road is free."`
+	Lamp       string          `json:"lamp" enum:"green,amber,red,unknown" doc:"The lamp over every situation in the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway rule, first match: red for a closed carriageway (a situation graded road_closed, or a closure not graded as one closed lane), a hazard on the road, a jam with a delay of 30 minutes or more, or severe weather reported as a traffic situation (graded major); unknown when a roads family the key may not read was left out (meta.partial); amber for any other jam, roadworks or a lane restriction of any severity, any other reported situation (an accident without a closure, also one that cannot be mapped or graded) or a missing or stale source (meta.freshness); green when nothing is reported and every source is fresh, which is no guarantee that the road is free. The official weather warnings are not read here; they are answered by getWeatherRisk."`
 	LampReason *string         `json:"lampReason" nullable:"true" enum:"road_closed,safety,long_jam,severe_weather,partial,jam,narrowing,warning,stale_source" doc:"Why the lamp has its colour, the first reason of the rule that applies; null for green. Open enumeration."`
 	Situations []RoadSituation `json:"situations" doc:"Ordered by severity descending, then distance, then id."`
 }
@@ -289,7 +289,7 @@ type RoadConditionsOutput struct {
 
 func registerRoadConditions(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "What is happening on the roads near a position"
-	op.Description = "The active situations within the radius of a position on every road class held, by severity descending, then distance, then id, with the lamp over every situation that answers the question. MCP counterpart: road status (area form). Needs the scope roads."
+	op.Description = "The active situations within the radius of a position on every road class held, by severity descending, then distance, then id, with the lamp over every situation within the radius. MCP counterpart: road status (area form). Needs the scope roads."
 	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, in *RoadConditionsInput) (*RoadConditionsOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {

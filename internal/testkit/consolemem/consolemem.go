@@ -1,6 +1,8 @@
 // Package consolemem is an in-memory console.Store for tests: it keeps the
 // rules of the access store's console tables (a code is used once and only
-// before it expires) and records every audited change.
+// before it expires, used and expired codes are dropped when a new one is
+// offered, a signature counter only moves forward) and records every
+// audited change.
 package consolemem
 
 import (
@@ -41,11 +43,23 @@ func (s *Store) Changes() []auth.Change {
 	return append([]auth.Change(nil), s.Audit...)
 }
 
+// Codes returns how many enrolment codes the store holds, open or not.
+func (s *Store) Codes() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.enrolments)
+}
+
 func (s *Store) OfferEnrolment(_ context.Context, c auth.Change, codeMAC []byte, owner string, expires time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.Err != nil {
 		return s.Err
+	}
+	for mac, e := range s.enrolments {
+		if e.used || !c.At.Before(e.expires) {
+			delete(s.enrolments, mac)
+		}
 	}
 	s.enrolments[string(codeMAC)] = enrolment{owner: owner, expires: expires}
 	s.Audit = append(s.Audit, c)
@@ -108,8 +122,8 @@ func (s *Store) SignedIn(_ context.Context, c auth.Change, id []byte, signCount 
 		return s.Err
 	}
 	p, ok := s.passkeys[string(id)]
-	if !ok {
-		return console.ErrUnknownPasskey
+	if !ok || (signCount <= p.SignCount && (signCount != 0 || p.SignCount != 0)) {
+		return console.ErrCounter
 	}
 	at := c.At
 	p.SignCount, p.Flags, p.LastUsedAt = signCount, flags, &at

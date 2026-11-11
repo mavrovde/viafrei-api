@@ -34,6 +34,7 @@ alter table access.audit add constraint audit_action_check
                       'console_enrolment', 'console_passkey_added', 'console_passkey_removed', 'console_sign_in'));
 
 grant select, insert, update, delete on access.console_passkey to api_access;
-grant select, insert, update on access.console_enrolment to api_access;
+-- Used and expired enrolment codes are deleted when a new one is offered.
+grant select, insert, update, delete on access.console_enrolment to api_access;
 
 insert into access.schema_version (version) values (3);

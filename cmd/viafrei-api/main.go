@@ -322,13 +322,14 @@ func consoleCmd(args, environ []string, stdout, stderr io.Writer) int {
 // startConsole serves the owner console on admin.listen_addr, which must be
 // a loopback address, and returns the function that stops it.
 func startConsole(ctx context.Context, cfg *config.Config, addr string, as *accessstore.Store, log *slog.Logger) (func(), error) {
+	clog := log.With("listener", "console")
 	// The settings New checks are the ones config.Load has validated.
 	h := invariant.Must(consoleweb.New(consoleweb.Deps{
 		Settings: wire.ConsoleWeb(cfg),
 		Guard:    console.NewGuard(wire.ConsoleGuard(cfg), nil, nil),
 		Owners:   console.NewOwners(wire.ConsoleOwners(cfg), as, nil, nil),
 		Keys:     auth.NewKeys(wire.AuthSettings(cfg), as, nil, nil),
-		Logger:   log.With("listener", "console"),
+		Logger:   clog,
 	}))
 	l, err := consoleweb.Listen(ctx, addr)
 	if err != nil {
@@ -338,6 +339,7 @@ func startConsole(ctx context.Context, cfg *config.Config, addr string, as *acce
 	srv := &http.Server{
 		Handler: h, ReadHeaderTimeout: cfg.Server.ReadHeaderTimeout, ReadTimeout: cfg.Server.ReadTimeout,
 		WriteTimeout: cfg.Server.WriteTimeout, IdleTimeout: cfg.Server.IdleTimeout, MaxHeaderBytes: cfg.Server.MaxHeaderBytes,
+		ErrorLog: consoleweb.ErrorLog(clog),
 	}
 	go func() { _ = srv.Serve(l) }()
 	log.Info("console listening", "addr", l.Addr().String())

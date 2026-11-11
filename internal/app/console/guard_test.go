@@ -44,8 +44,8 @@ func (r *limitedReader) Read(b []byte) (int, error) {
 func TestTheDefaultsAreTheSystemsOwn(t *testing.T) {
 	req.Covers(t, "THR-018")
 	g := console.NewGuard(settings, nil, nil)
-	s, err := g.StartSession("owner")
-	if err != nil || len(s.Token) != 43 || len(s.CSRF) != 43 || s.Token == s.CSRF || time.Until(s.Expires) <= 14*time.Minute {
+	s, err := g.StartSession("owner", []byte("owner"))
+	if err != nil || len(s.Token) != 43 || len(s.CSRF) != 43 || s.Token == s.CSRF || time.Until(s.Expires) <= 14*time.Minute || string(s.Passkey) != "owner" {
 		t.Fatalf("session %+v, %v", s, err)
 	}
 }
@@ -122,11 +122,11 @@ func TestSessionsExpireEndAndAreBounded(t *testing.T) {
 	req.Covers(t, "THR-018")
 	c := newClock()
 	g := console.NewGuard(settings, nil, c.now)
-	first, _ := g.StartSession("a")
+	first, _ := g.StartSession("a", []byte("a"))
 	c.t = c.t.Add(time.Second)
-	second, _ := g.StartSession("b")
+	second, _ := g.StartSession("b", []byte("b"))
 	c.t = c.t.Add(time.Second)
-	third, _ := g.StartSession("c")
+	third, _ := g.StartSession("c", []byte("c"))
 	if _, err := g.Session(first.Token); !errors.Is(err, console.ErrNoSession) {
 		t.Fatalf("the oldest is ended beyond max_sessions: %v", err)
 	}
@@ -171,8 +171,8 @@ func TestAConfirmationIsBoundToItsSession(t *testing.T) {
 	req.Covers(t, "THR-018")
 	c := newClock()
 	g := console.NewGuard(settings, nil, c.now)
-	a, _ := g.StartSession("a")
-	b, _ := g.StartSession("b")
+	a, _ := g.StartSession("a", []byte("a"))
+	b, _ := g.StartSession("b", []byte("b"))
 	id, _ := g.PutConfirm(a, "change")
 	if _, err := g.TakeConfirm(b, id); !errors.Is(err, console.ErrUnknown) {
 		t.Fatalf("another session: %v", err)
@@ -195,14 +195,14 @@ func TestAConfirmationIsBoundToItsSession(t *testing.T) {
 func TestAFailingRandomSourceIsAnError(t *testing.T) {
 	req.Covers(t, "THR-018")
 	g := console.NewGuard(settings, failingReader{}, nil)
-	if _, err := g.StartSession("a"); err == nil {
+	if _, err := g.StartSession("a", []byte("a")); err == nil {
 		t.Fatal("session without entropy")
 	}
 	if _, err := g.PutChallenge("signin", nil); err == nil {
 		t.Fatal("challenge without entropy")
 	}
 	g = console.NewGuard(settings, &limitedReader{n: 1}, nil)
-	if _, err := g.StartSession("a"); err == nil {
+	if _, err := g.StartSession("a", []byte("a")); err == nil {
 		t.Fatal("a session needs its CSRF token too")
 	}
 }

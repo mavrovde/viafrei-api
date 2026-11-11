@@ -64,7 +64,10 @@ type Enrolment struct {
 var (
 	ErrCode           = errors.New("console: unknown, used or expired enrolment code")
 	ErrUnknownPasskey = errors.New("console: no such passkey")
-	ErrInput          = errors.New("console: invalid request")
+	// ErrCounter is a sign-in whose signature counter does not advance the
+	// stored one: a replay, a cloned authenticator or a concurrent sign-in.
+	ErrCounter = errors.New("console: the signature counter did not advance")
+	ErrInput   = errors.New("console: invalid request")
 )
 
 // Store is the access store's console side. Every write and its audit record
@@ -79,6 +82,8 @@ type Store interface {
 	// Passkey returns one passkey, or ErrUnknownPasskey.
 	Passkey(ctx context.Context, id []byte) (Passkey, error)
 	// SignedIn records a sign-in: the new counter and flags, the instant.
+	// The counter only moves forward (a passkey that keeps no counter stays
+	// at 0); any other write, or a passkey that is gone, is ErrCounter.
 	SignedIn(ctx context.Context, c auth.Change, id []byte, signCount uint32, flags byte) error
 	Passkeys(ctx context.Context) ([]Passkey, error)
 	// RemovePasskey removes one passkey, or answers ErrUnknownPasskey.
@@ -180,6 +185,21 @@ func (o *Owners) SignedIn(ctx context.Context, p Passkey, signCount uint32, flag
 
 // Passkeys lists every enrolled passkey.
 func (o *Owners) Passkeys(ctx context.Context) ([]Passkey, error) { return o.store.Passkeys(ctx) }
+
+// PasskeysOf lists the passkeys owner holds.
+func (o *Owners) PasskeysOf(ctx context.Context, owner string) ([]Passkey, error) {
+	all, err := o.store.Passkeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var held []Passkey
+	for _, p := range all {
+		if p.Owner == owner {
+			held = append(held, p)
+		}
+	}
+	return held, nil
+}
 
 // Remove removes the passkey named name (its base64url credential id).
 func (o *Owners) Remove(ctx context.Context, name, actor string) error {

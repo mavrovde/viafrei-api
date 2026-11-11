@@ -3,17 +3,21 @@ package console_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"net/url"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -36,6 +40,30 @@ const (
 	plantedPepper = "pepper-PLANTED-0123456789abcdefghij"
 	plantedKey    = "vf_test_" + "PLANTEDKEY" + "abcdefghijklmnop"
 )
+
+// lockedBuffer is a buffer a server goroutine writes while a test reads it.
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+// otherLoopback is 127.b.c.d:port, an address of 127.0.0.0/8 other than
+// 127.0.0.1, built from its bytes.
+func otherLoopback(b, c, d byte, port uint16) string {
+	return netip.AddrPortFrom(netip.AddrFrom4([4]byte{127, b, c, d}), port).String()
+}
 
 // switchReader is a random source a test can make fail.
 type switchReader struct{ fail atomic.Bool }
@@ -151,7 +179,14 @@ func (l *lifecycle) last() string {
 // failingStore fails the named calls only.
 type failingStore struct {
 	*consolemem.Store
-	signedIn, add error
+	signedIn, add, passkeys error
+}
+
+func (f failingStore) Passkeys(ctx context.Context) ([]console.Passkey, error) {
+	if f.passkeys != nil {
+		return nil, f.passkeys
+	}
+	return f.Store.Passkeys(ctx)
 }
 
 func (f failingStore) SignedIn(ctx context.Context, c auth.Change, id []byte, n uint32, fl byte) error {
@@ -402,7 +437,7 @@ func TestTheConsoleAnswersTheLoopbackAndItsOwnHostOnly(t *testing.T) {
 	if w := r.do(request{method: http.MethodPost, path: "/signin/begin", body: "{}", contentType: "application/json", headers: map[string]string{"Sec-Fetch-Site": "same-origin"}}); w.Code != http.StatusOK {
 		t.Fatalf("same-origin: %d", w.Code)
 	}
-	for _, ok := range []string{"127.0.0.1:1", "[::1]:1", "[::ffff:127.0.0.1]:1"} {
+	for _, ok := range []string{"127.0.0.1:1", otherLoopback(8, 9, 10, 1), "[::1]:1", "[::ffff:127.0.0.1]:1"} {
 		if !consoleweb.Loopback(ok) {
 			t.Fatalf("%s is the loopback", ok)
 		}
@@ -606,9 +641,23 @@ func TestTheLifecyclesRefusalsAreShownWithoutTheStoresDetail(t *testing.T) {
 		}
 	}
 	r.keys.listErr = [3]error{}
-	r.store.Err = errors.New("down")
+	r.fail.passkeys = errors.New("down")
 	if w := r.do(request{method: http.MethodGet, path: "/", cookie: cookie}); w.Code != http.StatusInternalServerError {
 		t.Fatalf("passkeys: %d", w.Code)
+	}
+	r.fail.passkeys = nil
+	// A store that cannot say whether the session's passkey still exists
+	// admits nothing, and ends no session.
+	r.store.Err = errors.New("down")
+	if w := r.do(request{method: http.MethodGet, path: "/", cookie: cookie}); w.Code != http.StatusInternalServerError {
+		t.Fatalf("page, store down: %d", w.Code)
+	}
+	if w := r.do(request{method: http.MethodPost, path: "/act/prune", body: form(csrf), contentType: formType, cookie: cookie}); w.Code != http.StatusInternalServerError {
+		t.Fatalf("change, store down: %d", w.Code)
+	}
+	r.store.Err = nil
+	if w := r.do(request{method: http.MethodGet, path: "/", cookie: cookie}); w.Code != http.StatusOK {
+		t.Fatalf("session kept: %d", w.Code)
 	}
 }
 
@@ -780,6 +829,13 @@ func TestInternalFailuresAnswer500WithoutDetail(t *testing.T) {
 	if w := r.postJSON("/signin/finish", map[string]any{"id": b.ID, "credential": a.Get(b.Options)}); w.Code != 500 || strings.Contains(w.Body.String(), "PLANTED") {
 		t.Fatalf("signed in: %d %s", w.Code, w.Body)
 	}
+	// The store refuses the counter (a sign-in that raced this one, or a
+	// counter that did not advance): a refused sign-in, not a failure.
+	r.fail.signedIn = console.ErrCounter
+	b = r.begin("/signin/begin", struct{}{})
+	if w := r.postJSON("/signin/finish", map[string]any{"id": b.ID, "credential": a.Get(b.Options)}); w.Code != http.StatusUnauthorized || len(w.Result().Cookies()) != 0 {
+		t.Fatalf("counter refused: %d %s", w.Code, w.Body)
+	}
 	r.fail.signedIn = nil
 	// No entropy for the session.
 	b = r.begin("/signin/begin", struct{}{})
@@ -813,12 +869,107 @@ func TestInternalFailuresAnswer500WithoutDetail(t *testing.T) {
 		t.Fatalf("confirmation: %d", w.Code)
 	}
 	r.grand.fail.Store(false)
-	// The owner who already has a passkey enrols another under the same handle.
+	// The owner who already has a passkey enrols another under the same
+	// handle, with the passkeys the owner holds excluded; bob's is not.
 	code, _ = r.owners.Offer(ctx, "alice", "ops")
+	r.fail.passkeys = errors.New("PLANTED-DETAIL")
+	if w := r.postJSON("/enrol/begin", map[string]string{"code": code}); w.Code != 500 || strings.Contains(w.Body.String(), "PLANTED") {
+		t.Fatalf("passkeys for the exclusions: %d %s", w.Code, w.Body)
+	}
+	r.fail.passkeys = nil
+	bob := r.enrol("bob")
 	second := passkey.New(origin, "localhost")
 	b = r.begin("/enrol/begin", map[string]string{"code": code})
+	var opts struct {
+		PublicKey struct {
+			Exclude []struct {
+				Type string `json:"type"`
+				ID   string `json:"id"`
+			} `json:"excludeCredentials"`
+		} `json:"publicKey"`
+	}
+	if err := json.Unmarshal(b.Options, &opts); err != nil {
+		t.Fatal(err)
+	}
+	ex := opts.PublicKey.Exclude
+	if len(ex) != 1 || ex[0].Type != "public-key" || ex[0].ID != base64.RawURLEncoding.EncodeToString(a.ID) || ex[0].ID == base64.RawURLEncoding.EncodeToString(bob.ID) {
+		t.Fatalf("excluded %+v", ex)
+	}
 	if w := r.postJSON("/enrol/finish", map[string]any{"id": b.ID, "credential": second.Create(b.Options)}); w.Code != 200 || !bytes.Equal(second.Handle, a.Handle) {
 		t.Fatalf("second passkey: %d", w.Code)
+	}
+}
+
+// TestRemovingAPasskeyEndsItsSessions: a session lasts no longer than the
+// passkey it was signed in with; another passkey's session is untouched.
+func TestRemovingAPasskeyEndsItsSessions(t *testing.T) {
+	req.Covers(t, "THR-018")
+	r := newRig(t)
+	ctx := context.Background()
+	a := r.enrol("alice")
+	b := r.enrol("bob")
+	cookie, csrf := r.signIn(a)
+	other, otherCSRF := r.signIn(b)
+	if err := r.owners.Remove(ctx, base64.RawURLEncoding.EncodeToString(a.ID), "ops"); err != nil {
+		t.Fatal(err)
+	}
+	if w := r.do(request{method: http.MethodPost, path: "/act/prune", body: form(csrf), contentType: formType, cookie: cookie}); w.Code != http.StatusUnauthorized {
+		t.Fatalf("change after removal: %d %s", w.Code, w.Body)
+	}
+	if !strings.Contains(r.logs.String(), "its passkey was removed") {
+		t.Fatal("the ended session was not logged")
+	}
+	// The session is gone, not merely refused: a page sends to sign-in.
+	if w := r.do(request{method: http.MethodGet, path: "/", cookie: cookie}); w.Code != http.StatusSeeOther {
+		t.Fatalf("page after removal: %d", w.Code)
+	}
+	if _, err := r.guard.Session(cookie); !errors.Is(err, console.ErrNoSession) {
+		t.Fatalf("session kept: %v", err)
+	}
+	if id := r.ask(other, otherCSRF, "prune"); id == "" {
+		t.Fatal("another passkey's session ended")
+	}
+	// A page is refused the same way once its passkey goes.
+	if err := r.owners.Remove(ctx, base64.RawURLEncoding.EncodeToString(b.ID), "ops"); err != nil {
+		t.Fatal(err)
+	}
+	if w := r.do(request{method: http.MethodGet, path: "/audit", cookie: other}); w.Code != http.StatusSeeOther {
+		t.Fatalf("page after removal: %d", w.Code)
+	}
+}
+
+// TestTheServerErrorLogCarriesNoAddress: net/http's own error lines (a
+// panic, a TLS handshake error) name the peer; the console's error log
+// takes every address out.
+func TestTheServerErrorLogCarriesNoAddress(t *testing.T) {
+	req.Covers(t, "THR-018", "SEC-012")
+	var buf bytes.Buffer
+	el := consoleweb.ErrorLog(slog.New(slog.NewJSONHandler(&buf, nil)))
+	el.Printf("http: TLS handshake error from 192.0.2.77:51234: EOF")
+	el.Printf("http: panic serving [::1]:40404: boom")
+	el.Printf("bare 2001:db8::7 and fe80::1%%lo0 and 198.51.100.9")
+	got := buf.String()
+	for _, needle := range []string{"192.0.2.77", "51234", "::1", "40404", "2001:db8", "fe80", "198.51.100.9"} {
+		if strings.Contains(got, needle) {
+			t.Fatalf("%q in %s", needle, got)
+		}
+	}
+	if strings.Count(got, `"msg":"console http server"`) != 3 || !strings.Contains(got, "TLS handshake error from [address]: EOF") || !strings.Contains(got, "boom") {
+		t.Fatalf("log %s", got)
+	}
+	// A real panic, served over TCP: the client address is the loopback.
+	var served lockedBuffer
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { panic("PLANTED-PANIC") }))
+	srv.Config.ErrorLog = consoleweb.ErrorLog(slog.New(slog.NewJSONHandler(&served, nil)))
+	srv.Start()
+	hr, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
+	if resp, err := http.DefaultClient.Do(hr); err == nil {
+		_ = resp.Body.Close()
+	}
+	srv.Close()
+	got = served.String()
+	if !strings.Contains(got, "PLANTED-PANIC") || strings.Contains(got, "127.0.0.1") {
+		t.Fatalf("panic log %s", got)
 	}
 }
 
@@ -901,6 +1052,19 @@ func TestListenRefusesAnyAddressButTheLoopback(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = l.Close()
+	// The whole of 127.0.0.0/8 is the loopback. Linux answers on all of it;
+	// macOS configures 127.0.0.1 alone unless an alias is added, and there
+	// the bind itself is refused by the system, before Listen's own check.
+	other := otherLoopback(0, 0, 2, 0)
+	l, err = consoleweb.Listen(ctx, other)
+	switch {
+	case err == nil:
+		_ = l.Close()
+	case runtime.GOOS == "darwin" && errors.Is(err, syscall.EADDRNOTAVAIL):
+		t.Logf("%s: no such address on this macOS host; proven where the range is configured", other)
+	default:
+		t.Fatalf("%s: %v", other, err)
+	}
 	if _, err := consoleweb.Listen(ctx, "0.0.0.0:0"); !errors.Is(err, consoleweb.ErrNotLoopback) {
 		t.Fatalf("the wildcard: %v", err)
 	}

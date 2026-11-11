@@ -37,9 +37,11 @@ var (
 )
 
 // Session is a signed-in owner. Token is the cookie value; CSRF is the token
-// every change form must carry.
+// every change form must carry. Passkey is the credential id the owner
+// signed in with: the session lasts no longer than that passkey.
 type Session struct {
 	Token, CSRF, Owner string
+	Passkey            []byte
 	Expires            time.Time
 }
 
@@ -153,9 +155,9 @@ func (g *Guard) TakeChallenge(id, kind string) (any, error) {
 	return g.take(id, "challenge:"+kind, "")
 }
 
-// StartSession signs owner in. Beyond admin.max_sessions the session that
-// ends first is ended now.
-func (g *Guard) StartSession(owner string) (Session, error) {
+// StartSession signs owner in with the passkey of credential id passkey.
+// Beyond admin.max_sessions the session that ends first is ended now.
+func (g *Guard) StartSession(owner string, passkey []byte) (Session, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if len(g.sessions) >= g.s.MaxSessions {
@@ -175,7 +177,7 @@ func (g *Guard) StartSession(owner string) (Session, error) {
 	if err != nil {
 		return Session{}, err
 	}
-	s := Session{Token: tok, CSRF: csrf, Owner: owner, Expires: g.now().Add(g.s.SessionTTL)}
+	s := Session{Token: tok, CSRF: csrf, Owner: owner, Passkey: passkey, Expires: g.now().Add(g.s.SessionTTL)}
 	g.sessions[tok] = s
 	return s, nil
 }

@@ -126,10 +126,26 @@ server-rendered site on a second listener. It is off unless `admin.enabled`
 is set, needs `access.url`, and listens on `admin.listen_addr`, which must
 be a loopback address (`127.0.0.0/8` or `::1`); any other address is
 refused at boot, and the listener checks again when it opens. It is never
-on the public listener. Reach it from your machine through an SSH tunnel to
-the host and open `admin.origin` (`http://localhost:8081` by default) in
-the browser. Every `admin.*` key is in the
+on the public listener. Every `admin.*` key is in the
 [configuration reference](configuration.md).
+
+How to reach it depends on where the service runs. In each case you open
+`admin.origin` (`http://localhost:8081` by default) in the browser.
+
+- **The binary on a host:** forward a local port to the host's loopback
+  over SSH (`ssh -L 8081:127.0.0.1:8081 <host>`).
+- **A container with host networking** (`--network host`, Linux): the
+  container's loopback is the host's, so the same SSH forward works.
+- **A container on a bridge network:** run a forwarder inside the
+  container's own network namespace (for example a sidecar that shares it,
+  `--network container:<name>`). It accepts the SSH-forwarded connection
+  and connects to the console's loopback address there.
+
+Publishing the console's port (`-p`, or `ports:` in Compose) does not work,
+and this is by design. A published port needs the listener on `0.0.0.0`,
+which is refused at boot. The peer the console would see is the bridge
+gateway, which is not a loopback address, so every request would be refused
+too.
 
 The owner signs in with a passkey (WebAuthn, user verification required,
 discoverable credentials). A passkey is enrolled with a one-time code:
@@ -174,11 +190,24 @@ What the console holds every request to:
   held.
 - **A sign-in limit.** At most `admin.signin_limit` sign-in and enrolment
   attempts (begun or failed) per `admin.signin_window`, from all browsers
-  together; one more is answered `429` with `Retry-After`.
+  together; one more is answered `429` with `Retry-After`. The limit is
+  global, not per client, because every client is on the loopback. Any
+  local process that can reach the console can use up the limit and lock
+  the owner out until the window ends, which is a local denial of service.
+  It cannot sign in. If that happens, find the process on the host.
 - **A passkey that verifies.** The client data must name `admin.origin`,
   the authenticator data `admin.rp_id`, the user must be verified, the
   user handle must be the passkey owner's, and a signature counter that
-  goes backwards (a cloned authenticator) is refused.
+  does not move forward (a cloned authenticator, a replay, a concurrent
+  sign-in) is refused. The store applies the same rule when it records the
+  sign-in. An authenticator that keeps no counter answers 0 every time and
+  is accepted.
+- **A session no longer than its passkey.** A session is ended as soon as
+  the passkey it was signed in with is removed; its next request is
+  answered as signed out.
+- **One passkey per authenticator.** Enrolling a further passkey for an
+  owner excludes the passkeys the owner already holds, so an authenticator
+  that has one is not enrolled twice.
 - **A strict page.** `Content-Security-Policy` allows only the console's
   own script and style and no framing; every answer is `no-store` and
   sends no referrer.
@@ -186,9 +215,25 @@ What the console holds every request to:
 No page, log line or audit record of the console carries the pepper, a
 MAC, an enrolment code, a session or CSRF token, or a client address; the
 full key appears once, on the page that answers its issue or rotation.
+net/http's own error lines (a recovered panic, a TLS handshake error) name
+the peer, so the console's server writes them with every network address
+removed.
+
+An enrolment code is used once. When a new code is offered, used and
+expired codes are deleted.
 
 Browsers treat `http://localhost` as a secure context, so the default
-origin works through a tunnel. For another name, serve the console behind
-TLS on the loopback, set `admin.origin` to its `https://` origin and
-`admin.rp_id` to that host or a parent domain. A passkey works only under
-the relying-party id it was enrolled with.
+origin works through a tunnel. Older Safari/WebKit releases do not: they
+refuse to store a `Secure` cookie, and so the `__Host-` session cookie,
+from `http://localhost`. There the sign-in succeeds but the next page asks
+you to sign in again. Use a current browser, or serve the console over
+TLS as described next.
+
+For another name, serve the console behind TLS on the loopback, set
+`admin.origin` to its `https://` origin and `admin.rp_id` to that host or a
+parent domain. A passkey works only under the relying-party id it was
+enrolled with. The TLS terminator in front of the console must itself
+accept loopback clients only. The console sees the terminator as its peer,
+so a terminator that listens on another address extends the console to
+whoever can reach that address, and the loopback guarantee no longer
+holds.

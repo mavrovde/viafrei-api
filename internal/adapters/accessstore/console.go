@@ -74,6 +74,11 @@ from access.audit order by audit_id desc limit $1`, limit)
 // OfferEnrolment implements console.Store.
 func (s *Store) OfferEnrolment(ctx context.Context, c auth.Change, codeMAC []byte, owner string, expires time.Time) error {
 	return s.write(ctx, c, nil, nil, func(tx pgx.Tx) error {
+		// Used and expired codes are of no further use; they go with the
+		// offer of a new one.
+		if _, err := tx.Exec(ctx, `delete from access.console_enrolment where used_at is not null or expires_at <= $1`, c.At); err != nil {
+			return err
+		}
 		_, err := tx.Exec(ctx, `insert into access.console_enrolment (code_mac, owner_name, expires_at) values ($1, $2, $3)`,
 			codeMAC, owner, expires)
 		return err
@@ -148,9 +153,13 @@ func (s *Store) Passkeys(ctx context.Context) ([]console.Passkey, error) {
 // SignedIn implements console.Store.
 func (s *Store) SignedIn(ctx context.Context, c auth.Change, id []byte, signCount uint32, flags byte) error {
 	return s.write(ctx, c, nil, nil, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, `update access.console_passkey set sign_count = $2, flags = $3, last_used_at = $4 where credential_id = $1`,
+		// The counter only moves forward; a passkey that keeps no counter
+		// stays at 0. Anything else is refused, also when two sign-ins race.
+		tag, err := tx.Exec(ctx, `
+update access.console_passkey set sign_count = $2, flags = $3, last_used_at = $4
+where credential_id = $1 and (sign_count < $2 or ($2 = 0 and sign_count = 0))`,
 			id, int64(signCount), int16(flags), c.At)
-		return passkeyAffected(tag, err)
+		return oneRow(tag, err, console.ErrCounter)
 	})
 }
 
@@ -158,17 +167,18 @@ func (s *Store) SignedIn(ctx context.Context, c auth.Change, id []byte, signCoun
 func (s *Store) RemovePasskey(ctx context.Context, c auth.Change, id []byte) error {
 	return s.write(ctx, c, nil, nil, func(tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `delete from access.console_passkey where credential_id = $1`, id)
-		return passkeyAffected(tag, err)
+		return oneRow(tag, err, console.ErrUnknownPasskey)
 	})
 }
 
-// passkeyAffected is the outcome of a statement on one passkey.
-func passkeyAffected(tag pgconn.CommandTag, err error) error {
+// oneRow is the outcome of a statement on one passkey: none is an error,
+// no row changed is none.
+func oneRow(tag pgconn.CommandTag, err, none error) error {
 	if err != nil {
 		return err
 	}
 	if tag.RowsAffected() != 1 {
-		return console.ErrUnknownPasskey
+		return none
 	}
 	return nil
 }

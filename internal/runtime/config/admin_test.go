@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"net/netip"
 	"strings"
 	"testing"
 
@@ -57,6 +58,8 @@ func TestTheConsoleRules(t *testing.T) {
 	for _, ok := range [][]string{
 		{"VFAPI_ADMIN_ENABLED=true", "VFAPI_ACCESS_URL=postgres://a@b/c", pepper},
 		{"VFAPI_ADMIN_LISTEN_ADDR=[::1]:9000", "VFAPI_ADMIN_ORIGIN=http://localhost:9000/"},
+		// Any address of 127.0.0.0/8, not 127.0.0.1 alone (built from its bytes).
+		{"VFAPI_ADMIN_LISTEN_ADDR=" + netip.AddrPortFrom(netip.AddrFrom4([4]byte{127, 0, 0, 2}), 9000).String()},
 		{"VFAPI_ADMIN_LISTEN_ADDR=[::1]:9000", "VFAPI_ADMIN_ORIGIN=https://console.example.org", "VFAPI_ADMIN_RP_ID=example.org"},
 	} {
 		if _, err := config.Load(config.Options{Environ: ok}); err != nil {

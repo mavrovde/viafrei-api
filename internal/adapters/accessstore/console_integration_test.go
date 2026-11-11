@@ -99,8 +99,28 @@ func TestThePasskeyLifecycleAgainstTheStore(t *testing.T) {
 	if _, err := o.Enrolment(ctx, code); !errors.Is(err, console.ErrCode) {
 		t.Fatalf("a used code reads as used: %v", err)
 	}
+	// Used and expired codes go with the next offer.
+	conn := owner(t)
+	countCodes := func(where string) int {
+		t.Helper()
+		var n int
+		if err := conn.QueryRow(ctx, `select count(*) from access.console_enrolment where `+where).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	if _, err := conn.Exec(ctx, `insert into access.console_enrolment (code_mac, owner_name, expires_at) values ($1, 'erin', now() - interval '1 minute')`,
+		bytes.Repeat([]byte{0xee}, 32)); err != nil {
+		t.Fatal(err)
+	}
+	if countCodes(`owner_name = 'alice' and used_at is not null`) != 1 || countCodes(`owner_name = 'erin'`) != 1 {
+		t.Fatal("the planted codes are not there")
+	}
 	// A second code carries the owner's handle; the same credential id twice is refused.
 	second, _ := o.Offer(ctx, "alice", "tester")
+	if n, m := countCodes(`owner_name = 'alice' and used_at is not null`), countCodes(`owner_name = 'erin'`); n != 0 || m != 0 {
+		t.Fatalf("a used (%d) or expired (%d) code was kept", n, m)
+	}
 	if e, err := o.Enrolment(ctx, second); err != nil || !bytes.Equal(e.UserHandle, handle) {
 		t.Fatalf("second enrolment %+v %v", e, err)
 	}
@@ -117,6 +137,13 @@ func TestThePasskeyLifecycleAgainstTheStore(t *testing.T) {
 	}
 	if err := o.SignedIn(ctx, got, 9, 0x05); err != nil {
 		t.Fatal(err)
+	}
+	// The counter only moves forward: an equal, a lower and a zero counter
+	// are refused, and the stored one stays.
+	for _, n := range []uint32{9, 8, 0} {
+		if err := o.SignedIn(ctx, got, n, 0x01); !errors.Is(err, console.ErrCounter) {
+			t.Fatalf("counter %d: %v", n, err)
+		}
 	}
 	list, err := o.Passkeys(ctx)
 	if err != nil || len(list) == 0 {
@@ -136,12 +163,11 @@ func TestThePasskeyLifecycleAgainstTheStore(t *testing.T) {
 	if _, err := o.Passkey(ctx, p.ID); !errors.Is(err, console.ErrUnknownPasskey) {
 		t.Fatalf("removed: %v", err)
 	}
-	if err := o.SignedIn(ctx, got, 10, 0); !errors.Is(err, console.ErrUnknownPasskey) {
+	if err := o.SignedIn(ctx, got, 10, 0); !errors.Is(err, console.ErrCounter) {
 		t.Fatalf("sign-in of a removed passkey: %v", err)
 	}
 
 	// Every action was audited; no audit row holds the code, its MAC or a key.
-	conn := owner(t)
 	rows, _ := conn.Query(ctx, `select action, actor, coalesce(reason, ''), row_to_json(a)::text from access.audit a
 		where action like 'console_%' and (actor = 'tester' or actor = 'console:alice') order by audit_id`)
 	type row struct{ action, actor, reason, all string }
@@ -184,6 +210,12 @@ func TestConsoleStoreRefusals(t *testing.T) {
 	bad := "\xff" // not valid UTF-8: the database refuses it as text
 	if err := s.OfferEnrolment(ctx, c, mac, "Not An Owner", now.Add(time.Hour)); err == nil {
 		t.Error("an owner name the table refuses")
+	}
+	// An instant the database cannot hold fails the pruning statement.
+	beyond := c
+	beyond.At = time.Date(300000, 1, 1, 0, 0, 0, 0, time.UTC)
+	if err := s.OfferEnrolment(ctx, beyond, mac, "carol", now.Add(time.Hour)); err == nil {
+		t.Error("an offer at an instant the store cannot hold")
 	}
 	if _, err := s.Enrolment(ctx, mac); !errors.Is(err, console.ErrCode) {
 		t.Errorf("an unknown code: %v", err)

@@ -173,10 +173,17 @@ func (s *server) signInFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Owners.SignedIn(r.Context(), key, cred.Authenticator.SignCount, cred.Flags.MsgpByte()); err != nil {
+		if errors.Is(err, console.ErrCounter) {
+			// Another sign-in with this passkey got there first, or the
+			// counter did not advance: a replay or a cloned authenticator.
+			s.Logger.Warn("console sign-in failed", "error", err.Error())
+			s.failed(w, r, err)
+			return
+		}
 		s.unavailable(w, r, err)
 		return
 	}
-	sess, err := s.Guard.StartSession(key.Owner)
+	sess, err := s.Guard.StartSession(key.Owner, key.ID)
 	if err != nil {
 		s.unavailable(w, r, err)
 		return
@@ -206,14 +213,26 @@ func (s *server) enrolBegin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	o := owner{name: e.Owner, handle: e.UserHandle}
+	// An owner who already holds passkeys has them excluded, so an
+	// authenticator that holds one does not enrol a second.
+	var exclude []protocol.CredentialDescriptor
 	if o.handle == nil {
 		o.handle = make([]byte, 32)
 		if _, err := io.ReadFull(s.Random, o.handle); err != nil {
 			s.unavailable(w, r, err)
 			return
 		}
+	} else {
+		held, err := s.Owners.PasskeysOf(r.Context(), o.name)
+		if err != nil {
+			s.unavailable(w, r, err)
+			return
+		}
+		for _, p := range held {
+			exclude = append(exclude, protocol.CredentialDescriptor{Type: protocol.PublicKeyCredentialType, CredentialID: p.ID})
+		}
 	}
-	options, session := must2(s.webauthn.BeginRegistration(o))
+	options, session := must2(s.webauthn.BeginRegistration(o, webauthn.WithExclusions(exclude)))
 	s.begin(w, r, "enrol", enrolState{session: *session, code: req.Code, owner: o}, options)
 }
 

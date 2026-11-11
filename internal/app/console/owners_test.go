@@ -45,7 +45,11 @@ func TestAnEnrolmentCodeWorksOnceAndBeforeItExpires(t *testing.T) {
 		t.Fatalf("a used code enrols nothing: %v", err)
 	}
 	// A second code for the same owner carries the owner's user handle.
+	// The used code went with this offer.
 	second, _ := o.Offer(ctx, "alice", "ops")
+	if st.Codes() != 1 {
+		t.Fatalf("the used code is kept: %d", st.Codes())
+	}
 	if e, _ := o.Enrolment(ctx, second); string(e.UserHandle) != "handle" {
 		t.Fatalf("handle %q", e.UserHandle)
 	}
@@ -53,8 +57,15 @@ func TestAnEnrolmentCodeWorksOnceAndBeforeItExpires(t *testing.T) {
 	if _, err := o.Enrolment(ctx, second); !errors.Is(err, console.ErrCode) {
 		t.Fatalf("an expired code: %v", err)
 	}
+	// The expired code goes with the offer of the next one.
+	if st.Codes() != 1 {
+		t.Fatalf("codes before %d", st.Codes())
+	}
+	if _, err := o.Offer(ctx, "alice", "ops"); err != nil || st.Codes() != 1 {
+		t.Fatalf("codes after %d %v", st.Codes(), err)
+	}
 	changes := st.Changes()
-	if len(changes) != 3 || changes[0].Action != console.ActionEnrolment || changes[0].Actor != "ops" || changes[0].Reason != "owner alice" ||
+	if len(changes) != 4 || changes[0].Action != console.ActionEnrolment || changes[0].Actor != "ops" || changes[0].Reason != "owner alice" ||
 		changes[1].Action != console.ActionPasskeyAdded || changes[1].Actor != "console:alice" || changes[1].Reason != "passkey "+console.Fingerprint(p.ID) {
 		t.Fatalf("audit %+v", changes)
 	}
@@ -112,6 +123,12 @@ func TestSignInsAndRemovalsAreAudited(t *testing.T) {
 	if err != nil || len(list) != 1 || list[0].SignCount != 7 || list[0].Flags != 0x45 || !list[0].LastUsedAt.Equal(c.t) {
 		t.Fatalf("passkeys %+v %v", list, err)
 	}
+	// The counter only moves forward.
+	for _, n := range []uint32{7, 6, 0} {
+		if err := o.SignedIn(ctx, got, n, 0x45); !errors.Is(err, console.ErrCounter) {
+			t.Fatalf("counter %d: %v", n, err)
+		}
+	}
 	if err := o.Remove(ctx, got.Name(), "ops"); err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +173,41 @@ func TestStoreFailuresReachTheCaller(t *testing.T) {
 	if _, err := o.Passkey(ctx, []byte("x")); !errors.Is(err, console.ErrUnknownPasskey) {
 		t.Fatal(err)
 	}
-	if err := o.SignedIn(ctx, console.Passkey{ID: []byte("x")}, 1, 0); !errors.Is(err, console.ErrUnknownPasskey) {
+	// A passkey that is gone records no sign-in: the sign-in is refused.
+	if err := o.SignedIn(ctx, console.Passkey{ID: []byte("x")}, 1, 0); !errors.Is(err, console.ErrCounter) {
 		t.Fatal(err)
+	}
+	st.Err = errors.New("down")
+	if _, err := o.PasskeysOf(ctx, "alice"); !errors.Is(err, st.Err) {
+		t.Fatal(err)
+	}
+}
+
+// TestAPasskeyWithoutACounterStaysAtZero: an authenticator that keeps no
+// signature counter answers 0 every time and is accepted; PasskeysOf lists
+// one owner's passkeys only.
+func TestAPasskeyWithoutACounterStaysAtZero(t *testing.T) {
+	req.Covers(t, "THR-018")
+	ctx := context.Background()
+	st := consolemem.New()
+	o := console.NewOwners(ownerSettings, st, nil, nil)
+	for i, owner := range []string{"alice", "bob", "alice"} {
+		code, _ := o.Offer(ctx, owner, "ops")
+		if err := o.Enrol(ctx, code, console.Passkey{ID: []byte{byte(i)}, Owner: owner}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	zero := console.Passkey{ID: []byte{1}, Owner: "bob"}
+	for range 2 {
+		if err := o.SignedIn(ctx, zero, 0, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	held, err := o.PasskeysOf(ctx, "alice")
+	if err != nil || len(held) != 2 || held[0].Owner != "alice" || held[1].Owner != "alice" {
+		t.Fatalf("held %+v %v", held, err)
+	}
+	if none, err := o.PasskeysOf(ctx, "carol"); err != nil || len(none) != 0 {
+		t.Fatalf("none %+v %v", none, err)
 	}
 }

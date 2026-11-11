@@ -13,12 +13,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-webauthn/webauthn/protocol"
@@ -188,13 +191,27 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-// session returns the request's live session.
+// session returns the request's live session. A session lasts no longer
+// than the passkey it was signed in with: once that passkey is removed, the
+// session is ended and answers ErrNoSession.
 func (s *server) session(r *http.Request) (console.Session, error) {
 	c, err := r.Cookie(CookieName)
 	if err != nil {
 		return console.Session{}, console.ErrNoSession
 	}
-	return s.Guard.Session(c.Value)
+	sess, err := s.Guard.Session(c.Value)
+	if err != nil {
+		return console.Session{}, err
+	}
+	if _, err := s.Owners.Passkey(r.Context(), sess.Passkey); err != nil {
+		if errors.Is(err, console.ErrUnknownPasskey) {
+			s.Guard.EndSession(sess.Token)
+			s.Logger.Info("console session ended: its passkey was removed", "owner", sess.Owner, "passkey", console.Fingerprint(sess.Passkey))
+			return console.Session{}, console.ErrNoSession
+		}
+		return console.Session{}, err
+	}
+	return sess, nil
 }
 
 type sessionHandler func(http.ResponseWriter, *http.Request, console.Session)
@@ -204,8 +221,12 @@ type sessionHandler func(http.ResponseWriter, *http.Request, console.Session)
 func (s *server) withSession(next sessionHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sess, err := s.session(r)
-		if err != nil {
+		if errors.Is(err, console.ErrNoSession) {
 			http.Redirect(w, r, "/signin", http.StatusSeeOther)
+			return
+		}
+		if err != nil {
+			s.unavailable(w, r, err)
 			return
 		}
 		next(w, r, sess)
@@ -216,8 +237,12 @@ func (s *server) withSession(next sessionHandler) http.HandlerFunc {
 func (s *server) withChange(next sessionHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sess, err := s.session(r)
-		if err != nil {
+		if errors.Is(err, console.ErrNoSession) {
 			s.refuse(w, r, http.StatusUnauthorized, "sign in first")
+			return
+		}
+		if err != nil {
+			s.unavailable(w, r, err)
 			return
 		}
 		if err := r.ParseForm(); err != nil {
@@ -245,6 +270,25 @@ func (s *server) signOut(w http.ResponseWriter, _ *http.Request, sess console.Se
 // retryAfter writes the Retry-After header in whole seconds, at least one.
 func retryAfter(w http.ResponseWriter, d time.Duration) {
 	w.Header().Set("Retry-After", strconv.Itoa(max(1, int((d+time.Second-1)/time.Second))))
+}
+
+// address matches a network address with or without its port: IPv4, an IPv6
+// address in brackets, and a bare IPv6 address.
+var address = regexp.MustCompile(`\[[^\]\s]*\](:[0-9]+)?|[0-9]{1,3}(\.[0-9]{1,3}){3}(:[0-9]+)?|[0-9A-Fa-f]*(:[0-9A-Fa-f]*){2,}(%[0-9A-Za-z]+)?`)
+
+// ErrorLog is the console server's net/http error log ("http: panic
+// serving <peer>", "TLS handshake error from <peer>", …): each line goes to
+// logger with every network address taken out, so no client address
+// reaches a log line (THR-018).
+func ErrorLog(logger *slog.Logger) *log.Logger {
+	return log.New(addressFree{logger}, "", 0)
+}
+
+type addressFree struct{ logger *slog.Logger }
+
+func (a addressFree) Write(p []byte) (int, error) {
+	a.logger.Error("console http server", "message", address.ReplaceAllString(strings.TrimSpace(string(p)), "[address]"))
+	return len(p), nil
 }
 
 // isLoopbackListener reports whether addr is a loopback address.

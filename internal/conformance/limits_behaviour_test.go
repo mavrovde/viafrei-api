@@ -104,6 +104,11 @@ func addressSettings(t *testing.T, c *config.Config) string {
 	return fmt.Sprintf("%+v", wire.AddressSettings(c))
 }
 
+func sharedBudget(t *testing.T, c *config.Config) string {
+	t.Helper()
+	return fmt.Sprintf("%+v", wire.SharedBudget(c))
+}
+
 func meteringSettings(t *testing.T, c *config.Config) string {
 	t.Helper()
 	return fmt.Sprintf("%+v", wire.MeteringSettings(c))
@@ -120,28 +125,34 @@ func limitBehaviours() map[string]behaviour {
 			// One forwarded address for all: the untrusted peer is the client.
 			return anonymousCodes(t, c)
 		}},
-		"ratelimit.headers":             {"false", keyed},
-		"ratelimit.ip_state_ttl":        {"2m", addressSettings},
-		"ratelimit.ip_track_size":       {"500", addressSettings},
-		"ratelimit.ipv6_prefix":         {"128", sixAddressesOfOneSubnet},
-		"quota.reset_tz":                {"UTC", func(t *testing.T, c *config.Config) string { return wire.QuotaZone(c).String() }},
-		"tiers.critical.reserved":       {"2", admissionSettings},
-		"tiers.critical.queue_len":      {"8", admissionSettings},
-		"tiers.critical.queue_max_wait": {"500ms", admissionSettings},
-		"tiers.standard.reserved":       {"1", admissionSettings},
-		"tiers.standard.queue_len":      {"8", admissionSettings},
-		"tiers.standard.queue_max_wait": {"300ms", admissionSettings},
-		"tiers.bulk.reserved":           {"1", admissionSettings},
-		"tiers.bulk.queue_len":          {"8", admissionSettings},
-		"tiers.bulk.queue_max_wait":     {"100ms", admissionSettings},
-		"tiers.bulk.max_inflight":       {"2", admissionSettings},
-		"tiers.per_key_inflight":        {"2", admissionSettings},
-		"admission.aging_after":         {"1s", admissionSettings},
-		"admission.ewma_alpha":          {"0.5", admissionSettings},
-		"admission.shed_status":         {"503", keyed},
-		"metering.flush_interval":       {"10s", meteringSettings},
-		"metering.max_keys_buffered":    {"200", meteringSettings},
-		"metering.write_timeout":        {"500ms", meteringSettings},
-		"metering.retention_days":       {"90", authSettings},
+		"ratelimit.headers":                  {"false", keyed},
+		"ratelimit.ip_state_ttl":             {"2m", addressSettings},
+		"ratelimit.ip_track_size":            {"500", addressSettings},
+		"ratelimit.ipv6_prefix":              {"128", sixAddressesOfOneSubnet},
+		"quota.reset_tz":                     {"UTC", func(t *testing.T, c *config.Config) string { return wire.QuotaZone(c).String() }},
+		"tiers.critical.reserved":            {"2", admissionSettings},
+		"tiers.critical.queue_len":           {"8", admissionSettings},
+		"tiers.critical.queue_max_wait":      {"500ms", admissionSettings},
+		"tiers.standard.reserved":            {"1", admissionSettings},
+		"tiers.standard.queue_len":           {"8", admissionSettings},
+		"tiers.standard.queue_max_wait":      {"300ms", admissionSettings},
+		"tiers.bulk.reserved":                {"1", admissionSettings},
+		"tiers.bulk.queue_len":               {"8", admissionSettings},
+		"tiers.bulk.queue_max_wait":          {"100ms", admissionSettings},
+		"tiers.bulk.max_inflight":            {"2", admissionSettings},
+		"tiers.per_key_inflight":             {"2", admissionSettings},
+		"admission.aging_after":              {"1s", admissionSettings},
+		"admission.ewma_alpha":               {"0.5", admissionSettings},
+		"admission.shed_status":              {"503", keyed},
+		"metering.flush_interval":            {"10s", meteringSettings},
+		"metering.max_keys_buffered":         {"200", meteringSettings},
+		"metering.write_timeout":             {"500ms", meteringSettings},
+		"metering.retention_days":            {"90", authSettings},
+		"db.shared_budget.slots":             {"12", sharedBudget},
+		"db.shared_budget.lock_space":        {"42", sharedBudget},
+		"db.shared_budget.critical_reserved": {"0", sharedBudget},
+		"db.shared_budget.max_wait":          {"50ms", sharedBudget},
+		"db.shared_budget.retry_interval":    {"5ms", sharedBudget},
+		"db.shared_budget.retry_after":       {"2s", sharedBudget},
 	}
 }

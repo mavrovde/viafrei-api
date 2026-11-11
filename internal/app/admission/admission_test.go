@@ -344,3 +344,25 @@ func TestARequestThatEndsWhileWaitingLeavesTheQueue(t *testing.T) {
 		t.Fatalf("after a cancelled wait: %+v", s)
 	}
 }
+
+func TestTierOfReadsTheCallersTier(t *testing.T) {
+	req.Covers(t, "NFR-CAP-002")
+	if got := admission.TierOf(context.Background()); got != admission.Critical {
+		t.Errorf("a read without a caller is admitted as %v", got)
+	}
+	if got := admission.TierOf(admission.WithCaller(context.Background(), admission.Caller{Tier: admission.Bulk, Key: "k"})); got != admission.Bulk {
+		t.Errorf("a bulk caller reads as %v", got)
+	}
+}
+
+func TestAReadWithoutACallerTakesNoCriticalSlot(t *testing.T) {
+	req.Covers(t, "NFR-CAP-002")
+	if got := admission.SlotTierOf(context.Background()); got != admission.Standard {
+		t.Errorf("a read without a caller takes its shared slot as %v, want standard", got)
+	}
+	for _, tier := range []admission.Tier{admission.Critical, admission.Standard, admission.Bulk} {
+		if got := admission.SlotTierOf(admission.WithCaller(context.Background(), admission.Caller{Tier: tier, Key: "k"})); got != tier {
+			t.Errorf("a %v caller takes its shared slot as %v", tier, got)
+		}
+	}
+}

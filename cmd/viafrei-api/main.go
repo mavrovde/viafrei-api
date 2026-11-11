@@ -110,7 +110,7 @@ func serve(environ []string, stderr io.Writer) int {
 		return config.ExitCode
 	}
 	defer st.Close()
-	st.WithAdmission(admission.New(wire.AdmissionSettings(cfg), nil))
+	st.WithAdmission(admission.New(wire.AdmissionSettings(cfg), nil)).WithSharedBudget(wire.SharedBudget(cfg))
 	addresses := ratelimit.NewIPLimiter(wire.AddressSettings(cfg), nil)
 	go addresses.Run(ctx)
 

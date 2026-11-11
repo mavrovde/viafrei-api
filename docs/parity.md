@@ -237,8 +237,8 @@ uncommitted changes, because the bundle names the commit it answered from.
 ```sh
 # here: the fixture SQL the questions name (testdata/fixtures/tiny/seed.sql)
 make fixtures PROFILE=tiny SEED=1
-# in the platform checkout, against a test_* database
-TEST_DATABASE_URL=... npx tsx packages/mcp/scripts/parity-bundle.ts \
+# in the platform checkout, with its throwaway test database configured
+npx tsx packages/mcp/scripts/parity-bundle.ts \
   --questions <api>/test/parity/questions.json \
   --contract <api>/db/contract/0001_contract.sql \
   --seed <api>/testdata/fixtures/tiny/seed.sql \

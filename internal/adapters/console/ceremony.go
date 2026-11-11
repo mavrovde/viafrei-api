@@ -128,7 +128,7 @@ func (s *server) busy(w http.ResponseWriter, r *http.Request, err error) {
 
 // unavailable answers an internal failure without its detail.
 func (s *server) unavailable(w http.ResponseWriter, r *http.Request, err error) {
-	s.Logger.Error("console request failed", "path", r.URL.Path, "error", err.Error())
+	s.Logger.Error("console request failed", "method", method(r), "route", s.route(r), "error", err.Error())
 	s.refuse(w, r, http.StatusInternalServerError, "the console could not complete the request")
 }
 

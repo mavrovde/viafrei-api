@@ -78,6 +78,10 @@ type server struct {
 	Deps
 	host     string
 	webauthn *webauthn.WebAuthn
+	mux      *http.ServeMux
+	// routes maps each registered pattern to itself, so that a log line
+	// names a route the console registered and never a client's path.
+	routes map[string]string
 }
 
 // New returns the console's handler.
@@ -103,22 +107,55 @@ func New(d Deps) (http.Handler, error) {
 	if d.Random == nil {
 		d.Random = rand.Reader
 	}
-	s := &server{Deps: d, host: u.Host, webauthn: wa}
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", s.withSession(s.home))
-	mux.HandleFunc("GET /audit", s.withSession(s.audit))
-	mux.HandleFunc("GET /signin", s.page("signin", "Sign in"))
-	mux.HandleFunc("GET /enrol", s.page("enrol", "Enrol a passkey"))
-	mux.HandleFunc("GET /console.js", s.asset("assets/console.js", "text/javascript; charset=utf-8"))
-	mux.HandleFunc("GET /console.css", s.asset("assets/console.css", "text/css; charset=utf-8"))
-	mux.HandleFunc("POST /signin/begin", s.signInBegin)
-	mux.HandleFunc("POST /signin/finish", s.signInFinish)
-	mux.HandleFunc("POST /enrol/begin", s.enrolBegin)
-	mux.HandleFunc("POST /enrol/finish", s.enrolFinish)
-	mux.HandleFunc("POST /signout", s.withChange(s.signOut))
-	mux.HandleFunc("POST /act/{action}", s.withChange(s.ask))
-	mux.HandleFunc("POST /confirm", s.withChange(s.confirm))
-	return s.guard(mux), nil
+	s := &server{Deps: d, host: u.Host, webauthn: wa, mux: http.NewServeMux(), routes: map[string]string{}}
+	handle := func(pattern string, h http.HandlerFunc) {
+		s.mux.HandleFunc(pattern, h)
+		s.routes[pattern] = pattern
+	}
+	handle("GET /{$}", s.withSession(s.home))
+	handle("GET /audit", s.withSession(s.audit))
+	handle("GET /signin", s.page("signin", "Sign in"))
+	handle("GET /enrol", s.page("enrol", "Enrol a passkey"))
+	handle("GET /console.js", s.asset("assets/console.js", "text/javascript; charset=utf-8"))
+	handle("GET /console.css", s.asset("assets/console.css", "text/css; charset=utf-8"))
+	handle("POST /signin/begin", s.signInBegin)
+	handle("POST /signin/finish", s.signInFinish)
+	handle("POST /enrol/begin", s.enrolBegin)
+	handle("POST /enrol/finish", s.enrolFinish)
+	handle("POST /signout", s.withChange(s.signOut))
+	handle("POST /act/{action}", s.withChange(s.ask))
+	handle("POST /confirm", s.withChange(s.confirm))
+	return s.guard(s.mux), nil
+}
+
+// route names the request in a log line by the pattern the console
+// registered for it, or "unmatched"; the client's path never reaches a log.
+// The guard refuses before the mux runs, so an empty r.Pattern is resolved
+// against the mux without serving.
+func (s *server) route(r *http.Request) string {
+	pattern := r.Pattern
+	if pattern == "" {
+		_, pattern = s.mux.Handler(r)
+	}
+	if route, ok := s.routes[pattern]; ok {
+		return route
+	}
+	return "unmatched"
+}
+
+// method names the request's method in a log line: one the console's
+// routes accept, or "other".
+func method(r *http.Request) string {
+	switch r.Method {
+	case http.MethodGet:
+		return http.MethodGet
+	case http.MethodHead:
+		return http.MethodHead
+	case http.MethodPost:
+		return http.MethodPost
+	default:
+		return "other"
+	}
 }
 
 //go:embed assets
@@ -177,7 +214,7 @@ func (s *server) sameOrigin(r *http.Request) bool {
 // refuse answers a refusal and logs its reason: never the peer's address,
 // a cookie or a token.
 func (s *server) refuse(w http.ResponseWriter, r *http.Request, status int, reason string) {
-	s.Logger.Warn("console request refused", "method", r.Method, "path", r.URL.Path, "status", status, "reason", reason)
+	s.Logger.Warn("console request refused", "method", method(r), "route", s.route(r), "status", status, "reason", reason)
 	if r.Header.Get("Content-Type") == "application/json" {
 		writeJSON(w, status, map[string]string{"error": reason})
 		return

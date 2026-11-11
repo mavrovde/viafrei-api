@@ -938,6 +938,61 @@ func TestRemovingAPasskeyEndsItsSessions(t *testing.T) {
 	}
 }
 
+// TestNoLogLineCarriesTheClientsPathOrMethod: a path with CR/LF and a forged
+// log fragment, and a method the console does not route, are logged as the
+// registered route (or "unmatched") and a known method (or "other"), never
+// as the client sent them.
+func TestNoLogLineCarriesTheClientsPathOrMethod(t *testing.T) {
+	req.Covers(t, "THR-018", "SEC-012")
+	const forged = "\r\nlevel=ERROR msg=FORGED-ENTRY"
+	r := newRig(t)
+	plant := func(method, path, remote string, sendOrigin bool) *httptest.ResponseRecorder {
+		t.Helper()
+		hr := httptest.NewRequest(http.MethodGet, "http://"+host+"/", nil)
+		hr.Method = method
+		hr.URL.Path = path
+		hr.RequestURI = path
+		hr.RemoteAddr = remote
+		if sendOrigin {
+			hr.Header.Set("Origin", origin)
+		}
+		w := httptest.NewRecorder()
+		r.h.ServeHTTP(w, hr)
+		return w
+	}
+	cases := []struct {
+		method, path, remote string
+		sendOrigin           bool
+		status               int
+		wantMethod, route    string
+	}{
+		// Refused by the guard, before the mux: the route is resolved.
+		{http.MethodGet, "/audit" + forged, "192.0.2.10:1", false, http.StatusForbidden, http.MethodGet, "unmatched"},
+		{http.MethodHead, "/signin", "192.0.2.10:1", false, http.StatusForbidden, http.MethodHead, "GET /signin"},
+		{"FORGE" + forged, "/x" + forged, "192.0.2.10:1", false, http.StatusForbidden, "other", "unmatched"},
+		{http.MethodPost, "/confirm" + forged, peer, false, http.StatusForbidden, http.MethodPost, "unmatched"},
+		// Refused inside a route: the mux's own pattern.
+		{http.MethodPost, "/act/x" + forged, peer, true, http.StatusUnauthorized, http.MethodPost, "POST /act/{action}"},
+	}
+	for _, c := range cases {
+		r.logs.Reset()
+		if w := plant(c.method, c.path, c.remote, c.sendOrigin); w.Code != c.status {
+			t.Fatalf("%q %q: status %d, want %d", c.method, c.path, w.Code, c.status)
+		}
+		out := r.logs.String()
+		if strings.Contains(out, "FORGE") || strings.Contains(out, `\r`) {
+			t.Fatalf("a log line carries the client's path or method: %s", out)
+		}
+		var line struct{ Method, Route string }
+		if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &line); err != nil {
+			t.Fatalf("not one JSON log line: %v: %s", err, out)
+		}
+		if line.Method != c.wantMethod || line.Route != c.route {
+			t.Fatalf("%q %q: logged method %q route %q, want %q %q", c.method, c.path, line.Method, line.Route, c.wantMethod, c.route)
+		}
+	}
+}
+
 // TestTheServerErrorLogCarriesNoAddress: net/http's own error lines (a
 // panic, a TLS handshake error) name the peer; the console's error log
 // takes every address out.

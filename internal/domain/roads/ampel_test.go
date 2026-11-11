@@ -10,13 +10,13 @@ import (
 )
 
 // The cases below are transcribed from the platform's own test of the rule
-// this package ports, packages/ingest/src/analysis/motorway-ampel.test.ts
+// this package ports, motorway-ampel.test.ts of its analysis module
 // (cited as ts:LINE), and driven through the port. Where the platform's
 // function takes a value Go cannot type (a non-string description entry, a
 // delay as text, isBlocked as text), the case carries the value the port
 // takes in its place, and says so.
 
-const tsFile = "packages/ingest/src/analysis/motorway-ampel.test.ts"
+const tsFile = "motorway-ampel.test.ts"
 
 func str(s string) *string { return &s }
 
@@ -213,7 +213,7 @@ type sightCase struct {
 	readOK   bool
 	warnings int
 	// source is the sight of the warnings source; the platform passes its
-	// feed check (ts:334: checked s seconds ago at a cadence of 300 s,
+	// source check (ts:334: checked s seconds ago at a cadence of 300 s,
 	// fresh inside three cadences): ago(10) and ago(900) are fresh,
 	// ago(901) is stale, no check is missing.
 	source roads.Sight

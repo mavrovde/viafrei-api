@@ -8,7 +8,7 @@ import (
 )
 
 // This file is a port of the platform's motorway Ampel, line for line:
-// packages/ingest/src/analysis/motorway-ampel.ts (signalLamp, ampelOf,
+// motorway-ampel.ts of its analysis module (signalLamp, ampelOf,
 // reasonKeyOf, safetyWordOf, closureScopeOf, messageScopeOf, worksSignal,
 // autobahnEventSignal, dwdSightOf, messageSignal) and the order of the
 // reasons inside a colour of packages/mcp/src/tools/autobahn-ampel.ts

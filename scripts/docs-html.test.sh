@@ -9,11 +9,13 @@ here=$(cd "$(dirname "$0")" && pwd)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 pass=0 fail=0
+perl=$(command -v perl)
+script=$here/docs-html.pl
 
 expect() { # expect NAME HREF WANT_EXIT WANT_HREF [WANT_STDERR]
   local out err status got
   out=$(cd "$tmp" && DOCS_PAGES="docs/errors.md=errors.html" DOCS_SITE_FILES="openapi.json" \
-    perl "$here/docs-html.pl" docs <<<"<p><a href=\"$2\">x</a></p>" 2>"$tmp/stderr")
+    PATH=${run_path:-$PATH} "$perl" "$script" docs <<<"<p><a href=\"$2\">x</a></p>" 2>"$tmp/stderr")
   status=$?
   err=$(cat "$tmp/stderr")
   got=$(sed -n 's/.*href="\([^"]*\)".*/\1/p' <<<"$out")
@@ -35,5 +37,25 @@ expect "a misspelt page (docs/eror.md) is refused" "eror.md" 1 "missing-in-repo/
 expect "a missing script (../scripts/nope.sh) is refused" "../scripts/nope.sh" 1 "missing-in-repo/scripts/nope.sh" \
   "FAIL: link to scripts/nope.sh"
 
+# A copy of the script in a throwaway repository: a file git does not track
+# is no file of the repository, and without git the script refuses.
+repo=$tmp/repo
+mkdir -p "$repo/scripts" "$repo/docs"
+cp "$here/docs-html.pl" "$repo/scripts/"
+echo tracked > "$repo/scripts/tracked.sh"
+git init -q "$repo" && git -C "$repo" add scripts && git -C "$repo" -c user.email=t@example.org -c user.name=t commit -q -m t
+echo untracked > "$repo/scripts/untracked.sh"
+script=$repo/scripts/docs-html.pl
+expect "a tracked file of the repository becomes its GitHub URL" "../scripts/tracked.sh" 0 \
+  "https://github.com/mavrovde/viafrei-api/blob/main/scripts/tracked.sh"
+expect "an untracked file is refused" "../scripts/untracked.sh" 1 "missing-in-repo/scripts/untracked.sh" \
+  "FAIL: link to scripts/untracked.sh"
+rm -rf "$repo/.git"
+expect "outside a git repository the script refuses" "../scripts/tracked.sh" 2 "" \
+  "git could not list the files of the repository"
+script=$here/docs-html.pl run_path=/nonexistent
+expect "without git the script refuses" "../scripts/docs-build.sh" 2 "" "cannot run git"
+run_path=
+
 echo "docs-html self-test: $pass passed, $fail failed"
-(( fail == 0 ))
+(( fail == 0 && pass >= 11 ))

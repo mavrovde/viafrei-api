@@ -122,12 +122,36 @@ func seedFixtures(t *testing.T) {
 		if _, err := tx.Exec(ctx, buf.String()); err != nil {
 			return err
 		}
-		_, err := tx.Exec(ctx, freshReports, now)
-		return err
+		return plantFreshReports(ctx, tx)
 	}); err != nil {
 		t.Fatal(err)
 	}
 }
+
+// plantFreshReports runs freshReports and holds it to its word: exactly the
+// planted rows, each credited to a source (the subquery found the point).
+func plantFreshReports(ctx context.Context, tx pgx.Tx) error {
+	rows, err := tx.Query(ctx, freshReports, now)
+	if err != nil {
+		return err
+	}
+	planted, err := pgx.CollectRows(rows, pgx.RowTo[*string])
+	if err != nil {
+		return err
+	}
+	if len(planted) != freshPlanted {
+		return fmt.Errorf("planted %d fresh report(s), want %d", len(planted), freshPlanted)
+	}
+	for i, ref := range planted {
+		if ref == nil || *ref == "" {
+			return fmt.Errorf("fresh report %d has no source: its point has no fixture report", i)
+		}
+	}
+	return nil
+}
+
+// freshPlanted is the number of rows freshReports inserts.
+const freshPlanted = 3
 
 // freshReports plants, on the charging sites the examples document, reports
 // made minutes before the examples' clock (now, the end of the fixture
@@ -144,7 +168,8 @@ select p.point_id, $1::timestamptz - p.age, p.state,
 from (values ('cp-00012-0', interval '5 minutes', 'available'),
              ('cp-00012-1', interval '12 minutes', 'occupied'),
              ('cp-00000-0', interval '8 minutes', 'available'))
-     as p(point_id, age, state)`
+     as p(point_id, age, state)
+returning source_ref`
 
 // keyAuth admits every request as the example's key.
 type keyAuth struct{ p auth.Principal }

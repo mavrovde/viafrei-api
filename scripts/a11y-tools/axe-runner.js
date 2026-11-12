@@ -21,8 +21,8 @@
 //   - "undetermined": no pair can be read: the node has no element, or is
 //     not rendered or not where its box is, something is painted over its
 //     text, or a layer under it has a background image, a pseudo-element
-//     background, an opacity below 1, its border at the text, or a
-//     background colour that is not readable as sRGB. fgColor and bgColor
+//     background, an opacity below 1, a filter or a blend mode, its border
+//     at the text, or a background colour that is not readable as sRGB. fgColor and bgColor
 //     are null, and undeterminedBy says which.
 // - messageKey: why axe could not decide, when it says.
 //
@@ -101,6 +101,15 @@ const run = async options => {
       (top > 0 && y < r.top + top) || (bottom > 0 && y > r.bottom - bottom);
   };
   const undetermined = by => ({source: 'undetermined', by});
+  // An effect that changes the colour painted, which the colours read off
+  // the styles do not show: an opacity below 1, a filter or backdrop filter,
+  // or a blend mode other than normal.
+  const effect = st => {
+    if (Number.parseFloat(st.opacity) < 1) return 'opacity';
+    if (![undefined, 'none'].includes(st.filter) || ![undefined, 'none'].includes(st.backdropFilter)) return 'filter';
+    if (![undefined, 'normal'].includes(st.mixBlendMode)) return 'blend mode';
+    return null;
+  };
 
   // The colour painted under element's text at (x, y), read off the page's
   // own paint stack there (document.elementsFromPoint): {bg} or, when it
@@ -112,7 +121,7 @@ const run = async options => {
   //   ones are composited onto it, when every one is an sRGB colour. Any
   //   other element under the text, an ancestor or not, is a layer.
   // A layer with a background image, a ::before or ::after background, an
-  // opacity below 1, a drawn border at the point, a background colour whose
+  // effect (below), a drawn border at the point, a background colour whose
   // alpha cannot be read, or a translucent colour that is not sRGB makes it
   // unreadable.
   const background = (element, x, y) => {
@@ -130,7 +139,8 @@ const run = async options => {
       const st = window.getComputedStyle(e);
       if (st.backgroundImage && st.backgroundImage !== 'none') return {by: 'background image'};
       if (paintsBackground(e)) return {by: 'pseudo-element background'};
-      if (Number.parseFloat(st.opacity) < 1) return {by: 'opacity'};
+      const fx = effect(st);
+      if (fx) return {by: fx};
       if (onBorder(e, st, x, y)) return {by: 'border'};
       const a = alpha(st.backgroundColor);
       if (Number.isNaN(a)) return {by: 'unreadable alpha'};
@@ -156,14 +166,15 @@ const run = async options => {
   // on the neighbouring glyphs of inline text); every element is
   // made hit-testable while the stacks are read, so a layer with
   // pointer-events: none is not skipped. Undetermined: no element, an
-  // opacity below 1 on it or an ancestor, an empty box, a box clipped
+  // effect on it or an ancestor, an empty box, a box clipped
   // entirely, or a point whose
   // colour cannot be read (background, above).
   const computedPair = element => {
     if (!element) return undetermined('no element');
     const fg = window.getComputedStyle(element).color;
     for (let e = element; e?.nodeType === 1; e = e.parentElement) {
-      if (Number.parseFloat(window.getComputedStyle(e).opacity) < 1) return undetermined('opacity');
+      const fx = effect(window.getComputedStyle(e));
+      if (fx) return undetermined(fx);
     }
     element.scrollIntoView({block: 'center', inline: 'center'});
     const box = element.getClientRects()[0];

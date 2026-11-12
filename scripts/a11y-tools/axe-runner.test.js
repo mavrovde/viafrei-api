@@ -452,3 +452,26 @@ test('only the part of the box that is shown is sampled: the viewport and every 
     assert.deepEqual([extras.colourSource, extras.undeterminedBy], ['undetermined', 'clipped']);
   }
 });
+
+test('a filter, a backdrop filter or a blend mode, on a layer or an ancestor, makes the pair undetermined', async () => {
+  const cases = [
+    [{filter: 'brightness(0.5)'}, 'filter'],
+    [{backdropFilter: 'blur(2px)'}, 'filter'],
+    [{mixBlendMode: 'multiply'}, 'blend mode'],
+    [{filter: 'none', backdropFilter: 'none', mixBlendMode: 'normal'}, null]
+  ];
+  for (const [fx, by] of cases) {
+    const body = el(opaque);
+    const layer = el({...opaque, ...fx}, body);
+    const span = el({...clear, color: 'rgb(0, 0, 0)'}, body);
+    page({incomplete: [contrast(node(['span']))]}, {span});
+    globalThis.window.stack = [span, layer, body];
+    const [onLayer] = await runner.run(opts);
+    assert.equal(onLayer.runnerExtras.undeterminedBy, by, `layer ${JSON.stringify(fx)}`);
+    const inner = el({...clear, color: 'rgb(0, 0, 0)'}, el({...clear, ...fx}, body));
+    page({incomplete: [contrast(node(['span']))]}, {span: inner});
+    globalThis.window.stack = [inner, body];
+    const [onAncestor] = await runner.run(opts);
+    assert.equal(onAncestor.runnerExtras.undeterminedBy, by, `ancestor ${JSON.stringify(fx)}`);
+  }
+});

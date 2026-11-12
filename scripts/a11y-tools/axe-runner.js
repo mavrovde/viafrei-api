@@ -13,10 +13,15 @@
 //     as text partly obscured), so the element's computed text colour and the
 //     background colour of the nearest element at or above it that paints
 //     one, or "canvas" when none does;
+//     A partly transparent background is composited onto the opaque one
+//     below it. contrastRatio is the pair's WCAG contrast and requiredRatio
+//     what WCAG 1.4.3 asks of the element (3 for large text, else 4.5);
+//     docs-a11y.sh counts a needs-review result whose computed pair meets
+//     its ratio as decided, not as a failure;
 //   - "undetermined": no pair can be read off the styles: the node has no
 //     element, or the walk met a background image, an opacity below 1 or a
-//     partly transparent background colour. fgColor and bgColor are null,
-//     and undeterminedBy says which.
+//     background colour that is not readable as sRGB. fgColor and bgColor
+//     are null, and undeterminedBy says which.
 // - messageKey: why axe could not decide, when it says.
 //
 // The run function is stringified by pa11y and evaluated in the page, so it
@@ -58,20 +63,61 @@ const run = async options => {
     return a.endsWith('%') ? Number.parseFloat(a) / 100 : Number.parseFloat(a);
   };
 
-  // The colour pair of an element, read off the computed styles.
+  // The red, green, blue and alpha of an rgb()/rgba() colour with commas,
+  // the form getComputedStyle writes for sRGB colours; null for any other.
+  const rgba = c => {
+    const m = /^rgba?\(\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\s*\)$/.exec(c);
+    return m ? [Number(m[1]), Number(m[2]), Number(m[3]), m[4] === undefined ? 1 : Number(m[4])] : null;
+  };
+  // over(top, bottom): the opaque colour of a translucent top layer painted
+  // on an opaque bottom one (source-over compositing).
+  const over = (top, bottom) => [0, 1, 2].map(i => top[i] * top[3] + bottom[i] * (1 - top[3]));
+  const css = c => `rgb(${c.map(v => Math.round(v)).join(', ')})`;
+  const white = [255, 255, 255, 1];
+
+  // The colour pair of an element, read off the computed styles. A partly
+  // transparent background is composited onto the first opaque background
+  // below it (or the white canvas), when every layer is an sRGB colour.
   const computedPair = element => {
     if (!element) return {source: 'undetermined', by: 'no element'};
     const fg = window.getComputedStyle(element).color;
-    for (let e = element; e?.nodeType === 1; e = e.parentElement) {
+    const layers = [];
+    let bg = null;
+    for (let e = element; !bg && e?.nodeType === 1; e = e.parentElement) {
       const style = window.getComputedStyle(e);
       if (style.backgroundImage && style.backgroundImage !== 'none') return {source: 'undetermined', by: 'background image'};
       if (Number.parseFloat(style.opacity) < 1) return {source: 'undetermined', by: 'opacity'};
       const a = alpha(style.backgroundColor);
       if (Number.isNaN(a)) return {source: 'undetermined', by: 'unreadable alpha'};
-      if (a > 0 && a < 1) return {source: 'undetermined', by: 'translucent background'};
-      if (a >= 1) return {source: 'computed', fg, bg: style.backgroundColor};
+      if (a >= 1) bg = style.backgroundColor;
+      else if (a > 0) layers.push(rgba(style.backgroundColor));
     }
-    return {source: 'computed', fg, bg: 'canvas'};
+    if (!layers.length) return {source: 'computed', fg, bg: bg || 'canvas'};
+    const base = bg ? rgba(bg) : white;
+    if (!base || layers.includes(null)) return {source: 'undetermined', by: 'translucent background'};
+    return {source: 'computed', fg, bg: css(layers.reduceRight((b, top) => over(top, b), base))};
+  };
+
+  // The contrast of a computed pair (WCAG 2 relative luminance, the text
+  // composited onto the background when it is partly transparent) and the
+  // ratio WCAG 1.4.3 requires of the element: 3 for large text (24 px, or
+  // 18.66 px at weight 700 or more), else 4.5. Both are null when a colour
+  // is not an sRGB rgb()/rgba() value.
+  const lum = c =>
+    [0, 1, 2]
+      .map(i => c[i] / 255)
+      .map(v => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+      .reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+  const contrast = (element, pair) => {
+    const fg = rgba(pair.fg);
+    const bg = pair.bg === 'canvas' ? white : rgba(pair.bg);
+    if (!fg || !bg) return {ratio: null, required: null};
+    const l1 = lum(over(fg, bg));
+    const l2 = lum(bg);
+    const style = window.getComputedStyle(element);
+    const size = Number.parseFloat(style.fontSize);
+    const large = size >= 24 || (Number.parseInt(style.fontWeight, 10) >= 700 && size >= 18.66);
+    return {ratio: Math.round(((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)) * 100) / 100, required: large ? 3 : 4.5};
   };
 
   const issues = [];
@@ -97,11 +143,14 @@ const run = async options => {
       const extras = {impact: result.impact, needsFurtherReview, target, messageKey: why ? why.messageKey : null};
       if (result.id === 'color-contrast') {
         const pair = axeColours ? {source: 'axe', fg: axeColours.fgColor, bg: axeColours.bgColor} : computedPair(element);
+        const measured = pair.source === 'computed' ? contrast(element, pair) : {ratio: null, required: null};
         Object.assign(extras, {
           colourSource: pair.source,
           fgColor: pair.fg || null,
           bgColor: pair.bg || null,
-          undeterminedBy: pair.by || null
+          undeterminedBy: pair.by || null,
+          contrastRatio: measured.ratio,
+          requiredRatio: measured.required
         });
       }
       issues.push({

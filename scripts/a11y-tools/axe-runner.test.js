@@ -101,7 +101,7 @@ test('axe colours win over the computed ones, and messageKey is kept', async () 
     all: [{data: {fgColor: '#111', bgColor: '#fff'}}], none: []})]}, {p});
   const [i] = await runner.run(opts);
   assert.deepEqual(i.runnerExtras, {impact: 'serious', needsFurtherReview: false, target: 'p', messageKey: 'k',
-    colourSource: 'axe', fgColor: '#111', bgColor: '#fff', undeterminedBy: null});
+    colourSource: 'axe', fgColor: '#111', bgColor: '#fff', undeterminedBy: null, contrastRatio: null, requiredRatio: null});
   assert.equal(i.element, p);
 });
 
@@ -126,11 +126,11 @@ test('a walk that meets no painted background ends at the canvas, also at a non-
   assert.deepEqual([i.runnerExtras.colourSource, i.runnerExtras.fgColor, i.runnerExtras.bgColor], ['computed', 'red', 'canvas']);
 });
 
-test('a background image, an opacity below 1 or a translucent background make the pair undetermined', async () => {
+test('a background image, an opacity below 1 or a translucent background that is not sRGB make the pair undetermined', async () => {
   const cases = [
     [{...clear, backgroundImage: 'linear-gradient(red, blue)'}, 'background image'],
     [{...clear, opacity: '0.5'}, 'opacity'],
-    [{...clear, backgroundColor: 'rgba(212, 31, 28, 0.07)'}, 'translucent background']
+    [{...clear, backgroundColor: 'oklch(0.5 0.1 20 / 7%)'}, 'translucent background']
   ];
   for (const [style, by] of cases) {
     const span = el({...clear, color: 'red'}, el(style, el(opaque)));
@@ -178,4 +178,56 @@ test('the alpha of each colour syntax: zero is transparent, one is painted, betw
 test('the module names the axe script pa11y injects and the pa11y versions it supports', () => {
   assert.match(runner.scripts[0], /axe-core[\\/]axe\.min\.js$/);
   assert.equal(runner.supports, '^10.0.0');
+});
+
+// one(span): run the runner over one color-contrast node resolving to span.
+const one = async span => {
+  page({incomplete: [contrast(node(['span']))]}, {span});
+  const [i] = await runner.run(opts);
+  return i.runnerExtras;
+};
+
+test('a translucent sRGB background is composited onto the opaque one below it, or onto the white canvas', async () => {
+  const green = await one(el({...clear, color: 'rgb(29, 129, 39)', backgroundColor: 'rgba(29, 129, 39, 0.07)'}, el(opaque)));
+  assert.deepEqual([green.colourSource, green.bgColor, green.undeterminedBy], ['computed', 'rgb(239, 246, 240)', null]);
+  // Two half-black layers and no opaque one: the lower is painted first, on white.
+  const grey = await one(el({...clear, color: 'rgb(0, 0, 0)', backgroundColor: 'rgba(0, 0, 0, 0.5)'},
+    el({...clear, backgroundColor: 'rgba(0, 0, 0, 0.5)'}, {nodeType: 9, style: opaque, parentElement: null})));
+  assert.equal(grey.bgColor, 'rgb(64, 64, 64)');
+  // The opaque colour below is not sRGB: nothing to composite onto.
+  const named = await one(el({...clear, color: 'red', backgroundColor: 'rgba(0, 0, 0, 0.5)'}, el({...opaque, backgroundColor: 'white'})));
+  assert.deepEqual([named.colourSource, named.bgColor, named.undeterminedBy], ['undetermined', null, 'translucent background']);
+});
+
+test('a computed pair carries its WCAG contrast; a colour that is not sRGB has none', async () => {
+  const black = await one(el({...clear, color: 'rgb(0, 0, 0)'}, el(opaque)));
+  assert.deepEqual([black.contrastRatio, black.requiredRatio], [21, 4.5]);
+  const same = await one(el({...clear, color: 'rgb(255, 255, 255)'}, el(opaque)));
+  assert.equal(same.contrastRatio, 1);
+  const canvas = await one(el({color: 'rgb(0, 0, 0)'}, {nodeType: 9, style: opaque, parentElement: null}));
+  assert.deepEqual([canvas.bgColor, canvas.contrastRatio], ['canvas', 21]);
+  // Half-transparent black text is grey on white: 3.98:1, under 4.5.
+  const half = await one(el({...clear, color: 'rgba(0, 0, 0, 0.5)'}, el(opaque)));
+  assert.equal(half.contrastRatio, 3.98);
+  const named = await one(el({...clear, color: 'red'}, el(opaque)));
+  assert.deepEqual([named.contrastRatio, named.requiredRatio], [null, null]);
+  const namedBg = await one(el({...clear, color: 'rgb(0, 0, 0)'}, el({...opaque, backgroundColor: 'white'})));
+  assert.deepEqual([namedBg.contrastRatio, namedBg.requiredRatio], [null, null]);
+  // An axe pair or an undetermined one is not measured here.
+  page({incomplete: [contrast(node(['#gone']), node(['x'], {fgColor: '#111', bgColor: '#fff'}))]});
+  for (const i of await runner.run(opts)) assert.deepEqual([i.runnerExtras.contrastRatio, i.runnerExtras.requiredRatio], [null, null]);
+});
+
+test('large text (24 px, or 18.66 px at weight 700) needs 3:1, other text 4.5:1', async () => {
+  const cases = [
+    [{fontSize: '24px', fontWeight: '400'}, 3],
+    [{fontSize: '18.66px', fontWeight: '700'}, 3],
+    [{fontSize: '18.66px', fontWeight: '400'}, 4.5],
+    [{fontSize: '18px', fontWeight: '700'}, 4.5],
+    [{fontSize: '16px', fontWeight: 'bold'}, 4.5]
+  ];
+  for (const [font, want] of cases) {
+    const x = await one(el({...clear, color: 'rgb(0, 0, 0)', ...font}, el(opaque)));
+    assert.equal(x.requiredRatio, want, JSON.stringify(font));
+  }
 });

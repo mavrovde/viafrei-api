@@ -17,7 +17,7 @@ The `Documentation portal` CI job builds the portal and checks it.
 | Diagrams | the same | a Mermaid diagram not followed by a paragraph starting `Text description:`; an image without alt text; an inline SVG without a `<title>` |
 | No third party | the same | a page that loads a stylesheet, font, script, image, frame or media file from another host, in a tag (`src`, `srcset`, `href` of a `<link>` that loads, the `background` and `ping` attributes) or in CSS (`url()`, `image-set()`, `@import`); a link to another site, or a `<link>` that only names a relation, is not a request |
 | No third party, at run time | `scripts/docs-offsite.sh` (headless Chrome, `scripts/a11y-tools/offsite.js`) | a request a page makes while it loads, its scripts' included, to a host other than the site itself, until the network is idle; off-site requests are aborted, so the check contacts no host. It does not see a preconnect or DNS prefetch, an image that loads only when scrolled into view or a request made later; the static check reads those from the markup |
-| WCAG 2.2 AA | `scripts/docs-a11y.sh` (pa11y-ci with axe, headless Chrome) | on the guide pages, every axe result: a violation of any impact, and a result axe could not decide by itself ("needs review"); on the API reference, a rule whose count of distinct failures rises above `scripts/docs-a11y-baseline.json` |
+| WCAG 2.2 AA | `scripts/docs-a11y.sh` (pa11y-ci with axe, headless Chrome) | on the guide pages, every axe result: a violation of any impact, and a result axe could not decide by itself ("needs review"); on the API reference, any critical or serious result, and a moderate or minor rule whose count of distinct failures rises above `scripts/docs-a11y-baseline.json` |
 
 Each check prints the pages it read and fails closed: a site without pages,
 a page the browser could not load, or a report it could not read is a
@@ -54,20 +54,36 @@ response draws more highlighted strings) does not move the count:
   - `computed`: axe could not compare them (a "needs review" result, such as
     text in a scrolling code panel), so the element's computed text colour
     and the nearest background colour painted at or above it;
+    A partly transparent background is composited onto the opaque one
+    below it, and the pair's contrast is measured against the ratio WCAG
+    1.4.3 asks of the element (3:1 for large text, else 4.5:1). A result
+    whose computed pair meets that ratio is **decided**: it is a pass on
+    every page, and the check prints how many there were. A violation axe
+    itself decided is never overruled;
   - undetermined: no pair can be read off the styles (no element, a
     background image, an opacity below 1, or a partly transparent
-    background). These are counted one failure per place, like other rules.
+    background that is not an sRGB colour). These are counted one failure
+    per place, like other rules.
 - any other rule: one failure per place, the axe selector with its
   `nth-child` and `nth-of-type` parts removed and every number replaced, so
   that the tenth row of a table is the same failure as the first.
 
-The count of distinct failures per rule is held against the committed
+A critical or serious result on the reference fails like on a guide page;
+no baseline holds one. The count of distinct failures per rule is held against the committed
 baseline `scripts/docs-a11y-baseline.json`: a rule above its count, or a rule
 not listed, fails. The baseline may only go down:
 `scripts/docs-a11y-ratchet.sh` fails a pull request whose baseline raises a
 count, or adds a page or rule, compared with its base. When a count falls
 below the baseline, the check says so and the baseline is lowered in the same
 pull request.
+
+The build repairs what Redoc's theme cannot (`scripts/docs-build.sh`): its
+root is the page's main landmark, and the tree lines of its schema tables are
+drawn as a cell border instead of a background image, which left the
+contrast of every property name undecidable. Since #20 the reference stands
+at four distinct failures, all `heading-order`: Redoc's headings skip a
+level between an operation and its parameters, which its theme cannot
+change.
 
 A raise that is deliberate (a Redoc upgrade that brings a new failure we
 accept) is declared, with its reason, by a line in the message of a commit

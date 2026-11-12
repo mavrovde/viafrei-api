@@ -159,11 +159,19 @@ perl -pi -e 's{\Qsrc:"https://cdn.redoc.ly/redoc/logo-mini.svg"\E}{src:"data:,"}
 perl -0pi -e 's{<script src="https://cdn\.redocly\.com/redoc/v[0-9.]+/bundles/redoc\.standalone\.js"[^>]*></script>}{<script src="redoc.standalone.js"></script>}' "$out/reference.html"
 title=$(jq -r '.info.title' api/openapi.json)
 grep -qF "$title" "$out/reference.html" || { echo "FAIL: reference.html does not carry the document title '$title'" >&2; exit 1; }
-# Two WCAG 2.2 AA repairs Redoc's theme cannot make (scripts/docs-a11y.sh):
-# its JSON expand buttons are 15 px, under the 24 px target size, and its
-# code samples scroll without being reachable by keyboard.
+# WCAG 2.2 AA repairs Redoc's theme cannot make (scripts/docs-a11y.sh):
+# - its JSON expand buttons are 15 px, under the 24 px target size;
+# - its code samples scroll without being reachable by keyboard;
+# - its whole page sits in no landmark (axe: region, landmark-one-main), so
+#   its root is the page's main landmark;
+# - its schema tables draw their tree lines as a 1 px background image on the
+#   property-name cell, which leaves the contrast of the name undecidable;
+#   the same line is drawn as the cell's left border.
+[[ $(grep -c '<div id="redoc">' "$out/reference.html") == 1 ]] ||
+  { echo "FAIL: reference.html does not carry exactly one Redoc root to mark as the main landmark" >&2; exit 1; }
 perl -0pi -e '
-  s{</head>}{<style>.redoc-json .collapser{display:none!important}</style></head>};
+  s{<div id="redoc">}{<div id="redoc" role="main">};
+  s{</head>}{<style>.redoc-json .collapser{display:none!important}td[kind=field]{background-image:none!important;border-left:1px solid #7c7cbb}</style></head>};
   s{</body>}{<script>(function(){function f(){document.querySelectorAll("pre:not([tabindex])").forEach(function(p){p.setAttribute("tabindex","0")})}document.addEventListener("DOMContentLoaded",f);new MutationObserver(f).observe(document.documentElement,{childList:true,subtree:true})})();</script></body>};
 ' "$out/reference.html"
 touch "$out/.nojekyll"

@@ -29,16 +29,14 @@ func codes[T ~string](list []T) []string {
 
 // Road reads one road by its canonical reference.
 func (s *Store) Road(ctx context.Context, ref string) (roads.Road, error) {
-	var out []roads.Road
-	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
+	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]roads.Road, error) {
 		rows, _ := tx.Query(ctx, `
 select road_ref, road_class, length_km::float8, states
 from contract.road
 where upper(replace(road_ref, ' ', '')) = $1
 order by road_ref
 limit 1`, ref)
-		var err error
-		out, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (roads.Road, error) {
+		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (roads.Road, error) {
 			var (
 				v          roads.Road
 				ref, class string
@@ -47,7 +45,6 @@ limit 1`, ref)
 			v.Ref, v.Class = roads.Canonical(ref), roads.MapClass(class)
 			return v, err
 		})
-		return err
 	})
 	if err == nil && len(out) == 0 {
 		err = roads.ErrUnknownRoad
@@ -228,11 +225,18 @@ func scanSituation(r pgx.CollectableRow) (roads.Situation, error) {
 // states in scope and which roads families read cover their traffic
 // messages) in one snapshot.
 func (s *Store) read(ctx context.Context, list string, listArgs []any, limit int, fams roads.Families, now time.Time, sc scope) (roads.Page, error) {
-	var (
-		out    = roads.Page{Confirmations: map[string]ampel.Confirmation{}}
+	// The page and its messages are built inside the read and handed back
+	// by ReadValue, so nothing the caller holds is written after a read that
+	// ran past its deadline.
+	type snapshot struct {
+		page   roads.Page
 		stored []storedMessage
-	)
-	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
+	}
+	snap, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (snapshot, error) {
+		var (
+			out    = roads.Page{Confirmations: map[string]ampel.Confirmation{}}
+			stored []storedMessage
+		)
 		// The reads in order; the first that fails ends the snapshot.
 		for _, step := range []func() error{
 			func() (err error) {
@@ -283,15 +287,16 @@ order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, s
 			},
 		} {
 			if err := step(); err != nil {
-				return err
+				return snapshot{}, err
 			}
 		}
-		return nil
+		return snapshot{out, stored}, nil
 	})
 	if err != nil {
 		return roads.Page{}, err
 	}
-	for _, m := range stored {
+	out := snap.page
+	for _, m := range snap.stored {
 		out.Messages = append(out.Messages, roads.Message{Record: roads.MapRecord(m.Record), Kind: roads.MapKind(m.Kind),
 			Headline: m.Headline, Subtitle: m.Subtitle, Description: m.Description, PlaceText: m.PlaceText,
 			Blocked: m.Blocked, TrafficType: m.TrafficType, DelayS: m.DelayS, DelayMin: m.DelayMin})
@@ -417,16 +422,13 @@ where not exists (select 1 from near)`),
 // Situation reads one published situation of the given families that is
 // active or ended after endedSince (roads.ended_retention_h).
 func (s *Store) Situation(ctx context.Context, id string, families []string, endedSince time.Time) (roads.Situation, error) {
-	var rows []roads.Situation
-	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
+	rows, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]roads.Situation, error) {
 		res, _ := tx.Query(ctx, `
 select `+situationColumns+`, null::float8, null::int
 from contract.traffic_event e
 where e.event_id = $1 and e.withdrawn_at is null and e.source_ref = any($2)
   and (e.valid_to is null or e.valid_to > $3)`, id, families, endedSince)
-		var err error
-		rows, err = pgx.CollectRows(res, scanSituation)
-		return err
+		return pgx.CollectRows(res, scanSituation)
 	})
 	if err == nil && len(rows) == 0 {
 		err = roads.ErrUnknownSituation

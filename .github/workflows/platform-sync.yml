@@ -93,7 +93,7 @@ jobs:
             # so a pin that falls behind is never silent (a green run here would
             # read as "in step").
             echo "$branch exists already and is not merged: the API is behind platform $VERSION" >> "$GITHUB_STEP_SUMMARY"
-            echo "::error::the API is behind platform $VERSION: merge the pull request of $branch (it needs the parity bundle, docs/parity.md)"
+            echo "::error::the API is behind platform $VERSION: merge the pull request of $branch (it needs the parity bundle, docs/parity.md); if that pull request was closed unmerged, delete the branch so the next run opens a new one"
             exit 1
           fi
           git config user.name "github-actions[bot]"

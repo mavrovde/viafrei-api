@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -173,13 +174,70 @@ func (x *toxi) restored() bool {
 	return strings.Contains(last, "/reset") || strings.Contains(last, `"enabled":true`)
 }
 
+// cut reports whether the last call to the fault proxy about the storage
+// route, or a reset, left it cut.
+func (x *toxi) cut() bool {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	for i := len(x.calls) - 1; i >= 0; i-- {
+		c := x.calls[i]
+		if strings.Contains(c, "/reset") || strings.Contains(c, "/proxies/"+proxyStorage+" ") {
+			return strings.Contains(c, `"enabled":false`)
+		}
+	}
+	return false
+}
+
+// staleCache is a fake instance with a result cache behind the fault
+// proxy: while storage is cut it replays a request it answered no longer
+// than fresh ago as fresh, from memory, as the real one does within its
+// max-age; past that it serves a request it answered no longer than allow
+// ago with served_stale and its Age, except a charging search, and 503 for
+// everything else.
+type staleCache struct {
+	mu    sync.Mutex
+	read  map[string]time.Time
+	fresh time.Duration
+	allow time.Duration
+	down  func() bool
+}
+
+func (c *staleCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	key := r.URL.RequestURI()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.down() {
+		c.read[key] = time.Now()
+		answer(w, map[string]any{"warnings": []any{}})
+		return
+	}
+	t, seen := c.read[key]
+	if seen && time.Since(t) <= c.fresh {
+		w.Header().Set("Age", strconv.Itoa(int(time.Since(t)/time.Second)))
+		answer(w, map[string]any{"warnings": []any{}})
+		return
+	}
+	if !seen || strings.Contains(key, "charging") || time.Since(t) > c.allow {
+		problem(w, http.StatusServiceUnavailable, "upstream-unavailable")
+		return
+	}
+	stale(w, strconv.Itoa(int(time.Since(t)/time.Second)))
+}
+
+// stale writes a stale answer with the given Age.
+func stale(w http.ResponseWriter, age string) {
+	w.Header().Set("Age", age)
+	answer(w, map[string]any{"warnings": []any{map[string]any{"code": "partial"}, map[string]any{"code": "served_stale"}}})
+}
+
 // world is a runner against a fake API, a fake fault proxy and fake docker.
 type world struct {
-	r     *runner
-	api   *httptest.Server
-	proxy *toxi
-	dock  *fakeDocker
-	hits  atomic.Int64
+	r      *runner
+	api    *httptest.Server
+	cached *httptest.Server // the instance with the result cache
+	proxy  *toxi
+	dock   *fakeDocker
+	hits   atomic.Int64
 }
 
 func newWorld(t *testing.T, api http.HandlerFunc, dock func(string) (string, error)) *world {
@@ -196,6 +254,10 @@ func newWorld(t *testing.T, api http.HandlerFunc, dock func(string) (string, err
 	w.r.docker = w.dock.run
 	w.r.host = w.dock.run
 	w.r.brk = breakerSettings{failures: 5, openFor: 10 * time.Millisecond, probes: 2}
+	w.r.staleFor, w.r.freshFor = 60*time.Millisecond, 10*time.Millisecond
+	w.cached = httptest.NewServer(&staleCache{read: map[string]time.Time{}, fresh: w.r.freshFor, allow: w.r.staleFor, down: w.proxy.cut})
+	t.Cleanup(w.cached.Close)
+	w.r.cached = w.cached.URL
 	return w
 }
 

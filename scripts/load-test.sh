@@ -18,7 +18,8 @@
 #
 # Only this machine's loopback is a target: the runner refuses every host
 # that is not on test/load/allow-list.txt, and this script refuses an
-# LOADRUN_API or LOADRUN_PROXY that is not the loopback (TST-010).
+# LOADRUN_API, LOADRUN_CACHED_API or LOADRUN_PROXY that is not the loopback
+# (TST-010).
 #
 # Exit 0 when every scenario passed, 1 when one failed, 2 on a usage error
 # or a refused target.
@@ -29,11 +30,13 @@ cd "$(dirname "$0")/.."
 profile=${1:-}
 report=${2:-load-report.md}
 API_URL="${LOADRUN_API:-http://[::1]:8080}"
+CACHED_URL="${LOADRUN_CACHED_API:-http://[::1]:8081}"
 PROXY_URL="${LOADRUN_PROXY:-http://[::1]:8474}"
 loopback='^http://(localhost|127\.0\.0\.1|\[::1\]):[0-9]+$'
 
 [[ $profile == pr || $profile == nightly ]] || { echo "usage: load-test.sh pr|nightly [REPORT]" >&2; exit 2; }
 [[ $API_URL =~ $loopback ]] || { echo "FAIL: LOADRUN_API must be this machine's loopback, not $API_URL" >&2; exit 2; }
+[[ $CACHED_URL =~ $loopback ]] || { echo "FAIL: LOADRUN_CACHED_API must be this machine's loopback, not $CACHED_URL" >&2; exit 2; }
 [[ $PROXY_URL =~ $loopback ]] || { echo "FAIL: LOADRUN_PROXY must be this machine's loopback, not $PROXY_URL" >&2; exit 2; }
 
 export COMPOSE_FILE=compose.yaml:test/load/compose.yaml
@@ -75,19 +78,26 @@ LOADRUN_COLD_KEY=$(keys issue -plan load -label load-cold -contact ops@example.t
 [[ -n $LOADRUN_KEY && -n $LOADRUN_COLD_KEY ]] || { echo "FAIL: the key tool issued no key" >&2; exit 1; }
 export LOADRUN_KEY LOADRUN_COLD_KEY
 
-# The breaker's settings of the instance under test, read from the compose
-# file that sets them: the runner judges the breaker against these.
-breaker() {
+# The settings of the instances under test, read from the compose file that
+# sets them: the runner judges the breaker and the stale answers against
+# these. Each is set once in that file.
+setting() {
   local v
-  v=$(sed -n "s/^ *VFAPI_BREAKER_$1: *\"\{0,1\}\([^\"]*\)\"\{0,1\} *$/\1/p" test/load/compose.yaml)
-  [[ -n $v ]] || { echo "test/load/compose.yaml sets no VFAPI_BREAKER_$1" >&2; exit 2; }
+  v=$(sed -n "s/^ *VFAPI_$1: *\"\{0,1\}\([^\"]*\)\"\{0,1\} *$/\1/p" test/load/compose.yaml)
+  [[ -n $v && $v != *$'\n'* ]] || { echo "test/load/compose.yaml sets VFAPI_$1 not exactly once" >&2; exit 2; }
   printf '%s' "$v"
 }
-brk_failures=$(breaker FAILURE_THRESHOLD) || exit 2
-brk_open_for=$(breaker OPEN_FOR) || exit 2
-brk_probes=$(breaker HALF_OPEN_PROBES) || exit 2
+brk_failures=$(setting BREAKER_FAILURE_THRESHOLD) || exit 2
+brk_open_for=$(setting BREAKER_OPEN_FOR) || exit 2
+brk_probes=$(setting BREAKER_HALF_OPEN_PROBES) || exit 2
+stale_for=$(setting CACHE_STALE_IF_ERROR_PARKING) || exit 2
+max_age_parking=$(setting CACHE_MAX_AGE_PARKING) || exit 2
+max_age_energy=$(setting CACHE_MAX_AGE_ENERGY) || exit 2
+versions_ttl=$(setting CACHE_VERSIONS_TTL) || exit 2
 previous=()
 [[ -n ${LOADRUN_PREVIOUS:-} ]] && previous=(-previous "$LOADRUN_PREVIOUS")
 go run ./internal/testkit/loadrun -profile "$profile" -report "$report" -api "$API_URL" -proxy "$PROXY_URL" -place "$place" \
   -breaker-failures "$brk_failures" -breaker-open-for "$brk_open_for" -breaker-probes "$brk_probes" \
+  -cached-api "$CACHED_URL" -stale-if-error "$stale_for" \
+  -max-age-parking "$max_age_parking" -max-age-energy "$max_age_energy" -versions-ttl "$versions_ttl" \
   -compose-files compose.yaml,test/load/compose.yaml "${previous[@]}"

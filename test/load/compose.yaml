@@ -50,7 +50,8 @@ services:
       # The runner repeats the same few requests, so the result cache would
       # answer them from memory and no fault would reach storage: every
       # request has to reach the path its scenario cuts. The cache has its
-      # own tests (unit, integration and the benchmark leg).
+      # own tests (unit, integration and the benchmark leg), and api-cached
+      # below shows its stale answers.
       VFAPI_CACHE_ENABLED: "false"
       # The storage-killed scenario holds storage down longer than twice
       # open_for, so a failed half-open probe opening the breaker again is
@@ -60,3 +61,52 @@ services:
       VFAPI_BREAKER_FAILURE_THRESHOLD: "5"
       VFAPI_BREAKER_OPEN_FOR: 2s
       VFAPI_BREAKER_HALF_OPEN_PROBES: "2"
+
+  # A second instance of the same image with the result cache on, behind the
+  # same fault proxy, so the storage-killed scenario sees stale answers
+  # (NFR-RES-004) while every other scenario reaches storage through api.
+  # scripts/load-test.sh hands the runner its parking stale allowance
+  # (-stale-if-error), its parking and energy max-ages and its versions TTL,
+  # read from this file: the runner asks for stale answers once the stored
+  # ones are past their max-age and the versions past their TTL, because
+  # until then a stored answer is replayed as fresh, from memory. The
+  # charging families of the fixture set are never served stale, so a
+  # charging search is the family without a stale allowance.
+  api-cached:
+    image: viafrei-api:local
+    pull_policy: never
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      VFAPI_SERVER_LISTEN_ADDR: ":8080"
+      VFAPI_DB_URL: postgres://api_reader:${API_READER_PASSWORD:?set API_READER_PASSWORD in .env}@toxiproxy:15432/contract?sslmode=disable
+      VFAPI_ACCESS_URL: postgres://api_access:${API_ACCESS_PASSWORD:?set API_ACCESS_PASSWORD (scripts/load-test.sh does)}@toxiproxy:15433/contract?sslmode=disable
+      VFAPI_AUTH_PEPPER: ${VFAPI_AUTH_PEPPER:?set VFAPI_AUTH_PEPPER (scripts/load-test.sh does)}
+      VFAPI_AUTH_KEY_CACHE_TTL: 10m
+      VFAPI_RATELIMIT_ANON_RPS: "0"
+      # Its own name, so the runner counts the storage connections of api
+      # alone against db.pool_max (NFR-CAP-002).
+      VFAPI_DB_APPLICATION_NAME: viafrei-api-cached
+      VFAPI_CACHE_ENABLED: "true"
+      VFAPI_CACHE_STALE_IF_ERROR_PARKING: 4s
+      VFAPI_CACHE_MAX_AGE_PARKING: 1s
+      VFAPI_CACHE_MAX_AGE_ENERGY: 1s
+      VFAPI_CACHE_VERSIONS_TTL: 1s
+      VFAPI_CACHE_NO_STALE_FAMILIES: src-alpha-energy,src-alpha-energy-stale,src-beta-energy,src-gamma-energy
+    ports:
+      # Loopback only, like api.
+      - "${API_CACHED_PUBLISH:-[::1]:8081}:8080"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    cpus: 1.0
+    pids_limit: 128
+    healthcheck:
+      test: ["CMD", "/app", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks: [backend, frontend]

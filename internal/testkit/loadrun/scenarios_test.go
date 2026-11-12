@@ -587,3 +587,132 @@ func TestReportAndVerdict(t *testing.T) {
 		t.Errorf("freshness of nothing %+v", v)
 	}
 }
+
+func TestStorageKilledAssertsStaleAnswers(t *testing.T) {
+	req.Covers(t, "NFR-RES-004", "PROT-047", "TST-007")
+	const (
+		served   = "served from the cache with served_stale"
+		fast     = "each stale answer within 50 ms"
+		aged     = "none older than cache.stale_if_error"
+		never    = "a request the cache never answered"
+		old      = "answered longer ago than cache.stale_if_error"
+		noStale  = "a family listed in cache.no_stale_families"
+		again    = "the instance with the result cache answers from storage again"
+		uncached = "the instance without a result cache serves nothing stale"
+	)
+	o := runOne(t, proxiedWorld(t), "storage-killed")
+	mustPass(t, o)
+	for _, c := range []string{served, fast, aged, never, old, noStale, again, uncached} {
+		checkNamed(t, o, c)
+	}
+
+	// A cached instance that never answered: the stale checks are not run,
+	// and the scenario fails on the warm-up alone.
+	w := proxiedWorld(t)
+	w.cached.Config.Handler = http.HandlerFunc(brokenAPI)
+	o = runOne(t, w, "storage-killed")
+	mustFail(t, o, "answered before the fault")
+	for _, c := range o.checks {
+		if strings.Contains(c.name, served) || strings.Contains(c.name, again) {
+			t.Errorf("a stale check ran without a warm cache: %+v", c)
+		}
+	}
+
+	// cached wraps the fake cache: while storage is cut, bad answers instead.
+	cached := func(w *world, bad http.HandlerFunc) {
+		inner := w.cached.Config.Handler
+		w.cached.Config.Handler = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			if w.proxy.cut() {
+				bad(rw, r)
+				return
+			}
+			inner.ServeHTTP(rw, r)
+		})
+	}
+	for name, tc := range map[string]struct {
+		bad    http.HandlerFunc
+		failed []string
+	}{
+		"everything served stale":       {func(rw http.ResponseWriter, _ *http.Request) { stale(rw, "0") }, []string{never, old, noStale}},
+		"stale with no warning":         {func(rw http.ResponseWriter, _ *http.Request) { answer(rw, map[string]any{}) }, []string{served, fast}},
+		"stale with no Age":             {func(rw http.ResponseWriter, _ *http.Request) { stale(rw, "") }, []string{aged}},
+		"stale older than allowed":      {func(rw http.ResponseWriter, _ *http.Request) { stale(rw, "1") }, []string{aged}},
+		"a refusal with no Retry-After": {func(rw http.ResponseWriter, _ *http.Request) { rw.WriteHeader(http.StatusServiceUnavailable) }, []string{served, never, old, noStale}},
+		"slow stale answers": {func(rw http.ResponseWriter, _ *http.Request) {
+			time.Sleep(60 * time.Millisecond)
+			stale(rw, "0")
+		}, []string{fast}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			w := proxiedWorld(t)
+			cached(w, tc.bad)
+			o := runOne(t, w, "storage-killed")
+			for _, c := range tc.failed {
+				mustFail(t, o, c)
+			}
+		})
+	}
+
+	// After the repair the cached instance still serves stale.
+	w = proxiedWorld(t)
+	var cut atomic.Bool
+	inner := w.cached.Config.Handler
+	w.cached.Config.Handler = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if w.proxy.cut() {
+			cut.Store(true)
+		}
+		if cut.Load() {
+			stale(rw, "0")
+			return
+		}
+		inner.ServeHTTP(rw, r)
+	})
+	mustFail(t, runOne(t, w, "storage-killed"), again)
+
+	// After the repair the cached instance replays from memory, with an
+	// Age: that is not an answer from storage.
+	w = proxiedWorld(t)
+	cut.Store(false)
+	inner = w.cached.Config.Handler
+	w.cached.Config.Handler = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if w.proxy.cut() {
+			cut.Store(true)
+		}
+		if cut.Load() && !w.proxy.cut() {
+			rw.Header().Set("Age", "0")
+			answer(rw, map[string]any{"warnings": []any{}})
+			return
+		}
+		inner.ServeHTTP(rw, r)
+	})
+	mustFail(t, runOne(t, w, "storage-killed"), again)
+
+	// A runner that does not wait past the max-age is answered fresh from
+	// memory, and finds no stale answer.
+	w = proxiedWorld(t)
+	w.r.freshFor = 0
+	w.cached.Config.Handler = &staleCache{read: map[string]time.Time{}, fresh: time.Minute, allow: time.Hour, down: w.proxy.cut}
+	mustFail(t, runOne(t, w, "storage-killed"), served)
+
+	// The instance without a cache claims a stale answer.
+	w = proxiedWorld(t)
+	w.api.Config.Handler = http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		if w.proxy.cut() {
+			stale(rw, "0")
+			return
+		}
+		answer(rw, map[string]any{})
+	})
+	mustFail(t, runOne(t, w, "storage-killed"), uncached)
+}
+
+func TestWarningsOfAnAnswer(t *testing.T) {
+	req.Covers(t, "PROT-047")
+	x := result{status: http.StatusOK, body: map[string]any{"meta": map[string]any{"warnings": []any{map[string]any{"code": "served_stale"}, "odd"}}}}
+	if got := warnings(x); len(got) != 2 || got[0] != "served_stale" || got[1] != "" || !servedStale(x) {
+		t.Fatalf("warnings %q", got)
+	}
+	if warnings(result{}) != nil || servedStale(result{status: http.StatusServiceUnavailable, body: x.body}) {
+		t.Fatal("an answer without a body, or a refusal, counted as stale")
+	}
+}

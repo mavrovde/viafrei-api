@@ -244,40 +244,13 @@ func TestHasMoreIsExcludedOnlyWhereAPowerIsAsked(t *testing.T) {
 	}
 }
 
-func TestANamedDifferenceIsReportedAsItselfAndOnlyInItsDirection(t *testing.T) {
-	r := parity.Default
+func TestAChargePointStateIsComparedLikeAnyOtherFact(t *testing.T) {
+	// No state is a named difference (#18): a reservation the MCP side
+	// answers occupied and the API reserved is a plain difference.
 	const state = "data[cs-1].chargePoints[cp-1].availability.state"
 	want := []parity.Fact{{state, "occupied"}, {"data[cs-1].id", "cs-1"}}
-	diff, named := parity.Compare(want, []parity.Fact{{state, "reserved"}, {"data[cs-1].id", "cs-1"}}, r)
-	if len(diff) != 0 || len(named) != 1 || named[0].API != "reserved" || named[0].Reason == "" {
-		t.Errorf("the named difference: diff %q, named %+v", diff, named)
-	}
-	if u := r.Unseen(named); len(u) != 0 {
-		t.Errorf("a shown difference is unseen: %+v", u)
-	}
-	if u := r.Unseen(nil); len(u) != len(r.Differences) {
-		t.Errorf("no case shown, %d unseen", len(u))
-	}
-	// The other direction, another value, or a fact under another name is a plain difference.
-	for name, got := range map[string][]parity.Fact{
-		"reversed":     {{state, "occupied"}, {"data[cs-1].id", "cs-1"}},
-		"other value":  {{state, "available"}, {"data[cs-1].id", "cs-1"}},
-		"missing fact": {{"data[cs-1].id", "cs-1"}},
-	} {
-		w := want
-		if name == "reversed" {
-			w = []parity.Fact{{state, "reserved"}, {"data[cs-1].id", "cs-1"}}
-		}
-		if diff, named := parity.Compare(w, got, r); len(diff) != 1 || len(named) != 0 {
-			t.Errorf("%s: diff %q, named %+v", name, diff, named)
-		}
-	}
-	if diff, named := parity.Compare(want, want, r); diff != nil || named != nil {
-		t.Errorf("equal facts: diff %q, named %+v", diff, named)
-	}
-	for _, d := range r.Differences {
-		if d.Pattern == "" || d.Bundle == d.API || d.Reason == "" {
-			t.Errorf("a difference without its pattern, two values or reason: %+v", d)
-		}
+	d := parity.Diff(want, []parity.Fact{{state, "reserved"}, {"data[cs-1].id", "cs-1"}})
+	if len(d) != 1 || d[0] != `changed `+state+`: want "occupied", got "reserved"` {
+		t.Errorf("reserved against occupied: %q", d)
 	}
 }

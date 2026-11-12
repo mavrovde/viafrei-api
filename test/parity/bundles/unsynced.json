@@ -705,7 +705,7 @@
         },
         {
           "name": "data[cs-01-0001].chargePoints[cp-00001-0].availability.state",
-          "value": "reserved"
+          "value": "occupied"
         },
         {
           "name": "data[cs-01-0001].chargePoints[cp-00001-0].id",

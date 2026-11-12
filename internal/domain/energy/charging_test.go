@@ -20,7 +20,7 @@ func TestMappings(t *testing.T) {
 		}
 	}
 	for raw, want := range map[string]energy.State{
-		"available": energy.StateAvailable, "occupied": energy.StateOccupied, "reserved": energy.StateReserved,
+		"available": energy.StateAvailable, "occupied": energy.StateOccupied, "reserved": energy.StateOccupied,
 		"out_of_order": energy.StateOutOfOrder, "unknown": energy.StateUnknown, "x_unmapped": energy.StateOther,
 	} {
 		if got := energy.MapState(raw); got != want {
@@ -37,6 +37,20 @@ func TestMappings(t *testing.T) {
 	}
 	if energy.Other != "other" || len(energy.Accesses) != 4 || len(energy.States) != 7 || len(energy.Currents) != 3 {
 		t.Error("the enumerations changed")
+	}
+}
+
+func TestAReservedPointIsAnsweredOccupied(t *testing.T) {
+	// #18: the MCP capability answers a reservation as occupied, and so does
+	// the API. reserved stays in the enumeration (VER-002) and no stored code
+	// maps to it.
+	if got := energy.MapState("reserved"); got != energy.StateOccupied {
+		t.Errorf("MapState(reserved) = %q, want occupied", got)
+	}
+	for _, st := range energy.States {
+		if got := energy.MapState(string(st)); got == energy.StateReserved {
+			t.Errorf("MapState(%q) = reserved", st)
+		}
 	}
 }
 
@@ -72,7 +86,7 @@ func TestSummarise(t *testing.T) {
 			energy.Summary{ChargePoints: 2, AvailableNow: intp(0), MaxPowerKw: kw(50)}},
 		{"counted", []energy.ChargePoint{
 			point(energy.StateAvailable, 0, kw(150)), point(energy.StateAvailable, time.Minute, kw(22)),
-			point(energy.StateReserved, 0, nil), point(energy.StateAvailable, stale+time.Minute, kw(300)),
+			point(energy.MapState("reserved"), 0, nil), point(energy.StateAvailable, stale+time.Minute, kw(300)),
 		}, energy.Summary{ChargePoints: 4, AvailableNow: intp(2), MaxPowerKw: kw(300)}},
 	}
 	for _, c := range cases {
@@ -158,8 +172,8 @@ func TestAReportOlderThanTheShorterLimitIsShownStale(t *testing.T) {
 	for _, c := range []struct {
 		age  time.Duration
 		want energy.State
-	}{{0, energy.StateReserved}, {limit, energy.StateReserved}, {limit + time.Second, energy.StateStale}, {10 * time.Hour, energy.StateStale}} {
-		a := point(energy.StateReserved, c.age, nil).Availability
+	}{{0, energy.StateOccupied}, {limit, energy.StateOccupied}, {limit + time.Second, energy.StateStale}, {10 * time.Hour, energy.StateStale}} {
+		a := point(energy.StateOccupied, c.age, nil).Availability
 		if got := a.Shown(now, limit); got != c.want || a.Live(now, limit) != (c.want != energy.StateStale) {
 			t.Errorf("a report %v old: shown %q, want %q", c.age, got, c.want)
 		}

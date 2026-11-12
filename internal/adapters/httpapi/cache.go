@@ -684,10 +684,7 @@ func withWarning(body []byte, w DataWarning) ([]byte, bool) {
 	if !empty {
 		add = append([]byte{','}, add...)
 	}
-	out := make([]byte, 0, len(body)+len(add))
-	out = append(out, body[:at]...)
-	out = append(out, add...)
-	return append(out, body[at:]...), true
+	return slices.Concat(body[:at], add, body[at:]), true
 }
 
 // warningsAt is the offset of the closing bracket of body's top-level

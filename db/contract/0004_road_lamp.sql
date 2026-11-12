@@ -49,8 +49,8 @@ alter table contract.junction add column state_code text;
 -- ------------------------------------------------------- source_freshness
 
 alter table contract.source_freshness
-    -- The newest instant the source was confirmed current: its data
-    -- re-read and found unchanged, or changed. Null: never confirmed.
+    -- The newest instant the source's data was confirmed current, whether
+    -- or not it changed. Null: never confirmed.
     add column confirmed_at timestamptz,
     -- The interval, in seconds, at which the source is confirmed; null when
     -- it states none (the lamp then judges it against 600 s).
@@ -62,8 +62,8 @@ alter table contract.source_freshness
 -- ------------------------------------------------------- message_coverage
 
 -- Which sources tell the lamp a state's traffic messages are seen: the
--- state's own message sources (coverage_role own) and the sources measured
--- to carry the state's messages as well (coverage_role carried). An own
+-- state's own message sources (coverage_role own) and the sources that
+-- carry the state's messages as well (coverage_role carried). An own
 -- source whose messages are answered only while it is current
 -- (current_only) caps the state's sight. A state with no row here is not
 -- seen.

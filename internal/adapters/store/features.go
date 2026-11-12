@@ -20,8 +20,7 @@ import (
 // Provenance reads the attribution, the notes in lang and the freshness of
 // the given families only.
 func (s *Store) Provenance(ctx context.Context, families []string, lang string) ([]provenance.Family, error) {
-	var out []provenance.Family
-	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]provenance.Family, error) {
 		// A failed query surfaces through CollectRows (pgx returns it from
 		// rows.Err as well).
 		rows, _ := tx.Query(ctx, `
@@ -37,8 +36,7 @@ join contract.licence l using (licence_code)
 left join contract.source_freshness f using (source_ref)
 where s.source_ref = any($1)
 order by s.source_ref`, families, lang)
-		var err error
-		out, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (provenance.Family, error) {
+		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (provenance.Family, error) {
 			var (
 				f            provenance.Family
 				v            access.Source
@@ -53,9 +51,7 @@ order by s.source_ref`, families, lang)
 			}
 			return f, err
 		})
-		return err
 	})
-	return out, err
 }
 
 // ChargingNear reads the charging sites of the given families within the
@@ -71,8 +67,7 @@ func (s *Store) ChargingNear(ctx context.Context, q energy.Query, families []str
 		site  energy.Site
 		point *energy.ChargePoint
 	}
-	var rows []row
-	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
+	rows, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]row, error) {
 		// One statement: the sites (one more than the limit, to tell whether
 		// there are more), then their points. A failed query surfaces through
 		// CollectRows.
@@ -103,8 +98,7 @@ left join lateral (
   order by o.observed_at desc
   limit 1) o on true
 order by s.dist, s.site_id, p.point_id`, q.At.Lat, q.At.Lon, families, q.RadiusM, accessCodes, q.MinKw, q.Limit+1, now)
-		var err error
-		rows, err = pgx.CollectRows(res, func(r pgx.CollectableRow) (row, error) {
+		return pgx.CollectRows(res, func(r pgx.CollectableRow) (row, error) {
 			var (
 				v                       row
 				access                  string
@@ -125,7 +119,6 @@ order by s.dist, s.site_id, p.point_id`, q.At.Lat, q.At.Lon, families, q.RadiusM
 			}
 			return v, err
 		})
-		return err
 	})
 	var sites []energy.Site
 	for _, r := range rows {
@@ -148,11 +141,7 @@ order by s.dist, s.site_id, p.point_id`, q.At.Lat, q.At.Lon, families, q.RadiusM
 // radius, nearest first, then by id, each with its last occupancy report
 // from the occupancy families.
 func (s *Store) ParkingNear(ctx context.Context, q parking.Query, listed, occupancy []string, now time.Time) ([]parking.Site, bool, error) {
-	var (
-		sites []parking.Site
-		more  bool
-	)
-	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
+	sites, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]parking.Site, error) {
 		rows, _ := tx.Query(ctx, `
 with here as (select st_setsrid(st_makepoint($2, $1), 4326)::geography g)
 select f.facility_id, f.source_ref, f.name, f.operator_name, f.parking_kind,
@@ -174,8 +163,7 @@ where f.withdrawn_at is null
         select make_interval(secs => s.stale_after_s) from contract.source s where s.source_ref = o.source_ref)))
 order by 8, f.facility_id
 limit $8`, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, q.FreeMin, now, q.Limit+1)
-		var err error
-		sites, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (parking.Site, error) {
+		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (parking.Site, error) {
 			var (
 				v           parking.Site
 				kind        string
@@ -192,8 +180,8 @@ limit $8`, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, q.FreeMin, now, q.L
 			}
 			return v, err
 		})
-		return err
 	})
+	more := false
 	if len(sites) > q.Limit {
 		sites, more = sites[:q.Limit], true
 	}
@@ -202,8 +190,7 @@ limit $8`, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, q.FreeMin, now, q.L
 
 // Place reads one place of the given families.
 func (s *Store) Place(ctx context.Context, id string, families []string) (places.Place, error) {
-	var out places.Place
-	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
+	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (places.Place, error) {
 		rows, _ := tx.Query(ctx, `
 select place_id, name, place_kind, st_y(location), st_x(location), source_ref
 from contract.place
@@ -217,10 +204,11 @@ where place_id = $1 and withdrawn_at is null and source_ref = any($2)`, id, fami
 			v.Kind = places.MapKind(kind)
 			return v, err
 		})
+		var p places.Place
 		if len(ps) > 0 {
-			out = ps[0]
+			p = ps[0]
 		}
-		return err
+		return p, err
 	})
 	if err == nil && out.ID == "" {
 		err = places.ErrNotFound

@@ -185,34 +185,42 @@ func TestServerStopsTheStatementOnItsOwn(t *testing.T) {
 	req.Covers(t, "NFR-PERF-004")
 	ctx := bounded(t)
 	// Read answers at its deadline whatever the statement is doing, so the
-	// statement timeout must end before it: a 200ms reserve leaves room for
+	// statement timeout must end before it: a 400ms reserve leaves room for
 	// the round trips ahead of the timed statement, which its own timeout
-	// does not count.
-	st := openStore(t, ctx, "VFAPI_DEADLINE_RESERVE=200ms")
-	short, cancel := context.WithTimeout(ctx, 600*time.Millisecond)
+	// does not count, and a pooled connection keeps the connect out of them.
+	st := openStore(t, ctx, "VFAPI_DEADLINE_RESERVE=400ms")
+	if err := st.Read(ctx, func(context.Context, pgx.Tx) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	short, cancel := context.WithTimeout(ctx, 900*time.Millisecond)
 	defer cancel()
-	var limit, took time.Duration
-	err := st.Read(short, func(ctx context.Context, tx pgx.Tx) error {
-		var raw string
+	// The timings come back through ReadValue: fn writes nothing the test holds.
+	type timing struct{ limit, took time.Duration }
+	got, err := store.ReadValue(short, st, func(ctx context.Context, tx pgx.Tx) (timing, error) {
+		var (
+			raw string
+			tm  timing
+		)
 		if err := tx.QueryRow(ctx, "select current_setting('statement_timeout')").Scan(&raw); err != nil {
-			return err
+			return tm, err
 		}
 		if len(raw) < 3 || raw[len(raw)-2:] != "ms" {
-			return fmt.Errorf("statement_timeout %q is not the per-read budget in ms", raw)
+			return tm, fmt.Errorf("statement_timeout %q is not the per-read budget in ms", raw)
 		}
 		ms, err := strconv.Atoi(raw[:len(raw)-2])
 		if err != nil {
-			return fmt.Errorf("statement_timeout %q is not the per-read budget in ms", raw)
+			return tm, fmt.Errorf("statement_timeout %q is not the per-read budget in ms", raw)
 		}
-		limit = time.Duration(ms) * time.Millisecond
+		tm.limit = time.Duration(ms) * time.Millisecond
 		// Detach the client-side cancel: only the statement timeout can stop it. Only the
 		// statement is timed: the begin, this read and the rollback are outside its timeout,
 		// and timing them too made the bound fail on a loaded machine.
 		start := time.Now()
 		_, err = tx.Exec(context.WithoutCancel(ctx), "select pg_sleep(5)")
-		took = time.Since(start)
-		return err
+		tm.took = time.Since(start)
+		return tm, err
 	})
+	limit, took := got.limit, got.took
 	if !errors.Is(err, store.ErrDeadlineExhausted) || sqlState(err) != "57014" {
 		t.Fatalf("want the server-side statement timeout (57014), got %v", err)
 	}

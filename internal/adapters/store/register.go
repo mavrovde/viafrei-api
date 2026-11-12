@@ -11,15 +11,13 @@ import (
 // Register reads the licence terms of every source family the read contract
 // publishes: what the licence gate decides on (SEC-030).
 func (s *Store) Register(ctx context.Context) ([]access.Terms, error) {
-	var out []access.Terms
-	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]access.Terms, error) {
 		// A failed query surfaces through CollectRows (pgx returns it from
 		// rows.Err as well).
 		rows, _ := tx.Query(ctx, `
 select source_ref, domain, use_classes, acceptance_required, register_version::text, review_signed_on is not null
 from contract.source order by source_ref`)
-		var err error
-		out, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (access.Terms, error) {
+		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (access.Terms, error) {
 			var (
 				t       access.Terms
 				classes []string
@@ -30,16 +28,13 @@ from contract.source order by source_ref`)
 			}
 			return t, err
 		})
-		return err
 	})
-	return out, err
 }
 
 // Sources reads the attribution of the given families only: the allowed set
 // is applied inside the read, so a family outside it is never read (SEC-031).
 func (s *Store) Sources(ctx context.Context, allowed []string) ([]access.Source, error) {
-	var out []access.Source
-	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]access.Source, error) {
 		// A failed query surfaces through CollectRows (pgx returns it from
 		// rows.Err as well).
 		rows, _ := tx.Query(ctx, `
@@ -50,13 +45,10 @@ join contract.publisher p using (publisher_id)
 join contract.licence l using (licence_code)
 where s.source_ref = any($1)
 order by s.source_ref`, allowed)
-		var err error
-		out, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (access.Source, error) {
+		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (access.Source, error) {
 			var v access.Source
 			err := r.Scan(&v.Family, &v.Domain, &v.Publisher, &v.AttributionText, &v.Licence, &v.LicenceURL, &v.ShareAlike, &v.ShareAlikeOffer, &v.TermsURL)
 			return v, err
 		})
-		return err
 	})
-	return out, err
 }

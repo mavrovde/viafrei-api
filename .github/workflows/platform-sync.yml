@@ -88,8 +88,13 @@ jobs:
         run: |
           branch="platform-sync/$VERSION"
           if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
-            echo "$branch exists already; its pull request carries this sync" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+            # The API is still behind the platform: the pull request of this sync
+            # is open and unmerged. The run fails every day until it is merged,
+            # so a pin that falls behind is never silent (a green run here would
+            # read as "in step").
+            echo "$branch exists already and is not merged: the API is behind platform $VERSION" >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::the API is behind platform $VERSION: merge the pull request of $branch (it needs the parity bundle, docs/parity.md)"
+            exit 1
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -101,6 +106,7 @@ jobs:
             echo "Keeps the API in step with ViaFrei platform release $VERSION (docs/RELEASING.md)."
             echo
             echo "- internal/buildinfo/platform-version.txt: $VERSION, reported by /v1/meta as platformVersion."
+            echo "- The parity bundle for $VERSION is still to be produced: TestParity fails until test/parity/bundles/$VERSION.json is pinned in test/parity/lock.tsv (docs/parity.md, Producing the MCP bundle)."
             echo "- The commit's Release-As footer makes release-please propose $VERSION; that release pull request bumps version.txt and CHANGELOG.md, and its merge is tagged v$VERSION."
             echo
             echo "Opened by the Platform version sync workflow."

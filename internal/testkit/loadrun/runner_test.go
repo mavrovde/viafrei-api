@@ -112,6 +112,15 @@ func TestDatabaseReads(t *testing.T) {
 	if n, err := w.r.busy(ctx); err != nil || n != 0 {
 		t.Errorf("busy %d %v", n, err)
 	}
+	// Both count the instance under test alone: the instance with the
+	// result cache reads as the same role under another name.
+	w.dock.mu.Lock()
+	for _, c := range w.dock.calls {
+		if strings.Contains(c, "pg_stat_activity") && !strings.Contains(c, "application_name = 'viafrei-api'") {
+			t.Errorf("a connection count not scoped to the instance under test: %q", c)
+		}
+	}
+	w.dock.mu.Unlock()
 	if b, err := w.r.rss(ctx); err != nil || b != 3072*1024 {
 		t.Errorf("rss %d %v", b, err)
 	}

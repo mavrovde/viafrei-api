@@ -75,7 +75,19 @@ LOADRUN_COLD_KEY=$(keys issue -plan load -label load-cold -contact ops@example.t
 [[ -n $LOADRUN_KEY && -n $LOADRUN_COLD_KEY ]] || { echo "FAIL: the key tool issued no key" >&2; exit 1; }
 export LOADRUN_KEY LOADRUN_COLD_KEY
 
+# The breaker's settings of the instance under test, read from the compose
+# file that sets them: the runner judges the breaker against these.
+breaker() {
+  local v
+  v=$(sed -n "s/^ *VFAPI_BREAKER_$1: *\"\{0,1\}\([^\"]*\)\"\{0,1\} *$/\1/p" test/load/compose.yaml)
+  [[ -n $v ]] || { echo "test/load/compose.yaml sets no VFAPI_BREAKER_$1" >&2; exit 2; }
+  printf '%s' "$v"
+}
+brk_failures=$(breaker FAILURE_THRESHOLD) || exit 2
+brk_open_for=$(breaker OPEN_FOR) || exit 2
+brk_probes=$(breaker HALF_OPEN_PROBES) || exit 2
 previous=()
 [[ -n ${LOADRUN_PREVIOUS:-} ]] && previous=(-previous "$LOADRUN_PREVIOUS")
 go run ./internal/testkit/loadrun -profile "$profile" -report "$report" -api "$API_URL" -proxy "$PROXY_URL" -place "$place" \
+  -breaker-failures "$brk_failures" -breaker-open-for "$brk_open_for" -breaker-probes "$brk_probes" \
   -compose-files compose.yaml,test/load/compose.yaml "${previous[@]}"

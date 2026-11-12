@@ -87,6 +87,40 @@ func problem(w http.ResponseWriter, status int, slug string) {
 	_, _ = fmt.Fprintf(w, `{"type":"https://api.example.test/problems/%s","status":%d}`, slug, status)
 }
 
+// breakerProblem writes the answer of an open breaker.
+func breakerProblem(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Retry-After", "2")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	_ = json.NewEncoder(w).Encode(map[string]any{"type": "https://api.example.test/problems/upstream-unavailable", "status": 503, "detail": breakerDetail})
+}
+
+// at is a change of the breaker's state, "from>to", at t.
+func at(step string, t time.Time) stateChange { return stateChange{at: t, step: step} }
+
+// breakerLog is the instance's log of the given changes of the breaker's
+// state, among other lines.
+func breakerLog(changes ...stateChange) string {
+	lines := []string{`{"msg":"listening"}`, "not json"}
+	for _, c := range changes {
+		from, to, _ := strings.Cut(c.step, ">")
+		lines = append(lines, fmt.Sprintf(`{"time":%q,"level":"INFO","msg":%q,"from":%q,"to":%q,"generation":1}`,
+			c.at.UTC().Format(time.RFC3339Nano), breakerLogLine, from, to))
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+// logs answers the runner's log read with log(now) and every other docker
+// call like the stack at rest.
+func logs(log func(now time.Time) string) func(string) (string, error) {
+	return func(a string) (string, error) {
+		if strings.HasPrefix(a, "logs ") {
+			return log(time.Now()), nil
+		}
+		return healthyDocker(a)
+	}
+}
+
 // answer writes a 2xx answer with the meta a scenario reads.
 func answer(w http.ResponseWriter, meta map[string]any) {
 	w.Header().Set("Content-Type", "application/json")
@@ -127,6 +161,18 @@ func (x *toxi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// restored reports whether the last call to the fault proxy repaired it:
+// a reset, or a route enabled again.
+func (x *toxi) restored() bool {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if len(x.calls) == 0 {
+		return false
+	}
+	last := x.calls[len(x.calls)-1]
+	return strings.Contains(last, "/reset") || strings.Contains(last, `"enabled":true`)
+}
+
 // world is a runner against a fake API, a fake fault proxy and fake docker.
 type world struct {
 	r     *runner
@@ -149,6 +195,7 @@ func newWorld(t *testing.T, api http.HandlerFunc, dock func(string) (string, err
 	w.r = newRunner(tiny, testBudgets, w.api.URL, ps.URL, "vf_test_warm", "vf_test_cold", "pl-1", 4, 100*time.Millisecond, 20*time.Millisecond)
 	w.r.docker = w.dock.run
 	w.r.host = w.dock.run
+	w.r.brk = breakerSettings{failures: 5, openFor: 10 * time.Millisecond, probes: 2}
 	return w
 }
 

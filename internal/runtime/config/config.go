@@ -45,6 +45,7 @@ type Config struct {
 	Quota      Quota      `koanf:"quota"`
 	Tiers      Tiers      `koanf:"tiers"`
 	Admission  Admission  `koanf:"admission"`
+	Breaker    Breaker    `koanf:"breaker"`
 	Metering   Metering   `koanf:"metering"`
 	Cache      Cache      `koanf:"cache"`
 	Admin      Admin      `koanf:"admin"`
@@ -243,6 +244,15 @@ type Admission struct {
 	AgingAfter time.Duration `koanf:"aging_after" default:"500ms" validate:"min=0s,max=2s" desc:"A waiter older than this is promoted one tier, so no tier starves (RATE-010). 0s promotes every waiter at once."`
 	EWMAAlpha  float64       `koanf:"ewma_alpha" default:"0.2" validate:"min=0.01,max=1" desc:"Weight of the newest storage service time in the moving average the wait estimate uses (RATE-011)."`
 	ShedStatus int           `koanf:"shed_status" default:"429" validate:"oneof=429 503" desc:"HTTP status of an overloaded refusal: 429 or 503. The problem type is overloaded either way, with Retry-After."`
+}
+
+// Breaker holds the settings of the circuit breaker in front of storage
+// (NFR-RES-002).
+type Breaker struct {
+	FailureThreshold int           `koanf:"failure_threshold" default:"5" validate:"min=1,max=100" desc:"Consecutive storage failures, within breaker.window, that open the breaker. Open, it answers 503 upstream-unavailable at once without touching storage."`
+	Window           time.Duration `koanf:"window" default:"30s" validate:"min=1s,max=10m" desc:"Span in which the consecutive failures must fall; a failure later than this after the first of a run starts a new run."`
+	OpenFor          time.Duration `koanf:"open_for" default:"15s" validate:"min=1s,max=5m" desc:"Time the breaker stays open; Retry-After says what is left of it. Then it admits breaker.half_open_probes trial reads."`
+	HalfOpenProbes   int           `koanf:"half_open_probes" default:"2" validate:"min=1,max=16" desc:"Trial reads admitted after breaker.open_for; the first that succeeds closes the breaker, the first that fails opens it again, and other reads are refused meanwhile."`
 }
 
 // Metering holds the usage-metering settings (RATE-014).

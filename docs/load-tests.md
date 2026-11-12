@@ -56,19 +56,19 @@ never skipped.
 | `soak` | none | every answer 2xx; p95 and p99 per class within `test/load/budgets.tsv` (NFR-PERF-003); resident memory grows at most 10 % after warm-up; no connection left busy |
 | `spike` | four times design load | every refusal carries `Retry-After`; back to 2xx and within budget afterwards |
 | `stress` | a ramp doubling the rate past the knee | the knee is reached; throughput above it stays at least 80 % of the peak; refusals are `429` with `Retry-After` within 50 ms (NFR-CAP-003) |
-| `slow-storage` | latency beyond the deadline on every storage byte | `503 deadline-exhausted` by the deadline; 2xx after the repair |
+| `slow-storage` | latency beyond the deadline on every storage byte | `503 deadline-exhausted` by the deadline, or refused by the circuit breaker those failures open; 2xx after the repair |
 | `hanging-query` | every feature table locked | reads cut at the deadline; afterwards a run of requests without a poisoned connection |
 | `pool-exhausted` | every permit held, plus bursts | the admission refuses (`429 overloaded` with `Retry-After`), each refusal within the tier's `queue_max_wait` plus 50 ms (`-queue-max-wait`, default 400 ms) |
 | `composed-part-timeout` | the parking tables locked | `200` with the parking part `timeout` and the charging part `ok` |
-| `storage-killed` | the storage route cut | `503 upstream-unavailable` with `Retry-After`, p95 within 50 ms; 2xx after the repair |
+| `storage-killed` | the storage route cut | `503 upstream-unavailable` with `Retry-After`, p95 within 50 ms; the circuit breaker opens after at most `breaker.failure_threshold` reads reached storage, lets at most `breaker.half_open_probes` reads through in each half-open period, opens again on a failed probe, and a probe closes it after the repair (read from the instance's log; `-breaker-failures`, `-breaker-open-for`, `-breaker-probes` give the instance's settings, which `scripts/load-test.sh` reads from `test/load/compose.yaml`); 2xx after the repair |
 | `access-store-down` | the access-store route cut | a cached key keeps working; an uncached key is `503 upstream-unavailable`; both work after the repair |
 | `clock-skew` | the source clock 10 minutes ahead and 30 days behind | no negative age; ahead is fresh; behind is stale with `data_stale` |
 | `instance-killed` | `SIGKILL` under load, then a start | ready within 30 s; 2xx again |
 
 The report lists what each scenario does not assert yet:
 
-- the circuit breaker (NFR-RES-002) and `served_stale` answers
-  (NFR-RES-004), which do not exist in the service yet;
+- `served_stale` answers (NFR-RES-004), which do not exist in the service
+  yet;
 - metering buffering while the access store is down;
 - a moved service clock (the service's distroless container has no way to
   move it; quota windows under a moved clock are unit-tested);

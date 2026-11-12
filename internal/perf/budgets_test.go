@@ -47,6 +47,7 @@ func TestLoadRefusesWhatAssertsNothing(t *testing.T) {
 		"operation twice":  {classes, "op\tnear\nop\tnear\n", "operation op twice"},
 		"operation fields": {classes, "op\n", "1 fields, want 2"},
 		"no operation":     {classes, "# nothing\n", "no operation read"},
+		"unused classes":   {classes + "along\t1\t2\t3\ntransit\t1\t2\t3\n", "op\tnear\n", "classes: no operation uses along, transit"},
 	} {
 		if _, err := load(t, tc.c, tc.o); err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%s: %v, want %q", name, err, tc.want)

@@ -39,8 +39,9 @@ func (b Budgets) Of(operation string) (Class, bool) {
 // Load reads the two budget files. It refuses a malformed line, a class out
 // of order (p50 ≤ p95 ≤ p99 < deadline, the configured hard ceiling of every
 // request, deadline.request, NFR-PERF-001), a duplicate, an operation of an
-// unknown class, and files without the conditional class or any operation:
-// a budget read from nothing asserts nothing.
+// unknown class, a class other than conditional that no operation uses, and
+// files without the conditional class or any operation: a budget read from
+// nothing, or one nothing is measured against, asserts nothing.
 func Load(classes, operations io.Reader, deadline time.Duration) (Budgets, error) {
 	b := Budgets{Classes: map[string]Class{}, Operations: map[string]string{}}
 	err := rows(classes, 4, func(f []string) error {
@@ -83,6 +84,22 @@ func Load(classes, operations io.Reader, deadline time.Duration) (Budgets, error
 	}
 	if len(b.Operations) == 0 {
 		return Budgets{}, fmt.Errorf("operations: no operation read")
+	}
+	// A class no operation uses is a budget nothing is measured against;
+	// the conditional class is every operation's 304.
+	used := map[string]bool{Conditional: true}
+	for _, c := range b.Operations {
+		used[c] = true
+	}
+	var unused []string
+	for name := range b.Classes {
+		if !used[name] {
+			unused = append(unused, name)
+		}
+	}
+	if len(unused) > 0 {
+		slices.Sort(unused)
+		return Budgets{}, fmt.Errorf("classes: no operation uses %s", strings.Join(unused, ", "))
 	}
 	return b, nil
 }

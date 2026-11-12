@@ -142,7 +142,8 @@ standard read (NFR-CAP-002), the same as readiness: see
 - `cache.max_entries` entries, with or without a body.
 
 The least recently used entry goes first. A body is kept until its max-age
-ends; the entry stays without it, so its validator still answers a 304.
+ends, or until its stale allowance ends when that is later (below); the
+entry stays without it, so its validator still answers a 304.
 
 A repeat with no validator is served from memory under the same conditions
 as a 304. A replayed answer carries its own `requestId`, but the
@@ -184,6 +185,51 @@ downstream keeps it either, and an `If-None-Match` never matches it.
 
 `cache.enabled: false` sends `Cache-Control: no-store` and turns off the
 validators and the result cache.
+
+## Serving a stored answer while storage is down (NFR-RES-004, PROT-047)
+
+When storage cannot answer a request (the answer would be `503`
+`upstream-unavailable` or `deadline-exhausted`), the stored answer of the
+same request is sent instead, as a `200`, if it was read no longer than
+its domain's stale allowance ago: `cache.stale_if_error.<domain>`, with the
+domains of `cache.max_age` (default five minutes each). An answer read from
+several domains takes the smallest. It carries:
+
+- the `served_stale` warning in `meta.warnings`, whose detail says how many
+  seconds ago it was read;
+- an `Age` header with those seconds, so the data's age now is still
+  `ageS` plus `Age`;
+- this request's `requestId`;
+- `Cache-Control: no-store` and no `ETag`, so nothing downstream keeps it or
+  revalidates against it.
+
+To make this possible, a body is kept for the stale allowance even after its
+max-age ends; it is never replayed as fresh past its max-age. Such bodies
+count against `cache.max_bytes` like any other and are dropped least recently
+used first, so a longer allowance than max-age holds more bodies at once: with
+the defaults, an answer's body stays up to five minutes instead of 30 to 60
+seconds. A cache that fills drops the bodies asked for least recently, which
+then cannot be served stale; raise `cache.max_bytes` or shorten the allowance
+of a domain whose bodies crowd the others out.
+
+Requests waiting on the same read as a request storage could not answer are
+answered stale with it, when they may be, and never ask storage again; one
+whose own deadline ends while it waits is answered stale too, when it may be.
+
+Nothing is served stale:
+
+- when the stale allowance of a domain the answer was read from is `0s`;
+- for an answer read from any family listed in `cache.no_stale_families`;
+- when the answer was read under another licence register than the one last
+  read successfully, because the answer must then pass the licence gate
+  again: while storage is down the register cannot be read, and the last one
+  read is what the answer is held to;
+- before any register was read at all;
+- for any other refusal: an overloaded `503`, a `403`, a `404`;
+- for a request that never had an answer stored.
+
+In each of these cases the request gets the answer it would get without the
+cache.
 
 ## Compression
 

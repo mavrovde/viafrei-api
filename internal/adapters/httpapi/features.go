@@ -98,7 +98,7 @@ type Notes struct {
 
 // DataWarning is one entry of meta.warnings of a data answer.
 type DataWarning struct {
-	Code   string `json:"code" enum:"partial,data_stale" doc:"Stable warning code; clients tolerate codes they do not know."`
+	Code   string `json:"code" enum:"partial,data_stale,served_stale" doc:"Stable warning code; clients tolerate codes they do not know."`
 	Detail string `json:"detail" doc:"What the warning means for this answer."`
 }
 
@@ -205,7 +205,7 @@ func featureResponses(api huma.API, op *huma.Operation, notFound string) {
 	}
 	op.Responses["404"] = &huma.Response{Description: notFound, Content: problem}
 	op.Responses["503"] = &huma.Response{
-		Description: "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After.",
+		Description: "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
 		Headers:     map[string]*huma.Param{"Retry-After": {Schema: &huma.Schema{Type: huma.TypeInteger}}},
 		Content:     problem,
 	}

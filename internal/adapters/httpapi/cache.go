@@ -125,7 +125,10 @@ func noteDegraded(ctx context.Context) {
 type familyVersion struct{ family, version string }
 
 // entry is one answer of the result cache. Its body is kept while it is
-// younger than its max-age and fits the budget; get drops an expired body.
+// younger than its max-age, or than its stale allowance when that is longer,
+// and fits the budget; get drops a body past both. It is replayed as fresh
+// only before expires, and as stale only while storage cannot answer
+// (serveStale).
 // The ETag, the family versions and the register fingerprint stay while the
 // entry is in the cache, so a matching If-None-Match is answered without the
 // handler for as long as nothing the answer rests on changed. A stored entry
@@ -154,7 +157,14 @@ type entry struct {
 	// in its Age header (sendEntry).
 	built   time.Time
 	expires time.Time
-	elem    *list.Element
+	// stale is how long after built the answer may still be served stale
+	// (the smallest cache.stale_if_error of the domains it was read from,
+	// or 0 when a family it was read from is in cache.no_stale_families),
+	// and keep is when its body is dropped: the
+	// later of expires and built plus stale.
+	stale time.Duration
+	keep  time.Time
+	elem  *list.Element
 	// unversioned is set when nothing can tell when the answer changes: a
 	// family carried no freshness version, the versions could not be read
 	// before the answer, or the answer is degraded. It gets no ETag, is
@@ -212,6 +222,10 @@ type resultCache struct {
 type flight struct {
 	done chan struct{}
 	e    *entry // the leader's answer; nil when it had no 200 from source families
+	// failed is set when storage could not answer the leader: the requests
+	// that waited are then answered stale as the leader was, when they may
+	// be, rather than each asking the storage that just failed.
+	failed bool
 }
 
 func newResultCache(c config.Cache) *resultCache {
@@ -222,7 +236,7 @@ func newResultCache(c config.Cache) *resultCache {
 }
 
 // get returns the entry of key, the most recently used from now on. An entry
-// whose body has expired at now is replaced by its bodiless copy first.
+// whose body is past its keep at now is replaced by its bodiless copy first.
 func (c *resultCache) get(key string, now time.Time) *entry {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -230,7 +244,7 @@ func (c *resultCache) get(key string, now time.Time) *entry {
 	if e == nil {
 		return nil
 	}
-	if e.body != nil && !now.Before(e.expires) {
+	if e.body != nil && now.After(e.keep) {
 		bare := *e
 		bare.body, bare.header = nil, nil
 		c.remove(e)
@@ -378,6 +392,17 @@ func (v *versionCache) get(ctx context.Context) (provenance.Versions, bool) {
 	return vs, true
 }
 
+// last returns the versions of the last read that succeeded, however old,
+// and whether there was one. A stale answer is held to the register in it:
+// while storage cannot answer, the versions cannot be read either, and the
+// register the service last knew is the only one an answer may be checked
+// against.
+func (v *versionCache) last() (provenance.Versions, bool) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.vs, v.read
+}
+
 // serviceRead is the context of a read the service makes for every request,
 // not for the one that happened to ask: it carries none of that request's
 // values, so no caller rides on it and it is admitted as the service's own
@@ -441,7 +466,7 @@ func (s *server) cache(ctx huma.Context, next func(huma.Context)) {
 			s.sendNotModified(ctx, e)
 			return
 		}
-		if e.body != nil {
+		if e.body != nil && now.Before(e.expires) {
 			s.sendEntry(ctx, e, inm)
 			return
 		}
@@ -454,8 +479,16 @@ func (s *server) cache(ctx huma.Context, next func(huma.Context)) {
 				s.sendEntry(ctx, f.e, inm)
 				return
 			}
+			if f.failed && s.serveStale(ctx, key) {
+				return
+			}
 		case <-ctx.Context().Done():
-			// The request ended while waiting: it runs no read of its own.
+			// The request ended while waiting: it runs no read of its own,
+			// and is answered stale when it may be, as a deadline exhausted
+			// in its own read would be.
+			if s.serveStale(ctx, key) {
+				return
+			}
 			sendProblem(ctx, newProblem(ctx.Context(), SlugDeadlineExhausted, "The request ended while an identical request was being answered.", 1))
 			return
 		}
@@ -492,6 +525,14 @@ func (s *server) run(ctx huma.Context, next func(huma.Context), key, inm string,
 		}
 	}()
 	next(b)
+	if storageFailed(b) {
+		if f != nil {
+			f.failed = true
+		}
+		if s.serveStale(ctx, key) {
+			return
+		}
+	}
 	if b.status != http.StatusOK || len(note.fams) == 0 {
 		send(ctx, b.status, b.header, b.body.Bytes())
 		return
@@ -531,6 +572,10 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 		age := maxAge(s.cfg.Cache.MaxAge, f.Source.Domain)
 		if e.maxAge == 0 || age < e.maxAge {
 			e.maxAge = age
+		}
+		stale := maxAge(config.CacheMaxAge(s.cfg.Cache.StaleIfError), f.Source.Domain)
+		if len(e.families) == 1 || stale < e.stale {
+			e.stale = stale
 		}
 		if f.DataAsOf != nil && (e.modified == nil || f.DataAsOf.After(*e.modified)) {
 			e.modified = f.DataAsOf
@@ -584,10 +629,18 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 	}
 	e.etag = `W/"` + base64.RawURLEncoding.EncodeToString(h.Sum(nil)[:18]) + `"`
 	e.built, e.expires = now, now.Add(e.maxAge)
+	for _, f := range e.families {
+		if slices.Contains(s.cfg.Cache.NoStale, f.family) {
+			e.stale = 0
+		}
+	}
+	e.keep = now.Add(max(e.maxAge, e.stale))
 	return e
 }
 
-// maxAge is the Cache-Control max-age of a domain's answers.
+// maxAge is the Cache-Control max-age of a domain's answers, and, given the
+// stale allowances as a CacheMaxAge, the stale allowance of a domain's
+// answers.
 func maxAge(m config.CacheMaxAge, domain string) time.Duration {
 	switch domain {
 	case "places":
@@ -662,6 +715,135 @@ func (s *server) sendEntry(ctx huma.Context, e *entry, inm string) {
 		body = bytes.Replace(body, []byte(`"requestId":"`+e.requestID+`"`), []byte(`"requestId":"`+id+`"`), 1)
 	}
 	send(ctx, http.StatusOK, h, body)
+}
+
+// storageFailed reports whether the operation's answer is a 503 because
+// storage could not answer: unavailable, or out of time.
+func storageFailed(b *bufferedContext) bool {
+	if b.status != http.StatusServiceUnavailable {
+		return false
+	}
+	var p struct {
+		Type string `json:"type"`
+	}
+	if json.Unmarshal(b.body.Bytes(), &p) != nil {
+		return false
+	}
+	return strings.HasSuffix(p.Type, "/problems/"+SlugUpstreamUnavailable) ||
+		strings.HasSuffix(p.Type, "/problems/"+SlugDeadlineExhausted)
+}
+
+// stale returns the stored answer of key while it may still be served stale
+// at now (NFR-RES-004): its body is kept and it was read no longer than its
+// allowance ago.
+func (c *resultCache) stale(key string, now time.Time) *entry {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	e := c.entries[key]
+	if e == nil || e.body == nil || e.stale <= 0 || now.Sub(e.built) > e.stale {
+		return nil
+	}
+	return e
+}
+
+// serveStale answers a request storage could not answer with the stored
+// answer of key, when it may be served stale: a 200 with the served_stale
+// warning and its true Age (PROT-047). It is sent with no-store and no
+// validator, so nothing downstream keeps or revalidates it. An answer read
+// under another licence register than the one last read successfully is
+// never served, nor any answer before a register was read at all: the
+// licence gate reads the register from storage, so while storage cannot
+// answer this is the only check. It reports whether it answered.
+func (s *server) serveStale(ctx huma.Context, key string) bool {
+	e := s.results.stale(key, s.now())
+	if e == nil {
+		return false
+	}
+	if vs, ok := s.versions.last(); !ok || vs.Register != e.register {
+		return false
+	}
+	age := s.age(e)
+	body, ok := withWarning(e.body, DataWarning{
+		Code:   "served_stale",
+		Detail: "Storage could not answer; this is the answer read " + age + " s ago (see the Age header).",
+	})
+	if !ok {
+		return false
+	}
+	if id := RequestIDFrom(ctx.Context()); id != e.requestID {
+		body = bytes.Replace(body, []byte(`"requestId":"`+e.requestID+`"`), []byte(`"requestId":"`+id+`"`), 1)
+	}
+	h := e.header.Clone()
+	h.Del("ETag")
+	h.Set("Cache-Control", "no-store")
+	h.Set("Vary", varyOn)
+	h.Set("Age", age)
+	send(ctx, http.StatusOK, h, body)
+	return true
+}
+
+// withWarning returns body with w appended to its top-level meta.warnings.
+// It reports false when body has no such array.
+func withWarning(body []byte, w DataWarning) ([]byte, bool) {
+	at, empty, ok := warningsAt(body)
+	if !ok {
+		return nil, false
+	}
+	add, _ := json.Marshal(w)
+	if !empty {
+		add = append([]byte{','}, add...)
+	}
+	return slices.Concat(body[:at], add, body[at:]), true
+}
+
+// warningsAt is the offset of the closing bracket of body's top-level
+// meta.warnings array, and whether that array is empty.
+func warningsAt(body []byte) (int, bool, bool) {
+	d := json.NewDecoder(bytes.NewReader(body))
+	if !enter(d) || !member(d, "meta") || !enter(d) || !member(d, "warnings") {
+		return 0, false, false
+	}
+	if t, err := d.Token(); err != nil || t != json.Delim('[') {
+		return 0, false, false
+	}
+	empty := !d.More()
+	for d.More() {
+		var skip json.RawMessage
+		if d.Decode(&skip) != nil {
+			return 0, false, false
+		}
+	}
+	// More has skipped the space before the closing bracket.
+	at := int(d.InputOffset())
+	if at >= len(body) || body[at] != ']' {
+		return 0, false, false
+	}
+	return at, empty, true
+}
+
+// enter reads the opening brace of an object.
+func enter(d *json.Decoder) bool {
+	t, err := d.Token()
+	return err == nil && t == json.Delim('{')
+}
+
+// member advances d to the value of the member name of the object it is in,
+// skipping the members before it.
+func member(d *json.Decoder, name string) bool {
+	for d.More() {
+		t, err := d.Token()
+		if err != nil {
+			return false
+		}
+		if t == name {
+			return true
+		}
+		var skip json.RawMessage
+		if d.Decode(&skip) != nil {
+			return false
+		}
+	}
+	return false
 }
 
 // send writes an answer: the headers before the status, which the adapter

@@ -25,10 +25,11 @@ const (
 
 // request is one request of a scenario.
 type request struct {
-	class string
-	path  string
-	cold  bool // presents the cold key instead of the warm one
-	keep  bool // keeps the decoded body for a scenario's own check
+	class  string
+	path   string
+	cold   bool // presents the cold key instead of the warm one
+	keep   bool // keeps the decoded body for a scenario's own check
+	cached bool // goes to the instance with the result cache
 }
 
 // result is one answer, or a transport error (status 0).
@@ -37,6 +38,7 @@ type result struct {
 	status  int
 	problem string // the last segment of the problem type of a 4xx or 5xx
 	retry   bool   // Retry-After was sent
+	age     string // the Age header, empty when none was sent
 	took    time.Duration
 	sent    time.Time // when the request left
 	body    map[string]any
@@ -62,6 +64,13 @@ type runner struct {
 	fast     time.Duration // a refusal is fast within this (NFR-CAP-003)
 	queued   time.Duration // the standard tier's queue_max_wait: a waiter is shed by then (RATE-011)
 	brk      breakerSettings
+	cached   string        // base URL of the instance with the result cache (NFR-RES-004)
+	staleFor time.Duration // its cache.stale_if_error.parking
+	app      string        // db.application_name of the instance under test
+	// freshFor is the longest of its cache.max_age.parking,
+	// cache.max_age.energy and cache.versions_ttl: within it the instance
+	// replays a stored answer as fresh, from memory, storage or not.
+	freshFor time.Duration
 	http     *http.Client
 	docker   func(context.Context, ...string) (string, error) // docker compose on the stack's project
 	host     func(context.Context, ...string) (string, error) // the plain docker CLI (docker top)
@@ -74,7 +83,7 @@ func newRunner(p profile, b map[string]budget, api, proxy, key, cold, place stri
 	return &runner{
 		p: p, budgets: b, api: api, proxy: proxy, key: key, cold: cold, place: place, poolMax: poolMax,
 		limit: limit, overdue: deadline + grace + 100*time.Millisecond, fast: 50 * time.Millisecond,
-		http: newHTTPClient(limit), pollRSS: true, readyURL: api + "/readyz",
+		http: newHTTPClient(limit), pollRSS: true, readyURL: api + "/readyz", app: "viafrei-api",
 	}
 }
 
@@ -108,7 +117,11 @@ func (r *runner) mix(i int) request {
 // do sends one request and measures it until the body is read.
 func (r *runner) do(ctx context.Context, q request) result {
 	res := result{class: q.class, sent: time.Now()}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.api+q.path, nil)
+	base := r.api
+	if q.cached {
+		base = r.cached
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+q.path, nil)
 	if err != nil {
 		return res
 	}
@@ -128,6 +141,7 @@ func (r *runner) do(ctx context.Context, q request) result {
 	res.took = time.Since(start)
 	res.status = resp.StatusCode
 	res.retry = resp.Header.Get("Retry-After") != ""
+	res.age = resp.Header.Get("Age")
 	if res.status >= 400 {
 		var p struct {
 			Type string `json:"type"`
@@ -227,12 +241,14 @@ func (r *runner) psql(ctx context.Context, sql string) (string, error) {
 	return strings.TrimSpace(out), err
 }
 
-// backends reads the connections of the service's read-only role and those
-// running a statement for longer than the overdue limit.
+// backends reads the connections of the instance under test (its read-only
+// role and its application_name: the instance with the result cache reads
+// as the same role under another name) and those running a statement for
+// longer than the overdue limit.
 func (r *runner) backends(ctx context.Context) (sample, error) {
 	out, err := r.psql(ctx, fmt.Sprintf(
-		"select count(*), count(*) filter (where state = 'active' and now() - query_start > interval '%d milliseconds') from pg_stat_activity where usename = 'api_reader'",
-		r.overdue.Milliseconds()))
+		"select count(*), count(*) filter (where state = 'active' and now() - query_start > interval '%d milliseconds') from pg_stat_activity where usename = 'api_reader' and application_name = '%s'",
+		r.overdue.Milliseconds(), r.app))
 	if err != nil {
 		return sample{}, err
 	}
@@ -243,9 +259,9 @@ func (r *runner) backends(ctx context.Context) (sample, error) {
 	return s, nil
 }
 
-// busy counts the read-only role's backends that are not idle.
+// busy counts the instance under test's backends that are not idle.
 func (r *runner) busy(ctx context.Context) (int, error) {
-	out, err := r.psql(ctx, "select count(*) from pg_stat_activity where usename = 'api_reader' and state <> 'idle'")
+	out, err := r.psql(ctx, fmt.Sprintf("select count(*) from pg_stat_activity where usename = 'api_reader' and application_name = '%s' and state <> 'idle'", r.app))
 	if err != nil {
 		return 0, err
 	}

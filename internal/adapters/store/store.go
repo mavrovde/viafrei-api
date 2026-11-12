@@ -136,16 +136,64 @@ func (s *Store) Read(ctx context.Context, fn func(context.Context, pgx.Tx) error
 	if _, ok := s.Budget(ctx); !ok {
 		return ErrDeadlineExhausted
 	}
+	release := func() {}
 	if s.admit != nil {
-		release, err := s.admit.Acquire(ctx)
+		r, err := s.admit.Acquire(ctx)
 		if err != nil {
 			if errors.Is(err, admission.ErrOverloaded) {
 				return err
 			}
 			return fmt.Errorf("%w: %w", ErrDeadlineExhausted, err)
 		}
-		defer release()
+		release = r
 	}
+	// The answer is due at the deadline whatever the connection is doing
+	// (NFR-PERF-001). When the context ends, the driver sends a cancel request
+	// and abandons the connection only after db.cancel_grace, and both travel
+	// the same connection path as the read: on a slow path the read itself
+	// would return past the deadline. So the read runs on its own goroutine
+	// and Read returns at the deadline; that goroutine abandons the connection
+	// and only then gives the permit back, so storage is never asked for more
+	// than the pool while a cancel is still landing (NFR-PERF-002).
+	done := make(chan outcome, 1)
+	go func() {
+		defer release()
+		done <- s.guarded(ctx, fn)
+	}()
+	select {
+	case o := <-done:
+		if o.panicked {
+			panic(o.value)
+		}
+		return o.err
+	case <-ctx.Done():
+		return fmt.Errorf("%w: %w", ErrDeadlineExhausted, ctx.Err())
+	}
+}
+
+// outcome is what the read goroutine hands back: its error, or the value of
+// a panic in fn, which Read raises again on the request's own goroutine so
+// the server's panic handling sees it (a read that already missed its
+// deadline has no caller left to raise it to, and its panic ends with it).
+type outcome struct {
+	err      error
+	panicked bool
+	value    any
+}
+
+// guarded runs the transaction and turns a panic into an outcome.
+func (s *Store) guarded(ctx context.Context, fn func(context.Context, pgx.Tx) error) (o outcome) {
+	defer func() {
+		if v := recover(); v != nil {
+			o = outcome{panicked: true, value: v}
+		}
+	}()
+	return outcome{err: s.transact(ctx, fn)}
+}
+
+// transact runs fn in one read-only transaction whose statement timeout is
+// what is left of the budget.
+func (s *Store) transact(ctx context.Context, fn func(context.Context, pgx.Tx) error) error {
 	// The wait for a permit spent part of the budget: what is left is the
 	// statement timeout.
 	budget, ok := s.Budget(ctx)

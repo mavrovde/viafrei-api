@@ -184,7 +184,11 @@ func TestStatementTimeoutIsTheRemainingBudget(t *testing.T) {
 func TestServerStopsTheStatementOnItsOwn(t *testing.T) {
 	req.Covers(t, "NFR-PERF-004")
 	ctx := bounded(t)
-	st := openStore(t, ctx)
+	// Read answers at its deadline whatever the statement is doing, so the
+	// statement timeout must end before it: a 200ms reserve leaves room for
+	// the round trips ahead of the timed statement, which its own timeout
+	// does not count.
+	st := openStore(t, ctx, "VFAPI_DEADLINE_RESERVE=200ms")
 	short, cancel := context.WithTimeout(ctx, 600*time.Millisecond)
 	defer cancel()
 	var limit, took time.Duration

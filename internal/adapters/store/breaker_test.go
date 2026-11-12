@@ -164,7 +164,12 @@ func silentURL(t *testing.T) string {
 // nothing.
 func TestATransactionNotOpenedInTimeCountsAgainstTheBreaker(t *testing.T) {
 	req.Covers(t, "NFR-RES-002")
-	cfg, err := config.Load(config.Options{Environ: []string{"VFAPI_DB_URL=" + silentURL(t)}})
+	// A connection the silent storage never answers is waited for until
+	// db.connect_timeout, by the pool and by Close. The default (2s) is the
+	// test's whole bound (TST-012): one CI run took 2.01s. 500ms is still
+	// longer than every read's 200ms deadline below, so the reads end at
+	// their deadlines as before, and the test stays well inside the bound.
+	cfg, err := config.Load(config.Options{Environ: []string{"VFAPI_DB_URL=" + silentURL(t), "VFAPI_DB_CONNECT_TIMEOUT=500ms"}})
 	if err != nil {
 		t.Fatal(err)
 	}

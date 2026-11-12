@@ -68,8 +68,10 @@ for p in "${pages[@]}"; do
   [[ -s $src ]] || { echo "FAIL: $src is missing or empty" >&2; exit 1; }
   # A line that is only an image from another host (the README's status
   # badges) is GitHub's decoration and is left out of the portal, whose
-  # pages load nothing from a third party (#81, scripts/docs-check.pl).
-  body=$(grep -vE '^[[:space:]]*!\[[^]]*\]\((https?:)?//[^)]*\)[[:space:]]*$' "$src" | "${marked[@]}")
+  # pages load nothing from a third party (#81, scripts/docs-check.pl). A
+  # line inside a fenced code block is text and is kept.
+  body=$(awk '/^[[:space:]]*(```|~~~)/ { fenced = !fenced; print; next }
+    fenced || !/^[[:space:]]*!\[[^]]*\]\((https?:)?\/\/[^)]*\)[[:space:]]*$/' "$src" | "${marked[@]}")
   [[ -n $body ]] || { echo "FAIL: $src rendered to nothing" >&2; exit 1; }
   body=$(perl "$here/docs-html.pl" "$base" <<<"$body") || { echo "FAIL: $src has the link(s) above" >&2; exit 1; }
   nav=''

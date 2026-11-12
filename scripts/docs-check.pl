@@ -102,9 +102,18 @@ sub external_resources {
     my ($tag, $attrs) = (lc $1, $2);
     while ($attrs =~ /\s(href|xlink:href|src|srcset|data|poster)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi) {
       my ($attr, $v) = (lc $1, $2 // $3 // $4);
-      next if $tag eq 'link' && $attr ne 'href';
+      next if $tag eq 'link' && ($attr ne 'href' || !loads($attrs));
       my @urls = $attr eq 'srcset' ? map { (split ' ', $_)[0] // '' } split /,/, $v : ($v);
       push @found, map {"<$tag $attr=\"$_\">"} grep { $_ =~ $abs } @urls;
+    }
+  }
+  # Attributes that make a request from any tag: the legacy background image,
+  # and ping (a request to each listed URL when a link is followed).
+  while ($markup =~ /<([a-z][a-z0-9-]*)\b([^>]*)>/gis) {
+    my ($tag, $attrs) = (lc $1, $2);
+    while ($attrs =~ /\s(background|ping)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi) {
+      my ($attr, $v) = (lc $1, $2 // $3 // $4);
+      push @found, map {"<$tag $attr=\"$_\">"} grep { $_ =~ $abs } split ' ', $v;
     }
   }
   my @css;
@@ -112,9 +121,24 @@ sub external_resources {
   push @css, $1 // $2 while $markup =~ /\sstyle\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
   for my $c (@css) {
     while ($c =~ /url\(\s*["']?([^"')\s]+)/gi) { my $u = $1; push @found, "CSS url($u)" if $u =~ $abs }
+    while ($c =~ /image-set\(([^;{}]*)/gi) {
+      my $set = $1;
+      while ($set =~ /(["'])(.*?)\1/g) { my $u = $2; push @found, "CSS image-set($u)" if $u =~ $abs }
+    }
     while ($c =~ /\@import\s+(?:url\(\s*)?["']?([^"')\s;]+)/gi) { my $u = $1; push @found, "CSS \@import $u" if $u =~ $abs }
   }
   return @found;
+}
+
+# loads(ATTRS): whether a <link> fetches what it names. A link without rel,
+# or whose rel has a token that loads (a stylesheet, an icon, a preload or
+# prefetch, a preconnect or DNS prefetch, a manifest), does; one that only
+# names a relation (canonical, alternate, license, author, ...) does not.
+sub loads {
+  my ($attrs) = @_;
+  return 1 unless $attrs =~ /\srel\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
+  my %load = map { $_ => 1 } qw(stylesheet icon apple-touch-icon mask-icon preload prefetch modulepreload preconnect dns-prefetch prerender manifest);
+  return scalar grep { $load{lc $_} } split ' ', $1 // $2 // $3;
 }
 if (@findings) {
   print STDERR "FAIL: $_\n" for @findings;

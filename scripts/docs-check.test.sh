@@ -86,6 +86,13 @@ ext "a srcset candidate from another host fails" index.html '<img alt="x" src="a
 ext "a background image in a style attribute fails" index.html '<div style="background:url(https://img.example/bg.png)">x</div>' 'CSS url(https://img.example/bg.png)'
 ext "an iframe from another host fails" index.html '<iframe title="x" src="https://video.example/embed"></iframe>' '<iframe src="https://video.example/embed">'
 ext "the reference's resources are checked too" reference.html '<link href="https://fonts.googleapis.com/css?family=Montserrat" rel="stylesheet">' 'reference.html: loads a resource from another host'
+ext "an image-set() image from another host fails" index.html '<style>p{background-image:image-set("https://img.example/a.png" 1x)}</style>' 'CSS image-set(https://img.example/a.png)'
+ext "a legacy background attribute fails" index.html '<table background="https://img.example/bg.png"><tr><td>x</td></tr></table>' '<table background="https://img.example/bg.png">'
+ext "a ping attribute fails" index.html '<a href="other.html" ping="https://track.example/p">x</a>' '<a ping="https://track.example/p">'
+ext "a preconnect to another host fails" index.html '<link rel="preconnect" href="https://fonts.gstatic.com">' '<link href="https://fonts.gstatic.com">'
+clean "$s"; M='<link rel="license" href="https://opensource.org/license/mit"><link rel="canonical alternate" href="https://example.org/x">' perl -0pi -e 's{</head>}{$ENV{M}</head>}' "$s/index.html"
+expect 0 "a link that only names a relation (license, canonical, alternate) is no request" "$s"
+
 clean "$s"; M='<img alt="x" src="data:image/png;base64,AA"><style>p{background:url(data:image/png;base64,AA)}</style><script>var u="https://not.a.request.example/";</script>' perl -0pi -e 's{</main>}{$ENV{M}</main>}' "$s/index.html"
 expect 0 "a data: URL, a link to another site and a URL inside a script body are no request" "$s"
 
@@ -93,4 +100,4 @@ rm -rf "$s" && mkdir -p "$s"; expect 2 "a site without pages is refused" "$s" 'n
 expect 2 "a missing site is refused" "$tmp/none" 'cannot read'
 
 echo "docs-check self-test: $pass passed, $fail failed"
-(( fail == 0 && pass >= 30 ))
+(( fail == 0 && pass >= 35 ))

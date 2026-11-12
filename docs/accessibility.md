@@ -15,8 +15,8 @@ The `Documentation portal` CI job builds the portal and checks it.
 | Internal links | `scripts/docs-check.pl`, part of `scripts/docs-build.sh` | a link or image to a file the portal does not serve, a fragment that names no id of its page, a link out of the site |
 | Duplicate ids | the same | an id used twice on one page |
 | Diagrams | the same | a Mermaid diagram not followed by a paragraph starting `Text description:`; an image without alt text; an inline SVG without a `<title>` |
-| No third party | the same | a page that loads a stylesheet, font, script, image, frame or media file from another host, in a tag or in CSS (`url()`, `@import`); a link to another site is not a request |
-| No third party, at run time | `scripts/docs-offsite.sh` (headless Chrome, `scripts/a11y-tools/offsite.js`) | any request a page makes, its scripts' included, to a host other than the site itself; off-site requests are aborted, so the check contacts no host |
+| No third party | the same | a page that loads a stylesheet, font, script, image, frame or media file from another host, in a tag (`src`, `srcset`, `href` of a `<link>` that loads, the `background` and `ping` attributes) or in CSS (`url()`, `image-set()`, `@import`); a link to another site, or a `<link>` that only names a relation, is not a request |
+| No third party, at run time | `scripts/docs-offsite.sh` (headless Chrome, `scripts/a11y-tools/offsite.js`) | a request a page makes while it loads, its scripts' included, to a host other than the site itself, until the network is idle; off-site requests are aborted, so the check contacts no host. It does not see a preconnect or DNS prefetch, an image that loads only when scrolled into view or a request made later; the static check reads those from the markup |
 | WCAG 2.2 AA | `scripts/docs-a11y.sh` (pa11y-ci with axe, headless Chrome) | on the guide pages, every axe result: a violation of any impact, and a result axe could not decide by itself ("needs review"); on the API reference, a rule whose count of distinct failures rises above `scripts/docs-a11y-baseline.json` |
 
 Each check prints the pages it read and fails closed: a site without pages,

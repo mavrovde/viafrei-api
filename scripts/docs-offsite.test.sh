@@ -71,7 +71,7 @@ echo 'p{font-family:system-ui,sans-serif}' > "$tmp/clean/own.css"
 expect 0 "a page with its own files only passes and is named" "$tmp/clean" "docs offsite: read index.html"
 
 plant() { # plant NAME HEAD BODY: a site of the clean page plus one leaking page
-  rm -rf "$tmp/$1" && mkdir -p "$tmp/$1" && cp "$tmp/clean/"* "$tmp/$1/"
+  rm -rf "${tmp:?}/${1:?}" && mkdir -p "$tmp/$1" && cp "$tmp/clean/"* "$tmp/$1/"
   page "$tmp/$1/leak.html" "$2" "$3"
 }
 plant gfont '<link href="https://fonts.googleapis.com/css?family=Montserrat:300,400,700|Roboto:300,400,700" rel="stylesheet">' ''

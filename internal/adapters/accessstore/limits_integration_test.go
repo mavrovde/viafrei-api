@@ -84,6 +84,22 @@ func newStages() *stages {
 // open lets the permits of stage i go.
 func (s *stages) open(i int) { s.once[i].Do(func() { close(s.gates[i]) }) }
 
+// openAll lets every permit go.
+func (s *stages) openAll() {
+	for i := range s.gates {
+		s.open(i)
+	}
+}
+
+// settle lets every permit go and waits for the test's requests when it
+// ends, so none of them reports on a test that has already finished.
+func (s *stages) settle(t *testing.T, wg *sync.WaitGroup) {
+	t.Cleanup(func() {
+		s.openAll()
+		wg.Wait()
+	})
+}
+
 func (o oneRead) Register(ctx context.Context) ([]access.Terms, error) {
 	err := o.Read(ctx, func(ctx context.Context, _ pgx.Tx) error {
 		stage := min(int(o.stages.granted.Add(1)-1)/2, len(o.stages.gates)-1)
@@ -145,11 +161,7 @@ func newLimitedStackOf(t *testing.T, sources func(slowSources) httpapi.SourceRea
 func contended(t *testing.T, agingAfter string) (limitedStack, *stages) {
 	t.Helper()
 	st := newStages()
-	t.Cleanup(func() {
-		for i := range st.gates {
-			st.open(i)
-		}
-	})
+	t.Cleanup(st.openAll)
 	return newLimitedStackOf(t, func(s slowSources) httpapi.SourceReader {
 		register, err := s.Store.Register(bounded(t))
 		if err != nil {
@@ -162,30 +174,41 @@ func contended(t *testing.T, agingAfter string) (limitedStack, *stages) {
 		"VFAPI_TIERS_CRITICAL_QUEUE_MAX_WAIT=1500ms", "VFAPI_TIERS_STANDARD_QUEUE_MAX_WAIT=1500ms", "VFAPI_TIERS_BULK_QUEUE_MAX_WAIT=1500ms"), st
 }
 
-// handOn opens the holders' stage and checks who took the two permits, then
+// handOn opens the holders' stage and waits until both holders are served
+// and their permits handed on, and takes the snapshot of who took them; then
 // lets those two finish, waits until both are served, and lets the last
-// waiter go: the order served is then the order the permits were handed out.
+// waiter go. Each stage is served before the next is opened, so the order
+// served is the order the permits were handed out.
 func (s limitedStack) handOn(t *testing.T, ctx context.Context, st *stages, mu *sync.Mutex, order *[]string) admission.Snapshot {
 	t.Helper()
 	st.open(0)
+	servedN(t, ctx, mu, order, 2)
 	snap := s.until(t, ctx, "both permits handed on", func(n admission.Snapshot) bool {
 		return int(st.granted.Load()) == 4 && n.Free == 0
 	})
 	st.open(1)
+	servedN(t, ctx, mu, order, 4)
+	st.open(2)
+	return snap
+}
+
+// servedN waits, within the test's bound, until n requests are served.
+func servedN(t *testing.T, ctx context.Context, mu *sync.Mutex, order *[]string, n int) {
+	t.Helper()
 	for {
 		mu.Lock()
-		n := len(*order)
+		got := len(*order)
 		mu.Unlock()
-		if n >= 4 {
-			break
+		if got >= n {
+			return
 		}
 		if ctx.Err() != nil {
-			t.Fatalf("never served the first four: %v", *order)
+			mu.Lock()
+			defer mu.Unlock()
+			t.Fatalf("never served %d: %v", n, *order)
 		}
 		time.Sleep(time.Millisecond)
 	}
-	st.open(2)
-	return snap
 }
 
 // served runs one /v1/key request in the background and, when it is
@@ -237,6 +260,7 @@ func TestUnderContentionPermitsGoToTheHighestTierFirst(t *testing.T) {
 		mu    sync.Mutex
 		order []string
 	)
+	st.settle(t, &wg)
 	s.served(t, ctx, &wg, &mu, &order, "holder", holders[0].Full)
 	s.served(t, ctx, &wg, &mu, &order, "holder", holders[1].Full)
 	s.until(t, ctx, "bulk holding both permits", func(n admission.Snapshot) bool { return n.Inflight[admission.Bulk] == 2 && n.Free == 0 })
@@ -282,6 +306,7 @@ func TestAnAgedBulkWaiterIsServedAheadOfNewerStandardWaiters(t *testing.T) {
 				mu    sync.Mutex
 				order []string
 			)
+			st.settle(t, &wg)
 			s.served(t, ctx, &wg, &mu, &order, "holder", keys[0].Full)
 			s.served(t, ctx, &wg, &mu, &order, "holder", keys[1].Full)
 			s.until(t, ctx, "bulk holding both permits", func(n admission.Snapshot) bool { return n.Inflight[admission.Bulk] == 2 })
@@ -289,7 +314,10 @@ func TestAnAgedBulkWaiterIsServedAheadOfNewerStandardWaiters(t *testing.T) {
 			s.until(t, ctx, "the bulk waiter", func(n admission.Snapshot) bool { return n.Waiting[admission.Bulk] == 1 })
 			queued := time.Now()
 			// The bulk waiter waits past 200 ms, and short of 2 s, before
-			// the standard waiters arrive.
+			// the standard waiters arrive. The 200 ms case still needs the
+			// standard waiters to be younger than 200 ms when the holders
+			// let go: they are, by the few milliseconds between being seen
+			// in the queue and the hand-on.
 			time.Sleep(bulkWait)
 			s.served(t, ctx, &wg, &mu, &order, "standard", keys[3].Full)
 			s.served(t, ctx, &wg, &mu, &order, "standard", keys[4].Full)

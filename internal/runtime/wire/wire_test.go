@@ -33,3 +33,37 @@ func TestFeatureSettings(t *testing.T) {
 		t.Fatal("IsTimeout is not the store's deadline test")
 	}
 }
+
+func TestSharedBudget(t *testing.T) {
+	cfg := config.Defaults()
+	if b := wire.SharedBudget(cfg); b.Slots != 0 || b.LockSpace != 7301 || b.CriticalReserved != 1 || b.MaxWait != 200*time.Millisecond ||
+		b.RetryInterval != 10*time.Millisecond || b.RetryAfter != time.Second {
+		t.Fatalf("defaults: %+v", b)
+	}
+	cfg.DB.SharedBudget.Slots, cfg.DB.SharedBudget.LockSpace = 12, 99
+	if b := wire.SharedBudget(cfg); b.Slots != 12 || b.LockSpace != 99 {
+		t.Fatalf("carried: %+v", b)
+	}
+}
+
+func TestConsoleSettings(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Auth.Pepper = config.NewSecret(strings.Repeat("p", 32))
+	cfg.Admin.Origin = "http://localhost:9000/"
+	g := wire.ConsoleGuard(cfg)
+	if g.SessionTTL != 15*time.Minute || g.ChallengeTTL != time.Minute || g.ConfirmTTL != 2*time.Minute ||
+		g.SignInLimit != 10 || g.SignInWindow != 5*time.Minute || g.MaxPending != 32 || g.MaxSessions != 4 {
+		t.Fatalf("guard %+v", g)
+	}
+	if o := wire.ConsoleOwners(cfg); string(o.Pepper) != strings.Repeat("p", 32) || o.EnrolmentTTL != 30*time.Minute {
+		t.Fatal("owner settings not carried")
+	}
+	if addr, on := wire.ConsoleListener(cfg); addr != "127.0.0.1:8081" || on {
+		t.Fatalf("listener %s %v", addr, on)
+	}
+	w := wire.ConsoleWeb(cfg)
+	if w.Origin != "http://localhost:9000" || w.RPID != "localhost" || w.RPName != "ViaFrei API console" || w.AuditPage != 100 ||
+		w.ChallengeTTL != time.Minute || w.SessionTTL != 15*time.Minute {
+		t.Fatalf("web %+v", w)
+	}
+}

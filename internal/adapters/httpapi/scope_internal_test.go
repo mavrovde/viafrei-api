@@ -57,7 +57,7 @@ func TestScopeIsEnforcedPerOperation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(string(doc), `"x-required-scope": "roads"`) {
+		if !strings.Contains(string(doc()), `"x-required-scope": "roads"`) {
 			t.Fatal("the scope is not in the document")
 		}
 		w := httptest.NewRecorder()

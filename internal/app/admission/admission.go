@@ -100,7 +100,8 @@ type callerKey struct{}
 
 // WithCaller returns ctx carrying the caller of its storage reads. A read
 // without a caller (a service operation such as readiness) is admitted as
-// critical and under no key's share.
+// critical and under no key's share (in-process admission; its shared slot
+// is standard, SlotTierOf).
 func WithCaller(ctx context.Context, c Caller) context.Context {
 	return context.WithValue(ctx, callerKey{}, c)
 }
@@ -108,6 +109,24 @@ func WithCaller(ctx context.Context, c Caller) context.Context {
 func callerFrom(ctx context.Context) Caller {
 	c, _ := ctx.Value(callerKey{}).(Caller)
 	return c
+}
+
+// TierOf returns the tier the storage reads under ctx are admitted in: the
+// caller's, or critical for a read without one (in-process admission; its
+// shared slot is standard, SlotTierOf).
+func TierOf(ctx context.Context) Tier { return callerFrom(ctx).Tier }
+
+// SlotTierOf returns the tier the storage reads under ctx take a slot of the
+// shared budget in (NFR-CAP-002): the caller's, or standard for a read
+// without one. A service read with no caller (readiness, which anyone may
+// ask for without a key, and background reads) must not take the slots the
+// budget keeps for critical callers, which the other readers of the store
+// rely on too.
+func SlotTierOf(ctx context.Context) Tier {
+	if c, ok := ctx.Value(callerKey{}).(Caller); ok {
+		return c.Tier
+	}
+	return Standard
 }
 
 type tallyKey struct{}

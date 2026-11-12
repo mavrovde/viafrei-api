@@ -118,10 +118,11 @@ func swallowFindings(job string, j ciJob) []string {
 }
 
 // needsFindings: the coverage job waits for both test jobs, Sonar for the
-// merged profile.
+// merged profile and for the docs-portal job, whose LCOV of the
+// accessibility runner it reads.
 func needsFindings(w ciJobs) []string {
 	var out []string
-	for job, want := range map[string][]string{"coverage": {"test", "integration"}, "sonar": {"coverage"}} {
+	for job, want := range map[string][]string{"coverage": {"test", "integration"}, "sonar": {"coverage", "docs-portal"}} {
 		for _, n := range want {
 			if !slices.Contains(needs(w.Jobs[job].Needs), n) {
 				out = append(out, "job "+job+" does not need "+n)
@@ -144,7 +145,8 @@ func TestCoverageGateIsWired(t *testing.T) {
 		"job coverage does not run covergate -min 100": {"covergate -min 100", "covergate -min 95"},
 		"job integration does not measure every":       {"-tags integration -covermode=atomic -coverpkg=./...", "-tags integration -covermode=atomic"},
 		"job coverage does not run scripts/boot":       {"scripts/boot-coverage.sh coverage-boot.out", "true"},
-		"job sonar does not need coverage":             {"needs: [test, coverage]", "needs: test"},
+		"job sonar does not need coverage":             {"needs: [test, coverage, docs-portal]", "needs: [test, docs-portal]"},
+		"job sonar does not need docs-portal":          {"needs: [test, coverage, docs-portal]", "needs: [test, coverage]"},
 		"ci.yml does not parse":                        {"jobs:\n", "jobs: ["},
 		"job coverage sets continue-on-error":          {"    name: Coverage gate (100 % per package)\n", "    name: Coverage gate (100 % per package)\n    continue-on-error: true\n"},
 		"(Merge and gate) sets continue-on-error":      {"      - name: Merge and gate\n", "      - name: Merge and gate\n        continue-on-error: ${{ true }}\n"},

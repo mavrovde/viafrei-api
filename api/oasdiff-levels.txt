@@ -1,0 +1,4 @@
+response-property-enum-value-added	info
+response-mediatype-enum-value-added	info
+response-property-enum-value-removed	err
+response-mediatype-enum-value-removed	err

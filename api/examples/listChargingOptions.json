@@ -1,0 +1,130 @@
+{
+  "title": "Two charging sites within 20 km",
+  "request": "/v1/charging-options?at=50.82,6.0\u0026radius_m=20000\u0026limit=2",
+  "attribution": "Charging sites and the availability of their charge points come from the source families of the energy domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "energy"
+    ],
+    "sources": [
+      "src-alpha-energy",
+      "src-beta-energy",
+      "src-gamma-energy"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": [
+      {
+        "id": "cs-05-0012",
+        "name": "Gielfürau Laden",
+        "operator": "Weimweing Strom",
+        "location": {
+          "lat": 50.829574,
+          "lon": 6.034346
+        },
+        "distanceM": 2644,
+        "access": "public",
+        "summary": {
+          "chargePoints": 4,
+          "availableNow": 1,
+          "maxPowerKw": 300
+        },
+        "chargePoints": [
+          {
+            "id": "cp-00012-0",
+            "current": "dc",
+            "maxPowerKw": 150,
+            "availability": {
+              "state": "available",
+              "observedAt": "2026-03-29T23:55:00Z"
+            }
+          },
+          {
+            "id": "cp-00012-1",
+            "current": "dc",
+            "maxPowerKw": 150,
+            "availability": {
+              "state": "occupied",
+              "observedAt": "2026-03-29T23:48:00Z"
+            }
+          },
+          {
+            "id": "cp-00012-2",
+            "current": "ac",
+            "maxPowerKw": 11,
+            "availability": {
+              "state": "stale",
+              "observedAt": "2026-03-29T18:57:01Z"
+            }
+          },
+          {
+            "id": "cp-00012-3",
+            "current": "dc",
+            "maxPowerKw": 300,
+            "availability": {
+              "state": "stale",
+              "observedAt": "2026-03-29T06:47:06Z"
+            }
+          }
+        ],
+        "sourceFamily": "src-beta-energy"
+      }
+    ],
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": "2026-03-29T23:55:00Z",
+      "freshness": [
+        {
+          "family": "src-beta-energy",
+          "dataAsOf": "2026-03-29T23:55:00Z",
+          "ageS": 300,
+          "staleAfterS": 3600,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "src-beta-energy",
+          "domain": "energy",
+          "publisher": "Stönwän Datenwerk",
+          "text": "Synthetic data from family beta, licence lic-beta.",
+          "licence": "Synthetic licence beta",
+          "licenceUrl": "https://licences.example/beta",
+          "shareAlike": true,
+          "shareAlikeOffer": "https://beta.example/share-alike/energy",
+          "termsUrl": "https://beta.example/terms"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ],
+      "page": {
+        "limit": 2,
+        "hasMore": false
+      },
+      "query": {
+        "at": {
+          "lat": 50.82,
+          "lon": 6
+        },
+        "radiusM": 20000,
+        "minKw": 0,
+        "access": "public"
+      }
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/charging-options"
+    }
+  }
+}

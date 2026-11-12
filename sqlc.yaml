@@ -3,7 +3,7 @@ sql:
   - engine: postgresql
     schema:
       - db/contract/0001_contract.sql
-      - db/contract/0003_road_lamp.sql
+      - db/contract/0004_road_lamp.sql
     queries: db/queries
     gen:
       go:

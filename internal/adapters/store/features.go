@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -26,6 +27,7 @@ func (s *Store) Provenance(ctx context.Context, families []string, lang string) 
 		rows, _ := tx.Query(ctx, `
 select s.source_ref, s.domain, p.display_name, s.attribution_text, l.licence_name, l.licence_url,
        l.share_alike, s.share_alike_offer_url, s.terms_url, s.stale_after_s, f.data_as_of,
+       `+familyVersion+`,
        array(select n.note_kind from contract.source_note n
              where n.source_ref = s.source_ref and n.lang = $2 order by n.note_kind, n.body),
        array(select n.body from contract.source_note n
@@ -44,7 +46,7 @@ order by s.source_ref`, families, lang)
 				kinds, texts []string
 			)
 			err := r.Scan(&v.Family, &v.Domain, &v.Publisher, &v.AttributionText, &v.Licence, &v.LicenceURL,
-				&v.ShareAlike, &v.ShareAlikeOffer, &v.TermsURL, &staleAfter, &f.DataAsOf, &kinds, &texts)
+				&v.ShareAlike, &v.ShareAlikeOffer, &v.TermsURL, &staleAfter, &f.DataAsOf, &f.Version, &kinds, &texts)
 			f.Source, f.StaleAfter = v, time.Duration(staleAfter)*time.Second
 			for i := range min(len(kinds), len(texts)) {
 				f.Notes = append(f.Notes, provenance.Note{Kind: provenance.MapNoteKind(kinds[i]), Text: texts[i]})
@@ -57,8 +59,9 @@ order by s.source_ref`, families, lang)
 // ChargingNear reads the charging sites of the given families within the
 // radius, nearest first, then by id, each with its charge points (under a
 // minimum power only those of at least that power) and their last
-// availability report from the same families.
-func (s *Store) ChargingNear(ctx context.Context, q energy.Query, families []string, now time.Time) ([]energy.Site, bool, error) {
+// availability report from the same families. next is the earliest report
+// of those points dated after now, when one is: the answer changes then.
+func (s *Store) ChargingNear(ctx context.Context, q energy.Query, families []string, now time.Time) (sites []energy.Site, more bool, next *time.Time, err error) {
 	var accessCodes []string
 	for _, a := range q.Access.Codes() {
 		accessCodes = append(accessCodes, string(a))
@@ -66,6 +69,7 @@ func (s *Store) ChargingNear(ctx context.Context, q energy.Query, families []str
 	type row struct {
 		site  energy.Site
 		point *energy.ChargePoint
+		next  *time.Time
 	}
 	rows, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]row, error) {
 		// One statement: the sites (one more than the limit, to tell whether
@@ -88,7 +92,8 @@ sites as (
   order by dist, c.site_id
   limit $7)
 select s.site_id, s.source_ref, s.name, s.operator_name, s.access, s.lat, s.lon, s.dist,
-       p.point_id, p.current_kind, p.power_max_kw::float8, o.availability, o.observed_at, o.source_ref
+       p.point_id, p.current_kind, p.power_max_kw::float8, o.availability, o.observed_at, o.source_ref,
+       nx.next_at
 from sites s
 left join contract.charge_point p on p.site_id = s.site_id and ($6::float8 <= 0 or p.power_max_kw >= $6)
 left join lateral (
@@ -97,6 +102,10 @@ left join lateral (
   where o.point_id = p.point_id and o.source_ref = any($3) and o.observed_at <= $8
   order by o.observed_at desc
   limit 1) o on true
+left join lateral (
+  select min(o.observed_at) next_at
+  from contract.charge_point_state_observation o
+  where o.point_id = p.point_id and o.source_ref = any($3) and o.observed_at > $8) nx on true
 order by s.dist, s.site_id, p.point_id`, q.At.Lat, q.At.Lon, families, q.RadiusM, accessCodes, q.MinKw, q.Limit+1, now)
 		return pgx.CollectRows(res, func(r pgx.CollectableRow) (row, error) {
 			var (
@@ -109,7 +118,7 @@ order by s.dist, s.site_id, p.point_id`, q.At.Lat, q.At.Lon, families, q.RadiusM
 			)
 			err := r.Scan(&v.site.ID, &v.site.Family, &v.site.Name, &v.site.Operator, &access,
 				&v.site.Location.Lat, &v.site.Location.Lon, &v.site.DistanceM,
-				&pointID, &current, &power, &state, &observed, &family)
+				&pointID, &current, &power, &state, &observed, &family, &v.next)
 			v.site.Access = energy.MapAccess(access)
 			if pointID != nil {
 				v.point = &energy.ChargePoint{ID: *pointID, Current: energy.MapCurrent(current), MaxPowerKw: power}
@@ -120,28 +129,64 @@ order by s.dist, s.site_id, p.point_id`, q.At.Lat, q.At.Lon, families, q.RadiusM
 			return v, err
 		})
 	})
-	var sites []energy.Site
 	for _, r := range rows {
 		if len(sites) == 0 || sites[len(sites)-1].ID != r.site.ID {
+			if len(sites) == q.Limit {
+				// The one site past the limit only tells that there are more.
+				more = true
+				break
+			}
 			sites = append(sites, r.site)
 		}
 		if r.point != nil {
 			last := &sites[len(sites)-1]
 			last.Points = append(last.Points, *r.point)
 		}
+		next = earliest(next, r.next)
 	}
-	more := len(sites) > q.Limit
-	if more {
-		sites = sites[:q.Limit]
+	if next != nil {
+		t := next.UTC()
+		next = &t
 	}
-	return sites, more, err
+	return sites, more, next, err
+}
+
+// earliest returns the earlier of a and b, either of which may be nil.
+func earliest(a, b *time.Time) *time.Time {
+	if a == nil || (b != nil && b.Before(*a)) {
+		return b
+	}
+	return a
 }
 
 // ParkingNear reads the parking sites of the listed families within the
 // radius, nearest first, then by id, each with its last occupancy report
-// from the occupancy families.
-func (s *Store) ParkingNear(ctx context.Context, q parking.Query, listed, occupancy []string, now time.Time) ([]parking.Site, bool, error) {
-	sites, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]parking.Site, error) {
+// from the occupancy families. next is the earliest occupancy report dated
+// after now of any site within the radius, whether the free_min filter keeps
+// it or not, when one is: the answer may change then.
+func (s *Store) ParkingNear(ctx context.Context, q parking.Query, listed, occupancy []string, now time.Time) (sites []parking.Site, more bool, next *time.Time, err error) {
+	type answer struct {
+		sites []parking.Site
+		next  *time.Time
+	}
+	a, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (answer, error) {
+		var a answer
+		// The earliest future report, before the free_min filter: a site it
+		// leaves out may qualify once a later report takes effect. A failure
+		// aborts the transaction, so the next statement fails too and both
+		// surface together.
+		nextErr := tx.QueryRow(ctx, `
+with here as (select st_setsrid(st_makepoint($2, $1), 4326)::geography g)
+select min(nx.next_at)
+from contract.parking_facility f
+cross join here
+cross join lateral (
+  select min(o.observed_at) next_at
+  from contract.occupancy_observation o
+  where o.facility_id = f.facility_id and o.source_ref = any($4) and o.observed_at > $6) nx
+where f.withdrawn_at is null
+  and f.source_ref = any($3)
+  and st_dwithin(f.location::geography, here.g, $5)`, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, now).Scan(&a.next)
 		rows, _ := tx.Query(ctx, `
 with here as (select st_setsrid(st_makepoint($2, $1), 4326)::geography g)
 select f.facility_id, f.source_ref, f.name, f.operator_name, f.parking_kind,
@@ -163,7 +208,8 @@ where f.withdrawn_at is null
         select make_interval(secs => s.stale_after_s) from contract.source s where s.source_ref = o.source_ref)))
 order by 8, f.facility_id
 limit $8`, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, q.FreeMin, now, q.Limit+1)
-		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (parking.Site, error) {
+		var err error
+		a.sites, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (parking.Site, error) {
 			var (
 				v           parking.Site
 				kind        string
@@ -180,12 +226,17 @@ limit $8`, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, q.FreeMin, now, q.L
 			}
 			return v, err
 		})
+		return a, errors.Join(nextErr, err)
 	})
-	more := false
+	sites, next = a.sites, a.next
 	if len(sites) > q.Limit {
 		sites, more = sites[:q.Limit], true
 	}
-	return sites, more, err
+	if next != nil {
+		t := next.UTC()
+		next = &t
+	}
+	return sites, more, next, err
 }
 
 // Place reads one place of the given families.

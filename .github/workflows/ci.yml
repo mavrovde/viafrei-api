@@ -40,6 +40,8 @@ jobs:
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
       - name: shellcheck (scripts)
         run: shellcheck --version && shellcheck scripts/*.sh deploy/compose/*.sh
+      - name: Self-test of the previous-figures fetch (TST-021)
+        run: bash scripts/load-previous.test.sh
 
   test:
     name: Unit and handler tests
@@ -98,6 +100,38 @@ jobs:
           path: |
             test-integration.json
             coverage-integration.out
+          retention-days: 30
+          if-no-files-found: error
+
+  benchmark:
+    name: Benchmark leg (latency budgets)
+    # NFR-PERF-003..006: every operation through the real handler and store
+    # on the CI fixture profile, p95 and p99 asserted against
+    # test/perf/classes.tsv, without the race detector (a race-instrumented
+    # run is no latency measurement). docs/performance.md says what the leg
+    # measures and what it does not.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # pgtest.Image is pulled by its digest; the reaper, pinned and pulled by
+      # the integration job, is not needed on a runner discarded afterwards.
+      TESTCONTAINERS_RYUK_DISABLED: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: go test ./internal/perf -perf.assert
+        run: |
+          set -o pipefail
+          go test -count=1 -tags integration -v ./internal/perf -args -perf.assert -perf.samples=200 | tee benchmark.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: benchmark-report
+          path: benchmark.txt
           retention-days: 30
           if-no-files-found: error
 
@@ -403,7 +437,9 @@ jobs:
         if: always()
         with:
           name: load-report
-          path: load-report.md
+          path: |
+            load-report.md
+            load-report.json
           retention-days: 30
           if-no-files-found: ignore
 

@@ -159,24 +159,37 @@ perl -pi -e 's{\Qsrc:"https://cdn.redoc.ly/redoc/logo-mini.svg"\E}{src:"data:,"}
 perl -0pi -e 's{<script src="https://cdn\.redocly\.com/redoc/v[0-9.]+/bundles/redoc\.standalone\.js"[^>]*></script>}{<script src="redoc.standalone.js"></script>}' "$out/reference.html"
 title=$(jq -r '.info.title' api/openapi.json)
 grep -qF "$title" "$out/reference.html" || { echo "FAIL: reference.html does not carry the document title '$title'" >&2; exit 1; }
-# WCAG 2.2 AA repairs Redoc's theme cannot make (scripts/docs-a11y.sh), each
-# for every operation of the page, never for one:
+# WCAG 2.2 AA repairs Redoc's theme cannot make (scripts/docs-a11y.sh;
+# scripts/a11y-tools/layout-runner.js checks the landmark and tree-line
+# repairs in the rendered page):
 # - its JSON expand buttons are 15 px, under the 24 px target size;
 # - its code samples scroll without being reachable by keyboard;
-# - a response title (button > strong + div) holds its description, an
-#   inline-block paragraph, in an INLINE box one line high, so a description
-#   that wraps overflows it and axe cannot decide its contrast ("partially
-#   obscured"); an inline-block box contains it (#77);
-# - the page has no landmark, so all of its content is outside one: the
-#   side menu is made the navigation and the operations the main content;
+# - its page sits in no landmark (axe: region, landmark-one-main): the
+#   content column becomes the main landmark and the menu a navigation
+#   landmark, in the prerendered markup and again whenever Redoc renders
+#   them anew;
+# - its schema tables draw the first and the last row's tree-line segment as
+#   a 1 px background image on the property-name cell, which leaves the
+#   name's contrast undecidable. The image goes; the same segment (from
+#   22 px to the bottom on the first row, from the top to 22 px on the last,
+#   Redoc's own geometry) is a ::before border whose colour is inherited
+#   from the cell's own border-left-color, Redoc's theme line colour (and
+#   transparent where Redoc hides the line), so no colour is copied here.
 # - an operation's first sub-heading (an h5, "Authorizations" or a parameter
-#   list) follows its h2, a jump of three levels. Each visible heading of the
-#   main content is given the level it has in the outline: at most one below
-#   the heading before it (aria-level, which assistive technology and axe
-#   read in place of the tag's), and its own level when that already holds.
+#   list) follows its h2, a jump of three levels (axe: heading-order). Each
+#   visible heading of the content column is given the level it has in the
+#   outline: at most one below the heading before it (aria-level, which
+#   assistive technology and axe read in place of the tag's), and its own
+#   level when that already holds.
+for c in menu-content api-content; do
+  [[ $(grep -o "class=\"[^\"]* $c\"" "$out/reference.html" | wc -l | tr -d ' ') == 1 ]] ||
+    { echo "FAIL: reference.html does not carry exactly one Redoc .$c to mark as a landmark; the bundle changed" >&2; exit 1; }
+done
 perl -0pi -e '
-  s{</head>}{<style>.redoc-json .collapser{display:none!important}button>strong+div{display:inline-block!important}tr:first-of-type>td[kind],tr.last>td[kind]{background-image:none!important}tr:first-of-type>td[kind]::after,tr.last>td[kind]::after{content:"";position:absolute;left:0;top:22px;bottom:0;border-left:1px solid;border-left-color:inherit;pointer-events:none}tr.last>td[kind]::after{top:0;bottom:auto;height:22px}</style></head>};
-  s{</body>}{<script>(function(){function f(){document.querySelectorAll("pre:not([tabindex])").forEach(function(p){p.setAttribute("tabindex","0")});var m=document.querySelector(".menu-content");if(m&&m.getAttribute("role")!=="navigation"){m.setAttribute("role","navigation");m.setAttribute("aria-label","Operations")}var a=document.querySelector(".api-content");if(!a)return;if(a.getAttribute("role")!=="main")a.setAttribute("role","main");var prev=0;a.querySelectorAll("h1,h2,h3,h4,h5,h6").forEach(function(h){if(!h.getClientRects().length)return;var own=+h.tagName.charAt(1),lvl=Math.min(own,prev+1);if(lvl!==own){if(h.getAttribute("aria-level")!==String(lvl))h.setAttribute("aria-level",String(lvl))}else if(h.hasAttribute("aria-level")){h.removeAttribute("aria-level")}prev=lvl})}document.addEventListener("DOMContentLoaded",f);new MutationObserver(f).observe(document.documentElement,{childList:true,subtree:true})})();</script></body>};
+  s{(class="[^"]* menu-content")}{$1 role="navigation" aria-label="Reference contents"};
+  s{(class="[^"]* api-content")}{$1 role="main"};
+  s{</head>}{<style>.redoc-json .collapser{display:none!important}td[kind=field]{background-image:none!important}tr:first-of-type>td[kind=field]::before,tr.last>td[kind=field]::before{content:"";position:absolute;left:0;border-left:1px solid;border-left-color:inherit}tr:first-of-type>td[kind=field]::before{top:22px;bottom:0}tr.last>td[kind=field]::before{top:0;bottom:auto;height:22px}</style></head>};
+  s{</body>}{<script>(function(){function f(){document.querySelectorAll("pre:not([tabindex])").forEach(function(p){p.setAttribute("tabindex","0")});document.querySelectorAll(".menu-content:not([role])").forEach(function(m){m.setAttribute("role","navigation");m.setAttribute("aria-label","Reference contents")});document.querySelectorAll(".api-content:not([role])").forEach(function(m){m.setAttribute("role","main")});document.querySelectorAll(".api-content").forEach(function(a){var prev=0;a.querySelectorAll("h1,h2,h3,h4,h5,h6").forEach(function(h){if(!h.getClientRects().length)return;var own=+h.tagName.charAt(1),lvl=Math.min(own,prev+1);if(lvl!==own){if(h.getAttribute("aria-level")!==String(lvl))h.setAttribute("aria-level",String(lvl))}else if(h.hasAttribute("aria-level")){h.removeAttribute("aria-level")}prev=lvl})})}document.addEventListener("DOMContentLoaded",f);new MutationObserver(f).observe(document.documentElement,{childList:true,subtree:true})})();</script></body>};
 ' "$out/reference.html"
 touch "$out/.nojekyll"
 

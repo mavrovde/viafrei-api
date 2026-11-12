@@ -1,1 +1,5 @@
-{"reference.html": {"color-contrast": 8, "heading-order": 0, "landmark-one-main": 0, "region": 0}}
+{
+  "reference.html": {
+    "heading-order": 0
+  }
+}

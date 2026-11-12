@@ -1,0 +1,11 @@
+# Latency budgets per endpoint class: the table of NFR-PERF-003 (wiki: Spec:
+# Non-Functional Requirements, section 1), as design targets in milliseconds.
+# The benchmark leg (internal/perf) asserts p95 and p99; p50 is reported.
+# A class no operation uses is refused (internal/perf), so the table's
+# transit and history rows come in with their first operation.
+# class	p50_ms	p95_ms	p99_ms
+conditional	5	10	30
+lookup	40	120	300
+near	60	200	500
+along	120	400	900
+composed	300	800	1500

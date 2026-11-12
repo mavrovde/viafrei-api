@@ -48,6 +48,7 @@ type fake struct {
 	reg                                  []access.Terms // replaces register when set
 	regCalls                             int
 	notes                                map[string][]provenance.Note
+	next                                 *time.Time // the earliest future report both reads return
 }
 
 func (f *fake) Register(context.Context) ([]access.Terms, error) {
@@ -72,18 +73,18 @@ func (f *fake) Provenance(_ context.Context, fams []string, lang string) ([]prov
 	return out, nil
 }
 
-func (f *fake) ChargingNear(ctx context.Context, _ energy.Query, fams []string, at time.Time) ([]energy.Site, bool, error) {
+func (f *fake) ChargingNear(ctx context.Context, _ energy.Query, fams []string, at time.Time) ([]energy.Site, bool, *time.Time, error) {
 	f.gotFamilies, f.gotNow = fams, at
 	if f.chDelay {
 		<-ctx.Done()
-		return nil, false, ctx.Err()
+		return nil, false, nil, ctx.Err()
 	}
-	return slices.Clone(f.sites), true, f.chErr
+	return slices.Clone(f.sites), true, f.next, f.chErr
 }
 
-func (f *fake) ParkingNear(_ context.Context, _ parking.Query, listed, occ []string, at time.Time) ([]parking.Site, bool, error) {
+func (f *fake) ParkingNear(_ context.Context, _ parking.Query, listed, occ []string, at time.Time) ([]parking.Site, bool, *time.Time, error) {
 	f.gotListed, f.gotOccupancy, f.gotNow = listed, occ, at
-	return slices.Clone(f.parks), false, f.pkErr
+	return slices.Clone(f.parks), false, f.next, f.pkErr
 }
 
 func (f *fake) Place(context.Context, string, []string) (places.Place, error) {
@@ -138,6 +139,25 @@ func TestChargingIsGatedAndAttributed(t *testing.T) {
 	a, err = service(f, nil).Charging(context.Background(), key("consumer", allScopes, everything...), energy.Query{})
 	if err != nil || a.Partial || !slices.Equal(names(a.Families), []string{"e1", "e2"}) {
 		t.Errorf("an empty answer names the consulted families: %v, %v, %v", names(a.Families), a.Partial, err)
+	}
+}
+
+func TestTheAnswersCarryTheEarliestReportAfterNow(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005")
+	next := now.Add(7 * time.Minute)
+	f := &fake{place: berlin, sites: []energy.Site{site("e1")}, parks: []parking.Site{{Family: "p2"}}, next: &next}
+	k := key("commercial", allScopes, everything...)
+	c, err := service(f, nil).Charging(context.Background(), k, energy.Query{})
+	if err != nil || c.NextReport != &next {
+		t.Errorf("charging: next report %v, %v", c.NextReport, err)
+	}
+	p, err := service(f, nil).Parking(context.Background(), k, parking.Query{})
+	if err != nil || p.NextReport != &next {
+		t.Errorf("parking: next report %v, %v", p.NextReport, err)
+	}
+	o, err := service(f, nil).Overview(context.Background(), k, features.OverviewQuery{PlaceID: "pl-1"})
+	if err != nil || o.Charging == nil || o.Charging.NextReport != &next || o.Parking == nil || o.Parking.NextReport != &next {
+		t.Errorf("overview: %+v, %v", o, err)
 	}
 }
 

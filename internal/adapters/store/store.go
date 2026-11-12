@@ -61,6 +61,15 @@ func (s *Store) WithAdmission(c *admission.Controller) *Store {
 	return s
 }
 
+// execModes maps db.query_exec_mode to the driver's modes.
+var execModes = map[string]pgx.QueryExecMode{
+	"cache_statement": pgx.QueryExecModeCacheStatement,
+	"cache_describe":  pgx.QueryExecModeCacheDescribe,
+	"describe_exec":   pgx.QueryExecModeDescribeExec,
+	"exec":            pgx.QueryExecModeExec,
+	"simple_protocol": pgx.QueryExecModeSimpleProtocol,
+}
+
 // PoolConfig translates the configuration into a pgx pool configuration.
 // Exposed so tests can observe that each db.* key reaches the driver.
 func PoolConfig(cfg *config.Config) (*pgxpool.Config, error) {
@@ -75,6 +84,11 @@ func PoolConfig(cfg *config.Config) (*pgxpool.Config, error) {
 	pc.MaxConnIdleTime = cfg.DB.MaxConnIdle
 	pc.ConnConfig.ConnectTimeout = cfg.DB.ConnectTimeout
 	pc.ConnConfig.RuntimeParams["application_name"] = cfg.DB.ApplicationName
+	// Statements are prepared once per connection and reused: the per-request
+	// cost is a bind and an execute (Performance-and-Caching).
+	pc.ConnConfig.DefaultQueryExecMode = execModes[cfg.DB.QueryExecMode]
+	pc.ConnConfig.StatementCacheCapacity = cfg.DB.StatementCacheCapacity
+	pc.ConnConfig.DescriptionCacheCapacity = cfg.DB.StatementCacheCapacity
 	grace := cfg.DB.CancelGrace
 	// When a request's context ends, send a PostgreSQL cancel request at once
 	// and give it the grace period to land before the connection is abandoned.
@@ -253,9 +267,13 @@ func transact[T any](ctx context.Context, s *Store, fn func(context.Context, pgx
 	// timeout; the budget is an integer of milliseconds, never caller text.
 	// The isolation is repeatable read, so every statement of fn reads one
 	// snapshot (under read committed each statement takes its own): a page
-	// and the lamp over its scope cannot disagree.
+	// and the lamp over its scope cannot disagree. JIT compilation is off: a
+	// read answers within deadline.request, and a plan whose estimate crosses
+	// jit_above_cost (PostGIS functions are costed high, so a corridor read
+	// over a few rows does) spent over two seconds compiling for a millisecond
+	// of execution, so the read ran out of its deadline before it started.
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{
-		BeginQuery: "begin transaction isolation level repeatable read read only; set local statement_timeout = " + strconv.FormatInt(budget.Milliseconds(), 10),
+		BeginQuery: "begin transaction isolation level repeatable read read only; set local jit = off; set local statement_timeout = " + strconv.FormatInt(budget.Milliseconds(), 10),
 	})
 	if err != nil {
 		return v, classify(ctx, err)

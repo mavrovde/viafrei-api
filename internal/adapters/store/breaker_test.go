@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net"
-	"sync"
 	"testing"
 	"time"
 
@@ -139,49 +138,24 @@ func TestATrialRefusedBeforeStorageGivesItsSlotBack(t *testing.T) {
 }
 
 // silentURL is a storage address that accepts connections and never
-// answers, so a transaction cannot be opened before the deadline. The
-// returned hang-up closes the listener and every connection it accepted,
-// including one accepted after the hang-up: the caller registers it AFTER
-// the store's Close, so it runs first and Close never waits out the connect
-// timeout for a connection the pool opened late (a per-connection cleanup
-// registered at accept time ran after Close and cost CI the full 2 s).
-func silentURL(t *testing.T) (string, func()) {
+// answers, so a transaction cannot be opened before the deadline.
+func silentURL(t *testing.T) string {
 	t.Helper()
 	l, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var (
-		mu     sync.Mutex
-		conns  []net.Conn
-		hungUp bool
-	)
-	hangUp := func() {
-		mu.Lock()
-		defer mu.Unlock()
-		hungUp = true
-		_ = l.Close()
-		for _, c := range conns {
-			_ = c.Close()
-		}
-	}
-	t.Cleanup(hangUp)
+	t.Cleanup(func() { _ = l.Close() })
 	go func() {
 		for {
 			c, err := l.Accept()
 			if err != nil {
 				return
 			}
-			mu.Lock()
-			if hungUp {
-				_ = c.Close()
-			} else {
-				conns = append(conns, c)
-			}
-			mu.Unlock()
+			t.Cleanup(func() { _ = c.Close() })
 		}
 	}()
-	return "postgres://reader:pw@" + l.Addr().String() + "/contract?sslmode=disable", hangUp
+	return "postgres://reader:pw@" + l.Addr().String() + "/contract?sslmode=disable"
 }
 
 // A transaction that could not be opened by the deadline is a failure, the
@@ -190,8 +164,12 @@ func silentURL(t *testing.T) (string, func()) {
 // nothing.
 func TestATransactionNotOpenedInTimeCountsAgainstTheBreaker(t *testing.T) {
 	req.Covers(t, "NFR-RES-002")
-	url, hangUp := silentURL(t)
-	cfg, err := config.Load(config.Options{Environ: []string{"VFAPI_DB_URL=" + url}})
+	// A connection the silent storage never answers is waited for until
+	// db.connect_timeout, by the pool and by Close. The default (2s) is the
+	// test's whole bound (TST-012): one CI run took 2.01s. 500ms is still
+	// longer than every read's 200ms deadline below, so the reads end at
+	// their deadlines as before, and the test stays well inside the bound.
+	cfg, err := config.Load(config.Options{Environ: []string{"VFAPI_DB_URL=" + silentURL(t), "VFAPI_DB_CONNECT_TIMEOUT=500ms"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,8 +177,7 @@ func TestATransactionNotOpenedInTimeCountsAgainstTheBreaker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(st.Close)
-	t.Cleanup(hangUp) // runs before Close, which waits for a connection still opening
+	t.Cleanup(st.Close) // runs after the silent connections are closed: Close waits for one still opening
 	one := breaker.Settings{FailureThreshold: 1, Window: time.Minute, OpenFor: time.Minute, HalfOpenProbes: 1}
 
 	b := breaker.New(one, nil, nil)

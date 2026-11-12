@@ -111,7 +111,7 @@ where o.availability = 'reserved'
   and not exists (select 1 from contract.charge_point_state_observation n
                   where n.point_id = o.point_id and n.observed_at = o.observed_at and n.availability <> 'reserved')
 order by o.observed_at, p.point_id limit 1`, &site, &point, &at.Lat, &at.Lon, &observed)
-	sites, _, err := st.ChargingNear(bounded(t), energy.Query{At: at, RadiusM: 1, Access: energy.FilterAll, Limit: 100}, families(t, st, "energy"), observed)
+	sites, _, _, err := st.ChargingNear(bounded(t), energy.Query{At: at, RadiusM: 1, Access: energy.FilterAll, Limit: 100}, families(t, st, "energy"), observed)
 	if err != nil {
 		t.Fatal(err)
 	}

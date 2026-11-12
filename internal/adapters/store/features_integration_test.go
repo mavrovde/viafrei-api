@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -109,7 +110,7 @@ where o.availability = 'x_unmapped' order by o.observed_at limit 1`, &id, &fam, 
 	fams := families(t, st, "energy")
 	q := energy.Query{At: at, RadiusM: everywhere, Access: energy.FilterAll, Limit: 100}
 
-	sites, more, err := st.ChargingNear(bounded(t), q, fams, unknown)
+	sites, more, _, err := st.ChargingNear(bounded(t), q, fams, unknown)
 	if err != nil || len(sites) == 0 {
 		t.Fatalf("read %d sites: %v", len(sites), err)
 	}
@@ -136,16 +137,16 @@ where o.availability = 'x_unmapped' order by o.observed_at limit 1`, &id, &fam, 
 		t.Errorf("an unmapped state reads as other: %+v", a)
 	}
 
-	before, _, err := st.ChargingNear(bounded(t), q, fams, fixtures.ReferenceInstant.Add(-time.Second))
+	before, _, _, err := st.ChargingNear(bounded(t), q, fams, fixtures.ReferenceInstant.Add(-time.Second))
 	if err != nil || before[0].Points[0].Availability != nil {
 		t.Errorf("a report from after now was read: %v", err)
 	}
-	one, more, err := st.ChargingNear(bounded(t), energy.Query{At: at, RadiusM: everywhere, Access: energy.FilterAll, Limit: 1}, fams, unknown)
+	one, more, _, err := st.ChargingNear(bounded(t), energy.Query{At: at, RadiusM: everywhere, Access: energy.FilterAll, Limit: 1}, fams, unknown)
 	if err != nil || len(one) != 1 || !more || one[0].ID != id {
 		t.Errorf("limit 1: %d sites, more %v, %v", len(one), more, err)
 	}
 	for _, f := range []energy.AccessFilter{energy.FilterPublic, energy.FilterRestricted} {
-		got, _, err := st.ChargingNear(bounded(t), energy.Query{At: at, RadiusM: everywhere, Access: f, Limit: 100}, fams, unknown)
+		got, _, _, err := st.ChargingNear(bounded(t), energy.Query{At: at, RadiusM: everywhere, Access: f, Limit: 100}, fams, unknown)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -155,7 +156,7 @@ where o.availability = 'x_unmapped' order by o.observed_at limit 1`, &id, &fam, 
 			}
 		}
 	}
-	fast, _, err := st.ChargingNear(bounded(t), energy.Query{At: at, RadiusM: everywhere, Access: energy.FilterAll, MinKw: 150, Limit: 100}, fams, unknown)
+	fast, _, _, err := st.ChargingNear(bounded(t), energy.Query{At: at, RadiusM: everywhere, Access: energy.FilterAll, MinKw: 150, Limit: 100}, fams, unknown)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +179,7 @@ where o.availability = 'x_unmapped' order by o.observed_at limit 1`, &id, &fam, 
 	if dropped == 0 {
 		t.Error("min_kw dropped no slower point of a kept site; the fixture no longer proves the point filter")
 	}
-	other, _, err := st.ChargingNear(bounded(t), q, []string{"src-alpha-parking"}, unknown)
+	other, _, _, err := st.ChargingNear(bounded(t), q, []string{"src-alpha-parking"}, unknown)
 	if err != nil || len(other) != 0 {
 		t.Errorf("another domain's family read %d sites: %v", len(other), err)
 	}
@@ -197,7 +198,7 @@ from contract.parking_facility f join contract.occupancy_observation o using (fa
 where o.occupancy_status = 'x_unmapped' order by o.observed_at limit 1`, &id, &at.Lat, &at.Lon, &unknown)
 	listed := families(t, st, "parking")
 	q := parking.Query{At: at, RadiusM: everywhere, Limit: 100}
-	sites, more, err := st.ParkingNear(bounded(t), q, listed, listed, unknown)
+	sites, more, _, err := st.ParkingNear(bounded(t), q, listed, listed, unknown)
 	if err != nil || len(sites) == 0 || more {
 		t.Fatalf("read %d sites, more %v: %v", len(sites), more, err)
 	}
@@ -216,11 +217,11 @@ where o.occupancy_status = 'x_unmapped' order by o.observed_at limit 1`, &id, &a
 where source_ref = 'src-delta-parking' order by facility_id limit 1`, &delta, &dAt.Lat, &dAt.Lon)
 	end := fixtures.ReferenceInstant.AddDate(0, 0, 2)
 	occupancy := slices.DeleteFunc(slices.Clone(listed), func(f string) bool { return f == "src-delta-parking" })
-	got, _, err := st.ParkingNear(bounded(t), parking.Query{At: dAt, RadiusM: 1, Limit: 5}, listed, occupancy, end)
+	got, _, _, err := st.ParkingNear(bounded(t), parking.Query{At: dAt, RadiusM: 1, Limit: 5}, listed, occupancy, end)
 	if err != nil || len(got) != 1 || got[0].ID != delta || got[0].Occupancy != nil || got[0].Kind != parking.KindTruckParking {
 		t.Errorf("a pending family's site carries occupancy: %+v, %v", got, err)
 	}
-	got, _, err = st.ParkingNear(bounded(t), parking.Query{At: dAt, RadiusM: 1, Limit: 5}, occupancy, occupancy, end)
+	got, _, _, err = st.ParkingNear(bounded(t), parking.Query{At: dAt, RadiusM: 1, Limit: 5}, occupancy, occupancy, end)
 	if err != nil || len(got) != 0 {
 		t.Errorf("an unlisted family's site read: %+v, %v", got, err)
 	}
@@ -235,7 +236,7 @@ where source_ref = 'src-delta-parking' order by facility_id limit 1`, &delta, &d
 from contract.parking_facility f join contract.occupancy_observation o using (facility_id)
 where o.free_spaces > 0 and f.source_ref <> 'src-delta-parking' order by o.observed_at desc limit 1`, &fid, &fAt.Lat, &fAt.Lon, &free, &report)
 	near := func(min int, now time.Time) []parking.Site {
-		got, _, err := st.ParkingNear(bounded(t), parking.Query{At: fAt, RadiusM: 1, FreeMin: min, Limit: 5}, listed, listed, now)
+		got, _, _, err := st.ParkingNear(bounded(t), parking.Query{At: fAt, RadiusM: 1, FreeMin: min, Limit: 5}, listed, listed, now)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -261,9 +262,102 @@ where o.free_spaces > 0 and f.source_ref <> 'src-delta-parking' order by o.obser
 where (select count(*) from contract.parking_facility g
        where st_dwithin(f.location::geography, g.location::geography, 50000)) >= 2
 order by f.facility_id limit 1`, &crowded.Lat, &crowded.Lon)
-	one, more, err := st.ParkingNear(bounded(t), parking.Query{At: crowded, RadiusM: everywhere, Limit: 1}, listed, listed, unknown)
+	one, more, _, err := st.ParkingNear(bounded(t), parking.Query{At: crowded, RadiusM: everywhere, Limit: 1}, listed, listed, unknown)
 	if err != nil || len(one) != 1 || !more {
 		t.Errorf("limit 1: %d sites, more %v, %v", len(one), more, err)
+	}
+}
+
+// TestTheReadsTellTheEarliestReportAfterNow checks the instant a cached
+// answer must end at: the earliest report dated after now of the points
+// shown, and of every parking site within the radius whether free_min keeps
+// it or not.
+func TestTheReadsTellTheEarliestReportAfterNow(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005")
+	st := seeded(t)
+	fams := families(t, st, "energy")
+	in := "'{" + strings.Join(fams, ",") + "}'::text[]"
+	var (
+		id   string
+		at   geo.Point
+		now  time.Time
+		want time.Time
+	)
+	// A site with at least two reports: now is its first, the next is its
+	// second.
+	owner(t, `select c.site_id, st_y(c.location), st_x(c.location), min(o.observed_at)
+from contract.charging_site c join contract.charge_point p using (site_id)
+join contract.charge_point_state_observation o using (point_id)
+where o.source_ref = any(`+in+`) and c.withdrawn_at is null and c.source_ref = any(`+in+`)
+group by 1, 2, 3 having count(*) >= 2 order by 1 limit 1`, &id, &at.Lat, &at.Lon, &now)
+	q := energy.Query{At: at, RadiusM: 1, Access: energy.FilterAll, Limit: 1}
+	sites, _, next, err := st.ChargingNear(bounded(t), q, fams, now)
+	if err != nil || len(sites) != 1 || sites[0].ID != id {
+		t.Fatalf("read %+v: %v", sites, err)
+	}
+	owner(t, `select min(o.observed_at) from contract.charge_point p
+join contract.charge_point_state_observation o using (point_id)
+where p.site_id = '`+id+`' and o.source_ref = any(`+in+`) and o.observed_at > '`+now.Format(time.RFC3339Nano)+`'`, &want)
+	if next == nil || !next.Equal(want) || next.Location() != time.UTC {
+		t.Errorf("charging: next report %v, want %v", next, want)
+	}
+	if _, _, next, err := st.ChargingNear(bounded(t), q, fams, now.AddDate(10, 0, 0)); err != nil || next != nil {
+		t.Errorf("charging with no later report: %v, %v", next, err)
+	}
+
+	// The site past the limit only tells that there are more: its later
+	// report does not end the answer. Two sites, the nearer with no report
+	// after now, the next one with one.
+	var (
+		near, far string
+		radius    int
+	)
+	owner(t, `with s as (
+  select site_id, location from contract.charging_site where withdrawn_at is null and source_ref = any(`+in+`)),
+ranked as (
+  select a.site_id a, b.site_id b, ceil(st_distance(a.location::geography, b.location::geography))::int + 1 r,
+         row_number() over (partition by a.site_id
+           order by round(st_distance(a.location::geography, b.location::geography))::int, b.site_id) rk
+  from s a cross join s b),
+last as (
+  select p.site_id, max(o.observed_at) at from contract.charge_point p
+  join contract.charge_point_state_observation o using (point_id)
+  where o.source_ref = any(`+in+`) group by 1)
+select r2.a, st_y(c.location), st_x(c.location), r2.r, l.at, r2.b
+from ranked r1 join ranked r2 on r2.a = r1.a and r1.rk = 1 and r2.rk = 2 and r1.b = r1.a
+join contract.charging_site c on c.site_id = r2.a
+join last l on l.site_id = r2.a
+where exists (select 1 from contract.charge_point p join contract.charge_point_state_observation o using (point_id)
+              where p.site_id = r2.b and o.source_ref = any(`+in+`) and o.observed_at > l.at)
+order by r2.a limit 1`, &near, &at.Lat, &at.Lon, &radius, &now, &far)
+	two := energy.Query{At: at, RadiusM: radius, Access: energy.FilterAll, Limit: 2}
+	if sites, _, next, err := st.ChargingNear(bounded(t), two, fams, now); err != nil || len(sites) != 2 || sites[0].ID != near || sites[1].ID != far || next == nil {
+		t.Fatalf("limit 2 (%s, %s): %+v, next %v, %v", near, far, sites, next, err)
+	}
+	two.Limit = 1
+	if sites, more, next, err := st.ChargingNear(bounded(t), two, fams, now); err != nil || len(sites) != 1 || sites[0].ID != near || !more || next != nil {
+		t.Errorf("limit 1: %+v, more %v, next %v (the site past the limit), %v", sites, more, next, err)
+	}
+
+	listed := families(t, st, "parking")
+	pin := "'{" + strings.Join(listed, ",") + "}'::text[]"
+	var fid string
+	owner(t, `select f.facility_id, st_y(f.location), st_x(f.location), min(o.observed_at)
+from contract.parking_facility f join contract.occupancy_observation o using (facility_id)
+where o.source_ref = any(`+pin+`) and f.source_ref = any(`+pin+`) and f.withdrawn_at is null
+group by 1, 2, 3 having count(*) >= 2 order by 1 limit 1`, &fid, &at.Lat, &at.Lon, &now)
+	owner(t, `select min(o.observed_at) from contract.occupancy_observation o
+join contract.parking_facility f using (facility_id)
+where o.source_ref = any(`+pin+`) and f.source_ref = any(`+pin+`) and f.withdrawn_at is null and o.observed_at > '`+now.Format(time.RFC3339Nano)+`'
+  and st_dwithin(f.location::geography, (select location::geography from contract.parking_facility where facility_id = '`+fid+`'), 1)`, &want)
+	for _, freeMin := range []int{0, 1 << 20} {
+		got, _, next, err := st.ParkingNear(bounded(t), parking.Query{At: at, RadiusM: 1, FreeMin: freeMin, Limit: 5}, listed, listed, now)
+		if err != nil || next == nil || !next.Equal(want) || next.Location() != time.UTC {
+			t.Errorf("parking, free_min %d (%d sites): next report %v, want %v, %v", freeMin, len(got), next, want, err)
+		}
+	}
+	if _, _, next, err := st.ParkingNear(bounded(t), parking.Query{At: at, RadiusM: 1, Limit: 5}, listed, listed, now.AddDate(10, 0, 0)); err != nil || next != nil {
+		t.Errorf("parking with no later report: %v, %v", next, err)
 	}
 }
 
@@ -294,10 +388,10 @@ func TestFeatureReadsReportStorageFaults(t *testing.T) {
 	if _, err := st.Provenance(ctx, []string{"x"}, "en"); err == nil {
 		t.Error("Provenance on an ended context succeeded")
 	}
-	if _, _, err := st.ChargingNear(ctx, energy.Query{Limit: 1}, []string{"x"}, time.Now()); err == nil {
+	if _, _, _, err := st.ChargingNear(ctx, energy.Query{Limit: 1}, []string{"x"}, time.Now()); err == nil {
 		t.Error("ChargingNear on an ended context succeeded")
 	}
-	if _, _, err := st.ParkingNear(ctx, parking.Query{Limit: 1}, []string{"x"}, nil, time.Now()); err == nil {
+	if _, _, _, err := st.ParkingNear(ctx, parking.Query{Limit: 1}, []string{"x"}, nil, time.Now()); err == nil {
 		t.Error("ParkingNear on an ended context succeeded")
 	}
 	if _, err := st.Place(ctx, "x", []string{"x"}); err == nil || errors.Is(err, places.ErrNotFound) {

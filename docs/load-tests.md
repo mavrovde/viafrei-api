@@ -25,6 +25,12 @@ access-store role, issues two throwaway keys (one used throughout, one used
 only while the access store is down, so it is not cached) and runs the
 runner, `go run ./internal/testkit/loadrun`. The stack is removed on exit.
 
+The override turns the result cache off (`cache.enabled: false`). The runner
+repeats the same few requests, so with the cache on they would be answered
+from memory and a fault on the storage route would reach none of them. With
+it off, every request reaches storage and the path its scenario cuts. The
+cache is tested by the unit and integration tests and by the benchmark leg.
+
 The runner speaks only to hosts on `test/load/allow-list.txt` (the loopback).
 Any other host, any scheme but `http`, and a URL with credentials are refused
 before a request is sent (exit 2). An empty allow-list is refused too. Faults

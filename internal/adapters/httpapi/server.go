@@ -62,6 +62,10 @@ type Deps struct {
 	Keys KeyGate
 	// Meter records each keyed request's usage; nil records nothing.
 	Meter Meter
+	// Versions reads the source families' freshness versions, so the cache
+	// answers a matching If-None-Match before the operation runs; nil
+	// validates only after it.
+	Versions VersionReader
 }
 
 type server struct {
@@ -76,6 +80,8 @@ type server struct {
 	features        Features
 	keyGate         KeyGate
 	metering        Meter
+	results         *resultCache
+	versions        *versionCache
 }
 
 // operation is one registered API operation.
@@ -179,6 +185,8 @@ func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 	if s.now == nil {
 		s.now = time.Now
 	}
+	s.results = newResultCache(d.Config.Cache)
+	s.versions = &versionCache{reader: d.Versions, ttl: d.Config.Cache.VersionsTTL, now: s.now}
 	ops := append(operations(), extra...)
 	disabled := map[string]bool{}
 	for _, id := range d.Config.Endpoints.Disabled {
@@ -209,6 +217,7 @@ func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 		withRequest(base),
 		withClient(TrustedProxies(d.Config.Server.TrustedProxies)),
 		accessLog(s.log, s.now),
+		compress(d.Config.HTTP.CompressMinBytes, d.Config.HTTP.CompressLevel),
 		recoverPanics(s.log),
 		refuseKeyInQuery(access.Prefixes{Live: d.Config.Auth.KeyPrefixLive, Test: d.Config.Auth.KeyPrefixTest}),
 		limitURI(d.Config.Server.MaxURIBytes),
@@ -252,7 +261,7 @@ func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 		DefaultFormat: "application/json",
 	}
 	api := humachi.New(router, hc)
-	api.UseMiddleware(strictQuery(api), s.authenticate(api))
+	api.UseMiddleware(strictQuery(api), s.authenticate(api), s.cache)
 
 	for _, op := range ops {
 		if disabled[op.id] {
@@ -283,6 +292,9 @@ func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 
 	if d.Config.RateLimit.Headers {
 		documentRateLimit(api)
+	}
+	if d.Config.Cache.Enabled {
+		documentCaching(api)
 	}
 
 	// The document is a value of huma's own fixed types: marshalling it

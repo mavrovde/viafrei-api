@@ -8,6 +8,10 @@
 -- development can load synthetic fixtures into them.
 --
 -- sqlc compiles every query of db/queries against this file.
+--
+-- The observation relations are time series, partitioned by observed_at as
+-- the published contract's are; 0003_physical.sql gives them a default
+-- partition and adds the indexes the service's reads rely on.
 
 create extension if not exists postgis;
 
@@ -151,8 +155,9 @@ create table contract.traffic_event_observation (
     event_id    text not null references contract.traffic_event,
     observed_at timestamptz not null,
     version_no  integer not null,
-    primary key (event_id, version_no)
-);
+    -- observed_at is part of the key because the table is partitioned by it.
+    primary key (event_id, version_no, observed_at)
+) partition by range (observed_at);
 
 -- -------------------------------------------------------------------- energy
 
@@ -188,7 +193,7 @@ create table contract.fuel_price_observation (
     price        numeric(6,3) not null,
     currency     char(3) not null,
     source_ref   text not null references contract.source
-);
+) partition by range (observed_at);
 
 create table contract.charging_site (
     site_id       text primary key,
@@ -216,7 +221,7 @@ create table contract.charge_point_state_observation (
     observed_at  timestamptz not null,
     availability text not null,
     source_ref   text not null references contract.source
-);
+) partition by range (observed_at);
 
 -- ------------------------------------------------------------------- parking
 
@@ -243,7 +248,7 @@ create table contract.occupancy_observation (
     total_spaces     integer,
     occupancy_status text not null,
     source_ref       text not null references contract.source
-);
+) partition by range (observed_at);
 
 -- ------------------------------------------------------------------- transit
 
@@ -301,7 +306,7 @@ create table contract.call_observation (
     call_status           text not null,
     source_ref            text not null references contract.source,
     foreign key (journey_id, call_order) references contract.scheduled_call
-);
+) partition by range (observed_at);
 
 -- ------------------------------------------------------------- accessibility
 

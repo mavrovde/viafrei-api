@@ -124,6 +124,7 @@ func serve(environ []string, stderr io.Writer) int {
 		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st},
 			wire.FeatureSettings(cfg), time.Now),
 		Addresses: addresses,
+		Versions:  st,
 	}
 
 	if cfg.Access.URL.IsSet() {

@@ -354,6 +354,7 @@ func crossField(c *Config) Errors {
 		out = append(out, fmt.Sprintf("compose.part_deadline: %s × %d parts is longer than deadline.request minus deadline.reserve", c.Compose.PartDeadline, parts))
 	}
 	out = append(out, crossFieldAuth(c)...)
+	out = append(out, crossFieldCache(c)...)
 	out = append(out, crossFieldBudget(c)...)
 	out = append(out, crossFieldAdmin(c)...)
 	return append(out, crossFieldTiers(c)...)
@@ -426,4 +427,12 @@ func crossFieldAuth(c *Config) Errors {
 		out = append(out, "auth.pepper_previous: equal to auth.pepper; set it only during a rotation, to the old value")
 	}
 	return out
+}
+
+// crossFieldCache keeps one stored body inside the result cache's budget.
+func crossFieldCache(c *Config) Errors {
+	if c.Cache.MaxBytes > 0 && c.Cache.MaxEntryBytes > c.Cache.MaxBytes {
+		return Errors{fmt.Sprintf("cache.max_entry_bytes: %d is more than cache.max_bytes %d", c.Cache.MaxEntryBytes, c.Cache.MaxBytes)}
+	}
+	return nil
 }

@@ -32,9 +32,16 @@ func TestMain(m *testing.M) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	var err error
 	db, err = pgtest.Start(ctx)
+	if err != nil {
+		cancel()
+		fmt.Fprintln(os.Stderr, "integration tests need a container runtime:", err)
+		os.Exit(1)
+	}
+	err = seed(ctx)
 	cancel()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "integration tests need a container runtime:", err)
+		db.Stop()
+		fmt.Fprintln(os.Stderr, "loading the fixtures:", err)
 		os.Exit(1)
 	}
 	code := m.Run()

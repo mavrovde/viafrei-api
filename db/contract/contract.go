@@ -12,6 +12,9 @@ import (
 //go:embed 0001_contract.sql
 var schemaSQL string
 
+//go:embed 0003_physical.sql
+var physicalSQL string
+
 //go:embed 0002_reader_role.sql
 var readerRoleSQL string
 
@@ -25,8 +28,9 @@ const ReaderRole = "api_reader"
 // in major.minor form.
 func Version() string { return strings.TrimSpace(version) }
 
-// SchemaSQL returns the statements that build the contract stub.
-func SchemaSQL() string { return schemaSQL }
+// SchemaSQL returns the statements that build the contract stub: its
+// relations, then their partitions and indexes.
+func SchemaSQL() string { return schemaSQL + "\n" + physicalSQL }
 
 // ReaderRoleSQL returns the statements that create the read-only role. The
 // caller sets the role's password separately.

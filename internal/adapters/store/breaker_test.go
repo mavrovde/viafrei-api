@@ -3,12 +3,14 @@ package store_test
 import (
 	"context"
 	"errors"
+	"net"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
+	"github.com/mavrovde/viafrei-api/internal/app/admission"
 	"github.com/mavrovde/viafrei-api/internal/app/breaker"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
@@ -75,5 +77,126 @@ func TestAReadRefusedBeforeStorageLeavesTheBreakerClosed(t *testing.T) {
 	}
 	if b.State() != breaker.Closed {
 		t.Fatalf("breaker %v, want closed", b.State())
+	}
+}
+
+// halfOpen is a breaker with one trial slot, half-open: opened by its
+// threshold of failures, its open period over.
+func halfOpen(t *testing.T) *breaker.Breaker {
+	t.Helper()
+	at := time.Date(2026, 11, 12, 10, 0, 0, 0, time.UTC)
+	b := breaker.New(trip, func() time.Time { return at }, nil)
+	for range trip.FailureThreshold {
+		tk, err := b.Allow()
+		if err != nil {
+			t.Fatal(err)
+		}
+		tk.Done(breaker.Failure)
+	}
+	at = at.Add(trip.OpenFor)
+	if b.State() != breaker.HalfOpen {
+		t.Fatalf("breaker %v, want half-open", b.State())
+	}
+	return b
+}
+
+// trialFree: the breaker's one trial slot is free again, so a later read
+// is admitted.
+func trialFree(t *testing.T, b *breaker.Breaker) {
+	t.Helper()
+	tk, err := b.Allow()
+	if err != nil {
+		t.Fatalf("the trial slot was kept by a read refused before storage: %v", err)
+	}
+	tk.Done(breaker.Ignored)
+}
+
+// A trial refused before storage gives its slot back: kept, the breaker
+// would refuse every read once half_open_probes such reads had happened.
+func TestATrialRefusedBeforeStorageGivesItsSlotBack(t *testing.T) {
+	req.Covers(t, "NFR-RES-002")
+	// Refused by the deadline floor.
+	b := halfOpen(t)
+	st := store.New(nil, config.Defaults()).WithBreaker(b)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+	err := st.Read(ctx, untouched)
+	cancel()
+	if !errors.Is(err, store.ErrDeadlineExhausted) {
+		t.Fatalf("budget: %v, want ErrDeadlineExhausted", err)
+	}
+	trialFree(t, b)
+	// Refused by the admission.
+	b = halfOpen(t)
+	st, _, _ = held(t, "VFAPI_TIERS_BULK_QUEUE_LEN=0")
+	st.WithBreaker(b)
+	ctx = admission.WithCaller(context.Background(), admission.Caller{Tier: admission.Bulk, Key: "k"})
+	var r *admission.Refusal
+	if err := st.Read(ctx, untouched); !errors.As(err, &r) {
+		t.Fatalf("admission: %v, want a refusal", err)
+	}
+	trialFree(t, b)
+}
+
+// silentURL is a storage address that accepts connections and never
+// answers, so a transaction cannot be opened before the deadline.
+func silentURL(t *testing.T) string {
+	t.Helper()
+	l, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = l.Close() })
+	go func() {
+		for {
+			c, err := l.Accept()
+			if err != nil {
+				return
+			}
+			t.Cleanup(func() { _ = c.Close() })
+		}
+	}()
+	return "postgres://reader:pw@" + l.Addr().String() + "/contract?sslmode=disable"
+}
+
+// A transaction that could not be opened by the deadline is a failure, the
+// storage's own: unlike a statement that ran out of time, which is storage
+// answering. A read whose caller went away while opening it counts for
+// nothing.
+func TestATransactionNotOpenedInTimeCountsAgainstTheBreaker(t *testing.T) {
+	req.Covers(t, "NFR-RES-002")
+	cfg, err := config.Load(config.Options{Environ: []string{"VFAPI_DB_URL=" + silentURL(t)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, err := store.Open(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(st.Close) // runs after the silent connections are closed: Close waits for one still opening
+	one := breaker.Settings{FailureThreshold: 1, Window: time.Minute, OpenFor: time.Minute, HalfOpenProbes: 1}
+
+	b := breaker.New(one, nil, nil)
+	st.WithBreaker(b)
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(200*time.Millisecond, cancel)
+	if err := st.Read(ctx, untouched); err == nil {
+		t.Fatal("a read against silent storage succeeded")
+	}
+	if b.State() != breaker.Closed {
+		t.Fatalf("breaker %v after a read its caller abandoned, want closed", b.State())
+	}
+
+	ctx, cancel = context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	if err := st.Read(ctx, untouched); !errors.Is(err, store.ErrDeadlineExhausted) {
+		t.Fatalf("read: %v, want ErrDeadlineExhausted", err)
+	}
+	// The outcome is reported on the read's goroutine, a moment after the
+	// caller's answer.
+	for deadline := time.Now().Add(2 * time.Second); b.State() != breaker.Open && time.Now().Before(deadline); {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if b.State() != breaker.Open {
+		t.Fatalf("breaker %v after a transaction not opened in time, want open", b.State())
 	}
 }

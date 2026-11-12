@@ -95,15 +95,30 @@ func breakerProblem(w http.ResponseWriter) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"type": "https://api.example.test/problems/upstream-unavailable", "status": 503, "detail": breakerDetail})
 }
 
+// at is a change of the breaker's state, "from>to", at t.
+func at(step string, t time.Time) change { return change{at: t, step: step} }
+
 // breakerLog is the instance's log of the given changes of the breaker's
-// state, "from>to" each, among other lines.
-func breakerLog(changes ...string) string {
+// state, among other lines.
+func breakerLog(changes ...change) string {
 	lines := []string{`{"msg":"listening"}`, "not json"}
 	for _, c := range changes {
-		from, to, _ := strings.Cut(c, ">")
-		lines = append(lines, fmt.Sprintf(`{"time":"2026-11-12T10:00:00Z","level":"INFO","msg":%q,"from":%q,"to":%q,"generation":1}`, breakerLogLine, from, to))
+		from, to, _ := strings.Cut(c.step, ">")
+		lines = append(lines, fmt.Sprintf(`{"time":%q,"level":"INFO","msg":%q,"from":%q,"to":%q,"generation":1}`,
+			c.at.UTC().Format(time.RFC3339Nano), breakerLogLine, from, to))
 	}
 	return strings.Join(lines, "\n") + "\n"
+}
+
+// logs answers the runner's log read with log(now) and every other docker
+// call like the stack at rest.
+func logs(log func(now time.Time) string) func(string) (string, error) {
+	return func(a string) (string, error) {
+		if strings.HasPrefix(a, "logs ") {
+			return log(time.Now()), nil
+		}
+		return healthyDocker(a)
+	}
 }
 
 // answer writes a 2xx answer with the meta a scenario reads.

@@ -36,7 +36,7 @@ func newBreaker() (*breaker.Breaker, *clock, *changes) {
 	return breaker.New(settings, c.now, ch.record), c, ch
 }
 
-func admit(t *testing.T, b *breaker.Breaker) breaker.Ticket {
+func admit(t *testing.T, b *breaker.Breaker) *breaker.Ticket {
 	t.Helper()
 	tk, err := b.Allow()
 	if err != nil {
@@ -254,7 +254,7 @@ func TestConcurrentTrialsAreBounded(t *testing.T) {
 		c.advance(settings.OpenFor)
 		var wg sync.WaitGroup
 		var mu sync.Mutex
-		var held []breaker.Ticket
+		var held []*breaker.Ticket
 		refused := 0
 		start := make(chan struct{})
 		for range 64 {
@@ -283,5 +283,25 @@ func TestConcurrentTrialsAreBounded(t *testing.T) {
 		if b.State() != breaker.Closed {
 			t.Fatalf("round %d: a successful trial did not close the breaker", round)
 		}
+	}
+}
+
+func TestATicketCountsOnce(t *testing.T) {
+	req.Covers(t, "NFR-RES-002")
+	b, c, _ := newBreaker()
+	fail(t, b, settings.FailureThreshold)
+	c.advance(settings.OpenFor)
+	first, second := admit(t, b), admit(t, b)
+	// Reported twice, an ignored trial frees its slot once: one more read is
+	// admitted, the next is refused.
+	first.Done(breaker.Ignored)
+	first.Done(breaker.Ignored)
+	third := admit(t, b)
+	_ = refusal(t, b)
+	// A trial reported failed and then succeeded stays failed.
+	second.Done(breaker.Failure)
+	third.Done(breaker.Success)
+	if b.State() != breaker.Open {
+		t.Fatalf("breaker %v, want open after the failed trial", b.State())
 	}
 }

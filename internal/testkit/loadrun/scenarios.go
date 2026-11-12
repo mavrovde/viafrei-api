@@ -220,19 +220,76 @@ const breakerLogLine = "storage circuit breaker changed state"
 
 // transitions reads the breaker's changes of state the instance logged
 // since t, as "from>to", in order.
-func (r *runner) transitions(ctx context.Context, since time.Time) ([]string, error) {
+func (r *runner) transitions(ctx context.Context, since time.Time) ([]change, error) {
 	out, err := r.docker(ctx, "logs", "--no-color", "--no-log-prefix", "--since", since.UTC().Format(time.RFC3339Nano), "api") //nolint:misspell // docker's flag is spelled so
 	if err != nil {
 		return nil, err
 	}
-	var ts []string
+	var cs []change
 	for line := range strings.SplitSeq(out, "\n") {
-		var e struct{ Msg, From, To string }
-		if json.Unmarshal([]byte(line), &e) == nil && e.Msg == breakerLogLine {
-			ts = append(ts, e.From+">"+e.To)
+		var e struct {
+			Time          time.Time
+			Msg, From, To string
+		}
+		if json.Unmarshal([]byte(line), &e) != nil || e.Msg != breakerLogLine {
+			continue
+		}
+		if e.Time.IsZero() {
+			return nil, fmt.Errorf("a change of the breaker's state carries no time: %s", line)
+		}
+		cs = append(cs, change{at: e.Time, step: e.From + ">" + e.To})
+	}
+	return cs, nil
+}
+
+// change is one logged change of the breaker's state, "from>to".
+type change struct {
+	at   time.Time
+	step string
+}
+
+func steps(cs []change) []string {
+	out := make([]string, len(cs))
+	for i, c := range cs {
+		out[i] = c.step
+	}
+	return out
+}
+
+// probeSlack is how long before a half-open period began a read may have
+// been sent and still be one of its probes: the breaker admits a read when
+// it arrives, a moment after it was sent.
+const probeSlack = 100 * time.Millisecond
+
+// probesPerPeriod assigns each read of rs that reached storage (not refused
+// by the breaker) to the half-open period that began last before it was
+// sent (probeSlack allowed), among the periods that began before the
+// repair. It returns the reads of each period and the reads that fall in
+// none: sent while the breaker was open, they reached storage although
+// nothing should have.
+func probesPerPeriod(rs []result, cs []change, repaired time.Time) (per []int, stray int) {
+	var starts []time.Time
+	for _, c := range cs {
+		if c.step == "open>half-open" && c.at.Before(repaired) {
+			starts = append(starts, c.at)
 		}
 	}
-	return ts, nil
+	per = make([]int, len(starts))
+	for _, x := range rs {
+		if breakerRefused(x) {
+			continue
+		}
+		i := len(starts) - 1
+		for i >= 0 && starts[i].After(x.sent.Add(probeSlack)) {
+			i--
+		}
+		if i < 0 {
+			stray++
+			continue
+		}
+		per[i]++
+	}
+	return per, stray
 }
 
 func soak(ctx context.Context, r *runner, o *outcome) {
@@ -450,20 +507,25 @@ func storageKilled(ctx context.Context, r *runner, o *outcome) {
 	first := slices.IndexFunc(rs, breakerRefused)
 	o.add(fmt.Sprintf("the breaker opens after at most breaker.failure_threshold = %d reads reached the lost storage (NFR-RES-002)", r.brk.failures),
 		first >= 0 && first <= r.brk.failures, "first refused by the breaker: answer %d of %d", first+1, len(rs))
+	repaired := time.Now()
 	if err := r.setProxy(ctx, proxyStorage, true); err != nil {
 		o.add("storage route restored", false, "%v", err)
 		return
 	}
 	r.recovered(ctx, o, r.charging())
-	ts, err := r.transitions(ctx, start)
+	cs, err := r.transitions(ctx, start)
+	ts := steps(cs)
 	o.add("the breaker's changes of state are read from the instance's log", err == nil && len(ts) > 0, "%d changes%s", len(ts), errSuffix(err))
 	seen := strings.Join(ts, ", ")
 	o.add("the breaker opened: closed > open (NFR-RES-002)", slices.Contains(ts, "closed>open"), "%s", seen)
-	periods := len(slices.DeleteFunc(slices.Clone(ts), func(t string) bool { return t != "open>half-open" }))
 	if first >= 0 {
-		probed := count(rs[first:], func(x result) bool { return !breakerRefused(x) })
-		o.add(fmt.Sprintf("at most breaker.half_open_probes = %d reads reached storage in each half-open period (NFR-RES-002)", r.brk.probes),
-			probed <= r.brk.probes*periods, "%d reads reached storage after it opened, over %d half-open periods", probed, periods)
+		per, stray := probesPerPeriod(rs[first:], cs, repaired)
+		most := 0
+		if len(per) > 0 {
+			most = slices.Max(per)
+		}
+		o.add(fmt.Sprintf("at most breaker.half_open_probes = %d reads reached storage in each half-open period before the repair, none while open (NFR-RES-002)", r.brk.probes),
+			most <= r.brk.probes && stray == 0, "reads per half-open period %v, %d while open", per, stray)
 	}
 	if r.p.fault > 2*r.brk.openFor {
 		o.add("after breaker.open_for it let probes through, and a failed one opened it again: half-open > open", slices.Contains(ts, "half-open>open"), "%s", seen)

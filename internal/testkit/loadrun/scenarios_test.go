@@ -162,9 +162,16 @@ func TestStorageFaults(t *testing.T) {
 	}
 }
 
-// breakerLife is the log of a breaker that opened, let probes through
-// that failed, and was closed by a probe after the repair.
-var breakerLife = []string{"closed>open", "open>half-open", "half-open>open", "open>half-open", "half-open>closed"}
+// breakerLife is the log, read at now, of a breaker that opened at begin,
+// let probes through that failed, and was closed by a probe after the
+// repair: its last half-open period begins a moment before now, after the
+// repair.
+func breakerLife(begin time.Time) func(now time.Time) string {
+	return func(now time.Time) string {
+		return breakerLog(at("closed>open", begin), at("open>half-open", begin), at("half-open>open", now.Add(-2*time.Millisecond)),
+			at("open>half-open", now.Add(-time.Millisecond)), at("half-open>closed", now))
+	}
+}
 
 // proxiedWorld answers like a stack behind the fault proxy: a latency toxic
 // makes every read time out, a cut storage route makes it unavailable until
@@ -187,12 +194,7 @@ func proxiedWorld(t *testing.T) *world {
 		default:
 			healthyAPI(rw, r)
 		}
-	}, func(a string) (string, error) {
-		if strings.HasPrefix(a, "logs ") {
-			return breakerLog(breakerLife...), nil
-		}
-		return healthyDocker(a)
-	})
+	}, logs(breakerLife(time.Now())))
 	w.r.brk.failures = 2
 	w.proxy.fail = func(method, path, body string) bool {
 		switch {
@@ -259,12 +261,10 @@ func TestStorageKilledAssertsTheBreaker(t *testing.T) {
 			}
 			return healthyDocker(a)
 		},
-		func(a string) (string, error) {
-			if strings.HasPrefix(a, "logs ") {
-				return breakerLog(), nil
-			}
-			return healthyDocker(a)
-		},
+		logs(func(time.Time) string { return breakerLog() }),
+		logs(func(time.Time) string {
+			return `{"msg":"storage circuit breaker changed state","from":"closed","to":"open"}` + "\n"
+		}),
 	} {
 		w := proxiedWorld(t)
 		w.dock.answer = dock
@@ -276,43 +276,16 @@ func TestStorageKilledAssertsTheBreaker(t *testing.T) {
 	// A log in which the breaker never opened again after a probe, and never
 	// closed: each missing change is named.
 	w := proxiedWorld(t)
-	w.dock.answer = func(a string) (string, error) {
-		if strings.HasPrefix(a, "logs ") {
-			return breakerLog("closed>open", "open>half-open"), nil
-		}
-		return healthyDocker(a)
-	}
+	begin := time.Now()
+	w.dock.answer = logs(func(time.Time) string {
+		return breakerLog(at("closed>open", begin), at("open>half-open", begin))
+	})
 	o := runOne(t, w, "storage-killed")
 	mustFail(t, o, "a failed one opened it again")
 	mustFail(t, o, "half-open > closed, the last change")
 	if c := checkNamed(t, o, "the breaker opened"); !c.ok {
 		t.Errorf("opened: %+v", c)
 	}
-	// More reads reached storage after it opened than the half-open periods
-	// allow: one period of one probe, and every answer after the first
-	// refusal is not the breaker's.
-	w = proxiedWorld(t)
-	w.r.brk.probes = 1
-	w.dock.answer = func(a string) (string, error) {
-		if strings.HasPrefix(a, "logs ") {
-			return breakerLog("closed>open", "open>half-open", "half-open>closed"), nil
-		}
-		return healthyDocker(a)
-	}
-	var n atomic.Int64
-	w.api.Config.Handler = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		if w.proxy.restored() {
-			healthyAPI(rw, r)
-			return
-		}
-		if n.Add(1) == 1 {
-			breakerProblem(rw)
-			return
-		}
-		problem(rw, http.StatusServiceUnavailable, "upstream-unavailable")
-	})
-	o = runOne(t, w, "storage-killed")
-	mustFail(t, o, "at most breaker.half_open_probes = 1 reads")
 	// A fault no longer than twice breaker.open_for asserts no re-opening.
 	w = proxiedWorld(t)
 	w.r.brk.openFor = time.Hour
@@ -322,6 +295,98 @@ func TestStorageKilledAssertsTheBreaker(t *testing.T) {
 		if strings.Contains(c.name, "a failed one opened it again") {
 			t.Errorf("re-opening asserted on a fault shorter than open_for: %+v", c)
 		}
+	}
+}
+
+// sequenced is proxiedWorld whose lost storage answers the n-th request of
+// the fault as seq[n-1] says, the breaker's refusal after seq: 'u' is a
+// read that reached the lost storage (503 upstream-unavailable, after
+// delay), 'B' the breaker's refusal. Its log is breakerLife from when it
+// was made.
+func sequenced(t *testing.T, seq string, delay time.Duration) *world {
+	t.Helper()
+	w := proxiedWorld(t)
+	var n atomic.Int64
+	w.api.Config.Handler = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if w.proxy.restored() {
+			healthyAPI(rw, r)
+			return
+		}
+		if i := int(n.Add(1)); i <= len(seq) && seq[i-1] == 'u' {
+			time.Sleep(delay)
+			problem(rw, http.StatusServiceUnavailable, "upstream-unavailable")
+			return
+		}
+		breakerProblem(rw)
+	})
+	return w
+}
+
+// The edges of the breaker's two bounds: it opens after at most
+// failure_threshold reads, and lets at most half_open_probes through in a
+// half-open period before the repair; none while open.
+func TestStorageKilledHoldsTheBreakerToItsBounds(t *testing.T) {
+	req.Covers(t, "NFR-RES-002", "TST-007")
+	const opens = "the breaker opens after at most"
+	const probes = "at most breaker.half_open_probes = 2 reads reached storage in each half-open period"
+	for name, tc := range map[string]struct {
+		seq   string
+		delay time.Duration
+		check string
+		ok    bool
+	}{
+		"opens after exactly the threshold": {"uuB", 0, opens, true},
+		"opens one read late":               {"uuuB", 0, opens, false},
+		// The late reads answer last: only the order they were sent in
+		// shows that the breaker opened late.
+		"opens late, answers out of order": {"uuuB", 35 * time.Millisecond, opens, false},
+		"exactly the probes":               {"Buu", 0, probes, true},
+		"one probe too many":               {"Buuu", 0, probes, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			w := sequenced(t, tc.seq, tc.delay)
+			w.r.brk.probes = 2
+			o := runOne(t, w, "storage-killed")
+			if c := checkNamed(t, o, tc.check); c.ok != tc.ok {
+				t.Errorf("%+v, want ok %v", c, tc.ok)
+			}
+		})
+	}
+	// Reads that reached storage while the log shows it open: the only
+	// half-open period began after the repair.
+	w := sequenced(t, "Bu", 0)
+	w.dock.answer = logs(func(now time.Time) string {
+		return breakerLog(at("closed>open", now.Add(-time.Hour)), at("open>half-open", now.Add(-time.Millisecond)), at("half-open>closed", now))
+	})
+	o := runOne(t, w, "storage-killed")
+	if c := checkNamed(t, o, probes); c.ok || !strings.Contains(c.detail, "1 while open") {
+		t.Errorf("a read while open: %+v", c)
+	}
+}
+
+func TestProbesAreCountedPerPeriod(t *testing.T) {
+	req.Covers(t, "NFR-RES-002", "TST-007")
+	t0 := time.Date(2026, 11, 12, 10, 0, 0, 0, time.UTC)
+	sec := func(s float64) time.Time { return t0.Add(time.Duration(s * float64(time.Second))) }
+	cs := []change{
+		at("closed>open", sec(0)), at("open>half-open", sec(2)), at("half-open>open", sec(2.1)),
+		at("open>half-open", sec(4)), at("half-open>open", sec(4.1)), at("open>half-open", sec(9)), at("half-open>closed", sec(9.1)),
+	}
+	read := func(s float64) result { return result{status: http.StatusServiceUnavailable, sent: sec(s)} }
+	refusal := result{status: http.StatusServiceUnavailable, problem: "upstream-unavailable", retry: true, body: map[string]any{"detail": breakerDetail}, sent: sec(3)}
+	rs := []result{
+		refusal,
+		read(2), read(2.05), // the first period
+		read(4 - probeSlack.Seconds()), // sent a moment before the second began: one of its probes
+		read(1.5),                      // sent while open, before any period
+		read(6),                        // after the second period: assigned to it
+	}
+	per, stray := probesPerPeriod(rs, cs, sec(8))
+	if len(per) != 2 || per[0] != 2 || per[1] != 2 || stray != 1 {
+		t.Errorf("per %v, stray %d; want [2 2] and 1 (the period after the repair is not counted)", per, stray)
+	}
+	if per, stray := probesPerPeriod(rs, cs, sec(1)); len(per) != 0 || stray != 5 {
+		t.Errorf("no period before the repair: per %v, stray %d", per, stray)
 	}
 }
 

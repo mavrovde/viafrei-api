@@ -53,6 +53,10 @@ services:
       # own tests (unit, integration and the benchmark leg).
       VFAPI_CACHE_ENABLED: "false"
       # The storage-killed scenario holds storage down longer than twice
-      # this, so a failed half-open probe opening the breaker again is
-      # observed; the runner's -breaker-open-for says the same (NFR-RES-002).
+      # open_for, so a failed half-open probe opening the breaker again is
+      # observed. scripts/load-test.sh hands the runner these three values
+      # (-breaker-*), read from this file, so the two cannot differ
+      # (NFR-RES-002).
+      VFAPI_BREAKER_FAILURE_THRESHOLD: "5"
       VFAPI_BREAKER_OPEN_FOR: 2s
+      VFAPI_BREAKER_HALF_OPEN_PROBES: "2"

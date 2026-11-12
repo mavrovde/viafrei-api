@@ -15,6 +15,7 @@ package breaker
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -141,15 +142,17 @@ func (b *Breaker) State() State {
 	return st
 }
 
-// Ticket is one admitted read.
+// Ticket is one admitted read. Its outcome counts once: a second Done is
+// ignored, so a read reported twice can never free a trial slot twice.
 type Ticket struct {
 	b          *Breaker
 	generation uint64
 	trial      bool
+	done       atomic.Bool
 }
 
 // Allow admits a read or refuses it with a *Refusal.
-func (b *Breaker) Allow() (Ticket, error) {
+func (b *Breaker) Allow() (*Ticket, error) {
 	b.mu.Lock()
 	ch := b.expire()
 	t, err := b.allow()
@@ -158,26 +161,29 @@ func (b *Breaker) Allow() (Ticket, error) {
 	return t, err
 }
 
-func (b *Breaker) allow() (Ticket, error) {
+func (b *Breaker) allow() (*Ticket, error) {
 	switch b.state {
 	case Open:
 		b.counts.Refused++
-		return Ticket{}, &Refusal{State: Open, RetryAfter: b.openedAt.Add(b.settings.OpenFor).Sub(b.now())}
+		return nil, &Refusal{State: Open, RetryAfter: b.openedAt.Add(b.settings.OpenFor).Sub(b.now())}
 	case HalfOpen:
 		if b.trials >= b.settings.HalfOpenProbes {
 			b.counts.Refused++
-			return Ticket{}, &Refusal{State: HalfOpen}
+			return nil, &Refusal{State: HalfOpen}
 		}
 		b.trials++
 		b.counts.Trials++
-		return Ticket{b: b, generation: b.generation, trial: true}, nil
+		return &Ticket{b: b, generation: b.generation, trial: true}, nil
 	default:
-		return Ticket{b: b, generation: b.generation}, nil
+		return &Ticket{b: b, generation: b.generation}, nil
 	}
 }
 
-// Done reports the read's outcome. It may be called once per ticket.
-func (t Ticket) Done(o Outcome) {
+// Done reports the read's outcome; only the first call counts.
+func (t *Ticket) Done(o Outcome) {
+	if t.done.Swap(true) {
+		return
+	}
 	b := t.b
 	b.mu.Lock()
 	var ch *Change

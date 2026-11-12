@@ -43,6 +43,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -92,6 +93,9 @@ var profiles = map[string]profile{
 	},
 }
 
+// appName is an application_name the runner may put in a query.
+var appName = regexp.MustCompile(`^[a-z0-9-]{1,63}$`)
+
 func run(args []string, getenv func(string) string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet(prog, flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -119,6 +123,7 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		probes   = fs.Int("breaker-probes", 2, "breaker.half_open_probes of the instance under test (NFR-RES-002)")
 		cached   = fs.String("cached-api", "http://[::1]:8081", "base URL of the instance with the result cache, behind the same fault proxy (NFR-RES-004)")
 		staleFor = fs.Duration("stale-if-error", 4*time.Second, "cache.stale_if_error.parking of the instance with the result cache, as test/load/compose.yaml sets it (NFR-RES-004)")
+		app      = fs.String("application-name", "viafrei-api", "db.application_name of the instance under test: its storage connections are counted by it, apart from the instance with the result cache (NFR-CAP-002)")
 		ageP     = fs.Duration("max-age-parking", time.Second, "cache.max_age.parking of the instance with the result cache, as test/load/compose.yaml sets it")
 		ageE     = fs.Duration("max-age-energy", time.Second, "cache.max_age.energy of the instance with the result cache, as test/load/compose.yaml sets it")
 		ttl      = fs.Duration("versions-ttl", time.Second, "cache.versions_ttl of the instance with the result cache, as test/load/compose.yaml sets it")
@@ -150,6 +155,8 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		return fail("-breaker-failures and -breaker-probes must be at least 1, -breaker-open-for positive")
 	case *staleFor <= 0:
 		return fail("-stale-if-error must be positive")
+	case !appName.MatchString(*app):
+		return fail("-application-name must be 1 to 63 lower-case letters, digits and hyphens")
 	case *ageP <= 0 || *ageE <= 0 || *ttl <= 0:
 		return fail("-max-age-parking, -max-age-energy and -versions-ttl must be positive")
 	case *staleFor < 2*max(*ageP, *ageE, *ttl):
@@ -184,6 +191,7 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	r.host = execHost(*docker)
 	r.queued = *queued
 	r.brk = breakerSettings{failures: *failures, openFor: *openFor, probes: *probes}
+	r.app = *app
 	r.cached, r.staleFor, r.freshFor = strings.TrimRight(*cached, "/"), *staleFor, max(*ageP, *ageE, *ttl)
 	outs := r.runAll(context.Background(), sel)
 	figs := collect(*prof, outs)

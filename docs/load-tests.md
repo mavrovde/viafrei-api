@@ -43,7 +43,7 @@ fixture set. `scripts/load-test.sh` reads these four from
 a stored answer is replayed as fresh from memory, storage or not, so the
 runner asks for stale answers one and a half times the longest of the three
 after the cut; the allowance must be at least twice that, or the runner
-refuses to start.
+refuses to start. It reads as the same database role as `api` under its own `db.application_name`, so the runner counts the storage connections of `api` alone against `db.pool_max` (`-application-name`).
 
 The runner speaks only to hosts on `test/load/allow-list.txt` (the loopback).
 Any other host, any scheme but `http`, and a URL with credentials are refused

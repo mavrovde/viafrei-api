@@ -85,6 +85,9 @@ services:
       VFAPI_AUTH_PEPPER: ${VFAPI_AUTH_PEPPER:?set VFAPI_AUTH_PEPPER (scripts/load-test.sh does)}
       VFAPI_AUTH_KEY_CACHE_TTL: 10m
       VFAPI_RATELIMIT_ANON_RPS: "0"
+      # Its own name, so the runner counts the storage connections of api
+      # alone against db.pool_max (NFR-CAP-002).
+      VFAPI_DB_APPLICATION_NAME: viafrei-api-cached
       VFAPI_CACHE_ENABLED: "true"
       VFAPI_CACHE_STALE_IF_ERROR_PARKING: 4s
       VFAPI_CACHE_MAX_AGE_PARKING: 1s

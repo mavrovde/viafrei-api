@@ -66,6 +66,7 @@ type runner struct {
 	brk      breakerSettings
 	cached   string        // base URL of the instance with the result cache (NFR-RES-004)
 	staleFor time.Duration // its cache.stale_if_error.parking
+	app      string        // db.application_name of the instance under test
 	// freshFor is the longest of its cache.max_age.parking,
 	// cache.max_age.energy and cache.versions_ttl: within it the instance
 	// replays a stored answer as fresh, from memory, storage or not.
@@ -82,7 +83,7 @@ func newRunner(p profile, b map[string]budget, api, proxy, key, cold, place stri
 	return &runner{
 		p: p, budgets: b, api: api, proxy: proxy, key: key, cold: cold, place: place, poolMax: poolMax,
 		limit: limit, overdue: deadline + grace + 100*time.Millisecond, fast: 50 * time.Millisecond,
-		http: newHTTPClient(limit), pollRSS: true, readyURL: api + "/readyz",
+		http: newHTTPClient(limit), pollRSS: true, readyURL: api + "/readyz", app: "viafrei-api",
 	}
 }
 
@@ -240,12 +241,14 @@ func (r *runner) psql(ctx context.Context, sql string) (string, error) {
 	return strings.TrimSpace(out), err
 }
 
-// backends reads the connections of the service's read-only role and those
-// running a statement for longer than the overdue limit.
+// backends reads the connections of the instance under test (its read-only
+// role and its application_name: the instance with the result cache reads
+// as the same role under another name) and those running a statement for
+// longer than the overdue limit.
 func (r *runner) backends(ctx context.Context) (sample, error) {
 	out, err := r.psql(ctx, fmt.Sprintf(
-		"select count(*), count(*) filter (where state = 'active' and now() - query_start > interval '%d milliseconds') from pg_stat_activity where usename = 'api_reader'",
-		r.overdue.Milliseconds()))
+		"select count(*), count(*) filter (where state = 'active' and now() - query_start > interval '%d milliseconds') from pg_stat_activity where usename = 'api_reader' and application_name = '%s'",
+		r.overdue.Milliseconds(), r.app))
 	if err != nil {
 		return sample{}, err
 	}
@@ -256,9 +259,9 @@ func (r *runner) backends(ctx context.Context) (sample, error) {
 	return s, nil
 }
 
-// busy counts the read-only role's backends that are not idle.
+// busy counts the instance under test's backends that are not idle.
 func (r *runner) busy(ctx context.Context) (int, error) {
-	out, err := r.psql(ctx, "select count(*) from pg_stat_activity where usename = 'api_reader' and state <> 'idle'")
+	out, err := r.psql(ctx, fmt.Sprintf("select count(*) from pg_stat_activity where usename = 'api_reader' and application_name = '%s' and state <> 'idle'", r.app))
 	if err != nil {
 		return 0, err
 	}

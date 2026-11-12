@@ -7,6 +7,7 @@ import (
 	"maps"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -79,10 +80,7 @@ var catalogue = []scenario{
 	{name: "pool-exhausted", fault: "every permit held by hanging reads, plus bursts", expect: "the admission refuses, each refusal by the tier's queue_max_wait (RATE-011)", run: poolExhausted},
 	{name: "composed-part-timeout", fault: "the parking tables locked", expect: "200 with the parking part timeout and the charging part ok", run: composedPart},
 	{
-		name: "storage-killed", fault: "the storage route of the fault proxy cut", expect: "503 upstream-unavailable with Retry-After within 50 ms; the breaker opens, its half-open probes are bounded and a failed one opens it again; closed by a probe and 2xx again after the repair", run: storageKilled,
-		pending: []string{
-			"no result cache exists yet, so no answer may carry served_stale (NFR-RES-004); stale answers are asserted once the cache is built",
-		},
+		name: "storage-killed", fault: "the storage route of the fault proxy cut", expect: "503 upstream-unavailable with Retry-After within 50 ms; the breaker opens, its half-open probes are bounded and a failed one opens it again; closed by a probe and 2xx again after the repair; the instance with the result cache serves what it answered within cache.stale_if_error with served_stale and its Age, and 503 for everything else", run: storageKilled,
 	},
 	{
 		name: "access-store-down", fault: "the access-store route of the fault proxy cut", expect: "a cached key keeps working; an uncached key is 503 upstream-unavailable; both work after the repair", run: accessStoreDown,
@@ -491,11 +489,93 @@ func parts(body map[string]any) map[string]string {
 	return out
 }
 
+// The requests of the instance with the result cache: a parking search it
+// answers just before storage is cut, one it answered longer ago than its
+// stale allowance, one it never answered, and a charging search, whose
+// families cache.no_stale_families lists.
+func (r *runner) cachedParking(radius string) request {
+	return request{class: classNear, path: "/v1/parking-options?at=50.39,10.23&radius_m=" + radius, cached: true, keep: true}
+}
+
+func (r *runner) cachedCharging() request {
+	q := r.charging()
+	q.cached, q.keep = true, true
+	return q
+}
+
+// warnings are the codes of meta.warnings of a kept answer.
+func warnings(x result) []string {
+	meta, _ := x.body["meta"].(map[string]any)
+	list, _ := meta["warnings"].([]any)
+	var out []string
+	for _, w := range list {
+		m, _ := w.(map[string]any)
+		code, _ := m["code"].(string)
+		out = append(out, code)
+	}
+	return out
+}
+
+func servedStale(x result) bool { return ok(x) && slices.Contains(warnings(x), "served_stale") }
+
+// warmCache has the instance with the result cache answer the requests
+// served stale later: the old one first, then, once it is older than the
+// stale allowance, the others.
+func (r *runner) warmCache(ctx context.Context, o *outcome) bool {
+	rs, up := r.awaitOK(ctx, r.cachedParking("40000"), r.p.ready)
+	o.results = append(o.results, rs...)
+	_ = sleep(ctx, r.staleFor+r.staleFor/2)
+	for _, q := range []request{r.cachedParking("50000"), r.cachedCharging()} {
+		w, ok := r.awaitOK(ctx, q, r.p.ready)
+		o.results = append(o.results, w...)
+		up = up && ok
+	}
+	o.add("the instance with the result cache answered before the fault", up, "")
+	return up
+}
+
+// staleAnswers asks the instance with the result cache while storage is
+// cut (NFR-RES-004, PROT-047).
+func (r *runner) staleAnswers(ctx context.Context, o *outcome) {
+	var rs []result
+	for range 5 {
+		rs = append(rs, r.do(ctx, r.cachedParking("50000")))
+	}
+	o.results = append(o.results, rs...)
+	served := took(rs, servedStale)
+	o.add("a request answered before the fault is served from the cache with served_stale (NFR-RES-004, PROT-047)", len(served) == len(rs), "%d of %d", len(served), len(rs))
+	o.add("each stale answer within 50 ms, p95 (NFR-RES-004)", len(served) > 0 && percentile(served, 0.95) <= r.fast, "p95 %s", percentile(served, 0.95).Round(time.Millisecond))
+	oldest, aged := -1, true
+	for _, x := range rs {
+		s, err := strconv.Atoi(x.age)
+		aged = aged && err == nil && s >= 0 && time.Duration(s)*time.Second <= r.staleFor
+		oldest = max(oldest, s)
+	}
+	o.add(fmt.Sprintf("each carries its Age, none older than cache.stale_if_error = %s (NFR-RES-004)", r.staleFor), aged, "oldest Age %d s", oldest)
+	for _, c := range []struct {
+		name string
+		q    request
+	}{
+		{"a request the cache never answered", r.cachedParking("30000")},
+		{"a request answered longer ago than cache.stale_if_error", r.cachedParking("40000")},
+		{"a family listed in cache.no_stale_families", r.cachedCharging()},
+	} {
+		x := r.do(ctx, c.q)
+		o.results = append(o.results, x)
+		o.add(c.name+" is answered 503 upstream-unavailable with Retry-After (NFR-RES-004)",
+			x.status == http.StatusServiceUnavailable && x.retry && x.problem == "upstream-unavailable", "%d %s", x.status, x.problem)
+	}
+}
+
 func storageKilled(ctx context.Context, r *runner, o *outcome) {
 	start := time.Now()
+	warm := r.warmCache(ctx, o)
 	if err := r.setProxy(ctx, proxyStorage, false); err != nil {
 		o.add("storage route cut", false, "%v", err)
 		return
+	}
+	if warm {
+		r.staleAnswers(ctx, o)
 	}
 	q := r.charging()
 	q.keep = true
@@ -507,8 +587,8 @@ func storageKilled(ctx context.Context, r *runner, o *outcome) {
 	o.add("lost storage is answered 503 upstream-unavailable with Retry-After", len(lost) == len(rs), "%d of %d", len(lost), len(rs))
 	p95 := percentile(lost, 0.95)
 	o.add("each 503 within 50 ms, p95 (QAS-REL-02)", len(lost) > 0 && p95 <= r.fast, "p95 %s", p95.Round(time.Millisecond))
-	stale := count(rs, func(x result) bool { return x.problem == "served_stale" })
-	o.add("no answer claims served_stale while no cache exists (NFR-RES-004)", stale == 0, "%d", stale)
+	stale := count(rs, servedStale)
+	o.add("the instance without a result cache serves nothing stale (NFR-RES-004)", stale == 0, "%d", stale)
 	// The answers in the order they were sent: the reads before the
 	// breaker's first refusal reached the lost storage, and after it only
 	// the half-open probes do.
@@ -522,6 +602,11 @@ func storageKilled(ctx context.Context, r *runner, o *outcome) {
 		return
 	}
 	r.recovered(ctx, o, r.charging())
+	if warm {
+		again, up := r.awaitWhere(ctx, r.cachedParking("50000"), r.p.ready, func(x result) bool { return ok(x) && !servedStale(x) })
+		o.results = append(o.results, again...)
+		o.add(fmt.Sprintf("the instance with the result cache answers from storage again within %s of the repair", r.p.ready), up, "after %d tries", len(again))
+	}
 	cs, err := r.transitions(ctx, start)
 	ts := steps(cs)
 	o.add("the breaker's changes of state are read from the instance's log", err == nil && len(ts) > 0, "%d changes%s", len(ts), errSuffix(err))

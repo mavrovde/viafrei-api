@@ -390,7 +390,7 @@ func TestWithWarning(t *testing.T) {
 	}
 	for _, in := range []string{
 		``, `[]`, `{"data":1}`, `{"meta":[]}`, `{"meta":{"x":1}}`, `{"meta":{"warnings":{}}}`,
-		`{"meta":{"warnings":[`, `{"meta":{"warnings":[1,}`, `{"x":}`, `{,}`, `{"meta":{"warnings":`,
+		`{"meta":{"warnings":[`, `{"meta":{"warnings":[1,}`, `{"meta":{"warnings":[1}}`, `{"meta":{"warnings":[ 1 `, `{"x":}`, `{,}`, `{"meta":{"warnings":`,
 	} {
 		if _, ok := withWarning([]byte(in), w); ok {
 			t.Errorf("withWarning(%s) found a warnings array", in)

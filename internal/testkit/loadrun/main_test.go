@@ -64,7 +64,7 @@ func (c *cli) args(extra ...string) []string {
 	return append([]string{
 		"-api", c.api.URL, "-proxy", c.proxy.URL + "/", "-allow", c.allow, "-budgets", c.budgets,
 		"-profile", "test", "-scenarios", "soak", "-report", c.report, "-place", "pl-1",
-		"-docker", c.docker, "-compose-files", "a.yaml",
+		"-docker", c.docker, "-compose-files", "a.yaml", "-cached-api", c.api.URL,
 	}, extra...)
 }
 
@@ -136,6 +136,8 @@ func TestRunRefusesBadUsageAndForeignTargets(t *testing.T) {
 		"no breaker failures": {args: c.args("-breaker-failures", "0"), want: "-breaker-failures"},
 		"no breaker probes":   {args: c.args("-breaker-probes", "0"), want: "-breaker-probes"},
 		"no breaker open_for": {args: c.args("-breaker-open-for", "0s"), want: "-breaker-open-for"},
+		"no stale allowance":  {args: c.args("-stale-if-error", "0s"), want: "-stale-if-error must be positive"},
+		"foreign cached host": {args: c.args("-cached-api", "http://api.example.test"), want: "not on the test-environment allow-list"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

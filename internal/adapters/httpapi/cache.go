@@ -707,11 +707,9 @@ func warningsAt(body []byte) (int, bool, bool) {
 			return 0, false, false
 		}
 	}
+	// More has skipped the space before the closing bracket.
 	at := int(d.InputOffset())
-	for at < len(body) && body[at] != ']' {
-		at++
-	}
-	if at == len(body) {
+	if at >= len(body) || body[at] != ']' {
 		return 0, false, false
 	}
 	return at, empty, true

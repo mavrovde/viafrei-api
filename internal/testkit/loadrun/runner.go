@@ -25,10 +25,11 @@ const (
 
 // request is one request of a scenario.
 type request struct {
-	class string
-	path  string
-	cold  bool // presents the cold key instead of the warm one
-	keep  bool // keeps the decoded body for a scenario's own check
+	class  string
+	path   string
+	cold   bool // presents the cold key instead of the warm one
+	keep   bool // keeps the decoded body for a scenario's own check
+	cached bool // goes to the instance with the result cache
 }
 
 // result is one answer, or a transport error (status 0).
@@ -37,6 +38,7 @@ type result struct {
 	status  int
 	problem string // the last segment of the problem type of a 4xx or 5xx
 	retry   bool   // Retry-After was sent
+	age     string // the Age header, empty when none was sent
 	took    time.Duration
 	sent    time.Time // when the request left
 	body    map[string]any
@@ -62,6 +64,8 @@ type runner struct {
 	fast     time.Duration // a refusal is fast within this (NFR-CAP-003)
 	queued   time.Duration // the standard tier's queue_max_wait: a waiter is shed by then (RATE-011)
 	brk      breakerSettings
+	cached   string        // base URL of the instance with the result cache (NFR-RES-004)
+	staleFor time.Duration // its cache.stale_if_error
 	http     *http.Client
 	docker   func(context.Context, ...string) (string, error) // docker compose on the stack's project
 	host     func(context.Context, ...string) (string, error) // the plain docker CLI (docker top)
@@ -108,7 +112,11 @@ func (r *runner) mix(i int) request {
 // do sends one request and measures it until the body is read.
 func (r *runner) do(ctx context.Context, q request) result {
 	res := result{class: q.class, sent: time.Now()}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.api+q.path, nil)
+	base := r.api
+	if q.cached {
+		base = r.cached
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+q.path, nil)
 	if err != nil {
 		return res
 	}
@@ -128,6 +136,7 @@ func (r *runner) do(ctx context.Context, q request) result {
 	res.took = time.Since(start)
 	res.status = resp.StatusCode
 	res.retry = resp.Header.Get("Retry-After") != ""
+	res.age = resp.Header.Get("Age")
 	if res.status >= 400 {
 		var p struct {
 			Type string `json:"type"`

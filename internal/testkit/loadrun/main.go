@@ -117,6 +117,8 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		failures = fs.Int("breaker-failures", 5, "breaker.failure_threshold of the instance under test (NFR-RES-002)")
 		openFor  = fs.Duration("breaker-open-for", 2*time.Second, "breaker.open_for of the instance under test, as test/load/compose.yaml sets it (NFR-RES-002)")
 		probes   = fs.Int("breaker-probes", 2, "breaker.half_open_probes of the instance under test (NFR-RES-002)")
+		cached   = fs.String("cached-api", "http://[::1]:8081", "base URL of the instance with the result cache, behind the same fault proxy (NFR-RES-004)")
+		staleFor = fs.Duration("stale-if-error", 3*time.Second, "cache.stale_if_error of the instance with the result cache, as test/load/compose.yaml sets it (NFR-RES-004)")
 	)
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -143,6 +145,8 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		return fail("-report must end in .md, so that the figures can go beside it")
 	case *failures < 1 || *probes < 1 || *openFor <= 0:
 		return fail("-breaker-failures and -breaker-probes must be at least 1, -breaker-open-for positive")
+	case *staleFor <= 0:
+		return fail("-stale-if-error must be positive")
 	}
 	key, cold := getenv("LOADRUN_KEY"), getenv("LOADRUN_COLD_KEY")
 	if key == "" || cold == "" || key == cold {
@@ -152,7 +156,7 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	if err != nil {
 		return fail("%v", err)
 	}
-	for _, u := range []string{*api, *proxy} {
+	for _, u := range []string{*api, *proxy, *cached} {
 		if err := guard(u, hosts); err != nil {
 			return fail("%v", err)
 		}
@@ -170,6 +174,7 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	r.host = execHost(*docker)
 	r.queued = *queued
 	r.brk = breakerSettings{failures: *failures, openFor: *openFor, probes: *probes}
+	r.cached, r.staleFor = strings.TrimRight(*cached, "/"), *staleFor
 	outs := r.runAll(context.Background(), sel)
 	figs := collect(*prof, outs)
 	cmp := compare(*previous, figs, *tol, *floor)

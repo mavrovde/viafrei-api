@@ -692,7 +692,7 @@ func warnings(t *testing.T, w *httptest.ResponseRecorder) []string {
 }
 
 func TestAStoredAnswerIsServedStaleWhileStorageIsDown(t *testing.T) {
-	req.Covers(t, "NFR-RES-004", "PROT-047")
+	req.Covers(t, "NFR-RES-004", "PROT-047", "TEST-003")
 	for _, cause := range []error{errFake, store.ErrDeadlineExhausted} {
 		r := newCacheRig(t, config.Defaults(), "v1")
 		first := r.get(t, nil)
@@ -707,6 +707,12 @@ func TestAStoredAnswerIsServedStaleWhileStorageIsDown(t *testing.T) {
 		}
 		if got := warnings(t, w); !slices.Equal(got, []string{"served_stale"}) {
 			t.Fatalf("%v: warnings %v, want served_stale", cause, got)
+		}
+		// do() held the answer to the document; the marker is in it, and a
+		// code it does not list is refused.
+		unknown := strings.Replace(w.Body.String(), `"served_stale"`, `"served_old"`, 1)
+		if contract(t).Check(http.MethodGet, chargingURL, w.Code, w.Header(), []byte(unknown)) == nil {
+			t.Fatalf("%v: a warning code the document does not list passed the contract check", cause)
 		}
 		m := meta(t, decode(t, w))
 		if m["requestId"] != w.Header().Get("X-Request-Id") || !strings.Contains(fmt.Sprint(m["warnings"]), "120 s ago") {

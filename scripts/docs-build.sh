@@ -159,19 +159,31 @@ perl -pi -e 's{\Qsrc:"https://cdn.redoc.ly/redoc/logo-mini.svg"\E}{src:"data:,"}
 perl -0pi -e 's{<script src="https://cdn\.redocly\.com/redoc/v[0-9.]+/bundles/redoc\.standalone\.js"[^>]*></script>}{<script src="redoc.standalone.js"></script>}' "$out/reference.html"
 title=$(jq -r '.info.title' api/openapi.json)
 grep -qF "$title" "$out/reference.html" || { echo "FAIL: reference.html does not carry the document title '$title'" >&2; exit 1; }
-# Three WCAG 2.2 AA repairs Redoc's theme cannot make (scripts/docs-a11y.sh):
-# its JSON expand buttons are 15 px, under the 24 px target size; its
-# code samples scroll without being reachable by keyboard; and a response
-# title (button > strong + div) holds its description, an inline-block
-# paragraph, in an INLINE box one line high, so a description that wraps
-# overflows its container and axe cannot decide its contrast ("partially
-# obscured"): every wrapping response description was a needs-review result
-# held against the baseline, and each new one (the 304s of #9) raised the
-# count. Making that box inline-block lets it contain the paragraph, and axe
-# then computes the pair and passes it.
+# WCAG 2.2 AA repairs Redoc's theme cannot make (scripts/docs-a11y.sh;
+# scripts/a11y-tools/layout-runner.js checks the last two in the rendered
+# page):
+# - its JSON expand buttons are 15 px, under the 24 px target size;
+# - its code samples scroll without being reachable by keyboard;
+# - its page sits in no landmark (axe: region, landmark-one-main): the
+#   content column becomes the main landmark and the menu a navigation
+#   landmark, in the prerendered markup and again whenever Redoc renders
+#   them anew;
+# - its schema tables draw the first and the last row's tree-line segment as
+#   a 1 px background image on the property-name cell, which leaves the
+#   name's contrast undecidable. The image goes; the same segment (from
+#   22 px to the bottom on the first row, from the top to 22 px on the last,
+#   Redoc's own geometry) is a ::before border whose colour is inherited
+#   from the cell's own border-left-color, Redoc's theme line colour (and
+#   transparent where Redoc hides the line), so no colour is copied here.
+for c in menu-content api-content; do
+  [[ $(grep -o "class=\"[^\"]* $c\"" "$out/reference.html" | wc -l | tr -d ' ') == 1 ]] ||
+    { echo "FAIL: reference.html does not carry exactly one Redoc .$c to mark as a landmark; the bundle changed" >&2; exit 1; }
+done
 perl -0pi -e '
-  s{</head>}{<style>.redoc-json .collapser{display:none!important}button>strong+div{display:inline-block!important}</style></head>};
-  s{</body>}{<script>(function(){function f(){document.querySelectorAll("pre:not([tabindex])").forEach(function(p){p.setAttribute("tabindex","0")})}document.addEventListener("DOMContentLoaded",f);new MutationObserver(f).observe(document.documentElement,{childList:true,subtree:true})})();</script></body>};
+  s{(class="[^"]* menu-content")}{$1 role="navigation" aria-label="Reference contents"};
+  s{(class="[^"]* api-content")}{$1 role="main"};
+  s{</head>}{<style>.redoc-json .collapser{display:none!important}td[kind=field]{background-image:none!important}tr:first-of-type>td[kind=field]::before,tr.last>td[kind=field]::before{content:"";position:absolute;left:0;border-left:1px solid;border-left-color:inherit}tr:first-of-type>td[kind=field]::before{top:22px;bottom:0}tr.last>td[kind=field]::before{top:0;bottom:auto;height:22px}</style></head>};
+  s{</body>}{<script>(function(){function f(){document.querySelectorAll("pre:not([tabindex])").forEach(function(p){p.setAttribute("tabindex","0")});document.querySelectorAll(".menu-content:not([role])").forEach(function(m){m.setAttribute("role","navigation");m.setAttribute("aria-label","Reference contents")});document.querySelectorAll(".api-content:not([role])").forEach(function(m){m.setAttribute("role","main")})}document.addEventListener("DOMContentLoaded",f);new MutationObserver(f).observe(document.documentElement,{childList:true,subtree:true})})();</script></body>};
 ' "$out/reference.html"
 touch "$out/.nojekyll"
 

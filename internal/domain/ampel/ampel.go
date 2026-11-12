@@ -7,6 +7,7 @@ package ampel
 
 import (
 	"cmp"
+	"math"
 	"regexp"
 	"slices"
 	"strings"
@@ -607,6 +608,23 @@ func ConfirmedSight(c *Confirmation, now time.Time) Sight {
 	return SightStale
 }
 
+// LapsesAt is the first instant ConfirmedSight turns a confirmation stale
+// with the clock alone: the first whole millisecond past three intervals
+// (600 s when it states none) after it. Nil when the clock never turns it:
+// never confirmed, or its updates paused.
+func LapsesAt(c *Confirmation) *time.Time {
+	if c == nil || c.At == nil || c.Paused {
+		return nil
+	}
+	interval := defaultIntervalS
+	if c.IntervalS != nil {
+		interval = *c.IntervalS
+	}
+	// Alive holds while the whole milliseconds elapsed are at most the limit.
+	t := c.At.Add(time.Duration(math.Floor(3*interval*1000)+1) * time.Millisecond)
+	return &t
+}
+
 // WarningSightOf is the weather warnings' sight: missing when the warnings
 // read did not answer; fresh when it holds a warning, or when the warnings'
 // source is fresh by its confirmation (a quiet read of a live source);
@@ -623,7 +641,7 @@ func WarningSightOf(readOK bool, warnings int, c *Confirmation, now time.Time) S
 }
 
 // Coverage are the sources that tell the lamp one state's traffic messages
-// are seen: the state's own message sources (Own), the sources measured to
+// are seen: the state's own message sources (Own), the sources that
 // carry the state's messages as well (Carried), and the own sources whose
 // messages are answered only while current (CurrentOnly).
 type Coverage struct {

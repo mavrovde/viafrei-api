@@ -43,6 +43,10 @@ type Conditions struct {
 	Road   *roads.Road
 	Lamp   roads.Lamp
 	Reason *roads.Reason
+	// Read are every family the lamp read, whether or not it contributed
+	// (Families names only those): a new version of any of them, or of its
+	// confirmation, may change the lamp.
+	Read roads.Families
 }
 
 // sights are the sight of every group the lamp reads (ampelOf's sight):
@@ -143,8 +147,9 @@ func (s *Service) conditions(ctx context.Context, key access.Record, read func(f
 	}
 	lamp, reason := roads.LampOf(p.Messages, levels, sights(p, fams, partial, weatherRead, now))
 	return Conditions{
-		Answer: Answer[roads.Situation]{Items: p.Items, HasMore: p.HasMore, Families: attributed, Partial: partial, At: now},
-		Lamp:   lamp, Reason: reason,
+		Answer: Answer[roads.Situation]{Items: p.Items, HasMore: p.HasMore, Families: attributed, Partial: partial, At: now,
+			ChangesAt: p.ChangesAt(now)},
+		Lamp: lamp, Reason: reason, Read: fams,
 	}, nil
 }
 
@@ -201,5 +206,11 @@ func (s *Service) RoadSituation(ctx context.Context, key access.Record, id strin
 	if err != nil {
 		return Answer[roads.Situation]{}, err
 	}
-	return Answer[roads.Situation]{Items: []roads.Situation{sit}, Families: fams, At: now}, nil
+	out := Answer[roads.Situation]{Items: []roads.Situation{sit}, Families: fams, At: now}
+	// An ended situation is answered until it leaves the retention.
+	if sit.Until != nil {
+		gone := sit.Until.Add(s.set.EndedRetention)
+		out.ChangesAt = &gone
+	}
+	return out, nil
 }

@@ -89,17 +89,29 @@ func filterArgs(f roads.Filter, families []string, now time.Time) []any {
 	return []any{families, now, codes(kinds), other, codes(roads.Kinds[:len(roads.Kinds)-1]), codes(roads.Ordered()), f.MinSeverity.Floor()}
 }
 
+// nextChange is, over the rows (as x) a scope read selects that have not
+// ended at $2 (now), the earliest instant after now at which one starts or
+// ends: its start when it starts after now, else its end; null when none
+// does.
+const nextChange = `min(case when x.valid_from > $2 then x.valid_from else x.valid_to end)`
+
 // messagesSelect aggregates the lamp's view of every situation in the scope
 // as a JSON array of {"r": record, "k": kind, "h": headline, "s": subtitle,
 // "t": description, "p": place words, "b": blocked, "y": traffic type,
-// "ds": delay in seconds, "d": delay in minutes}; null when the scope holds
-// none.
+// "ds": delay in seconds, "d": delay in minutes}, null when the scope holds
+// none; and the scope's next change (nextChange). It reads the scope's
+// situations that have not ended, so one that starts later is seen too; only
+// those active at now are aggregated.
 const messagesSelect = `select jsonb_agg(distinct jsonb_build_object('r', e.record_class, 'k', e.event_kind, 'h', e.headline,
                                          's', e.subtitle, 't', e.description, 'p', e.place_text,
                                          'b', coalesce(e.is_blocked, false), 'y', e.traffic_type,
-                                         'ds', e.delay_s, 'd', e.delay_min))
+                                         'ds', e.delay_s, 'd', e.delay_min)) filter (where e.valid_from <= $2),
+       ` + nextChange + `
 from contract.traffic_event e
-where ` + scopeFilter
+cross join lateral (select e.valid_from, e.valid_to) x
+where e.withdrawn_at is null
+  and e.source_ref = any($1)
+  and (e.valid_to is null or e.valid_to > $2)`
 
 // storedMessage is one element of messagesSelect, in stored codes.
 type storedMessage struct {
@@ -115,14 +127,15 @@ type storedMessage struct {
 	DelayMin    *int    `json:"d"`
 }
 
-// warningsScope is the condition of a weather warning the lamp reads: a
-// published, not cancelled warning of the given families in force at now,
-// placed in an area. $1 families, $2 now.
-const warningsScope = `from contract.weather_warning w
+// warningsPending is the condition of a weather warning the lamp reads or
+// will read: a published, not cancelled warning of the given families that
+// has not ended at now, placed in an area. $1 families, $2 now. Those whose
+// valid_from is at or before now are in force; the others start later.
+const warningsPending = `from contract.weather_warning w
 join contract.admin_region r on r.region_code = w.region_code
 where w.withdrawn_at is null and w.message_status <> 'cancelled'
   and w.source_ref = any($1)
-  and w.valid_from <= $2 and (w.valid_to is null or w.valid_to > $2)`
+  and (w.valid_to is null or w.valid_to > $2)`
 
 // sourcesSelect reads the freshness of the given families and the newest
 // confirmation of those that have a freshness row. $1 families.
@@ -244,21 +257,33 @@ func (s *Store) read(ctx context.Context, list string, listArgs []any, limit int
 				out.Items, err = pgx.CollectRows(res, scanSituation)
 				return err
 			},
-			func() error { return tx.QueryRow(ctx, sc.messages, sc.args...).Scan(&stored) },
+			func() error { return tx.QueryRow(ctx, sc.messages, sc.args...).Scan(&stored, &out.NextChange) },
 			func() error {
 				if len(fams.Weather) == 0 {
 					return nil
 				}
-				res, _ := tx.Query(ctx, `select w.source_ref, w.warning_level `+warningsScope+`
+				// One read of the warnings that have not ended: those in
+				// force are the lamp's, and the earliest start or end after
+				// now of any is when the scope changes.
+				res, _ := tx.Query(ctx, `select w.source_ref, w.warning_level, w.valid_from <= $2,
+  case when w.valid_from > $2 then w.valid_from else w.valid_to end `+warningsPending+`
   and `+sc.warnings+`
 order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, sc.warningArgs...)...)
-				found, err := pgx.CollectRows(res, func(r pgx.CollectableRow) (roads.Warning, error) {
-					var w roads.Warning
-					return w, r.Scan(&w.Family, &w.Level)
-				})
 				// A read that found none is an empty list, never nil: nil
 				// means the warnings were not read.
-				out.Warnings = append([]roads.Warning{}, found...)
+				out.Warnings = []roads.Warning{}
+				var w roads.Warning
+				var inForce bool
+				var next *time.Time
+				_, err := pgx.ForEachRow(res, []any{&w.Family, &w.Level, &inForce, &next}, func() error {
+					if inForce {
+						out.Warnings = append(out.Warnings, w)
+					}
+					if next != nil && (out.NextChange == nil || next.Before(*out.NextChange)) {
+						out.NextChange = next
+					}
+					return nil
+				})
 				return err
 			},
 			func() (err error) {

@@ -106,6 +106,11 @@ type Answer[T any] struct {
 	// NextReport is the earliest report the read considered that is dated
 	// after At, if any: the answer may change when it takes effect.
 	NextReport *time.Time
+	// ChangesAt is the earliest instant after At at which the answer changes
+	// with the clock alone besides its families turning stale: a situation
+	// starting or ending, a confirmation lapsing, an ended situation leaving
+	// the retention. Nil when nothing else does.
+	ChangesAt *time.Time
 }
 
 // ErrGateViolation wraps access.ErrForbiddenItem: storage returned an item

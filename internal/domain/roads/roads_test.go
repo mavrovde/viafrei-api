@@ -294,3 +294,40 @@ func TestFiltersSplitTheUnmappedValue(t *testing.T) {
 		t.Errorf("no classes: %v %v", classes, otherClass)
 	}
 }
+
+// TestAPageChangesAtItsEarliestClockInstant: the next start or end in the
+// scope, a family turning stale (the first whole second past its threshold)
+// and a confirmation lapsing all count; whichever comes first after now is
+// the instant, and nothing at or before now does.
+func TestAPageChangesAtItsEarliestClockInstant(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004", "NFR-PERF-005")
+	now := time.Date(2026, 11, 12, 8, 0, 0, 0, time.UTC)
+	at := func(d time.Duration) *time.Time { v := now.Add(d); return &v }
+	interval := 60.0
+	family := func(asOf *time.Time) provenance.Family {
+		return provenance.Family{StaleAfter: 10*time.Minute + 500*time.Millisecond, DataAsOf: asOf}
+	}
+	if got := (roads.Page{}).ChangesAt(now); got != nil {
+		t.Fatalf("an empty page changes at %s", got)
+	}
+	cases := []struct {
+		name string
+		page roads.Page
+		want time.Duration
+	}{
+		{"a situation ends", roads.Page{NextChange: at(7 * time.Minute)}, 7 * time.Minute},
+		// Stale past 600 whole seconds: 601 s after the data.
+		{"a family turns stale", roads.Page{Sources: []provenance.Family{family(at(-time.Minute)), family(nil)}}, 9*time.Minute + time.Second},
+		{"a confirmation lapses", roads.Page{Confirmations: map[string]ampel.Confirmation{
+			"a": {At: at(-time.Minute), IntervalS: &interval}, "b": {At: at(-time.Hour), Paused: true}}}, 2*time.Minute + time.Millisecond},
+		{"the earliest wins, the past is ignored", roads.Page{NextChange: at(5 * time.Minute),
+			Sources:       []provenance.Family{family(at(-time.Hour))},
+			Confirmations: map[string]ampel.Confirmation{"a": {At: at(-4 * time.Minute), IntervalS: &interval}}}, 5 * time.Minute},
+	}
+	for _, c := range cases {
+		got := c.page.ChangesAt(now)
+		if got == nil || !got.Equal(now.Add(c.want)) {
+			t.Errorf("%s: %v, want %s", c.name, got, now.Add(c.want))
+		}
+	}
+}

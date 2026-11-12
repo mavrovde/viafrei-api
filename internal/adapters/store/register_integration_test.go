@@ -13,6 +13,7 @@ import (
 	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
@@ -195,6 +196,88 @@ func TestAFamilyVersionMovesWithItsDataAsOf(t *testing.T) {
 		}
 		if back, err := st.FreshnessVersions(ctx); err != nil || back.Families[family] != base.Families[family] {
 			t.Errorf("data_as_of moved back and the version is %q, want %q (%v)", back.Families[family], base.Families[family], err)
+		}
+	}
+}
+
+// TestTheLampsVersionsMoveWithWhatItJudges: the road lamp judges a family by
+// its newest confirmation and reads the coverage of traffic messages and the
+// junctions' states, so a confirmation moves that family's confirmation
+// version and no data version, and a coverage row or a junction's state moves
+// the lamp's reference and not the register.
+func TestTheLampsVersionsMoveWithWhatItJudges(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005", "FR-ROAD-004")
+	st := seeded(t)
+	ctx := bounded(t)
+	conn, err := db.Owner(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	const family = "src-gamma-energy"
+	read := func() provenance.Versions {
+		t.Helper()
+		vs, err := st.FreshnessVersions(ctx)
+		if err != nil || vs.LampReference == "" || vs.Confirmations[family] == "" {
+			t.Fatalf("versions %+v, %v", vs, err)
+		}
+		return vs
+	}
+	exec := func(sql string) {
+		t.Helper()
+		if _, err := conn.Exec(ctx, sql); err != nil {
+			t.Fatal(err)
+		}
+	}
+	base := read()
+	t.Cleanup(func() {
+		ctx := context.WithoutCancel(ctx)
+		c, err := db.Owner(ctx)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer func() { _ = c.Close(ctx) }()
+		for _, sql := range []string{
+			`update contract.source_freshness set confirmed_at = null, confirm_interval_s = null, updates_paused = false where source_ref = '` + family + `'`,
+			`delete from contract.message_coverage where state_code = '96'`,
+			`update contract.junction set state_code = null`,
+		} {
+			if _, err := c.Exec(ctx, sql); err != nil {
+				t.Error(err)
+			}
+		}
+	})
+	seen := map[string]bool{base.Confirmations[family]: true}
+	for _, change := range []string{
+		`confirmed_at = '2102-01-01T00:30:00Z'`,
+		`confirm_interval_s = 300`,
+		`updates_paused = true`,
+	} {
+		exec(`update contract.source_freshness set ` + change + ` where source_ref = '` + family + `'`)
+		moved := read()
+		if seen[moved.Confirmations[family]] {
+			t.Errorf("%s did not move the confirmation version %q", change, moved.Confirmations[family])
+		}
+		seen[moved.Confirmations[family]] = true
+		if moved.Families[family] != base.Families[family] || moved.Register != base.Register || moved.LampReference != base.LampReference {
+			t.Errorf("%s moved more than the confirmation version: %+v", change, moved)
+		}
+	}
+	refs := map[string]bool{base.LampReference: true}
+	for _, change := range []string{
+		`insert into contract.message_coverage (state_code, source_ref, coverage_role, current_only) values ('96', '` + family + `', 'own', true)`,
+		`update contract.message_coverage set current_only = false where state_code = '96'`,
+		`update contract.junction set state_code = '96' where junction_id = (select min(junction_id) from contract.junction)`,
+	} {
+		exec(change)
+		moved := read()
+		if refs[moved.LampReference] {
+			t.Errorf("%s did not move the lamp's reference %q", change, moved.LampReference)
+		}
+		refs[moved.LampReference] = true
+		if moved.Register != base.Register {
+			t.Errorf("%s moved the register", change)
 		}
 	}
 }

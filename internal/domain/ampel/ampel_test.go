@@ -608,6 +608,33 @@ func TestTheAliveRule(t *testing.T) {
 	}
 }
 
+// TestAConfirmationLapsesWhereItsSightTurns: LapsesAt is the first instant
+// ConfirmedSight says stale, a millisecond before it still fresh, with and
+// without an interval (a fractional one too); nothing lapses that was never
+// confirmed or whose updates are paused.
+func TestAConfirmationLapsesWhereItsSightTurns(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004")
+	at := time.Date(2026, 11, 12, 8, 0, 0, 0, time.UTC)
+	for _, interval := range []*float64{nil, secs(60), secs(0.3335)} {
+		c := &ampel.Confirmation{At: &at, IntervalS: interval}
+		lapse := ampel.LapsesAt(c)
+		if lapse == nil {
+			t.Fatalf("interval %v: no lapse", interval)
+		}
+		if got := ampel.ConfirmedSight(c, *lapse); got != ampel.SightStale {
+			t.Errorf("interval %v: at the lapse %s the sight is %q, want stale", interval, lapse, got)
+		}
+		if got := ampel.ConfirmedSight(c, lapse.Add(-time.Millisecond)); got != ampel.SightFresh {
+			t.Errorf("interval %v: a millisecond before the lapse the sight is %q, want fresh", interval, got)
+		}
+	}
+	for _, c := range []*ampel.Confirmation{nil, {}, {At: &at, Paused: true}} {
+		if got := ampel.LapsesAt(c); got != nil {
+			t.Errorf("%+v lapses at %s, want never", c, got)
+		}
+	}
+}
+
 // TestAnAstralRuneCountsAsTwo: the platform's bounded repetitions count
 // UTF-16 code units, so a rune above U+FFFF takes two of the forty a
 // closed ramp may lie after "gesperrt".

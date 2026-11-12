@@ -413,3 +413,39 @@ func TestTheLampSeesEveryStateInScope(t *testing.T) {
 		lit(t, name, got, c.lamp, why)
 	}
 }
+
+// TestAConditionsAnswerSaysWhatItRestsOn: the answer names every family the
+// lamp read, whether or not it contributed, and the earliest instant it
+// changes with the clock alone, here the families turning stale a minute
+// and a second after their data.
+func TestAConditionsAnswerSaysWhatItRestsOn(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004", "NFR-PERF-005")
+	f := &roadFake{road: roads.Road{Ref: "A8"}}
+	c, err := roadService(f).MotorwayConditions(context.Background(), key("commercial", weatherScope, "r1", "r2", "e1", "w1"), roads.CorridorQuery{Road: "A8"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(c.Read.Roads, []string{"r1"}) || !slices.Equal(c.Read.Weather, []string{"w1"}) {
+		t.Errorf("read %+v", c.Read)
+	}
+	if c.ChangesAt == nil || !c.ChangesAt.Equal(now.Add(61*time.Second)) {
+		t.Errorf("changes at %v, want %s", c.ChangesAt, now.Add(61*time.Second))
+	}
+}
+
+// TestAnEndedSituationChangesWhenItLeavesTheRetention: an ended situation is
+// not found once roads.ended_retention_h has passed since its end; an
+// open-ended one never changes with the clock.
+func TestAnEndedSituationChangesWhenItLeavesTheRetention(t *testing.T) {
+	req.Covers(t, "FR-ROAD-002", "NFR-PERF-005")
+	end := now.Add(-time.Hour)
+	f := &roadFake{sits: []roads.Situation{{Family: "r1", Until: &end}}}
+	a, err := roadService(f).RoadSituation(context.Background(), key("commercial", roadsScope, "r1"), "ev-1")
+	if err != nil || a.ChangesAt == nil || !a.ChangesAt.Equal(end.Add(24*time.Hour)) {
+		t.Fatalf("changes at %v (%v)", a.ChangesAt, err)
+	}
+	f.sits[0].Until = nil
+	if a, _ := roadService(f).RoadSituation(context.Background(), key("commercial", roadsScope, "r1"), "ev-1"); a.ChangesAt != nil {
+		t.Errorf("an open-ended situation changes at %v", a.ChangesAt)
+	}
+}

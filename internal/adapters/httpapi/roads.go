@@ -8,6 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 )
 
@@ -104,6 +105,29 @@ func roadSituations(list []roads.Situation) []RoadSituation {
 		out[i] = roadSituation(v)
 	}
 	return out
+}
+
+// noteLamp tells the cache what a conditions answer rests on besides the
+// families it attributes: every family the lamp read, with its
+// confirmation; the lamp's reference rows; the lamp and its reason, which
+// the clock alone can change; and the earliest instant it does.
+func noteLamp(ctx context.Context, c features.Conditions) {
+	noteSight(ctx, "roads", c.Read.Roads)
+	noteSight(ctx, "weather", c.Read.Weather)
+	reason := ""
+	if c.Reason != nil {
+		reason = string(*c.Reason)
+	}
+	noteShown(ctx, "lamp "+string(c.Lamp)+" "+reason)
+	noteChanges(ctx, c.ChangesAt)
+}
+
+// noteChanges records the instant an answer changes with the clock alone,
+// when there is one.
+func noteChanges(ctx context.Context, t *time.Time) {
+	if t != nil {
+		noteChangesAt(ctx, *t)
+	}
 }
 
 func lampReason(r *roads.Reason) *string {
@@ -220,6 +244,7 @@ func registerMotorwayConditions(api huma.API, s *server, op huma.Operation) {
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
 		}
+		noteLamp(ctx, c)
 		return &MotorwayOutput{CacheControl: noStore, Body: MotorwayEnvelope{
 			Data: MotorwayData{
 				Corridor:   Corridor{Road: c.Road.Ref, RoadType: string(c.Road.Class), Direction: string(q.Direction), States: append([]string{}, c.Road.States...)},
@@ -305,6 +330,7 @@ func registerRoadConditions(api huma.API, s *server, op huma.Operation) {
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
 		}
+		noteLamp(ctx, c)
 		return &RoadConditionsOutput{CacheControl: noStore, Body: RoadConditionsEnvelope{
 			Data: RoadConditionsData{
 				Area:       Area{At: position(q.At), RadiusM: q.RadiusM},
@@ -354,6 +380,7 @@ func registerRoadSituation(api huma.API, s *server, op huma.Operation) {
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
 		}
+		noteChanges(ctx, a.ChangesAt)
 		return &SituationOutput{CacheControl: noStore, Body: SituationEnvelope{
 			Data:  roadSituation(a.Items[0]),
 			Meta:  s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),

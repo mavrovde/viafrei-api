@@ -124,4 +124,13 @@ func AnyStale(fs []Freshness) bool {
 type Versions struct {
 	Families map[string]string
 	Register string
+	// Confirmations is, by family with a freshness row, the version of its
+	// newest confirmation (the instant, the interval and whether its updates
+	// are paused). Only an answer that judges a family by its confirmation
+	// (the road lamp's sight) rests on it.
+	Confirmations map[string]string
+	// LampReference is a fingerprint of the reference rows the road lamp
+	// judges its sight by: which families cover each state's traffic
+	// messages, and the state of each junction.
+	LampReference string
 }

@@ -470,6 +470,37 @@ type Page struct {
 	// has a freshness row, by family (its instant nil when it was never
 	// confirmed); a family without one is absent.
 	Confirmations map[string]ampel.Confirmation
+	// NextChange is the earliest instant after the read at which a
+	// situation or a warning of the scope starts or ends (its valid_from or
+	// valid_to), whatever the list's filters keep; nil when none does.
+	NextChange *time.Time
+}
+
+// ChangesAt is the earliest instant after now at which the answer read in p
+// changes with the clock alone: a situation or a warning of the scope
+// starting or ending (NextChange), a family read turning stale (the first
+// whole second past its threshold, as Assess counts it), or a family's
+// confirmation lapsing (ampel.LapsesAt). Nil when nothing in it changes
+// with the clock; until then, only a new version of a family read, of its
+// confirmation or of the lamp's reference rows changes it.
+func (p Page) ChangesAt(now time.Time) *time.Time {
+	var out *time.Time
+	consider := func(t *time.Time) {
+		if t != nil && t.After(now) && (out == nil || t.Before(*out)) {
+			out = t
+		}
+	}
+	consider(p.NextChange)
+	for _, f := range p.Sources {
+		if f.DataAsOf != nil {
+			t := f.DataAsOf.Add((f.StaleAfter/time.Second + 1) * time.Second)
+			consider(&t)
+		}
+	}
+	for _, c := range p.Confirmations {
+		consider(ampel.LapsesAt(&c))
+	}
+	return out
 }
 
 // Filter narrows the situations a question reads.

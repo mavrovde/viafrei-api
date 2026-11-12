@@ -685,3 +685,93 @@ where source_ref = any('{`+strings.Join(append(slices.Clone(fams), weather...), 
 		t.Errorf("every junction within the radius: %v", got)
 	}
 }
+
+// TestTheLampReadsWhenItsScopeNextChanges plants, far after the fixture's
+// window, situations on road "A 101" and warnings in and out of its scope:
+// the page's next change is the earliest start or end after the read among
+// the scope's situations that are not withdrawn and, when weather families
+// are read, its warnings; one that starts later is not yet a message.
+func TestTheLampReadsWhenItsScopeNextChanges(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004", "NFR-PERF-005")
+	st := seeded(t)
+	fams := families(t, st, "roads")
+	weather := families(t, st, "weather")
+	if len(weather) == 0 {
+		t.Fatal("the fixture holds no weather family")
+	}
+	var n int
+	owner(t, `with ins as (
+  insert into contract.traffic_event (event_id, event_kind, severity, road_ref, road_class, direction, direction_label,
+    location, valid_from, valid_to, lanes_closed, lanes_total, delay_min, affected_length_m,
+    headline, description, text_lang, source_ref, origin_key, published_at, recorded_at, changed_at, withdrawn_at)
+  select v.id, 'jam', 'minor', 'A 101', 'motorway', 'both', null,
+    e.location, v.since::timestamptz, v.until::timestamptz, null, null, null, null,
+    v.headline, null, 'de', e.source_ref, 'o-' || v.id, '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z', v.withdrawn::timestamptz
+  from contract.traffic_event e,
+    (values ('ev-next-now', 'Jetzt', '2102-01-01T00:00:00Z', '2102-01-01T02:00:00Z', null),
+            ('ev-next-later', 'Später', '2102-01-01T01:30:00Z', null, null),
+            ('ev-next-withdrawn', 'Zurückgezogen', '2102-01-01T00:00:00Z', '2102-01-01T01:05:00Z', '2102-01-01T00:30:00Z'))
+    v(id, headline, since, until, withdrawn)
+  where e.event_id = 'ev-u-kind'
+  returning 1)
+select count(*) from ins`, &n)
+	t.Cleanup(func() {
+		var gone int
+		owner(t, `with del as (delete from contract.traffic_event where event_id like 'ev-next-%' returning 1) select count(*) from del`, &gone)
+	})
+	if n != 3 {
+		t.Fatalf("planted %d of 3", n)
+	}
+	var on, off string
+	owner(t, `select r.region_code,
+  (select o.region_code from contract.admin_region o where o.region_level = 'district'
+   order by st_distance(o.boundary, g.geometry) desc, o.region_code limit 1)
+from contract.admin_region r, contract.road g
+where g.road_ref = 'A 101' and r.region_level = 'district' and st_intersects(r.boundary, g.geometry)
+order by r.region_code limit 1`, &on, &off)
+	owner(t, `with ins as (
+  insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name,
+    headline, text_lang, valid_from, valid_to, published_at, region_code, source_ref, recorded_at, withdrawn_at)
+  select v.id, 'ice', 2, 'Stufe', 'issued', 'Wetterdienst', 'Glätte', 'de', v.since::timestamptz, null,
+    '2102-01-01T00:00:00Z', v.region, '`+weather[0]+`', '2102-01-01T00:00:00Z', null
+  from (values ('ww-next-on', '2102-01-01T01:20:00Z', '`+on+`'), ('ww-next-off', '2102-01-01T01:10:00Z', '`+off+`'))
+    v(id, since, region)
+  returning 1)
+select count(*) from ins`, &n)
+	t.Cleanup(func() {
+		var gone int
+		owner(t, `with del as (delete from contract.weather_warning where warning_id like 'ww-next-%' returning 1) select count(*) from del`, &gone)
+	})
+	if n != 2 || on == off {
+		t.Fatalf("planted %d of 2 in %s, off %s", n, on, off)
+	}
+	at := time.Date(2102, 1, 1, 1, 0, 0, 0, time.UTC)
+	q := roads.CorridorQuery{Road: "A101", Direction: roads.DirectionBoth, Filter: roads.Filter{MinSeverity: roads.SeverityInfo}, Limit: 100}
+	withWeather := roads.Families{Roads: fams, Weather: weather[:1]}
+	for _, c := range []struct {
+		name string
+		at   time.Time
+		fams roads.Families
+		want time.Time
+	}{
+		{"a situation starts", at, onRoads(fams), at.Add(30 * time.Minute)},
+		{"a warning in scope starts", at, withWeather, at.Add(20 * time.Minute)},
+		{"a situation ends", at.Add(45 * time.Minute), withWeather, at.Add(time.Hour)},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			p, err := st.SituationsOnRoad(bounded(t), q, c.fams, c.at)
+			if err != nil || p.NextChange == nil || !p.NextChange.Equal(c.want) {
+				t.Fatalf("next change %v, want %s, %v", p.NextChange, c.want, err)
+			}
+			later := slices.ContainsFunc(p.Messages, func(m roads.Message) bool { return m.Headline == "Später" })
+			if later != c.at.After(at) {
+				t.Errorf("the later situation is a message: %v", later)
+			}
+		})
+	}
+	t.Run("nothing starts or ends after the last end", func(t *testing.T) {
+		if p, err := st.SituationsOnRoad(bounded(t), q, onRoads(fams), at.Add(2*time.Hour)); err != nil || p.NextChange != nil {
+			t.Errorf("next change %v, %v", p.NextChange, err)
+		}
+	})
+}

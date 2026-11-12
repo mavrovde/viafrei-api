@@ -380,6 +380,33 @@ jobs:
           persist-credentials: false
       - run: make compose-test COMMIT=${{ github.sha }}
 
+  load:
+    # The pull-request budget of the soak, stress, spike and fault scenarios
+    # (TST-007, issue #19) on the test stack this job starts; the long run is
+    # load-nightly.yml. Nothing but that stack's loopback is a target.
+    name: Load and faults (pull-request budget)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: Every scenario, pull-request budget
+        run: scripts/load-test.sh pr load-report.md
+      - name: Report in the job summary
+        if: always() && hashFiles('load-report.md') != ''
+        run: cat load-report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: load-report
+          path: load-report.md
+          retention-days: 30
+          if-no-files-found: ignore
+
   sonar:
     name: SonarCloud analysis
     needs: [test, coverage, docs-portal]

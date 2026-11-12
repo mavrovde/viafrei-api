@@ -1,0 +1,10 @@
+# Latency budget per endpoint class (NFR-PERF-003, Performance Test Plan
+# section 2), in milliseconds: class, p50, p95, p99. Design targets, not
+# measurements. The load runner asserts p95 and p99 of each class it sends.
+conditional	5	10	30
+lookup	40	120	300
+near	60	200	500
+live-transit	80	250	600
+along	120	400	900
+composed	300	800	1500
+history	150	400	1000

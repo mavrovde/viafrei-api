@@ -1,0 +1,6 @@
+# The hosts the load and fault runner may reach (internal/testkit/loadrun,
+# issue #19): the loopback of the machine that started the test stack, and
+# nothing else. The runner refuses any other host before it sends a request.
+localhost
+127.0.0.1
+::1

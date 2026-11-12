@@ -47,3 +47,8 @@ services:
       # The runner sends from one address; the per-address limit of keyless
       # requests would answer it alone. The keyed limits stay on.
       VFAPI_RATELIMIT_ANON_RPS: "0"
+      # The runner repeats the same few requests, so the result cache would
+      # answer them from memory and no fault would reach storage: every
+      # request has to reach the path its scenario cuts. The cache has its
+      # own tests (unit, integration and the benchmark leg).
+      VFAPI_CACHE_ENABLED: "false"

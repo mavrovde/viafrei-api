@@ -47,7 +47,7 @@ func TestNoteTextIsNotComparedButFamilyAndCountAre(t *testing.T) {
 	// two sides differ, and that alone is allowed.
 	want := notes(t, `{"condition":["the platform's own text"]}`, parity.Owners{"the platform's own text": {"fam-a"}})
 	o := parity.Owners{"synthetic": {"fam-a"}, "second": {"fam-a"}, "other": {"fam-b"}}
-	if d, _ := parity.Compare(want, notes(t, `{"condition":["synthetic"]}`, o), parity.Default); len(d) > 0 {
+	if d := parity.Diff(want, notes(t, `{"condition":["synthetic"]}`, o)); len(d) > 0 {
 		t.Errorf("another text of the same family's one note differs: %q", d)
 	}
 	cases := map[string]struct {
@@ -60,7 +60,7 @@ func TestNoteTextIsNotComparedButFamilyAndCountAre(t *testing.T) {
 		"a second family": {`{"condition":["synthetic","other"]}`, []string{`extra   meta.notes.condition[fam-b]: got "1"`}},
 	}
 	for name, c := range cases {
-		if d, _ := parity.Compare(want, notes(t, c.notes, o), parity.Default); !slices.Equal(d, c.diff) {
+		if d := parity.Diff(want, notes(t, c.notes, o)); !slices.Equal(d, c.diff) {
 			t.Errorf("%s: diff %q, want %q", name, d, c.diff)
 		}
 	}

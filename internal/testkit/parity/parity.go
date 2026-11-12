@@ -116,12 +116,6 @@ type Rules struct {
 	// reason (docs/parity.md). Project drops them and Parse refuses a bundle
 	// that states one, so neither side can compare them by accident.
 	Excluded []Exclusion
-	// Differences are the facts both sides are known to state differently,
-	// each with its reason (docs/parity.md). They are compared all the same:
-	// a fact that differs in exactly the named way is reported as that
-	// difference, and a named difference no case shows any more fails, so a
-	// change of either side is seen.
-	Differences []Difference
 	// OwnedNotes are the note kinds of meta.notes whose text is not
 	// compared: each is stated per family that owns a note of it, as
 	// meta.notes.<kind>[<family>] = how many distinct notes it owns, and as
@@ -142,15 +136,6 @@ type Owners map[string][]string
 type Exclusion struct {
 	Pattern string
 	Asked   string
-	Reason  string
-}
-
-// Difference is one fact both sides state differently by design: Bundle is
-// the value the MCP side states, API the value this API states.
-type Difference struct {
-	Pattern string
-	Bundle  string
-	API     string
 	Reason  string
 }
 
@@ -178,17 +163,6 @@ func Asks(request, param string) bool {
 	}
 	n, err := strconv.ParseFloat(v[0], 64)
 	return err != nil || n > 0
-}
-
-// Named returns the difference of r that a fact stated as bundle by the MCP
-// side and as api by this API is, if it is one.
-func (r Rules) Named(name, bundle, api string) (Difference, bool) {
-	for _, d := range r.Differences {
-		if exclusionPattern(d.Pattern).MatchString(name) && d.Bundle == bundle && d.API == api {
-			return d, true
-		}
-	}
-	return Difference{}, false
 }
 
 func exclusionPattern(p string) *regexp.Regexp {
@@ -219,9 +193,6 @@ var Default = Rules{
 		{"meta.attribution[*].shareAlikeOffer", "", attributionReason},
 		{"meta.attribution[*].termsUrl", "", attributionReason},
 		{"meta.attribution[*].text", "", attributionReason},
-	},
-	Differences: []Difference{
-		{"data[*].chargePoints[*].availability.state", "occupied", "reserved", "the MCP capability answers a reservation as occupied; the API keeps the reported state reserved, which says more"},
 	},
 	// The fixture's condition notes are synthetic register texts and the
 	// platform states its own register's (attributionReason): which family
@@ -719,42 +690,6 @@ func Diff(want, got []Fact) []string {
 			out = append(out, fmt.Sprintf("extra   %s: got %q", n, gv))
 		case wv != gv:
 			out = append(out, fmt.Sprintf("changed %s: want %q, got %q", n, wv, gv))
-		}
-	}
-	return out
-}
-
-// Compare is Diff under r's named differences: a fact the bundle states as a
-// difference's Bundle value and this API as its API value is returned in
-// named, not in diff.
-func Compare(want, got []Fact, r Rules) (diff []string, named []Difference) {
-	g := index(got)
-	var w, kept []Fact
-	drop := map[string]bool{}
-	for _, f := range want {
-		if v, ok := g[f.Name]; ok && v != f.Value {
-			if d, ok := r.Named(f.Name, f.Value, v); ok {
-				named = append(named, d)
-				drop[f.Name] = true
-				continue
-			}
-		}
-		w = append(w, f)
-	}
-	for _, f := range got {
-		if !drop[f.Name] {
-			kept = append(kept, f)
-		}
-	}
-	return Diff(w, kept), named
-}
-
-// Unseen are the named differences of r that none of seen is.
-func (r Rules) Unseen(seen []Difference) []Difference {
-	var out []Difference
-	for _, d := range r.Differences {
-		if !slices.Contains(seen, d) {
-			out = append(out, d)
 		}
 	}
 	return out

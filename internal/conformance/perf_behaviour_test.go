@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
+	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/energy"
@@ -24,10 +25,14 @@ type cachedFeatures struct {
 	domain string
 	sites  int
 	reads  atomic.Int32
+	down   atomic.Bool // storage fails every read
 }
 
 func (f *cachedFeatures) Charging(context.Context, access.Record, energy.Query) (features.Answer[energy.Site], error) {
 	f.reads.Add(1)
+	if f.down.Load() {
+		return features.Answer[energy.Site]{}, store.ErrUnavailable
+	}
 	fam := provenance.Family{Source: access.Source{Family: "fam-" + f.domain, Domain: f.domain, Publisher: "P",
 		AttributionText: "T", Licence: "L", LicenceURL: "https://licences.example/l"}, StaleAfter: time.Hour, Version: "1"}
 	items := make([]energy.Site, f.sites)
@@ -104,6 +109,40 @@ func cacheAlternate(t *testing.T, c *config.Config) string {
 	return fmt.Sprintf("reads=%d", f.reads.Load())
 }
 
+// cacheStale reads a charging answer, then asks again two minutes later
+// while storage is down, and reports the status and Age of that answer: the
+// stored one served stale, or the refusal.
+func cacheStale(domain string) func(t *testing.T, c *config.Config) string {
+	return func(t *testing.T, c *config.Config) string {
+		t.Helper()
+		return staleRun(t, c, domain)
+	}
+}
+
+func staleRun(t *testing.T, c *config.Config, domain string) string {
+	t.Helper()
+	// Every answer is past its max-age at the second request, so only the
+	// stale allowance can answer it, whatever the domain's max-age.
+	second := time.Second
+	c.Cache.MaxAge = config.CacheMaxAge{Places: second, Roads: second, Energy: second, Parking: second, Transit: second,
+		Accessibility: second, Weather: second, Rules: second, Default: second}
+	f, v := &cachedFeatures{domain: domain, sites: 1}, &countedVersions{}
+	now := time.Now()
+	clock := func() time.Time { return now }
+	h, err := httpapi.NewHandler(httpapi.Deps{Config: c, ContractVersion: "0.1", Auth: everyScope{}, Features: f, Versions: v, Now: clock})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var w *httptest.ResponseRecorder
+	for range 2 {
+		w = httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/charging-options?at=1,2", nil))
+		now = now.Add(2 * time.Minute)
+		f.down.Store(true)
+	}
+	return fmt.Sprintf("status=%d age=%q", w.Code, w.Header().Get("Age"))
+}
+
 // compressed fetches the OpenAPI document gzip-encoded and reports the coding
 // and the encoded size.
 func compressed(t *testing.T, c *config.Config) string {
@@ -137,6 +176,9 @@ func perfBehaviours() map[string]behaviour {
 		// Room for one entry: the first request's entry is dropped by the
 		// second and read again by the third.
 		"cache.max_entries": {"1", cacheAlternate},
+		// An answer read two minutes ago is served stale within five
+		// minutes, not within one, and never for a family listed.
+		"cache.no_stale_families": {"fam-energy", cacheStale("energy")},
 	}
 	for _, d := range []string{"places", "roads", "energy", "parking", "transit", "accessibility", "weather", "rules", "default"} {
 		domain := d
@@ -144,6 +186,7 @@ func perfBehaviours() map[string]behaviour {
 			domain = "other"
 		}
 		out["cache.max_age."+d] = behaviour{"2h", cacheRun(domain, 1, 1, 0)}
+		out["cache.stale_if_error."+d] = behaviour{"1m", cacheStale(domain)}
 	}
 	return out
 }

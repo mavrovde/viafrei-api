@@ -31,6 +31,20 @@ from memory and a fault on the storage route would reach none of them. With
 it off, every request reaches storage and the path its scenario cuts. The
 cache is tested by the unit and integration tests and by the benchmark leg.
 
+A second instance of the same image, `api-cached`, runs with the cache on
+behind the same fault proxy, published on the loopback at port 8081
+(`-cached-api`). Only `storage-killed` speaks to it, to see stale answers
+(NFR-RES-004). Its `cache.stale_if_error.parking` is 4 s, its
+`cache.max_age.parking`, `cache.max_age.energy` and `cache.versions_ttl` are
+1 s each, and `cache.no_stale_families` lists every charging family of the
+fixture set. `scripts/load-test.sh` reads these four from
+`test/load/compose.yaml` and passes them as `-stale-if-error`,
+`-max-age-parking`, `-max-age-energy` and `-versions-ttl`. Within the max-age
+a stored answer is replayed as fresh from memory, storage or not, so the
+runner asks for stale answers one and a half times the longest of the three
+after the cut; the allowance must be at least twice that, or the runner
+refuses to start. It reads as the same database role as `api` under its own `db.application_name`, so the runner counts the storage connections of `api` alone against `db.pool_max` (`-application-name`).
+
 The runner speaks only to hosts on `test/load/allow-list.txt` (the loopback).
 Any other host, any scheme but `http`, and a URL with credentials are refused
 before a request is sent (exit 2). An empty allow-list is refused too. Faults
@@ -60,15 +74,13 @@ never skipped.
 | `hanging-query` | every feature table locked | reads cut at the deadline; afterwards a run of requests without a poisoned connection |
 | `pool-exhausted` | every permit held, plus bursts | the admission refuses (`429 overloaded` with `Retry-After`), each refusal within the tier's `queue_max_wait` plus 50 ms (`-queue-max-wait`, default 400 ms) |
 | `composed-part-timeout` | the parking tables locked | `200` with the parking part `timeout` and the charging part `ok` |
-| `storage-killed` | the storage route cut | `503 upstream-unavailable` with `Retry-After`, p95 within 50 ms; the circuit breaker opens after at most `breaker.failure_threshold` reads reached storage, lets at most `breaker.half_open_probes` reads through in each half-open period, opens again on a failed probe, and a probe closes it after the repair (read from the instance's log; `-breaker-failures`, `-breaker-open-for`, `-breaker-probes` give the instance's settings, which `scripts/load-test.sh` reads from `test/load/compose.yaml`); 2xx after the repair |
+| `storage-killed` | the storage route cut | `503 upstream-unavailable` with `Retry-After`, p95 within 50 ms; the circuit breaker opens after at most `breaker.failure_threshold` reads reached storage, lets at most `breaker.half_open_probes` reads through in each half-open period, opens again on a failed probe, and a probe closes it after the repair (read from the instance's log; `-breaker-failures`, `-breaker-open-for`, `-breaker-probes` give the instance's settings, which `scripts/load-test.sh` reads from `test/load/compose.yaml`); 2xx after the repair. On `api-cached`: a parking search answered just before the cut is served `200` with `served_stale` and an `Age` no older than `-stale-if-error`, p95 within 50 ms; a parking search it never answered, one answered longer ago than the allowance, and a charging search (a family without a stale allowance) are `503 upstream-unavailable` with `Retry-After`; after the repair it answers from storage again. The instance without a cache serves nothing stale |
 | `access-store-down` | the access-store route cut | a cached key keeps working; an uncached key is `503 upstream-unavailable`; both work after the repair |
 | `clock-skew` | the source clock 10 minutes ahead and 30 days behind | no negative age; ahead is fresh; behind is stale with `data_stale` |
 | `instance-killed` | `SIGKILL` under load, then a start | ready within 30 s; 2xx again |
 
 The report lists what each scenario does not assert yet:
 
-- `served_stale` answers (NFR-RES-004), which do not exist in the service
-  yet;
 - metering buffering while the access store is down;
 - a moved service clock (the service's distroless container has no way to
   move it; quota windows under a moved clock are unit-tested);

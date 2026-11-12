@@ -8,8 +8,13 @@
 # It starts compose.yaml plus test/load/compose.yaml (the fault proxy and an
 # access store in the throwaway database), issues two throwaway keys, runs
 # internal/testkit/loadrun against that stack, writes the Markdown report to
-# REPORT (default load-report.md) and tears the stack and its volume down on
-# every exit path. The keys and the generated passwords are never printed.
+# REPORT (default load-report.md) and its figures beside it (REPORT with .json
+# for .md), and tears the stack and its volume down on every exit path. The
+# keys and the generated passwords are never printed.
+#
+# LOADRUN_PREVIOUS, when set, names the previous main run's figures
+# (scripts/load-previous.sh fetches them); the report compares this run with
+# them and a p95 or p99 regression beyond the tolerance fails it (TST-021).
 #
 # Only this machine's loopback is a target: the runner refuses every host
 # that is not on test/load/allow-list.txt, and this script refuses an
@@ -70,5 +75,7 @@ LOADRUN_COLD_KEY=$(keys issue -plan load -label load-cold -contact ops@example.t
 [[ -n $LOADRUN_KEY && -n $LOADRUN_COLD_KEY ]] || { echo "FAIL: the key tool issued no key" >&2; exit 1; }
 export LOADRUN_KEY LOADRUN_COLD_KEY
 
+previous=()
+[[ -n ${LOADRUN_PREVIOUS:-} ]] && previous=(-previous "$LOADRUN_PREVIOUS")
 go run ./internal/testkit/loadrun -profile "$profile" -report "$report" -api "$API_URL" -proxy "$PROXY_URL" -place "$place" \
-  -compose-files compose.yaml,test/load/compose.yaml
+  -compose-files compose.yaml,test/load/compose.yaml "${previous[@]}"

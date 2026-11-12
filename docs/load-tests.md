@@ -68,11 +68,40 @@ The report lists what each scenario does not assert yet:
   move it; quota windows under a moved clock are unit-tested);
 - the metering counts lost to a kill.
 
+## Comparison with the previous run on main
+
+Every run writes its figures beside the report, as JSON (`load-report.json`
+for `load-report.md`): for each scenario and endpoint class, the requests,
+the answers by status class, p50, p95 and p99 of the 2xx answers, the
+slowest answer and the share refused under load, and for the soak the
+resident memory's growth (TST-021).
+
+The nightly run on `main` fetches the figures of the newest successful
+nightly run on `main` (`scripts/load-previous.sh`) and the report gains a
+comparison section, also in the job summary: each figure, its previous value
+and the change.
+
+- A class's p95 or p99 more than `-regression-tolerance` (default 10 %) and
+  more than `-regression-floor` (default 5 ms) above the previous run fails
+  the run, and the report names the scenario, the class and the figure.
+  Only a class with at least 20 2xx answers in both runs is judged; a
+  percentile of fewer answers is a single answer.
+- With no previous run, or a previous run that left no figures, the report
+  names the absent file and the run is judged on the absolute budgets alone.
+- A previous file that exists but cannot be read as figures fails the run;
+  it is never read as "no change".
+- Runs of different budgets (`pr` and `nightly`) are not compared, and the
+  report says so.
+
+The pull-request job writes its figures too but compares with nothing; its
+report says so.
+
 ## Running it
 
 ```sh
 scripts/load-test.sh pr                     # the pull-request budget, report in load-report.md
 scripts/load-test.sh nightly night.md       # the full run, about two hours
+LOADRUN_PREVIOUS=prev/load-report.json scripts/load-test.sh nightly   # compared with earlier figures
 ```
 
 It needs Docker and the ports the stack publishes on the loopback. Run only one stack per machine.

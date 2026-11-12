@@ -7,6 +7,12 @@
 # The report names every scenario, its assertions and its counts; it is the
 # job summary and an artifact kept for the release evidence. A scenario that
 # sent no request fails.
+#
+# Each run also writes its figures (load-report.json) into that artifact. A
+# run on main fetches the figures of the newest successful nightly run on
+# main and the report compares the two (TST-021, issue #80): a p95 or p99
+# regression beyond the tolerance fails the run, and a missing or unreadable
+# previous file is named in the report, never read as "no change".
 name: Load nightly
 
 on:
@@ -20,6 +26,7 @@ on:
 
 permissions:
   contents: read
+  actions: read # the previous nightly run's artifact (scripts/load-previous.sh)
 
 concurrency:
   group: load-nightly
@@ -40,9 +47,18 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: The previous main run's figures (TST-021)
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: scripts/load-previous.sh previous
       - name: Every scenario on the test stack
         env:
           PROFILE: ${{ inputs.profile || 'nightly' }}
+          # On main the run is compared with the previous main run's figures;
+          # when there are none the report names the absent file.
+          LOADRUN_PREVIOUS: ${{ github.ref == 'refs/heads/main' && 'previous/load-report.json' || '' }}
         run: scripts/load-test.sh "$PROFILE" load-report.md
       - name: Report in the job summary
         if: always() && hashFiles('load-report.md') != ''
@@ -51,6 +67,8 @@ jobs:
         if: always()
         with:
           name: load-nightly
-          path: load-report.md
+          path: |
+            load-report.md
+            load-report.json
           retention-days: 90
           if-no-files-found: error

@@ -52,3 +52,7 @@ services:
       # request has to reach the path its scenario cuts. The cache has its
       # own tests (unit, integration and the benchmark leg).
       VFAPI_CACHE_ENABLED: "false"
+      # The storage-killed scenario holds storage down longer than twice
+      # this, so a failed half-open probe opening the breaker again is
+      # observed; the runner's -breaker-open-for says the same (NFR-RES-002).
+      VFAPI_BREAKER_OPEN_FOR: 2s

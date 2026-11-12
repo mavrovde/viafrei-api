@@ -8,8 +8,10 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
+	"github.com/mavrovde/viafrei-api/internal/app/breaker"
 	"github.com/mavrovde/viafrei-api/internal/app/metering"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/limits"
 )
 
 // SourceReader is the port to the source register of the read contract.
@@ -146,6 +148,12 @@ func (s *server) permittedSources(ctx context.Context, k access.Record) ([]Attri
 func (s *server) storageProblem(ctx context.Context, err error) *Problem {
 	if p, ok := s.overloadedProblem(ctx, err); ok {
 		return p
+	}
+	// The breaker is open (NFR-RES-002): storage was not asked; Retry-After
+	// is what is left of the open period.
+	var open *breaker.Refusal
+	if errors.As(err, &open) {
+		return newProblem(ctx, SlugUpstreamUnavailable, "Storage is unavailable; it is not asked again until the time given.", limits.Seconds(open.RetryAfter))
 	}
 	if errors.Is(err, store.ErrDeadlineExhausted) {
 		noteRefusal(ctx, metering.DeadlineExhausted)

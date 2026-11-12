@@ -162,16 +162,24 @@ func TestStorageFaults(t *testing.T) {
 	}
 }
 
+// breakerLife is the log of a breaker that opened, let probes through
+// that failed, and was closed by a probe after the repair.
+var breakerLife = []string{"closed>open", "open>half-open", "half-open>open", "open>half-open", "half-open>closed"}
+
 // proxiedWorld answers like a stack behind the fault proxy: a latency toxic
-// makes every read time out, a cut storage route makes it unavailable, a
-// cut access route refuses the cold key.
+// makes every read time out, a cut storage route makes it unavailable until
+// the breaker opens after two failures, then refused by the breaker; a cut
+// access route refuses the cold key. Its log holds breakerLife.
 func proxiedWorld(t *testing.T) *world {
 	t.Helper()
 	var slow, storageDown, accessDown atomic.Bool
+	var failed atomic.Int64
 	w := newWorld(t, func(rw http.ResponseWriter, r *http.Request) {
 		switch {
 		case slow.Load():
 			problem(rw, http.StatusServiceUnavailable, "deadline-exhausted")
+		case storageDown.Load() && failed.Add(1) > 2:
+			breakerProblem(rw)
 		case storageDown.Load():
 			problem(rw, http.StatusServiceUnavailable, "upstream-unavailable")
 		case accessDown.Load() && r.Header.Get("Authorization") == "Bearer vf_test_cold":
@@ -179,7 +187,13 @@ func proxiedWorld(t *testing.T) *world {
 		default:
 			healthyAPI(rw, r)
 		}
-	}, healthyDocker)
+	}, func(a string) (string, error) {
+		if strings.HasPrefix(a, "logs ") {
+			return breakerLog(breakerLife...), nil
+		}
+		return healthyDocker(a)
+	})
+	w.r.brk.failures = 2
 	w.proxy.fail = func(method, path, body string) bool {
 		switch {
 		case path == "/reset":
@@ -231,6 +245,104 @@ func TestProxyFaults(t *testing.T) {
 	mustFail(t, o, "2xx again within")
 	if c := checkNamed(t, o, "each 503 within 50 ms"); !c.ok {
 		t.Errorf("fast 503s: %+v", c)
+	}
+	mustFail(t, o, "the breaker opens after at most")
+}
+
+func TestStorageKilledAssertsTheBreaker(t *testing.T) {
+	req.Covers(t, "NFR-RES-002", "TST-007")
+	// The log read fails, or says nothing of the breaker.
+	for _, dock := range []func(string) (string, error){
+		func(a string) (string, error) {
+			if strings.HasPrefix(a, "logs ") {
+				return "", errFake
+			}
+			return healthyDocker(a)
+		},
+		func(a string) (string, error) {
+			if strings.HasPrefix(a, "logs ") {
+				return breakerLog(), nil
+			}
+			return healthyDocker(a)
+		},
+	} {
+		w := proxiedWorld(t)
+		w.dock.answer = dock
+		o := runOne(t, w, "storage-killed")
+		mustFail(t, o, "read from the instance's log")
+		mustFail(t, o, "closed > open")
+		mustFail(t, o, "half-open > closed, the last change")
+	}
+	// A log in which the breaker never opened again after a probe, and never
+	// closed: each missing change is named.
+	w := proxiedWorld(t)
+	w.dock.answer = func(a string) (string, error) {
+		if strings.HasPrefix(a, "logs ") {
+			return breakerLog("closed>open", "open>half-open"), nil
+		}
+		return healthyDocker(a)
+	}
+	o := runOne(t, w, "storage-killed")
+	mustFail(t, o, "a failed one opened it again")
+	mustFail(t, o, "half-open > closed, the last change")
+	if c := checkNamed(t, o, "the breaker opened"); !c.ok {
+		t.Errorf("opened: %+v", c)
+	}
+	// More reads reached storage after it opened than the half-open periods
+	// allow: one period of one probe, and every answer after the first
+	// refusal is not the breaker's.
+	w = proxiedWorld(t)
+	w.r.brk.probes = 1
+	w.dock.answer = func(a string) (string, error) {
+		if strings.HasPrefix(a, "logs ") {
+			return breakerLog("closed>open", "open>half-open", "half-open>closed"), nil
+		}
+		return healthyDocker(a)
+	}
+	var n atomic.Int64
+	w.api.Config.Handler = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if w.proxy.restored() {
+			healthyAPI(rw, r)
+			return
+		}
+		if n.Add(1) == 1 {
+			breakerProblem(rw)
+			return
+		}
+		problem(rw, http.StatusServiceUnavailable, "upstream-unavailable")
+	})
+	o = runOne(t, w, "storage-killed")
+	mustFail(t, o, "at most breaker.half_open_probes = 1 reads")
+	// A fault no longer than twice breaker.open_for asserts no re-opening.
+	w = proxiedWorld(t)
+	w.r.brk.openFor = time.Hour
+	o = runOne(t, w, "storage-killed")
+	mustPass(t, o)
+	for _, c := range o.checks {
+		if strings.Contains(c.name, "a failed one opened it again") {
+			t.Errorf("re-opening asserted on a fault shorter than open_for: %+v", c)
+		}
+	}
+}
+
+func TestSlowStorageAcceptsTheOpenBreaker(t *testing.T) {
+	req.Covers(t, "NFR-RES-002", "TST-007")
+	w := proxiedWorld(t)
+	var n atomic.Int64
+	w.api.Config.Handler = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		switch {
+		case w.proxy.restored():
+			healthyAPI(rw, r)
+		case n.Add(1) <= 3:
+			problem(rw, http.StatusServiceUnavailable, "deadline-exhausted")
+		default:
+			breakerProblem(rw)
+		}
+	})
+	o := runOne(t, w, "slow-storage")
+	mustPass(t, o)
+	if c := checkNamed(t, o, "refused by the breaker"); !strings.Contains(c.detail, "3 deadline-exhausted") {
+		t.Errorf("slow storage: %+v", c)
 	}
 }
 

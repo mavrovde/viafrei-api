@@ -114,6 +114,9 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		deadline = fs.Duration("deadline", 2*time.Second, "deadline.request of the instance under test (NFR-PERF-001)")
 		grace    = fs.Duration("cancel-grace", 100*time.Millisecond, "db.cancel_grace of the instance under test (NFR-PERF-002)")
 		queued   = fs.Duration("queue-max-wait", 400*time.Millisecond, "tiers.standard.queue_max_wait of the instance under test (RATE-011)")
+		failures = fs.Int("breaker-failures", 5, "breaker.failure_threshold of the instance under test (NFR-RES-002)")
+		openFor  = fs.Duration("breaker-open-for", 2*time.Second, "breaker.open_for of the instance under test, as test/load/compose.yaml sets it (NFR-RES-002)")
+		probes   = fs.Int("breaker-probes", 2, "breaker.half_open_probes of the instance under test (NFR-RES-002)")
 	)
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -138,6 +141,8 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		return fail("-regression-floor must not be negative")
 	case !strings.HasSuffix(*report, ".md"):
 		return fail("-report must end in .md, so that the figures can go beside it")
+	case *failures < 1 || *probes < 1 || *openFor <= 0:
+		return fail("-breaker-failures and -breaker-probes must be at least 1, -breaker-open-for positive")
 	}
 	key, cold := getenv("LOADRUN_KEY"), getenv("LOADRUN_COLD_KEY")
 	if key == "" || cold == "" || key == cold {
@@ -164,6 +169,7 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	r.docker = execDocker(*docker, *project, strings.Split(*files, ","))
 	r.host = execHost(*docker)
 	r.queued = *queued
+	r.brk = breakerSettings{failures: *failures, openFor: *openFor, probes: *probes}
 	outs := r.runAll(context.Background(), sel)
 	figs := collect(*prof, outs)
 	cmp := compare(*previous, figs, *tol, *floor)

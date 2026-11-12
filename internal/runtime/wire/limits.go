@@ -1,14 +1,42 @@
 package wire
 
 import (
+	"context"
+	"log/slog"
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/app/admission"
+	"github.com/mavrovde/viafrei-api/internal/app/breaker"
 	"github.com/mavrovde/viafrei-api/internal/app/metering"
 	"github.com/mavrovde/viafrei-api/internal/app/ratelimit"
 	"github.com/mavrovde/viafrei-api/internal/domain/limits"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
+
+// BreakerSettings reads the breaker.* settings (NFR-RES-002).
+func BreakerSettings(cfg *config.Config) breaker.Settings {
+	b := cfg.Breaker
+	return breaker.Settings{FailureThreshold: b.FailureThreshold, Window: b.Window, OpenFor: b.OpenFor, HalfOpenProbes: b.HalfOpenProbes}
+}
+
+// Breaker builds the circuit breaker in front of storage on the wall clock.
+// Each change of state is logged: a warning when it opens, information
+// otherwise, with the generation that orders the changes.
+func Breaker(cfg *config.Config, log *slog.Logger) *breaker.Breaker {
+	return BreakerAt(cfg, log, nil)
+}
+
+// BreakerAt is Breaker on the clock now (the wall clock when nil).
+func BreakerAt(cfg *config.Config, log *slog.Logger, now func() time.Time) *breaker.Breaker {
+	return breaker.New(BreakerSettings(cfg), now, func(ch breaker.Change) {
+		level := slog.LevelInfo
+		if ch.To == breaker.Open {
+			level = slog.LevelWarn
+		}
+		log.Log(context.Background(), level, "storage circuit breaker changed state",
+			"from", ch.From.String(), "to", ch.To.String(), "generation", ch.Generation)
+	})
+}
 
 // AdmissionSettings reads the tiers.* and admission.* settings. The permits
 // are db.pool_max, so nothing ever waits inside the pool (RATE-008); the

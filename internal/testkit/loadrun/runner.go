@@ -38,6 +38,7 @@ type result struct {
 	problem string // the last segment of the problem type of a 4xx or 5xx
 	retry   bool   // Retry-After was sent
 	took    time.Duration
+	sent    time.Time // when the request left
 	body    map[string]any
 }
 
@@ -60,6 +61,7 @@ type runner struct {
 	overdue  time.Duration // the deadline plus the cancel grace plus 100 ms (NFR-PERF-002)
 	fast     time.Duration // a refusal is fast within this (NFR-CAP-003)
 	queued   time.Duration // the standard tier's queue_max_wait: a waiter is shed by then (RATE-011)
+	brk      breakerSettings
 	http     *http.Client
 	docker   func(context.Context, ...string) (string, error) // docker compose on the stack's project
 	host     func(context.Context, ...string) (string, error) // the plain docker CLI (docker top)
@@ -105,7 +107,7 @@ func (r *runner) mix(i int) request {
 
 // do sends one request and measures it until the body is read.
 func (r *runner) do(ctx context.Context, q request) result {
-	res := result{class: q.class}
+	res := result{class: q.class, sent: time.Now()}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.api+q.path, nil)
 	if err != nil {
 		return res

@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"net/http"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 )
@@ -72,14 +74,13 @@ var catalogue = []scenario{
 	{name: "soak", fault: "none", expect: "design load: every answer 2xx and within the class budget; resident memory grows at most 10 % after warm-up; no connection left busy", run: soak},
 	{name: "spike", fault: "none", expect: "four times design load briefly: refusals carry Retry-After; back within budget after it", run: spike},
 	{name: "stress", fault: "none", expect: "a ramp past the knee: throughput flat above it; excess refused 429 within 50 ms", run: stress},
-	{name: "slow-storage", fault: "latency on every storage byte, beyond the deadline", expect: "503 deadline-exhausted by the deadline; storage idle within the cancel grace plus 100 ms", run: slowStorage},
+	{name: "slow-storage", fault: "latency on every storage byte, beyond the deadline", expect: "503 deadline-exhausted by the deadline, or refused by the breaker it opens; storage idle within the cancel grace plus 100 ms", run: slowStorage},
 	{name: "hanging-query", fault: "every feature table locked, so each read hangs in storage", expect: "cut at the deadline; afterwards no poisoned connection", run: hangingQuery},
 	{name: "pool-exhausted", fault: "every permit held by hanging reads, plus bursts", expect: "the admission refuses, each refusal by the tier's queue_max_wait (RATE-011)", run: poolExhausted},
 	{name: "composed-part-timeout", fault: "the parking tables locked", expect: "200 with the parking part timeout and the charging part ok", run: composedPart},
 	{
-		name: "storage-killed", fault: "the storage route of the fault proxy cut", expect: "503 upstream-unavailable with Retry-After within 50 ms; 2xx again after the repair", run: storageKilled,
+		name: "storage-killed", fault: "the storage route of the fault proxy cut", expect: "503 upstream-unavailable with Retry-After within 50 ms; the breaker opens, its half-open probes are bounded and a failed one opens it again; closed by a probe and 2xx again after the repair", run: storageKilled,
 		pending: []string{
-			"the circuit breaker (NFR-RES-002) does not exist yet, so its opening and its half-open probes are not asserted",
 			"no result cache exists yet, so no answer may carry served_stale (NFR-RES-004); stale answers are asserted once the cache is built",
 		},
 	},
@@ -194,6 +195,46 @@ func cutOrShed(r result) bool {
 	return (r.status == http.StatusServiceUnavailable && r.problem == "deadline-exhausted" && r.retry) || (refused(r) && r.retry)
 }
 
+// breakerSettings are the breaker.* settings of the instance under test
+// (NFR-RES-002).
+type breakerSettings struct {
+	failures int           // breaker.failure_threshold
+	openFor  time.Duration // breaker.open_for
+	probes   int           // breaker.half_open_probes
+}
+
+// breakerDetail is the detail of the answer of an open or half-open breaker,
+// which did not ask storage (internal/adapters/httpapi, storageProblem).
+const breakerDetail = "Storage is unavailable; it is not asked again until the time given."
+
+// breakerRefused: 503 upstream-unavailable with Retry-After from the
+// breaker itself; the request was given its body (request.keep).
+func breakerRefused(r result) bool {
+	detail, _ := r.body["detail"].(string)
+	return r.status == http.StatusServiceUnavailable && r.problem == "upstream-unavailable" && r.retry && detail == breakerDetail
+}
+
+// breakerLogLine is the instance's log of a change of the breaker's state
+// (internal/runtime/wire, BreakerAt).
+const breakerLogLine = "storage circuit breaker changed state"
+
+// transitions reads the breaker's changes of state the instance logged
+// since t, as "from>to", in order.
+func (r *runner) transitions(ctx context.Context, since time.Time) ([]string, error) {
+	out, err := r.docker(ctx, "logs", "--no-color", "--no-log-prefix", "--since", since.UTC().Format(time.RFC3339Nano), "api") //nolint:misspell // docker's flag is spelled so
+	if err != nil {
+		return nil, err
+	}
+	var ts []string
+	for line := range strings.SplitSeq(out, "\n") {
+		var e struct{ Msg, From, To string }
+		if json.Unmarshal([]byte(line), &e) == nil && e.Msg == breakerLogLine {
+			ts = append(ts, e.From+">"+e.To)
+		}
+	}
+	return ts, nil
+}
+
 func soak(ctx context.Context, r *runner, o *outcome) {
 	o.results = append(o.results, r.drive(ctx, r.p.rate, r.p.warm, r.mix)...)
 	var (
@@ -289,11 +330,17 @@ func slowStorage(ctx context.Context, r *runner, o *outcome) {
 		o.add("latency injected", false, "%v", err)
 		return
 	}
-	rs := r.drive(ctx, r.p.faultRate, r.p.fault, func(int) request { return r.charging() })
+	q := r.charging()
+	q.keep = true
+	rs := r.drive(ctx, r.p.faultRate, r.p.fault, func(int) request { return q })
 	o.results = append(o.results, rs...)
 	cut := count(rs, problemIs("deadline-exhausted"))
-	o.add("slowed storage is answered 503 deadline-exhausted, or shed, with Retry-After", count(rs, cutOrShed) == len(rs) && cut > 0,
-		"%d deadline-exhausted, %d shed, %d answers", cut, count(rs, refused), len(rs))
+	// A storage slower than every deadline is a failing storage: once
+	// breaker.failure_threshold reads have run out of time opening their
+	// transaction, the breaker opens and refuses the rest (NFR-RES-002).
+	o.add("slowed storage is answered 503 deadline-exhausted, shed, or refused by the breaker, with Retry-After",
+		count(rs, func(x result) bool { return cutOrShed(x) || breakerRefused(x) }) == len(rs) && cut > 0,
+		"%d deadline-exhausted, %d shed, %d refused by the breaker, %d answers", cut, count(rs, refused), count(rs, breakerRefused), len(rs))
 	if err := r.reset(ctx); err != nil {
 		o.add("latency removed", false, "%v", err)
 		return
@@ -379,11 +426,14 @@ func parts(body map[string]any) map[string]string {
 }
 
 func storageKilled(ctx context.Context, r *runner, o *outcome) {
+	start := time.Now()
 	if err := r.setProxy(ctx, proxyStorage, false); err != nil {
 		o.add("storage route cut", false, "%v", err)
 		return
 	}
-	rs := r.drive(ctx, r.p.faultRate, r.p.fault, func(int) request { return r.charging() })
+	q := r.charging()
+	q.keep = true
+	rs := r.drive(ctx, r.p.faultRate, r.p.fault, func(int) request { return q })
 	o.results = append(o.results, rs...)
 	lost := took(rs, func(x result) bool {
 		return x.status == http.StatusServiceUnavailable && x.retry && x.problem == "upstream-unavailable"
@@ -393,11 +443,32 @@ func storageKilled(ctx context.Context, r *runner, o *outcome) {
 	o.add("each 503 within 50 ms, p95 (QAS-REL-02)", len(lost) > 0 && p95 <= r.fast, "p95 %s", p95.Round(time.Millisecond))
 	stale := count(rs, func(x result) bool { return x.problem == "served_stale" })
 	o.add("no answer claims served_stale while no cache exists (NFR-RES-004)", stale == 0, "%d", stale)
+	// The answers in the order they were sent: the reads before the
+	// breaker's first refusal reached the lost storage, and after it only
+	// the half-open probes do.
+	slices.SortStableFunc(rs, func(a, b result) int { return a.sent.Compare(b.sent) })
+	first := slices.IndexFunc(rs, breakerRefused)
+	o.add(fmt.Sprintf("the breaker opens after at most breaker.failure_threshold = %d reads reached the lost storage (NFR-RES-002)", r.brk.failures),
+		first >= 0 && first <= r.brk.failures, "first refused by the breaker: answer %d of %d", first+1, len(rs))
 	if err := r.setProxy(ctx, proxyStorage, true); err != nil {
 		o.add("storage route restored", false, "%v", err)
 		return
 	}
 	r.recovered(ctx, o, r.charging())
+	ts, err := r.transitions(ctx, start)
+	o.add("the breaker's changes of state are read from the instance's log", err == nil && len(ts) > 0, "%d changes%s", len(ts), errSuffix(err))
+	seen := strings.Join(ts, ", ")
+	o.add("the breaker opened: closed > open (NFR-RES-002)", slices.Contains(ts, "closed>open"), "%s", seen)
+	periods := len(slices.DeleteFunc(slices.Clone(ts), func(t string) bool { return t != "open>half-open" }))
+	if first >= 0 {
+		probed := count(rs[first:], func(x result) bool { return !breakerRefused(x) })
+		o.add(fmt.Sprintf("at most breaker.half_open_probes = %d reads reached storage in each half-open period (NFR-RES-002)", r.brk.probes),
+			probed <= r.brk.probes*periods, "%d reads reached storage after it opened, over %d half-open periods", probed, periods)
+	}
+	if r.p.fault > 2*r.brk.openFor {
+		o.add("after breaker.open_for it let probes through, and a failed one opened it again: half-open > open", slices.Contains(ts, "half-open>open"), "%s", seen)
+	}
+	o.add("after the repair a probe closed it: half-open > closed, the last change", len(ts) > 0 && ts[len(ts)-1] == "half-open>closed", "%s", seen)
 }
 
 func accessStoreDown(ctx context.Context, r *runner, o *outcome) {

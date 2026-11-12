@@ -87,6 +87,25 @@ func problem(w http.ResponseWriter, status int, slug string) {
 	_, _ = fmt.Fprintf(w, `{"type":"https://api.example.test/problems/%s","status":%d}`, slug, status)
 }
 
+// breakerProblem writes the answer of an open breaker.
+func breakerProblem(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Retry-After", "2")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	_ = json.NewEncoder(w).Encode(map[string]any{"type": "https://api.example.test/problems/upstream-unavailable", "status": 503, "detail": breakerDetail})
+}
+
+// breakerLog is the instance's log of the given changes of the breaker's
+// state, "from>to" each, among other lines.
+func breakerLog(changes ...string) string {
+	lines := []string{`{"msg":"listening"}`, "not json"}
+	for _, c := range changes {
+		from, to, _ := strings.Cut(c, ">")
+		lines = append(lines, fmt.Sprintf(`{"time":"2026-11-12T10:00:00Z","level":"INFO","msg":%q,"from":%q,"to":%q,"generation":1}`, breakerLogLine, from, to))
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
 // answer writes a 2xx answer with the meta a scenario reads.
 func answer(w http.ResponseWriter, meta map[string]any) {
 	w.Header().Set("Content-Type", "application/json")
@@ -127,6 +146,18 @@ func (x *toxi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// restored reports whether the last call to the fault proxy repaired it:
+// a reset, or a route enabled again.
+func (x *toxi) restored() bool {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if len(x.calls) == 0 {
+		return false
+	}
+	last := x.calls[len(x.calls)-1]
+	return strings.Contains(last, "/reset") || strings.Contains(last, `"enabled":true`)
+}
+
 // world is a runner against a fake API, a fake fault proxy and fake docker.
 type world struct {
 	r     *runner
@@ -149,6 +180,7 @@ func newWorld(t *testing.T, api http.HandlerFunc, dock func(string) (string, err
 	w.r = newRunner(tiny, testBudgets, w.api.URL, ps.URL, "vf_test_warm", "vf_test_cold", "pl-1", 4, 100*time.Millisecond, 20*time.Millisecond)
 	w.r.docker = w.dock.run
 	w.r.host = w.dock.run
+	w.r.brk = breakerSettings{failures: 5, openFor: 10 * time.Millisecond, probes: 2}
 	return w
 }
 

@@ -23,7 +23,9 @@ func TestTheBreakerRecoversThroughOneTrialRead(t *testing.T) {
 	now := time.Now()
 	clock := func() time.Time { return now }
 	b := breaker.New(breaker.Settings{FailureThreshold: 1, Window: time.Minute, OpenFor: time.Minute, HalfOpenProbes: 1}, clock, nil)
-	st := openStore(t, ctx).WithBreaker(b)
+	// A wide reserve, so the statement timeout fires well before the
+	// client's deadline even on a loaded host.
+	st := openStore(t, ctx, "VFAPI_DEADLINE_RESERVE=400ms").WithBreaker(b)
 
 	tk, err := b.Allow()
 	if err != nil {
@@ -47,14 +49,14 @@ func TestTheBreakerRecoversThroughOneTrialRead(t *testing.T) {
 
 	// A statement stopped by its timeout leaves the breaker closed.
 	for range 3 {
-		short, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
+		short, cancel := context.WithTimeout(ctx, time.Second)
 		err := st.Read(short, func(ctx context.Context, tx pgx.Tx) error {
-			_, err := tx.Exec(ctx, "select pg_sleep(2)")
+			_, err := tx.Exec(ctx, "select pg_sleep(5)")
 			return err
 		})
 		cancel()
 		if sqlState(err) != "57014" {
-			t.Fatalf("a two-second statement under a 300 ms budget: %v, want the statement timeout (57014)", err)
+			t.Fatalf("a five-second statement under a one-second budget: %v, want the statement timeout (57014)", err)
 		}
 	}
 	if b.State() != breaker.Closed {

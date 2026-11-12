@@ -380,7 +380,7 @@ func TestProbesAreCountedPerPeriod(t *testing.T) {
 	req.Covers(t, "NFR-RES-002", "TST-007")
 	t0 := time.Date(2026, 11, 12, 10, 0, 0, 0, time.UTC)
 	sec := func(s float64) time.Time { return t0.Add(time.Duration(s * float64(time.Second))) }
-	cs := []change{
+	cs := []stateChange{
 		at("closed>open", sec(0)), at("open>half-open", sec(2)), at("half-open>open", sec(2.1)),
 		at("open>half-open", sec(4)), at("half-open>open", sec(4.1)), at("open>half-open", sec(9)), at("half-open>closed", sec(9.1)),
 	}
@@ -402,7 +402,7 @@ func TestProbesAreCountedPerPeriod(t *testing.T) {
 		t.Errorf("no period before the repair: per %v, stray %d", per, stray)
 	}
 	// A period not yet over when the log was read holds every later read.
-	open := []change{at("closed>open", sec(0)), at("open>half-open", sec(2))}
+	open := []stateChange{at("closed>open", sec(0)), at("open>half-open", sec(2))}
 	if per, stray := probesPerPeriod([]result{read(2), read(30)}, open, sec(60)); len(per) != 1 || per[0] != 2 || stray != 0 {
 		t.Errorf("a lasting period: per %v, stray %d", per, stray)
 	}

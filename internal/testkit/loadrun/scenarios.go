@@ -220,12 +220,12 @@ const breakerLogLine = "storage circuit breaker changed state"
 
 // transitions reads the breaker's changes of state the instance logged
 // since t, as "from>to", in order.
-func (r *runner) transitions(ctx context.Context, since time.Time) ([]change, error) {
+func (r *runner) transitions(ctx context.Context, since time.Time) ([]stateChange, error) {
 	out, err := r.docker(ctx, "logs", "--no-color", "--no-log-prefix", "--since", since.UTC().Format(time.RFC3339Nano), "api") //nolint:misspell // docker's flag is spelled so
 	if err != nil {
 		return nil, err
 	}
-	var cs []change
+	var cs []stateChange
 	for line := range strings.SplitSeq(out, "\n") {
 		var e struct {
 			Time          time.Time
@@ -237,18 +237,18 @@ func (r *runner) transitions(ctx context.Context, since time.Time) ([]change, er
 		if e.Time.IsZero() {
 			return nil, fmt.Errorf("a change of the breaker's state carries no time: %s", line)
 		}
-		cs = append(cs, change{at: e.Time, step: e.From + ">" + e.To})
+		cs = append(cs, stateChange{at: e.Time, step: e.From + ">" + e.To})
 	}
 	return cs, nil
 }
 
-// change is one logged change of the breaker's state, "from>to".
-type change struct {
+// stateChange is one logged change of the breaker's state, "from>to".
+type stateChange struct {
 	at   time.Time
 	step string
 }
 
-func steps(cs []change) []string {
+func steps(cs []stateChange) []string {
 	out := make([]string, len(cs))
 	for i, c := range cs {
 		out[i] = c.step
@@ -276,7 +276,7 @@ func (p period) holds(t time.Time) bool {
 // It returns the reads of each period and the reads that fall in none:
 // sent while the breaker was open, before the first period or between two,
 // they reached storage although nothing should have.
-func probesPerPeriod(rs []result, cs []change, repaired time.Time) (per []int, stray int) {
+func probesPerPeriod(rs []result, cs []stateChange, repaired time.Time) (per []int, stray int) {
 	var ps []period
 	for _, c := range cs {
 		switch {

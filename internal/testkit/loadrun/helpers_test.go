@@ -96,11 +96,11 @@ func breakerProblem(w http.ResponseWriter) {
 }
 
 // at is a change of the breaker's state, "from>to", at t.
-func at(step string, t time.Time) change { return change{at: t, step: step} }
+func at(step string, t time.Time) stateChange { return stateChange{at: t, step: step} }
 
 // breakerLog is the instance's log of the given changes of the breaker's
 // state, among other lines.
-func breakerLog(changes ...change) string {
+func breakerLog(changes ...stateChange) string {
 	lines := []string{`{"msg":"listening"}`, "not json"}
 	for _, c := range changes {
 		from, to, _ := strings.Cut(c.step, ">")

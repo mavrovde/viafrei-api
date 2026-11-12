@@ -32,9 +32,16 @@ func TestMain(m *testing.M) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	var err error
 	db, err = pgtest.Start(ctx)
+	if err != nil {
+		cancel()
+		fmt.Fprintln(os.Stderr, "integration tests need a container runtime:", err)
+		os.Exit(1)
+	}
+	err = seed(ctx)
 	cancel()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "integration tests need a container runtime:", err)
+		db.Stop()
+		fmt.Fprintln(os.Stderr, "loading the fixtures:", err)
 		os.Exit(1)
 	}
 	code := m.Run()
@@ -181,34 +188,68 @@ func TestStatementTimeoutIsTheRemainingBudget(t *testing.T) {
 	}
 }
 
+// TestReadsDoNotCompile: a read never spends its deadline on JIT
+// compilation, whatever the server's default.
+func TestReadsDoNotCompile(t *testing.T) {
+	req.Covers(t, "NFR-PERF-001")
+	ctx := bounded(t)
+	st := openStore(t, ctx)
+	// reset_val is the connection's own value, the one it has outside a
+	// read: on (the server's default), or the test would hold nothing.
+	var jit, outside string
+	if err := st.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, "select current_setting('jit'), reset_val from pg_settings where name = 'jit'").Scan(&jit, &outside)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if outside != "on" {
+		t.Fatalf("jit is %q outside a read, so off inside proves nothing", outside)
+	}
+	if jit != "off" {
+		t.Fatalf("jit is %q inside a read, want off", jit)
+	}
+}
+
 func TestServerStopsTheStatementOnItsOwn(t *testing.T) {
 	req.Covers(t, "NFR-PERF-004")
 	ctx := bounded(t)
-	st := openStore(t, ctx)
-	short, cancel := context.WithTimeout(ctx, 600*time.Millisecond)
+	// Read answers at its deadline whatever the statement is doing, so the
+	// statement timeout must end before it: a 400ms reserve leaves room for
+	// the round trips ahead of the timed statement, which its own timeout
+	// does not count, and a pooled connection keeps the connect out of them.
+	st := openStore(t, ctx, "VFAPI_DEADLINE_RESERVE=400ms")
+	if err := st.Read(ctx, func(context.Context, pgx.Tx) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	short, cancel := context.WithTimeout(ctx, 900*time.Millisecond)
 	defer cancel()
-	var limit, took time.Duration
-	err := st.Read(short, func(ctx context.Context, tx pgx.Tx) error {
-		var raw string
+	// The timings come back through ReadValue: fn writes nothing the test holds.
+	type timing struct{ limit, took time.Duration }
+	got, err := store.ReadValue(short, st, func(ctx context.Context, tx pgx.Tx) (timing, error) {
+		var (
+			raw string
+			tm  timing
+		)
 		if err := tx.QueryRow(ctx, "select current_setting('statement_timeout')").Scan(&raw); err != nil {
-			return err
+			return tm, err
 		}
 		if len(raw) < 3 || raw[len(raw)-2:] != "ms" {
-			return fmt.Errorf("statement_timeout %q is not the per-read budget in ms", raw)
+			return tm, fmt.Errorf("statement_timeout %q is not the per-read budget in ms", raw)
 		}
 		ms, err := strconv.Atoi(raw[:len(raw)-2])
 		if err != nil {
-			return fmt.Errorf("statement_timeout %q is not the per-read budget in ms", raw)
+			return tm, fmt.Errorf("statement_timeout %q is not the per-read budget in ms", raw)
 		}
-		limit = time.Duration(ms) * time.Millisecond
+		tm.limit = time.Duration(ms) * time.Millisecond
 		// Detach the client-side cancel: only the statement timeout can stop it. Only the
 		// statement is timed: the begin, this read and the rollback are outside its timeout,
 		// and timing them too made the bound fail on a loaded machine.
 		start := time.Now()
 		_, err = tx.Exec(context.WithoutCancel(ctx), "select pg_sleep(5)")
-		took = time.Since(start)
-		return err
+		tm.took = time.Since(start)
+		return tm, err
 	})
+	limit, took := got.limit, got.took
 	if !errors.Is(err, store.ErrDeadlineExhausted) || sqlState(err) != "57014" {
 		t.Fatalf("want the server-side statement timeout (57014), got %v", err)
 	}

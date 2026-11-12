@@ -27,6 +27,7 @@ type wxFake struct {
 	warnings    []weather.Warning
 	levels      []weather.Level // the levels in force; those of warnings when nil
 	more        bool
+	next        *time.Time // the next start or end of a warning placed at the position
 	stale       []string
 	missing     []string
 	topic       rules.Topic
@@ -38,7 +39,7 @@ type wxFake struct {
 	readCalls   int
 }
 
-func (f *wxFake) WarningsAt(_ context.Context, q weather.Query, fams []string, at time.Time) ([]weather.Warning, []weather.Level, bool, error) {
+func (f *wxFake) WarningsAt(_ context.Context, q weather.Query, fams []string, at time.Time) (weather.Scope, error) {
 	f.readCalls++
 	f.gotQuery, f.gotFamilies, f.gotNow = q, fams, at
 	levels := f.levels
@@ -47,7 +48,7 @@ func (f *wxFake) WarningsAt(_ context.Context, q weather.Query, fams []string, a
 			levels = append(levels, w.Level)
 		}
 	}
-	return f.warnings, levels, f.more, f.readErr
+	return weather.Scope{Warnings: f.warnings, Levels: levels, HasMore: f.more, NextChange: f.next}, f.readErr
 }
 
 // Provenance answers every family fresh at now, except those in f.stale,
@@ -147,6 +148,36 @@ func TestTheWeatherLampSeesStaleAndMissingFamilies(t *testing.T) {
 	f := &wxFake{warnings: []weather.Warning{{ID: "a", Family: "w1", Level: 4}}, stale: []string{"w2"}}
 	if r, err := wxService(f).WeatherRisk(context.Background(), both, weather.Query{}); err != nil || r.Lamp != weather.LampRed || !slices.Equal(names(r.Families), []string{"w1"}) {
 		t.Errorf("stale and a level-4 warning: %s %v %v", r.Lamp, names(r.Families), err)
+	}
+}
+
+func TestTheWeatherAnswerSaysWhenTheClockChangesIt(t *testing.T) {
+	req.Covers(t, "FR-WEATHER-001")
+	both := key("consumer", []access.Scope{"weather"}, "w1", "w2")
+	// Every family is fresh at now and turns stale 61 s later (a threshold
+	// of one minute): a warning starting earlier is the answer's change.
+	soon, late := now.Add(30*time.Second), now.Add(time.Hour)
+	turn := now.Add(61 * time.Second)
+	for name, c := range map[string]struct {
+		f       *wxFake
+		changes *time.Time
+	}{
+		"a warning starts first": {&wxFake{next: &soon}, &soon},
+		"a family turns stale":   {&wxFake{next: &late}, &turn},
+		"no warning changes":     {&wxFake{}, &turn},
+		"every family stale":     {&wxFake{next: &late, stale: []string{"w1", "w2"}}, &late},
+		"nothing changes":        {&wxFake{stale: []string{"w1", "w2"}}, nil},
+	} {
+		r, err := wxService(c.f).WeatherRisk(context.Background(), both, weather.Query{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if (r.ChangesAt == nil) != (c.changes == nil) || (c.changes != nil && !r.ChangesAt.Equal(*c.changes)) {
+			t.Errorf("%s: changes at %v, want %v", name, r.ChangesAt, c.changes)
+		}
+		if r.WarningChange != c.f.next || !slices.Equal(r.Read, []string{"w1", "w2"}) {
+			t.Errorf("%s: warning change %v, read %v", name, r.WarningChange, r.Read)
+		}
 	}
 }
 

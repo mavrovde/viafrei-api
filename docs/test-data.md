@@ -77,6 +77,13 @@ answered on that file and must stay valid:
 - a weather warning in force, the same warning cancelled, and one withdrawn
   from publication, in one area over the same window.
 
+`seed.sql` carries none of what the road lamp reads beyond the situations
+and the warnings: no junction has a state code, no source covers a state's
+traffic messages, no source has a confirmation, and every situation is a
+traffic message. A lamp over the bare set is therefore never green. The
+tests that need more plant it themselves (the store's integration tests, and
+the documented examples, see `docs/examples.md`).
+
 The generator fails closed: an unknown profile is a usage error (exit 2), and
 a set with an empty table, a Land or family without rows, a missing licence
 class or a missing edge case is an error (exit 1), not an empty success.

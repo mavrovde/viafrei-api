@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -102,7 +103,7 @@ type Notes struct {
 
 // DataWarning is one entry of meta.warnings of a data answer.
 type DataWarning struct {
-	Code   string `json:"code" enum:"partial,data_stale" doc:"Stable warning code; clients tolerate codes they do not know."`
+	Code   string `json:"code" enum:"partial,data_stale,served_stale" doc:"Stable warning code; clients tolerate codes they do not know."`
 	Detail string `json:"detail" doc:"What the warning means for this answer."`
 }
 
@@ -139,9 +140,11 @@ const (
 
 func (s *server) dataMeta(ctx context.Context, fams []provenance.Family, at time.Time, partial bool, partialText string) DataMeta {
 	m := DataMeta{ResponseMeta: s.envelopeMeta(ctx), Freshness: []FreshnessEntry{}, Attribution: []Attribution{}, Warnings: []DataWarning{}}
+	noteFamilies(ctx, fams)
 	var fs []provenance.Freshness
 	for _, f := range fams {
 		fr := f.Assess(at)
+		noteFreshness(ctx, f, fr, at)
 		fs = append(fs, fr)
 		m.Freshness = append(m.Freshness, FreshnessEntry{Family: fr.Family, DataAsOf: fr.DataAsOf, AgeS: fr.AgeS, StaleAfterS: fr.StaleAfterS, Stale: fr.Stale})
 		m.Attribution = append(m.Attribution, attribution(f.Source))
@@ -155,6 +158,21 @@ func (s *server) dataMeta(ctx context.Context, fams []provenance.Family, at time
 		m.Warnings = append(m.Warnings, DataWarning{Code: "data_stale", Detail: staleDetail})
 	}
 	return m
+}
+
+// noteFreshness tells the cache how the family's freshness entry changes with
+// the clock: its stale flag is part of the ETag, and a family not yet stale
+// turns stale once its age passes staleAfterS whole seconds. Data dated after
+// at counts from its own instant (Assess gives it the age zero until then).
+func noteFreshness(ctx context.Context, f provenance.Family, fr provenance.Freshness, at time.Time) {
+	noteShown(ctx, "freshness "+fr.Family+" stale="+strconv.FormatBool(fr.Stale))
+	if fr.Stale || f.DataAsOf == nil {
+		return
+	}
+	if f.DataAsOf.After(at) {
+		noteChangesAt(ctx, *f.DataAsOf)
+	}
+	noteChangesAt(ctx, f.DataAsOf.Add(time.Duration(fr.StaleAfterS+1)*time.Second))
 }
 
 // featureProblem maps a refusal of the feature use cases to its problem.
@@ -199,7 +217,7 @@ func featureResponses(api huma.API, op *huma.Operation, notFound string) {
 	}
 	op.Responses["404"] = &huma.Response{Description: notFound, Content: problem}
 	op.Responses["503"] = &huma.Response{
-		Description: "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After.",
+		Description: "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
 		Headers:     map[string]*huma.Param{"Retry-After": {Schema: &huma.Schema{Type: huma.TypeInteger}}},
 		Content:     problem,
 	}
@@ -269,7 +287,7 @@ type ChargingInput struct {
 
 // Availability is the last reported state of a charge point.
 type Availability struct {
-	State      string    `json:"state" enum:"available,occupied,reserved,out_of_order,unknown,other,stale" doc:"Open enumeration; treat an unknown value as other. stale: the report is older than the status age limit (30 minutes by default) or than its family's freshness threshold, and is not counted in summary.availableNow."`
+	State      string    `json:"state" enum:"available,occupied,reserved,out_of_order,unknown,other,stale" doc:"Open enumeration; treat an unknown value as other. reserved is never sent: a point reported reserved is answered occupied, as the MCP capability answers it. stale: the report is older than the status age limit (30 minutes by default) or than its family's freshness threshold, and is not counted in summary.availableNow."`
 	ObservedAt time.Time `json:"observedAt" doc:"When the state was reported."`
 }
 
@@ -328,7 +346,8 @@ type ChargingOutput struct {
 	Body         ChargingEnvelope
 }
 
-func chargingSites(a features.Answer[energy.Site], maxAge time.Duration) []ChargingSite {
+func chargingSites(ctx context.Context, a features.Answer[energy.Site], maxAge time.Duration) []ChargingSite {
+	noteNextReport(ctx, a.NextReport)
 	// Each report is judged by the status age limit and its own family's
 	// threshold, whichever is shorter (energy.StatusLimit); every family that
 	// contributed is in a.Families (ENV-003).
@@ -353,6 +372,13 @@ func chargingSites(a features.Answer[energy.Site], maxAge time.Duration) []Charg
 			}
 			if r := p.Availability; r != nil && r.Says() {
 				cp.Availability = &Availability{State: string(r.Shown(a.At, limit(r.Family))), ObservedAt: r.ObservedAt.UTC()}
+				// A live report is shown as stale once it is older than its
+				// limit: the cached answer ends then, and the shown state is
+				// part of its ETag.
+				noteShown(ctx, "charging "+v.ID+"/"+p.ID+"="+cp.Availability.State)
+				if r.Live(a.At, limit(r.Family)) {
+					noteChangesAt(ctx, r.ObservedAt.Add(limit(r.Family)+time.Nanosecond))
+				}
 			}
 			item.ChargePoints = append(item.ChargePoints, cp)
 		}
@@ -376,7 +402,7 @@ func registerCharging(api huma.API, s *server, op huma.Operation) {
 			return nil, s.featureProblem(ctx, err)
 		}
 		return &ChargingOutput{CacheControl: noStore, Body: ChargingEnvelope{
-			Data: chargingSites(a, s.cfg.Charging.StatusMaxAge),
+			Data: chargingSites(ctx, a, s.cfg.Charging.StatusMaxAge),
 			Meta: ChargingMeta{
 				DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
 				Page:     Page{Limit: q.Limit, HasMore: a.HasMore},
@@ -459,6 +485,35 @@ func parkingSites(a features.Answer[parking.Site]) ([]ParkingSite, bool) {
 	return out, withheld
 }
 
+// noteNextReport tells the cache that the answer may change when a report
+// dated after the read takes effect: storage reads no report dated after now.
+func noteNextReport(ctx context.Context, next *time.Time) {
+	if next != nil {
+		noteChangesAt(ctx, *next)
+	}
+}
+
+// noteFreeMin tells the cache how a free_min answer changes with the clock:
+// a site is kept only while its report is no older than its family's
+// threshold, so each kept site leaves the answer once its report passes it
+// (storage compares at microsecond precision). The kept sites are part of
+// the ETag.
+func noteFreeMin(ctx context.Context, a features.Answer[parking.Site], freeMin int) {
+	if freeMin <= 0 {
+		return
+	}
+	thresholds := map[string]time.Duration{}
+	for _, f := range a.Families {
+		thresholds[f.Source.Family] = f.StaleAfter
+	}
+	for _, v := range a.Items {
+		noteShown(ctx, "parking "+v.ID)
+		if o := v.Occupancy; o != nil {
+			noteChangesAt(ctx, o.ObservedAt.Add(thresholds[o.Family]+time.Microsecond))
+		}
+	}
+}
+
 func registerParking(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "Where to park near a position"
 	op.Description = "Parking sites within the radius of a position, nearest first, then by id, each with its last reported occupancy. A site whose terms need accepting first is listed without its occupancy and marked termsRequired. Needs the scope parking."
@@ -474,6 +529,8 @@ func registerParking(api huma.API, s *server, op huma.Operation) {
 			return nil, s.featureProblem(ctx, err)
 		}
 		data, withheld := parkingSites(a)
+		noteNextReport(ctx, a.NextReport)
+		noteFreeMin(ctx, a, q.FreeMin)
 		detail := partialDetail
 		if withheld {
 			detail += " " + termsDetail
@@ -640,11 +697,12 @@ func registerOverview(api huma.API, s *server, op huma.Operation) {
 		}}
 		withheld := false
 		if o.Charging != nil {
-			data.Charging = &ChargingPart{Sites: chargingSites(*o.Charging, s.cfg.Charging.StatusMaxAge)}
+			data.Charging = &ChargingPart{Sites: chargingSites(ctx, *o.Charging, s.cfg.Charging.StatusMaxAge)}
 		}
 		if o.Parking != nil {
 			var sites []ParkingSite
 			sites, withheld = parkingSites(*o.Parking)
+			noteNextReport(ctx, o.Parking.NextReport)
 			data.Parking = &ParkingPart{Sites: sites}
 		}
 		// A part asked for and not ok makes the answer partial as well
@@ -658,6 +716,9 @@ func registerOverview(api huma.API, s *server, op huma.Operation) {
 		}
 		if missingPart(o.Parts) {
 			details = append(details, partDetail)
+			// A part that timed out or was unavailable may answer on the
+			// next request: this answer is neither stored nor validated.
+			noteDegraded(ctx)
 		}
 		meta := OverviewMeta{
 			DataMeta: s.dataMeta(ctx, o.Families, s.now(), len(details) > 0, strings.Join(details, " ")),

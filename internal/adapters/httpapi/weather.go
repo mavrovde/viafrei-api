@@ -6,6 +6,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 )
@@ -111,6 +112,7 @@ func registerWeatherRisk(api huma.API, s *server, op huma.Operation) {
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
 		}
+		noteWeatherLamp(ctx, a)
 		ws := make([]WeatherWarning, len(a.Items))
 		for i, w := range a.Items {
 			ws[i] = WeatherWarning{
@@ -128,6 +130,20 @@ func registerWeatherRisk(api huma.API, s *server, op huma.Operation) {
 			Links: s.selfLink(ctx),
 		}}, nil
 	})
+}
+
+// noteWeatherLamp tells the cache what a weather answer rests on besides the
+// families it attributes: every family the lamp read, by its data; the lamp,
+// which the clock alone can change; the earliest instant it does; and the
+// next start or end of a warning at the position, past which the answer is
+// never served, not even stale.
+func noteWeatherLamp(ctx context.Context, a features.WeatherRisk) {
+	noteRead(ctx, "weather", a.Read)
+	noteShown(ctx, "lamp "+string(a.Lamp))
+	noteChanges(ctx, a.ChangesAt)
+	if a.WarningChange != nil {
+		noteBound(ctx, *a.WarningChange)
+	}
 }
 
 // ------------------------------------------------------------- driving rules
@@ -188,6 +204,7 @@ func registerDrivingRules(api huma.API, s *server, op huma.Operation) {
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
 		}
+		noteRules(ctx)
 		rs := make([]DrivingRule, len(t.Rules))
 		for i, r := range t.Rules {
 			rs[i] = DrivingRule{Text: r.Text, LegalBasis: r.LegalBasis}

@@ -40,6 +40,8 @@ jobs:
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
       - name: shellcheck (scripts)
         run: shellcheck --version && shellcheck scripts/*.sh deploy/compose/*.sh
+      - name: Self-test of the previous-figures fetch (TST-021)
+        run: bash scripts/load-previous.test.sh
 
   test:
     name: Unit and handler tests
@@ -98,6 +100,38 @@ jobs:
           path: |
             test-integration.json
             coverage-integration.out
+          retention-days: 30
+          if-no-files-found: error
+
+  benchmark:
+    name: Benchmark leg (latency budgets)
+    # NFR-PERF-003..006: every operation through the real handler and store
+    # on the CI fixture profile, p95 and p99 asserted against
+    # test/perf/classes.tsv, without the race detector (a race-instrumented
+    # run is no latency measurement). docs/performance.md says what the leg
+    # measures and what it does not.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # pgtest.Image is pulled by its digest; the reaper, pinned and pulled by
+      # the integration job, is not needed on a runner discarded afterwards.
+      TESTCONTAINERS_RYUK_DISABLED: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: go test ./internal/perf -perf.assert
+        run: |
+          set -o pipefail
+          go test -count=1 -tags integration -v ./internal/perf -args -perf.assert -perf.samples=200 | tee benchmark.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: benchmark-report
+          path: benchmark.txt
           retention-days: 30
           if-no-files-found: error
 
@@ -194,8 +228,59 @@ jobs:
         run: scripts/openapi-diff.sh "$BASE_REF" api/openapi.json
       - name: Breaking changes against the last released document (TEST-004)
         run: scripts/openapi-released.sh api/openapi.json
+      - name: Docs link rewrite self-test (a misspelt link fails the build)
+        run: bash scripts/docs-html.test.sh
       - name: Docs build (the site release.yml publishes to GitHub Pages)
         run: scripts/docs-build.sh site
+
+  docs-portal:
+    name: Documentation portal (links, diagrams, accessibility)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # the baseline is compared with the base's
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22" # pa11y-ci 5 needs ^22.13
+      - name: Self-test of the pin and baseline guards
+        run: bash scripts/docs-a11y-guards.test.sh
+      - name: Unit test of the accessibility runner (100 % coverage)
+        run: bash scripts/docs-a11y-runner.test.sh coverage-a11y-runner.lcov
+      - name: Upload the runner's coverage for SonarCloud
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-a11y-runner
+          path: coverage-a11y-runner.lcov
+          if-no-files-found: error
+      - name: Self-test of the privacy check, offsite.js at 100 % coverage (#81)
+        run: bash scripts/docs-offsite.test.sh coverage-offsite.lcov
+      - name: Upload the privacy check's coverage for SonarCloud
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-offsite
+          path: coverage-offsite.lcov
+          if-no-files-found: error
+      - name: The checker is at the versions the licence exception names (security.yml)
+        run: scripts/docs-a11y-pins.sh scripts/a11y-tools/package-lock.json
+      - name: The reference baseline only goes down
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: scripts/docs-a11y-ratchet.sh "$BASE_REF"
+      - name: Self-test of the link and diagram check
+        run: bash scripts/docs-check.test.sh
+      - name: Docs build, with the link, id and diagram checks (#20)
+        run: scripts/docs-build.sh site
+      - name: Self-test of the accessibility check
+        run: bash scripts/docs-a11y.test.sh
+      - name: Accessibility, WCAG 2.2 AA, every page (NFR-A11Y-001)
+        run: scripts/docs-a11y.sh site
+      - name: No page requests anything from another host (#81)
+        run: scripts/docs-offsite.sh site
 
   vulncheck:
     name: govulncheck
@@ -329,9 +414,38 @@ jobs:
           persist-credentials: false
       - run: make compose-test COMMIT=${{ github.sha }}
 
+  load:
+    # The pull-request budget of the soak, stress, spike and fault scenarios
+    # (TST-007, issue #19) on the test stack this job starts; the long run is
+    # load-nightly.yml. Nothing but that stack's loopback is a target.
+    name: Load and faults (pull-request budget)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: Every scenario, pull-request budget
+        run: scripts/load-test.sh pr load-report.md
+      - name: Report in the job summary
+        if: always() && hashFiles('load-report.md') != ''
+        run: cat load-report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: load-report
+          path: |
+            load-report.md
+            load-report.json
+          retention-days: 30
+          if-no-files-found: ignore
+
   sonar:
     name: SonarCloud analysis
-    needs: [test, coverage]
+    needs: [test, coverage, docs-portal]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -358,8 +472,14 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: coverage
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-a11y-runner
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-offsite
       - name: The merged coverage report is there
-        run: test -s coverage.out && test -s test-unit.json
+        run: test -s coverage.out && test -s test-unit.json && test -s coverage-a11y-runner.lcov && test -s coverage-offsite.lcov
       - uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

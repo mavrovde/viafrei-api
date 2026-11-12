@@ -85,7 +85,9 @@ func WriteCompletionDraft(w io.Writer, r *Report, m Meta) error {
 	}
 	fmt.Fprintf(&b, "\n## 4. Requirement report\n- Automated MUST rows in scope with a passing test: %d of %d\n- Rows without a passing test, with reason: %s\n\n", passing, len(r.Scope), listOrNone(missing))
 	b.WriteString("## 5. Quality measures against targets\n*To complete* from the coverage and mutation results of the run.\n\n")
-	b.WriteString("## 6. Non-functional results\n*To complete*: load, chaos, security scans and DAST, accessibility.\n\n")
+	b.WriteString("## 6. Non-functional results\n*To complete*: load, chaos, security scans and DAST, accessibility.\n" +
+		"- Documentation portal, automated accessibility check (`scripts/docs-a11y.sh`): *to complete* (pages checked, guide-page findings, reference notes against the baseline)\n" +
+		"- Documentation portal, manual accessibility pass (minor releases, checklist in `docs/accessibility.md`): *to complete* (date, tester, keyboard and screen reader results, findings)\n\n")
 	fmt.Fprintf(&b, "## 7. Deviations\n- Findings of the automated gates: %s\n- SHOULD rows not met, open defects, gates changed: *to complete*\n\n", listOrNone(r.Findings))
 	b.WriteString("## 8. Escaped defects since the last report\n*To complete.*\n\n## 9. Lessons and actions\n*To complete.*\n\n## 10. Approval\n- Maintainer: *to complete*\n- Owner: *to complete*\n")
 	_, err := io.WriteString(w, b.String())

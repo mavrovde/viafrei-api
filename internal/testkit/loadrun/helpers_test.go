@@ -1,0 +1,275 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+)
+
+// tiny is a profile that runs every scenario in a few hundred milliseconds
+// against the fakes below.
+var tiny = profile{
+	rate: 200, warm: 20 * time.Millisecond, soak: 80 * time.Millisecond,
+	step: 20 * time.Millisecond, maxRate: 1600,
+	spikeBase: 10 * time.Millisecond, spikeBurst: 10 * time.Millisecond, recover: 20 * time.Millisecond,
+	fault: 40 * time.Millisecond, faultRate: 100, after: 5, burst: 5,
+	sample: 5 * time.Millisecond, ready: 60 * time.Millisecond, settle: 2 * time.Millisecond,
+}
+
+var testBudgets = map[string]budget{
+	classLookup:   {40 * time.Millisecond, 120 * time.Millisecond, 300 * time.Millisecond},
+	classNear:     {60 * time.Millisecond, 200 * time.Millisecond, 500 * time.Millisecond},
+	classComposed: {300 * time.Millisecond, 800 * time.Millisecond, 1500 * time.Millisecond},
+}
+
+var errFake = errors.New("fake failure")
+
+// fakeDocker answers docker compose calls in process.
+type fakeDocker struct {
+	mu     sync.Mutex
+	calls  []string
+	answer func(args string) (string, error)
+}
+
+func (f *fakeDocker) run(_ context.Context, args ...string) (string, error) {
+	a := strings.Join(args, " ")
+	f.mu.Lock()
+	f.calls = append(f.calls, a)
+	f.mu.Unlock()
+	return f.answer(a)
+}
+
+func (f *fakeDocker) called(sub string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, c := range f.calls {
+		if strings.Contains(c, sub) {
+			return true
+		}
+	}
+	return false
+}
+
+// healthyDocker answers like the test stack at rest.
+func healthyDocker(a string) (string, error) {
+	switch {
+	case strings.Contains(a, "state <> 'idle'"):
+		return "0\n", nil
+	case strings.Contains(a, "pg_stat_activity"):
+		return "2|0\n", nil
+	case strings.Contains(a, "pg_locks"):
+		return "1\n", nil
+	case strings.Contains(a, "begin; lock table"):
+		time.Sleep(20 * time.Millisecond)
+		return "", nil
+	case a == "ps -q api":
+		return "c1\n", nil
+	case a == "top c1 -o pid,rss":
+		return "PID RSS\n7 2048\n9 1024\n", nil
+	}
+	return "", nil
+}
+
+// problem writes an RFC 9457 problem of slug.
+func problem(w http.ResponseWriter, status int, slug string) {
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Retry-After", "1")
+	w.WriteHeader(status)
+	_, _ = fmt.Fprintf(w, `{"type":"https://api.example.test/problems/%s","status":%d}`, slug, status)
+}
+
+// breakerProblem writes the answer of an open breaker.
+func breakerProblem(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Retry-After", "2")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	_ = json.NewEncoder(w).Encode(map[string]any{"type": "https://api.example.test/problems/upstream-unavailable", "status": 503, "detail": breakerDetail})
+}
+
+// at is a change of the breaker's state, "from>to", at t.
+func at(step string, t time.Time) stateChange { return stateChange{at: t, step: step} }
+
+// breakerLog is the instance's log of the given changes of the breaker's
+// state, among other lines.
+func breakerLog(changes ...stateChange) string {
+	lines := []string{`{"msg":"listening"}`, "not json"}
+	for _, c := range changes {
+		from, to, _ := strings.Cut(c.step, ">")
+		lines = append(lines, fmt.Sprintf(`{"time":%q,"level":"INFO","msg":%q,"from":%q,"to":%q,"generation":1}`,
+			c.at.UTC().Format(time.RFC3339Nano), breakerLogLine, from, to))
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+// logs answers the runner's log read with log(now) and every other docker
+// call like the stack at rest.
+func logs(log func(now time.Time) string) func(string) (string, error) {
+	return func(a string) (string, error) {
+		if strings.HasPrefix(a, "logs ") {
+			return log(time.Now()), nil
+		}
+		return healthyDocker(a)
+	}
+}
+
+// answer writes a 2xx answer with the meta a scenario reads.
+func answer(w http.ResponseWriter, meta map[string]any) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{}, "meta": meta})
+}
+
+var composedOK = map[string]any{"parts": []any{
+	map[string]any{"part": "charging", "status": "ok"},
+	map[string]any{"part": "parking", "status": "timeout"},
+}}
+
+// healthyAPI answers every request like a healthy instance.
+func healthyAPI(w http.ResponseWriter, r *http.Request) {
+	switch {
+	case strings.Contains(r.URL.Path, "/overview"):
+		answer(w, composedOK)
+	default:
+		answer(w, map[string]any{})
+	}
+}
+
+// toxi is a fake fault proxy: fail decides which calls fail.
+type toxi struct {
+	mu    sync.Mutex
+	calls []string
+	fail  func(method, path, body string) bool
+}
+
+func (x *toxi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	b, _ := io.ReadAll(r.Body)
+	x.mu.Lock()
+	x.calls = append(x.calls, r.Method+" "+r.URL.Path+" "+string(b))
+	x.mu.Unlock()
+	if x.fail != nil && x.fail(r.Method, r.URL.Path, string(b)) {
+		http.Error(w, "proxy refused", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// restored reports whether the last call to the fault proxy repaired it:
+// a reset, or a route enabled again.
+func (x *toxi) restored() bool {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if len(x.calls) == 0 {
+		return false
+	}
+	last := x.calls[len(x.calls)-1]
+	return strings.Contains(last, "/reset") || strings.Contains(last, `"enabled":true`)
+}
+
+// cut reports whether the last call to the fault proxy about the storage
+// route, or a reset, left it cut.
+func (x *toxi) cut() bool {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	for i := len(x.calls) - 1; i >= 0; i-- {
+		c := x.calls[i]
+		if strings.Contains(c, "/reset") || strings.Contains(c, "/proxies/"+proxyStorage+" ") {
+			return strings.Contains(c, `"enabled":false`)
+		}
+	}
+	return false
+}
+
+// staleCache is a fake instance with a result cache behind the fault
+// proxy: while storage is cut it replays a request it answered no longer
+// than fresh ago as fresh, from memory, as the real one does within its
+// max-age; past that it serves a request it answered no longer than allow
+// ago with served_stale and its Age, except a charging search, and 503 for
+// everything else.
+type staleCache struct {
+	mu    sync.Mutex
+	read  map[string]time.Time
+	fresh time.Duration
+	allow time.Duration
+	down  func() bool
+}
+
+func (c *staleCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	key := r.URL.RequestURI()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.down() {
+		c.read[key] = time.Now()
+		answer(w, map[string]any{"warnings": []any{}})
+		return
+	}
+	t, seen := c.read[key]
+	if seen && time.Since(t) <= c.fresh {
+		w.Header().Set("Age", strconv.Itoa(int(time.Since(t)/time.Second)))
+		answer(w, map[string]any{"warnings": []any{}})
+		return
+	}
+	if !seen || strings.Contains(key, "charging") || time.Since(t) > c.allow {
+		problem(w, http.StatusServiceUnavailable, "upstream-unavailable")
+		return
+	}
+	stale(w, strconv.Itoa(int(time.Since(t)/time.Second)))
+}
+
+// stale writes a stale answer with the given Age.
+func stale(w http.ResponseWriter, age string) {
+	w.Header().Set("Age", age)
+	answer(w, map[string]any{"warnings": []any{map[string]any{"code": "partial"}, map[string]any{"code": "served_stale"}}})
+}
+
+// world is a runner against a fake API, a fake fault proxy and fake docker.
+type world struct {
+	r      *runner
+	api    *httptest.Server
+	cached *httptest.Server // the instance with the result cache
+	proxy  *toxi
+	dock   *fakeDocker
+	hits   atomic.Int64
+}
+
+func newWorld(t *testing.T, api http.HandlerFunc, dock func(string) (string, error)) *world {
+	t.Helper()
+	w := &world{proxy: &toxi{}, dock: &fakeDocker{answer: dock}}
+	w.api = httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		w.hits.Add(1)
+		api(rw, r)
+	}))
+	t.Cleanup(w.api.Close)
+	ps := httptest.NewServer(w.proxy)
+	t.Cleanup(ps.Close)
+	w.r = newRunner(tiny, testBudgets, w.api.URL, ps.URL, "vf_test_warm", "vf_test_cold", "pl-1", 4, 100*time.Millisecond, 20*time.Millisecond)
+	w.r.docker = w.dock.run
+	w.r.host = w.dock.run
+	w.r.brk = breakerSettings{failures: 5, openFor: 10 * time.Millisecond, probes: 2}
+	w.r.staleFor, w.r.freshFor = 60*time.Millisecond, 10*time.Millisecond
+	w.cached = httptest.NewServer(&staleCache{read: map[string]time.Time{}, fresh: w.r.freshFor, allow: w.r.staleFor, down: w.proxy.cut})
+	t.Cleanup(w.cached.Close)
+	w.r.cached = w.cached.URL
+	return w
+}
+
+// checkNamed returns the check whose name contains sub, failing the test
+// when there is none.
+func checkNamed(t *testing.T, o *outcome, sub string) check {
+	t.Helper()
+	for _, c := range o.checks {
+		if strings.Contains(c.name, sub) {
+			return c
+		}
+	}
+	t.Fatalf("no check named %q among %+v", sub, o.checks)
+	return check{}
+}

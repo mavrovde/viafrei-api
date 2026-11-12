@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/ampel"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 )
 
@@ -18,13 +19,16 @@ type Roads interface {
 	// situations on the road of the roads families, in the order of their
 	// position along it, and whether there are more; the lamp's view of
 	// every situation in the scope (the road and direction, whatever the
-	// filters keep); the DWD warnings of the weather families in force in
-	// an area the road crosses (none read when no weather family is given);
-	// and the freshness of every family given.
+	// filters keep); the weather warnings of the weather families in force
+	// in an area the road crosses (none read when no weather family is
+	// given); the freshness of every family given; the states of the road's
+	// junctions, the roads families given that cover their traffic messages,
+	// and the newest confirmation of those and of the weather families.
 	SituationsOnRoad(ctx context.Context, q roads.CorridorQuery, fams roads.Families, now time.Time) (roads.Page, error)
 	// SituationsNear is SituationsOnRoad for the radius of a position, by
 	// severity then distance; the warnings are those of an area within the
-	// radius.
+	// radius, and the states those of the junctions within it, else of the
+	// junction nearest the position.
 	SituationsNear(ctx context.Context, q roads.AreaQuery, fams roads.Families, now time.Time) (roads.Page, error)
 	// Situation returns one situation of the given families that is active
 	// or ended after endedSince, or roads.ErrUnknownSituation.
@@ -39,47 +43,56 @@ type Conditions struct {
 	Road   *roads.Road
 	Lamp   roads.Lamp
 	Reason *roads.Reason
+	// Read are every family the lamp read, whether or not it contributed
+	// (Families names only those): a new version of any of them, or of its
+	// confirmation, may change the lamp.
+	Read roads.Families
 }
 
 // sights are the sight of every group the lamp reads (ampelOf's sight):
 // one entry per permitted roads family (missing without a freshness row or
 // data, stale past its threshold); one missing entry when a roads family
-// the key may not read was left out (partial); and the DWD warnings'
-// sight (dwdSightOf), whose read answered only when every weather family
-// was permitted and read, and whose source is fresh only when every
-// weather family read is.
-func sights(p roads.Page, fams roads.Families, partial, weatherRead bool, now time.Time) []roads.SightEntry {
-	fresh := map[string]roads.Sight{}
+// the key may not read was left out (partial); the weather warnings' sight,
+// fresh only when the read answered (every weather family permitted and
+// read) and, for each weather family, a warning is held or the family is
+// current by its newest confirmation, missing otherwise; and the traffic
+// messages' sight of every state in scope, judged over the roads families
+// read that cover it (one missing entry when no state is in scope).
+func sights(p roads.Page, fams roads.Families, partial, weatherRead bool, now time.Time) []ampel.SightEntry {
+	fresh := map[string]ampel.Sight{}
 	for _, f := range p.Sources {
 		fresh[f.Source.Family] = roads.SourceSight(f.Assess(now))
 	}
-	of := func(family string) roads.Sight {
-		if s, ok := fresh[family]; ok {
-			return s
-		}
-		return roads.SightMissing
-	}
-	var out []roads.SightEntry
+	var out []ampel.SightEntry
 	for _, f := range fams.Roads {
-		out = append(out, roads.SightEntry{Group: roads.GroupRoads, State: of(f)})
+		s, ok := fresh[f]
+		if !ok {
+			s = ampel.SightMissing
+		}
+		out = append(out, ampel.SightEntry{Group: roads.GroupRoads, State: s})
 	}
 	if partial {
-		out = append(out, roads.SightEntry{Group: roads.GroupRoads, State: roads.SightMissing})
+		out = append(out, ampel.SightEntry{Group: roads.GroupRoads, State: ampel.SightMissing})
 	}
-	source := roads.SightMissing
+	weather := ampel.SightMissing
 	if len(fams.Weather) > 0 {
-		source = roads.SightFresh
+		weather = ampel.SightFresh
 	}
 	for _, f := range fams.Weather {
-		if of(f) != roads.SightFresh {
-			source = of(f)
+		var c *ampel.Confirmation
+		if v, ok := p.Confirmations[f]; ok {
+			c = &v
+		}
+		if s := ampel.WarningSightOf(weatherRead, len(p.Warnings), c, now); s != ampel.SightFresh {
+			weather = s
 		}
 	}
-	return append(out, roads.SightEntry{Group: roads.GroupDWD, State: roads.DWDSightOf(weatherRead, len(p.Warnings), source)})
+	out = append(out, ampel.SightEntry{Group: ampel.GroupWeather, State: weather})
+	return append(out, ampel.MessageSight(p.States, p.Coverage, p.Confirmations, now)...)
 }
 
 // conditions reads a page of situations of the permitted roads families and
-// the DWD warnings of the permitted weather families in one snapshot,
+// the weather warnings of the permitted weather families in one snapshot,
 // post-checks and attributes it, and computes the lamp over every situation
 // and warning in the scope with the sight of every group read.
 func (s *Service) conditions(ctx context.Context, key access.Record, read func(fams roads.Families, now time.Time) (roads.Page, error)) (Conditions, error) {
@@ -92,7 +105,7 @@ func (s *Service) conditions(ctx context.Context, key access.Record, read func(f
 		return Conditions{}, err
 	}
 	// A key without the weather scope, or that may read no weather family,
-	// reads no warning: the DWD group is then missing, never an error of
+	// reads no warning: the weather group is then missing, never an error of
 	// the roads question.
 	var weather []string
 	weatherRead := false
@@ -134,8 +147,9 @@ func (s *Service) conditions(ctx context.Context, key access.Record, read func(f
 	}
 	lamp, reason := roads.LampOf(p.Messages, levels, sights(p, fams, partial, weatherRead, now))
 	return Conditions{
-		Answer: Answer[roads.Situation]{Items: p.Items, HasMore: p.HasMore, Families: attributed, Partial: partial, At: now},
-		Lamp:   lamp, Reason: reason,
+		Answer: Answer[roads.Situation]{Items: p.Items, HasMore: p.HasMore, Families: attributed, Partial: partial, At: now,
+			ChangesAt: p.ChangesAt(now)},
+		Lamp: lamp, Reason: reason, Read: fams,
 	}, nil
 }
 
@@ -192,5 +206,11 @@ func (s *Service) RoadSituation(ctx context.Context, key access.Record, id strin
 	if err != nil {
 		return Answer[roads.Situation]{}, err
 	}
-	return Answer[roads.Situation]{Items: []roads.Situation{sit}, Families: fams, At: now}, nil
+	out := Answer[roads.Situation]{Items: []roads.Situation{sit}, Families: fams, At: now}
+	// An ended situation is answered until it leaves the retention.
+	if sit.Until != nil {
+		gone := sit.Until.Add(s.set.EndedRetention)
+		out.ChangesAt = &gone
+	}
+	return out, nil
 }

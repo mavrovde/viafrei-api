@@ -8,6 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 )
 
@@ -106,6 +107,29 @@ func roadSituations(list []roads.Situation) []RoadSituation {
 	return out
 }
 
+// noteLamp tells the cache what a conditions answer rests on besides the
+// families it attributes: every family the lamp read, with its
+// confirmation; the lamp's reference rows; the lamp and its reason, which
+// the clock alone can change; and the earliest instant it does.
+func noteLamp(ctx context.Context, c features.Conditions) {
+	noteSight(ctx, "roads", c.Read.Roads)
+	noteSight(ctx, "weather", c.Read.Weather)
+	reason := ""
+	if c.Reason != nil {
+		reason = string(*c.Reason)
+	}
+	noteShown(ctx, "lamp "+string(c.Lamp)+" "+reason)
+	noteChanges(ctx, c.ChangesAt)
+}
+
+// noteChanges records the instant an answer changes with the clock alone,
+// when there is one.
+func noteChanges(ctx context.Context, t *time.Time) {
+	if t != nil {
+		noteChangesAt(ctx, *t)
+	}
+}
+
 func lampReason(r *roads.Reason) *string {
 	if r == nil {
 		return nil
@@ -175,8 +199,8 @@ type Corridor struct {
 // MotorwayData is the answer of getMotorwayConditions.
 type MotorwayData struct {
 	Corridor   Corridor        `json:"corridor"`
-	Lamp       string          `json:"lamp" enum:"green,amber,red" doc:"The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope and every official DWD warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a jam with a delay of 30 minutes or more; a DWD warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a DWD warning of level 1 or 2; any other message (an accident without a closure, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the DWD warnings not readable with the key or their source not fresh. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is fresh, which is no guarantee that the road is free."`
-	LampReason *string         `json:"lampReason" nullable:"true" enum:"road_closed,safety,bridge_closed,long_jam,weather_warning,ramp_closed,jam,slippery,warning,narrowing,limited_sight" doc:"Why the lamp has its colour: the first of its reasons, red ones first, then amber ones in the platform's order (ramp_closed, jam, weather_warning, slippery, warning, narrowing, limited_sight); null for green. bridge_closed and slippery are never given while the read contract holds no bridge states and no road-weather forecast. Open enumeration."`
+	Lamp       string          `json:"lamp" enum:"green,amber,red" doc:"The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope as its record is read (the motorway operator's event, any other traffic message, a bridge's state) and every official weather warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a closed bridge; a jam with a delay of 30 minutes or more; a weather warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a weather warning of level 1 or 2; any other message (an accident without a closure, a restricted bridge, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the weather warnings not readable with the key or their source not current, or a state in scope whose traffic messages no current roads family the key may read covers. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is current, which is no guarantee that the road is free."`
+	LampReason *string         `json:"lampReason" nullable:"true" enum:"road_closed,ramp_closed,safety,bridge_closed,long_jam,jam,weather_warning,slippery,warning,narrowing,limited_sight" doc:"Why the lamp has its colour: the first of its reasons, a red one before any amber one, and inside a colour in the platform's order, which is this enumeration's order; null for green. slippery is never given while the read contract holds no road-weather forecast. Open enumeration."`
 	Situations []RoadSituation `json:"situations" doc:"Ordered by position along the road (those that cannot be placed last), then severity descending, then id."`
 }
 
@@ -209,7 +233,7 @@ type MotorwayOutput struct {
 
 func registerMotorwayConditions(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "What is happening on a motorway"
-	op.Description = "The active situations on one road, ordered by their position along it, with the lamp over every situation on the road in the asked direction and every DWD warning in force in an area the road crosses. MCP counterpart: road status. Needs the scope roads; the DWD warnings are read with the scope weather, and without it the lamp says its sight is limited."
+	op.Description = "The active situations on one road, ordered by their position along it, with the lamp over every situation on the road in the asked direction and every official weather warning in force in an area the road crosses. MCP counterpart: road status. Needs the scope roads; the weather warnings are read with the scope weather, and without it the lamp says its sight is limited."
 	featureResponses(api, &op, "No road with this reference (not-found), or the operation is switched off on this instance (feature-disabled).")
 	huma.Register(api, op, func(ctx context.Context, in *MotorwayInput) (*MotorwayOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
@@ -220,6 +244,7 @@ func registerMotorwayConditions(api huma.API, s *server, op huma.Operation) {
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
 		}
+		noteLamp(ctx, c)
 		return &MotorwayOutput{CacheControl: noStore, Body: MotorwayEnvelope{
 			Data: MotorwayData{
 				Corridor:   Corridor{Road: c.Road.Ref, RoadType: string(c.Road.Class), Direction: string(q.Direction), States: append([]string{}, c.Road.States...)},
@@ -255,8 +280,8 @@ type Area struct {
 // RoadConditionsData is the answer of listRoadConditions.
 type RoadConditionsData struct {
 	Area       Area            `json:"area"`
-	Lamp       string          `json:"lamp" enum:"green,amber,red" doc:"The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope and every official DWD warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a jam with a delay of 30 minutes or more; a DWD warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a DWD warning of level 1 or 2; any other message (an accident without a closure, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the DWD warnings not readable with the key or their source not fresh. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is fresh, which is no guarantee that the road is free."`
-	LampReason *string         `json:"lampReason" nullable:"true" enum:"road_closed,safety,bridge_closed,long_jam,weather_warning,ramp_closed,jam,slippery,warning,narrowing,limited_sight" doc:"Why the lamp has its colour: the first of its reasons, red ones first, then amber ones in the platform's order (ramp_closed, jam, weather_warning, slippery, warning, narrowing, limited_sight); null for green. bridge_closed and slippery are never given while the read contract holds no bridge states and no road-weather forecast. Open enumeration."`
+	Lamp       string          `json:"lamp" enum:"green,amber,red" doc:"The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope as its record is read (the motorway operator's event, any other traffic message, a bridge's state) and every official weather warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a closed bridge; a jam with a delay of 30 minutes or more; a weather warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a weather warning of level 1 or 2; any other message (an accident without a closure, a restricted bridge, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the weather warnings not readable with the key or their source not current, or a state in scope whose traffic messages no current roads family the key may read covers. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is current, which is no guarantee that the road is free."`
+	LampReason *string         `json:"lampReason" nullable:"true" enum:"road_closed,ramp_closed,safety,bridge_closed,long_jam,jam,weather_warning,slippery,warning,narrowing,limited_sight" doc:"Why the lamp has its colour: the first of its reasons, a red one before any amber one, and inside a colour in the platform's order, which is this enumeration's order; null for green. slippery is never given while the read contract holds no road-weather forecast. Open enumeration."`
 	Situations []RoadSituation `json:"situations" doc:"Ordered by severity descending, then distance, then id."`
 }
 
@@ -289,7 +314,7 @@ type RoadConditionsOutput struct {
 
 func registerRoadConditions(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "What is happening on the roads near a position"
-	op.Description = "The active situations within the radius of a position on every road class held, by severity descending, then distance, then id, with the lamp over every situation within the radius and every DWD warning in force in an area within it. MCP counterpart: road status (area form). Needs the scope roads; the DWD warnings are read with the scope weather, and without it the lamp says its sight is limited."
+	op.Description = "The active situations within the radius of a position on every road class held, by severity descending, then distance, then id, with the lamp over every situation within the radius and every official weather warning in force in an area within it. MCP counterpart: road status (area form). Needs the scope roads; the weather warnings are read with the scope weather, and without it the lamp says its sight is limited."
 	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, in *RoadConditionsInput) (*RoadConditionsOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
@@ -305,6 +330,7 @@ func registerRoadConditions(api huma.API, s *server, op huma.Operation) {
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
 		}
+		noteLamp(ctx, c)
 		return &RoadConditionsOutput{CacheControl: noStore, Body: RoadConditionsEnvelope{
 			Data: RoadConditionsData{
 				Area:       Area{At: position(q.At), RadiusM: q.RadiusM},
@@ -354,6 +380,7 @@ func registerRoadSituation(api huma.API, s *server, op huma.Operation) {
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
 		}
+		noteChanges(ctx, a.ChangesAt)
 		return &SituationOutput{CacheControl: noStore, Body: SituationEnvelope{
 			Data:  roadSituation(a.Items[0]),
 			Meta:  s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),

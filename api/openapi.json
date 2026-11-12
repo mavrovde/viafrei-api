@@ -94,7 +94,7 @@
                 "type": "string"
               },
               "state": {
-                "description": "Open enumeration; treat an unknown value as other. stale: the report is older than the status age limit (30 minutes by default) or than its family's freshness threshold, and is not counted in summary.availableNow.",
+                "description": "Open enumeration; treat an unknown value as other. reserved is never sent: a point reported reserved is answered occupied, as the MCP capability answers it. stale: the report is older than the status age limit (30 minutes by default) or than its family's freshness threshold, and is not counted in summary.availableNow.",
                 "enum": [
                   "available",
                   "occupied",
@@ -495,7 +495,8 @@
             "description": "Stable warning code; clients tolerate codes they do not know.",
             "enum": [
               "partial",
-              "data_stale"
+              "data_stale",
+              "served_stale"
             ],
             "type": "string"
           },
@@ -865,7 +866,7 @@
             "$ref": "#/components/schemas/Corridor"
           },
           "lamp": {
-            "description": "The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope and every official DWD warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a jam with a delay of 30 minutes or more; a DWD warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a DWD warning of level 1 or 2; any other message (an accident without a closure, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the DWD warnings not readable with the key or their source not fresh. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is fresh, which is no guarantee that the road is free.",
+            "description": "The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope as its record is read (the motorway operator's event, any other traffic message, a bridge's state) and every official weather warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a closed bridge; a jam with a delay of 30 minutes or more; a weather warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a weather warning of level 1 or 2; any other message (an accident without a closure, a restricted bridge, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the weather warnings not readable with the key or their source not current, or a state in scope whose traffic messages no current roads family the key may read covers. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is current, which is no guarantee that the road is free.",
             "enum": [
               "green",
               "amber",
@@ -874,15 +875,15 @@
             "type": "string"
           },
           "lampReason": {
-            "description": "Why the lamp has its colour: the first of its reasons, red ones first, then amber ones in the platform's order (ramp_closed, jam, weather_warning, slippery, warning, narrowing, limited_sight); null for green. bridge_closed and slippery are never given while the read contract holds no bridge states and no road-weather forecast. Open enumeration.",
+            "description": "Why the lamp has its colour: the first of its reasons, a red one before any amber one, and inside a colour in the platform's order, which is this enumeration's order; null for green. slippery is never given while the read contract holds no road-weather forecast. Open enumeration.",
             "enum": [
               "road_closed",
+              "ramp_closed",
               "safety",
               "bridge_closed",
               "long_jam",
-              "weather_warning",
-              "ramp_closed",
               "jam",
+              "weather_warning",
               "slippery",
               "warning",
               "narrowing",
@@ -1672,7 +1673,7 @@
             "$ref": "#/components/schemas/Area"
           },
           "lamp": {
-            "description": "The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope and every official DWD warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a jam with a delay of 30 minutes or more; a DWD warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a DWD warning of level 1 or 2; any other message (an accident without a closure, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the DWD warnings not readable with the key or their source not fresh. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is fresh, which is no guarantee that the road is free.",
+            "description": "The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope as its record is read (the motorway operator's event, any other traffic message, a bridge's state) and every official weather warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a closed bridge; a jam with a delay of 30 minutes or more; a weather warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a weather warning of level 1 or 2; any other message (an accident without a closure, a restricted bridge, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the weather warnings not readable with the key or their source not current, or a state in scope whose traffic messages no current roads family the key may read covers. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is current, which is no guarantee that the road is free.",
             "enum": [
               "green",
               "amber",
@@ -1681,15 +1682,15 @@
             "type": "string"
           },
           "lampReason": {
-            "description": "Why the lamp has its colour: the first of its reasons, red ones first, then amber ones in the platform's order (ramp_closed, jam, weather_warning, slippery, warning, narrowing, limited_sight); null for green. bridge_closed and slippery are never given while the read contract holds no bridge states and no road-weather forecast. Open enumeration.",
+            "description": "Why the lamp has its colour: the first of its reasons, a red one before any amber one, and inside a colour in the platform's order, which is this enumeration's order; null for green. slippery is never given while the read contract holds no road-weather forecast. Open enumeration.",
             "enum": [
               "road_closed",
+              "ramp_closed",
               "safety",
               "bridge_closed",
               "long_jam",
-              "weather_warning",
-              "ramp_closed",
               "jam",
+              "weather_warning",
               "slippery",
               "warning",
               "narrowing",
@@ -2531,6 +2532,14 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The process answers",
+                    "value": {
+                      "status": "ok"
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/HealthBody"
                 }
@@ -2559,7 +2568,16 @@
         "summary": "Liveness",
         "tags": [
           "service"
-        ]
+        ],
+        "x-attribution": "No source data: this answer carries no attribution.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/healthz\""
+          }
+        ],
+        "x-example-request": "/healthz"
       }
     },
     "/readyz": {
@@ -2570,6 +2588,14 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "Storage answers with a compatible read contract",
+                    "value": {
+                      "status": "ready"
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/ReadinessBody"
                 }
@@ -2615,7 +2641,16 @@
         "summary": "Readiness",
         "tags": [
           "service"
-        ]
+        ],
+        "x-attribution": "No source data: this answer carries no attribution.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/readyz\""
+          }
+        ],
+        "x-example-request": "/readyz"
       }
     },
     "/v1/charging-options": {
@@ -2698,6 +2733,124 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "Two charging sites within 20 km",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "cs-05-0012",
+                          "name": "Gielfürau Laden",
+                          "operator": "Weimweing Strom",
+                          "location": {
+                            "lat": 50.829574,
+                            "lon": 6.034346
+                          },
+                          "distanceM": 2644,
+                          "access": "public",
+                          "summary": {
+                            "chargePoints": 4,
+                            "availableNow": 1,
+                            "maxPowerKw": 300
+                          },
+                          "chargePoints": [
+                            {
+                              "id": "cp-00012-0",
+                              "current": "dc",
+                              "maxPowerKw": 150,
+                              "availability": {
+                                "state": "available",
+                                "observedAt": "2026-03-29T23:55:00Z"
+                              }
+                            },
+                            {
+                              "id": "cp-00012-1",
+                              "current": "dc",
+                              "maxPowerKw": 150,
+                              "availability": {
+                                "state": "occupied",
+                                "observedAt": "2026-03-29T23:48:00Z"
+                              }
+                            },
+                            {
+                              "id": "cp-00012-2",
+                              "current": "ac",
+                              "maxPowerKw": 11,
+                              "availability": {
+                                "state": "stale",
+                                "observedAt": "2026-03-29T18:57:01Z"
+                              }
+                            },
+                            {
+                              "id": "cp-00012-3",
+                              "current": "dc",
+                              "maxPowerKw": 300,
+                              "availability": {
+                                "state": "stale",
+                                "observedAt": "2026-03-29T06:47:06Z"
+                              }
+                            }
+                          ],
+                          "sourceFamily": "src-beta-energy"
+                        }
+                      ],
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:55:00Z",
+                        "freshness": [
+                          {
+                            "family": "src-beta-energy",
+                            "dataAsOf": "2026-03-29T23:55:00Z",
+                            "ageS": 300,
+                            "staleAfterS": 3600,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "src-beta-energy",
+                            "domain": "energy",
+                            "publisher": "Stönwän Datenwerk",
+                            "text": "Synthetic data from family beta, licence lic-beta.",
+                            "licence": "Synthetic licence beta",
+                            "licenceUrl": "https://licences.example/beta",
+                            "shareAlike": true,
+                            "shareAlikeOffer": "https://beta.example/share-alike/energy",
+                            "termsUrl": "https://beta.example/terms"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 2,
+                          "hasMore": false
+                        },
+                        "query": {
+                          "at": {
+                            "lat": 50.82,
+                            "lon": 6
+                          },
+                          "radiusM": 20000,
+                          "minKw": 0,
+                          "access": "public"
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/charging-options"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/ChargingEnvelope"
                 }
@@ -2705,7 +2858,27 @@
             },
             "description": "OK",
             "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
               "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
                   "type": "string"
                 }
@@ -2718,6 +2891,41 @@
               },
               "RateLimit-Policy": {
                 "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
                   "type": "string"
                 }
@@ -2827,7 +3035,7 @@
                 }
               }
             },
-            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After.",
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
             "headers": {
               "RateLimit": {
                 "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
@@ -2885,6 +3093,15 @@
         "tags": [
           "energy"
         ],
+        "x-attribution": "Charging sites and the availability of their charge points come from the source families of the energy domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/charging-options?at=50.82,6.0\u0026radius_m=20000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/charging-options?at=50.82,6.0\u0026radius_m=20000\u0026limit=2",
         "x-mcp-counterpart": "charging station search",
         "x-required-scope": "energy"
       }
@@ -2915,6 +3132,74 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The driving rules on one topic",
+                    "value": {
+                      "data": {
+                        "topic": "winter_tyres",
+                        "title": "Synthetic rule topic winter_tyres",
+                        "rules": [
+                          {
+                            "text": "Synthetic statement 1 about winter_tyres, for tests only.",
+                            "legalBasis": "§ 0 synthetic"
+                          },
+                          {
+                            "text": "Synthetic statement 2 about winter_tyres, for tests only.",
+                            "legalBasis": null
+                          },
+                          {
+                            "text": "Synthetic statement 3 about winter_tyres, for tests only.",
+                            "legalBasis": null
+                          }
+                        ],
+                        "reviewedOn": "2026-02-01",
+                        "disclaimer": "Informational, not legal advice."
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-15T00:00:00Z",
+                        "freshness": [
+                          {
+                            "family": "src-alpha-rules",
+                            "dataAsOf": "2026-03-15T00:00:00Z",
+                            "ageS": 1296000,
+                            "staleAfterS": 7776000,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "src-alpha-rules",
+                            "domain": "rules",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ]
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/driving-rules"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/DrivingRulesEnvelope"
                 }
@@ -2922,7 +3207,27 @@
             },
             "description": "OK",
             "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
               "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
                   "type": "string"
                 }
@@ -2935,6 +3240,41 @@
               },
               "RateLimit-Policy": {
                 "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
                   "type": "string"
                 }
@@ -3044,7 +3384,7 @@
                 }
               }
             },
-            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After.",
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
             "headers": {
               "RateLimit": {
                 "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
@@ -3102,6 +3442,15 @@
         "tags": [
           "rules"
         ],
+        "x-attribution": "Driving rules are curated content published under every source family of the rules domain the key is entitled to, and each answer is attributed to all of them. Every answer lists each such family in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/driving-rules?topic=winter_tyres\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/driving-rules?topic=winter_tyres",
         "x-required-scope": "rules"
       }
     },
@@ -3113,6 +3462,83 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The presenting key, its plan and the source families it may receive",
+                    "value": {
+                      "data": {
+                        "keyId": "examplekey",
+                        "environment": "live",
+                        "plan": {
+                          "name": "example",
+                          "useClass": "commercial",
+                          "tier": "standard",
+                          "scopes": [
+                            "energy",
+                            "parking",
+                            "places"
+                          ]
+                        },
+                        "expiresAt": "2026-06-28T00:00:00Z",
+                        "sources": [
+                          {
+                            "family": "src-alpha-energy",
+                            "domain": "energy",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          },
+                          {
+                            "family": "src-alpha-parking",
+                            "domain": "parking",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          },
+                          {
+                            "family": "src-alpha-places",
+                            "domain": "places",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          },
+                          {
+                            "family": "src-zeta-places",
+                            "domain": "places",
+                            "publisher": "Deingmeir Datenwerk",
+                            "text": "Synthetic data from family zeta, licence lic-zeta.",
+                            "licence": "Synthetic licence zeta",
+                            "licenceUrl": "https://licences.example/zeta",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://zeta.example/terms"
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "warnings": []
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/key"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/KeyEnvelope"
                 }
@@ -3222,7 +3648,16 @@
         "summary": "The presenting key",
         "tags": [
           "access"
-        ]
+        ],
+        "x-attribution": "No source data is returned. data.sources lists the source families the key may receive, each with the publisher, licence and attribution text a client must show wherever it displays their data.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/key\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/key"
       }
     },
     "/v1/meta": {
@@ -3233,6 +3668,31 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "Versions of the running service",
+                    "value": {
+                      "data": {
+                        "apiVersion": "1.0.0-example",
+                        "buildSha": "0123456789ab",
+                        "contractVersion": "0.2",
+                        "platformVersion": null,
+                        "openapi": "https://api.viafrei.de/v1/openapi.json",
+                        "languages": [
+                          "en"
+                        ]
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en"
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/meta"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/MetaEnvelope"
                 }
@@ -3261,12 +3721,21 @@
         "summary": "Service metadata",
         "tags": [
           "service"
-        ]
+        ],
+        "x-attribution": "No source data: this answer carries no attribution.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/meta\""
+          }
+        ],
+        "x-example-request": "/v1/meta"
       }
     },
     "/v1/motorways/{road}/conditions": {
       "get": {
-        "description": "The active situations on one road, ordered by their position along it, with the lamp over every situation on the road in the asked direction and every DWD warning in force in an area the road crosses. MCP counterpart: road status. Needs the scope roads; the DWD warnings are read with the scope weather, and without it the lamp says its sight is limited.",
+        "description": "The active situations on one road, ordered by their position along it, with the lamp over every situation on the road in the asked direction and every official weather warning in force in an area the road crosses. MCP counterpart: road status. Needs the scope roads; the weather warnings are read with the scope weather, and without it the lamp says its sight is limited.",
         "operationId": "getMotorwayConditions",
         "parameters": [
           {
@@ -3361,6 +3830,175 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The situations on a motorway, two to a page, with its lamp",
+                    "value": {
+                      "data": {
+                        "corridor": {
+                          "road": "A101",
+                          "roadType": "motorway",
+                          "direction": "both",
+                          "states": [
+                            "05",
+                            "06",
+                            "07",
+                            "08",
+                            "10",
+                            "11",
+                            "12",
+                            "15",
+                            "16"
+                          ]
+                        },
+                        "lamp": "red",
+                        "lampReason": "road_closed",
+                        "situations": [
+                          {
+                            "id": "ev-00028",
+                            "kind": "weather",
+                            "severity": "info",
+                            "road": "A101",
+                            "roadType": "motorway",
+                            "direction": "south",
+                            "directionText": "Sackbeiheim",
+                            "location": {
+                              "lat": 50.000247,
+                              "lon": 13.554106
+                            },
+                            "validity": {
+                              "from": "2026-03-29T22:00:00Z",
+                              "fromLocal": "2026-03-30T00:00:00+02:00",
+                              "until": "2026-03-31T18:00:00Z",
+                              "untilLocal": "2026-03-31T20:00:00+02:00"
+                            },
+                            "lanes": null,
+                            "delayMin": null,
+                            "lengthM": 4959,
+                            "headline": "Weather bei Gieckpückau",
+                            "description": null,
+                            "textLanguage": "de",
+                            "updatedAt": "2026-03-29T22:01:00Z",
+                            "updatedAtLocal": "2026-03-30T00:01:00+02:00",
+                            "position": {
+                              "fromKm": 539.7,
+                              "toKm": null,
+                              "junctionFrom": null,
+                              "junctionTo": null
+                            },
+                            "sourceFamily": "src-alpha-roads"
+                          },
+                          {
+                            "id": "ev-00020",
+                            "kind": "roadworks",
+                            "severity": "lane_closed",
+                            "road": "A101",
+                            "roadType": "motorway",
+                            "direction": "unknown",
+                            "directionText": "Dirkäningen",
+                            "location": {
+                              "lat": 50.094131,
+                              "lon": 12.752644
+                            },
+                            "validity": {
+                              "from": "2026-03-29T00:59:59Z",
+                              "fromLocal": "2026-03-29T01:59:59+01:00",
+                              "until": "2026-03-31T02:59:59Z",
+                              "untilLocal": "2026-03-31T04:59:59+02:00"
+                            },
+                            "lanes": {
+                              "closed": 1,
+                              "total": 2
+                            },
+                            "delayMin": null,
+                            "lengthM": 7554,
+                            "headline": "Roadworks bei Zautbrierwerder",
+                            "description": null,
+                            "textLanguage": "de",
+                            "updatedAt": "2026-03-29T01:00:59Z",
+                            "updatedAtLocal": "2026-03-29T03:00:59+02:00",
+                            "position": {
+                              "fromKm": 619.1,
+                              "toKm": null,
+                              "junctionFrom": null,
+                              "junctionTo": null
+                            },
+                            "sourceFamily": "src-alpha-roads"
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:57:30Z",
+                        "freshness": [
+                          {
+                            "family": "src-alpha-roads",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          },
+                          {
+                            "family": "src-eta-weather",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 1800,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "src-alpha-roads",
+                            "domain": "roads",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          },
+                          {
+                            "family": "src-eta-weather",
+                            "domain": "weather",
+                            "publisher": "Longkein Datenwerk",
+                            "text": "Synthetic data from family eta, licence lic-eta.",
+                            "licence": "Synthetic licence eta",
+                            "licenceUrl": "https://licences.example/eta",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://eta.example/terms"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 2,
+                          "hasMore": true
+                        },
+                        "query": {
+                          "road": "A101",
+                          "direction": "both",
+                          "kinds": [],
+                          "minSeverity": "info"
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/motorways/A101/conditions"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/MotorwayEnvelope"
                 }
@@ -3368,7 +4006,27 @@
             },
             "description": "OK",
             "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
               "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
                   "type": "string"
                 }
@@ -3381,6 +4039,41 @@
               },
               "RateLimit-Policy": {
                 "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
                   "type": "string"
                 }
@@ -3490,7 +4183,7 @@
                 }
               }
             },
-            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After.",
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
             "headers": {
               "RateLimit": {
                 "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
@@ -3548,6 +4241,15 @@
         "tags": [
           "roads"
         ],
+        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/motorways/A101/conditions?limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/motorways/A101/conditions?limit=2",
         "x-required-scope": "roads"
       }
     },
@@ -3615,6 +4317,89 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "Two parking sites within 50 km, with terms accepted",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "pk-07-0012",
+                          "name": "Gienneisfeld Parken",
+                          "operator": "Firgräng Parkraum",
+                          "kind": "truck_parking",
+                          "location": {
+                            "lat": 50.387403,
+                            "lon": 10.232051
+                          },
+                          "distanceM": 324,
+                          "occupancy": {
+                            "free": 93,
+                            "total": 350,
+                            "state": "free",
+                            "observedAt": "2026-03-29T22:01:21Z"
+                          },
+                          "termsRequired": false,
+                          "sourceFamily": "src-delta-parking"
+                        }
+                      ],
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:57:30Z",
+                        "freshness": [
+                          {
+                            "family": "src-delta-parking",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 1800,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "src-delta-parking",
+                            "domain": "parking",
+                            "publisher": "Kleber Datenwerk",
+                            "text": "Synthetic data from family delta, licence lic-delta.",
+                            "licence": "Synthetic licence delta",
+                            "licenceUrl": "https://licences.example/delta",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://delta.example/terms"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [
+                            "Use only after accepting the terms (synthetic)."
+                          ],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 2,
+                          "hasMore": false
+                        },
+                        "query": {
+                          "at": {
+                            "lat": 50.39,
+                            "lon": 10.23
+                          },
+                          "radiusM": 50000,
+                          "freeMin": 0
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/parking-options"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/ParkingEnvelope"
                 }
@@ -3622,7 +4407,27 @@
             },
             "description": "OK",
             "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
               "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
                   "type": "string"
                 }
@@ -3635,6 +4440,41 @@
               },
               "RateLimit-Policy": {
                 "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
                   "type": "string"
                 }
@@ -3744,7 +4584,7 @@
                 }
               }
             },
-            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After.",
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
             "headers": {
               "RateLimit": {
                 "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
@@ -3802,6 +4642,15 @@
         "tags": [
           "parking"
         ],
+        "x-attribution": "Parking sites and their occupancy come from the source families of the parking domain the key is entitled to; a family whose terms need accepting answers only after the key has accepted them. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/parking-options?at=50.39,10.23\u0026radius_m=50000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=50000\u0026limit=2",
         "x-mcp-counterpart": "parking search",
         "x-required-scope": "parking"
       }
@@ -3874,6 +4723,187 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "Charging and parking around a place",
+                    "value": {
+                      "data": {
+                        "place": {
+                          "id": "pl-01-0003",
+                          "name": "Kofüßwerder",
+                          "kind": "municipality",
+                          "location": {
+                            "lat": 48.437771,
+                            "lon": 7.687209
+                          },
+                          "sourceFamily": "src-zeta-places"
+                        },
+                        "charging": {
+                          "sites": [
+                            {
+                              "id": "cs-01-0000",
+                              "name": "Kofüßwerder Laden",
+                              "operator": "Wickmel Strom",
+                              "location": {
+                                "lat": 48.404524,
+                                "lon": 7.659936
+                              },
+                              "distanceM": 4212,
+                              "access": "public",
+                              "summary": {
+                                "chargePoints": 3,
+                                "availableNow": 1,
+                                "maxPowerKw": 150
+                              },
+                              "chargePoints": [
+                                {
+                                  "id": "cp-00000-0",
+                                  "current": "ac",
+                                  "maxPowerKw": 22,
+                                  "availability": {
+                                    "state": "available",
+                                    "observedAt": "2026-03-29T23:52:00Z"
+                                  }
+                                },
+                                {
+                                  "id": "cp-00000-1",
+                                  "current": "ac",
+                                  "maxPowerKw": 22,
+                                  "availability": null
+                                },
+                                {
+                                  "id": "cp-00000-2",
+                                  "current": "dc",
+                                  "maxPowerKw": 150,
+                                  "availability": {
+                                    "state": "stale",
+                                    "observedAt": "2026-03-29T09:34:59Z"
+                                  }
+                                }
+                              ],
+                              "sourceFamily": "src-alpha-energy"
+                            }
+                          ]
+                        },
+                        "parking": {
+                          "sites": [
+                            {
+                              "id": "pk-01-0000",
+                              "name": "Kofüßwerder Parken",
+                              "operator": "Sänür Parkraum",
+                              "kind": "garage",
+                              "location": {
+                                "lat": 48.433324,
+                                "lon": 7.681788
+                              },
+                              "distanceM": 637,
+                              "occupancy": {
+                                "free": 34,
+                                "total": 43,
+                                "state": "free",
+                                "observedAt": "2026-03-29T12:02:49Z"
+                              },
+                              "termsRequired": false,
+                              "sourceFamily": "src-alpha-parking"
+                            }
+                          ]
+                        }
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T12:00:00Z",
+                        "freshness": [
+                          {
+                            "family": "src-alpha-energy",
+                            "dataAsOf": "2026-03-29T23:55:00Z",
+                            "ageS": 300,
+                            "staleAfterS": 3600,
+                            "stale": false
+                          },
+                          {
+                            "family": "src-alpha-parking",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 1800,
+                            "stale": false
+                          },
+                          {
+                            "family": "src-zeta-places",
+                            "dataAsOf": "2026-03-29T12:00:00Z",
+                            "ageS": 43200,
+                            "staleAfterS": 604800,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "src-alpha-energy",
+                            "domain": "energy",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          },
+                          {
+                            "family": "src-alpha-parking",
+                            "domain": "parking",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          },
+                          {
+                            "family": "src-zeta-places",
+                            "domain": "places",
+                            "publisher": "Deingmeir Datenwerk",
+                            "text": "Synthetic data from family zeta, licence lic-zeta.",
+                            "licence": "Synthetic licence zeta",
+                            "licenceUrl": "https://licences.example/zeta",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://zeta.example/terms"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "parts": [
+                          {
+                            "part": "charging",
+                            "status": "ok"
+                          },
+                          {
+                            "part": "parking",
+                            "status": "ok"
+                          }
+                        ],
+                        "query": {
+                          "placeId": "pl-01-0003",
+                          "radiusM": 20000,
+                          "perPartLimit": 2
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/places/pl-01-0003/overview"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/OverviewEnvelope"
                 }
@@ -3881,7 +4911,27 @@
             },
             "description": "OK",
             "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
               "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
                   "type": "string"
                 }
@@ -3894,6 +4944,41 @@
               },
               "RateLimit-Policy": {
                 "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
                   "type": "string"
                 }
@@ -4061,12 +5146,21 @@
         "tags": [
           "places"
         ],
+        "x-attribution": "The place comes from the places domain, each part from its own domain (energy, parking), each under the licence gate on its own. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/places/pl-01-0003/overview?needs=charging,parking\u0026radius_m=20000\u0026per_part_limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/places/pl-01-0003/overview?needs=charging,parking\u0026radius_m=20000\u0026per_part_limit=2",
         "x-required-scope": "places"
       }
     },
     "/v1/road-conditions": {
       "get": {
-        "description": "The active situations within the radius of a position on every road class held, by severity descending, then distance, then id, with the lamp over every situation within the radius and every DWD warning in force in an area within it. MCP counterpart: road status (area form). Needs the scope roads; the DWD warnings are read with the scope weather, and without it the lamp says its sight is limited.",
+        "description": "The active situations within the radius of a position on every road class held, by severity descending, then distance, then id, with the lamp over every situation within the radius and every official weather warning in force in an area within it. MCP counterpart: road status (area form). Needs the scope roads; the weather warnings are read with the scope weather, and without it the lamp says its sight is limited.",
         "operationId": "listRoadConditions",
         "parameters": [
           {
@@ -4176,6 +5270,111 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The situations within 50 km, two to a page, with their lamp",
+                    "value": {
+                      "data": {
+                        "area": {
+                          "at": {
+                            "lat": 50.39,
+                            "lon": 10.23
+                          },
+                          "radiusM": 50000
+                        },
+                        "lamp": "amber",
+                        "lampReason": "warning",
+                        "situations": [
+                          {
+                            "id": "ev-00009",
+                            "kind": "other",
+                            "severity": "lane_closed",
+                            "road": "A103",
+                            "roadType": "motorway",
+                            "direction": "unknown",
+                            "directionText": "Giellönfeld",
+                            "location": {
+                              "lat": 50.43293,
+                              "lon": 9.661006
+                            },
+                            "validity": {
+                              "from": "2026-03-28T16:33:33Z",
+                              "fromLocal": "2026-03-28T17:33:33+01:00",
+                              "until": null,
+                              "untilLocal": null
+                            },
+                            "lanes": null,
+                            "delayMin": null,
+                            "lengthM": 9932,
+                            "headline": "Other bei Klespelau",
+                            "description": null,
+                            "textLanguage": "de",
+                            "updatedAt": "2026-03-28T16:34:33Z",
+                            "updatedAtLocal": "2026-03-28T17:34:33+01:00",
+                            "position": null,
+                            "distanceM": 40726,
+                            "sourceFamily": "src-alpha-roads"
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:57:30Z",
+                        "freshness": [
+                          {
+                            "family": "src-alpha-roads",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "src-alpha-roads",
+                            "domain": "roads",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 2,
+                          "hasMore": false
+                        },
+                        "query": {
+                          "at": {
+                            "lat": 50.39,
+                            "lon": 10.23
+                          },
+                          "radiusM": 50000,
+                          "kinds": [],
+                          "minSeverity": "info",
+                          "roadClasses": []
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/road-conditions"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/RoadConditionsEnvelope"
                 }
@@ -4183,7 +5382,27 @@
             },
             "description": "OK",
             "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
               "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
                   "type": "string"
                 }
@@ -4196,6 +5415,41 @@
               },
               "RateLimit-Policy": {
                 "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
                   "type": "string"
                 }
@@ -4305,7 +5559,7 @@
                 }
               }
             },
-            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After.",
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
             "headers": {
               "RateLimit": {
                 "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
@@ -4363,6 +5617,15 @@
         "tags": [
           "roads"
         ],
+        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/road-conditions?at=50.39,10.23\u0026radius_m=50000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/road-conditions?at=50.39,10.23\u0026radius_m=50000\u0026limit=2",
         "x-required-scope": "roads"
       }
     },
@@ -4391,6 +5654,78 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "One road situation",
+                    "value": {
+                      "data": {
+                        "id": "ev-00028",
+                        "kind": "weather",
+                        "severity": "info",
+                        "road": "A101",
+                        "roadType": "motorway",
+                        "direction": "south",
+                        "directionText": "Sackbeiheim",
+                        "location": {
+                          "lat": 50.000247,
+                          "lon": 13.554106
+                        },
+                        "validity": {
+                          "from": "2026-03-29T22:00:00Z",
+                          "fromLocal": "2026-03-30T00:00:00+02:00",
+                          "until": "2026-03-31T18:00:00Z",
+                          "untilLocal": "2026-03-31T20:00:00+02:00"
+                        },
+                        "lanes": null,
+                        "delayMin": null,
+                        "lengthM": 4959,
+                        "headline": "Weather bei Gieckpückau",
+                        "description": null,
+                        "textLanguage": "de",
+                        "updatedAt": "2026-03-29T22:01:00Z",
+                        "updatedAtLocal": "2026-03-30T00:01:00+02:00",
+                        "position": null,
+                        "sourceFamily": "src-alpha-roads"
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:57:30Z",
+                        "freshness": [
+                          {
+                            "family": "src-alpha-roads",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "src-alpha-roads",
+                            "domain": "roads",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": []
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/road-situations/ev-00028"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/SituationEnvelope"
                 }
@@ -4398,7 +5733,27 @@
             },
             "description": "OK",
             "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
               "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
                   "type": "string"
                 }
@@ -4411,6 +5766,41 @@
               },
               "RateLimit-Policy": {
                 "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
                   "type": "string"
                 }
@@ -4520,7 +5910,7 @@
                 }
               }
             },
-            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After.",
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
             "headers": {
               "RateLimit": {
                 "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
@@ -4578,6 +5968,15 @@
         "tags": [
           "roads"
         ],
+        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/road-situations/ev-00028\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/road-situations/ev-00028",
         "x-required-scope": "roads"
       }
     },
@@ -4646,6 +6045,109 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The official weather warnings at a position, with their lamp",
+                    "value": {
+                      "data": {
+                        "lamp": "red",
+                        "warnings": [
+                          {
+                            "id": "ww-00021",
+                            "hazard": "ice",
+                            "level": 4,
+                            "levelName": "Stufe 4",
+                            "issuer": "Synthetischer Wetterdienst",
+                            "headline": "Warnung vor ice (Stufe 4)",
+                            "textLanguage": "de",
+                            "validity": {
+                              "from": "2026-03-29T13:36:25Z",
+                              "fromLocal": "2026-03-29T15:36:25+02:00",
+                              "until": "2026-03-30T08:36:25Z",
+                              "untilLocal": "2026-03-30T10:36:25+02:00"
+                            },
+                            "area": {
+                              "name": "Stungrißhausen Kreis",
+                              "geometry": null
+                            },
+                            "sourceFamily": "src-eta-weather"
+                          },
+                          {
+                            "id": "ww-00020",
+                            "hazard": "wind",
+                            "level": 3,
+                            "levelName": "Stufe 3",
+                            "issuer": "Synthetischer Wetterdienst",
+                            "headline": "Warnung vor wind (Stufe 3)",
+                            "textLanguage": "de",
+                            "validity": {
+                              "from": "2026-03-29T22:22:27Z",
+                              "fromLocal": "2026-03-30T00:22:27+02:00",
+                              "until": "2026-03-30T22:22:27Z",
+                              "untilLocal": "2026-03-31T00:22:27+02:00"
+                            },
+                            "area": {
+                              "name": "Stungrißhausen Kreis",
+                              "geometry": null
+                            },
+                            "sourceFamily": "src-eta-weather"
+                          }
+                        ],
+                        "truncated": false,
+                        "roadWeather": []
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:57:30Z",
+                        "freshness": [
+                          {
+                            "family": "src-eta-weather",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 1800,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "src-eta-weather",
+                            "domain": "weather",
+                            "publisher": "Longkein Datenwerk",
+                            "text": "Synthetic data from family eta, licence lic-eta.",
+                            "licence": "Synthetic licence eta",
+                            "licenceUrl": "https://licences.example/eta",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://eta.example/terms"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "query": {
+                          "at": {
+                            "lat": 52.1,
+                            "lon": 12.2
+                          },
+                          "minLevel": 1,
+                          "hazards": []
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/weather-risk"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/WeatherRiskEnvelope"
                 }
@@ -4653,7 +6155,27 @@
             },
             "description": "OK",
             "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
               "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
                   "type": "string"
                 }
@@ -4666,6 +6188,41 @@
               },
               "RateLimit-Policy": {
                 "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
                   "type": "string"
                 }
@@ -4775,7 +6332,7 @@
                 }
               }
             },
-            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After.",
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
             "headers": {
               "RateLimit": {
                 "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
@@ -4833,6 +6390,15 @@
         "tags": [
           "weather"
         ],
+        "x-attribution": "Weather warnings come from the source families of the weather domain the key is entitled to; the lamp reads every one of them. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/weather-risk?at=52.1,12.2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/weather-risk?at=52.1,12.2",
         "x-required-scope": "weather"
       }
     }

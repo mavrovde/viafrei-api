@@ -5,8 +5,8 @@ package store_test
 import (
 	"bytes"
 	"context"
+	"maps"
 	"slices"
-	"sync"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -14,37 +14,37 @@ import (
 	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
-var seedOnce sync.Once
+// seed loads the tiny fixture set and its planted rows into the shared test
+// database. TestMain runs it once, as setup: generating and loading the
+// fixtures is outside every test body's bound, which it would otherwise spend
+// in whichever test happened to ask first.
+func seed(ctx context.Context) error {
+	var buf bytes.Buffer
+	if _, err := fixtures.Generate(&buf, "tiny", 1, contract.Version()); err != nil {
+		return err
+	}
+	if err := fixtures.Planted(&buf, "tiny", 1, contract.Version()); err != nil {
+		return err
+	}
+	conn, err := db.Owner(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = conn.Close(ctx) }()
+	return pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, buf.String())
+		return err
+	})
+}
 
-// seeded loads the tiny fixture set and its planted rows once into the
-// shared test database.
+// seeded opens a store on the shared test database, which TestMain seeded.
 func seeded(t *testing.T) *store.Store {
 	t.Helper()
-	seedOnce.Do(func() {
-		var buf bytes.Buffer
-		if _, err := fixtures.Generate(&buf, "tiny", 1, contract.Version()); err != nil {
-			t.Fatal(err)
-		}
-		if err := fixtures.Planted(&buf, "tiny", 1, contract.Version()); err != nil {
-			t.Fatal(err)
-		}
-		ctx := context.Background()
-		conn, err := db.Owner(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() { _ = conn.Close(ctx) }()
-		if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-			_, err := tx.Exec(ctx, buf.String())
-			return err
-		}); err != nil {
-			t.Fatal(err)
-		}
-	})
 	st, err := store.Open(context.Background(), readerConfig(t))
 	if err != nil {
 		t.Fatal(err)
@@ -106,5 +106,239 @@ func TestRegisterAndSourcesReportStorageFaults(t *testing.T) {
 	}
 	if _, err := st.Sources(ctx, []string{"x"}); err == nil {
 		t.Error("Sources on an ended context succeeded")
+	}
+}
+
+func TestTheRegisterFingerprintMovesWithEveryLicenceInput(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005", "SEC-030")
+	st := seeded(t)
+	ctx := bounded(t)
+	conn, err := db.Owner(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	base, err := st.FreshnessVersions(ctx)
+	if err != nil || base.Register == "" || len(base.Families) == 0 {
+		t.Fatalf("versions %+v, %v", base, err)
+	}
+	for _, change := range []struct{ name, do, undo string }{
+		{"register_version", `update contract.source set register_version = register_version + 1 where source_ref = 'src-delta-parking'`,
+			`update contract.source set register_version = register_version - 1 where source_ref = 'src-delta-parking'`},
+		{"use_classes", `update contract.source set use_classes = use_classes || '{probe}' where source_ref = 'src-gamma-energy'`,
+			`update contract.source set use_classes = array_remove(use_classes, 'probe') where source_ref = 'src-gamma-energy'`},
+		{"a note", `update contract.source_note set body = body || ' (probe)' where source_ref = 'src-gamma-energy'`,
+			`update contract.source_note set body = left(body, -8) where source_ref = 'src-gamma-energy'`},
+	} {
+		if _, err := conn.Exec(ctx, change.do); err != nil {
+			t.Fatal(err)
+		}
+		got, err := st.FreshnessVersions(ctx)
+		if _, uerr := conn.Exec(ctx, change.undo); uerr != nil {
+			t.Fatal(uerr)
+		}
+		if err != nil || got.Register == base.Register {
+			t.Errorf("%s changed and the fingerprint did not: %v", change.name, err)
+		}
+		if back, err := st.FreshnessVersions(ctx); err != nil || back.Register != base.Register {
+			t.Errorf("after undoing %s the fingerprint is %q, want %q (%v)", change.name, back.Register, base.Register, err)
+		}
+	}
+}
+
+// TestAFamilyVersionMovesWithItsDataAsOf is the clock-skew case of the load
+// tests: the source's data_as_of moves while its freshness version stays the
+// same. Every answer renders its age, staleness and Last-Modified from
+// data_as_of, so the version the HTTP cache compares, and the one an answer
+// is tagged with, must move with it, and the two must stay equal.
+func TestAFamilyVersionMovesWithItsDataAsOf(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005")
+	st := seeded(t)
+	ctx := bounded(t)
+	conn, err := db.Owner(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	const family = "src-gamma-energy"
+	tagged := func() string {
+		t.Helper()
+		fs, err := st.Provenance(ctx, []string{family}, "en")
+		if err != nil || len(fs) != 1 {
+			t.Fatalf("provenance %+v, %v", fs, err)
+		}
+		return fs[0].Version
+	}
+	base, err := st.FreshnessVersions(ctx)
+	if err != nil || base.Families[family] == "" {
+		t.Fatalf("versions %+v, %v", base, err)
+	}
+	if got := tagged(); got != base.Families[family] {
+		t.Fatalf("the answer is tagged %q, the cache compares %q", got, base.Families[family])
+	}
+	for _, c := range []struct{ shift, back string }{
+		{"+ interval '10 minutes'", "- interval '10 minutes'"},
+		{"- interval '30 days'", "+ interval '30 days'"},
+	} {
+		shift := c.shift
+		if _, err := conn.Exec(ctx, `update contract.source_freshness set data_as_of = data_as_of `+shift+` where source_ref = $1`, family); err != nil {
+			t.Fatal(err)
+		}
+		moved, err := st.FreshnessVersions(ctx)
+		answer := tagged()
+		if _, uerr := conn.Exec(ctx, `update contract.source_freshness set data_as_of = data_as_of `+c.back+` where source_ref = $1`, family); uerr != nil {
+			t.Fatal(uerr)
+		}
+		if err != nil || moved.Families[family] == base.Families[family] {
+			t.Errorf("data_as_of moved %s and the version did not: %q (%v)", shift, moved.Families[family], err)
+		}
+		if answer != moved.Families[family] {
+			t.Errorf("after data_as_of moved %s the answer is tagged %q, the cache compares %q", shift, answer, moved.Families[family])
+		}
+		if back, err := st.FreshnessVersions(ctx); err != nil || back.Families[family] != base.Families[family] {
+			t.Errorf("data_as_of moved back and the version is %q, want %q (%v)", back.Families[family], base.Families[family], err)
+		}
+	}
+}
+
+// TestTheLampsVersionsMoveWithWhatItJudges: the road lamp judges a family by
+// its newest confirmation and reads the coverage of traffic messages and the
+// junctions' states, so a confirmation moves that family's confirmation
+// version and no data version, and a coverage row or a junction's state moves
+// the lamp's reference and not the register.
+func TestTheLampsVersionsMoveWithWhatItJudges(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005", "FR-ROAD-004")
+	st := seeded(t)
+	ctx := bounded(t)
+	conn, err := db.Owner(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	const family = "src-gamma-energy"
+	read := func() provenance.Versions {
+		t.Helper()
+		vs, err := st.FreshnessVersions(ctx)
+		if err != nil || vs.LampReference == "" || vs.Confirmations[family] == "" {
+			t.Fatalf("versions %+v, %v", vs, err)
+		}
+		return vs
+	}
+	exec := func(sql string) {
+		t.Helper()
+		if _, err := conn.Exec(ctx, sql); err != nil {
+			t.Fatal(err)
+		}
+	}
+	base := read()
+	t.Cleanup(func() {
+		ctx := context.WithoutCancel(ctx)
+		c, err := db.Owner(ctx)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer func() { _ = c.Close(ctx) }()
+		for _, sql := range []string{
+			`update contract.source_freshness set confirmed_at = null, confirm_interval_s = null, updates_paused = false where source_ref = '` + family + `'`,
+			`delete from contract.message_coverage where state_code = '96'`,
+			`update contract.junction set state_code = null`,
+		} {
+			if _, err := c.Exec(ctx, sql); err != nil {
+				t.Error(err)
+			}
+		}
+	})
+	seen := map[string]bool{base.Confirmations[family]: true}
+	for _, change := range []string{
+		`confirmed_at = '2102-01-01T00:30:00Z'`,
+		`confirm_interval_s = 300`,
+		`updates_paused = true`,
+	} {
+		exec(`update contract.source_freshness set ` + change + ` where source_ref = '` + family + `'`)
+		moved := read()
+		if seen[moved.Confirmations[family]] {
+			t.Errorf("%s did not move the confirmation version %q", change, moved.Confirmations[family])
+		}
+		seen[moved.Confirmations[family]] = true
+		if moved.Families[family] != base.Families[family] || moved.Register != base.Register || moved.LampReference != base.LampReference {
+			t.Errorf("%s moved more than the confirmation version: %+v", change, moved)
+		}
+	}
+	refs := map[string]bool{base.LampReference: true}
+	for _, change := range []string{
+		`insert into contract.message_coverage (state_code, source_ref, coverage_role, current_only) values ('96', '` + family + `', 'own', true)`,
+		`update contract.message_coverage set current_only = false where state_code = '96'`,
+		`update contract.junction set state_code = '96' where junction_id = (select min(junction_id) from contract.junction)`,
+	} {
+		exec(change)
+		moved := read()
+		if refs[moved.LampReference] {
+			t.Errorf("%s did not move the lamp's reference %q", change, moved.LampReference)
+		}
+		refs[moved.LampReference] = true
+		if moved.Register != base.Register {
+			t.Errorf("%s moved the register", change)
+		}
+	}
+}
+
+// TestTheRulesReferenceMovesWithTheRuleRows: the curated rules carry no
+// freshness version of their own, so an edited, added or removed rule or
+// topic moves the rules reference, and nothing else moves with it.
+func TestTheRulesReferenceMovesWithTheRuleRows(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005", "FR-RULES-001")
+	st := seeded(t)
+	ctx := bounded(t)
+	conn, err := db.Owner(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	read := func() provenance.Versions {
+		t.Helper()
+		vs, err := st.FreshnessVersions(ctx)
+		if err != nil || vs.RulesReference == "" {
+			t.Fatalf("versions %+v, %v", vs, err)
+		}
+		return vs
+	}
+	base := read()
+	t.Cleanup(func() {
+		ctx := context.WithoutCancel(ctx)
+		c, err := db.Owner(ctx)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer func() { _ = c.Close(ctx) }()
+		for _, sql := range []string{
+			`delete from contract.rule_statement where topic_code = 'rt_reference'`,
+			`delete from contract.rule_topic where topic_code = 'rt_reference'`,
+		} {
+			if _, err := c.Exec(ctx, sql); err != nil {
+				t.Error(err)
+			}
+		}
+	})
+	refs := map[string]bool{base.RulesReference: true}
+	for _, change := range []string{
+		`insert into contract.rule_topic (topic_code, title, reviewed_on) values ('rt_reference', 'Reference', '2026-01-01')`,
+		`insert into contract.rule_statement (statement_id, topic_code, position, body) values ('rt_reference-1', 'rt_reference', 1, 'One')`,
+		`update contract.rule_statement set body = 'One, edited' where statement_id = 'rt_reference-1'`,
+		`update contract.rule_topic set reviewed_on = '2026-02-01' where topic_code = 'rt_reference'`,
+		`delete from contract.rule_statement where statement_id = 'rt_reference-1'`,
+	} {
+		if _, err := conn.Exec(ctx, change); err != nil {
+			t.Fatal(err)
+		}
+		moved := read()
+		if refs[moved.RulesReference] {
+			t.Errorf("%s did not move the rules reference %q", change, moved.RulesReference)
+		}
+		refs[moved.RulesReference] = true
+		if moved.Register != base.Register || moved.LampReference != base.LampReference || !maps.Equal(moved.Families, base.Families) {
+			t.Errorf("%s moved more than the rules reference: %+v", change, moved)
+		}
 	}
 }

@@ -1,0 +1,17 @@
+# The endpoint class of every operation, which sets its latency budget
+# (classes.tsv). Every operation of the OpenAPI document has one row
+# (TestEveryOperationHasABudget); the 304 of any operation is the class
+# "conditional".
+# operation	class
+getHealth	lookup
+getReadiness	lookup
+getMeta	lookup
+getKey	lookup
+listChargingOptions	near
+listParkingOptions	near
+getPlaceOverview	composed
+getMotorwayConditions	along
+listRoadConditions	near
+getRoadSituation	lookup
+getWeatherRisk	near
+getDrivingRules	lookup

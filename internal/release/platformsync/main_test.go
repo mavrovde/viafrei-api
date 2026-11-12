@@ -165,6 +165,37 @@ func TestApplyStartsAndAdvancesTheSync(t *testing.T) {
 	}
 }
 
+// A pin moved while the API is still a 0.x pre-release, without -start, does
+// not switch the release over: no Release-As footer, so release-please keeps
+// the API's own version. Once the API follows the platform (past 0.x), every
+// sync carries the footer.
+func TestApplyWritesTheFooterOnlyOnceTheReleaseFollows(t *testing.T) {
+	req.Covers(t, "REL-001")
+	for name, c := range map[string]struct {
+		api    string
+		footer bool
+	}{
+		"0.x pre-release": {"0.3.0\n", false},
+		"following":       {"2.6.8\n", true},
+	} {
+		dir := repo(t, "2.6.8\n", c.api)
+		msg := filepath.Join(t.TempDir(), "msg")
+		if code, out, errs := runOut("apply", "-dir", dir, "-version", "2.6.12", "-message", msg); code != 0 || out != "changed 2.6.12\n" {
+			t.Fatalf("%s: exit %d, out %q, err %q", name, code, out, errs)
+		}
+		b, _ := os.ReadFile(msg)
+		if !strings.HasPrefix(string(b), "deps: keep in step with ViaFrei platform 2.6.12\n\n") {
+			t.Errorf("%s: subject of %q", name, b)
+		}
+		if got := strings.Contains(string(b), "Release-As:"); got != c.footer {
+			t.Errorf("%s: Release-As footer %v, want %v in %q", name, got, c.footer, b)
+		}
+		if !c.footer && !strings.Contains(string(b), "does not\nfollow the platform's yet") {
+			t.Errorf("%s: the message does not say the release stays on its own version: %q", name, b)
+		}
+	}
+}
+
 func TestApplyAcceptsThePlatformEqualToTheAPI(t *testing.T) {
 	req.Covers(t, "REL-001")
 	dir := repo(t, "unsynced\n", "2.5.21\n")

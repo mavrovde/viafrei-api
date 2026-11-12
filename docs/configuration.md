@@ -19,6 +19,8 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `server.shutdown_grace` | `VFAPI_SERVER_SHUTDOWN_GRACE` | duration | `10s` | 1s to 60s | Time in-flight requests get to finish on shutdown; the final metering flush runs after it. |
 | `server.trusted_proxies` | `VFAPI_SERVER_TRUSTED_PROXIES` | list | empty | CIDR list | Networks (CIDR) of the reverse proxies whose X-Forwarded-For header is believed; the client address is then the nearest address in that header outside these networks. Empty: the immediate peer is the client (RATE-001). Comma-separated in the environment. |
 | `http.hsts_max_age` | `VFAPI_HTTP_HSTS_MAX_AGE` | duration | `8760h` | 0s to 17520h | max-age of Strict-Transport-Security on every answer, sent in whole seconds; 0s sends max-age=0, which tells browsers to forget the policy. |
+| `http.compress_min_bytes` | `VFAPI_HTTP_COMPRESS_MIN_BYTES` | int | `1024` | 0 to 1048576 | Smallest answer body, in bytes, that is compressed (br or gzip, as the client accepts); 0 compresses every body. |
+| `http.compress_level` | `VFAPI_HTTP_COMPRESS_LEVEL` | int | `5` | 1 to 9 | Compression level of br and gzip, from 1 (fastest) to 9 (smallest). |
 | `db.url` | `VFAPI_DB_URL` or `VFAPI_DB_URL_FILE` | secret | secret, no default | — | Connection URL of the service's read-only role. Required to serve. Secret: environment or *_FILE only. |
 | `db.pool_max` | `VFAPI_DB_POOL_MAX` | int | `4` | 1 to 16 | Largest number of pooled connections. |
 | `db.pool_min` | `VFAPI_DB_POOL_MIN` | int | `1` | 0 to 16 | Connections kept open when idle. At most pool_max. |
@@ -28,6 +30,14 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `db.statement_timeout_floor` | `VFAPI_DB_STATEMENT_TIMEOUT_FLOOR` | duration | `50ms` | 10ms to 1s | Smallest useful remaining budget; below it a read is refused without touching storage. |
 | `db.cancel_grace` | `VFAPI_DB_CANCEL_GRACE` | duration | `100ms` | 10ms to 1s | Time a cancel request gets to land before the connection is abandoned. |
 | `db.application_name` | `VFAPI_DB_APPLICATION_NAME` | string | `viafrei-api` | at most 63 characters | application_name reported to the database. |
+| `db.query_exec_mode` | `VFAPI_DB_QUERY_EXEC_MODE` | string | `cache_statement` | one of cache_statement, cache_describe, describe_exec, exec, simple_protocol | How statements are sent: cache_statement prepares each statement once per connection and reuses it; the others are the driver's fallbacks for a pooler that cannot keep prepared statements. |
+| `db.statement_cache_capacity` | `VFAPI_DB_STATEMENT_CACHE_CAPACITY` | int | `128` | 1 to 4096 | Prepared statements (or descriptions) cached per connection under cache_statement and cache_describe. |
+| `db.shared_budget.slots` | `VFAPI_DB_SHARED_BUDGET_SLOTS` | int | `0` | 0 to 1024 | Statements all readers sharing db.shared_budget.lock_space may run at once; each read of this service holds one slot to the end of its transaction. 0 switches the shared budget off. |
+| `db.shared_budget.lock_space` | `VFAPI_DB_SHARED_BUDGET_LOCK_SPACE` | int | `7301` | 1 to 2147483647 | First key of the two-key advisory locks the slots are (the second is the slot number, 1 to db.shared_budget.slots). Every reader sharing the budget names the same value. |
+| `db.shared_budget.critical_reserved` | `VFAPI_DB_SHARED_BUDGET_CRITICAL_RESERVED` | int | `1` | 0 to 1024 | The highest-numbered slots, which only a read of the critical tier may take. Less than db.shared_budget.slots. |
+| `db.shared_budget.max_wait` | `VFAPI_DB_SHARED_BUDGET_MAX_WAIT` | duration | `200ms` | 0s to 2s | Longest time a read waits for a free slot before it is refused overloaded with Retry-After. Less than deadline.request. |
+| `db.shared_budget.retry_interval` | `VFAPI_DB_SHARED_BUDGET_RETRY_INTERVAL` | duration | `10ms` | 1ms to 500ms | Pause between two attempts to take a slot while every slot is held, spread at random over ±50 %. |
+| `db.shared_budget.retry_after` | `VFAPI_DB_SHARED_BUDGET_RETRY_AFTER` | duration | `1s` | 1s to 60s | Retry-After of a read refused because no slot came free in db.shared_budget.max_wait. |
 | `deadline.request` | `VFAPI_DEADLINE_REQUEST` | duration | `2s` | 200ms to 2s | Hard deadline of every request (NFR-PERF-001). |
 | `deadline.reserve` | `VFAPI_DEADLINE_RESERVE` | duration | `50ms` | 0s to 500ms | Margin kept back from the deadline when the statement timeout is set. Less than deadline.request. |
 | `contract.expected` | `VFAPI_CONTRACT_EXPECTED` | string | empty | major.minor | Read-contract version (major.minor) this instance requires; empty means the version built in. Readiness fails on another major or an older minor. |
@@ -83,10 +93,38 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `admission.aging_after` | `VFAPI_ADMISSION_AGING_AFTER` | duration | `500ms` | 0s to 2s | A waiter older than this is promoted one tier, so no tier starves (RATE-010). 0s promotes every waiter at once. |
 | `admission.ewma_alpha` | `VFAPI_ADMISSION_EWMA_ALPHA` | float | `0.2` | 0.01 to 1 | Weight of the newest storage service time in the moving average the wait estimate uses (RATE-011). |
 | `admission.shed_status` | `VFAPI_ADMISSION_SHED_STATUS` | int | `429` | one of 429, 503 | HTTP status of an overloaded refusal: 429 or 503. The problem type is overloaded either way, with Retry-After. |
+| `breaker.failure_threshold` | `VFAPI_BREAKER_FAILURE_THRESHOLD` | int | `5` | 1 to 100 | Consecutive storage failures, within breaker.window, that open the breaker. Open, it answers 503 upstream-unavailable at once without touching storage. |
+| `breaker.window` | `VFAPI_BREAKER_WINDOW` | duration | `30s` | 1s to 10m | Span in which the consecutive failures must fall; a failure later than this after the first of a run starts a new run. |
+| `breaker.open_for` | `VFAPI_BREAKER_OPEN_FOR` | duration | `15s` | 1s to 5m | Time the breaker stays open; Retry-After says what is left of it. Then it admits breaker.half_open_probes trial reads. |
+| `breaker.half_open_probes` | `VFAPI_BREAKER_HALF_OPEN_PROBES` | int | `2` | 1 to 16 | Trial reads admitted after breaker.open_for; the first that succeeds closes the breaker, the first that fails opens it again, and other reads are refused meanwhile. |
 | `metering.flush_interval` | `VFAPI_METERING_FLUSH_INTERVAL` | duration | `30s` | 5s to 5m | Interval of the batched usage write to the access store. A crash loses at most one interval of counts; one more flush runs on shutdown. |
 | `metering.max_keys_buffered` | `VFAPI_METERING_MAX_KEYS_BUFFERED` | int | `100000` | 100 to 1000000 | Largest number of (key, hour, operation) counters held between flushes; the counts of a new counter beyond it are dropped and the drop is logged. |
 | `metering.write_timeout` | `VFAPI_METERING_WRITE_TIMEOUT` | duration | `1s` | 100ms to 10s | Deadline of one usage write; a failed write keeps its counts for the next flush. |
 | `metering.retention_days` | `VFAPI_METERING_RETENTION_DAYS` | int | `400` | 30 to 1825 | Days a usage record is kept; keys prune removes older ones. |
+| `cache.enabled` | `VFAPI_CACHE_ENABLED` | bool | `true` | — | Send ETag and Cache-Control on data answers, answer a matching If-None-Match with 304, and keep the result cache. false sends Cache-Control: no-store and caches nothing. |
+| `cache.max_bytes` | `VFAPI_CACHE_MAX_BYTES` | int | `33554432` | 0 to 1073741824 | Byte budget of the result cache's stored bodies; the least recently used entry is dropped first. 0 stores no body (ETag and 304 still work). |
+| `cache.max_entry_bytes` | `VFAPI_CACHE_MAX_ENTRY_BYTES` | int | `524288` | 1024 to 16777216 | Largest body the result cache stores, in bytes. At most cache.max_bytes when that is above 0. |
+| `cache.max_entries` | `VFAPI_CACHE_MAX_ENTRIES` | int | `10000` | 1 to 1000000 | Most entries the result cache holds, with or without a body; the least recently used entry is dropped first. Each entry also counts against cache.max_bytes with its key, validator, versions and headers. |
+| `cache.versions_ttl` | `VFAPI_CACHE_VERSIONS_TTL` | duration | `1s` | 100ms to 60s | How long one read of the source families' freshness versions is reused to answer If-None-Match before the handler runs; it is read only while requests arrive. |
+| `cache.max_age.places` | `VFAPI_CACHE_MAX_AGE_PLACES` | duration | `24h` | 1s to 168h | max-age of place answers. |
+| `cache.max_age.roads` | `VFAPI_CACHE_MAX_AGE_ROADS` | duration | `60s` | 1s to 168h | max-age of road-condition answers. |
+| `cache.max_age.energy` | `VFAPI_CACHE_MAX_AGE_ENERGY` | duration | `60s` | 1s to 168h | max-age of charging and fuel answers. |
+| `cache.max_age.parking` | `VFAPI_CACHE_MAX_AGE_PARKING` | duration | `60s` | 1s to 168h | max-age of parking answers. |
+| `cache.max_age.transit` | `VFAPI_CACHE_MAX_AGE_TRANSIT` | duration | `30s` | 1s to 168h | max-age of departure and disruption answers. |
+| `cache.max_age.accessibility` | `VFAPI_CACHE_MAX_AGE_ACCESSIBILITY` | duration | `60s` | 1s to 168h | max-age of accessibility answers. |
+| `cache.max_age.weather` | `VFAPI_CACHE_MAX_AGE_WEATHER` | duration | `300s` | 1s to 168h | max-age of weather answers. |
+| `cache.max_age.rules` | `VFAPI_CACHE_MAX_AGE_RULES` | duration | `24h` | 1s to 168h | max-age of driving-rule answers. |
+| `cache.max_age.default` | `VFAPI_CACHE_MAX_AGE_DEFAULT` | duration | `30s` | 1s to 168h | max-age of an answer from a domain not listed above. |
+| `cache.stale_if_error.places` | `VFAPI_CACHE_STALE_IF_ERROR_PLACES` | duration | `5m` | 0s to 1h | Stale allowance of place answers. |
+| `cache.stale_if_error.roads` | `VFAPI_CACHE_STALE_IF_ERROR_ROADS` | duration | `5m` | 0s to 1h | Stale allowance of road-condition answers. |
+| `cache.stale_if_error.energy` | `VFAPI_CACHE_STALE_IF_ERROR_ENERGY` | duration | `5m` | 0s to 1h | Stale allowance of charging and fuel answers. |
+| `cache.stale_if_error.parking` | `VFAPI_CACHE_STALE_IF_ERROR_PARKING` | duration | `5m` | 0s to 1h | Stale allowance of parking answers. |
+| `cache.stale_if_error.transit` | `VFAPI_CACHE_STALE_IF_ERROR_TRANSIT` | duration | `5m` | 0s to 1h | Stale allowance of departure and disruption answers. |
+| `cache.stale_if_error.accessibility` | `VFAPI_CACHE_STALE_IF_ERROR_ACCESSIBILITY` | duration | `5m` | 0s to 1h | Stale allowance of accessibility answers. |
+| `cache.stale_if_error.weather` | `VFAPI_CACHE_STALE_IF_ERROR_WEATHER` | duration | `5m` | 0s to 1h | Stale allowance of weather answers. |
+| `cache.stale_if_error.rules` | `VFAPI_CACHE_STALE_IF_ERROR_RULES` | duration | `5m` | 0s to 1h | Stale allowance of driving-rule answers. |
+| `cache.stale_if_error.default` | `VFAPI_CACHE_STALE_IF_ERROR_DEFAULT` | duration | `5m` | 0s to 1h | Stale allowance of an answer from a domain not listed above. |
+| `cache.no_stale_families` | `VFAPI_CACHE_NO_STALE_FAMILIES` | list | empty | — | Source families whose answers are never served stale: an answer read from any of them is 503 while storage is unavailable, whatever cache.stale_if_error allows its domain. Comma-separated in the environment. |
 | `admin.enabled` | `VFAPI_ADMIN_ENABLED` | bool | `false` | — | Run the owner console on admin.listen_addr. Needs access.url. Off by default. |
 | `admin.listen_addr` | `VFAPI_ADMIN_LISTEN_ADDR` | string | `127.0.0.1:8081` | — | Address of the console listener: a loopback IP address (127.0.0.0/8 or ::1) and a port. Any other address is refused at boot; reach the console through a tunnel to the host. |
 | `admin.origin` | `VFAPI_ADMIN_ORIGIN` | string | `http://localhost:8081` | absolute URL | The console's origin as the browser sees it: scheme, host and port, no path. Every request must name its host, every change must come from it, and passkeys are bound to it. http is accepted for localhost and loopback addresses only. |

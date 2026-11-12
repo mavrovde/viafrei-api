@@ -110,7 +110,7 @@ func serve(environ []string, stderr io.Writer) int {
 		return config.ExitCode
 	}
 	defer st.Close()
-	st.WithAdmission(admission.New(wire.AdmissionSettings(cfg), nil))
+	st.WithAdmission(admission.New(wire.AdmissionSettings(cfg), nil)).WithSharedBudget(wire.SharedBudget(cfg)).WithLogger(log).WithBreaker(wire.Breaker(cfg, log))
 	addresses := ratelimit.NewIPLimiter(wire.AddressSettings(cfg), nil)
 	go addresses.Run(ctx)
 
@@ -124,6 +124,7 @@ func serve(environ []string, stderr io.Writer) int {
 		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st},
 			wire.FeatureSettings(cfg), time.Now),
 		Addresses: addresses,
+		Versions:  st,
 	}
 
 	if cfg.Access.URL.IsSet() {

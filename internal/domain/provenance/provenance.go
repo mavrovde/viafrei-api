@@ -45,7 +45,10 @@ type Family struct {
 	// change in its data: a source that answers unchanged stays fresh. Nil
 	// when the family has never been read successfully.
 	DataAsOf *time.Time
-	Notes    []Note
+	// Version changes whenever the family's data changes; empty when the
+	// family has published none. An answer's ETag is built from it.
+	Version string
+	Notes   []Note
 }
 
 // Freshness is one entry of meta.freshness (ENV-003).
@@ -113,4 +116,27 @@ func (f Family) Without(kind NoteKind) Family {
 // AnyStale reports whether any entry is stale.
 func AnyStale(fs []Freshness) bool {
 	return slices.ContainsFunc(fs, func(f Freshness) bool { return f.Stale })
+}
+
+// Versions is one read of what an answer's validity rests on: the version of
+// every source family's data and a fingerprint of the licence register (each
+// family's terms, attribution, licence, publisher and notes). An answer read
+// under one Versions is current while a later read finds the same family
+// versions and the same fingerprint.
+type Versions struct {
+	Families map[string]string
+	Register string
+	// Confirmations is, by family with a freshness row, the version of its
+	// newest confirmation (the instant, the interval and whether its updates
+	// are paused). Only an answer that judges a family by its confirmation
+	// (the road lamp's sight) rests on it.
+	Confirmations map[string]string
+	// LampReference is a fingerprint of the reference rows the road lamp
+	// judges its sight by: which families cover each state's traffic
+	// messages, and the state of each junction.
+	LampReference string
+	// RulesReference is a fingerprint of the curated rule rows (every topic
+	// and every rule): a rules answer rests on them, and they carry no
+	// freshness version of their own.
+	RulesReference string
 }

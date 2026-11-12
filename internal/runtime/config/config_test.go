@@ -162,6 +162,13 @@ func TestCrossFieldRules(t *testing.T) {
 	if _, err := config.Load(config.Options{Environ: []string{"VFAPI_DEADLINE_REQUEST=1s", "VFAPI_COMPOSE_PART_DEADLINE=450ms"}}); err != nil {
 		t.Errorf("every part fits the budget: %v", err)
 	}
+	// One stored body must fit the result cache; a cache of 0 bytes stores
+	// nothing, so any entry size is allowed with it.
+	_, err = config.Load(config.Options{Environ: []string{"VFAPI_CACHE_MAX_BYTES=1048576", "VFAPI_CACHE_MAX_ENTRY_BYTES=2097152"}})
+	assertRefused(t, err, "cache.max_entry_bytes: 2097152 is more than cache.max_bytes 1048576")
+	if _, err := config.Load(config.Options{Environ: []string{"VFAPI_CACHE_MAX_BYTES=0", "VFAPI_CACHE_MAX_ENTRY_BYTES=2097152"}}); err != nil {
+		t.Errorf("a cache that stores nothing bounds no entry: %v", err)
+	}
 }
 
 func TestMissingRequiredSecret(t *testing.T) {

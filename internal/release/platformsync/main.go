@@ -14,8 +14,10 @@
 //
 // apply writes that version to internal/buildinfo/platform-version.txt, the
 // file /v1/meta reports as platformVersion, and writes the commit message of
-// the sync to -message: a deps: subject (the CHANGELOG line) and a
-// Release-As footer, which tells release-please to cut exactly that version.
+// the sync to -message: a deps: subject (the CHANGELOG line) and, once the
+// API's release follows the platform's (the first sync with -start, or an API
+// past 0.x), a Release-As footer, which tells release-please to cut exactly
+// that version.
 // The release pull request then bumps version.txt and CHANGELOG.md in one
 // commit, and the tag job tags that commit. Before the first sync the file
 // says unsynced and apply changes nothing unless -start is given, so the
@@ -226,9 +228,20 @@ type refusal struct{ msg string }
 
 func (r refusal) Error() string { return r.msg }
 
-// commitMessage is the sync commit: the subject is the CHANGELOG line, the
-// footer tells release-please which version to cut.
-func commitMessage(version string) string {
+// commitMessage is the sync commit: the subject is the CHANGELOG line. The
+// Release-As footer, which tells release-please to cut the platform's version,
+// is written only when the API's release follows the platform's: on the
+// first sync (-start) and after it, when the API has left its 0.x
+// pre-releases. A pinned platform version alone does not switch the release
+// over (docs/RELEASING.md): before the first public release the pin moves and
+// the API's own 0.x line goes on.
+func commitMessage(version string, follows bool) string {
+	if !follows {
+		return fmt.Sprintf("deps: keep in step with ViaFrei platform %s\n\n"+
+			"/v1/meta reports %s as platformVersion. The API's release does not\n"+
+			"follow the platform's yet (a 0.x pre-release, docs/RELEASING.md), so\n"+
+			"release-please goes on with the API's own version.\n", version, version)
+	}
 	return fmt.Sprintf("deps: keep in step with ViaFrei platform %s\n\n"+
 		"The API's release follows the platform's (docs/RELEASING.md): /v1/meta\n"+
 		"reports %s as platformVersion, and release-please cuts the same version.\n\n"+
@@ -270,7 +283,7 @@ func apply(dir, version string, want [3]int, start bool, message string) (string
 	if message == "" {
 		return "", errors.New("-message is required when the version changes")
 	}
-	if err := os.WriteFile(message, []byte(commitMessage(version)), 0o600); err != nil {
+	if err := os.WriteFile(message, []byte(commitMessage(version, start || api[0] >= 1)), 0o600); err != nil {
 		return "", err
 	}
 	if err := os.WriteFile(pf, []byte(version+"\n"), 0o644); err != nil { //nolint:gosec // a tracked source file the build reads

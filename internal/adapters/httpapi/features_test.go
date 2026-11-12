@@ -15,6 +15,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
+	"github.com/mavrovde/viafrei-api/internal/app/breaker"
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
@@ -187,6 +188,9 @@ func TestChargingOptionsAnswer(t *testing.T) {
 	req.Covers(t, "FR-ENERGY-004", "FR-ENERGY-005", "ENV-003", "ENV-004", "ENV-011", "ENV-040", "ENV-041")
 	f := everyAnswer()
 	w := do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/charging-options?at=52.52,13.405", bearer)
+	// This handler reads no freshness versions, so nothing tells when the
+	// answer changes and no one may keep it (the versioned max-age is
+	// TestARepeatedRequestIsANotModified's).
 	if w.Code != http.StatusOK || w.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("status %d, cache %q: %s", w.Code, w.Header().Get("Cache-Control"), w.Body)
 	}
@@ -419,17 +423,18 @@ func TestFeatureRefusals(t *testing.T) {
 		{store.ErrDeadlineExhausted, 503, "deadline-exhausted"},
 		{store.ErrUnavailable, 503, "upstream-unavailable"},
 	}
-	// One handler per refusal, asked every target: building a handler is
-	// the cost of this test (TST-012).
+	// One handler per case, shared by the three targets: building a handler
+	// registers the whole contract and is the cost of this test (TST-012's 2 s
+	// bound was crossed under -race and coverage with fifteen builds).
 	for _, c := range cases {
 		h := featureHandler(t, config.Defaults(), &fakeFeatures{err: c.err}, nil)
 		for _, target := range targets {
 			assertProblem(t, do(t, h, http.MethodGet, target, bearer), c.status, c.slug)
 		}
 	}
-	off := featureHandler(t, config.Defaults(), nil, nil)
+	disabled := featureHandler(t, config.Defaults(), nil, nil)
 	for _, target := range targets {
-		assertProblem(t, do(t, off, http.MethodGet, target, bearer), 404, "feature-disabled")
+		assertProblem(t, do(t, disabled, http.MethodGet, target, bearer), 404, "feature-disabled")
 	}
 	assertProblem(t, do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: places.ErrNotFound}, nil), http.MethodGet, targets[2], bearer), 404, "not-found")
 }
@@ -568,5 +573,25 @@ func TestFeatureOperationsListTheirRefusals(t *testing.T) {
 				t.Errorf("%s does not list its %s problem", path, status)
 			}
 		}
+	}
+}
+
+// An open storage breaker is 503 upstream-unavailable at once, with
+// Retry-After the whole seconds left of its open period (NFR-RES-002).
+func TestAnOpenBreakerIsUpstreamUnavailableWithItsRetryAfter(t *testing.T) {
+	req.Covers(t, "NFR-RES-002")
+	open := fmt.Errorf("%w: %w", store.ErrUnavailable, &breaker.Refusal{State: breaker.Open, RetryAfter: 7200 * time.Millisecond})
+	w := do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: open}, nil), http.MethodGet, "/v1/charging-options?at=52.52,13.405", bearer)
+	assertProblem(t, w, 503, "upstream-unavailable")
+	if got := w.Header().Get("Retry-After"); got != "8" {
+		t.Fatalf("Retry-After %q, want 8", got)
+	}
+	if !strings.Contains(w.Body.String(), "not asked again until the time given") {
+		t.Fatalf("detail does not say the breaker is open: %s", w.Body.String())
+	}
+	trial := fmt.Errorf("%w: %w", store.ErrUnavailable, &breaker.Refusal{State: breaker.HalfOpen})
+	w = do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: trial}, nil), http.MethodGet, "/v1/charging-options?at=52.52,13.405", bearer)
+	if got := w.Header().Get("Retry-After"); got != "1" {
+		t.Fatalf("Retry-After %q while the trials run, want 1", got)
 	}
 }

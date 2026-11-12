@@ -1,0 +1,26 @@
+{
+  "title": "Versions of the running service",
+  "request": "/v1/meta",
+  "attribution": "No source data: this answer carries no attribution.",
+  "status": 200,
+  "response": {
+    "data": {
+      "apiVersion": "1.0.0-example",
+      "buildSha": "0123456789ab",
+      "contractVersion": "0.2",
+      "platformVersion": null,
+      "openapi": "https://api.viafrei.de/v1/openapi.json",
+      "languages": [
+        "en"
+      ]
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en"
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/meta"
+    }
+  }
+}

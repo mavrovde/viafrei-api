@@ -12,6 +12,12 @@ import (
 //go:embed 0001_contract.sql
 var schemaSQL string
 
+//go:embed 0003_physical.sql
+var physicalSQL string
+
+//go:embed 0004_road_lamp.sql
+var roadLampSQL string
+
 //go:embed 0002_reader_role.sql
 var readerRoleSQL string
 
@@ -25,8 +31,11 @@ const ReaderRole = "api_reader"
 // in major.minor form.
 func Version() string { return strings.TrimSpace(version) }
 
-// SchemaSQL returns the statements that build the contract stub.
-func SchemaSQL() string { return schemaSQL }
+// SchemaSQL returns the statements that build the contract stub: the 0.1
+// relations, their partitions and indexes, then the road lamp's additions of
+// 0.2, in that order. The reader role is created after them, so its grant
+// covers every relation.
+func SchemaSQL() string { return schemaSQL + "\n" + physicalSQL + "\n" + roadLampSQL }
 
 // ReaderRoleSQL returns the statements that create the read-only role. The
 // caller sets the role's password separately.

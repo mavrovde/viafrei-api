@@ -68,13 +68,16 @@ and merge release pull requests.
    it is open, or lists the open issues in the job summary.
 7. The `pages` job builds the documentation site from the tag
    (`scripts/docs-build.sh`: the guide from `README.md` and the guide pages
-   under `docs/`, the OpenAPI reference rendered from `api/openapi.json`, and
-   the document itself) and deploys it to GitHub Pages,
+   under `docs/`, the endpoints page generated from `api/openapi.json` with its
+   recorded examples, the changelog, the OpenAPI reference rendered from
+   `api/openapi.json`, and the document itself) and deploys it to GitHub Pages,
    <https://mavrovde.github.io/viafrei-api/>, then reads the published
    `index.html`, `reference.html` and `openapi.json` back and fails unless
    they serve that version. Only the newest final release publishes; an rc
    or a backported patch never replaces the site. CI builds the same site on
-   every pull request (`OpenAPI lint and breaking changes` job).
+   every pull request (`OpenAPI lint and breaking changes` job) and checks
+   its links, diagrams and accessibility (`Documentation portal` job,
+   [accessibility](accessibility.md)).
 
 ### When CI failed on the release commit
 
@@ -120,12 +123,16 @@ sync is `.github/workflows/platform-sync.yml`, daily and by hand, built on
 2. `platformsync apply -version X.Y.Z` writes the version to
    `internal/buildinfo/platform-version.txt` and the commit message of the
    sync: the subject `deps: keep in step with ViaFrei platform X.Y.Z` (the
-   CHANGELOG line, under Dependencies) and the footer `Release-As: X.Y.Z`.
-   It never goes back: a version older than the synced one or than
+   CHANGELOG line, under Dependencies) and, once the API's release follows
+   the platform's, the footer `Release-As: X.Y.Z`. The release follows from
+   the run made with `-start` on: while the API is a 0.x pre-release, only
+   that run writes the footer, and any other moved pin writes none, so
+   release-please goes on with the API's own version. It never goes back: a
+   version older than the synced one or than
    `version.txt` is refused (exit 1).
 3. The workflow pushes `platform-sync/X.Y.Z`, opens the pull request
    assigned to a maintainer, and approves its CI and Security runs. A
-   maintainer reviews and squash-merges it; the squash keeps the footer.
+   maintainer reviews and squash-merges it; the squash keeps the footer, when there is one.
    The pull request also pins the parity bundle of `X.Y.Z` in
    `test/parity/lock.tsv` ([parity](parity.md)): with none pinned the parity
    harness fails closed, so the sync cannot merge without one.
@@ -145,7 +152,8 @@ viafrei-api meta-check -platform X.Y.Z -contract M.m   # 0 match, 1 mismatch (bo
 Before the first public release the file says `unsynced` and the scheduled
 run only reports the platform's version. The switch is one manual run of the
 workflow with `start: true` at that milestone; until then no `Release-As`
-footer is used.
+footer is used, also when the pinned platform version moves (the parity
+bundle of a platform release is pinned before the first public release).
 
 Try the sync against a fixture version, with no network:
 
@@ -160,6 +168,7 @@ git checkout internal/buildinfo/platform-version.txt
 - [ ] CI is green on the release pull request, including the image and compose jobs.
 - [ ] The Coverage gate job shows 100 % for every package, and every line of `test/coverage-exclusions.txt` carries its reason ([coverage](coverage.md)).
 - [ ] The `Requirement report` job is green on `main` at the release commit; its `requirement-report` artifact holds the requirement report and the draft test completion report, which the maintainers complete and attach to the release (TEST-002).
+- [ ] For a minor release (`X.Y.0`): the manual accessibility pass of the documentation portal is done on the portal built from the release commit, and its result is recorded in section 6 of the test completion report ([accessibility](accessibility.md#manual-pass-once-per-minor-release)). The automated check (`Documentation portal` job) is green on every release.
 - [ ] The CHANGELOG section reads correctly; every user-visible change has a line.
 - [ ] Every breaking change is intended and is described with a migration note.
 - [ ] `api/openapi.json` on `main` is the contract you mean to publish.

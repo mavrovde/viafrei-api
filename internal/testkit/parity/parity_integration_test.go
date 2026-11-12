@@ -241,32 +241,24 @@ func compare(t *testing.T, name string) (parity.Bundle, asker) {
 	}
 	a := open(t)
 	compared := map[string][]string{}
-	var seen []parity.Difference
+	facts, differ := 0, 0
 	for _, c := range b.Cases {
 		got, err := parity.Project(a.ask(t, c), parity.Default, c.Request, a.owners)
 		if err != nil {
 			t.Fatal(err)
 		}
-		d, named := parity.Compare(c.Facts, got, parity.Default)
+		d := parity.Diff(c.Facts, got)
 		if len(d) > 0 {
 			t.Errorf("case %s (%s, MCP %q): %d of %d facts differ:\n  %s", c.ID, c.Operation, c.Counterpart, len(d), len(c.Facts), strings.Join(d, "\n  "))
 		}
-		for _, n := range named {
-			t.Logf("case %s: named difference %s (%s vs %s): %s", c.ID, n.Pattern, n.Bundle, n.API, n.Reason)
-		}
-		seen = append(seen, named...)
+		facts += len(c.Facts)
+		differ += len(d)
 		compared[c.Operation] = append(compared[c.Operation], c.ID)
 	}
 	for op, ids := range compared {
 		t.Logf("compared %s: %d case(s): %s", op, len(ids), strings.Join(ids, ", "))
 	}
-	// A named difference stands for a fact the MCP side states otherwise; if
-	// no case shows it any more, one side changed and the rule must say so.
-	if b.Producer == parity.ProducerMCP {
-		for _, d := range parity.Default.Unseen(seen) {
-			t.Errorf("named difference %s (%s vs %s) is shown by no case: either side changed, or no question reaches it", d.Pattern, d.Bundle, d.API)
-		}
-	}
+	t.Logf("bundle %s: %d case(s), %d fact(s) compared, %d difference(s)", name, len(b.Cases), facts, differ)
 	return b, a
 }
 

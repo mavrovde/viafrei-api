@@ -11,13 +11,15 @@ import (
 
 // Weather is the port to the weather-warning store.
 type Weather interface {
-	// WarningsAt returns the warnings of the given families in force at now
-	// whose area contains q.At, at or above q.MinLevel, of the asked
-	// hazards: level descending, then start, then id; at most
-	// weather.MaxWarnings, and whether more answer. It also returns the
-	// level of every warning of the families in force at q.At, whatever
-	// the floor and the hazards keep, for the lamp.
-	WarningsAt(ctx context.Context, q weather.Query, families []string, now time.Time) ([]weather.Warning, []weather.Level, bool, error)
+	// WarningsAt returns, from one snapshot, the warnings of the given
+	// families in force at now whose area contains q.At, at or above
+	// q.MinLevel, of the asked hazards: level descending, then start, then
+	// id; at most weather.MaxWarnings, and whether more answer. It also
+	// returns the level of every warning of the families in force at q.At,
+	// whatever the floor and the hazards keep, for the lamp, and the earliest
+	// instant after now at which any warning of the families placed at q.At
+	// starts or ends.
+	WarningsAt(ctx context.Context, q weather.Query, families []string, now time.Time) (weather.Scope, error)
 }
 
 // Rules is the port to the driving-rules store.
@@ -31,6 +33,15 @@ type Rules interface {
 type WeatherRisk struct {
 	Answer[weather.Warning]
 	Lamp weather.Lamp
+	// Read are every family the lamp read, whether or not it contributed
+	// (Families names only those): a new version of any of them may change
+	// the lamp.
+	Read []string
+	// WarningChange is the earliest instant after At at which a warning
+	// placed at the position starts or ends: the answer is wrong from then
+	// on, so it is never served past it, not even stale. Nil when none
+	// starts or ends.
+	WarningChange *time.Time
 }
 
 // WeatherRisk answers "is there a weather warning here" for key
@@ -47,24 +58,31 @@ func (s *Service) WeatherRisk(ctx context.Context, key access.Record, q weather.
 		return WeatherRisk{}, err
 	}
 	now := s.now()
-	ws, levels, more, err := s.repos.Weather.WarningsAt(ctx, q, permitted, now)
+	sc, err := s.repos.Weather.WarningsAt(ctx, q, permitted, now)
 	if err != nil {
 		return WeatherRisk{}, err
 	}
-	contributed := make([]string, len(ws))
-	for i, w := range ws {
+	contributed := make([]string, len(sc.Warnings))
+	for i, w := range sc.Warnings {
 		contributed[i] = w.Family
 	}
 	if err := gate.Check(contributed); err != nil {
 		return WeatherRisk{}, err
 	}
-	fams, stale, err := s.sight(ctx, permitted, contributed, now)
+	fams, stale, turns, err := s.sight(ctx, permitted, contributed, now)
 	if err != nil {
 		return WeatherRisk{}, err
 	}
+	// The answer changes with the clock alone when a warning starts or ends,
+	// or when a family the lamp read turns stale.
+	changes := sc.NextChange
+	if turns != nil && (changes == nil || turns.Before(*changes)) {
+		changes = turns
+	}
 	return WeatherRisk{
-		Answer: Answer[weather.Warning]{Items: ws, HasMore: more, Families: fams, Partial: partial, At: now},
-		Lamp:   weather.LampOf(levels, partial, stale),
+		Answer: Answer[weather.Warning]{Items: sc.Warnings, HasMore: sc.HasMore, Families: fams, Partial: partial, At: now,
+			ChangesAt: changes},
+		Lamp: weather.LampOf(sc.Levels, partial, stale), Read: permitted, WarningChange: sc.NextChange,
 	}, nil
 }
 

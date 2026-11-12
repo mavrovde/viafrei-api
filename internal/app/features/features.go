@@ -28,17 +28,21 @@ type Register interface {
 // Charging is the port to the charging store.
 type Charging interface {
 	// ChargingNear returns up to q.Limit sites of the given families, by
-	// distance then id, and whether there are more. Availability reports are
-	// read from the given families only and never after now.
-	ChargingNear(ctx context.Context, q energy.Query, families []string, now time.Time) ([]energy.Site, bool, error)
+	// distance then id, whether there are more, and the earliest
+	// availability report of their points dated after now, if any.
+	// Availability reports are read from the given families only and never
+	// after now.
+	ChargingNear(ctx context.Context, q energy.Query, families []string, now time.Time) ([]energy.Site, bool, *time.Time, error)
 }
 
 // Parking is the port to the parking store.
 type Parking interface {
 	// ParkingNear returns up to q.Limit sites of the listed families, by
-	// distance then id, and whether there are more. Occupancy is read from
-	// the occupancy families only and never after now.
-	ParkingNear(ctx context.Context, q parking.Query, listed, occupancy []string, now time.Time) ([]parking.Site, bool, error)
+	// distance then id, whether there are more, and the earliest occupancy
+	// report dated after now of any listed site within the radius, before
+	// the free-space filter, if any. Occupancy is read from the occupancy
+	// families only and never after now.
+	ParkingNear(ctx context.Context, q parking.Query, listed, occupancy []string, now time.Time) ([]parking.Site, bool, *time.Time, error)
 }
 
 // Places is the port to the places store.
@@ -101,6 +105,14 @@ type Answer[T any] struct {
 	Withheld []string
 	// At is the instant the answer is computed at.
 	At time.Time
+	// NextReport is the earliest report the read considered that is dated
+	// after At, if any: the answer may change when it takes effect.
+	NextReport *time.Time
+	// ChangesAt is the earliest instant after At at which the answer changes
+	// with the clock alone besides its families turning stale: a situation
+	// starting or ending, a confirmation lapsing, an ended situation leaving
+	// the retention. Nil when nothing else does.
+	ChangesAt *time.Time
 }
 
 // ErrGateViolation wraps access.ErrForbiddenItem: storage returned an item
@@ -138,25 +150,32 @@ func (s *Service) provenanceOf(ctx context.Context, contributed, consulted []str
 }
 
 // sight reads every permitted family's provenance once: for a lamp, whether
-// one is missing (no provenance row) or stale, which limits the sight; for
-// the attribution, those that contributed, or all of them when none did. The
-// gate's post-check keeps contributed inside permitted.
-func (s *Service) sight(ctx context.Context, permitted, contributed []string, now time.Time) ([]provenance.Family, bool, error) {
+// one is missing (no provenance row) or stale, which limits the sight, and
+// the earliest instant after now at which one that is fresh turns stale (nil
+// when none is fresh); for the attribution, those that contributed, or all of
+// them when none did. The gate's post-check keeps contributed inside
+// permitted.
+func (s *Service) sight(ctx context.Context, permitted, contributed []string, now time.Time) ([]provenance.Family, bool, *time.Time, error) {
 	consulted := slices.Clone(permitted)
 	slices.Sort(consulted)
 	consulted = slices.Compact(consulted)
 	all, err := s.repos.Register.Provenance(ctx, consulted, s.set.Language)
 	if err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
 	stale, fams := len(all) < len(consulted), []provenance.Family{}
+	var turns *time.Time
 	for _, f := range all {
-		stale = stale || f.Assess(now).Stale
+		if f.Assess(now).Stale {
+			stale = true
+		} else if t := f.DataAsOf.Add((f.StaleAfter/time.Second + 1) * time.Second); turns == nil || t.Before(*turns) {
+			turns = &t
+		}
 		if len(contributed) == 0 || slices.Contains(contributed, f.Source.Family) {
 			fams = append(fams, f)
 		}
 	}
-	return fams, stale, nil
+	return fams, stale, turns, nil
 }
 
 // withholdConditions drops the condition notes of the withheld families. A
@@ -188,7 +207,7 @@ func (s *Service) charging(ctx context.Context, reg []access.Terms, gate access.
 		return Answer[energy.Site]{}, err
 	}
 	now := s.now()
-	sites, more, err := s.repos.Charging.ChargingNear(ctx, q, permitted, now)
+	sites, more, next, err := s.repos.Charging.ChargingNear(ctx, q, permitted, now)
 	if err != nil {
 		return Answer[energy.Site]{}, err
 	}
@@ -203,7 +222,7 @@ func (s *Service) charging(ctx context.Context, reg []access.Terms, gate access.
 	if err != nil {
 		return Answer[energy.Site]{}, err
 	}
-	return Answer[energy.Site]{Items: sites, HasMore: more, Families: fams, Partial: partial, At: now}, nil
+	return Answer[energy.Site]{Items: sites, HasMore: more, Families: fams, Partial: partial, At: now, NextReport: next}, nil
 }
 
 // Parking answers "where can I park near here" for key (FR-PARK). A family
@@ -233,7 +252,7 @@ func (s *Service) parking(ctx context.Context, reg []access.Terms, gate access.G
 	}
 	listed := slices.Sorted(slices.Values(append(slices.Clone(permitted), pending...)))
 	now := s.now()
-	sites, more, err := s.repos.Parking.ParkingNear(ctx, q, listed, permitted, now)
+	sites, more, next, err := s.repos.Parking.ParkingNear(ctx, q, listed, permitted, now)
 	if err != nil {
 		return Answer[parking.Site]{}, err
 	}
@@ -258,5 +277,5 @@ func (s *Service) parking(ctx context.Context, reg []access.Terms, gate access.G
 	if err != nil {
 		return Answer[parking.Site]{}, err
 	}
-	return Answer[parking.Site]{Items: sites, HasMore: more, Families: withholdConditions(fams, pending), Partial: partial, Withheld: pending, At: now}, nil
+	return Answer[parking.Site]{Items: sites, HasMore: more, Families: withholdConditions(fams, pending), Partial: partial, Withheld: pending, At: now, NextReport: next}, nil
 }

@@ -1,0 +1,1005 @@
+{
+  "format": "viafrei.parity/2",
+  "platform": "2.6.13",
+  "producer": "mcp",
+  "commit": "a07f515475c5264c807f42d1e63e38551f9aa689",
+  "rules": "viafrei.parity.rules/4",
+  "fixture": {
+    "profile": "tiny",
+    "seed": 1,
+    "sha256": "e6562a7bd002350e239f9e25cf501a7a2f1364395f7bc176a47aac7fe8b4b7d8"
+  },
+  "cases": [
+    {
+      "id": "charging-commercial",
+      "operation": "listChargingOptions",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options?at=50.82,6.0&radius_m=20000&access=all&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "src-alpha-energy",
+          "src-beta-energy",
+          "src-gamma-energy"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data[cs-05-0012].chargePoints[cp-00012-0].availability.observedAt",
+          "value": "2026-03-29T03:23:03Z"
+        },
+        {
+          "name": "data[cs-05-0012].chargePoints[cp-00012-0].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-05-0012].chargePoints[cp-00012-0].id",
+          "value": "cp-00012-0"
+        },
+        {
+          "name": "data[cs-05-0012].chargePoints[cp-00012-0].maxPowerKw",
+          "value": "150"
+        },
+        {
+          "name": "data[cs-05-0012].chargePoints[cp-00012-1].availability.observedAt",
+          "value": "2026-03-29T14:51:34Z"
+        },
+        {
+          "name": "data[cs-05-0012].chargePoints[cp-00012-1].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-05-0012].chargePoints[cp-00012-1].id",
+          "value": "cp-00012-1"
+        },
+        {
+          "name": "data[cs-05-0012].chargePoints[cp-00012-1].maxPowerKw",
+          "value": "150"
+        },
+        {
+          "name": "data[cs-05-0012].chargePoints[cp-00012-2].availability.observedAt",
+          "value": "2026-03-29T18:57:01Z"
+        },
+        {
+          "name": "data[cs-05-0012].chargePoints[cp-00012-2].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-05-0012].chargePoints[cp-00012-2].id",
+          "value": "cp-00012-2"
+        },
+        {
+          "name": "data[cs-05-0012].chargePoints[cp-00012-2].maxPowerKw",
+          "value": "11"
+        },
+        {
+          "name": "data[cs-05-0012].chargePoints[cp-00012-3].availability.observedAt",
+          "value": "2026-03-29T06:47:06Z"
+        },
+        {
+          "name": "data[cs-05-0012].chargePoints[cp-00012-3].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-05-0012].chargePoints[cp-00012-3].id",
+          "value": "cp-00012-3"
+        },
+        {
+          "name": "data[cs-05-0012].chargePoints[cp-00012-3].maxPowerKw",
+          "value": "300"
+        },
+        {
+          "name": "data[cs-05-0012].distanceM",
+          "value": "2644"
+        },
+        {
+          "name": "data[cs-05-0012].id",
+          "value": "cs-05-0012"
+        },
+        {
+          "name": "data[cs-05-0012].location.lat",
+          "value": "50.82957"
+        },
+        {
+          "name": "data[cs-05-0012].location.lon",
+          "value": "6.03435"
+        },
+        {
+          "name": "data[cs-05-0012].name",
+          "value": "Gielfürau Laden"
+        },
+        {
+          "name": "data[cs-05-0012].operator",
+          "value": "Weimweing Strom"
+        },
+        {
+          "name": "data[cs-05-0012].sourceFamily",
+          "value": "src-beta-energy"
+        },
+        {
+          "name": "data[cs-05-0012].summary.availableNow",
+          "value": "null"
+        },
+        {
+          "name": "data[cs-05-0012].summary.chargePoints",
+          "value": "4"
+        },
+        {
+          "name": "data[cs-05-0012].summary.maxPowerKw",
+          "value": "300"
+        },
+        {
+          "name": "data[cs-05-0014].chargePoints[cp-00014-0].availability",
+          "value": "null"
+        },
+        {
+          "name": "data[cs-05-0014].chargePoints[cp-00014-0].id",
+          "value": "cp-00014-0"
+        },
+        {
+          "name": "data[cs-05-0014].chargePoints[cp-00014-0].maxPowerKw",
+          "value": "22"
+        },
+        {
+          "name": "data[cs-05-0014].distanceM",
+          "value": "5789"
+        },
+        {
+          "name": "data[cs-05-0014].id",
+          "value": "cs-05-0014"
+        },
+        {
+          "name": "data[cs-05-0014].location.lat",
+          "value": "50.80773"
+        },
+        {
+          "name": "data[cs-05-0014].location.lon",
+          "value": "5.92017"
+        },
+        {
+          "name": "data[cs-05-0014].name",
+          "value": "Gielfürau Laden"
+        },
+        {
+          "name": "data[cs-05-0014].operator",
+          "value": "Keßräß Strom"
+        },
+        {
+          "name": "data[cs-05-0014].sourceFamily",
+          "value": "src-beta-energy"
+        },
+        {
+          "name": "data[cs-05-0014].summary.availableNow",
+          "value": "null"
+        },
+        {
+          "name": "data[cs-05-0014].summary.chargePoints",
+          "value": "1"
+        },
+        {
+          "name": "data[cs-05-0014].summary.maxPowerKw",
+          "value": "22"
+        },
+        {
+          "name": "meta.attribution[src-beta-energy].family",
+          "value": "src-beta-energy"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "5"
+        }
+      ]
+    },
+    {
+      "id": "charging-all-consumer-fast",
+      "operation": "listChargingOptions",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options?at=48.41,7.68&radius_m=25000&access=all&min_kw=50&limit=3",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "src-alpha-energy",
+          "src-beta-energy",
+          "src-gamma-energy"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].availability.observedAt",
+          "value": "2026-03-29T09:34:59Z"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].id",
+          "value": "cp-00000-2"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].maxPowerKw",
+          "value": "150"
+        },
+        {
+          "name": "data[cs-01-0000].distanceM",
+          "value": "1605"
+        },
+        {
+          "name": "data[cs-01-0000].id",
+          "value": "cs-01-0000"
+        },
+        {
+          "name": "data[cs-01-0000].location.lat",
+          "value": "48.40452"
+        },
+        {
+          "name": "data[cs-01-0000].location.lon",
+          "value": "7.65994"
+        },
+        {
+          "name": "data[cs-01-0000].name",
+          "value": "Kofüßwerder Laden"
+        },
+        {
+          "name": "data[cs-01-0000].operator",
+          "value": "Wickmel Strom"
+        },
+        {
+          "name": "data[cs-01-0000].sourceFamily",
+          "value": "src-alpha-energy"
+        },
+        {
+          "name": "data[cs-01-0000].summary.availableNow",
+          "value": "null"
+        },
+        {
+          "name": "data[cs-01-0000].summary.chargePoints",
+          "value": "1"
+        },
+        {
+          "name": "data[cs-01-0000].summary.maxPowerKw",
+          "value": "150"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].availability.observedAt",
+          "value": "2026-03-29T16:42:46Z"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].id",
+          "value": "cp-00001-2"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].maxPowerKw",
+          "value": "50"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].availability.observedAt",
+          "value": "2026-03-29T15:32:38Z"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].id",
+          "value": "cp-00001-3"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].maxPowerKw",
+          "value": "300"
+        },
+        {
+          "name": "data[cs-01-0001].distanceM",
+          "value": "1361"
+        },
+        {
+          "name": "data[cs-01-0001].id",
+          "value": "cs-01-0001"
+        },
+        {
+          "name": "data[cs-01-0001].location.lat",
+          "value": "48.41116"
+        },
+        {
+          "name": "data[cs-01-0001].location.lon",
+          "value": "7.69830"
+        },
+        {
+          "name": "data[cs-01-0001].name",
+          "value": "Kofüßwerder Laden"
+        },
+        {
+          "name": "data[cs-01-0001].operator",
+          "value": "Döszäl Strom"
+        },
+        {
+          "name": "data[cs-01-0001].sourceFamily",
+          "value": "src-alpha-energy"
+        },
+        {
+          "name": "data[cs-01-0001].summary.availableNow",
+          "value": "null"
+        },
+        {
+          "name": "data[cs-01-0001].summary.chargePoints",
+          "value": "2"
+        },
+        {
+          "name": "data[cs-01-0001].summary.maxPowerKw",
+          "value": "300"
+        },
+        {
+          "name": "meta.attribution[src-alpha-energy].family",
+          "value": "src-alpha-energy"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "3"
+        }
+      ]
+    },
+    {
+      "id": "charging-status-age-limit",
+      "operation": "listChargingOptions",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options?at=48.41,7.68&radius_m=25000&access=all&limit=2",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "src-alpha-energy",
+          "src-beta-energy",
+          "src-gamma-energy"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-29T21:50:00Z",
+      "facts": [
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-0].availability.observedAt",
+          "value": "2026-03-29T21:11:57Z"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-0].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-0].id",
+          "value": "cp-00000-0"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-0].maxPowerKw",
+          "value": "22"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-1].availability",
+          "value": "null"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-1].id",
+          "value": "cp-00000-1"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-1].maxPowerKw",
+          "value": "22"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].availability.observedAt",
+          "value": "2026-03-29T09:34:59Z"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].id",
+          "value": "cp-00000-2"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].maxPowerKw",
+          "value": "150"
+        },
+        {
+          "name": "data[cs-01-0000].distanceM",
+          "value": "1605"
+        },
+        {
+          "name": "data[cs-01-0000].id",
+          "value": "cs-01-0000"
+        },
+        {
+          "name": "data[cs-01-0000].location.lat",
+          "value": "48.40452"
+        },
+        {
+          "name": "data[cs-01-0000].location.lon",
+          "value": "7.65994"
+        },
+        {
+          "name": "data[cs-01-0000].name",
+          "value": "Kofüßwerder Laden"
+        },
+        {
+          "name": "data[cs-01-0000].operator",
+          "value": "Wickmel Strom"
+        },
+        {
+          "name": "data[cs-01-0000].sourceFamily",
+          "value": "src-alpha-energy"
+        },
+        {
+          "name": "data[cs-01-0000].summary.availableNow",
+          "value": "null"
+        },
+        {
+          "name": "data[cs-01-0000].summary.chargePoints",
+          "value": "3"
+        },
+        {
+          "name": "data[cs-01-0000].summary.maxPowerKw",
+          "value": "150"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-0].availability.observedAt",
+          "value": "2026-03-28T07:03:46Z"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-0].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-0].id",
+          "value": "cp-00001-0"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-0].maxPowerKw",
+          "value": "22"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-1].availability",
+          "value": "null"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-1].id",
+          "value": "cp-00001-1"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-1].maxPowerKw",
+          "value": "11"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].availability.observedAt",
+          "value": "2026-03-29T16:42:46Z"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].id",
+          "value": "cp-00001-2"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].maxPowerKw",
+          "value": "50"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].availability.observedAt",
+          "value": "2026-03-29T15:32:38Z"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].id",
+          "value": "cp-00001-3"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].maxPowerKw",
+          "value": "300"
+        },
+        {
+          "name": "data[cs-01-0001].distanceM",
+          "value": "1361"
+        },
+        {
+          "name": "data[cs-01-0001].id",
+          "value": "cs-01-0001"
+        },
+        {
+          "name": "data[cs-01-0001].location.lat",
+          "value": "48.41116"
+        },
+        {
+          "name": "data[cs-01-0001].location.lon",
+          "value": "7.69830"
+        },
+        {
+          "name": "data[cs-01-0001].name",
+          "value": "Kofüßwerder Laden"
+        },
+        {
+          "name": "data[cs-01-0001].operator",
+          "value": "Döszäl Strom"
+        },
+        {
+          "name": "data[cs-01-0001].sourceFamily",
+          "value": "src-alpha-energy"
+        },
+        {
+          "name": "data[cs-01-0001].summary.availableNow",
+          "value": "null"
+        },
+        {
+          "name": "data[cs-01-0001].summary.chargePoints",
+          "value": "4"
+        },
+        {
+          "name": "data[cs-01-0001].summary.maxPowerKw",
+          "value": "300"
+        },
+        {
+          "name": "meta.attribution[src-alpha-energy].family",
+          "value": "src-alpha-energy"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "2"
+        }
+      ]
+    },
+    {
+      "id": "charging-reserved",
+      "operation": "listChargingOptions",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options?at=48.41,7.68&radius_m=25000&access=all&limit=2",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "src-alpha-energy",
+          "src-beta-energy",
+          "src-gamma-energy"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-29T22:10:00Z",
+      "facts": [
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-0].availability.observedAt",
+          "value": "2026-03-29T21:11:57Z"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-0].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-0].id",
+          "value": "cp-00000-0"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-0].maxPowerKw",
+          "value": "22"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-1].availability",
+          "value": "null"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-1].id",
+          "value": "cp-00000-1"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-1].maxPowerKw",
+          "value": "22"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].availability.observedAt",
+          "value": "2026-03-29T09:34:59Z"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].id",
+          "value": "cp-00000-2"
+        },
+        {
+          "name": "data[cs-01-0000].chargePoints[cp-00000-2].maxPowerKw",
+          "value": "150"
+        },
+        {
+          "name": "data[cs-01-0000].distanceM",
+          "value": "1605"
+        },
+        {
+          "name": "data[cs-01-0000].id",
+          "value": "cs-01-0000"
+        },
+        {
+          "name": "data[cs-01-0000].location.lat",
+          "value": "48.40452"
+        },
+        {
+          "name": "data[cs-01-0000].location.lon",
+          "value": "7.65994"
+        },
+        {
+          "name": "data[cs-01-0000].name",
+          "value": "Kofüßwerder Laden"
+        },
+        {
+          "name": "data[cs-01-0000].operator",
+          "value": "Wickmel Strom"
+        },
+        {
+          "name": "data[cs-01-0000].sourceFamily",
+          "value": "src-alpha-energy"
+        },
+        {
+          "name": "data[cs-01-0000].summary.availableNow",
+          "value": "null"
+        },
+        {
+          "name": "data[cs-01-0000].summary.chargePoints",
+          "value": "3"
+        },
+        {
+          "name": "data[cs-01-0000].summary.maxPowerKw",
+          "value": "150"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-0].availability.observedAt",
+          "value": "2026-03-29T22:02:46Z"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-0].availability.state",
+          "value": "occupied"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-0].id",
+          "value": "cp-00001-0"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-0].maxPowerKw",
+          "value": "22"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-1].availability",
+          "value": "null"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-1].id",
+          "value": "cp-00001-1"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-1].maxPowerKw",
+          "value": "11"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].availability.observedAt",
+          "value": "2026-03-29T16:42:46Z"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].id",
+          "value": "cp-00001-2"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-2].maxPowerKw",
+          "value": "50"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].availability.observedAt",
+          "value": "2026-03-29T15:32:38Z"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].id",
+          "value": "cp-00001-3"
+        },
+        {
+          "name": "data[cs-01-0001].chargePoints[cp-00001-3].maxPowerKw",
+          "value": "300"
+        },
+        {
+          "name": "data[cs-01-0001].distanceM",
+          "value": "1361"
+        },
+        {
+          "name": "data[cs-01-0001].id",
+          "value": "cs-01-0001"
+        },
+        {
+          "name": "data[cs-01-0001].location.lat",
+          "value": "48.41116"
+        },
+        {
+          "name": "data[cs-01-0001].location.lon",
+          "value": "7.69830"
+        },
+        {
+          "name": "data[cs-01-0001].name",
+          "value": "Kofüßwerder Laden"
+        },
+        {
+          "name": "data[cs-01-0001].operator",
+          "value": "Döszäl Strom"
+        },
+        {
+          "name": "data[cs-01-0001].sourceFamily",
+          "value": "src-alpha-energy"
+        },
+        {
+          "name": "data[cs-01-0001].summary.availableNow",
+          "value": "0"
+        },
+        {
+          "name": "data[cs-01-0001].summary.chargePoints",
+          "value": "4"
+        },
+        {
+          "name": "data[cs-01-0001].summary.maxPowerKw",
+          "value": "300"
+        },
+        {
+          "name": "meta.attribution[src-alpha-energy].family",
+          "value": "src-alpha-energy"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "2"
+        }
+      ]
+    },
+    {
+      "id": "parking-terms-pending",
+      "operation": "listParkingOptions",
+      "counterpart": "parking search",
+      "request": "/v1/parking-options?at=50.39,10.23&radius_m=25000&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "parking"
+        ],
+        "sources": [
+          "src-alpha-parking",
+          "src-beta-parking",
+          "src-delta-parking"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data[pk-07-0012].distanceM",
+          "value": "324"
+        },
+        {
+          "name": "data[pk-07-0012].id",
+          "value": "pk-07-0012"
+        },
+        {
+          "name": "data[pk-07-0012].kind",
+          "value": "truck_parking"
+        },
+        {
+          "name": "data[pk-07-0012].location.lat",
+          "value": "50.38740"
+        },
+        {
+          "name": "data[pk-07-0012].location.lon",
+          "value": "10.23205"
+        },
+        {
+          "name": "data[pk-07-0012].name",
+          "value": "Gienneisfeld Parken"
+        },
+        {
+          "name": "data[pk-07-0012].occupancy",
+          "value": "null"
+        },
+        {
+          "name": "data[pk-07-0012].operator",
+          "value": "Firgräng Parkraum"
+        },
+        {
+          "name": "data[pk-07-0012].sourceFamily",
+          "value": "src-delta-parking"
+        },
+        {
+          "name": "data[pk-07-0012].termsRequired",
+          "value": "true"
+        },
+        {
+          "name": "meta.attribution[src-delta-parking].family",
+          "value": "src-delta-parking"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "5"
+        }
+      ]
+    },
+    {
+      "id": "parking-terms-accepted",
+      "operation": "listParkingOptions",
+      "counterpart": "parking search",
+      "request": "/v1/parking-options?at=50.39,10.23&radius_m=25000&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "parking"
+        ],
+        "sources": [
+          "src-alpha-parking",
+          "src-beta-parking",
+          "src-delta-parking"
+        ],
+        "accepted": [
+          {
+            "source": "src-delta-parking",
+            "version": "2026-03-01"
+          }
+        ]
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data[pk-07-0012].distanceM",
+          "value": "324"
+        },
+        {
+          "name": "data[pk-07-0012].id",
+          "value": "pk-07-0012"
+        },
+        {
+          "name": "data[pk-07-0012].kind",
+          "value": "truck_parking"
+        },
+        {
+          "name": "data[pk-07-0012].location.lat",
+          "value": "50.38740"
+        },
+        {
+          "name": "data[pk-07-0012].location.lon",
+          "value": "10.23205"
+        },
+        {
+          "name": "data[pk-07-0012].name",
+          "value": "Gienneisfeld Parken"
+        },
+        {
+          "name": "data[pk-07-0012].occupancy.free",
+          "value": "93"
+        },
+        {
+          "name": "data[pk-07-0012].occupancy.observedAt",
+          "value": "2026-03-29T22:01:21Z"
+        },
+        {
+          "name": "data[pk-07-0012].occupancy.state",
+          "value": "free"
+        },
+        {
+          "name": "data[pk-07-0012].occupancy.total",
+          "value": "350"
+        },
+        {
+          "name": "data[pk-07-0012].operator",
+          "value": "Firgräng Parkraum"
+        },
+        {
+          "name": "data[pk-07-0012].sourceFamily",
+          "value": "src-delta-parking"
+        },
+        {
+          "name": "data[pk-07-0012].termsRequired",
+          "value": "false"
+        },
+        {
+          "name": "meta.attribution[src-delta-parking].family",
+          "value": "src-delta-parking"
+        },
+        {
+          "name": "meta.notes.condition[src-delta-parking]",
+          "value": "1"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "5"
+        }
+      ]
+    }
+  ]
+}

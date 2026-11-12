@@ -132,3 +132,20 @@ func LampOf(levels []Level, partial, stale bool) Lamp {
 	}
 	return LampGreen
 }
+
+// Scope is one snapshot of the warnings at a position.
+type Scope struct {
+	// Warnings are those the floor and the hazards keep, worst first; at
+	// most MaxWarnings.
+	Warnings []Warning
+	// HasMore is set when more than MaxWarnings answer.
+	HasMore bool
+	// Levels are the levels of every warning in force at the position,
+	// whatever the floor and the hazards keep: the lamp's.
+	Levels []Level
+	// NextChange is the earliest instant after the read at which a warning
+	// placed at the position starts or ends, of any level and hazard: the
+	// list or the lamp may change then with no new data. Nil when none
+	// starts or ends.
+	NextChange *time.Time
+}

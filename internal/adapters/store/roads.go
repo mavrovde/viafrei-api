@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/mavrovde/viafrei-api/internal/domain/ampel"
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
@@ -28,16 +29,14 @@ func codes[T ~string](list []T) []string {
 
 // Road reads one road by its canonical reference.
 func (s *Store) Road(ctx context.Context, ref string) (roads.Road, error) {
-	var out []roads.Road
-	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
+	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]roads.Road, error) {
 		rows, _ := tx.Query(ctx, `
 select road_ref, road_class, length_km::float8, states
 from contract.road
 where upper(replace(road_ref, ' ', '')) = $1
 order by road_ref
 limit 1`, ref)
-		var err error
-		out, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (roads.Road, error) {
+		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (roads.Road, error) {
 			var (
 				v          roads.Road
 				ref, class string
@@ -46,7 +45,6 @@ limit 1`, ref)
 			v.Ref, v.Class = roads.Canonical(ref), roads.MapClass(class)
 			return v, err
 		})
-		return err
 	})
 	if err == nil && len(out) == 0 {
 		err = roads.ErrUnknownRoad
@@ -91,47 +89,113 @@ func filterArgs(f roads.Filter, families []string, now time.Time) []any {
 	return []any{families, now, codes(kinds), other, codes(roads.Kinds[:len(roads.Kinds)-1]), codes(roads.Ordered()), f.MinSeverity.Floor()}
 }
 
+// nextChange is, over the rows (as x) a scope read selects that have not
+// ended at $2 (now), the earliest instant after now at which one starts or
+// ends: its start when it starts after now, else its end; null when none
+// does.
+const nextChange = `min(case when x.valid_from > $2 then x.valid_from else x.valid_to end)`
+
 // messagesSelect aggregates the lamp's view of every situation in the scope
-// as a JSON array of {"k": kind, "h": headline, "t": description, "l": text
-// language, "d": delay}; null when the scope holds none.
-const messagesSelect = `select jsonb_agg(distinct jsonb_build_object('k', e.event_kind, 'h', e.headline, 't', e.description,
-                                         'l', e.text_lang, 'd', e.delay_min))
+// as a JSON array of {"r": record, "k": kind, "h": headline, "s": subtitle,
+// "t": description, "p": place words, "b": blocked, "y": traffic type,
+// "ds": delay in seconds, "d": delay in minutes}, null when the scope holds
+// none; and the scope's next change (nextChange). It reads the scope's
+// situations that have not ended, so one that starts later is seen too; only
+// those active at now are aggregated.
+const messagesSelect = `select jsonb_agg(distinct jsonb_build_object('r', e.record_class, 'k', e.event_kind, 'h', e.headline,
+                                         's', e.subtitle, 't', e.description, 'p', e.place_text,
+                                         'b', coalesce(e.is_blocked, false), 'y', e.traffic_type,
+                                         'ds', e.delay_s, 'd', e.delay_min)) filter (where e.valid_from <= $2),
+       ` + nextChange + `
 from contract.traffic_event e
-where ` + scopeFilter
+cross join lateral (select e.valid_from, e.valid_to) x
+where e.withdrawn_at is null
+  and e.source_ref = any($1)
+  and (e.valid_to is null or e.valid_to > $2)`
 
 // storedMessage is one element of messagesSelect, in stored codes.
 type storedMessage struct {
+	Record      string  `json:"r"`
 	Kind        string  `json:"k"`
 	Headline    string  `json:"h"`
+	Subtitle    *string `json:"s"`
 	Description *string `json:"t"`
-	Language    string  `json:"l"`
+	PlaceText   *string `json:"p"`
+	Blocked     bool    `json:"b"`
+	TrafficType *string `json:"y"`
+	DelayS      *int    `json:"ds"`
 	DelayMin    *int    `json:"d"`
 }
 
-// warningsScope is the condition of a DWD warning the lamp reads: a
-// published, not cancelled warning of the given families in force at now,
-// placed in an area. $1 families, $2 now.
-const warningsScope = `from contract.weather_warning w
+// warningsPending is the condition of a weather warning the lamp reads or
+// will read: a published, not cancelled warning of the given families that
+// has not ended at now, placed in an area. $1 families, $2 now. Those whose
+// valid_from is at or before now are in force; the others start later.
+const warningsPending = `from contract.weather_warning w
 join contract.admin_region r on r.region_code = w.region_code
 where w.withdrawn_at is null and w.message_status <> 'cancelled'
   and w.source_ref = any($1)
-  and w.valid_from <= $2 and (w.valid_to is null or w.valid_to > $2)`
+  and (w.valid_to is null or w.valid_to > $2)`
 
-// sourcesSelect reads the freshness of the given families. $1 families.
-const sourcesSelect = `select s.source_ref, s.stale_after_s, f.data_as_of
+// sourcesSelect reads the freshness of the given families and the newest
+// confirmation of those that have a freshness row. $1 families.
+const sourcesSelect = `select s.source_ref, s.stale_after_s, f.data_as_of,
+       f.source_ref is not null, f.confirmed_at, f.confirm_interval_s::float8, coalesce(f.updates_paused, false)
 from contract.source s
 left join contract.source_freshness f using (source_ref)
 where s.source_ref = any($1)
 order by s.source_ref`
 
+// coverageSelect reads which of the given families cover the traffic
+// messages of the given states. $1 states, $2 families.
+const coverageSelect = `select state_code, source_ref, coverage_role, current_only
+from contract.message_coverage
+where state_code = any($1) and source_ref = any($2)
+order by state_code, source_ref`
+
+// statesOf aggregates the distinct, known state codes of the junctions a
+// query selects (column state_code) into a sorted array, empty when none.
+func statesOf(junctions string) string {
+	return `select coalesce(array_agg(distinct state_code order by state_code) filter (where state_code is not null), '{}')
+from (` + junctions + `) j`
+}
+
+// coverageRow is one row of coverageSelect.
+type coverageRow struct {
+	State, Source, Role string
+	CurrentOnly         bool
+}
+
+// coverageOf gathers the coverage rows of the states in scope by state.
+func coverageOf(rows pgx.Rows) (map[string]ampel.Coverage, error) {
+	read, err := pgx.CollectRows(rows, pgx.RowToStructByPos[coverageRow])
+	out := map[string]ampel.Coverage{}
+	for _, r := range read {
+		c := out[r.State]
+		if r.Role == "own" {
+			c.Own = append(c.Own, r.Source)
+			if r.CurrentOnly {
+				c.CurrentOnly = append(c.CurrentOnly, r.Source)
+			}
+		} else {
+			c.Carried = append(c.Carried, r.Source)
+		}
+		out[r.State] = c
+	}
+	return out, err
+}
+
 // scope is one read of the lamp's scope, run in the page's snapshot.
 type scope struct {
 	messages string
 	args     []any
-	// warnings is the area condition of the DWD warnings, over $3 onwards
-	// of warningArgs.
+	// warnings is the area condition of the weather warnings, over $3
+	// onwards of warningArgs.
 	warnings    string
 	warningArgs []any
+	// states selects the codes of the states in scope, over stateArgs.
+	states    string
+	stateArgs []any
 }
 
 func scanSituation(r pgx.CollectableRow) (roads.Situation, error) {
@@ -169,14 +233,23 @@ func scanSituation(r pgx.CollectableRow) (roads.Situation, error) {
 }
 
 // read runs the page query and the reads of the lamp's scope (its
-// situations, the DWD warnings in force there when a weather family is read,
-// the freshness of every family read) in one snapshot.
+// situations, the weather warnings in force there when a weather family is
+// read, the freshness and newest confirmation of every family read, the
+// states in scope and which roads families read cover their traffic
+// messages) in one snapshot.
 func (s *Store) read(ctx context.Context, list string, listArgs []any, limit int, fams roads.Families, now time.Time, sc scope) (roads.Page, error) {
-	var (
-		out    roads.Page
+	// The page and its messages are built inside the read and handed back
+	// by ReadValue, so nothing the caller holds is written after a read that
+	// ran past its deadline.
+	type snapshot struct {
+		page   roads.Page
 		stored []storedMessage
-	)
-	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
+	}
+	snap, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (snapshot, error) {
+		var (
+			out    = roads.Page{Confirmations: map[string]ampel.Confirmation{}}
+			stored []storedMessage
+		)
 		// The reads in order; the first that fails ends the snapshot.
 		for _, step := range []func() error{
 			func() (err error) {
@@ -184,21 +257,33 @@ func (s *Store) read(ctx context.Context, list string, listArgs []any, limit int
 				out.Items, err = pgx.CollectRows(res, scanSituation)
 				return err
 			},
-			func() error { return tx.QueryRow(ctx, sc.messages, sc.args...).Scan(&stored) },
+			func() error { return tx.QueryRow(ctx, sc.messages, sc.args...).Scan(&stored, &out.NextChange) },
 			func() error {
 				if len(fams.Weather) == 0 {
 					return nil
 				}
-				res, _ := tx.Query(ctx, `select w.source_ref, w.warning_level `+warningsScope+`
+				// One read of the warnings that have not ended: those in
+				// force are the lamp's, and the earliest start or end after
+				// now of any is when the scope changes.
+				res, _ := tx.Query(ctx, `select w.source_ref, w.warning_level, w.valid_from <= $2,
+  case when w.valid_from > $2 then w.valid_from else w.valid_to end `+warningsPending+`
   and `+sc.warnings+`
 order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, sc.warningArgs...)...)
-				found, err := pgx.CollectRows(res, func(r pgx.CollectableRow) (roads.Warning, error) {
-					var w roads.Warning
-					return w, r.Scan(&w.Family, &w.Level)
-				})
 				// A read that found none is an empty list, never nil: nil
 				// means the warnings were not read.
-				out.Warnings = append([]roads.Warning{}, found...)
+				out.Warnings = []roads.Warning{}
+				var w roads.Warning
+				var inForce bool
+				var next *time.Time
+				_, err := pgx.ForEachRow(res, []any{&w.Family, &w.Level, &inForce, &next}, func() error {
+					if inForce {
+						out.Warnings = append(out.Warnings, w)
+					}
+					if next != nil && (out.NextChange == nil || next.Before(*out.NextChange)) {
+						out.NextChange = next
+					}
+					return nil
+				})
 				return err
 			},
 			func() (err error) {
@@ -207,26 +292,39 @@ order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, s
 					var (
 						f          provenance.Family
 						staleAfter int64
+						held       bool
+						c          ampel.Confirmation
 					)
-					err := r.Scan(&f.Source.Family, &staleAfter, &f.DataAsOf)
+					err := r.Scan(&f.Source.Family, &staleAfter, &f.DataAsOf, &held, &c.At, &c.IntervalS, &c.Paused)
 					f.StaleAfter = time.Duration(staleAfter) * time.Second
+					if held {
+						out.Confirmations[f.Source.Family] = c
+					}
 					return f, err
 				})
 				return err
 			},
+			func() error { return tx.QueryRow(ctx, sc.states, sc.stateArgs...).Scan(&out.States) },
+			func() (err error) {
+				res, _ := tx.Query(ctx, coverageSelect, out.States, fams.Roads)
+				out.Coverage, err = coverageOf(res)
+				return err
+			},
 		} {
 			if err := step(); err != nil {
-				return err
+				return snapshot{}, err
 			}
 		}
-		return nil
+		return snapshot{out, stored}, nil
 	})
 	if err != nil {
 		return roads.Page{}, err
 	}
-	for _, m := range stored {
-		out.Messages = append(out.Messages, roads.Message{Kind: roads.MapKind(m.Kind), Headline: m.Headline,
-			Description: m.Description, TextLanguage: m.Language, DelayMin: m.DelayMin})
+	out := snap.page
+	for _, m := range snap.stored {
+		out.Messages = append(out.Messages, roads.Message{Record: roads.MapRecord(m.Record), Kind: roads.MapKind(m.Kind),
+			Headline: m.Headline, Subtitle: m.Subtitle, Description: m.Description, PlaceText: m.PlaceText,
+			Blocked: m.Blocked, TrafficType: m.TrafficType, DelayS: m.DelayS, DelayMin: m.DelayMin})
 	}
 	if len(out.Items) > limit {
 		out.Items, out.HasMore = out.Items[:limit], true
@@ -243,9 +341,10 @@ order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, s
 // starts where the carriageway's traffic comes from, decided by the line's
 // own ends (a road whose last part ends further north than its first part
 // starts is driven north with rising chainage). Those that cannot be placed
-// come last, then severity descending, then id; and it returns the signals
-// of every situation in the scope (the road and direction) and the DWD
-// warnings in force in an area the road's line crosses, for the lamp.
+// come last, then severity descending, then id; and it returns, for the
+// lamp, the view of every situation in the scope (the road and direction),
+// the weather warnings in force in an area the road's line crosses, and the
+// states of the road's junctions.
 // A situation's road reference is compared in its canonical form, as the
 // road's is: A1 and A 1 are one road.
 func (s *Store) SituationsOnRoad(ctx context.Context, q roads.CorridorQuery, fams roads.Families, now time.Time) (roads.Page, error) {
@@ -300,13 +399,17 @@ limit $11`, args, q.Limit, fams, now, scope{
 		warnings: `st_intersects(r.boundary, (select g.geometry from contract.road g
                                   where ` + fmt.Sprintf(canonicalRef, "g.road_ref") + ` = $3 order by g.road_ref limit 1))`,
 		warningArgs: []any{q.Road},
+		states: statesOf(`select state_code from contract.junction
+where ` + fmt.Sprintf(canonicalRef, "road_ref") + ` = $1`),
+		stateArgs: []any{q.Road},
 	})
 }
 
 // SituationsNear reads the active situations within the radius of a
-// position, by severity descending, then distance, then id; and the
-// signals of every situation in the scope (the radius) and the DWD warnings
-// in force in an area within the radius, for the lamp.
+// position, by severity descending, then distance, then id; and, for the
+// lamp, the view of every situation in the scope (the radius), the weather
+// warnings in force in an area within the radius, and the states of the
+// junctions within the radius, else of the junction nearest the position.
 func (s *Store) SituationsNear(ctx context.Context, q roads.AreaQuery, fams roads.Families, now time.Time) (roads.Page, error) {
 	classes, other := q.KnownClasses()
 	args := append(filterArgs(q.Filter, fams.Roads, now), q.At.Lat, q.At.Lon, q.RadiusM,
@@ -330,22 +433,27 @@ limit $14`, args, q.Limit, fams, now, scope{
 		args:        []any{fams.Roads, now, q.At.Lat, q.At.Lon, q.RadiusM},
 		warnings:    `st_dwithin(r.boundary::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`,
 		warningArgs: []any{q.At.Lat, q.At.Lon, q.RadiusM},
+		states: statesOf(`with here as (select st_setsrid(st_makepoint($2, $1), 4326) g),
+near as (select j.state_code from contract.junction j, here
+         where st_dwithin(j.location::geography, here.g::geography, $3))
+select state_code from near
+union all
+select (select j.state_code from contract.junction j, here order by j.location <-> here.g, j.junction_id limit 1)
+where not exists (select 1 from near)`),
+		stateArgs: []any{q.At.Lat, q.At.Lon, q.RadiusM},
 	})
 }
 
 // Situation reads one published situation of the given families that is
 // active or ended after endedSince (roads.ended_retention_h).
 func (s *Store) Situation(ctx context.Context, id string, families []string, endedSince time.Time) (roads.Situation, error) {
-	var rows []roads.Situation
-	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
+	rows, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]roads.Situation, error) {
 		res, _ := tx.Query(ctx, `
 select `+situationColumns+`, null::float8, null::int
 from contract.traffic_event e
 where e.event_id = $1 and e.withdrawn_at is null and e.source_ref = any($2)
   and (e.valid_to is null or e.valid_to > $3)`, id, families, endedSince)
-		var err error
-		rows, err = pgx.CollectRows(res, scanSituation)
-		return err
+		return pgx.CollectRows(res, scanSituation)
 	})
 	if err == nil && len(rows) == 0 {
 		err = roads.ErrUnknownSituation

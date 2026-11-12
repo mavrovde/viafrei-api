@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mavrovde/viafrei-api/db/contract"
@@ -241,57 +242,94 @@ func TestLifecycleAgainstTheStore(t *testing.T) {
 	}
 }
 
+// sqlstate is the SQLSTATE of a database refusal, or "" for any other error.
+func sqlstate(err error) string {
+	var pg *pgconn.PgError
+	if errors.As(err, &pg) {
+		return pg.Code
+	}
+	return ""
+}
+
+// TestStoreRefusals runs each refusal as its own subtest with its own bound,
+// and asserts the refusal it expects: a deadline or any other failure is not
+// a refusal.
 func TestStoreRefusals(t *testing.T) {
 	s := open(t)
 	k := auth.NewKeys(wire.AuthSettings(cfg(t)), s, nil, nil)
-	ctx := bounded(t)
 	bad := "\xff" // not valid UTF-8: the database refuses it as text
-	if _, err := s.Lookup(ctx, "nosuchkey0"); !errors.Is(err, auth.ErrUnknown) {
-		t.Errorf("unknown: %v", err)
-	}
-	if _, err := s.Lookup(ctx, bad); err == nil || errors.Is(err, auth.ErrUnknown) {
-		t.Errorf("bad id: %v", err)
-	}
-	if err := k.Move(ctx, "nosuchkey0", "x", "tester"); !errors.Is(err, accessstore.ErrNotFound) {
-		t.Errorf("move unknown: %v", err)
-	}
-	if err := k.Move(ctx, bad, "x", "tester"); err == nil {
-		t.Error("move bad id")
-	}
 	plan := newPlan(t, k, "consumer")
-	key, _ := k.Issue(ctx, plan, "l", "c", 0, "tester")
-	if err := k.Move(ctx, key.ID, "no-such-plan", "tester"); err == nil {
-		t.Error("move to a missing plan")
+	key, err := k.Issue(bounded(t), plan, "l", "c", 0, "tester")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, err := k.Issue(ctx, "no-such-plan", "l", "c", 0, "tester"); err == nil {
-		t.Error("issue on a missing plan")
-	}
-	now := time.Now()
-	for name, err := range map[string]error{
-		"revoke bad reason":  s.Revoke(ctx, auth.Change{Action: "revoke", KeyID: key.ID, Actor: "t", Reason: bad, At: now}),
-		"rotate bad mac":     s.Rotate(ctx, auth.Change{Action: "rotate", KeyID: key.ID, Actor: "t", At: now}, []byte("short"), now),
-		"accept bad id":      s.Accept(ctx, auth.Change{Action: "accept_terms", KeyID: bad, Actor: "t", At: now}, access.Acceptance{Source: "x", Version: "1"}),
-		"accept unknown":     s.Accept(ctx, auth.Change{Action: "accept_terms", KeyID: "nosuchkey0", Actor: "t", At: now}, access.Acceptance{Source: "x", Version: "1"}),
-		"accept bad source":  s.Accept(ctx, auth.Change{Action: "accept_terms", KeyID: key.ID, Actor: "t", At: now}, access.Acceptance{Source: bad, Version: "1"}),
-		"audit bad action":   s.Revoke(ctx, auth.Change{Action: "bogus", KeyID: key.ID, Actor: "t", Reason: "r", At: now}),
-		"rotate unknown":     s.Rotate(ctx, auth.Change{Action: "rotate", KeyID: "nosuchkey0", Actor: "t", At: now}, make([]byte, 32), now),
-		"plan bad use class": s.PutPlan(ctx, auth.Change{Action: "plan_put", Actor: "t", At: now}, access.Plan{Name: "zz", UseClass: "x", Tier: "bulk", Rate: 1, Burst: 1}),
-		"changed bad context": func() error {
+	const (
+		invalidText = "22021" // character_not_in_repertoire
+		foreignKey  = "23503"
+		checkFailed = "23514"
+		raised      = "P0001"
+	)
+	is := func(want error) func(error) bool { return func(err error) bool { return errors.Is(err, want) } }
+	code := func(want string) func(error) bool { return func(err error) bool { return sqlstate(err) == want } }
+	for _, c := range []struct {
+		name    string
+		run     func(context.Context, time.Time) error
+		refused func(error) bool
+	}{
+		{"lookup unknown", func(ctx context.Context, _ time.Time) error { _, err := s.Lookup(ctx, "nosuchkey0"); return err }, is(auth.ErrUnknown)},
+		{"lookup bad id", func(ctx context.Context, _ time.Time) error { _, err := s.Lookup(ctx, bad); return err }, code(invalidText)},
+		{"move unknown", func(ctx context.Context, _ time.Time) error { return k.Move(ctx, "nosuchkey0", "x", "tester") }, is(accessstore.ErrNotFound)},
+		{"move bad id", func(ctx context.Context, _ time.Time) error { return k.Move(ctx, bad, "x", "tester") }, code(invalidText)},
+		{"move to a missing plan", func(ctx context.Context, _ time.Time) error { return k.Move(ctx, key.ID, "no-such-plan", "tester") }, code(foreignKey)},
+		{"issue on a missing plan", func(ctx context.Context, _ time.Time) error {
+			_, err := k.Issue(ctx, "no-such-plan", "l", "c", 0, "tester")
+			return err
+		}, code(foreignKey)},
+		{"revoke bad reason", func(ctx context.Context, now time.Time) error {
+			return s.Revoke(ctx, auth.Change{Action: "revoke", KeyID: key.ID, Actor: "t", Reason: bad, At: now})
+		}, code(invalidText)},
+		{"rotate bad mac", func(ctx context.Context, now time.Time) error {
+			return s.Rotate(ctx, auth.Change{Action: "rotate", KeyID: key.ID, Actor: "t", At: now}, []byte("short"), now)
+		}, code(checkFailed)},
+		{"accept bad id", func(ctx context.Context, now time.Time) error {
+			return s.Accept(ctx, auth.Change{Action: "accept_terms", KeyID: bad, Actor: "t", At: now}, access.Acceptance{Source: "x", Version: "1"})
+		}, code(invalidText)},
+		{"accept unknown", func(ctx context.Context, now time.Time) error {
+			return s.Accept(ctx, auth.Change{Action: "accept_terms", KeyID: "nosuchkey0", Actor: "t", At: now}, access.Acceptance{Source: "x", Version: "1"})
+		}, is(accessstore.ErrNotFound)},
+		{"accept bad source", func(ctx context.Context, now time.Time) error {
+			return s.Accept(ctx, auth.Change{Action: "accept_terms", KeyID: key.ID, Actor: "t", At: now}, access.Acceptance{Source: bad, Version: "1"})
+		}, code(invalidText)},
+		{"audit bad action", func(ctx context.Context, now time.Time) error {
+			return s.Revoke(ctx, auth.Change{Action: "bogus", KeyID: key.ID, Actor: "t", Reason: "r", At: now})
+		}, code(checkFailed)},
+		{"rotate unknown", func(ctx context.Context, now time.Time) error {
+			return s.Rotate(ctx, auth.Change{Action: "rotate", KeyID: "nosuchkey0", Actor: "t", At: now}, make([]byte, 32), now)
+		}, is(accessstore.ErrNotFound)},
+		{"plan bad use class", func(ctx context.Context, now time.Time) error {
+			return s.PutPlan(ctx, auth.Change{Action: "plan_put", Actor: "t", At: now}, access.Plan{Name: "zz", UseClass: "x", Tier: "bulk", Rate: 1, Burst: 1})
+		}, code(checkFailed)},
+		{"changed bad context", func(ctx context.Context, now time.Time) error {
 			c, cancel := context.WithCancel(ctx)
 			cancel()
 			_, _, err := s.ChangedSince(c, now)
 			return err
-		}(),
+		}, is(context.Canceled)},
+		{"audit records younger than 30 days", func(ctx context.Context, now time.Time) error {
+			_, err := s.PruneAudit(ctx, auth.Change{Action: "audit_pruned", Actor: "t", At: now}, now)
+			return err
+		}, code(raised)},
 	} {
-		if err == nil {
-			t.Errorf("%s: accepted", name)
-		}
+		t.Run(c.name, func(t *testing.T) {
+			ctx := bounded(t)
+			err := c.run(ctx, time.Now())
+			if ctx.Err() != nil || !c.refused(err) {
+				t.Fatalf("got %v (sqlstate %q, context %v)", err, sqlstate(err), ctx.Err())
+			}
+		})
 	}
-	if _, err := k.Prune(ctx, "tester"); err != nil {
+	if _, err := k.Prune(bounded(t), "tester"); err != nil {
 		t.Fatalf("prune at the configured retention: %v", err)
-	}
-	if _, err := s.PruneAudit(ctx, auth.Change{Action: "audit_pruned", Actor: "t", At: now}, now); err == nil {
-		t.Error("audit records younger than 30 days were pruned")
 	}
 }
 

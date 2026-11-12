@@ -1,0 +1,9 @@
+{
+  "name": "viafrei-api-docs-a11y-tools",
+  "private": true,
+  "description": "The pinned toolchain of scripts/docs-a11y.sh; installed with npm ci --ignore-scripts.",
+  "dependencies": {
+    "pa11y-ci": "5.0.0",
+    "axe-core": "4.13.0"
+  }
+}

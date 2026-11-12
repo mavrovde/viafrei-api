@@ -274,14 +274,33 @@ const MaxKeyLifetime = 1095 * Day
 // Cache holds HTTP caching and the in-process result cache
 // (Performance-and-Caching).
 type Cache struct {
-	Enabled       bool          `koanf:"enabled" default:"true" desc:"Send ETag and Cache-Control on data answers, answer a matching If-None-Match with 304, and keep the result cache. false sends Cache-Control: no-store and caches nothing."`
-	MaxBytes      int           `koanf:"max_bytes" default:"33554432" validate:"min=0,max=1073741824" desc:"Byte budget of the result cache's stored bodies; the least recently used entry is dropped first. 0 stores no body (ETag and 304 still work)."`
-	MaxEntryBytes int           `koanf:"max_entry_bytes" default:"524288" validate:"min=1024,max=16777216" desc:"Largest body the result cache stores, in bytes. At most cache.max_bytes when that is above 0."`
-	MaxEntries    int           `koanf:"max_entries" default:"10000" validate:"min=1,max=1000000" desc:"Most entries the result cache holds, with or without a body; the least recently used entry is dropped first. Each entry also counts against cache.max_bytes with its key, validator, versions and headers."`
-	VersionsTTL   time.Duration `koanf:"versions_ttl" default:"1s" validate:"min=100ms,max=60s" desc:"How long one read of the source families' freshness versions is reused to answer If-None-Match before the handler runs; it is read only while requests arrive."`
-	MaxAge        CacheMaxAge   `koanf:"max_age"`
-	StaleIfError  time.Duration `koanf:"stale_if_error" default:"5m" validate:"min=0s,max=1h" desc:"While storage is unavailable or the deadline runs out, a stored answer read no longer than this ago is served with the served_stale warning and its true Age instead of 503 (NFR-RES-004, PROT-047). Its body is kept this long even past its max-age. 0s serves nothing stale."`
-	NoStale       []string      `koanf:"no_stale_families" default:"" desc:"Source families whose answers are never served stale: an answer read from any of them is 503 while storage is unavailable, whatever cache.stale_if_error says. Comma-separated in the environment."`
+	Enabled       bool              `koanf:"enabled" default:"true" desc:"Send ETag and Cache-Control on data answers, answer a matching If-None-Match with 304, and keep the result cache. false sends Cache-Control: no-store and caches nothing."`
+	MaxBytes      int               `koanf:"max_bytes" default:"33554432" validate:"min=0,max=1073741824" desc:"Byte budget of the result cache's stored bodies; the least recently used entry is dropped first. 0 stores no body (ETag and 304 still work)."`
+	MaxEntryBytes int               `koanf:"max_entry_bytes" default:"524288" validate:"min=1024,max=16777216" desc:"Largest body the result cache stores, in bytes. At most cache.max_bytes when that is above 0."`
+	MaxEntries    int               `koanf:"max_entries" default:"10000" validate:"min=1,max=1000000" desc:"Most entries the result cache holds, with or without a body; the least recently used entry is dropped first. Each entry also counts against cache.max_bytes with its key, validator, versions and headers."`
+	VersionsTTL   time.Duration     `koanf:"versions_ttl" default:"1s" validate:"min=100ms,max=60s" desc:"How long one read of the source families' freshness versions is reused to answer If-None-Match before the handler runs; it is read only while requests arrive."`
+	MaxAge        CacheMaxAge       `koanf:"max_age"`
+	StaleIfError  CacheStaleIfError `koanf:"stale_if_error"`
+	NoStale       []string          `koanf:"no_stale_families" default:"" desc:"Source families whose answers are never served stale: an answer read from any of them is 503 while storage is unavailable, whatever cache.stale_if_error allows its domain. Comma-separated in the environment."`
+}
+
+// CacheStaleIfError is the stale allowance of each data domain (NFR-RES-004,
+// PROT-047): while storage is unavailable or the deadline runs out, a stored
+// answer read no longer than this ago is served with the served_stale warning
+// and its true Age instead of 503, and its body is kept this long even past
+// its max-age. An answer from several domains takes the smallest; 0s serves
+// nothing of that domain stale. It has the fields of CacheMaxAge, so a domain
+// is looked up the same way.
+type CacheStaleIfError struct {
+	Places        time.Duration `koanf:"places" default:"5m" validate:"min=0s,max=1h" desc:"Stale allowance of place answers."`
+	Roads         time.Duration `koanf:"roads" default:"5m" validate:"min=0s,max=1h" desc:"Stale allowance of road-condition answers."`
+	Energy        time.Duration `koanf:"energy" default:"5m" validate:"min=0s,max=1h" desc:"Stale allowance of charging and fuel answers."`
+	Parking       time.Duration `koanf:"parking" default:"5m" validate:"min=0s,max=1h" desc:"Stale allowance of parking answers."`
+	Transit       time.Duration `koanf:"transit" default:"5m" validate:"min=0s,max=1h" desc:"Stale allowance of departure and disruption answers."`
+	Accessibility time.Duration `koanf:"accessibility" default:"5m" validate:"min=0s,max=1h" desc:"Stale allowance of accessibility answers."`
+	Weather       time.Duration `koanf:"weather" default:"5m" validate:"min=0s,max=1h" desc:"Stale allowance of weather answers."`
+	Rules         time.Duration `koanf:"rules" default:"5m" validate:"min=0s,max=1h" desc:"Stale allowance of driving-rule answers."`
+	Default       time.Duration `koanf:"default" default:"5m" validate:"min=0s,max=1h" desc:"Stale allowance of an answer from a domain not listed above."`
 }
 
 // CacheMaxAge is the Cache-Control max-age of each data domain; an answer

@@ -80,7 +80,7 @@ var catalogue = []scenario{
 	{name: "pool-exhausted", fault: "every permit held by hanging reads, plus bursts", expect: "the admission refuses, each refusal by the tier's queue_max_wait (RATE-011)", run: poolExhausted},
 	{name: "composed-part-timeout", fault: "the parking tables locked", expect: "200 with the parking part timeout and the charging part ok", run: composedPart},
 	{
-		name: "storage-killed", fault: "the storage route of the fault proxy cut", expect: "503 upstream-unavailable with Retry-After within 50 ms; the breaker opens, its half-open probes are bounded and a failed one opens it again; closed by a probe and 2xx again after the repair; the instance with the result cache serves what it answered within cache.stale_if_error with served_stale and its Age, and 503 for everything else", run: storageKilled,
+		name: "storage-killed", fault: "the storage route of the fault proxy cut", expect: "503 upstream-unavailable with Retry-After within 50 ms; the breaker opens, its half-open probes are bounded and a failed one opens it again; closed by a probe and 2xx again after the repair; the instance with the result cache serves what it answered within cache.stale_if_error.parking with served_stale and its Age, and 503 for everything else", run: storageKilled,
 	},
 	{
 		name: "access-store-down", fault: "the access-store route of the fault proxy cut", expect: "a cached key keeps working; an uncached key is 503 upstream-unavailable; both work after the repair", run: accessStoreDown,
@@ -535,8 +535,11 @@ func (r *runner) warmCache(ctx context.Context, o *outcome) bool {
 }
 
 // staleAnswers asks the instance with the result cache while storage is
-// cut (NFR-RES-004, PROT-047).
+// cut (NFR-RES-004, PROT-047), once what it stored is past its max-age and
+// the versions it read are past their TTL: until then it replays a stored
+// answer as fresh, from memory, and storage is never asked.
 func (r *runner) staleAnswers(ctx context.Context, o *outcome) {
+	_ = sleep(ctx, r.freshFor+r.freshFor/2)
 	var rs []result
 	for range 5 {
 		rs = append(rs, r.do(ctx, r.cachedParking("50000")))
@@ -551,13 +554,13 @@ func (r *runner) staleAnswers(ctx context.Context, o *outcome) {
 		aged = aged && err == nil && s >= 0 && time.Duration(s)*time.Second <= r.staleFor
 		oldest = max(oldest, s)
 	}
-	o.add(fmt.Sprintf("each carries its Age, none older than cache.stale_if_error = %s (NFR-RES-004)", r.staleFor), aged, "oldest Age %d s", oldest)
+	o.add(fmt.Sprintf("each carries its Age, none older than cache.stale_if_error.parking = %s (NFR-RES-004)", r.staleFor), aged, "oldest Age %d s", oldest)
 	for _, c := range []struct {
 		name string
 		q    request
 	}{
 		{"a request the cache never answered", r.cachedParking("30000")},
-		{"a request answered longer ago than cache.stale_if_error", r.cachedParking("40000")},
+		{"a request answered longer ago than cache.stale_if_error.parking", r.cachedParking("40000")},
 		{"a family listed in cache.no_stale_families", r.cachedCharging()},
 	} {
 		x := r.do(ctx, c.q)
@@ -603,7 +606,8 @@ func storageKilled(ctx context.Context, r *runner, o *outcome) {
 	}
 	r.recovered(ctx, o, r.charging())
 	if warm {
-		again, up := r.awaitWhere(ctx, r.cachedParking("50000"), r.p.ready, func(x result) bool { return ok(x) && !servedStale(x) })
+		// A read from storage carries no Age; a replay from memory does.
+		again, up := r.awaitWhere(ctx, r.cachedParking("50000"), r.p.ready, func(x result) bool { return ok(x) && !servedStale(x) && x.age == "" })
 		o.results = append(o.results, again...)
 		o.add(fmt.Sprintf("the instance with the result cache answers from storage again within %s of the repair", r.p.ready), up, "after %d tries", len(again))
 	}

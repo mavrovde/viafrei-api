@@ -65,7 +65,11 @@ type runner struct {
 	queued   time.Duration // the standard tier's queue_max_wait: a waiter is shed by then (RATE-011)
 	brk      breakerSettings
 	cached   string        // base URL of the instance with the result cache (NFR-RES-004)
-	staleFor time.Duration // its cache.stale_if_error
+	staleFor time.Duration // its cache.stale_if_error.parking
+	// freshFor is the longest of its cache.max_age.parking,
+	// cache.max_age.energy and cache.versions_ttl: within it the instance
+	// replays a stored answer as fresh, from memory, storage or not.
+	freshFor time.Duration
 	http     *http.Client
 	docker   func(context.Context, ...string) (string, error) // docker compose on the stack's project
 	host     func(context.Context, ...string) (string, error) // the plain docker CLI (docker top)

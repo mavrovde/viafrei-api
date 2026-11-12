@@ -137,6 +137,10 @@ func TestRunRefusesBadUsageAndForeignTargets(t *testing.T) {
 		"no breaker probes":   {args: c.args("-breaker-probes", "0"), want: "-breaker-probes"},
 		"no breaker open_for": {args: c.args("-breaker-open-for", "0s"), want: "-breaker-open-for"},
 		"no stale allowance":  {args: c.args("-stale-if-error", "0s"), want: "-stale-if-error must be positive"},
+		"no max-age":          {args: c.args("-max-age-energy", "0s"), want: "-versions-ttl must be positive"},
+		"no versions ttl":     {args: c.args("-versions-ttl", "0s"), want: "-versions-ttl must be positive"},
+		"no parking max-age":  {args: c.args("-max-age-parking", "0s"), want: "-versions-ttl must be positive"},
+		"allowance too short": {args: c.args("-stale-if-error", "3s", "-versions-ttl", "2s"), want: "at least twice the longest"},
 		"foreign cached host": {args: c.args("-cached-api", "http://api.example.test"), want: "not on the test-environment allow-list"},
 	}
 	for name, tc := range cases {

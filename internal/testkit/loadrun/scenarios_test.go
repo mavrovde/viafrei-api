@@ -669,6 +669,31 @@ func TestStorageKilledAssertsStaleAnswers(t *testing.T) {
 	})
 	mustFail(t, runOne(t, w, "storage-killed"), again)
 
+	// After the repair the cached instance replays from memory, with an
+	// Age: that is not an answer from storage.
+	w = proxiedWorld(t)
+	cut.Store(false)
+	inner = w.cached.Config.Handler
+	w.cached.Config.Handler = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if w.proxy.cut() {
+			cut.Store(true)
+		}
+		if cut.Load() && !w.proxy.cut() {
+			rw.Header().Set("Age", "0")
+			answer(rw, map[string]any{"warnings": []any{}})
+			return
+		}
+		inner.ServeHTTP(rw, r)
+	})
+	mustFail(t, runOne(t, w, "storage-killed"), again)
+
+	// A runner that does not wait past the max-age is answered fresh from
+	// memory, and finds no stale answer.
+	w = proxiedWorld(t)
+	w.r.freshFor = 0
+	w.cached.Config.Handler = &staleCache{read: map[string]time.Time{}, fresh: time.Minute, allow: time.Hour, down: w.proxy.cut}
+	mustFail(t, runOne(t, w, "storage-killed"), served)
+
 	// The instance without a cache claims a stale answer.
 	w = proxiedWorld(t)
 	w.api.Config.Handler = http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {

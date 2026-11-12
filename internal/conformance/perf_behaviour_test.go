@@ -112,9 +112,21 @@ func cacheAlternate(t *testing.T, c *config.Config) string {
 // cacheStale reads a charging answer, then asks again two minutes later
 // while storage is down, and reports the status and Age of that answer: the
 // stored one served stale, or the refusal.
-func cacheStale(t *testing.T, c *config.Config) string {
+func cacheStale(domain string) func(t *testing.T, c *config.Config) string {
+	return func(t *testing.T, c *config.Config) string {
+		t.Helper()
+		return staleRun(t, c, domain)
+	}
+}
+
+func staleRun(t *testing.T, c *config.Config, domain string) string {
 	t.Helper()
-	f, v := &cachedFeatures{domain: "energy", sites: 1}, &countedVersions{}
+	// Every answer is past its max-age at the second request, so only the
+	// stale allowance can answer it, whatever the domain's max-age.
+	second := time.Second
+	c.Cache.MaxAge = config.CacheMaxAge{Places: second, Roads: second, Energy: second, Parking: second, Transit: second,
+		Accessibility: second, Weather: second, Rules: second, Default: second}
+	f, v := &cachedFeatures{domain: domain, sites: 1}, &countedVersions{}
 	now := time.Now()
 	clock := func() time.Time { return now }
 	h, err := httpapi.NewHandler(httpapi.Deps{Config: c, ContractVersion: "0.1", Auth: everyScope{}, Features: f, Versions: v, Now: clock})
@@ -166,8 +178,7 @@ func perfBehaviours() map[string]behaviour {
 		"cache.max_entries": {"1", cacheAlternate},
 		// An answer read two minutes ago is served stale within five
 		// minutes, not within one, and never for a family listed.
-		"cache.stale_if_error":    {"1m", cacheStale},
-		"cache.no_stale_families": {"fam-energy", cacheStale},
+		"cache.no_stale_families": {"fam-energy", cacheStale("energy")},
 	}
 	for _, d := range []string{"places", "roads", "energy", "parking", "transit", "accessibility", "weather", "rules", "default"} {
 		domain := d
@@ -175,6 +186,7 @@ func perfBehaviours() map[string]behaviour {
 			domain = "other"
 		}
 		out["cache.max_age."+d] = behaviour{"2h", cacheRun(domain, 1, 1, 0)}
+		out["cache.stale_if_error."+d] = behaviour{"1m", cacheStale(domain)}
 	}
 	return out
 }

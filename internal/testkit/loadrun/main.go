@@ -118,7 +118,10 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		openFor  = fs.Duration("breaker-open-for", 2*time.Second, "breaker.open_for of the instance under test, as test/load/compose.yaml sets it (NFR-RES-002)")
 		probes   = fs.Int("breaker-probes", 2, "breaker.half_open_probes of the instance under test (NFR-RES-002)")
 		cached   = fs.String("cached-api", "http://[::1]:8081", "base URL of the instance with the result cache, behind the same fault proxy (NFR-RES-004)")
-		staleFor = fs.Duration("stale-if-error", 3*time.Second, "cache.stale_if_error of the instance with the result cache, as test/load/compose.yaml sets it (NFR-RES-004)")
+		staleFor = fs.Duration("stale-if-error", 4*time.Second, "cache.stale_if_error.parking of the instance with the result cache, as test/load/compose.yaml sets it (NFR-RES-004)")
+		ageP     = fs.Duration("max-age-parking", time.Second, "cache.max_age.parking of the instance with the result cache, as test/load/compose.yaml sets it")
+		ageE     = fs.Duration("max-age-energy", time.Second, "cache.max_age.energy of the instance with the result cache, as test/load/compose.yaml sets it")
+		ttl      = fs.Duration("versions-ttl", time.Second, "cache.versions_ttl of the instance with the result cache, as test/load/compose.yaml sets it")
 	)
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -147,6 +150,13 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		return fail("-breaker-failures and -breaker-probes must be at least 1, -breaker-open-for positive")
 	case *staleFor <= 0:
 		return fail("-stale-if-error must be positive")
+	case *ageP <= 0 || *ageE <= 0 || *ttl <= 0:
+		return fail("-max-age-parking, -max-age-energy and -versions-ttl must be positive")
+	case *staleFor < 2*max(*ageP, *ageE, *ttl):
+		// The stale answers are asked once the stored ones are past their
+		// max-age and the versions past their TTL: they must then still be
+		// within the allowance.
+		return fail("-stale-if-error must be at least twice the longest of -max-age-parking, -max-age-energy and -versions-ttl")
 	}
 	key, cold := getenv("LOADRUN_KEY"), getenv("LOADRUN_COLD_KEY")
 	if key == "" || cold == "" || key == cold {
@@ -174,7 +184,7 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	r.host = execHost(*docker)
 	r.queued = *queued
 	r.brk = breakerSettings{failures: *failures, openFor: *openFor, probes: *probes}
-	r.cached, r.staleFor = strings.TrimRight(*cached, "/"), *staleFor
+	r.cached, r.staleFor, r.freshFor = strings.TrimRight(*cached, "/"), *staleFor, max(*ageP, *ageE, *ttl)
 	outs := r.runAll(context.Background(), sel)
 	figs := collect(*prof, outs)
 	cmp := compare(*previous, figs, *tol, *floor)

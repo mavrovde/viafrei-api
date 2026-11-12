@@ -90,10 +90,14 @@ setting() {
 brk_failures=$(setting BREAKER_FAILURE_THRESHOLD) || exit 2
 brk_open_for=$(setting BREAKER_OPEN_FOR) || exit 2
 brk_probes=$(setting BREAKER_HALF_OPEN_PROBES) || exit 2
-stale_for=$(setting CACHE_STALE_IF_ERROR) || exit 2
+stale_for=$(setting CACHE_STALE_IF_ERROR_PARKING) || exit 2
+max_age_parking=$(setting CACHE_MAX_AGE_PARKING) || exit 2
+max_age_energy=$(setting CACHE_MAX_AGE_ENERGY) || exit 2
+versions_ttl=$(setting CACHE_VERSIONS_TTL) || exit 2
 previous=()
 [[ -n ${LOADRUN_PREVIOUS:-} ]] && previous=(-previous "$LOADRUN_PREVIOUS")
 go run ./internal/testkit/loadrun -profile "$profile" -report "$report" -api "$API_URL" -proxy "$PROXY_URL" -place "$place" \
   -breaker-failures "$brk_failures" -breaker-open-for "$brk_open_for" -breaker-probes "$brk_probes" \
   -cached-api "$CACHED_URL" -stale-if-error "$stale_for" \
+  -max-age-parking "$max_age_parking" -max-age-energy "$max_age_energy" -versions-ttl "$versions_ttl" \
   -compose-files compose.yaml,test/load/compose.yaml "${previous[@]}"

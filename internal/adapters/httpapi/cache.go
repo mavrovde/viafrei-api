@@ -128,8 +128,9 @@ type entry struct {
 	built   time.Time
 	expires time.Time
 	// stale is how long after built the answer may still be served stale
-	// (cache.stale_if_error, or 0 when a family it was read from is in
-	// cache.no_stale_families), and keep is when its body is dropped: the
+	// (the smallest cache.stale_if_error of the domains it was read from,
+	// or 0 when a family it was read from is in cache.no_stale_families),
+	// and keep is when its body is dropped: the
 	// later of expires and built plus stale.
 	stale time.Duration
 	keep  time.Time
@@ -178,6 +179,10 @@ type resultCache struct {
 type flight struct {
 	done chan struct{}
 	e    *entry // the leader's answer; nil when it had no 200 from source families
+	// failed is set when storage could not answer the leader: the requests
+	// that waited are then answered stale as the leader was, when they may
+	// be, rather than each asking the storage that just failed.
+	failed bool
 }
 
 func newResultCache(c config.Cache) *resultCache {
@@ -344,6 +349,17 @@ func (v *versionCache) get(ctx context.Context) (provenance.Versions, bool) {
 	return vs, true
 }
 
+// last returns the versions of the last read that succeeded, however old,
+// and whether there was one. A stale answer is held to the register in it:
+// while storage cannot answer, the versions cannot be read either, and the
+// register the service last knew is the only one an answer may be checked
+// against.
+func (v *versionCache) last() (provenance.Versions, bool) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.vs, v.read
+}
+
 // serviceRead is the context of a read the service makes for every request,
 // not for the one that happened to ask: it carries none of that request's
 // values, so no caller rides on it and it is admitted as the service's own
@@ -420,8 +436,16 @@ func (s *server) cache(ctx huma.Context, next func(huma.Context)) {
 				s.sendEntry(ctx, f.e, inm)
 				return
 			}
+			if f.failed && s.serveStale(ctx, key) {
+				return
+			}
 		case <-ctx.Context().Done():
-			// The request ended while waiting: it runs no read of its own.
+			// The request ended while waiting: it runs no read of its own,
+			// and is answered stale when it may be, as a deadline exhausted
+			// in its own read would be.
+			if s.serveStale(ctx, key) {
+				return
+			}
 			sendProblem(ctx, newProblem(ctx.Context(), SlugDeadlineExhausted, "The request ended while an identical request was being answered.", 1))
 			return
 		}
@@ -458,8 +482,13 @@ func (s *server) run(ctx huma.Context, next func(huma.Context), key, inm string,
 		}
 	}()
 	next(b)
-	if storageFailed(b) && s.serveStale(ctx, key, vs, versioned) {
-		return
+	if storageFailed(b) {
+		if f != nil {
+			f.failed = true
+		}
+		if s.serveStale(ctx, key) {
+			return
+		}
 	}
 	if b.status != http.StatusOK || len(note.fams) == 0 {
 		send(ctx, b.status, b.header, b.body.Bytes())
@@ -501,6 +530,10 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 		if e.maxAge == 0 || age < e.maxAge {
 			e.maxAge = age
 		}
+		stale := maxAge(config.CacheMaxAge(s.cfg.Cache.StaleIfError), f.Source.Domain)
+		if len(e.families) == 1 || stale < e.stale {
+			e.stale = stale
+		}
 		if f.DataAsOf != nil && (e.modified == nil || f.DataAsOf.After(*e.modified)) {
 			e.modified = f.DataAsOf
 		}
@@ -526,7 +559,6 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 	}
 	e.etag = `W/"` + base64.RawURLEncoding.EncodeToString(h.Sum(nil)[:18]) + `"`
 	e.built, e.expires = now, now.Add(e.maxAge)
-	e.stale = s.cfg.Cache.StaleIfError
 	for _, f := range e.families {
 		if slices.Contains(s.cfg.Cache.NoStale, f.family) {
 			e.stale = 0
@@ -536,7 +568,9 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 	return e
 }
 
-// maxAge is the Cache-Control max-age of a domain's answers.
+// maxAge is the Cache-Control max-age of a domain's answers, and, given the
+// stale allowances as a CacheMaxAge, the stale allowance of a domain's
+// answers.
 func maxAge(m config.CacheMaxAge, domain string) time.Duration {
 	switch domain {
 	case "places":
@@ -646,11 +680,16 @@ func (c *resultCache) stale(key string, now time.Time) *entry {
 // answer of key, when it may be served stale: a 200 with the served_stale
 // warning and its true Age (PROT-047). It is sent with no-store and no
 // validator, so nothing downstream keeps or revalidates it. An answer read
-// under another licence register than the one last read is never served.
-// It reports whether it answered.
-func (s *server) serveStale(ctx huma.Context, key string, vs provenance.Versions, versioned bool) bool {
+// under another licence register than the one last read successfully is
+// never served, nor any answer before a register was read at all: the
+// licence gate reads the register from storage, so while storage cannot
+// answer this is the only check. It reports whether it answered.
+func (s *server) serveStale(ctx huma.Context, key string) bool {
 	e := s.results.stale(key, s.now())
-	if e == nil || (versioned && vs.Register != e.register) {
+	if e == nil {
+		return false
+	}
+	if vs, ok := s.versions.last(); !ok || vs.Register != e.register {
 		return false
 	}
 	age := s.age(e)

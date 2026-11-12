@@ -34,9 +34,16 @@ cache is tested by the unit and integration tests and by the benchmark leg.
 A second instance of the same image, `api-cached`, runs with the cache on
 behind the same fault proxy, published on the loopback at port 8081
 (`-cached-api`). Only `storage-killed` speaks to it, to see stale answers
-(NFR-RES-004). Its `cache.stale_if_error` is 3 s, which `scripts/load-test.sh`
-reads from `test/load/compose.yaml` and passes as `-stale-if-error`, and
-`cache.no_stale_families` lists every charging family of the fixture set.
+(NFR-RES-004). Its `cache.stale_if_error.parking` is 4 s, its
+`cache.max_age.parking`, `cache.max_age.energy` and `cache.versions_ttl` are
+1 s each, and `cache.no_stale_families` lists every charging family of the
+fixture set. `scripts/load-test.sh` reads these four from
+`test/load/compose.yaml` and passes them as `-stale-if-error`,
+`-max-age-parking`, `-max-age-energy` and `-versions-ttl`. Within the max-age
+a stored answer is replayed as fresh from memory, storage or not, so the
+runner asks for stale answers one and a half times the longest of the three
+after the cut; the allowance must be at least twice that, or the runner
+refuses to start.
 
 The runner speaks only to hosts on `test/load/allow-list.txt` (the loopback).
 Any other host, any scheme but `http`, and a URL with credentials are refused

@@ -755,7 +755,8 @@ func TestNoStaleAnswerWhenItIsNotAllowed(t *testing.T) {
 		cfg func(*config.Config)
 		rig func(*cacheRig)
 	}{
-		"stale_if_error 0s": {cfg: func(c *config.Config) { c.Cache.StaleIfError = 0 }},
+		"stale_if_error.energy 0s": {cfg: func(c *config.Config) { c.Cache.StaleIfError.Energy = 0 }},
+		"stale_if_error.energy 1m": {cfg: func(c *config.Config) { c.Cache.StaleIfError.Energy = time.Minute }},
 		"a family that is never served stale": {cfg: func(c *config.Config) {
 			c.Cache.NoStale = []string{"src-zeta-places", "src-alpha-energy"}
 		}},
@@ -779,6 +780,92 @@ func TestNoStaleAnswerWhenItIsNotAllowed(t *testing.T) {
 		if w := r.get(t, nil); w.Code != http.StatusServiceUnavailable {
 			t.Errorf("%s: %d, want 503", name, w.Code)
 		}
+	}
+}
+
+func TestAnAnswerOfSeveralDomainsTakesTheSmallestAllowance(t *testing.T) {
+	req.Covers(t, "NFR-RES-004", "CFG-001")
+	for name, set := range map[string]func(*config.CacheStaleIfError){
+		"the first domain's": func(a *config.CacheStaleIfError) { a.Energy = time.Minute },
+		"a later domain's":   func(a *config.CacheStaleIfError) { a.Parking = time.Minute },
+	} {
+		cfg := config.Defaults()
+		set(&cfg.Cache.StaleIfError)
+		r := newCacheRig(t, cfg, "v1")
+		parking := terms
+		parking.Notes = nil
+		r.features.charging.Families = append(r.features.charging.Families, parking)
+		r.get(t, nil)
+		r.clock.add(30 * time.Second)
+		r.failStorage(errFake)
+		if w := r.get(t, nil); w.Code != http.StatusOK || w.Header().Get("Age") != "30" {
+			t.Fatalf("%s: within both allowances: %d", name, w.Code)
+		}
+		r.clock.add(time.Minute)
+		if w := r.get(t, nil); w.Code != http.StatusServiceUnavailable {
+			t.Errorf("%s: past %s allowance and within the other: %d, want 503", name, name, w.Code)
+		}
+	}
+}
+
+func TestNoStaleAnswerUnderAnOlderRegisterWhileTheVersionsCannotBeRead(t *testing.T) {
+	req.Covers(t, "NFR-RES-004", "SEC-030")
+	r := newCacheRig(t, config.Defaults(), "v1")
+	r.get(t, nil)
+	r.clock.add(2 * time.Minute)
+	// The register changes and another request reads it; then storage is
+	// lost, for the versions as well.
+	r.versions.mu.Lock()
+	r.versions.register = "reg-2"
+	r.versions.mu.Unlock()
+	if w := do(t, r.h, http.MethodGet, "/v1/charging-options?at=48.1,11.5", http.Header{"Authorization": {"Bearer x"}}); w.Code != http.StatusOK {
+		t.Fatalf("another request: %d", w.Code)
+	}
+	r.clock.add(2 * time.Second)
+	r.versions.mu.Lock()
+	r.versions.err = errFake
+	r.versions.mu.Unlock()
+	r.failStorage(errFake)
+	if w := r.get(t, nil); w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("an answer read under the older register was served stale: %d", w.Code)
+	}
+}
+
+func TestFollowersOfAFailedLeaderAreAnsweredStale(t *testing.T) {
+	req.Covers(t, "NFR-RES-004", "NFR-PERF-006")
+	r := newCacheRig(t, config.Defaults(), "v1")
+	r.get(t, nil)
+	r.clock.add(2 * time.Minute)
+	r.failStorage(errFake)
+	for _, w := range followTheLeader(t, r, 3, nil) {
+		if w.Code != http.StatusOK || w.Header().Get("Age") != "120" || !slices.Equal(warnings(t, w), []string{"served_stale"}) {
+			t.Fatalf("a request of the flight: %d %v", w.Code, w.Header())
+		}
+	}
+	if n := r.features.calls.Load(); n != 2 {
+		t.Fatalf("%d reads; the requests that waited must not ask the failed storage again", n)
+	}
+}
+
+func TestAFollowerWhoseRequestEndsIsAnsweredStale(t *testing.T) {
+	req.Covers(t, "NFR-RES-004", "NFR-PERF-006")
+	r := newCacheRig(t, config.Defaults(), "v1")
+	r.get(t, nil)
+	r.clock.add(2 * time.Minute)
+	r.features.hold = make(chan struct{})
+	leader := make(chan struct{})
+	go func() { r.h.ServeHTTP(httptest.NewRecorder(), authed(context.Background())); close(leader) }()
+	for r.features.calls.Load() < 2 {
+		time.Sleep(time.Millisecond)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	w := httptest.NewRecorder()
+	r.h.ServeHTTP(w, authed(ctx))
+	close(r.features.hold)
+	<-leader
+	if w.Code != http.StatusOK || w.Header().Get("Age") != "120" {
+		t.Fatalf("a follower whose request ended: %d %s", w.Code, w.Body)
 	}
 }
 

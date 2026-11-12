@@ -47,19 +47,20 @@ func TestTheBreakerRecoversThroughOneTrialRead(t *testing.T) {
 		t.Fatalf("breaker %v after a successful trial, want closed", b.State())
 	}
 
-	// A statement stopped by its timeout leaves the breaker closed.
-	for range 3 {
-		short, cancel := context.WithTimeout(ctx, time.Second)
-		err := st.Read(short, func(ctx context.Context, tx pgx.Tx) error {
-			_, err := tx.Exec(ctx, "select pg_sleep(5)")
-			return err
-		})
-		cancel()
-		if sqlState(err) != "57014" {
-			t.Fatalf("a five-second statement under a one-second budget: %v, want the statement timeout (57014)", err)
-		}
+	// A statement stopped by its timeout leaves the breaker closed: one is
+	// enough, since one failure (FailureThreshold 1) would open it. Its
+	// budget is its own, not what is left of the test's bound, so a slow
+	// setup cannot shrink it below the reserve and the floor.
+	short, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	err = st.Read(short, func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, "select pg_sleep(5)")
+		return err
+	})
+	if sqlState(err) != "57014" {
+		t.Fatalf("a five-second statement under a one-second budget: %v, want the statement timeout (57014)", err)
 	}
 	if b.State() != breaker.Closed {
-		t.Fatalf("breaker %v after statements that ran out of time, want closed", b.State())
+		t.Fatalf("breaker %v after a statement that ran out of time, want closed", b.State())
 	}
 }

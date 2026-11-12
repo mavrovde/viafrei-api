@@ -135,8 +135,11 @@ contract cannot express; they are not compared here.
 
 ## Known differences that remain
 
-None in the platform 2.6.8 bundle: `TestParity` passes. Its facts are the
-2.5.24 bundle's, fact for fact; only `platform` and `commit` differ.
+No mismatch in the platform 2.6.12 bundle: `TestParity` passes. One fact
+differs by design, the named difference above (`charging-reserved`: the MCP
+side answers `occupied` where the API keeps `reserved`). The bundle's facts
+are the 2.6.8 bundle's, and so the 2.5.24 bundle's, fact for fact; only
+`platform` and `commit` differ.
 
 The 2.5.23 bundle differed in 9 facts. All 9 are closed:
 
@@ -161,8 +164,9 @@ The 2.5.23 bundle differed in 9 facts. All 9 are closed:
 
 The 2.5.23 and 2.5.24 bundles were answered from producer commits made after
 those versions' tags (each names its commit in `commit`). They are records
-only, not parity evidence; the evidence is the 2.6.8 bundle, answered at the
-2.6.8 tag's commit.
+only, not parity evidence; the evidence is the bundle of the pinned platform
+version (2.6.12), answered at that tag's commit, as the 2.6.8 bundle was at
+its own.
 
 The 2.5.23 bundle stays pinned as the record of that version. It was
 projected with rules/3, which this harness no longer reads (`Load` refuses

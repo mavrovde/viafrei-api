@@ -140,3 +140,58 @@ func TestTheRegisterFingerprintMovesWithEveryLicenceInput(t *testing.T) {
 		}
 	}
 }
+
+// TestAFamilyVersionMovesWithItsDataAsOf is the clock-skew case of the load
+// tests: the source's data_as_of moves while its freshness version stays the
+// same. Every answer renders its age, staleness and Last-Modified from
+// data_as_of, so the version the HTTP cache compares, and the one an answer
+// is tagged with, must move with it, and the two must stay equal.
+func TestAFamilyVersionMovesWithItsDataAsOf(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005")
+	st := seeded(t)
+	ctx := bounded(t)
+	conn, err := db.Owner(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	const family = "src-gamma-energy"
+	tagged := func() string {
+		t.Helper()
+		fs, err := st.Provenance(ctx, []string{family}, "en")
+		if err != nil || len(fs) != 1 {
+			t.Fatalf("provenance %+v, %v", fs, err)
+		}
+		return fs[0].Version
+	}
+	base, err := st.FreshnessVersions(ctx)
+	if err != nil || base.Families[family] == "" {
+		t.Fatalf("versions %+v, %v", base, err)
+	}
+	if got := tagged(); got != base.Families[family] {
+		t.Fatalf("the answer is tagged %q, the cache compares %q", got, base.Families[family])
+	}
+	for _, c := range []struct{ shift, back string }{
+		{"+ interval '10 minutes'", "- interval '10 minutes'"},
+		{"- interval '30 days'", "+ interval '30 days'"},
+	} {
+		shift := c.shift
+		if _, err := conn.Exec(ctx, `update contract.source_freshness set data_as_of = data_as_of `+shift+` where source_ref = $1`, family); err != nil {
+			t.Fatal(err)
+		}
+		moved, err := st.FreshnessVersions(ctx)
+		answer := tagged()
+		if _, uerr := conn.Exec(ctx, `update contract.source_freshness set data_as_of = data_as_of `+c.back+` where source_ref = $1`, family); uerr != nil {
+			t.Fatal(uerr)
+		}
+		if err != nil || moved.Families[family] == base.Families[family] {
+			t.Errorf("data_as_of moved %s and the version did not: %q (%v)", shift, moved.Families[family], err)
+		}
+		if answer != moved.Families[family] {
+			t.Errorf("after data_as_of moved %s the answer is tagged %q, the cache compares %q", shift, answer, moved.Families[family])
+		}
+		if back, err := st.FreshnessVersions(ctx); err != nil || back.Families[family] != base.Families[family] {
+			t.Errorf("data_as_of moved back and the version is %q, want %q (%v)", back.Families[family], base.Families[family], err)
+		}
+	}
+}

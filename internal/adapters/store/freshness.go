@@ -9,7 +9,7 @@ import (
 )
 
 // freshnessVersions reads, in one statement, a row per source family with its
-// freshness version and one row (flagged true) carrying the register
+// version (familyVersion) and one row (flagged true) carrying the register
 // fingerprint: a digest of every row the licence gate, the attribution and the
 // notes of an answer are read from. The register is a handful of small tables,
 // never an observation, so it is read whole. One statement means one failure
@@ -21,7 +21,17 @@ select true, '', md5(concat_ws('|',
   (select string_agg(t::text, ',' order by t::text) from contract.licence t),
   (select string_agg(t::text, ',' order by t::text) from contract.publisher t)))
 union all
-select false, source_ref::text, freshness_version::text from contract.source_freshness`
+select false, f.source_ref::text, ` + familyVersion + ` from contract.source_freshness f`
+
+// familyVersion is the version of a family's data that the HTTP cache
+// compares and an ETag is built from, over contract.source_freshness as f:
+// the freshness version AND the instant the data is current to. An answer
+// renders dataAsOf, ageS, stale and Last-Modified from data_as_of, so a
+// moved data_as_of must end a cached answer even when the freshness version
+// stayed the same (a source clock that was wrong and is corrected, say).
+// Empty when the family has published nothing; Provenance reads the same
+// expression, so an answer is tagged with the version this read compares.
+const familyVersion = `coalesce(f.freshness_version || '@' || coalesce(extract(epoch from f.data_as_of)::text, ''), '')`
 
 // FreshnessVersions reads the freshness version of every source family and
 // the register fingerprint, in one snapshot. Both are small tables, never an

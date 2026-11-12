@@ -270,7 +270,7 @@ type ChargingInput struct {
 
 // Availability is the last reported state of a charge point.
 type Availability struct {
-	State      string    `json:"state" enum:"available,occupied,reserved,out_of_order,unknown,other,stale" doc:"Open enumeration; treat an unknown value as other. stale: the report is older than the status age limit (30 minutes by default) or than its family's freshness threshold, and is not counted in summary.availableNow."`
+	State      string    `json:"state" enum:"available,occupied,reserved,out_of_order,unknown,other,stale" doc:"Open enumeration; treat an unknown value as other. reserved is never sent: a point reported reserved is answered occupied, as the MCP capability answers it. stale: the report is older than the status age limit (30 minutes by default) or than its family's freshness threshold, and is not counted in summary.availableNow."`
 	ObservedAt time.Time `json:"observedAt" doc:"When the state was reported."`
 }
 

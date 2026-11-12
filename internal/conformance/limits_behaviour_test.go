@@ -99,6 +99,11 @@ func admissionSettings(t *testing.T, c *config.Config) string {
 	return fmt.Sprintf("%+v", wire.AdmissionSettings(c))
 }
 
+func breakerSettings(t *testing.T, c *config.Config) string {
+	t.Helper()
+	return fmt.Sprintf("%+v", wire.BreakerSettings(c))
+}
+
 func addressSettings(t *testing.T, c *config.Config) string {
 	t.Helper()
 	return fmt.Sprintf("%+v", wire.AddressSettings(c))
@@ -144,6 +149,10 @@ func limitBehaviours() map[string]behaviour {
 		"admission.aging_after":              {"1s", admissionSettings},
 		"admission.ewma_alpha":               {"0.5", admissionSettings},
 		"admission.shed_status":              {"503", keyed},
+		"breaker.failure_threshold":          {"3", breakerSettings},
+		"breaker.window":                     {"1m", breakerSettings},
+		"breaker.open_for":                   {"30s", breakerSettings},
+		"breaker.half_open_probes":           {"1", breakerSettings},
 		"metering.flush_interval":            {"10s", meteringSettings},
 		"metering.max_keys_buffered":         {"200", meteringSettings},
 		"metering.write_timeout":             {"500ms", meteringSettings},

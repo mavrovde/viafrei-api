@@ -127,6 +127,13 @@ The answer could not be made within the 2 second deadline.
 ### upstream-unavailable
 Status `503` · Upstream unavailable · retryable.
 Storage is unavailable.
+After `breaker.failure_threshold` consecutive storage failures the service
+stops asking storage for `breaker.open_for` and answers this at once;
+`Retry-After` is the whole seconds left of that period (a composed answer
+none of whose parts is available says `Retry-After: 1`, since its parts may
+have failed for different reasons). Then a few trial
+requests are let through, and the first that storage answers ends it
+([configuration](configuration.md)).
 
 ### not-ready
 Status `503` · Not ready · retryable.

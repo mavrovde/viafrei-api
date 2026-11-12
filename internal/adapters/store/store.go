@@ -8,9 +8,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"net"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -20,6 +23,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/store/contractdb"
 	"github.com/mavrovde/viafrei-api/internal/app/admission"
+	"github.com/mavrovde/viafrei-api/internal/app/breaker"
 	"github.com/mavrovde/viafrei-api/internal/invariant"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
@@ -44,6 +48,15 @@ type Store struct {
 	budget  SharedBudget
 	pace    pace
 	log     *slog.Logger
+	breaker *breaker.Breaker
+}
+
+// WithBreaker puts the circuit breaker in front of every read (NFR-RES-002):
+// while it is open a read is refused at once with ErrUnavailable, wrapping
+// the *breaker.Refusal that says when to retry.
+func (s *Store) WithBreaker(b *breaker.Breaker) *Store {
+	s.breaker = b
+	return s
 }
 
 // WithLogger names the logger of a read's panic that no caller is left to
@@ -176,6 +189,12 @@ func (s *Store) Read(ctx context.Context, fn func(context.Context, pgx.Tx) error
 // That goroutine abandons the connection and only then gives the permit
 // back, so storage is never asked for more than the pool while a cancel is
 // still landing (NFR-PERF-002).
+//
+// With a breaker (WithBreaker), a read it refuses is answered at once with
+// ErrUnavailable and never asks storage. An admitted read tells it how the
+// read went (verdict) when the read itself ends, on the read's goroutine:
+// a read whose caller stopped waiting still counts, once storage has
+// answered it or failed to.
 func ReadValue[T any](ctx context.Context, s *Store, fn func(context.Context, pgx.Tx) (T, error)) (T, error) {
 	var zero T
 	if _, has := ctx.Deadline(); !has {
@@ -183,13 +202,23 @@ func ReadValue[T any](ctx context.Context, s *Store, fn func(context.Context, pg
 		ctx, cancel = context.WithTimeout(ctx, s.request)
 		defer cancel()
 	}
+	report := func(stage, error) {}
+	if s.breaker != nil {
+		ticket, err := s.breaker.Allow()
+		if err != nil {
+			return zero, fmt.Errorf("%w: %w", ErrUnavailable, err)
+		}
+		report = func(reached stage, err error) { ticket.Done(verdict(ctx, reached, err)) }
+	}
 	if _, ok := s.Budget(ctx); !ok {
+		report(refused, ErrDeadlineExhausted)
 		return zero, ErrDeadlineExhausted
 	}
 	release := func() {}
 	if s.admit != nil {
 		r, err := s.admit.Acquire(ctx)
 		if err != nil {
+			report(refused, err)
 			if errors.Is(err, admission.ErrOverloaded) {
 				return zero, err
 			}
@@ -205,6 +234,7 @@ func ReadValue[T any](ctx context.Context, s *Store, fn func(context.Context, pg
 	go func() {
 		o := guarded(ctx, s, fn)
 		release()
+		report(o.reached, o.err)
 		select {
 		case done <- o:
 		case <-gone:
@@ -236,11 +266,64 @@ type ReadPanic struct {
 func (p *ReadPanic) Error() string { return fmt.Sprintf("%v\n\n%s", p.Value, p.Stack) }
 
 // outcome is what the read goroutine hands back: the result and error of
-// fn, or its panic.
+// fn, or its panic, and how far the read got towards storage.
 type outcome[T any] struct {
-	value T
-	err   error
-	panic *ReadPanic
+	value   T
+	err     error
+	panic   *ReadPanic
+	reached stage
+}
+
+// stage is how far a read got towards storage.
+type stage int
+
+const (
+	refused stage = iota // refused before storage was asked, or panicked: says nothing about it
+	begun                // the transaction could not be opened
+	opened               // the transaction was opened: storage answered
+)
+
+// verdict is what a read tells the breaker. A read refused before storage
+// was asked tells nothing; one whose transaction could not be opened is a
+// failure unless its caller went away. Once the transaction is open,
+// storage has answered: only an error that says storage itself is down
+// (storageDown) is a failure. A statement that ran out of time, a read shed
+// by the shared budget, an error the server raised for one statement and a
+// row the code could not decode are storage answering, so a fault confined
+// to one request shape never opens the breaker for every other.
+func verdict(ctx context.Context, reached stage, err error) breaker.Outcome {
+	switch {
+	case reached == refused:
+		return breaker.Ignored
+	case reached == begun && errors.Is(ctx.Err(), context.Canceled):
+		return breaker.Ignored
+	case reached == begun:
+		return breaker.Failure
+	case err != nil && ctx.Err() == nil && storageDown(err):
+		return breaker.Failure
+	default:
+		return breaker.Success
+	}
+}
+
+// storageDown reports whether err says storage itself is unavailable rather
+// than that it refused one statement: the connection was lost (an end of
+// stream, a closed or failed network connection), or the server answered
+// with a SQLSTATE of class 08 (connection exception), 53 (insufficient
+// resources), 58 (system error) or XX (internal error), or 57P01 to 57P03
+// (the server is shutting down or cannot connect now).
+func storageDown(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return false // a deadline, which a context error also reports as a network timeout
+	}
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
+		return len(pgErr.Code) == 5 && (strings.Contains(" 08 53 58 XX ", " "+pgErr.Code[:2]+" ") || pgErr.Code == "57P01" || pgErr.Code == "57P02" || pgErr.Code == "57P03")
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, net.ErrClosed) {
+		return true
+	}
+	_, isNet := errors.AsType[net.Error](err)
+	return isNet
 }
 
 // guarded runs the transaction and turns a panic into an outcome.
@@ -250,18 +333,18 @@ func guarded[T any](ctx context.Context, s *Store, fn func(context.Context, pgx.
 			o = outcome[T]{panic: &ReadPanic{Value: v, Stack: debug.Stack()}}
 		}
 	}()
-	v, err := transact(ctx, s, fn)
-	return outcome[T]{value: v, err: err}
+	v, reached, err := transact(ctx, s, fn)
+	return outcome[T]{value: v, err: err, reached: reached}
 }
 
 // transact runs fn in one read-only transaction whose statement timeout is
-// what is left of the budget.
-func transact[T any](ctx context.Context, s *Store, fn func(context.Context, pgx.Tx) (T, error)) (v T, err error) {
+// what is left of the budget, and says how far it got towards storage.
+func transact[T any](ctx context.Context, s *Store, fn func(context.Context, pgx.Tx) (T, error)) (v T, reached stage, err error) {
 	// The wait for a permit spent part of the budget: what is left is the
 	// statement timeout.
 	budget, ok := s.Budget(ctx)
 	if !ok {
-		return v, ErrDeadlineExhausted
+		return v, refused, ErrDeadlineExhausted
 	}
 	// One round trip opens the read-only transaction and sets its statement
 	// timeout; the budget is an integer of milliseconds, never caller text.
@@ -276,21 +359,21 @@ func transact[T any](ctx context.Context, s *Store, fn func(context.Context, pgx
 		BeginQuery: "begin transaction isolation level repeatable read read only; set local jit = off; set local statement_timeout = " + strconv.FormatInt(budget.Milliseconds(), 10),
 	})
 	if err != nil {
-		return v, classify(ctx, err)
+		return v, begun, classify(ctx, err)
 	}
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 	if s.budget.Slots > 0 {
 		if err := s.takeSlot(ctx, tx); err != nil {
-			return v, err
+			return v, opened, err
 		}
 	}
 	if v, err = fn(ctx, tx); err != nil {
-		return v, classify(ctx, err)
+		return v, opened, classify(ctx, err)
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return v, classify(ctx, err)
+		return v, opened, classify(ctx, err)
 	}
-	return v, nil
+	return v, opened, nil
 }
 
 // takeSlot holds a slot of the shared budget for tx (NFR-CAP-002). A read

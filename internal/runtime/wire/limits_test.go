@@ -1,10 +1,14 @@
 package wire_test
 
 import (
+	"bytes"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/app/admission"
+	"github.com/mavrovde/viafrei-api/internal/app/breaker"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/runtime/wire"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
@@ -56,5 +60,39 @@ func TestQuotaZone(t *testing.T) {
 	cfg.Quota.ResetTZ = "Nowhere/Never"
 	if got := wire.QuotaZone(cfg); got != time.UTC {
 		t.Fatalf("fallback %s", got)
+	}
+}
+
+func TestBreakerSettings(t *testing.T) {
+	req.Covers(t, "NFR-RES-002")
+	cfg := config.Defaults()
+	b := wire.BreakerSettings(cfg)
+	if b.FailureThreshold != 5 || b.Window != 30*time.Second || b.OpenFor != 15*time.Second || b.HalfOpenProbes != 2 {
+		t.Fatalf("breaker: %+v, want the specified defaults 5 / 30s / 15s / 2", b)
+	}
+}
+
+func TestBreakerLogsEachChangeOfState(t *testing.T) {
+	req.Covers(t, "NFR-RES-002")
+	cfg := config.Defaults()
+	cfg.Breaker.FailureThreshold = 1
+	cfg.Breaker.OpenFor = time.Second
+	var out bytes.Buffer
+	at := time.Date(2026, 11, 12, 10, 0, 0, 0, time.UTC)
+	b := wire.BreakerAt(cfg, slog.New(slog.NewJSONHandler(&out, nil)), func() time.Time { return at })
+	tk, err := b.Allow()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tk.Done(breaker.Failure)
+	if !strings.Contains(out.String(), `"level":"WARN","msg":"storage circuit breaker changed state","from":"closed","to":"open","generation":1`) {
+		t.Fatalf("opening not logged as a warning: %s", out.String())
+	}
+	at = at.Add(cfg.Breaker.OpenFor)
+	if b.State() != breaker.HalfOpen || !strings.Contains(out.String(), `"level":"INFO","msg":"storage circuit breaker changed state","from":"open","to":"half-open","generation":2`) {
+		t.Fatalf("half-open not logged as information: %s", out.String())
+	}
+	if wire.Breaker(cfg, slog.New(slog.NewJSONHandler(&out, nil))).State() != breaker.Closed {
+		t.Fatal("the wall-clock breaker does not start closed")
 	}
 }

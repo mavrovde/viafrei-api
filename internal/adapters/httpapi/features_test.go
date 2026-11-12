@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
+	"github.com/mavrovde/viafrei-api/internal/app/breaker"
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
@@ -552,5 +554,25 @@ func TestFeatureOperationsListTheirRefusals(t *testing.T) {
 				t.Errorf("%s does not list its %s problem", path, status)
 			}
 		}
+	}
+}
+
+// An open storage breaker is 503 upstream-unavailable at once, with
+// Retry-After the whole seconds left of its open period (NFR-RES-002).
+func TestAnOpenBreakerIsUpstreamUnavailableWithItsRetryAfter(t *testing.T) {
+	req.Covers(t, "NFR-RES-002")
+	open := fmt.Errorf("%w: %w", store.ErrUnavailable, &breaker.Refusal{State: breaker.Open, RetryAfter: 7200 * time.Millisecond})
+	w := do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: open}, nil), http.MethodGet, "/v1/charging-options?at=52.52,13.405", bearer)
+	assertProblem(t, w, 503, "upstream-unavailable")
+	if got := w.Header().Get("Retry-After"); got != "8" {
+		t.Fatalf("Retry-After %q, want 8", got)
+	}
+	if !strings.Contains(w.Body.String(), "not asked again until the time given") {
+		t.Fatalf("detail does not say the breaker is open: %s", w.Body.String())
+	}
+	trial := fmt.Errorf("%w: %w", store.ErrUnavailable, &breaker.Refusal{State: breaker.HalfOpen})
+	w = do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: trial}, nil), http.MethodGet, "/v1/charging-options?at=52.52,13.405", bearer)
+	if got := w.Header().Get("Retry-After"); got != "1" {
+		t.Fatalf("Retry-After %q while the trials run, want 1", got)
 	}
 }

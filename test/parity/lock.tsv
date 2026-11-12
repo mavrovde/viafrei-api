@@ -2,7 +2,7 @@
 # Pinned by the version sync; see docs/parity.md.
 # 2.5.23 and 2.5.24 were answered from producer commits made after those
 # versions' tags (each named in its bundle's commit): records only, not
-# parity evidence. 2.6.8 and 2.6.12 were answered at their tags' commits.
+# parity evidence. 2.6.8, 2.6.12 and 2.6.13 were answered at their tags' commits.
 # 2.5.23 is projected with viafrei.parity.rules/3: kept as that version's record,
 # Load refuses it under rules/4 (lock_test.go). It is compared only by a
 # checkout of its own time.
@@ -10,4 +10,5 @@
 2.5.24	bundles/2.5.24.json	5ab94136763df1c4fe385f02caa948842011b60aec3686a288925989267955a3
 2.6.8	bundles/2.6.8.json	c635fc26e779f15853cb7afc5f117ea669799dcfc8a4fd7251fd6225122e2e65
 2.6.12	bundles/2.6.12.json	256e58ddb09cccc8f72f0b188bdc8d14361cb5eeb8e5ebe5bd525f3f32840ce0
+2.6.13	bundles/2.6.13.json	19bf69046b519dfaf99ec794a3d12b80f75da6e22bfd5834a4d623e0c71b4cb8
 unsynced	bundles/unsynced.json	81c5346d7920ee8d0a8dd3476d85f3d294da12ce9dceaed0b0c121d5ea9eed68

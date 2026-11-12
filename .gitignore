@@ -30,3 +30,4 @@ sarif/
 
 # The pinned a11y toolchain (scripts/docs-a11y.sh installs it)
 /scripts/a11y-tools/node_modules/
+/coverage-offsite.lcov

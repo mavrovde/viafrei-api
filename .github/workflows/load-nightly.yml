@@ -10,9 +10,11 @@
 #
 # Each run also writes its figures (load-report.json) into that artifact. A
 # run on main fetches the figures of the newest successful nightly run on
-# main and the report compares the two (TST-021, issue #80): a p95 or p99
-# regression beyond the tolerance fails the run, and a missing or unreadable
-# previous file is named in the report, never read as "no change".
+# main of the same budget and the report compares the two (TST-021, issue
+# #80): a p95 or p99 regression beyond the tolerance fails the run, and a
+# missing or unreadable previous file is named in the report, never read as
+# "no change". A dispatch with compare off runs without the comparison, so
+# an accepted slowdown makes a new baseline (docs/load-tests.md).
 name: Load nightly
 
 on:
@@ -23,6 +25,10 @@ on:
       profile:
         description: Budget (pr for a quick check, nightly for the full run)
         default: nightly
+      compare:
+        description: Compare with the previous main run; off makes this run the new baseline when a slowdown is accepted
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -48,17 +54,21 @@ jobs:
         with:
           go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
       - name: The previous main run's figures (TST-021)
-        if: github.ref == 'refs/heads/main'
+        # A scheduled run on main always compares; a dispatch on main unless
+        # its compare input is off.
+        if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.compare)
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-        run: scripts/load-previous.sh previous
+          PROFILE: ${{ inputs.profile || 'nightly' }}
+        run: scripts/load-previous.sh previous "$PROFILE"
       - name: Every scenario on the test stack
         env:
           PROFILE: ${{ inputs.profile || 'nightly' }}
-          # On main the run is compared with the previous main run's figures;
-          # when there are none the report names the absent file.
-          LOADRUN_PREVIOUS: ${{ github.ref == 'refs/heads/main' && 'previous/load-report.json' || '' }}
+          # On main the run is compared with the previous main run's figures
+          # of its budget, unless a dispatch turned compare off; when there
+          # are none the report names the absent file.
+          LOADRUN_PREVIOUS: ${{ github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.compare) && 'previous/load-report.json' || '' }}
         run: scripts/load-test.sh "$PROFILE" load-report.md
       - name: Report in the job summary
         if: always() && hashFiles('load-report.md') != ''

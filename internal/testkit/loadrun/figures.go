@@ -70,26 +70,31 @@ func collect(prof string, outs []*outcome) figures {
 		}
 		slices.Sort(classes)
 		for _, c := range classes {
-			in := func(r result) bool { return r.class == c }
-			var st [6]int
-			for _, r := range o.results {
-				if in(r) {
-					st[min(r.status/100, 5)]++
-				}
-			}
-			good := took(o.results, func(r result) bool { return in(r) && ok(r) })
-			n := count(o.results, in)
-			s.Classes = append(s.Classes, classFigures{
-				Class: c, Requests: n,
-				Status2xx: st[2], Status4xx: st[4], Status5xx: st[5], NoAnswer: st[0], OK: len(good),
-				P50Ms: ms(percentile(good, 0.50)), P95Ms: ms(percentile(good, 0.95)), P99Ms: ms(percentile(good, 0.99)),
-				SlowestMs:    ms(percentile(took(o.results, in), 1)),
-				RefusalShare: float64(count(o.results, func(r result) bool { return in(r) && refused(r) })) / float64(n),
-			})
+			s.Classes = append(s.Classes, classFigure(o.results, c))
 		}
 		f.Scenarios = append(f.Scenarios, s)
 	}
 	return f
+}
+
+// classFigure is the figures of the results of class c.
+func classFigure(rs []result, c string) classFigures {
+	in := func(r result) bool { return r.class == c }
+	var st [6]int
+	for _, r := range rs {
+		if in(r) {
+			st[min(r.status/100, 5)]++
+		}
+	}
+	good := took(rs, func(r result) bool { return in(r) && ok(r) })
+	n := count(rs, in)
+	return classFigures{
+		Class: c, Requests: n,
+		Status2xx: st[2], Status4xx: st[4], Status5xx: st[5], NoAnswer: st[0], OK: len(good),
+		P50Ms: ms(percentile(good, 0.50)), P95Ms: ms(percentile(good, 0.95)), P99Ms: ms(percentile(good, 0.99)),
+		SlowestMs:    ms(percentile(took(rs, in), 1)),
+		RefusalShare: float64(count(rs, func(r result) bool { return in(r) && refused(r) })) / float64(n),
+	}
 }
 
 // writeFigures writes f as indented JSON.
@@ -153,6 +158,7 @@ type comparison struct {
 	reason      string
 	rows        []string // Markdown table rows
 	regressions []string // each names the scenario, the class and the figure
+	unjudged    []string // classes in both runs with too few 2xx answers to judge
 }
 
 // failed: a regression beyond the tolerance, or a previous file that exists
@@ -183,35 +189,7 @@ func compare(path string, cur figures, tol float64, floor time.Duration) compari
 			c.rows = append(c.rows, fmt.Sprintf("| %s | all | new in this run | | | | | | |", s.Name))
 			continue
 		}
-		p := prev.Scenarios[i]
-		if s.MemoryGrowth != nil && p.MemoryGrowth != nil {
-			c.rows = append(c.rows, fmt.Sprintf("| %s | memory growth | %s | | | | | | |", s.Name, change(*p.MemoryGrowth*100, *s.MemoryGrowth*100, " %")))
-		}
-		for _, k := range s.Classes {
-			j := slices.IndexFunc(p.Classes, func(x classFigures) bool { return x.Class == k.Class })
-			if j < 0 {
-				c.rows = append(c.rows, fmt.Sprintf("| %s | %s | new in this run | | | | | | |", s.Name, k.Class))
-				continue
-			}
-			q := p.Classes[j]
-			c.rows = append(c.rows, fmt.Sprintf("| %s | %s | %s | %d/%d/%d/%d → %d/%d/%d/%d | %s | %s | %s | %s | %s |",
-				s.Name, k.Class, change(float64(q.Requests), float64(k.Requests), ""),
-				q.Status2xx, q.Status4xx, q.Status5xx, q.NoAnswer, k.Status2xx, k.Status4xx, k.Status5xx, k.NoAnswer,
-				change(q.P50Ms, k.P50Ms, " ms"), change(q.P95Ms, k.P95Ms, " ms"), change(q.P99Ms, k.P99Ms, " ms"),
-				change(q.SlowestMs, k.SlowestMs, " ms"), change(q.RefusalShare*100, k.RefusalShare*100, " %")))
-			if q.OK < minCompared || k.OK < minCompared {
-				continue
-			}
-			for _, fig := range []struct {
-				name      string
-				prev, now float64
-			}{{"p95", q.P95Ms, k.P95Ms}, {"p99", q.P99Ms, k.P99Ms}} {
-				if fig.now > fig.prev*(1+tol) && fig.now-fig.prev > ms(floor) {
-					c.regressions = append(c.regressions, fmt.Sprintf("%s, class %s: %s %s, more than %.0f %% and %s above the previous run",
-						s.Name, k.Class, fig.name, change(fig.prev, fig.now, " ms"), tol*100, floor))
-				}
-			}
-		}
+		c.scenario(prev.Scenarios[i], s, tol, floor)
 	}
 	for _, p := range prev.Scenarios {
 		if !slices.ContainsFunc(cur.Scenarios, func(s scenarioFigures) bool { return s.Name == p.Name }) {
@@ -219,6 +197,51 @@ func compare(path string, cur figures, tol float64, floor time.Duration) compari
 		}
 	}
 	return c
+}
+
+// scenario adds the rows, regressions and unjudged classes of scenario s,
+// present in both runs (p the previous).
+func (c *comparison) scenario(p, s scenarioFigures, tol float64, floor time.Duration) {
+	if s.MemoryGrowth != nil && p.MemoryGrowth != nil {
+		c.rows = append(c.rows, fmt.Sprintf("| %s | memory growth | %s | | | | | | |", s.Name, change(*p.MemoryGrowth*100, *s.MemoryGrowth*100, " %")))
+	}
+	for _, k := range s.Classes {
+		j := slices.IndexFunc(p.Classes, func(x classFigures) bool { return x.Class == k.Class })
+		if j < 0 {
+			c.rows = append(c.rows, fmt.Sprintf("| %s | %s | new in this run | | | | | | |", s.Name, k.Class))
+			continue
+		}
+		c.class(s.Name, p.Classes[j], k, tol, floor)
+	}
+}
+
+// class adds the row of class k of scenario name (q the previous), and its
+// regressions, or says it is not judged.
+func (c *comparison) class(name string, q, k classFigures, tol float64, floor time.Duration) {
+	c.rows = append(c.rows, fmt.Sprintf("| %s | %s | %s | %d/%d/%d/%d → %d/%d/%d/%d | %s | %s | %s | %s | %s |",
+		name, k.Class, change(float64(q.Requests), float64(k.Requests), ""),
+		q.Status2xx, q.Status4xx, q.Status5xx, q.NoAnswer, k.Status2xx, k.Status4xx, k.Status5xx, k.NoAnswer,
+		change(q.P50Ms, k.P50Ms, " ms"), change(q.P95Ms, k.P95Ms, " ms"), change(q.P99Ms, k.P99Ms, " ms"),
+		change(q.SlowestMs, k.SlowestMs, " ms"), change(q.RefusalShare*100, k.RefusalShare*100, " %")))
+	if q.OK < minCompared || k.OK < minCompared {
+		c.unjudged = append(c.unjudged, fmt.Sprintf("%s, class %s: %d → %d 2xx answers, fewer than %d in a run", name, k.Class, q.OK, k.OK, minCompared))
+		return
+	}
+	for _, fig := range []struct {
+		name      string
+		prev, now float64
+	}{{"p95", q.P95Ms, k.P95Ms}, {"p99", q.P99Ms, k.P99Ms}} {
+		if regressed(fig.prev, fig.now, tol, floor) {
+			c.regressions = append(c.regressions, fmt.Sprintf("%s, class %s: %s %s, more than %.0f %% and %s above the previous run",
+				name, k.Class, fig.name, change(fig.prev, fig.now, " ms"), tol*100, floor))
+		}
+	}
+}
+
+// regressed: now is more than tol (a fraction) and more than floor above
+// prev, both in milliseconds.
+func regressed(prev, now, tol float64, floor time.Duration) bool {
+	return now > prev*(1+tol) && now-prev > ms(floor)
 }
 
 // render is the report's comparison section.
@@ -239,6 +262,12 @@ func (c comparison) render(tol float64, floor time.Duration) string {
 	b.WriteString("|---|---|---|---|---|---|---|---|---|\n")
 	for _, r := range c.rows {
 		b.WriteString(r + "\n")
+	}
+	if len(c.unjudged) > 0 {
+		b.WriteString("\nNot judged, too few 2xx answers for a p95 or p99 to compare:\n\n")
+		for _, u := range c.unjudged {
+			fmt.Fprintf(&b, "- %s\n", u)
+		}
 	}
 	if len(c.regressions) == 0 {
 		b.WriteString("\nNo regression beyond the tolerance.\n")

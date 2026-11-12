@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"os"
@@ -76,31 +77,65 @@ func TestComparisonFailsAP95OrP99RegressionAndNamesIt(t *testing.T) {
 		p95, p99 float64
 		want     []string
 	}{
-		"p95 up 20 %":             {120, 200, []string{"soak, class near: p95 100 ms → 120 ms (+20.0 %)"}},
-		"p99 up 20 %":             {100, 240, []string{"soak, class near: p99 200 ms → 240 ms (+20.0 %)"}},
-		"both up":                 {150, 300, []string{"p95 100 ms → 150 ms", "p99 200 ms → 300 ms"}},
-		"within the tolerance":    {109, 219, nil},
-		"faster":                  {50, 100, nil},
-		"at the tolerance's edge": {110, 220, nil},
+		"p95 up 20 %":          {120, 200, []string{"soak, class near: p95 100 ms → 120 ms (+20.0 %)"}},
+		"p99 up 20 %":          {100, 240, []string{"soak, class near: p99 200 ms → 240 ms (+20.0 %)"}},
+		"both up":              {150, 300, []string{"p95 100 ms → 150 ms", "p99 200 ms → 300 ms"}},
+		"within the tolerance": {109, 219, nil},
+		"faster":               {50, 100, nil},
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := compare(prev, figuresWith("nightly", "soak", classNear, 100, tc.p95, tc.p99), 0.10, 5*time.Millisecond)
-			if c.state != compared || len(c.regressions) != len(tc.want) || c.failed() != (len(tc.want) > 0) {
-				t.Fatalf("%+v", c)
-			}
-			for i, w := range tc.want {
-				if !strings.Contains(c.regressions[i], w) {
-					t.Errorf("regression %q, want %q", c.regressions[i], w)
-				}
-			}
-			text := c.render(0.10, 5*time.Millisecond)
-			if !strings.Contains(text, "| soak | near | 100 → 100 (+0.0 %) | 100/0/0/0 → 100/0/0/0 |") {
-				t.Errorf("table:\n%s", text)
-			}
-			if (len(tc.want) > 0) != strings.Contains(text, "**FAIL**") || (len(tc.want) == 0) != strings.Contains(text, "No regression beyond the tolerance") {
-				t.Errorf("verdict:\n%s", text)
-			}
+			assertRegressions(t, c, tc.want)
 		})
+	}
+}
+
+// assertRegressions checks that c compared, found exactly the regressions
+// want names (in order), and says so in its report.
+func assertRegressions(t *testing.T, c comparison, want []string) {
+	t.Helper()
+	if c.state != compared || len(c.regressions) != len(want) || c.failed() != (len(want) > 0) {
+		t.Fatalf("%+v", c)
+	}
+	for i, w := range want {
+		if !strings.Contains(c.regressions[i], w) {
+			t.Errorf("regression %q, want %q", c.regressions[i], w)
+		}
+	}
+	text := c.render(0.10, 5*time.Millisecond)
+	if !strings.Contains(text, "| soak | near | 100 → 100 (+0.0 %) | 100/0/0/0 → 100/0/0/0 |") {
+		t.Errorf("table:\n%s", text)
+	}
+	if (len(want) > 0) != strings.Contains(text, "**FAIL**") || (len(want) == 0) != strings.Contains(text, "No regression beyond the tolerance") {
+		t.Errorf("verdict:\n%s", text)
+	}
+}
+
+// The edges of the tolerance and the floor, on values whose products are
+// exact in float64: equal to the bound is no regression, a hair above is.
+func TestRegressionEdges(t *testing.T) {
+	req.Covers(t, "TST-021")
+	for _, tc := range []struct {
+		prev, now, tol float64
+		floor          time.Duration
+		want           bool
+	}{
+		{100, 125, 0.25, 0, false},                       // exactly the tolerance
+		{100, 125.001, 0.25, 0, true},                    // just above it
+		{100, 105, 0.01, 5 * time.Millisecond, false},    // above the tolerance, exactly the floor
+		{100, 105.001, 0.01, 5 * time.Millisecond, true}, // just above the floor
+	} {
+		if got := regressed(tc.prev, tc.now, tc.tol, tc.floor); got != tc.want {
+			t.Errorf("regressed(%v, %v, %v, %v) = %v, want %v", tc.prev, tc.now, tc.tol, tc.floor, got, tc.want)
+		}
+	}
+	// The same edge through compare, so compare is the predicate's caller.
+	prev := writeJSON(t, figuresWith("nightly", "soak", classNear, 100, 100, 100))
+	if c := compare(prev, figuresWith("nightly", "soak", classNear, 100, 125, 100), 0.25, 0); len(c.regressions) != 0 {
+		t.Errorf("at the tolerance: %v", c.regressions)
+	}
+	if c := compare(prev, figuresWith("nightly", "soak", classNear, 100, 125.001, 100), 0.25, 0); len(c.regressions) != 1 {
+		t.Errorf("above the tolerance: %v", c.regressions)
 	}
 }
 
@@ -117,14 +152,19 @@ func TestComparisonIgnoresSmallOrThinChanges(t *testing.T) {
 	}
 	// Fewer than minCompared 2xx answers in either run are not judged.
 	thin := writeJSON(t, figuresWith("nightly", "soak", classLookup, minCompared-1, 100, 100))
-	if c := compare(thin, figuresWith("nightly", "soak", classLookup, 100, 500, 500), 0.10, 0); c.failed() {
+	c := compare(thin, figuresWith("nightly", "soak", classLookup, 100, 500, 500), 0.10, 0)
+	if c.failed() {
 		t.Errorf("thin previous: %+v", c.regressions)
+	}
+	want := fmt.Sprintf("- soak, class lookup: %d → 100 2xx answers, fewer than %d in a run", minCompared-1, minCompared)
+	if text := c.render(0.10, 0); !strings.Contains(text, "Not judged, too few 2xx answers") || !strings.Contains(text, want) {
+		t.Errorf("an unjudged class is not named:\n%s", text)
 	}
 	if c := compare(prev, figuresWith("nightly", "soak", classLookup, minCompared-1, 500, 500), 0.10, 0); c.failed() {
 		t.Errorf("thin now: %+v", c.regressions)
 	}
-	if c := compare(prev, figuresWith("nightly", "soak", classLookup, minCompared, 500, 500), 0.10, 0); len(c.regressions) != 2 {
-		t.Errorf("exactly minCompared: %+v", c.regressions)
+	if c := compare(prev, figuresWith("nightly", "soak", classLookup, minCompared, 500, 500), 0.10, 0); len(c.regressions) != 2 || len(c.unjudged) != 0 {
+		t.Errorf("exactly minCompared: %+v", c)
 	}
 }
 

@@ -48,23 +48,32 @@ write. Its axe results are printed as notes and counted as **distinct
 failures**, so that the example content Redoc renders (a longer example
 response draws more highlighted strings) does not move the count:
 
-- `color-contrast`: one failure per colour pair and where it came from. The
-  runner `scripts/a11y-tools/axe-runner.js` reports it:
+- `color-contrast`: the runner `scripts/a11y-tools/axe-runner.js` reports
+  where each pair came from:
   - `axe`: the text and background colour axe compared;
   - `computed`: axe could not compare them (a "needs review" result, such as
     text in a scrolling code panel), so the element's computed text colour
-    and the nearest background colour painted at or above it;
-    A partly transparent background is composited onto the opaque one
-    below it, and the pair's contrast is measured against the ratio WCAG
-    1.4.3 asks of the element (3:1 for large text, else 4.5:1). A result
-    whose computed pair meets that ratio is **decided**: it is a pass on
-    every page, and the check prints how many there were. A violation axe
-    itself decided is never overruled;
-  - undetermined: no pair can be read off the styles (no element, a
-    background image, an opacity below 1, or a partly transparent
-    background that is not an sRGB colour). These are counted one failure
-    per place, like other rules.
-- any other rule: one failure per place, the axe selector with its
+    and the colour the page paints under its text, read off the browser's
+    own paint stack (`document.elementsFromPoint`) at five points of the
+    part of the element's box that is shown (its centre and the centres of
+    its quarters, inside the viewport and every ancestor that clips its
+    overflow). Nothing but the element's own descendants may be above the
+    text, and every layer under it, an ancestor or not, is read down to the
+    first opaque one; translucent layers are composited onto it. Text over
+    two backgrounds is held to the one it contrasts least with. The pair's
+    contrast, rounded down, is measured against the ratio WCAG 1.4.3 asks
+    of the element (3:1 for large text, else 4.5:1). A result axe left for
+    review only because the text is partly obscured by, or partly obscures,
+    another element, and whose computed pair meets that ratio, is
+    **decided**: it is a pass on every page, and the check prints how many
+    there were. A result left for any other reason, and a violation axe
+    itself decided, are never overruled;
+  - undetermined: no pair can be read (no element, a box not rendered or
+    clipped entirely, something painted over the text, or a layer under it
+    with a background image, a pseudo-element background, an opacity below
+    1, a drawn border at the text, or a translucent colour that is not
+    sRGB).
+- every rule, contrast included: one failure per place, the axe selector with its
   `nth-child` and `nth-of-type` parts removed and every number replaced, so
   that the tenth row of a table is the same failure as the first.
 
@@ -77,10 +86,17 @@ count, or adds a page or rule, compared with its base. When a count falls
 below the baseline, the check says so and the baseline is lowered in the same
 pull request.
 
-The build repairs what Redoc's theme cannot (`scripts/docs-build.sh`): its
-root is the page's main landmark, and the tree lines of its schema tables are
-drawn as a cell border instead of a background image, which left the
-contrast of every property name undecidable. Since #20 the reference stands
+The build repairs what Redoc's theme cannot (`scripts/docs-build.sh`): the
+content column is the page's one main landmark and the menu a navigation
+landmark beside it, and the tree lines of its schema tables are drawn as a
+cell border (a 1 px segment on the first and last rows, as Redoc draws them)
+instead of a background image, which left the contrast of every property
+name undecidable. A second runner, `scripts/a11y-tools/layout-runner.js`,
+checks both repairs in the rendered page and reports a missing one as an
+error: a field cell still drawing a background image, a row whose line or
+segment is missing or not in the line colour, no field cell at all, more or
+fewer than one main landmark, or the menu not a navigation landmark outside
+it. Since #20 the reference stands
 at four distinct failures, all `heading-order`: Redoc's headings skip a
 level between an operation and its parameters, which its theme cannot
 change.

@@ -193,7 +193,9 @@ When storage cannot answer a request (the answer would be `503`
 same request is sent instead, as a `200`, if it was read no longer than
 its domain's stale allowance ago: `cache.stale_if_error.<domain>`, with the
 domains of `cache.max_age` (default five minutes each). An answer read from
-several domains takes the smallest. It carries:
+several domains takes the smallest; a road conditions answer counts the
+domains of the families its lamp read, and is never served stale when one of
+those families is in `cache.no_stale_families`. It carries:
 
 - the `served_stale` warning in `meta.warnings`, whose detail says how many
   seconds ago it was read;

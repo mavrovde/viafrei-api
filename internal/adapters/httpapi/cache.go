@@ -159,6 +159,7 @@ type entry struct {
 	expires time.Time
 	// stale is how long after built the answer may still be served stale
 	// (the smallest cache.stale_if_error of the domains it was read from,
+	// a road lamp's read included,
 	// or 0 when a family it was read from is in cache.no_stale_families),
 	// and keep is when its body is dropped: the
 	// later of expires and built plus stale.
@@ -583,8 +584,8 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 	}
 	slices.SortFunc(e.families, func(a, b familyVersion) int { return strings.Compare(a.family, b.family) })
 	// A family the lamp read changes the answer as much as one it
-	// attributes: its versions are kept, and its domain's max-age bounds
-	// the answer's.
+	// attributes: its versions are kept, and its domain's max-age and stale
+	// allowance bound the answer's.
 	if note.lamp {
 		e.lamp, e.lampReference = true, vs.LampReference
 	}
@@ -596,6 +597,9 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 		}
 		if age := maxAge(s.cfg.Cache.MaxAge, f.domain); e.maxAge == 0 || age < e.maxAge {
 			e.maxAge = age
+		}
+		if stale := maxAge(config.CacheMaxAge(s.cfg.Cache.StaleIfError), f.domain); stale < e.stale {
+			e.stale = stale
 		}
 	}
 	slices.SortFunc(e.sight, func(a, b familyVersion) int { return strings.Compare(a.family, b.family) })
@@ -629,7 +633,7 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 	}
 	e.etag = `W/"` + base64.RawURLEncoding.EncodeToString(h.Sum(nil)[:18]) + `"`
 	e.built, e.expires = now, now.Add(e.maxAge)
-	for _, f := range e.families {
+	for _, f := range slices.Concat(e.families, e.sight) {
 		if slices.Contains(s.cfg.Cache.NoStale, f.family) {
 			e.stale = 0
 		}

@@ -191,3 +191,31 @@ func TestTheMaxAgeOfAFamilyTheLampReadBoundsTheAnswer(t *testing.T) {
 		t.Fatalf("Cache-Control %q", cc)
 	}
 }
+
+// TestAFamilyTheLampReadBoundsTheStaleAllowance: a road conditions answer
+// is served stale while storage is down, unless a family its lamp read
+// forbids it, by its domain's allowance or by name, though the answer does
+// not attribute that family.
+func TestAFamilyTheLampReadBoundsTheStaleAllowance(t *testing.T) {
+	req.Covers(t, "NFR-RES-004", "FR-ROAD-004")
+	for name, tc := range map[string]struct {
+		cfg  func(*config.Config)
+		want int
+	}{
+		"nothing forbids it":                  {want: http.StatusOK},
+		"stale_if_error.weather 1m":           {cfg: func(c *config.Config) { c.Cache.StaleIfError.Weather = time.Minute }, want: http.StatusServiceUnavailable},
+		"a weather family never served stale": {cfg: func(c *config.Config) { c.Cache.NoStale = []string{quietWeather} }, want: http.StatusServiceUnavailable},
+	} {
+		cfg := config.Defaults()
+		if tc.cfg != nil {
+			tc.cfg(cfg)
+		}
+		r := newRoadRigWith(t, cfg)
+		r.road(t, motorwayURL, "")
+		r.clock.add(2 * time.Minute)
+		r.failStorage(errFake)
+		if w := r.road(t, motorwayURL, ""); w.Code != tc.want {
+			t.Errorf("%s: %d, want %d", name, w.Code, tc.want)
+		}
+	}
+}

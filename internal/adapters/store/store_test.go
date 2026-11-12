@@ -60,6 +60,8 @@ func TestPoolConfigCarriesEveryDBKey(t *testing.T) {
 		"VFAPI_DB_MAX_CONN_IDLE=90s",
 		"VFAPI_DB_CANCEL_GRACE=250ms",
 		"VFAPI_DB_APPLICATION_NAME=probe-name",
+		"VFAPI_DB_QUERY_EXEC_MODE=describe_exec",
+		"VFAPI_DB_STATEMENT_CACHE_CAPACITY=33",
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -76,6 +78,9 @@ func TestPoolConfigCarriesEveryDBKey(t *testing.T) {
 	}
 	if pc.ConnConfig.ConnectTimeout != 1500*time.Millisecond || pc.MaxConnLifetime != 7*time.Minute || pc.MaxConnIdleTime != 90*time.Second {
 		t.Errorf("timeouts %s %s %s", pc.ConnConfig.ConnectTimeout, pc.MaxConnLifetime, pc.MaxConnIdleTime)
+	}
+	if pc.ConnConfig.DefaultQueryExecMode != pgx.QueryExecModeDescribeExec || pc.ConnConfig.StatementCacheCapacity != 33 || pc.ConnConfig.DescriptionCacheCapacity != 33 {
+		t.Errorf("statement mode %v, caches %d/%d", pc.ConnConfig.DefaultQueryExecMode, pc.ConnConfig.StatementCacheCapacity, pc.ConnConfig.DescriptionCacheCapacity)
 	}
 	if pc.ConnConfig.RuntimeParams["application_name"] != "probe-name" {
 		t.Errorf("application_name %q", pc.ConnConfig.RuntimeParams["application_name"])

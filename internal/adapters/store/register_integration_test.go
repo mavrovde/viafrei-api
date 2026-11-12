@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"slices"
-	"sync"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -18,29 +17,29 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
-var seedOnce sync.Once
+// seed loads the tiny fixture set into the shared test database. TestMain
+// runs it once, as setup: generating and loading the fixtures is outside
+// every test body's bound, which it would otherwise spend in whichever test
+// happened to ask first.
+func seed(ctx context.Context) error {
+	var buf bytes.Buffer
+	if _, err := fixtures.Generate(&buf, "tiny", 1, contract.Version()); err != nil {
+		return err
+	}
+	conn, err := db.Owner(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = conn.Close(ctx) }()
+	return pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, buf.String())
+		return err
+	})
+}
 
-// seeded loads the tiny fixture set once into the shared test database.
+// seeded opens a store on the shared test database, which TestMain seeded.
 func seeded(t *testing.T) *store.Store {
 	t.Helper()
-	seedOnce.Do(func() {
-		var buf bytes.Buffer
-		if _, err := fixtures.Generate(&buf, "tiny", 1, contract.Version()); err != nil {
-			t.Fatal(err)
-		}
-		ctx := context.Background()
-		conn, err := db.Owner(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() { _ = conn.Close(ctx) }()
-		if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-			_, err := tx.Exec(ctx, buf.String())
-			return err
-		}); err != nil {
-			t.Fatal(err)
-		}
-	})
 	st, err := store.Open(context.Background(), readerConfig(t))
 	if err != nil {
 		t.Fatal(err)
@@ -102,5 +101,97 @@ func TestRegisterAndSourcesReportStorageFaults(t *testing.T) {
 	}
 	if _, err := st.Sources(ctx, []string{"x"}); err == nil {
 		t.Error("Sources on an ended context succeeded")
+	}
+}
+
+func TestTheRegisterFingerprintMovesWithEveryLicenceInput(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005", "SEC-030")
+	st := seeded(t)
+	ctx := bounded(t)
+	conn, err := db.Owner(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	base, err := st.FreshnessVersions(ctx)
+	if err != nil || base.Register == "" || len(base.Families) == 0 {
+		t.Fatalf("versions %+v, %v", base, err)
+	}
+	for _, change := range []struct{ name, do, undo string }{
+		{"register_version", `update contract.source set register_version = register_version + 1 where source_ref = 'src-delta-parking'`,
+			`update contract.source set register_version = register_version - 1 where source_ref = 'src-delta-parking'`},
+		{"use_classes", `update contract.source set use_classes = use_classes || '{probe}' where source_ref = 'src-gamma-energy'`,
+			`update contract.source set use_classes = array_remove(use_classes, 'probe') where source_ref = 'src-gamma-energy'`},
+		{"a note", `update contract.source_note set body = body || ' (probe)' where source_ref = 'src-gamma-energy'`,
+			`update contract.source_note set body = left(body, -8) where source_ref = 'src-gamma-energy'`},
+	} {
+		if _, err := conn.Exec(ctx, change.do); err != nil {
+			t.Fatal(err)
+		}
+		got, err := st.FreshnessVersions(ctx)
+		if _, uerr := conn.Exec(ctx, change.undo); uerr != nil {
+			t.Fatal(uerr)
+		}
+		if err != nil || got.Register == base.Register {
+			t.Errorf("%s changed and the fingerprint did not: %v", change.name, err)
+		}
+		if back, err := st.FreshnessVersions(ctx); err != nil || back.Register != base.Register {
+			t.Errorf("after undoing %s the fingerprint is %q, want %q (%v)", change.name, back.Register, base.Register, err)
+		}
+	}
+}
+
+// TestAFamilyVersionMovesWithItsDataAsOf is the clock-skew case of the load
+// tests: the source's data_as_of moves while its freshness version stays the
+// same. Every answer renders its age, staleness and Last-Modified from
+// data_as_of, so the version the HTTP cache compares, and the one an answer
+// is tagged with, must move with it, and the two must stay equal.
+func TestAFamilyVersionMovesWithItsDataAsOf(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005")
+	st := seeded(t)
+	ctx := bounded(t)
+	conn, err := db.Owner(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	const family = "src-gamma-energy"
+	tagged := func() string {
+		t.Helper()
+		fs, err := st.Provenance(ctx, []string{family}, "en")
+		if err != nil || len(fs) != 1 {
+			t.Fatalf("provenance %+v, %v", fs, err)
+		}
+		return fs[0].Version
+	}
+	base, err := st.FreshnessVersions(ctx)
+	if err != nil || base.Families[family] == "" {
+		t.Fatalf("versions %+v, %v", base, err)
+	}
+	if got := tagged(); got != base.Families[family] {
+		t.Fatalf("the answer is tagged %q, the cache compares %q", got, base.Families[family])
+	}
+	for _, c := range []struct{ shift, back string }{
+		{"+ interval '10 minutes'", "- interval '10 minutes'"},
+		{"- interval '30 days'", "+ interval '30 days'"},
+	} {
+		shift := c.shift
+		if _, err := conn.Exec(ctx, `update contract.source_freshness set data_as_of = data_as_of `+shift+` where source_ref = $1`, family); err != nil {
+			t.Fatal(err)
+		}
+		moved, err := st.FreshnessVersions(ctx)
+		answer := tagged()
+		if _, uerr := conn.Exec(ctx, `update contract.source_freshness set data_as_of = data_as_of `+c.back+` where source_ref = $1`, family); uerr != nil {
+			t.Fatal(uerr)
+		}
+		if err != nil || moved.Families[family] == base.Families[family] {
+			t.Errorf("data_as_of moved %s and the version did not: %q (%v)", shift, moved.Families[family], err)
+		}
+		if answer != moved.Families[family] {
+			t.Errorf("after data_as_of moved %s the answer is tagged %q, the cache compares %q", shift, answer, moved.Families[family])
+		}
+		if back, err := st.FreshnessVersions(ctx); err != nil || back.Families[family] != base.Families[family] {
+			t.Errorf("data_as_of moved back and the version is %q, want %q (%v)", back.Families[family], base.Families[family], err)
+		}
 	}
 }

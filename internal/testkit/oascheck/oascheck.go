@@ -57,6 +57,8 @@ var TransportHeaders = map[string]string{
 	"Content-Security-Policy":      "security header on every answer",
 	"Referrer-Policy":              "security header on every answer",
 	"Cross-Origin-Resource-Policy": "security header on every answer",
+	"Vary":                         "every answer varies by Accept-Encoding, the compression layer's negotiation",
+	"Content-Encoding":             "the compression layer's coding of a body large enough",
 }
 
 // ProblemHeaders may also appear on a problem response.

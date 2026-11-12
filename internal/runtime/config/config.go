@@ -46,6 +46,7 @@ type Config struct {
 	Tiers      Tiers      `koanf:"tiers"`
 	Admission  Admission  `koanf:"admission"`
 	Metering   Metering   `koanf:"metering"`
+	Cache      Cache      `koanf:"cache"`
 	Admin      Admin      `koanf:"admin"`
 }
 
@@ -65,21 +66,25 @@ type Server struct {
 
 // HTTP holds the response-header settings (NFR-SEC-001).
 type HTTP struct {
-	HSTSMaxAge time.Duration `koanf:"hsts_max_age" default:"8760h" validate:"min=0s,max=17520h" desc:"max-age of Strict-Transport-Security on every answer, sent in whole seconds; 0s sends max-age=0, which tells browsers to forget the policy."`
+	HSTSMaxAge       time.Duration `koanf:"hsts_max_age" default:"8760h" validate:"min=0s,max=17520h" desc:"max-age of Strict-Transport-Security on every answer, sent in whole seconds; 0s sends max-age=0, which tells browsers to forget the policy."`
+	CompressMinBytes int           `koanf:"compress_min_bytes" default:"1024" validate:"min=0,max=1048576" desc:"Smallest answer body, in bytes, that is compressed (br or gzip, as the client accepts); 0 compresses every body."`
+	CompressLevel    int           `koanf:"compress_level" default:"5" validate:"min=1,max=9" desc:"Compression level of br and gzip, from 1 (fastest) to 9 (smallest)."`
 }
 
 // DB holds the storage settings of the read-only role.
 type DB struct {
-	URL                   Secret        `koanf:"url" secret:"true" desc:"Connection URL of the service's read-only role. Required to serve. Secret: environment or *_FILE only."`
-	PoolMax               int           `koanf:"pool_max" default:"4" validate:"min=1,max=16" desc:"Largest number of pooled connections."`
-	PoolMin               int           `koanf:"pool_min" default:"1" validate:"min=0,max=16" desc:"Connections kept open when idle. At most pool_max."`
-	ConnectTimeout        time.Duration `koanf:"connect_timeout" default:"2s" validate:"min=100ms,max=30s" desc:"Time allowed to open one connection."`
-	MaxConnLifetime       time.Duration `koanf:"max_conn_lifetime" default:"30m" validate:"min=1m,max=24h" desc:"A connection older than this is closed after use."`
-	MaxConnIdle           time.Duration `koanf:"max_conn_idle" default:"5m" validate:"min=10s,max=24h" desc:"An idle connection older than this is closed."`
-	StatementTimeoutFloor time.Duration `koanf:"statement_timeout_floor" default:"50ms" validate:"min=10ms,max=1s" desc:"Smallest useful remaining budget; below it a read is refused without touching storage."`
-	CancelGrace           time.Duration `koanf:"cancel_grace" default:"100ms" validate:"min=10ms,max=1s" desc:"Time a cancel request gets to land before the connection is abandoned."`
-	ApplicationName       string        `koanf:"application_name" default:"viafrei-api" validate:"required,max=63" desc:"application_name reported to the database."`
-	SharedBudget          SharedBudget  `koanf:"shared_budget"`
+	URL                    Secret        `koanf:"url" secret:"true" desc:"Connection URL of the service's read-only role. Required to serve. Secret: environment or *_FILE only."`
+	PoolMax                int           `koanf:"pool_max" default:"4" validate:"min=1,max=16" desc:"Largest number of pooled connections."`
+	PoolMin                int           `koanf:"pool_min" default:"1" validate:"min=0,max=16" desc:"Connections kept open when idle. At most pool_max."`
+	ConnectTimeout         time.Duration `koanf:"connect_timeout" default:"2s" validate:"min=100ms,max=30s" desc:"Time allowed to open one connection."`
+	MaxConnLifetime        time.Duration `koanf:"max_conn_lifetime" default:"30m" validate:"min=1m,max=24h" desc:"A connection older than this is closed after use."`
+	MaxConnIdle            time.Duration `koanf:"max_conn_idle" default:"5m" validate:"min=10s,max=24h" desc:"An idle connection older than this is closed."`
+	StatementTimeoutFloor  time.Duration `koanf:"statement_timeout_floor" default:"50ms" validate:"min=10ms,max=1s" desc:"Smallest useful remaining budget; below it a read is refused without touching storage."`
+	CancelGrace            time.Duration `koanf:"cancel_grace" default:"100ms" validate:"min=10ms,max=1s" desc:"Time a cancel request gets to land before the connection is abandoned."`
+	ApplicationName        string        `koanf:"application_name" default:"viafrei-api" validate:"required,max=63" desc:"application_name reported to the database."`
+	QueryExecMode          string        `koanf:"query_exec_mode" default:"cache_statement" validate:"oneof=cache_statement cache_describe describe_exec exec simple_protocol" desc:"How statements are sent: cache_statement prepares each statement once per connection and reuses it; the others are the driver's fallbacks for a pooler that cannot keep prepared statements."`
+	StatementCacheCapacity int           `koanf:"statement_cache_capacity" default:"128" validate:"min=1,max=4096" desc:"Prepared statements (or descriptions) cached per connection under cache_statement and cache_describe."`
+	SharedBudget           SharedBudget  `koanf:"shared_budget"`
 }
 
 // SharedBudget is the storage concurrency budget this service shares with
@@ -255,3 +260,28 @@ const Day = 24 * time.Hour
 // MaxKeyLifetime is the longest lifetime a key may be issued with: 1 095
 // days, the upper bound of auth.default_expiry (SEC-040).
 const MaxKeyLifetime = 1095 * Day
+
+// Cache holds HTTP caching and the in-process result cache
+// (Performance-and-Caching).
+type Cache struct {
+	Enabled       bool          `koanf:"enabled" default:"true" desc:"Send ETag and Cache-Control on data answers, answer a matching If-None-Match with 304, and keep the result cache. false sends Cache-Control: no-store and caches nothing."`
+	MaxBytes      int           `koanf:"max_bytes" default:"33554432" validate:"min=0,max=1073741824" desc:"Byte budget of the result cache's stored bodies; the least recently used entry is dropped first. 0 stores no body (ETag and 304 still work)."`
+	MaxEntryBytes int           `koanf:"max_entry_bytes" default:"524288" validate:"min=1024,max=16777216" desc:"Largest body the result cache stores, in bytes. At most cache.max_bytes when that is above 0."`
+	MaxEntries    int           `koanf:"max_entries" default:"10000" validate:"min=1,max=1000000" desc:"Most entries the result cache holds, with or without a body; the least recently used entry is dropped first. Each entry also counts against cache.max_bytes with its key, validator, versions and headers."`
+	VersionsTTL   time.Duration `koanf:"versions_ttl" default:"1s" validate:"min=100ms,max=60s" desc:"How long one read of the source families' freshness versions is reused to answer If-None-Match before the handler runs; it is read only while requests arrive."`
+	MaxAge        CacheMaxAge   `koanf:"max_age"`
+}
+
+// CacheMaxAge is the Cache-Control max-age of each data domain; an answer
+// from several domains takes the smallest.
+type CacheMaxAge struct {
+	Places        time.Duration `koanf:"places" default:"24h" validate:"min=1s,max=168h" desc:"max-age of place answers."`
+	Roads         time.Duration `koanf:"roads" default:"60s" validate:"min=1s,max=168h" desc:"max-age of road-condition answers."`
+	Energy        time.Duration `koanf:"energy" default:"60s" validate:"min=1s,max=168h" desc:"max-age of charging and fuel answers."`
+	Parking       time.Duration `koanf:"parking" default:"60s" validate:"min=1s,max=168h" desc:"max-age of parking answers."`
+	Transit       time.Duration `koanf:"transit" default:"30s" validate:"min=1s,max=168h" desc:"max-age of departure and disruption answers."`
+	Accessibility time.Duration `koanf:"accessibility" default:"60s" validate:"min=1s,max=168h" desc:"max-age of accessibility answers."`
+	Weather       time.Duration `koanf:"weather" default:"300s" validate:"min=1s,max=168h" desc:"max-age of weather answers."`
+	Rules         time.Duration `koanf:"rules" default:"24h" validate:"min=1s,max=168h" desc:"max-age of driving-rule answers."`
+	Default       time.Duration `koanf:"default" default:"30s" validate:"min=1s,max=168h" desc:"max-age of an answer from a domain not listed above."`
+}

@@ -118,7 +118,9 @@ sub external_resources {
   }
   my @css;
   push @css, $1 while $markup =~ /<style\b[^>]*>(.*?)<\/style>/gis;
-  push @css, $1 // $2 while $markup =~ /\sstyle\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
+  # An attribute value carries its quotes as character references
+  # (url(&quot;...&quot;)); they are decoded before the CSS is read.
+  push @css, unentity($1 // $2) while $markup =~ /\sstyle\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
   for my $c (@css) {
     while ($c =~ /url\(\s*["']?([^"')\s]+)/gi) { my $u = $1; push @found, "CSS url($u)" if $u =~ $abs }
     while ($c =~ /image-set\(([^;{}]*)/gi) {
@@ -128,6 +130,15 @@ sub external_resources {
     while ($c =~ /\@import\s+(?:url\(\s*)?["']?([^"')\s;]+)/gi) { my $u = $1; push @found, "CSS \@import $u" if $u =~ $abs }
   }
   return @found;
+}
+
+# unentity(TEXT): TEXT with its character references decoded: the named
+# quote, apostrophe and ampersand, and every decimal or hexadecimal one.
+sub unentity {
+  my ($t) = @_;
+  my %named = (quot => '"', apos => "'", amp => '&');
+  $t =~ s{&(?:#x([0-9a-f]+)|#([0-9]+)|(quot|apos|amp));}{defined $1 ? chr hex $1 : defined $2 ? chr $2 : $named{lc $3}}gie;
+  return $t;
 }
 
 # loads(ATTRS): whether a <link> fetches what it names. A link without rel,

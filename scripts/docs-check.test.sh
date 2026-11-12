@@ -87,6 +87,9 @@ ext "a background image in a style attribute fails" index.html '<div style="back
 ext "an iframe from another host fails" index.html '<iframe title="x" src="https://video.example/embed"></iframe>' '<iframe src="https://video.example/embed">'
 ext "the reference's resources are checked too" reference.html '<link href="https://fonts.googleapis.com/css?family=Montserrat" rel="stylesheet">' 'reference.html: loads a resource from another host'
 ext "an image-set() image from another host fails" index.html '<style>p{background-image:image-set("https://img.example/a.png" 1x)}</style>' 'CSS image-set(https://img.example/a.png)'
+ext "a URL quoted with &quot; in a style attribute fails" index.html '<p style="background:url(&quot;https://img.example/q.png&quot;)">x</p>' 'CSS url(https://img.example/q.png)'
+ext "an image-set() quoted with &#39; in a style attribute fails" index.html '<p style="background-image:image-set(&#39;https://img.example/s.png&#39; 1x)">x</p>' 'CSS image-set(https://img.example/s.png)'
+ext "a URL quoted with &#x22; fails" index.html '<p style="background:url(&#x22;https://img.example/h.png&#x22;)">x</p>' 'CSS url(https://img.example/h.png)'
 ext "a legacy background attribute fails" index.html '<table background="https://img.example/bg.png"><tr><td>x</td></tr></table>' '<table background="https://img.example/bg.png">'
 ext "a ping attribute fails" index.html '<a href="other.html" ping="https://track.example/p">x</a>' '<a ping="https://track.example/p">'
 ext "a preconnect to another host fails" index.html '<link rel="preconnect" href="https://fonts.gstatic.com">' '<link href="https://fonts.gstatic.com">'
@@ -100,4 +103,4 @@ rm -rf "$s" && mkdir -p "$s"; expect 2 "a site without pages is refused" "$s" 'n
 expect 2 "a missing site is refused" "$tmp/none" 'cannot read'
 
 echo "docs-check self-test: $pass passed, $fail failed"
-(( fail == 0 && pass >= 35 ))
+(( fail == 0 && pass >= 38 ))

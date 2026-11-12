@@ -66,7 +66,12 @@ export DOCS_PAGES DOCS_SITE_FILES
 for p in "${pages[@]}"; do
   IFS='|' read -r src base page title _ <<<"$p"
   [[ -s $src ]] || { echo "FAIL: $src is missing or empty" >&2; exit 1; }
-  body=$("${marked[@]}" -i "$src")
+  # A line that is only an image from another host (the README's status
+  # badges) is GitHub's decoration and is left out of the portal, whose
+  # pages load nothing from a third party (#81, scripts/docs-check.pl). A
+  # line inside a fenced code block is text and is kept.
+  body=$(awk '/^[[:space:]]*(```|~~~)/ { fenced = !fenced; print; next }
+    fenced || !/^[[:space:]]*!\[[^]]*\]\((https?:)?\/\/[^)]*\)[[:space:]]*$/' "$src" | "${marked[@]}")
   [[ -n $body ]] || { echo "FAIL: $src rendered to nothing" >&2; exit 1; }
   body=$(perl "$here/docs-html.pl" "$base" <<<"$body") || { echo "FAIL: $src has the link(s) above" >&2; exit 1; }
   nav=''
@@ -115,7 +120,43 @@ while read -r id; do
 done < <(jq -r '.paths[][] | objects | .operationId // empty' api/openapi.json)
 
 cp api/openapi.json "$out/openapi.json"
-"${redocly[@]}" build-docs api/openapi.json --theme.openapi.jsonSamplesExpandLevel=all --output "$out/reference.html" >/dev/null
+# No request may leave the site when a page is opened (#81): Redoc's Google
+# web fonts are switched off and its theme uses the system font stack, like
+# the guide pages; its script, which the CLI links from Redocly's CDN, is
+# served from the site itself (below).
+fonts='system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+"${redocly[@]}" build-docs api/openapi.json --disableGoogleFont \
+  --theme.openapi.jsonSamplesExpandLevel=all \
+  --theme.openapi.theme.typography.fontFamily="$fonts" \
+  --theme.openapi.theme.typography.headings.fontFamily="$fonts" \
+  --output "$out/reference.html" >/dev/null
+# The script tag the CLI wrote names the Redoc version and the bundle's
+# sha384. The same version is fetched from the npm registry, must have that
+# very digest (so it is the file the CDN would have served), and is served
+# beside the page with its licence files; the tag then names the local copy.
+cdn='<script src="https://cdn\.redocly\.com/redoc/v([0-9][0-9.]*)/bundles/redoc\.standalone\.js" integrity="sha384-([A-Za-z0-9+/=]+)" crossorigin="anonymous"></script>'
+[[ $(grep -cE "$cdn" "$out/reference.html") == 1 ]] ||
+  { echo "FAIL: reference.html does not carry exactly one Redoc CDN script tag to replace; the CLI's template changed" >&2; exit 1; }
+redoc_version=$(grep -oE "$cdn" "$out/reference.html" | sed -E "s#$cdn#\\1#")
+redoc_digest=$(grep -oE "$cdn" "$out/reference.html" | sed -E "s#$cdn#\\2#")
+npm pack --silent --pack-destination "$tmp" "redoc@$redoc_version" >/dev/null ||
+  { echo "FAIL: could not fetch redoc@$redoc_version from the npm registry" >&2; exit 1; }
+tar -xzf "$tmp/redoc-$redoc_version.tgz" -C "$tmp"
+got=$(openssl dgst -sha384 -binary "$tmp/package/bundles/redoc.standalone.js" | openssl base64 -A)
+[[ $got == "$redoc_digest" ]] ||
+  { echo "FAIL: redoc@$redoc_version's redoc.standalone.js is not the bundle the CLI names (sha384 differs)" >&2; exit 1; }
+cp "$tmp/package/bundles/redoc.standalone.js" "$tmp/package/bundles/redoc.standalone.js.LICENSE.txt" "$out/"
+cp "$tmp/package/LICENSE" "$out/redoc.LICENSE.txt"
+# The one change to the bundle (MIT, redoc.LICENSE.txt): its sidebar credit
+# loads Redocly's logo from Redocly's CDN at run time. The image source
+# becomes an empty data: URL, which fails to decode, so the bundle's own
+# error handler drops the image and the credit's text stays; no request
+# leaves the site (scripts/docs-offsite.sh).
+logo='src:"https://cdn.redoc.ly/redoc/logo-mini.svg"'
+[[ $(grep -oF "$logo" "$out/redoc.standalone.js" | wc -l | tr -d ' ') == 1 ]] ||
+  { echo "FAIL: redoc.standalone.js does not load the sidebar logo from the CDN exactly once; the bundle changed" >&2; exit 1; }
+perl -pi -e 's{\Qsrc:"https://cdn.redoc.ly/redoc/logo-mini.svg"\E}{src:"data:,"}' "$out/redoc.standalone.js"
+perl -0pi -e 's{<script src="https://cdn\.redocly\.com/redoc/v[0-9.]+/bundles/redoc\.standalone\.js"[^>]*></script>}{<script src="redoc.standalone.js"></script>}' "$out/reference.html"
 title=$(jq -r '.info.title' api/openapi.json)
 grep -qF "$title" "$out/reference.html" || { echo "FAIL: reference.html does not carry the document title '$title'" >&2; exit 1; }
 # Two WCAG 2.2 AA repairs Redoc's theme cannot make (scripts/docs-a11y.sh):

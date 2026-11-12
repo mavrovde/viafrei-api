@@ -11,7 +11,14 @@
 # - diagrams: every diagram must have an equivalent text description. A
 #   Mermaid block must be followed by a paragraph that starts with
 #   "Text description:"; an image needs a non-empty alt text; an inline SVG
-#   on a guide page needs a <title>.
+#   on a guide page needs a <title>;
+# - resources from another host (#81): no page may load a stylesheet, font,
+#   script, image, frame or media file from an absolute URL, in a tag
+#   (<link href>, <script src>, <img src|srcset>, <iframe src>, <source>, ...)
+#   or in CSS (url() and @import in a <style> block or a style attribute).
+#   The visitor's browser would hand that host the visitor's address before
+#   any consent. A link to another site (<a href>) is not a request and
+#   passes. What a script requests at run time is scripts/docs-offsite.sh's.
 #
 # Every page is read; reference.html, which Redoc renders, is checked for
 # links and ids only, since its icons are not diagrams. Prints every page it
@@ -64,6 +71,7 @@ for my $p (@pages) {
       push @findings, "$p: link \"$ref\" names no id of $file";
     }
   }
+  push @findings, "$p: loads a resource from another host: $_" for external_resources($h);
   next if $p eq 'reference.html';
   while ($h =~ /<pre[^>]*><code class="language-mermaid">.*?<\/code><\/pre>\s*(<p>(?:<(?:strong|em)>)?\s*Text description:)?/gs) {
     $diagrams++;
@@ -81,6 +89,68 @@ for my $p (@pages) {
 }
 
 print "docs check: read $_\n" for @pages;
+
+# external_resources(HTML): every resource the page loads from an absolute
+# URL (a scheme other than data: and blob:, or "//host"), described as the
+# tag and attribute or the CSS construct, with the URL.
+sub external_resources {
+  my ($h) = @_;
+  my $abs = qr{^\s*(?:(?!data:|blob:)[a-z][a-z0-9+.-]*:|//)}i;
+  my @found;
+  (my $markup = $h) =~ s{(<script\b[^>]*>).*?</script>}{$1</script>}gis;    # a script body is code, not markup
+  while ($markup =~ /<(link|script|img|iframe|frame|source|track|video|audio|embed|object|image|use|input)\b([^>]*)>/gis) {
+    my ($tag, $attrs) = (lc $1, $2);
+    while ($attrs =~ /\s(href|xlink:href|src|srcset|data|poster)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi) {
+      my ($attr, $v) = (lc $1, $2 // $3 // $4);
+      next if $tag eq 'link' && ($attr ne 'href' || !loads($attrs));
+      my @urls = $attr eq 'srcset' ? map { (split ' ', $_)[0] // '' } split /,/, $v : ($v);
+      push @found, map {"<$tag $attr=\"$_\">"} grep { $_ =~ $abs } @urls;
+    }
+  }
+  # Attributes that make a request from any tag: the legacy background image,
+  # and ping (a request to each listed URL when a link is followed).
+  while ($markup =~ /<([a-z][a-z0-9-]*)\b([^>]*)>/gis) {
+    my ($tag, $attrs) = (lc $1, $2);
+    while ($attrs =~ /\s(background|ping)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi) {
+      my ($attr, $v) = (lc $1, $2 // $3 // $4);
+      push @found, map {"<$tag $attr=\"$_\">"} grep { $_ =~ $abs } split ' ', $v;
+    }
+  }
+  my @css;
+  push @css, $1 while $markup =~ /<style\b[^>]*>(.*?)<\/style>/gis;
+  # An attribute value carries its quotes as character references
+  # (url(&quot;...&quot;)); they are decoded before the CSS is read.
+  push @css, unentity($1 // $2) while $markup =~ /\sstyle\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
+  for my $c (@css) {
+    while ($c =~ /url\(\s*["']?([^"')\s]+)/gi) { my $u = $1; push @found, "CSS url($u)" if $u =~ $abs }
+    while ($c =~ /image-set\(([^;{}]*)/gi) {
+      my $set = $1;
+      while ($set =~ /(["'])(.*?)\1/g) { my $u = $2; push @found, "CSS image-set($u)" if $u =~ $abs }
+    }
+    while ($c =~ /\@import\s+(?:url\(\s*)?["']?([^"')\s;]+)/gi) { my $u = $1; push @found, "CSS \@import $u" if $u =~ $abs }
+  }
+  return @found;
+}
+
+# unentity(TEXT): TEXT with its character references decoded: the named
+# quote, apostrophe and ampersand, and every decimal or hexadecimal one.
+sub unentity {
+  my ($t) = @_;
+  my %named = (quot => '"', apos => "'", amp => '&');
+  $t =~ s{&(?:#x([0-9a-f]+)|#([0-9]+)|(quot|apos|amp));}{defined $1 ? chr hex $1 : defined $2 ? chr $2 : $named{lc $3}}gie;
+  return $t;
+}
+
+# loads(ATTRS): whether a <link> fetches what it names. A link without rel,
+# or whose rel has a token that loads (a stylesheet, an icon, a preload or
+# prefetch, a preconnect or DNS prefetch, a manifest), does; one that only
+# names a relation (canonical, alternate, license, author, ...) does not.
+sub loads {
+  my ($attrs) = @_;
+  return 1 unless $attrs =~ /\srel\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
+  my %load = map { $_ => 1 } qw(stylesheet icon apple-touch-icon mask-icon preload prefetch modulepreload preconnect dns-prefetch prerender manifest);
+  return scalar grep { $load{lc $_} } split ' ', $1 // $2 // $3;
+}
 if (@findings) {
   print STDERR "FAIL: $_\n" for @findings;
   printf STDERR "FAIL: %d finding(s) over %d page(s)\n", scalar @findings, scalar @pages;

@@ -123,12 +123,16 @@ sync is `.github/workflows/platform-sync.yml`, daily and by hand, built on
 2. `platformsync apply -version X.Y.Z` writes the version to
    `internal/buildinfo/platform-version.txt` and the commit message of the
    sync: the subject `deps: keep in step with ViaFrei platform X.Y.Z` (the
-   CHANGELOG line, under Dependencies) and the footer `Release-As: X.Y.Z`.
-   It never goes back: a version older than the synced one or than
+   CHANGELOG line, under Dependencies) and, once the API's release follows
+   the platform's, the footer `Release-As: X.Y.Z`. The release follows from
+   the run made with `-start` on: while the API is a 0.x pre-release, only
+   that run writes the footer, and any other moved pin writes none, so
+   release-please goes on with the API's own version. It never goes back: a
+   version older than the synced one or than
    `version.txt` is refused (exit 1).
 3. The workflow pushes `platform-sync/X.Y.Z`, opens the pull request
    assigned to a maintainer, and approves its CI and Security runs. A
-   maintainer reviews and squash-merges it; the squash keeps the footer.
+   maintainer reviews and squash-merges it; the squash keeps the footer, when there is one.
    The pull request also pins the parity bundle of `X.Y.Z` in
    `test/parity/lock.tsv` ([parity](parity.md)): with none pinned the parity
    harness fails closed, so the sync cannot merge without one.
@@ -148,7 +152,8 @@ viafrei-api meta-check -platform X.Y.Z -contract M.m   # 0 match, 1 mismatch (bo
 Before the first public release the file says `unsynced` and the scheduled
 run only reports the platform's version. The switch is one manual run of the
 workflow with `start: true` at that milestone; until then no `Release-As`
-footer is used.
+footer is used, also when the pinned platform version moves (the parity
+bundle of a platform release is pinned before the first public release).
 
 Try the sync against a fixture version, with no network:
 

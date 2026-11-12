@@ -102,7 +102,10 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		budgets  = fs.String("budgets", "test/load/budgets.tsv", "latency budget per endpoint class (NFR-PERF-003)")
 		prof     = fs.String("profile", "", "pr or nightly")
 		only     = fs.String("scenarios", "", "comma-separated scenario names; empty runs every scenario")
-		report   = fs.String("report", "load-report.md", "the Markdown report to write")
+		report   = fs.String("report", "load-report.md", "the Markdown report to write; the figures go beside it, .json for .md (TST-021)")
+		previous = fs.String("previous", "", "the previous main run's figures to compare with; empty compares with nothing, and the report says so (TST-021)")
+		tol      = fs.Float64("regression-tolerance", 0.10, "the growth of a class's p95 or p99 over the previous run that fails it, a fraction (TST-021)")
+		floor    = fs.Duration("regression-floor", 5*time.Millisecond, "a p95 or p99 growth no larger than this is never a regression (TST-021)")
 		place    = fs.String("place", "", "a place id of the fixture set, for the composed answer")
 		docker   = fs.String("docker", "docker", "the docker CLI")
 		project  = fs.String("project", "viafrei-api", "the compose project of the test stack")
@@ -129,6 +132,12 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		return fail("-place is required")
 	case *poolMax < 1:
 		return fail("-pool-max must be at least 1")
+	case !(*tol > 0 && *tol <= 10):
+		return fail("-regression-tolerance must be above 0 and at most 10")
+	case *floor < 0:
+		return fail("-regression-floor must not be negative")
+	case !strings.HasSuffix(*report, ".md"):
+		return fail("-report must end in .md, so that the figures can go beside it")
 	}
 	key, cold := getenv("LOADRUN_KEY"), getenv("LOADRUN_COLD_KEY")
 	if key == "" || cold == "" || key == cold {
@@ -156,8 +165,13 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	r.host = execHost(*docker)
 	r.queued = *queued
 	outs := r.runAll(context.Background(), sel)
-	text := renderReport(*prof, outs)
+	figs := collect(*prof, outs)
+	cmp := compare(*previous, figs, *tol, *floor)
+	text := renderReport(*prof, outs) + cmp.render(*tol, *floor)
 	if err := os.WriteFile(*report, []byte(text), 0o600); err != nil {
+		return fail("%v", err)
+	}
+	if err := writeFigures(figuresPath(*report), figs); err != nil {
 		return fail("%v", err)
 	}
 	failed := 0
@@ -167,8 +181,14 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		}
 		fmt.Fprintf(stdout, "%s: %s: %d requests, %s\n", prog, o.name, len(o.results), o.verdict())
 	}
-	fmt.Fprintf(stdout, "%s: %d scenario(s), %d failed; report in %s\n", prog, len(outs), failed, *report)
-	if failed > 0 {
+	for _, r := range cmp.regressions {
+		fmt.Fprintf(stdout, "%s: regression: %s\n", prog, r)
+	}
+	if cmp.state != compared {
+		fmt.Fprintf(stdout, "%s: not compared with the previous main run: %s\n", prog, cmp.reason)
+	}
+	fmt.Fprintf(stdout, "%s: %d scenario(s), %d failed; report in %s, figures in %s\n", prog, len(outs), failed, *report, figuresPath(*report))
+	if failed > 0 || cmp.failed() {
 		return 1
 	}
 	return 0

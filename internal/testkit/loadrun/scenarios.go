@@ -26,6 +26,7 @@ type outcome struct {
 	sampleErr           error
 	checks              []check
 	notes               []string
+	memGrowth           *float64 // the soak's resident-memory growth after warm-up, a fraction
 }
 
 func (o *outcome) add(name string, ok bool, format string, a ...any) {
@@ -220,6 +221,7 @@ func soak(ctx context.Context, r *runner, o *outcome) {
 	if third := len(rss) / 3; rssErr == nil && third > 0 {
 		first, last := median(rss[:third]), median(rss[len(rss)-third:])
 		growth := float64(last-first) / float64(first)
+		o.memGrowth = &growth
 		o.add("resident memory grows at most 10 % after warm-up (TST-007)", growth <= 0.10,
 			"%.1f MiB to %.1f MiB (%+.1f %%), median of the first and the last third of %d reads", mib(first), mib(last), growth*100, len(rss))
 	} else {

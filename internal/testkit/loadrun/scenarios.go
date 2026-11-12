@@ -256,33 +256,42 @@ func steps(cs []change) []string {
 	return out
 }
 
-// probeSlack is how long before a half-open period began a read may have
-// been sent and still be one of its probes: the breaker admits a read when
-// it arrives, a moment after it was sent.
+// probeSlack is how far outside a half-open period a read may have been
+// sent and still be one of its probes: the breaker admits a read when it
+// arrives, a moment after it was sent, and logs the period's end a moment
+// after the probe that ended it.
 const probeSlack = 100 * time.Millisecond
 
+// period is one half-open period: from the change into half-open to the
+// next change out of it (zero while it lasts).
+type period struct{ from, to time.Time }
+
+func (p period) holds(t time.Time) bool {
+	return !p.from.After(t.Add(probeSlack)) && (p.to.IsZero() || !t.After(p.to.Add(probeSlack)))
+}
+
 // probesPerPeriod assigns each read of rs that reached storage (not refused
-// by the breaker) to the half-open period that began last before it was
-// sent (probeSlack allowed), among the periods that began before the
-// repair. It returns the reads of each period and the reads that fall in
-// none: sent while the breaker was open, they reached storage although
-// nothing should have.
+// by the breaker) to the half-open period it was sent in (probeSlack
+// allowed at either end), among the periods that began before the repair.
+// It returns the reads of each period and the reads that fall in none:
+// sent while the breaker was open, before the first period or between two,
+// they reached storage although nothing should have.
 func probesPerPeriod(rs []result, cs []change, repaired time.Time) (per []int, stray int) {
-	var starts []time.Time
+	var ps []period
 	for _, c := range cs {
-		if c.step == "open>half-open" && c.at.Before(repaired) {
-			starts = append(starts, c.at)
+		switch {
+		case c.step == "open>half-open" && c.at.Before(repaired):
+			ps = append(ps, period{from: c.at})
+		case strings.HasPrefix(c.step, "half-open>") && len(ps) > 0 && ps[len(ps)-1].to.IsZero():
+			ps[len(ps)-1].to = c.at
 		}
 	}
-	per = make([]int, len(starts))
+	per = make([]int, len(ps))
 	for _, x := range rs {
 		if breakerRefused(x) {
 			continue
 		}
-		i := len(starts) - 1
-		for i >= 0 && starts[i].After(x.sent.Add(probeSlack)) {
-			i--
-		}
+		i := slices.IndexFunc(ps, func(p period) bool { return p.holds(x.sent) })
 		if i < 0 {
 			stray++
 			continue

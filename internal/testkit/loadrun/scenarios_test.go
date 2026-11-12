@@ -362,6 +362,18 @@ func TestStorageKilledHoldsTheBreakerToItsBounds(t *testing.T) {
 	if c := checkNamed(t, o, probes); c.ok || !strings.Contains(c.detail, "1 while open") {
 		t.Errorf("a read while open: %+v", c)
 	}
+	// A read that reached storage after a half-open period had ended and the
+	// breaker had opened again is not a probe of that period.
+	w = sequenced(t, "Bu", 0)
+	w.dock.answer = logs(func(now time.Time) string {
+		long := now.Add(-time.Hour)
+		return breakerLog(at("closed>open", long), at("open>half-open", long), at("half-open>open", long.Add(time.Millisecond)),
+			at("open>half-open", now.Add(-time.Millisecond)), at("half-open>closed", now))
+	})
+	o = runOne(t, w, "storage-killed")
+	if c := checkNamed(t, o, probes); c.ok || !strings.Contains(c.detail, "[0], 1 while open") {
+		t.Errorf("a read while open again: %+v", c)
+	}
 }
 
 func TestProbesAreCountedPerPeriod(t *testing.T) {
@@ -377,16 +389,22 @@ func TestProbesAreCountedPerPeriod(t *testing.T) {
 	rs := []result{
 		refusal,
 		read(2), read(2.05), // the first period
-		read(4 - probeSlack.Seconds()), // sent a moment before the second began: one of its probes
-		read(1.5),                      // sent while open, before any period
-		read(6),                        // after the second period: assigned to it
+		read(4 - probeSlack.Seconds()),   // sent a moment before the second began: one of its probes
+		read(4.1 + probeSlack.Seconds()), // sent a moment after it ended: one of its probes
+		read(1.5),                        // sent while open, before any period
+		read(6),                          // sent while open again, between two periods
 	}
 	per, stray := probesPerPeriod(rs, cs, sec(8))
-	if len(per) != 2 || per[0] != 2 || per[1] != 2 || stray != 1 {
-		t.Errorf("per %v, stray %d; want [2 2] and 1 (the period after the repair is not counted)", per, stray)
+	if len(per) != 2 || per[0] != 2 || per[1] != 2 || stray != 2 {
+		t.Errorf("per %v, stray %d; want [2 2] and 2 (the period after the repair is not counted)", per, stray)
 	}
-	if per, stray := probesPerPeriod(rs, cs, sec(1)); len(per) != 0 || stray != 5 {
+	if per, stray := probesPerPeriod(rs, cs, sec(1)); len(per) != 0 || stray != 6 {
 		t.Errorf("no period before the repair: per %v, stray %d", per, stray)
+	}
+	// A period not yet over when the log was read holds every later read.
+	open := []change{at("closed>open", sec(0)), at("open>half-open", sec(2))}
+	if per, stray := probesPerPeriod([]result{read(2), read(30)}, open, sec(60)); len(per) != 1 || per[0] != 2 || stray != 0 {
+		t.Errorf("a lasting period: per %v, stray %d", per, stray)
 	}
 }
 

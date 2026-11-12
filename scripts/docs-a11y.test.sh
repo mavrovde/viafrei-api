@@ -11,8 +11,13 @@
 # than the site has, an unreadable report, an unreadable baseline, a
 # needs-review result, a moderate and a minor result on a guide page, and
 # reference.html's notes held against the baseline in each direction,
-# counted as distinct failures: one per colour pair for color-contrast, one
-# per selector with its nth-child parts and numbers removed for other rules.
+# counted as distinct failures: one per place, the selector with its
+# nth-child parts and numbers removed, whatever colours a result carries.
+# A needs-review contrast result whose reason is partial obscuring and whose
+# computed pair meets its WCAG ratio is decided (a pass), and each near miss
+# of that rule (another reason, no reason, a pair from axe, a ratio under or
+# missing, a violation) is still a finding.
+# A critical or serious result on reference.html fails whatever the baseline.
 set -uo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -82,42 +87,33 @@ report() { # report GUIDE_ISSUES_JSON REFERENCE_ISSUES_JSON
   jq -n --arg g "file://$s/index.html" --arg r "file://$s/reference.html" --argjson gi "$guide" --argjson ri "$reference" \
     '{total: 2, passes: 0, errors: 0, results: {($g): $gi, ($r): $ri}}' > "$STUB_REPORT"
 }
-cc=$(issue error color-contrast true)
-green=$(issue error color-contrast true 'span' 'rgb(160, 251, 170)' 'rgb(17, 23, 26)')
-green2=$(issue error color-contrast true 'pre > span:nth-child(3)' 'rgb(160, 251, 170)' 'rgb(17, 23, 26)')
-red=$(issue error color-contrast true 'span' 'rgb(212, 31, 28)' 'rgb(17, 23, 26)')
-white=$(issue error color-contrast true 'span' 'rgb(255, 255, 255)' 'rgb(17, 23, 26)')
+cc=$(issue warning color-contrast true)
+green=$(issue warning color-contrast true 'span' 'rgb(160, 251, 170)' 'rgb(17, 23, 26)')
+red=$(issue warning color-contrast true 'span' 'rgb(212, 31, 28)' 'rgb(17, 23, 26)')
+white=$(issue warning color-contrast true 'span' 'rgb(255, 255, 255)' 'rgb(17, 23, 26)')
+other=$(issue warning color-contrast true 'pre > code' 'rgb(160, 251, 170)' 'rgb(17, 23, 26)')
 
-report '[]' "[$green, $red]"
+report '[]' "[$green, $other]"
 expect 0 "reference.html's notes at the baseline pass" "$s" "reference.html: 2 distinct failure(s) (2 result(s)) within the baseline"
 
-report '[]' "[$green, $green2, $green, $red, $red]"
-expect 0 "results of one colour pair are one failure, wherever they are" "$s" "reference.html: 2 distinct failure(s) (5 result(s)) within the baseline"
+report '[]' "[$green, $red, $white, $other]"
+expect 0 "results in one place are one failure, whatever their colours" "$s" "reference.html: 2 distinct failure(s) (4 result(s)) within the baseline"
 
 report '[]' "[$cc, $cc, $green]"
 expect 0 "undetermined results in one place are one failure" "$s" "reference.html: 2 distinct failure(s) (3 result(s)) within the baseline"
 
 undet() { # undet TARGET: a contrast result whose pair could not be read
   local target=$1
-  jq -n --arg target "$target" '{type: "error", code: "color-contrast", message: "planted", selector: "p",
+  jq -n --arg target "$target" '{type: "warning", code: "color-contrast", message: "planted", selector: "p",
     runnerExtras: {needsFurtherReview: true, target: $target, colourSource: "undetermined", fgColor: null, bgColor: null}}'
 }
 report '[]' "[$(undet '#a > span:nth-child(1)'), $(undet '#a > span:nth-child(4)'), $(undet '#b > span')]"
 expect 0 "undetermined results are counted per place, not as one bucket" "$s" "reference.html: 2 distinct failure(s) (3 result(s)) within the baseline"
 report '[]' "[$(undet '#a > span'), $(undet '#b > span'), $(undet '#c > span')]"
-expect 1 "a third undetermined place is above the baseline" "$s" "FAIL: reference.html: color-contrast: 3 distinct failure(s), above the baseline of 2"
-
-frame=$(issue error color-contrast true '#frame span' 'rgb(1, 1, 1)' 'rgb(2, 2, 2)' axe)
-report '[]' "[$frame, $(issue error color-contrast true '#x' 'rgb(1, 1, 1)' 'rgb(2, 2, 2)')]"
-expect 0 "the same colours from axe and from the styles are two failures" "$s" "reference.html: 2 distinct failure(s) (2 result(s)) within the baseline"
-report '[]' "[$frame, $(issue error color-contrast true '#y' 'rgb(1, 1, 1)' 'rgb(2, 2, 2)'), $(issue error color-contrast true '#z' 'rgb(1, 1, 1)' 'rgb(2, 2, 2)' undetermined)]"
-expect 1 "colours whose source is undetermined are not counted as a pair" "$s" "FAIL: reference.html: color-contrast: 3 distinct failure(s), above the baseline of 2"
+expect 1 "a third place is above the baseline" "$s" "FAIL: reference.html: color-contrast: 3 distinct failure(s), above the baseline of 2"
 
 report '[]' "[$red]"
 expect 0 "a count below the baseline passes and asks to lower it" "$s" "below the baseline of 2: lower it"
-
-report '[]' "[$green, $red, $white]"
-expect 1 "a new colour pair above the baseline fails" "$s" "FAIL: reference.html: color-contrast: 3 distinct failure(s), above the baseline of 2"
 
 printf '{"reference.html": {"color-contrast": 2, "region": 1}}\n' > "$tmp/baseline.json"
 row() { # row N: a region result in the Nth row of one table
@@ -130,6 +126,42 @@ report '[]' "[$(row 1), $(issue warning region false '#operation\\/getMeta > div
 expect 1 "a region failure in another place is a new failure" "$s" "FAIL: reference.html: region: 2 distinct failure(s), above the baseline of 1"
 printf '{"reference.html": {"color-contrast": 2}}\n' > "$tmp/baseline.json"
 
+review_fail='FAIL: index.html: color-contrast (review)'
+
+# A needs-review contrast result whose computed pair meets its WCAG ratio is
+# decided: a pass on any page, counted on its own line. Each near miss is not.
+measured() { # measured REVIEW SOURCE RATIO REQUIRED [MESSAGE_KEY]: '-' for no key
+  local review=$1 source=$2 ratio=$3 required=$4 key=${5:-elmPartiallyObscured}
+  jq -n --argjson r "$review" --arg src "$source" --argjson ratio "$ratio" --argjson req "$required" --arg key "$key" \
+    '{type: "error", code: "color-contrast",
+    message: "planted", selector: "p", runnerExtras: ({needsFurtherReview: $r, target: "td > span", colourSource: $src,
+    fgColor: "rgb(0, 0, 0)", bgColor: "rgb(255, 255, 255)", contrastRatio: $ratio, requiredRatio: $req}
+      + (if $key == "-" then {} else {messageKey: $key} end))}'
+}
+report "[$(measured true computed 4.67 4.5), $(measured true computed 3 3 elmPartiallyObscuring)]" "[$(measured true computed 21 4.5)]"
+expect 0 "needs-review results partly obscured whose computed pair meets its ratio are decided" "$s" "docs a11y: 3 contrast result(s) left for review by axe are decided"
+report '[]' "[$(measured true computed 21 4.5), $green, $other]"
+expect 0 "a decided result is not counted against the baseline" "$s" "reference.html: 2 distinct failure(s) (2 result(s)) within the baseline"
+report "[$(measured true computed 21 4.5 bgOverlap)]" '[]'
+expect 1 "a result axe left for another reason is not decided" "$s" "$review_fail"
+report "[$(measured true computed 21 4.5 -)]" '[]'
+expect 1 "a result with no reason is not decided" "$s" "$review_fail"
+report "[$(measured true computed 4.49 4.5)]" '[]'
+expect 1 "a computed pair under its ratio is still a finding" "$s" "$review_fail"
+report "[$(measured true computed null 4.5)]" '[]'
+expect 1 "a pair with no measured ratio is still a finding" "$s" "$review_fail"
+report "[$(measured true axe 21 4.5)]" '[]'
+expect 1 "only a computed pair decides, not one axe compared" "$s" "$review_fail"
+report "[$(measured false computed 21 4.5)]" '[]'
+expect 1 "a violation axe decided is never overruled" "$s" "FAIL: index.html: color-contrast (error)"
+
+# A critical or serious result on reference.html fails, even under a rule
+# the baseline holds; so does an undetermined serious contrast result.
+report '[]' "[$(issue error color-contrast false 'span' 'rgb(1, 1, 1)' 'rgb(2, 2, 2)' axe)]"
+expect 1 "a serious result on reference.html fails whatever the baseline holds" "$s" "FAIL: reference.html: color-contrast (error): a critical or serious result, which no baseline holds"
+report '[]' "[$(issue error color-contrast true)]"
+expect 1 "a serious needs-review result on reference.html that is not decided fails" "$s" "FAIL: reference.html: color-contrast (review): a critical or serious result"
+
 report '[]' "[$(issue warning region false)]"
 expect 1 "a rule not in the baseline fails" "$s" "FAIL: reference.html: region: 1 distinct failure(s), a rule not in the baseline"
 
@@ -140,7 +172,7 @@ report '[]' '[{"message": "timed out"}]'
 expect 1 "reference.html not loading fails" "$s" "FAIL: reference.html: could not be checked: timed out"
 
 report "[$cc]" '[]'
-expect 1 "a needs-review result on a guide page fails" "$s" "FAIL: index.html: color-contrast (review)"
+expect 1 "a needs-review result on a guide page fails" "$s" "$review_fail"
 
 report "[$(issue warning heading-order false)]" '[]'
 expect 1 "a moderate result on a guide page fails" "$s" "FAIL: index.html: heading-order (warning)"
@@ -165,4 +197,4 @@ echo '{"reference.html": {"color-contrast": "two"}}' > "$tmp/baseline.json"
 expect 2 "an unreadable baseline is refused" "$s" "is not readable as {page: {rule: count}}"
 
 echo "docs-a11y self-test: $pass passed, $fail failed"
-(( fail == 0 && pass >= 26 ))
+(( fail == 0 && pass >= 33 ))

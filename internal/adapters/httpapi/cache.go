@@ -101,7 +101,10 @@ func noteDegraded(ctx context.Context) {
 type familyVersion struct{ family, version string }
 
 // entry is one answer of the result cache. Its body is kept while it is
-// younger than its max-age and fits the budget; get drops an expired body.
+// younger than its max-age, or than its stale allowance when that is longer,
+// and fits the budget; get drops a body past both. It is replayed as fresh
+// only before expires, and as stale only while storage cannot answer
+// (serveStale).
 // The ETag, the family versions and the register fingerprint stay while the
 // entry is in the cache, so a matching If-None-Match is answered without the
 // handler for as long as nothing the answer rests on changed. A stored entry
@@ -124,7 +127,13 @@ type entry struct {
 	// in its Age header (sendEntry).
 	built   time.Time
 	expires time.Time
-	elem    *list.Element
+	// stale is how long after built the answer may still be served stale
+	// (cache.stale_if_error, or 0 when a family it was read from is in
+	// cache.no_stale_families), and keep is when its body is dropped: the
+	// later of expires and built plus stale.
+	stale time.Duration
+	keep  time.Time
+	elem  *list.Element
 	// unversioned is set when nothing can tell when the answer changes: a
 	// family carried no freshness version, the versions could not be read
 	// before the answer, or the answer is degraded. It gets no ETag, is
@@ -179,7 +188,7 @@ func newResultCache(c config.Cache) *resultCache {
 }
 
 // get returns the entry of key, the most recently used from now on. An entry
-// whose body has expired at now is replaced by its bodiless copy first.
+// whose body is past its keep at now is replaced by its bodiless copy first.
 func (c *resultCache) get(key string, now time.Time) *entry {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -187,7 +196,7 @@ func (c *resultCache) get(key string, now time.Time) *entry {
 	if e == nil {
 		return nil
 	}
-	if e.body != nil && !now.Before(e.expires) {
+	if e.body != nil && now.After(e.keep) {
 		bare := *e
 		bare.body, bare.header = nil, nil
 		c.remove(e)
@@ -398,7 +407,7 @@ func (s *server) cache(ctx huma.Context, next func(huma.Context)) {
 			s.sendNotModified(ctx, e)
 			return
 		}
-		if e.body != nil {
+		if e.body != nil && now.Before(e.expires) {
 			s.sendEntry(ctx, e, inm)
 			return
 		}
@@ -449,6 +458,9 @@ func (s *server) run(ctx huma.Context, next func(huma.Context), key, inm string,
 		}
 	}()
 	next(b)
+	if storageFailed(b) && s.serveStale(ctx, key, vs, versioned) {
+		return
+	}
 	if b.status != http.StatusOK || len(note.fams) == 0 {
 		send(ctx, b.status, b.header, b.body.Bytes())
 		return
@@ -514,6 +526,13 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 	}
 	e.etag = `W/"` + base64.RawURLEncoding.EncodeToString(h.Sum(nil)[:18]) + `"`
 	e.built, e.expires = now, now.Add(e.maxAge)
+	e.stale = s.cfg.Cache.StaleIfError
+	for _, f := range e.families {
+		if slices.Contains(s.cfg.Cache.NoStale, f.family) {
+			e.stale = 0
+		}
+	}
+	e.keep = now.Add(max(e.maxAge, e.stale))
 	return e
 }
 
@@ -592,6 +611,135 @@ func (s *server) sendEntry(ctx huma.Context, e *entry, inm string) {
 		body = bytes.Replace(body, []byte(`"requestId":"`+e.requestID+`"`), []byte(`"requestId":"`+id+`"`), 1)
 	}
 	send(ctx, http.StatusOK, h, body)
+}
+
+// storageFailed reports whether the operation's answer is a 503 because
+// storage could not answer: unavailable, or out of time.
+func storageFailed(b *bufferedContext) bool {
+	if b.status != http.StatusServiceUnavailable {
+		return false
+	}
+	var p struct {
+		Type string `json:"type"`
+	}
+	if json.Unmarshal(b.body.Bytes(), &p) != nil {
+		return false
+	}
+	return strings.HasSuffix(p.Type, "/problems/"+SlugUpstreamUnavailable) ||
+		strings.HasSuffix(p.Type, "/problems/"+SlugDeadlineExhausted)
+}
+
+// stale returns the stored answer of key while it may still be served stale
+// at now (NFR-RES-004): its body is kept and it was read no longer than its
+// allowance ago.
+func (c *resultCache) stale(key string, now time.Time) *entry {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	e := c.entries[key]
+	if e == nil || e.body == nil || e.stale <= 0 || now.Sub(e.built) > e.stale {
+		return nil
+	}
+	return e
+}
+
+// serveStale answers a request storage could not answer with the stored
+// answer of key, when it may be served stale: a 200 with the served_stale
+// warning and its true Age (PROT-047). It is sent with no-store and no
+// validator, so nothing downstream keeps or revalidates it. An answer read
+// under another licence register than the one last read is never served.
+// It reports whether it answered.
+func (s *server) serveStale(ctx huma.Context, key string, vs provenance.Versions, versioned bool) bool {
+	e := s.results.stale(key, s.now())
+	if e == nil || (versioned && vs.Register != e.register) {
+		return false
+	}
+	age := s.age(e)
+	body, ok := withWarning(e.body, DataWarning{
+		Code:   "served_stale",
+		Detail: "Storage could not answer; this is the answer read " + age + " s ago (see the Age header).",
+	})
+	if !ok {
+		return false
+	}
+	if id := RequestIDFrom(ctx.Context()); id != e.requestID {
+		body = bytes.Replace(body, []byte(`"requestId":"`+e.requestID+`"`), []byte(`"requestId":"`+id+`"`), 1)
+	}
+	h := e.header.Clone()
+	h.Del("ETag")
+	h.Set("Cache-Control", "no-store")
+	h.Set("Vary", varyOn)
+	h.Set("Age", age)
+	send(ctx, http.StatusOK, h, body)
+	return true
+}
+
+// withWarning returns body with w appended to its top-level meta.warnings.
+// It reports false when body has no such array.
+func withWarning(body []byte, w DataWarning) ([]byte, bool) {
+	at, empty, ok := warningsAt(body)
+	if !ok {
+		return nil, false
+	}
+	add, _ := json.Marshal(w)
+	if !empty {
+		add = append([]byte{','}, add...)
+	}
+	out := make([]byte, 0, len(body)+len(add))
+	out = append(out, body[:at]...)
+	out = append(out, add...)
+	return append(out, body[at:]...), true
+}
+
+// warningsAt is the offset of the closing bracket of body's top-level
+// meta.warnings array, and whether that array is empty.
+func warningsAt(body []byte) (int, bool, bool) {
+	d := json.NewDecoder(bytes.NewReader(body))
+	if !enter(d) || !member(d, "meta") || !enter(d) || !member(d, "warnings") {
+		return 0, false, false
+	}
+	if t, err := d.Token(); err != nil || t != json.Delim('[') {
+		return 0, false, false
+	}
+	empty := !d.More()
+	for d.More() {
+		var skip json.RawMessage
+		if d.Decode(&skip) != nil {
+			return 0, false, false
+		}
+	}
+	at := int(d.InputOffset())
+	for at < len(body) && body[at] != ']' {
+		at++
+	}
+	if at == len(body) {
+		return 0, false, false
+	}
+	return at, empty, true
+}
+
+// enter reads the opening brace of an object.
+func enter(d *json.Decoder) bool {
+	t, err := d.Token()
+	return err == nil && t == json.Delim('{')
+}
+
+// member advances d to the value of the member name of the object it is in,
+// skipping the members before it.
+func member(d *json.Decoder, name string) bool {
+	for d.More() {
+		t, err := d.Token()
+		if err != nil {
+			return false
+		}
+		if t == name {
+			return true
+		}
+		var skip json.RawMessage
+		if d.Decode(&skip) != nil {
+			return false
+		}
+	}
+	return false
 }
 
 // send writes an answer: the headers before the status, which the adapter

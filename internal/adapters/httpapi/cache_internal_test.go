@@ -241,7 +241,7 @@ func TestResultCacheKeepsItsBudget(t *testing.T) {
 	now := time.Unix(0, 0)
 	c := newResultCache(config.Cache{MaxBytes: 3*one(30) + 10, MaxEntryBytes: 40, MaxEntries: 100})
 	put := func(key string, n int) *entry {
-		e := &entry{key: key, etag: "e", body: bytes.Repeat([]byte("x"), n), expires: now.Add(time.Hour)}
+		e := &entry{key: key, etag: "e", body: bytes.Repeat([]byte("x"), n), expires: now.Add(time.Hour), keep: now.Add(time.Hour)}
 		c.put(e)
 		return e
 	}
@@ -306,21 +306,107 @@ func TestTheResultCacheCapsItsEntries(t *testing.T) {
 }
 
 func TestAnExpiredBodyIsDropped(t *testing.T) {
-	req.Covers(t, "NFR-PERF-005")
+	req.Covers(t, "NFR-PERF-005", "NFR-RES-004")
 	now := time.Unix(0, 0)
 	c := newResultCache(config.Cache{MaxBytes: 1 << 20, MaxEntryBytes: 1024, MaxEntries: 100})
-	stored := &entry{key: "k", etag: "e", header: http.Header{"A": {"b"}}, body: []byte("body"), expires: now.Add(time.Minute)}
+	// Its max-age ends at one minute, its stale allowance at two: the body
+	// is kept until the later of the two.
+	stored := &entry{key: "k", etag: "e", header: http.Header{"A": {"b"}}, body: []byte("body"),
+		built: now, expires: now.Add(time.Minute), stale: 2 * time.Minute, keep: now.Add(2 * time.Minute)}
 	c.put(stored)
-	if e := c.get("k", now.Add(time.Minute-time.Nanosecond)); e != stored || e.body == nil {
-		t.Fatal("a body was dropped before it expired")
+	if e := c.get("k", now.Add(2*time.Minute)); e != stored || e.body == nil {
+		t.Fatal("a body was dropped before its stale allowance ended")
 	}
-	e := c.get("k", now.Add(time.Minute))
+	if c.stale("k", now.Add(2*time.Minute)) != stored {
+		t.Fatal("an answer read exactly its allowance ago is not served stale")
+	}
+	e := c.get("k", now.Add(2*time.Minute+time.Nanosecond))
 	if e == nil || e.body != nil || e.header != nil || e.etag != "e" || c.bytes != e.size() {
 		t.Fatalf("an expired body is still counted or kept: %+v, bytes %d", e, c.bytes)
 	}
 	// The stored entry a request may still be sending is not written.
 	if stored.body == nil {
 		t.Fatal("dropping the body wrote the entry a request may be sending")
+	}
+}
+
+func TestTheStaleLookup(t *testing.T) {
+	req.Covers(t, "NFR-RES-004")
+	now := time.Unix(0, 0)
+	c := newResultCache(config.Cache{MaxBytes: 1 << 20, MaxEntryBytes: 1024, MaxEntries: 100})
+	c.put(&entry{key: "k", body: []byte("b"), built: now, stale: time.Minute, keep: now.Add(time.Minute)})
+	c.put(&entry{key: "none", body: []byte("b"), built: now, keep: now.Add(time.Minute)})
+	c.put(&entry{key: "bare", built: now, stale: time.Minute})
+	for _, tc := range []struct {
+		key  string
+		at   time.Duration
+		want bool
+	}{
+		{"k", time.Minute, true},
+		{"k", time.Minute + time.Nanosecond, false},
+		{"none", 0, false},
+		{"bare", 0, false},
+		{"absent", 0, false},
+	} {
+		if got := c.stale(tc.key, now.Add(tc.at)) != nil; got != tc.want {
+			t.Errorf("stale(%q) after %v = %v, want %v", tc.key, tc.at, got, tc.want)
+		}
+	}
+}
+
+func TestStorageFailed(t *testing.T) {
+	req.Covers(t, "NFR-RES-004")
+	for body, want := range map[string]bool{
+		`{"type":"https://x/problems/upstream-unavailable"}`: true,
+		`{"type":"https://x/problems/deadline-exhausted"}`:   true,
+		`{"type":"https://x/problems/overloaded"}`:           false,
+		`not json`: false,
+	} {
+		b := &bufferedContext{status: http.StatusServiceUnavailable}
+		b.body.WriteString(body)
+		if got := storageFailed(b); got != want {
+			t.Errorf("storageFailed(503 %s) = %v", body, got)
+		}
+	}
+	b := &bufferedContext{status: http.StatusInternalServerError}
+	b.body.WriteString(`{"type":"https://x/problems/upstream-unavailable"}`)
+	if storageFailed(b) {
+		t.Error("a 500 counted as storage failing")
+	}
+}
+
+func TestWithWarning(t *testing.T) {
+	req.Covers(t, "PROT-047")
+	w := DataWarning{Code: "served_stale", Detail: "d"}
+	for in, want := range map[string]string{
+		`{"data":[],"meta":{"a":{"b":[1]},"warnings":[]},"z":1}`:               `{"data":[],"meta":{"a":{"b":[1]},"warnings":[{"code":"served_stale","detail":"d"}]},"z":1}`,
+		`{"meta":{"warnings":[{"code":"data_stale","detail":"x"}] }}`:          `{"meta":{"warnings":[{"code":"data_stale","detail":"x"},{"code":"served_stale","detail":"d"}] }}`,
+		`{"meta":{"warnings":[ {"code":"partial"} , {"code":"data_stale"} ]}}`: `{"meta":{"warnings":[ {"code":"partial"} , {"code":"data_stale"} ,{"code":"served_stale","detail":"d"}]}}`,
+	} {
+		got, ok := withWarning([]byte(in), w)
+		if !ok || string(got) != want {
+			t.Errorf("withWarning(%s) = %s, %v; want %s", in, got, ok, want)
+		}
+	}
+	for _, in := range []string{
+		``, `[]`, `{"data":1}`, `{"meta":[]}`, `{"meta":{"x":1}}`, `{"meta":{"warnings":{}}}`,
+		`{"meta":{"warnings":[`, `{"meta":{"warnings":[1,}`, `{"x":}`, `{,}`, `{"meta":{"warnings":`,
+	} {
+		if _, ok := withWarning([]byte(in), w); ok {
+			t.Errorf("withWarning(%s) found a warnings array", in)
+		}
+	}
+}
+
+func TestAStoredAnswerWithNoWarningsIsNotServedStale(t *testing.T) {
+	req.Covers(t, "PROT-047")
+	now := time.Unix(0, 0)
+	s := &server{cfg: config.Defaults(), now: func() time.Time { return now }, results: newResultCache(config.Defaults().Cache)}
+	s.results.put(&entry{key: "k", body: []byte(`{}`), built: now, stale: time.Minute, keep: now.Add(time.Minute)})
+	// Without the served_stale warning nothing may be sent; the request is
+	// never touched.
+	if s.serveStale(nil, "k", provenance.Versions{}, false) {
+		t.Fatal("an answer that cannot carry served_stale was served stale")
 	}
 }
 

@@ -673,3 +673,133 @@ func TestAnErrorIsNeverCached(t *testing.T) {
 }
 
 var errFake = errors.New("down")
+
+// failStorage makes every charging read fail with err.
+func (r *cacheRig) failStorage(err error) {
+	r.features.mu.Lock()
+	r.features.err = err
+	r.features.mu.Unlock()
+}
+
+// warnings are the codes of meta.warnings of an answer.
+func warnings(t *testing.T, w *httptest.ResponseRecorder) []string {
+	t.Helper()
+	codes := []string{}
+	for _, x := range meta(t, decode(t, w))["warnings"].([]any) {
+		codes = append(codes, x.(map[string]any)["code"].(string))
+	}
+	return codes
+}
+
+func TestAStoredAnswerIsServedStaleWhileStorageIsDown(t *testing.T) {
+	req.Covers(t, "NFR-RES-004", "PROT-047")
+	for _, cause := range []error{errFake, store.ErrDeadlineExhausted} {
+		r := newCacheRig(t, config.Defaults(), "v1")
+		first := r.get(t, nil)
+		// Past its max-age, storage fails: the answer read two minutes ago
+		// is sent, saying so, with its true Age.
+		r.clock.add(2 * time.Minute)
+		r.failStorage(cause)
+		w := r.get(t, nil)
+		if w.Code != http.StatusOK || w.Header().Get("Age") != "120" || w.Header().Get("Cache-Control") != "no-store" ||
+			w.Header().Get("ETag") != "" || r.features.calls.Load() != 2 {
+			t.Fatalf("%v: a stale answer: %d %v after %d reads", cause, w.Code, w.Header(), r.features.calls.Load())
+		}
+		if got := warnings(t, w); !slices.Equal(got, []string{"served_stale"}) {
+			t.Fatalf("%v: warnings %v, want served_stale", cause, got)
+		}
+		m := meta(t, decode(t, w))
+		if m["requestId"] != w.Header().Get("X-Request-Id") || !strings.Contains(fmt.Sprint(m["warnings"]), "120 s ago") {
+			t.Fatalf("%v: the stale answer's meta: %v", cause, m)
+		}
+		if fmt.Sprint(decode(t, first)["data"]) != fmt.Sprint(decode(t, w)["data"]) {
+			t.Fatalf("%v: the stale answer's data is not the stored one", cause)
+		}
+		// Five minutes after the read it is still served; a moment later it
+		// is not, and the request is refused as before.
+		r.clock.add(3 * time.Minute)
+		if w := r.get(t, nil); w.Code != http.StatusOK || w.Header().Get("Age") != "300" {
+			t.Fatalf("%v: at the allowance: %d, Age %q", cause, w.Code, w.Header().Get("Age"))
+		}
+		r.clock.add(time.Second)
+		if w := r.get(t, nil); w.Code != http.StatusServiceUnavailable || w.Header().Get("Age") != "" {
+			t.Fatalf("%v: past the allowance: %d %v", cause, w.Code, w.Header())
+		}
+	}
+}
+
+func TestAStaleAnswerNeedsNoVersions(t *testing.T) {
+	req.Covers(t, "NFR-RES-004")
+	r := newCacheRig(t, config.Defaults(), "v1")
+	r.get(t, nil)
+	r.clock.add(2 * time.Minute)
+	// Storage is down for the versions as well.
+	r.versions.mu.Lock()
+	r.versions.err = errFake
+	r.versions.mu.Unlock()
+	r.failStorage(errFake)
+	if w := r.get(t, nil); w.Code != http.StatusOK || !slices.Equal(warnings(t, w), []string{"served_stale"}) {
+		t.Fatalf("with no versions readable: %d", w.Code)
+	}
+}
+
+func TestNoStaleAnswerWhenItIsNotAllowed(t *testing.T) {
+	req.Covers(t, "NFR-RES-004", "SEC-030")
+	for name, tc := range map[string]struct {
+		cfg func(*config.Config)
+		rig func(*cacheRig)
+	}{
+		"stale_if_error 0s": {cfg: func(c *config.Config) { c.Cache.StaleIfError = 0 }},
+		"a family that is never served stale": {cfg: func(c *config.Config) {
+			c.Cache.NoStale = []string{"src-zeta-places", "src-alpha-energy"}
+		}},
+		"the register changed": {rig: func(r *cacheRig) {
+			r.versions.mu.Lock()
+			r.versions.register = "reg-2"
+			r.versions.mu.Unlock()
+		}},
+	} {
+		cfg := config.Defaults()
+		if tc.cfg != nil {
+			tc.cfg(cfg)
+		}
+		r := newCacheRig(t, cfg, "v1")
+		r.get(t, nil)
+		r.clock.add(2 * time.Minute)
+		if tc.rig != nil {
+			tc.rig(r)
+		}
+		r.failStorage(errFake)
+		if w := r.get(t, nil); w.Code != http.StatusServiceUnavailable {
+			t.Errorf("%s: %d, want 503", name, w.Code)
+		}
+	}
+}
+
+func TestOnlyAStorageFailureIsAnsweredStale(t *testing.T) {
+	req.Covers(t, "NFR-RES-004")
+	r := newCacheRig(t, config.Defaults(), "v1")
+	r.get(t, nil)
+	r.clock.add(2 * time.Minute)
+	// The key may no longer read the family: that is the answer, not a
+	// stored one.
+	r.failStorage(access.ErrNonePermitted)
+	if w := r.get(t, nil); w.Code != http.StatusForbidden {
+		t.Fatalf("a refusal was answered stale: %d", w.Code)
+	}
+}
+
+func TestAFreshAnswerReplacesTheStaleOne(t *testing.T) {
+	req.Covers(t, "NFR-RES-004")
+	r := newCacheRig(t, config.Defaults(), "v1")
+	r.get(t, nil)
+	r.clock.add(2 * time.Minute)
+	if w := r.get(t, nil); w.Code != http.StatusOK || w.Header().Get("Age") != "" || len(warnings(t, w)) != 0 {
+		t.Fatalf("a read while storage answers: %d, Age %q", w.Code, w.Header().Get("Age"))
+	}
+	r.clock.add(4 * time.Minute)
+	r.failStorage(errFake)
+	if w := r.get(t, nil); w.Code != http.StatusOK || w.Header().Get("Age") != "240" {
+		t.Fatalf("the newer read was not the one served stale: %d, Age %q", w.Code, w.Header().Get("Age"))
+	}
+}

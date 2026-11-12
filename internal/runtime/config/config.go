@@ -280,6 +280,8 @@ type Cache struct {
 	MaxEntries    int           `koanf:"max_entries" default:"10000" validate:"min=1,max=1000000" desc:"Most entries the result cache holds, with or without a body; the least recently used entry is dropped first. Each entry also counts against cache.max_bytes with its key, validator, versions and headers."`
 	VersionsTTL   time.Duration `koanf:"versions_ttl" default:"1s" validate:"min=100ms,max=60s" desc:"How long one read of the source families' freshness versions is reused to answer If-None-Match before the handler runs; it is read only while requests arrive."`
 	MaxAge        CacheMaxAge   `koanf:"max_age"`
+	StaleIfError  time.Duration `koanf:"stale_if_error" default:"5m" validate:"min=0s,max=1h" desc:"While storage is unavailable or the deadline runs out, a stored answer read no longer than this ago is served with the served_stale warning and its true Age instead of 503 (NFR-RES-004, PROT-047). Its body is kept this long even past its max-age. 0s serves nothing stale."`
+	NoStale       []string      `koanf:"no_stale_families" default:"" desc:"Source families whose answers are never served stale: an answer read from any of them is 503 while storage is unavailable, whatever cache.stale_if_error says. Comma-separated in the environment."`
 }
 
 // CacheMaxAge is the Cache-Control max-age of each data domain; an answer

@@ -68,12 +68,9 @@ rule set `viafrei.parity.rules/4` (`parity.Default`):
   exclusion may hold only in a case that asks a parameter: a parameter is
   asked when it is present and its value is not a number of 0 or less, which
   filters nothing.
-- **Named differences** are facts both sides state differently by design,
-  each with its reason (below). They are still compared: a fact differing in
-  exactly the named way (the MCP side's value against the API's) is reported
-  as that difference and not as a mismatch, any other difference in it is a
-  mismatch, and a named difference that no case of an MCP bundle shows fails
-  the harness. So a change on either side is seen.
+- **No named differences.** Every fact that is not excluded is compared
+  as it is: a value either side states otherwise is a mismatch. There is no
+  list of facts both sides may state differently.
 
 ### Excluded facts
 
@@ -88,12 +85,6 @@ rule set `viafrei.parity.rules/4` (`parity.Default`):
 | `meta.attribution[*].` `domain`, `licence`, `licenceUrl`, `publisher`, `shareAlike`, `shareAlikeOffer`, `termsUrl`, `text` | The fixture's families carry synthetic register texts; the platform credits its own register rows for the sources the producer stores each family as, so the texts cannot be equal on these rows. Which families are credited (`meta.attribution[*].family`) is compared. |
 | The text of a condition note (`meta.notes.condition`) | The same reason, since rules/4: the fixture's condition notes are synthetic and the platform states its own register's condition. The family of each note and how many each family has are compared (`meta.notes.condition[<family>]`, above). |
 
-### Named differences
-
-| Fact | MCP | API | Why |
-|---|---|---|---|
-| `data[*].chargePoints[*].availability.state` | `occupied` | `reserved` | The MCP capability answers a reservation as occupied; the API keeps the reported state `reserved`, which says more (decided for the API, which keeps its richer state). |
-
 ## The questions
 
 Every question states its `limit`, so neither side's default limit is
@@ -107,7 +98,8 @@ its family's design threshold (an hour). Both sides must answer it `stale`,
 so a change of either side's limit fails here.
 
 `charging-reserved` is asked at the same place 7 minutes after a point
-reported `reserved`: the named difference above, shown by a live report.
+reported `reserved`. Both sides must answer it `occupied`: a reserved point
+is not free to charge at, and no answer states `reserved` (#18).
 
 Both cases also reach the fixture row planted for crediting (generator
 0.2.0, edge `foreign_unknown_report`): the newest report of `cp-00000-1` is
@@ -116,6 +108,8 @@ nothing, so that family contributed nothing and neither side credits it.
 
 ## Charging rules both sides follow
 
+- **A reserved point** is answered `occupied`; `reserved` is not a state of
+  the answer.
 - **A point's status.** A report older than the shorter of the status age
   limit (`charging.status_max_age`; the MCP capability's status age limit,
   30 minutes) and its family's design threshold is answered with
@@ -135,9 +129,10 @@ contract cannot express; they are not compared here.
 
 ## Known differences that remain
 
-No mismatch in the platform 2.6.12 bundle: `TestParity` passes. One fact
-differs by design, the named difference above (`charging-reserved`: the MCP
-side answers `occupied` where the API keeps `reserved`). The bundle's facts
+None in the platform 2.6.12 bundle: `TestParity` passes with zero
+differences, `charging-reserved` included. Until #18 one fact differed by
+design: the API stated `reserved` where the MCP side answers `occupied`;
+the API now answers `occupied` too. The bundle's facts
 are the 2.6.8 bundle's, and so the 2.5.24 bundle's, fact for fact; only
 `platform` and `commit` differ.
 
@@ -182,8 +177,6 @@ compared only by a checkout of its own time.
   it is parsed.
 - An empty bundle, an unknown member, another format, platform or rule set,
   a producer other than `mcp` or `api`, or a case naming a fact twice.
-- A named difference that no case of an MCP bundle shows: one side changed,
-  or no question reaches it any more.
 - Fixture rows that are not the ones the bundle names.
 - A bundle that does not answer `test/parity/questions.json` exactly: a
   question left out, a case that is not a question, a case asked differently

@@ -61,7 +61,6 @@ type State string
 const (
 	StateAvailable  State = "available"
 	StateOccupied   State = "occupied"
-	StateReserved   State = "reserved"
 	StateOutOfOrder State = "out_of_order"
 	StateUnknown    State = "unknown"
 	StateOther      State = Other
@@ -74,11 +73,19 @@ const (
 // States lists every availability state of the contract. unknown and other
 // stay in the enum but are never sent: a report of either says nothing
 // (Availability.Says), so its point is answered as availability: null.
-var States = []State{StateAvailable, StateOccupied, StateReserved, StateOutOfOrder, StateUnknown, StateOther, StateStale}
+var States = []State{StateAvailable, StateOccupied, StateOutOfOrder, StateUnknown, StateOther, StateStale}
 
-// MapState maps a stored availability code.
+// storedReserved is the stored code of a reserved point. A reserved point
+// is not free to charge at, so it is answered as occupied: the MCP
+// capability's rule (#18), and no answer states reserved.
+const storedReserved = "reserved"
+
+// MapState maps a stored availability code; reserved is answered occupied.
 func MapState(raw string) State {
-	return mapCode(raw, States[:5], StateOther)
+	if raw == storedReserved {
+		return StateOccupied
+	}
+	return mapCode(raw, States[:4], StateOther)
 }
 
 func mapCode[T ~string](raw string, known []T, other T) T {

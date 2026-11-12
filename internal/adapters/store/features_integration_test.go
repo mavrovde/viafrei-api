@@ -94,6 +94,39 @@ func TestProvenanceReadsTheGivenFamiliesInOneLanguage(t *testing.T) {
 	}
 }
 
+func TestChargingNearReadsAReservedPointAsOccupied(t *testing.T) {
+	// #18: a point whose newest report is reserved is answered occupied, as
+	// the MCP capability answers it.
+	st := seeded(t)
+	var (
+		site, point string
+		at          geo.Point
+		observed    time.Time
+	)
+	owner(t, `select c.site_id, p.point_id, st_y(c.location), st_x(c.location), o.observed_at
+from contract.charging_site c join contract.charge_point p using (site_id)
+join contract.charge_point_state_observation o using (point_id)
+where o.availability = 'reserved'
+  and not exists (select 1 from contract.charge_point_state_observation n
+                  where n.point_id = o.point_id and n.observed_at = o.observed_at and n.availability <> 'reserved')
+order by o.observed_at, p.point_id limit 1`, &site, &point, &at.Lat, &at.Lon, &observed)
+	sites, _, err := st.ChargingNear(bounded(t), energy.Query{At: at, RadiusM: 1, Access: energy.FilterAll, Limit: 100}, families(t, st, "energy"), observed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range sites {
+		for _, p := range s.Points {
+			if s.ID == site && p.ID == point {
+				if a := p.Availability; a == nil || a.State != energy.StateOccupied || !a.ObservedAt.Equal(observed) {
+					t.Errorf("a reserved report reads as %+v, want occupied", a)
+				}
+				return
+			}
+		}
+	}
+	t.Fatalf("point %s of site %s was not read", point, site)
+}
+
 func TestChargingNearReadsTheNearestSitesOfTheGivenFamilies(t *testing.T) {
 	req.Covers(t, "FR-ENERGY-004", "FR-ENERGY-005", "FR-ENERGY-006", "SEC-031")
 	st := seeded(t)

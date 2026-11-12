@@ -76,11 +76,10 @@
                 "type": "string"
               },
               "state": {
-                "description": "Open enumeration; treat an unknown value as other. stale: the report is older than the status age limit (30 minutes by default) or than its family's freshness threshold, and is not counted in summary.availableNow.",
+                "description": "Open enumeration; treat an unknown value as other. A point reported reserved is answered occupied, as the MCP capability answers it. stale: the report is older than the status age limit (30 minutes by default) or than its family's freshness threshold, and is not counted in summary.availableNow.",
                 "enum": [
                   "available",
                   "occupied",
-                  "reserved",
                   "out_of_order",
                   "unknown",
                   "other",

@@ -105,12 +105,14 @@ func TestTinyLoadsIntoTheContract(t *testing.T) {
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 	// The ci set committed in TestMain uses the same identifiers, so the
 	// tables are emptied inside this transaction first; the rollback brings
-	// the ci set back for the other tests.
+	// the ci set back for the other tests. Cascade: a contract table the
+	// generator does not fill (contract.message_coverage) references one it
+	// does, and is emptied with it.
 	names := make([]string, len(fixtures.Tables))
 	for i, table := range fixtures.Tables {
 		names[i] = "contract." + pgx.Identifier{table}.Sanitize() //nolint:misspell // the pgx method's name
 	}
-	if _, err := tx.Exec(ctx, "truncate table "+strings.Join(names, ", ")); err != nil {
+	if _, err := tx.Exec(ctx, "truncate table "+strings.Join(names, ", ")+" cascade"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := tx.Exec(ctx, buf.String()); err != nil {

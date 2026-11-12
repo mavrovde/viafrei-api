@@ -2,6 +2,7 @@ package httpapi_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"slices"
 	"testing"
@@ -208,5 +209,42 @@ func TestMotorwayReferencesAreNormalised(t *testing.T) {
 	in := &httpapi.MotorwayInput{Road: "C8"}
 	if errs := in.Resolve(nil); len(errs) != 1 {
 		t.Errorf("C8 resolved: %v", errs)
+	}
+}
+
+// TestTheLampEnumerationsAreTheDomains: the served document's lamp and
+// lampReason enumerations of both conditions answers are the domain's lists,
+// in the domain's order, which is the platform's order of the reasons.
+func TestTheLampEnumerationsAreTheDomains(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004", "FR-SVC-005")
+	w := do(t, newHandler(t, config.Defaults(), nil), http.MethodGet, "/v1/openapi.json", nil)
+	var doc struct {
+		Components struct {
+			Schemas map[string]struct {
+				Properties map[string]struct {
+					Enum []any `json:"enum"`
+				} `json:"properties"`
+			} `json:"schemas"`
+		} `json:"components"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	reasons := []any{}
+	for _, r := range roads.Reasons {
+		reasons = append(reasons, string(r))
+	}
+	lamps := []any{}
+	for _, l := range roads.Lamps {
+		lamps = append(lamps, string(l))
+	}
+	for _, name := range []string{"MotorwayData", "RoadConditionsData"} {
+		p := doc.Components.Schemas[name].Properties
+		if got := slices.DeleteFunc(slices.Clone(p["lampReason"].Enum), func(v any) bool { return v == nil }); !slices.Equal(got, reasons) {
+			t.Errorf("%s.lampReason %v, want %v", name, got, reasons)
+		}
+		if !slices.Equal(p["lamp"].Enum, lamps) {
+			t.Errorf("%s.lamp %v, want %v", name, p["lamp"].Enum, lamps)
+		}
 	}
 }

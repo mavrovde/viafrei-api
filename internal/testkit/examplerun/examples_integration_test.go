@@ -122,7 +122,10 @@ func seedFixtures(t *testing.T) {
 		if _, err := tx.Exec(ctx, buf.String()); err != nil {
 			return err
 		}
-		return plantFreshReports(ctx, tx)
+		if err := plantFreshReports(ctx, tx); err != nil {
+			return err
+		}
+		return plantLampSight(ctx, tx)
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -150,6 +153,37 @@ func plantFreshReports(ctx context.Context, tx pgx.Tx) error {
 	for i, ref := range planted {
 		if ref == nil || *ref == "" {
 			return fmt.Errorf("fresh report %d has no source: its point has no fixture report", i)
+		}
+	}
+	return nil
+}
+
+// plantLampSight gives the road lamps of the examples the sight the
+// generated set does not hold (it carries no state code, coverage or
+// confirmation): each junction is placed in the state whose boundary holds
+// it, every state with a junction is covered by the roads family
+// src-alpha-roads, and every source whose data is at most ten minutes old
+// at the examples' clock was confirmed two minutes before it, at an
+// interval of 300 s. Each statement must change rows.
+func plantLampSight(ctx context.Context, tx pgx.Tx) error {
+	for _, q := range []string{
+		`update contract.junction j set state_code = r.region_code from contract.admin_region r
+where r.region_level = 'state' and st_contains(r.boundary, j.location)`,
+		`insert into contract.message_coverage (state_code, source_ref, coverage_role)
+select distinct state_code, 'src-alpha-roads', 'own' from contract.junction where state_code is not null`,
+		`update contract.source_freshness set confirmed_at = $1::timestamptz - interval '2 minutes', confirm_interval_s = 300
+where data_as_of >= $1::timestamptz - interval '10 minutes'`,
+	} {
+		args := []any{}
+		if strings.Contains(q, "$1") {
+			args = append(args, now)
+		}
+		tag, err := tx.Exec(ctx, q, args...)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return fmt.Errorf("planting the lamps' sight changed no row: %s", q)
 		}
 	}
 	return nil
@@ -216,7 +250,7 @@ func ask(t *testing.T, cfg *config.Config, st *store.Store, e api.Example) (int,
 		Config: cfg, Build: build, ContractVersion: contract.Version(), Now: clock,
 		Readiness: health.NewChecker(st, expected, cfg.Health.ReadyTimeout),
 		Auth:      keyAuth{principal(e.Key)}, Sources: st,
-		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st}, wire.FeatureSettings(cfg), clock),
+		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st}, wire.FeatureSettings(cfg), clock),
 	})
 	if err != nil {
 		t.Fatal(err)

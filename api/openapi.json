@@ -787,7 +787,7 @@
             "$ref": "#/components/schemas/Corridor"
           },
           "lamp": {
-            "description": "The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope and every official DWD warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a jam with a delay of 30 minutes or more; a DWD warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a DWD warning of level 1 or 2; any other message (an accident without a closure, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the DWD warnings not readable with the key or their source not fresh. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is fresh, which is no guarantee that the road is free.",
+            "description": "The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope as its record is read (the motorway operator's event, any other traffic message, a bridge's state) and every official weather warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a closed bridge; a jam with a delay of 30 minutes or more; a weather warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a weather warning of level 1 or 2; any other message (an accident without a closure, a restricted bridge, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the weather warnings not readable with the key or their source not current, or a state in scope whose traffic messages no current roads family the key may read covers. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is current, which is no guarantee that the road is free.",
             "enum": [
               "green",
               "amber",
@@ -796,15 +796,15 @@
             "type": "string"
           },
           "lampReason": {
-            "description": "Why the lamp has its colour: the first of its reasons, red ones first, then amber ones in the platform's order (ramp_closed, jam, weather_warning, slippery, warning, narrowing, limited_sight); null for green. bridge_closed and slippery are never given while the read contract holds no bridge states and no road-weather forecast. Open enumeration.",
+            "description": "Why the lamp has its colour: the first of its reasons, a red one before any amber one, and inside a colour in the platform's order, which is this enumeration's order; null for green. slippery is never given while the read contract holds no road-weather forecast. Open enumeration.",
             "enum": [
               "road_closed",
+              "ramp_closed",
               "safety",
               "bridge_closed",
               "long_jam",
-              "weather_warning",
-              "ramp_closed",
               "jam",
+              "weather_warning",
               "slippery",
               "warning",
               "narrowing",
@@ -1594,7 +1594,7 @@
             "$ref": "#/components/schemas/Area"
           },
           "lamp": {
-            "description": "The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope and every official DWD warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a jam with a delay of 30 minutes or more; a DWD warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a DWD warning of level 1 or 2; any other message (an accident without a closure, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the DWD warnings not readable with the key or their source not fresh. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is fresh, which is no guarantee that the road is free.",
+            "description": "The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope as its record is read (the motorway operator's event, any other traffic message, a bridge's state) and every official weather warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a closed bridge; a jam with a delay of 30 minutes or more; a weather warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a weather warning of level 1 or 2; any other message (an accident without a closure, a restricted bridge, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the weather warnings not readable with the key or their source not current, or a state in scope whose traffic messages no current roads family the key may read covers. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is current, which is no guarantee that the road is free.",
             "enum": [
               "green",
               "amber",
@@ -1603,15 +1603,15 @@
             "type": "string"
           },
           "lampReason": {
-            "description": "Why the lamp has its colour: the first of its reasons, red ones first, then amber ones in the platform's order (ramp_closed, jam, weather_warning, slippery, warning, narrowing, limited_sight); null for green. bridge_closed and slippery are never given while the read contract holds no bridge states and no road-weather forecast. Open enumeration.",
+            "description": "Why the lamp has its colour: the first of its reasons, a red one before any amber one, and inside a colour in the platform's order, which is this enumeration's order; null for green. slippery is never given while the read contract holds no road-weather forecast. Open enumeration.",
             "enum": [
               "road_closed",
+              "ramp_closed",
               "safety",
               "bridge_closed",
               "long_jam",
-              "weather_warning",
-              "ramp_closed",
               "jam",
+              "weather_warning",
               "slippery",
               "warning",
               "narrowing",
@@ -2873,7 +2873,7 @@
                       "data": {
                         "apiVersion": "1.0.0-example",
                         "buildSha": "0123456789ab",
-                        "contractVersion": "0.1",
+                        "contractVersion": "0.2",
                         "platformVersion": null,
                         "openapi": "https://api.viafrei.de/v1/openapi.json",
                         "languages": [
@@ -2933,7 +2933,7 @@
     },
     "/v1/motorways/{road}/conditions": {
       "get": {
-        "description": "The active situations on one road, ordered by their position along it, with the lamp over every situation on the road in the asked direction and every DWD warning in force in an area the road crosses. MCP counterpart: road status. Needs the scope roads; the DWD warnings are read with the scope weather, and without it the lamp says its sight is limited.",
+        "description": "The active situations on one road, ordered by their position along it, with the lamp over every situation on the road in the asked direction and every official weather warning in force in an area the road crosses. MCP counterpart: road status. Needs the scope roads; the weather warnings are read with the scope weather, and without it the lamp says its sight is limited.",
         "operationId": "getMotorwayConditions",
         "parameters": [
           {
@@ -3028,6 +3028,175 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The situations on a motorway, two to a page, with its lamp",
+                    "value": {
+                      "data": {
+                        "corridor": {
+                          "road": "A101",
+                          "roadType": "motorway",
+                          "direction": "both",
+                          "states": [
+                            "05",
+                            "06",
+                            "07",
+                            "08",
+                            "10",
+                            "11",
+                            "12",
+                            "15",
+                            "16"
+                          ]
+                        },
+                        "lamp": "red",
+                        "lampReason": "road_closed",
+                        "situations": [
+                          {
+                            "id": "ev-00028",
+                            "kind": "weather",
+                            "severity": "info",
+                            "road": "A101",
+                            "roadType": "motorway",
+                            "direction": "south",
+                            "directionText": "Sackbeiheim",
+                            "location": {
+                              "lat": 50.000247,
+                              "lon": 13.554106
+                            },
+                            "validity": {
+                              "from": "2026-03-29T22:00:00Z",
+                              "fromLocal": "2026-03-30T00:00:00+02:00",
+                              "until": "2026-03-31T18:00:00Z",
+                              "untilLocal": "2026-03-31T20:00:00+02:00"
+                            },
+                            "lanes": null,
+                            "delayMin": null,
+                            "lengthM": 4959,
+                            "headline": "Weather bei Gieckpückau",
+                            "description": null,
+                            "textLanguage": "de",
+                            "updatedAt": "2026-03-29T22:01:00Z",
+                            "updatedAtLocal": "2026-03-30T00:01:00+02:00",
+                            "position": {
+                              "fromKm": 539.7,
+                              "toKm": null,
+                              "junctionFrom": null,
+                              "junctionTo": null
+                            },
+                            "sourceFamily": "src-alpha-roads"
+                          },
+                          {
+                            "id": "ev-00020",
+                            "kind": "roadworks",
+                            "severity": "lane_closed",
+                            "road": "A101",
+                            "roadType": "motorway",
+                            "direction": "unknown",
+                            "directionText": "Dirkäningen",
+                            "location": {
+                              "lat": 50.094131,
+                              "lon": 12.752644
+                            },
+                            "validity": {
+                              "from": "2026-03-29T00:59:59Z",
+                              "fromLocal": "2026-03-29T01:59:59+01:00",
+                              "until": "2026-03-31T02:59:59Z",
+                              "untilLocal": "2026-03-31T04:59:59+02:00"
+                            },
+                            "lanes": {
+                              "closed": 1,
+                              "total": 2
+                            },
+                            "delayMin": null,
+                            "lengthM": 7554,
+                            "headline": "Roadworks bei Zautbrierwerder",
+                            "description": null,
+                            "textLanguage": "de",
+                            "updatedAt": "2026-03-29T01:00:59Z",
+                            "updatedAtLocal": "2026-03-29T03:00:59+02:00",
+                            "position": {
+                              "fromKm": 619.1,
+                              "toKm": null,
+                              "junctionFrom": null,
+                              "junctionTo": null
+                            },
+                            "sourceFamily": "src-alpha-roads"
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:57:30Z",
+                        "freshness": [
+                          {
+                            "family": "src-alpha-roads",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          },
+                          {
+                            "family": "src-eta-weather",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 1800,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "src-alpha-roads",
+                            "domain": "roads",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          },
+                          {
+                            "family": "src-eta-weather",
+                            "domain": "weather",
+                            "publisher": "Longkein Datenwerk",
+                            "text": "Synthetic data from family eta, licence lic-eta.",
+                            "licence": "Synthetic licence eta",
+                            "licenceUrl": "https://licences.example/eta",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://eta.example/terms"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 2,
+                          "hasMore": true
+                        },
+                        "query": {
+                          "road": "A101",
+                          "direction": "both",
+                          "kinds": [],
+                          "minSeverity": "info"
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/motorways/A101/conditions"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/MotorwayEnvelope"
                 }
@@ -3215,6 +3384,15 @@
         "tags": [
           "roads"
         ],
+        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/motorways/A101/conditions?limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/motorways/A101/conditions?limit=2",
         "x-required-scope": "roads"
       }
     },
@@ -4015,7 +4193,7 @@
     },
     "/v1/road-conditions": {
       "get": {
-        "description": "The active situations within the radius of a position on every road class held, by severity descending, then distance, then id, with the lamp over every situation within the radius and every DWD warning in force in an area within it. MCP counterpart: road status (area form). Needs the scope roads; the DWD warnings are read with the scope weather, and without it the lamp says its sight is limited.",
+        "description": "The active situations within the radius of a position on every road class held, by severity descending, then distance, then id, with the lamp over every situation within the radius and every official weather warning in force in an area within it. MCP counterpart: road status (area form). Needs the scope roads; the weather warnings are read with the scope weather, and without it the lamp says its sight is limited.",
         "operationId": "listRoadConditions",
         "parameters": [
           {
@@ -4125,6 +4303,111 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The situations within 50 km, two to a page, with their lamp",
+                    "value": {
+                      "data": {
+                        "area": {
+                          "at": {
+                            "lat": 50.39,
+                            "lon": 10.23
+                          },
+                          "radiusM": 50000
+                        },
+                        "lamp": "amber",
+                        "lampReason": "warning",
+                        "situations": [
+                          {
+                            "id": "ev-00009",
+                            "kind": "other",
+                            "severity": "lane_closed",
+                            "road": "A103",
+                            "roadType": "motorway",
+                            "direction": "unknown",
+                            "directionText": "Giellönfeld",
+                            "location": {
+                              "lat": 50.43293,
+                              "lon": 9.661006
+                            },
+                            "validity": {
+                              "from": "2026-03-28T16:33:33Z",
+                              "fromLocal": "2026-03-28T17:33:33+01:00",
+                              "until": null,
+                              "untilLocal": null
+                            },
+                            "lanes": null,
+                            "delayMin": null,
+                            "lengthM": 9932,
+                            "headline": "Other bei Klespelau",
+                            "description": null,
+                            "textLanguage": "de",
+                            "updatedAt": "2026-03-28T16:34:33Z",
+                            "updatedAtLocal": "2026-03-28T17:34:33+01:00",
+                            "position": null,
+                            "distanceM": 40726,
+                            "sourceFamily": "src-alpha-roads"
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:57:30Z",
+                        "freshness": [
+                          {
+                            "family": "src-alpha-roads",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "src-alpha-roads",
+                            "domain": "roads",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 2,
+                          "hasMore": false
+                        },
+                        "query": {
+                          "at": {
+                            "lat": 50.39,
+                            "lon": 10.23
+                          },
+                          "radiusM": 50000,
+                          "kinds": [],
+                          "minSeverity": "info",
+                          "roadClasses": []
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/road-conditions"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/RoadConditionsEnvelope"
                 }
@@ -4312,6 +4595,15 @@
         "tags": [
           "roads"
         ],
+        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/road-conditions?at=50.39,10.23\u0026radius_m=50000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/road-conditions?at=50.39,10.23\u0026radius_m=50000\u0026limit=2",
         "x-required-scope": "roads"
       }
     },
@@ -4340,6 +4632,78 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "One road situation",
+                    "value": {
+                      "data": {
+                        "id": "ev-00028",
+                        "kind": "weather",
+                        "severity": "info",
+                        "road": "A101",
+                        "roadType": "motorway",
+                        "direction": "south",
+                        "directionText": "Sackbeiheim",
+                        "location": {
+                          "lat": 50.000247,
+                          "lon": 13.554106
+                        },
+                        "validity": {
+                          "from": "2026-03-29T22:00:00Z",
+                          "fromLocal": "2026-03-30T00:00:00+02:00",
+                          "until": "2026-03-31T18:00:00Z",
+                          "untilLocal": "2026-03-31T20:00:00+02:00"
+                        },
+                        "lanes": null,
+                        "delayMin": null,
+                        "lengthM": 4959,
+                        "headline": "Weather bei Gieckpückau",
+                        "description": null,
+                        "textLanguage": "de",
+                        "updatedAt": "2026-03-29T22:01:00Z",
+                        "updatedAtLocal": "2026-03-30T00:01:00+02:00",
+                        "position": null,
+                        "sourceFamily": "src-alpha-roads"
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:57:30Z",
+                        "freshness": [
+                          {
+                            "family": "src-alpha-roads",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "src-alpha-roads",
+                            "domain": "roads",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": []
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/road-situations/ev-00028"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/SituationEnvelope"
                 }
@@ -4527,6 +4891,15 @@
         "tags": [
           "roads"
         ],
+        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/road-situations/ev-00028\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/road-situations/ev-00028",
         "x-required-scope": "roads"
       }
     }

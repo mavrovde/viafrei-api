@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/mavrovde/viafrei-api/internal/domain/ampel"
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
@@ -92,23 +93,32 @@ func filterArgs(f roads.Filter, families []string, now time.Time) []any {
 }
 
 // messagesSelect aggregates the lamp's view of every situation in the scope
-// as a JSON array of {"k": kind, "h": headline, "t": description, "l": text
-// language, "d": delay}; null when the scope holds none.
-const messagesSelect = `select jsonb_agg(distinct jsonb_build_object('k', e.event_kind, 'h', e.headline, 't', e.description,
-                                         'l', e.text_lang, 'd', e.delay_min))
+// as a JSON array of {"r": record, "k": kind, "h": headline, "s": subtitle,
+// "t": description, "p": place words, "b": blocked, "y": traffic type,
+// "ds": delay in seconds, "d": delay in minutes}; null when the scope holds
+// none.
+const messagesSelect = `select jsonb_agg(distinct jsonb_build_object('r', e.record_class, 'k', e.event_kind, 'h', e.headline,
+                                         's', e.subtitle, 't', e.description, 'p', e.place_text,
+                                         'b', coalesce(e.is_blocked, false), 'y', e.traffic_type,
+                                         'ds', e.delay_s, 'd', e.delay_min))
 from contract.traffic_event e
 where ` + scopeFilter
 
 // storedMessage is one element of messagesSelect, in stored codes.
 type storedMessage struct {
+	Record      string  `json:"r"`
 	Kind        string  `json:"k"`
 	Headline    string  `json:"h"`
+	Subtitle    *string `json:"s"`
 	Description *string `json:"t"`
-	Language    string  `json:"l"`
+	PlaceText   *string `json:"p"`
+	Blocked     bool    `json:"b"`
+	TrafficType *string `json:"y"`
+	DelayS      *int    `json:"ds"`
 	DelayMin    *int    `json:"d"`
 }
 
-// warningsScope is the condition of a DWD warning the lamp reads: a
+// warningsScope is the condition of a weather warning the lamp reads: a
 // published, not cancelled warning of the given families in force at now,
 // placed in an area. $1 families, $2 now.
 const warningsScope = `from contract.weather_warning w
@@ -117,21 +127,65 @@ where w.withdrawn_at is null and w.message_status <> 'cancelled'
   and w.source_ref = any($1)
   and w.valid_from <= $2 and (w.valid_to is null or w.valid_to > $2)`
 
-// sourcesSelect reads the freshness of the given families. $1 families.
-const sourcesSelect = `select s.source_ref, s.stale_after_s, f.data_as_of
+// sourcesSelect reads the freshness of the given families and the newest
+// confirmation of those that have a freshness row. $1 families.
+const sourcesSelect = `select s.source_ref, s.stale_after_s, f.data_as_of,
+       f.source_ref is not null, f.confirmed_at, f.confirm_interval_s::float8, coalesce(f.updates_paused, false)
 from contract.source s
 left join contract.source_freshness f using (source_ref)
 where s.source_ref = any($1)
 order by s.source_ref`
 
+// coverageSelect reads which of the given families cover the traffic
+// messages of the given states. $1 states, $2 families.
+const coverageSelect = `select state_code, source_ref, coverage_role, current_only
+from contract.message_coverage
+where state_code = any($1) and source_ref = any($2)
+order by state_code, source_ref`
+
+// statesOf aggregates the distinct, known state codes of the junctions a
+// query selects (column state_code) into a sorted array, empty when none.
+func statesOf(junctions string) string {
+	return `select coalesce(array_agg(distinct state_code order by state_code) filter (where state_code is not null), '{}')
+from (` + junctions + `) j`
+}
+
+// coverageRow is one row of coverageSelect.
+type coverageRow struct {
+	State, Source, Role string
+	CurrentOnly         bool
+}
+
+// coverageOf gathers the coverage rows of the states in scope by state.
+func coverageOf(rows pgx.Rows) (map[string]ampel.Coverage, error) {
+	read, err := pgx.CollectRows(rows, pgx.RowToStructByPos[coverageRow])
+	out := map[string]ampel.Coverage{}
+	for _, r := range read {
+		c := out[r.State]
+		if r.Role == "own" {
+			c.Own = append(c.Own, r.Source)
+			if r.CurrentOnly {
+				c.CurrentOnly = append(c.CurrentOnly, r.Source)
+			}
+		} else {
+			c.Carried = append(c.Carried, r.Source)
+		}
+		out[r.State] = c
+	}
+	return out, err
+}
+
 // scope is one read of the lamp's scope, run in the page's snapshot.
 type scope struct {
 	messages string
 	args     []any
-	// warnings is the area condition of the DWD warnings, over $3 onwards
-	// of warningArgs.
+	// warnings is the area condition of the weather warnings, over $3
+	// onwards of warningArgs.
 	warnings    string
 	warningArgs []any
+	// states selects the codes of the states in scope, over stateArgs.
+	states    string
+	stateArgs []any
 }
 
 func scanSituation(r pgx.CollectableRow) (roads.Situation, error) {
@@ -169,11 +223,13 @@ func scanSituation(r pgx.CollectableRow) (roads.Situation, error) {
 }
 
 // read runs the page query and the reads of the lamp's scope (its
-// situations, the DWD warnings in force there when a weather family is read,
-// the freshness of every family read) in one snapshot.
+// situations, the weather warnings in force there when a weather family is
+// read, the freshness and newest confirmation of every family read, the
+// states in scope and which roads families read cover their traffic
+// messages) in one snapshot.
 func (s *Store) read(ctx context.Context, list string, listArgs []any, limit int, fams roads.Families, now time.Time, sc scope) (roads.Page, error) {
 	var (
-		out    roads.Page
+		out    = roads.Page{Confirmations: map[string]ampel.Confirmation{}}
 		stored []storedMessage
 	)
 	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
@@ -207,11 +263,22 @@ order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, s
 					var (
 						f          provenance.Family
 						staleAfter int64
+						held       bool
+						c          ampel.Confirmation
 					)
-					err := r.Scan(&f.Source.Family, &staleAfter, &f.DataAsOf)
+					err := r.Scan(&f.Source.Family, &staleAfter, &f.DataAsOf, &held, &c.At, &c.IntervalS, &c.Paused)
 					f.StaleAfter = time.Duration(staleAfter) * time.Second
+					if held {
+						out.Confirmations[f.Source.Family] = c
+					}
 					return f, err
 				})
+				return err
+			},
+			func() error { return tx.QueryRow(ctx, sc.states, sc.stateArgs...).Scan(&out.States) },
+			func() (err error) {
+				res, _ := tx.Query(ctx, coverageSelect, out.States, fams.Roads)
+				out.Coverage, err = coverageOf(res)
 				return err
 			},
 		} {
@@ -225,8 +292,9 @@ order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, s
 		return roads.Page{}, err
 	}
 	for _, m := range stored {
-		out.Messages = append(out.Messages, roads.Message{Kind: roads.MapKind(m.Kind), Headline: m.Headline,
-			Description: m.Description, TextLanguage: m.Language, DelayMin: m.DelayMin})
+		out.Messages = append(out.Messages, roads.Message{Record: roads.MapRecord(m.Record), Kind: roads.MapKind(m.Kind),
+			Headline: m.Headline, Subtitle: m.Subtitle, Description: m.Description, PlaceText: m.PlaceText,
+			Blocked: m.Blocked, TrafficType: m.TrafficType, DelayS: m.DelayS, DelayMin: m.DelayMin})
 	}
 	if len(out.Items) > limit {
 		out.Items, out.HasMore = out.Items[:limit], true
@@ -243,9 +311,10 @@ order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, s
 // starts where the carriageway's traffic comes from, decided by the line's
 // own ends (a road whose last part ends further north than its first part
 // starts is driven north with rising chainage). Those that cannot be placed
-// come last, then severity descending, then id; and it returns the signals
-// of every situation in the scope (the road and direction) and the DWD
-// warnings in force in an area the road's line crosses, for the lamp.
+// come last, then severity descending, then id; and it returns, for the
+// lamp, the view of every situation in the scope (the road and direction),
+// the weather warnings in force in an area the road's line crosses, and the
+// states of the road's junctions.
 // A situation's road reference is compared in its canonical form, as the
 // road's is: A1 and A 1 are one road.
 func (s *Store) SituationsOnRoad(ctx context.Context, q roads.CorridorQuery, fams roads.Families, now time.Time) (roads.Page, error) {
@@ -300,13 +369,17 @@ limit $11`, args, q.Limit, fams, now, scope{
 		warnings: `st_intersects(r.boundary, (select g.geometry from contract.road g
                                   where ` + fmt.Sprintf(canonicalRef, "g.road_ref") + ` = $3 order by g.road_ref limit 1))`,
 		warningArgs: []any{q.Road},
+		states: statesOf(`select state_code from contract.junction
+where ` + fmt.Sprintf(canonicalRef, "road_ref") + ` = $1`),
+		stateArgs: []any{q.Road},
 	})
 }
 
 // SituationsNear reads the active situations within the radius of a
-// position, by severity descending, then distance, then id; and the
-// signals of every situation in the scope (the radius) and the DWD warnings
-// in force in an area within the radius, for the lamp.
+// position, by severity descending, then distance, then id; and, for the
+// lamp, the view of every situation in the scope (the radius), the weather
+// warnings in force in an area within the radius, and the states of the
+// junctions within the radius, else of the junction nearest the position.
 func (s *Store) SituationsNear(ctx context.Context, q roads.AreaQuery, fams roads.Families, now time.Time) (roads.Page, error) {
 	classes, other := q.KnownClasses()
 	args := append(filterArgs(q.Filter, fams.Roads, now), q.At.Lat, q.At.Lon, q.RadiusM,
@@ -330,6 +403,14 @@ limit $14`, args, q.Limit, fams, now, scope{
 		args:        []any{fams.Roads, now, q.At.Lat, q.At.Lon, q.RadiusM},
 		warnings:    `st_dwithin(r.boundary::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`,
 		warningArgs: []any{q.At.Lat, q.At.Lon, q.RadiusM},
+		states: statesOf(`with here as (select st_setsrid(st_makepoint($2, $1), 4326) g),
+near as (select j.state_code from contract.junction j, here
+         where st_dwithin(j.location::geography, here.g::geography, $3))
+select state_code from near
+union all
+select (select j.state_code from contract.junction j, here order by j.location <-> here.g, j.junction_id limit 1)
+where not exists (select 1 from near)`),
+		stateArgs: []any{q.At.Lat, q.At.Lon, q.RadiusM},
 	})
 }
 

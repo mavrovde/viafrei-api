@@ -1,0 +1,117 @@
+{
+  "title": "The situations within 50 km, two to a page, with their lamp",
+  "request": "/v1/road-conditions?at=50.39,10.23\u0026radius_m=50000\u0026limit=2",
+  "attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "roads",
+      "weather"
+    ],
+    "sources": [
+      "src-alpha-roads",
+      "src-eta-weather"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": {
+      "area": {
+        "at": {
+          "lat": 50.39,
+          "lon": 10.23
+        },
+        "radiusM": 50000
+      },
+      "lamp": "amber",
+      "lampReason": "warning",
+      "situations": [
+        {
+          "id": "ev-00009",
+          "kind": "other",
+          "severity": "lane_closed",
+          "road": "A103",
+          "roadType": "motorway",
+          "direction": "unknown",
+          "directionText": "Giellönfeld",
+          "location": {
+            "lat": 50.43293,
+            "lon": 9.661006
+          },
+          "validity": {
+            "from": "2026-03-28T16:33:33Z",
+            "fromLocal": "2026-03-28T17:33:33+01:00",
+            "until": null,
+            "untilLocal": null
+          },
+          "lanes": null,
+          "delayMin": null,
+          "lengthM": 9932,
+          "headline": "Other bei Klespelau",
+          "description": null,
+          "textLanguage": "de",
+          "updatedAt": "2026-03-28T16:34:33Z",
+          "updatedAtLocal": "2026-03-28T17:34:33+01:00",
+          "position": null,
+          "distanceM": 40726,
+          "sourceFamily": "src-alpha-roads"
+        }
+      ]
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": "2026-03-29T23:57:30Z",
+      "freshness": [
+        {
+          "family": "src-alpha-roads",
+          "dataAsOf": "2026-03-29T23:57:30Z",
+          "ageS": 150,
+          "staleAfterS": 900,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "src-alpha-roads",
+          "domain": "roads",
+          "publisher": "Nimbruß Datenwerk",
+          "text": "Synthetic data from family alpha, licence lic-alpha.",
+          "licence": "Synthetic licence alpha",
+          "licenceUrl": "https://licences.example/alpha",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://alpha.example/terms"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ],
+      "page": {
+        "limit": 2,
+        "hasMore": false
+      },
+      "query": {
+        "at": {
+          "lat": 50.39,
+          "lon": 10.23
+        },
+        "radiusM": 50000,
+        "kinds": [],
+        "minSeverity": "info",
+        "roadClasses": []
+      }
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/road-conditions"
+    }
+  }
+}

@@ -105,6 +105,7 @@ type ContractJunction struct {
 	JunctionKind string
 	ChainageKm   pgtype.Numeric
 	Location     interface{}
+	StateCode    pgtype.Text
 }
 
 type ContractLicence struct {
@@ -114,6 +115,13 @@ type ContractLicence struct {
 	LicenceCategory     string
 	ShareAlike          bool
 	AttributionRequired bool
+}
+
+type ContractMessageCoverage struct {
+	StateCode    string
+	SourceRef    string
+	CoverageRole string
+	CurrentOnly  bool
 }
 
 type ContractOccupancyObservation struct {
@@ -224,6 +232,9 @@ type ContractSourceFreshness struct {
 	SourceRef        string
 	DataAsOf         pgtype.Timestamptz
 	FreshnessVersion string
+	ConfirmedAt      pgtype.Timestamptz
+	ConfirmIntervalS pgtype.Int4
+	UpdatesPaused    bool
 }
 
 type ContractSourceNote struct {
@@ -280,14 +291,21 @@ type ContractTrafficEvent struct {
 	DelayMin        pgtype.Int4
 	AffectedLengthM pgtype.Int4
 	Headline        string
-	Description     pgtype.Text
-	TextLang        string
-	SourceRef       string
-	OriginKey       string
-	PublishedAt     pgtype.Timestamptz
-	RecordedAt      pgtype.Timestamptz
-	ChangedAt       pgtype.Timestamptz
-	WithdrawnAt     pgtype.Timestamptz
+	// The publisher's description: its lines in their order, joined with one newline (U+000A) and nothing else. The lamp reads an operator event's location line ("Auffahrt auf die A9: ...", "A45: Hagen -> Gießen, ...") line by line. For a bridge_state record, the bridge's state text.
+	Description pgtype.Text
+	TextLang    string
+	SourceRef   string
+	OriginKey   string
+	PublishedAt pgtype.Timestamptz
+	RecordedAt  pgtype.Timestamptz
+	ChangedAt   pgtype.Timestamptz
+	WithdrawnAt pgtype.Timestamptz
+	RecordClass string
+	Subtitle    pgtype.Text
+	PlaceText   pgtype.Text
+	IsBlocked   pgtype.Bool
+	TrafficType pgtype.Text
+	DelayS      pgtype.Int4
 }
 
 type ContractTrafficEventObservation struct {

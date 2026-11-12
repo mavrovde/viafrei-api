@@ -6,13 +6,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
+	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/mavrovde/viafrei-api/internal/domain/ampel"
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
@@ -50,7 +54,7 @@ func countOnA101(t *testing.T, now time.Time, predicate string) (n int) {
 // hasMessage says whether the lamp's messages carry the situation's.
 func hasMessage(msgs []roads.Message, s roads.Situation) bool {
 	return slices.ContainsFunc(msgs, func(m roads.Message) bool {
-		return m.Kind == s.Kind && m.Headline == s.Headline && m.TextLanguage == s.TextLanguage &&
+		return m.Kind == s.Kind && m.Headline == s.Headline &&
 			(m.Description == nil) == (s.Description == nil) && (m.Description == nil || *m.Description == *s.Description) &&
 			(m.DelayMin == nil) == (s.DelayMin == nil) && (m.DelayMin == nil || *m.DelayMin == *s.DelayMin)
 	})
@@ -456,13 +460,13 @@ func TestRoadReadsReportStorageFaults(t *testing.T) {
 	}
 }
 
-// TestTheLampReadsTheDWDWarningsOfTheScope plants, far after the fixture's
-// window, DWD warnings in a district that road "A 101" crosses and in the
+// TestTheLampReadsTheWeatherWarningsOfTheScope plants, far after the fixture's
+// window, weather warnings in a district that road "A 101" crosses and in the
 // district furthest from it, and one each that must not be read (cancelled,
 // withdrawn, ended, of a family not asked for): the corridor reads the
 // warnings of an area the road's line crosses, the radius those of an area
 // within it, both in the snapshot of the page.
-func TestTheLampReadsTheDWDWarningsOfTheScope(t *testing.T) {
+func TestTheLampReadsTheWeatherWarningsOfTheScope(t *testing.T) {
 	req.Covers(t, "FR-ROAD-004", "FR-ROAD-006")
 	st := seeded(t)
 	fams := families(t, st, "roads")
@@ -482,7 +486,7 @@ order by r.region_code limit 1`, &on, &inside.Lat, &inside.Lon, &off)
 	owner(t, `with ins as (
   insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name,
     headline, text_lang, valid_from, valid_to, published_at, region_code, source_ref, recorded_at, withdrawn_at)
-  select v.id, 'ice', v.level, 'Stufe', v.status, 'DWD', 'Glätte', 'de', '2102-01-01T00:00:00Z', v.until::timestamptz,
+  select v.id, 'ice', v.level, 'Stufe', v.status, 'Wetterdienst', 'Glätte', 'de', '2102-01-01T00:00:00Z', v.until::timestamptz,
     '2102-01-01T00:00:00Z', v.region, v.family, '2102-01-01T00:00:00Z', v.withdrawn::timestamptz
   from (values ('ww-scope-on', 3, 'issued', null, '`+on+`', '`+weather[0]+`', null),
                ('ww-scope-on-2', 1, 'updated', null, '`+on+`', '`+weather[0]+`', null),
@@ -556,5 +560,128 @@ func TestAReadIsOneSnapshot(t *testing.T) {
 	})
 	if err != nil || iso != "repeatable read" || before == 0 || after != before {
 		t.Errorf("isolation %q, %d then %d rows, %v", iso, before, after, err)
+	}
+}
+
+// TestTheLampReadsItsRecordsAndItsSight plants, far after the fixture's
+// window, one record of each class on road "A 101" with the fields the lamp
+// reads, state codes on every junction, coverage rows and a confirmation:
+// the page carries each record as written, the states of the road's
+// junctions (or of the junctions within the radius, else of the nearest),
+// the coverage of the roads families read only, and the newest confirmation
+// of every family read that has a freshness row.
+func TestTheLampReadsItsRecordsAndItsSight(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004", "FR-ROAD-006")
+	st := seeded(t)
+	fams := families(t, st, "roads")
+	weather := families(t, st, "weather")
+	if len(fams) < 2 || len(weather) == 0 {
+		t.Fatalf("the fixture holds roads families %v and weather families %v", fams, weather)
+	}
+	var n int
+	owner(t, `with up as (update contract.junction set state_code = case when road_ref <> 'A 101' then '97'
+  when right(junction_id, 1) in ('0', '2', '4', '6', '8') then '98' else '99' end returning 1)
+select count(*) from up`, &n)
+	t.Cleanup(func() {
+		var gone int
+		owner(t, `with up as (update contract.junction set state_code = null returning 1) select count(*) from up`, &gone)
+	})
+	owner(t, `with ins as (insert into contract.message_coverage (state_code, source_ref, coverage_role, current_only)
+values ('98', '`+fams[0]+`', 'own', true), ('98', '`+fams[1]+`', 'carried', false), ('98', '`+weather[0]+`', 'carried', false)
+returning 1) select count(*) from ins`, &n)
+	t.Cleanup(func() {
+		var gone int
+		owner(t, `with del as (delete from contract.message_coverage returning 1) select count(*) from del`, &gone)
+	})
+	confirmed := time.Date(2102, 1, 1, 0, 30, 0, 0, time.UTC)
+	owner(t, `with up as (update contract.source_freshness set confirmed_at = '2102-01-01T00:30:00Z', confirm_interval_s = 300,
+  updates_paused = true where source_ref = '`+fams[0]+`' returning 1) select count(*) from up`, &n)
+	if n != 1 {
+		t.Fatalf("%s has no freshness row", fams[0])
+	}
+	t.Cleanup(func() {
+		var gone int
+		owner(t, `with up as (update contract.source_freshness set confirmed_at = null, confirm_interval_s = null, updates_paused = false
+  returning 1) select count(*) from up`, &gone)
+	})
+	owner(t, `with ins as (
+  insert into contract.traffic_event (event_id, event_kind, severity, road_ref, road_class, direction, direction_label,
+    location, valid_from, valid_to, lanes_closed, lanes_total, delay_min, affected_length_m,
+    headline, description, text_lang, source_ref, origin_key, published_at, recorded_at, changed_at, withdrawn_at,
+    record_class, subtitle, place_text, is_blocked, traffic_type, delay_s)
+  select v.id, v.kind, 'minor', 'A 101', 'motorway', 'both', null,
+    e.location, '2102-01-01T00:00:00Z', null, null, null, v.delay_min, null,
+    v.headline, v.description, 'de', e.source_ref, 'o-' || v.id, '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z', null,
+    v.record, v.subtitle, v.place, v.blocked, v.traffic, v.delay_s
+  from contract.traffic_event e,
+    (values ('ev-lamp-operator', 'jam', 'Stau', E'Zeile 1\nZeile 2', 'operator_event', 'AS Nord', null, true, 'stationary', 1800, 30),
+            ('ev-lamp-bridge', 'other', 'Talbrücke', 'gesperrt', 'bridge_state', null, null, null, null, null, null),
+            ('ev-lamp-message', 'roadworks', 'Baustelle', null, 'traffic_message', null, 'zwischen Nord und Süd', null, null, null, null))
+    v(id, kind, headline, description, record, subtitle, place, blocked, traffic, delay_s, delay_min)
+  where e.event_id = 'ev-u-kind'
+  returning 1)
+select count(*) from ins`, &n)
+	t.Cleanup(func() {
+		var gone int
+		owner(t, `with del as (delete from contract.traffic_event where event_id like 'ev-lamp-%' returning 1) select count(*) from del`, &gone)
+	})
+	if n != 3 {
+		t.Fatalf("planted %d of 3", n)
+	}
+	var held []string
+	owner(t, `select coalesce(array_agg(source_ref order by source_ref), '{}') from contract.source_freshness
+where source_ref = any('{`+strings.Join(append(slices.Clone(fams), weather...), ",")+`}')`, &held)
+	at := time.Date(2102, 1, 1, 1, 0, 0, 0, time.UTC)
+	asked := roads.Families{Roads: fams, Weather: weather}
+	p, err := st.SituationsOnRoad(bounded(t), roads.CorridorQuery{Road: "A101", Direction: roads.DirectionBoth, Filter: roads.Filter{MinSeverity: roads.SeverityInfo}, Limit: 100}, asked, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines, delayS, sub, place, traffic := "Zeile 1\nZeile 2", 1800, "AS Nord", "zwischen Nord und Süd", "stationary"
+	mins, bridge := 30, "gesperrt"
+	for _, want := range []roads.Message{
+		{Record: roads.RecordOperatorEvent, Kind: roads.KindJam, Headline: "Stau", Subtitle: &sub, Description: &lines, Blocked: true, TrafficType: &traffic, DelayS: &delayS, DelayMin: &mins},
+		{Record: roads.RecordBridgeState, Kind: roads.KindOther, Headline: "Talbrücke", Description: &bridge},
+		{Record: roads.RecordTrafficMessage, Kind: roads.KindRoadworks, Headline: "Baustelle", PlaceText: &place},
+	} {
+		if !slices.ContainsFunc(p.Messages, func(m roads.Message) bool { return reflect.DeepEqual(m, want) }) {
+			t.Errorf("the record %s is not read as written: %+v", want.Headline, p.Messages)
+		}
+	}
+	if !slices.Equal(p.States, []string{"98", "99"}) {
+		t.Errorf("the corridor's states %v", p.States)
+	}
+	if want := (map[string]ampel.Coverage{"98": {Own: []string{fams[0]}, Carried: []string{fams[1]}, CurrentOnly: []string{fams[0]}}}); !reflect.DeepEqual(p.Coverage, want) {
+		t.Errorf("coverage %+v, want %+v", p.Coverage, want)
+	}
+	if got := slices.Sorted(maps.Keys(p.Confirmations)); !slices.Equal(got, held) {
+		t.Errorf("confirmations of %v, want those of the families with a freshness row %v", got, held)
+	}
+	if c := p.Confirmations[fams[0]]; c.At == nil || !c.At.Equal(confirmed) || c.IntervalS == nil || *c.IntervalS != 300 || !c.Paused {
+		t.Errorf("the confirmation of %s: %+v", fams[0], c)
+	}
+	if c := p.Confirmations[fams[1]]; c.At != nil || c.IntervalS != nil || c.Paused {
+		t.Errorf("a family never confirmed: %+v", c)
+	}
+	// The radius: the junctions within it; with none, the nearest junction.
+	var jn geo.Point
+	var jstate string
+	owner(t, `select st_y(location), st_x(location), state_code from contract.junction where road_ref = 'A 101' order by junction_id limit 1`, &jn.Lat, &jn.Lon, &jstate)
+	area := func(here geo.Point, radius int) []string {
+		t.Helper()
+		ap, err := st.SituationsNear(bounded(t), roads.AreaQuery{At: here, RadiusM: radius, Filter: roads.Filter{MinSeverity: roads.SeverityInfo}, Limit: 1}, onRoads(fams), at)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ap.States
+	}
+	if got := area(jn, 1); !slices.Equal(got, []string{jstate}) {
+		t.Errorf("a junction within the radius: %v, want %s", got, jstate)
+	}
+	if got := area(geo.Point{Lat: jn.Lat + 0.0002, Lon: jn.Lon}, 1); !slices.Equal(got, []string{jstate}) {
+		t.Errorf("no junction within the radius, the nearest: %v, want %s", got, jstate)
+	}
+	if got := area(jn, 2_000_000); !slices.Equal(got, []string{"97", "98", "99"}) {
+		t.Errorf("every junction within the radius: %v", got)
 	}
 }

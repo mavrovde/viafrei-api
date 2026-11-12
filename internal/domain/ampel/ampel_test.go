@@ -3,20 +3,22 @@ package ampel_test
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/ampel"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
 // The cases below are transcribed from the platform's own test of the rule
-// this package ports, motorway-ampel.test.ts of its analysis module
-// (cited as ts:LINE), and driven through the port. Where the platform's
+// this package ports, the test file of its motorway Ampel module (cited as
+// ts:LINE), and driven through the port. Where the platform's
 // function takes a value Go cannot type (a non-string description entry, a
 // delay as text, isBlocked as text), the case carries the value the port
 // takes in its place, and says so.
 
-const tsFile = "motorway-ampel.test.ts"
+const tsFile = "ts"
 
 func str(s string) *string { return &s }
 
@@ -31,7 +33,7 @@ func strs(ss ...string) []*string {
 }
 
 // fresh is the platform's FRESH sight (ts:33).
-var fresh = []ampel.SightEntry{{Group: "autobahn", State: ampel.SightFresh}, {Group: "dwd", State: ampel.SightFresh}}
+var fresh = []ampel.SightEntry{{Group: ampel.GroupOperator, State: ampel.SightFresh}, {Group: ampel.GroupWeather, State: ampel.SightFresh}}
 
 type lampCase struct {
 	at   int
@@ -47,25 +49,25 @@ var signalCases = []lampCase{
 	{52, ampel.Signal{Kind: ampel.SignalSafety, Word: ampel.WordObject}, ampel.LampRed, true},
 	{53, ampel.Signal{Kind: ampel.SignalSafety, Word: ampel.WordPerson}, ampel.LampRed, true},
 	{54, ampel.Signal{Kind: ampel.SignalSafety, Word: ampel.WordAccidentClosure}, ampel.LampRed, true},
-	{55, ampel.Signal{Kind: ampel.SignalDWD, Level: 3}, ampel.LampRed, true},
-	{56, ampel.Signal{Kind: ampel.SignalDWD, Level: 4}, ampel.LampRed, true},
+	{55, ampel.Signal{Kind: ampel.SignalWeather, Level: 3}, ampel.LampRed, true},
+	{56, ampel.Signal{Kind: ampel.SignalWeather, Level: 4}, ampel.LampRed, true},
 	{57, ampel.Signal{Kind: ampel.SignalJam, DelayS: secs(1800)}, ampel.LampRed, true},
 	{58, ampel.Signal{Kind: ampel.SignalBridgeWind}, ampel.LampRed, true},
 	{65, ampel.Signal{Kind: ampel.SignalJam, DelayS: secs(1799)}, ampel.LampAmber, true},
 	{66, ampel.Signal{Kind: ampel.SignalJam}, ampel.LampAmber, true},
 	{67, ampel.Signal{Kind: ampel.SignalRoadworks, Scope: ampel.ScopeCarriageway}, ampel.LampAmber, true},
 	{68, ampel.Signal{Kind: ampel.SignalWarning}, ampel.LampAmber, true},
-	{69, ampel.Signal{Kind: ampel.SignalDWD, Level: 1}, ampel.LampAmber, true},
-	{70, ampel.Signal{Kind: ampel.SignalDWD, Level: 2}, ampel.LampAmber, true},
+	{69, ampel.Signal{Kind: ampel.SignalWeather, Level: 1}, ampel.LampAmber, true},
+	{70, ampel.Signal{Kind: ampel.SignalWeather, Level: 2}, ampel.LampAmber, true},
 	{71, ampel.Signal{Kind: ampel.SignalSlippery}, ampel.LampAmber, true},
 	{72, ampel.Signal{Kind: ampel.SignalClosure, Scope: ampel.ScopeRamp}, ampel.LampAmber, true},
 	{79, ampel.Signal{Kind: ampel.SignalRoadworks, Scope: ampel.ScopeRamp}, "", false},
-	{80, ampel.Signal{Kind: ampel.SignalDWD, Level: 0}, "", false},
+	{80, ampel.Signal{Kind: ampel.SignalWeather, Level: 0}, "", false},
 	{87, ampel.Signal{Kind: ampel.SignalJam, DelayS: secs(29 * 60)}, ampel.LampAmber, true},
 	{88, ampel.Signal{Kind: ampel.SignalJam, DelayS: secs(30 * 60)}, ampel.LampRed, true},
 	{89, ampel.Signal{Kind: ampel.SignalJam, DelayS: secs(30*60 - 1)}, ampel.LampAmber, true},
-	{92, ampel.Signal{Kind: ampel.SignalDWD, Level: 2}, ampel.LampAmber, true},
-	{93, ampel.Signal{Kind: ampel.SignalDWD, Level: 3}, ampel.LampRed, true},
+	{92, ampel.Signal{Kind: ampel.SignalWeather, Level: 2}, ampel.LampAmber, true},
+	{93, ampel.Signal{Kind: ampel.SignalWeather, Level: 3}, ampel.LampRed, true},
 }
 
 type ampelCase struct {
@@ -75,23 +77,27 @@ type ampelCase struct {
 	lamp    ampel.Lamp
 	// reasons are the keys of the reasons, in order.
 	reasons []ampel.ReasonKey
+	// sights are the entries of the sight reasons, in order, where the
+	// platform asserts them whole.
+	sights []ampel.SightEntry
 }
 
-// ampelCases are ampelOf's cases (ts:81, 95-147, 326-327).
+// ampelCases are ampelOf's cases (ts:81, 95-147, 307-313, 326-327).
 var ampelCases = []ampelCase{
-	{81, []ampel.Signal{{Kind: ampel.SignalRoadworks, Scope: ampel.ScopeRamp}, {Kind: ampel.SignalDWD, Level: 0}}, fresh, ampel.LampGreen, nil},
-	{96, nil, []ampel.SightEntry{{Group: "autobahn", State: ampel.SightStale}, {Group: "dwd", State: ampel.SightFresh}}, ampel.LampAmber, []ampel.ReasonKey{ampel.KeySight}},
-	{99, nil, []ampel.SightEntry{{Group: "autobahn", State: ampel.SightFresh}, {Group: "dwd", State: ampel.SightMissing}}, ampel.LampAmber, []ampel.ReasonKey{ampel.KeySight}},
-	{107, []ampel.Signal{{Kind: ampel.SignalJam, DelayS: secs(600)}, {Kind: ampel.SignalClosure, Scope: ampel.ScopeCarriageway}}, fresh, ampel.LampRed, []ampel.ReasonKey{"closure", "jam"}},
-	{118, []ampel.Signal{{Kind: ampel.SignalSafety, Word: ampel.WordWrongWay}}, []ampel.SightEntry{{Group: "autobahn", State: ampel.SightStale}}, ampel.LampRed, []ampel.ReasonKey{"safety", ampel.KeySight}},
-	{124, []ampel.Signal{{Kind: ampel.SignalRoadworks, Scope: ampel.ScopeCarriageway}, {Kind: ampel.SignalWarning}, {Kind: ampel.SignalJam}}, fresh, ampel.LampAmber, []ampel.ReasonKey{"roadworks", "warning", "jam"}},
-	{138, nil, []ampel.SightEntry{{Group: "autobahn", State: ampel.SightStale}, {Group: "dwd", State: ampel.SightFresh}}, ampel.LampAmber, []ampel.ReasonKey{ampel.KeySight}},
-	{141, nil, fresh, ampel.LampGreen, nil},
-	{144, nil, nil, ampel.LampAmber, []ampel.ReasonKey{ampel.KeySight}},
-	{310, nil, []ampel.SightEntry{{Group: "autobahn", State: ampel.SightFresh}, {Group: "police", State: ampel.SightMissing}}, ampel.LampAmber, []ampel.ReasonKey{ampel.KeySight}},
-	{313, nil, []ampel.SightEntry{{Group: "autobahn", State: ampel.SightFresh}, {Group: "police", State: ampel.SightFresh}}, ampel.LampGreen, nil},
-	{326, []ampel.Signal{ampel.AutobahnEventSignal(ampel.AutobahnRow{Kind: "roadworks", Title: str("A7 | Kassel - Göttingen"), Blocked: true})}, nil, ampel.LampRed, []ampel.ReasonKey{"closure"}},
-	{327, []ampel.Signal{ampel.AutobahnEventSignal(ampel.AutobahnRow{Kind: "roadworks", Title: str("A7 | Kassel - Göttingen"), Subtitle: str("AS Kassel-Nord (aus Richtung Hannover)"), Blocked: true})}, nil, ampel.LampAmber, []ampel.ReasonKey{ampel.KeyRampClosure}},
+	{81, []ampel.Signal{{Kind: ampel.SignalRoadworks, Scope: ampel.ScopeRamp}, {Kind: ampel.SignalWeather, Level: 0}}, fresh, ampel.LampGreen, nil, nil},
+	{96, nil, []ampel.SightEntry{{Group: ampel.GroupOperator, State: ampel.SightStale}, {Group: ampel.GroupWeather, State: ampel.SightFresh}}, ampel.LampAmber, []ampel.ReasonKey{ampel.KeySight}, []ampel.SightEntry{{Group: ampel.GroupOperator, State: ampel.SightStale}}},
+	{99, nil, []ampel.SightEntry{{Group: ampel.GroupOperator, State: ampel.SightFresh}, {Group: ampel.GroupWeather, State: ampel.SightMissing}}, ampel.LampAmber, []ampel.ReasonKey{ampel.KeySight}, []ampel.SightEntry{{Group: ampel.GroupWeather, State: ampel.SightMissing}}},
+	{107, []ampel.Signal{{Kind: ampel.SignalJam, DelayS: secs(600)}, {Kind: ampel.SignalClosure, Scope: ampel.ScopeCarriageway}}, fresh, ampel.LampRed, []ampel.ReasonKey{"closure", "jam"}, nil},
+	{118, []ampel.Signal{{Kind: ampel.SignalSafety, Word: ampel.WordWrongWay}}, []ampel.SightEntry{{Group: ampel.GroupOperator, State: ampel.SightStale}}, ampel.LampRed, []ampel.ReasonKey{"safety", ampel.KeySight}, nil},
+	{124, []ampel.Signal{{Kind: ampel.SignalRoadworks, Scope: ampel.ScopeCarriageway}, {Kind: ampel.SignalWarning}, {Kind: ampel.SignalJam}}, fresh, ampel.LampAmber, []ampel.ReasonKey{"roadworks", "warning", "jam"}, nil},
+	{138, nil, []ampel.SightEntry{{Group: ampel.GroupOperator, State: ampel.SightStale}, {Group: ampel.GroupWeather, State: ampel.SightFresh}}, ampel.LampAmber, []ampel.ReasonKey{ampel.KeySight}, nil},
+	{141, nil, fresh, ampel.LampGreen, nil, nil},
+	{144, nil, nil, ampel.LampAmber, []ampel.ReasonKey{ampel.KeySight}, []ampel.SightEntry{{Group: ampel.GroupOperator, State: ampel.SightMissing}}},
+	{307, nil, append([]ampel.SightEntry{{Group: ampel.GroupOperator, State: ampel.SightFresh}}, ampel.MessageSightOf([]string{"08"}, coverage(), sightBy(fr, st, mi))...), ampel.LampAmber, []ampel.ReasonKey{ampel.KeySight}, nil},
+	{310, nil, []ampel.SightEntry{{Group: ampel.GroupOperator, State: ampel.SightFresh}, entry(mi, "03")}, ampel.LampAmber, []ampel.ReasonKey{ampel.KeySight}, []ampel.SightEntry{entry(mi, "03")}},
+	{313, nil, []ampel.SightEntry{{Group: ampel.GroupOperator, State: ampel.SightFresh}, entry(fr, "08")}, ampel.LampGreen, nil, nil},
+	{326, []ampel.Signal{ampel.OperatorEventSignal(ampel.OperatorEvent{Kind: "roadworks", Title: str("A7 | Kassel - Göttingen"), Blocked: true})}, nil, ampel.LampRed, []ampel.ReasonKey{"closure"}, nil},
+	{327, []ampel.Signal{ampel.OperatorEventSignal(ampel.OperatorEvent{Kind: "roadworks", Title: str("A7 | Kassel - Göttingen"), Subtitle: str("AS Kassel-Nord (aus Richtung Hannover)"), Blocked: true})}, nil, ampel.LampAmber, []ampel.ReasonKey{ampel.KeyRampClosure}, nil},
 }
 
 type wordCase struct {
@@ -180,14 +186,14 @@ var messageCases = []messageCase{
 
 type rowCase struct {
 	at   int
-	in   ampel.AutobahnRow
+	in   ampel.OperatorEvent
 	want ampel.Signal
 }
 
 // row is the platform's r() (ts:318): a warning titled "A7 | Kassel -
 // Göttingen" with no traffic type, delay, subtitle or description.
-func row(f func(*ampel.AutobahnRow)) ampel.AutobahnRow {
-	r := ampel.AutobahnRow{Kind: "warning", Title: str("A7 | Kassel - Göttingen")}
+func row(f func(*ampel.OperatorEvent)) ampel.OperatorEvent {
+	r := ampel.OperatorEvent{Kind: "warning", Title: str("A7 | Kassel - Göttingen")}
 	f(&r)
 	return r
 }
@@ -196,37 +202,192 @@ func row(f func(*ampel.AutobahnRow)) ampel.AutobahnRow {
 // "false" is the port's Blocked; the delay "1800" is the number the port
 // takes.
 var rowCases = []rowCase{
-	{320, row(func(r *ampel.AutobahnRow) { r.Kind, r.Description = "closure", strs("Auffahrt auf die A7: gesperrt") }), ampel.Signal{Kind: ampel.SignalClosure, Scope: ampel.ScopeRamp}},
-	{321, row(func(r *ampel.AutobahnRow) { r.Kind = "roadworks" }), ampel.Signal{Kind: ampel.SignalRoadworks, Scope: ampel.ScopeCarriageway}},
-	{323, row(func(r *ampel.AutobahnRow) { r.Kind, r.Blocked = "roadworks", true }), ampel.Signal{Kind: ampel.SignalClosure, Scope: ampel.ScopeCarriageway}},
-	{324, row(func(r *ampel.AutobahnRow) {
+	{320, row(func(r *ampel.OperatorEvent) { r.Kind, r.Description = "closure", strs("Auffahrt auf die A7: gesperrt") }), ampel.Signal{Kind: ampel.SignalClosure, Scope: ampel.ScopeRamp}},
+	{321, row(func(r *ampel.OperatorEvent) { r.Kind = "roadworks" }), ampel.Signal{Kind: ampel.SignalRoadworks, Scope: ampel.ScopeCarriageway}},
+	{323, row(func(r *ampel.OperatorEvent) { r.Kind, r.Blocked = "roadworks", true }), ampel.Signal{Kind: ampel.SignalClosure, Scope: ampel.ScopeCarriageway}},
+	{324, row(func(r *ampel.OperatorEvent) {
 		r.Kind, r.Blocked, r.Subtitle = "roadworks", true, str("AS Kassel-Nord (aus Richtung Hannover)")
 	}), ampel.Signal{Kind: ampel.SignalClosure, Scope: ampel.ScopeRamp}},
-	{325, row(func(r *ampel.AutobahnRow) { r.Kind = "roadworks" }), ampel.Signal{Kind: ampel.SignalRoadworks, Scope: ampel.ScopeCarriageway}},
-	{328, row(func(r *ampel.AutobahnRow) { r.AbnormalTrafficType, r.DelayS = str("STATIONARY_TRAFFIC"), secs(1800) }), ampel.Signal{Kind: ampel.SignalJam, DelayS: secs(1800)}},
-	{329, row(func(r *ampel.AutobahnRow) { r.Description = strs("Tiere auf der Fahrbahn") }), ampel.Signal{Kind: ampel.SignalSafety, Word: ampel.WordAnimal}},
-	{330, row(func(r *ampel.AutobahnRow) { r.Description = strs("Rechter Fahrstreifen gesperrt") }), ampel.Signal{Kind: ampel.SignalWarning}},
+	{325, row(func(r *ampel.OperatorEvent) { r.Kind = "roadworks" }), ampel.Signal{Kind: ampel.SignalRoadworks, Scope: ampel.ScopeCarriageway}},
+	{328, row(func(r *ampel.OperatorEvent) { r.TrafficType, r.DelayS = str("STATIONARY_TRAFFIC"), secs(1800) }), ampel.Signal{Kind: ampel.SignalJam, DelayS: secs(1800)}},
+	{329, row(func(r *ampel.OperatorEvent) { r.Description = strs("Tiere auf der Fahrbahn") }), ampel.Signal{Kind: ampel.SignalSafety, Word: ampel.WordAnimal}},
+	{330, row(func(r *ampel.OperatorEvent) { r.Description = strs("Rechter Fahrstreifen gesperrt") }), ampel.Signal{Kind: ampel.SignalWarning}},
 }
 
 type sightCase struct {
 	at       int
 	readOK   bool
 	warnings int
-	// source is the sight of the warnings source; the platform passes its
-	// source check (ts:334: checked s seconds ago at a cadence of 300 s,
-	// fresh inside three cadences): ago(10) and ago(900) are fresh,
-	// ago(901) is stale, no check is missing.
-	source ampel.Sight
-	want   ampel.Sight
+	// confirmation is the warnings source's newest confirmation: the
+	// platform's ago(s), confirmed s seconds before now at an interval of
+	// 300 s; nil when there is none.
+	confirmation *ampel.Confirmation
+	want         ampel.Sight
 }
 
-// sightCases are dwdSightOf's cases (ts:332-340).
+// sightNow is the instant of the platform's weather-sight cases (ts:333).
+var sightNow = time.Date(2026, 10, 21, 8, 0, 0, 0, time.UTC)
+
+// ago is the platform's ago(s) (ts:334).
+func ago(s int) *ampel.Confirmation {
+	at := sightNow.Add(-time.Duration(s) * time.Second)
+	return &ampel.Confirmation{At: &at, IntervalS: secs(300)}
+}
+
+// sightCases are the weather warnings' sight cases (ts:332-340).
 var sightCases = []sightCase{
-	{335, false, 3, ampel.SightFresh, ampel.SightMissing},
-	{336, true, 1, ampel.SightMissing, ampel.SightFresh},
-	{337, true, 0, ampel.SightFresh, ampel.SightFresh},
-	{338, true, 0, ampel.SightStale, ampel.SightMissing},
-	{339, true, 0, ampel.SightMissing, ampel.SightMissing},
+	{335, false, 3, ago(10), ampel.SightMissing},
+	{336, true, 1, nil, ampel.SightFresh},
+	{337, true, 0, ago(900), ampel.SightFresh},
+	{338, true, 0, ago(901), ampel.SightMissing},
+	{339, true, 0, nil, ampel.SightMissing},
+}
+
+type thresholdCase struct {
+	at        int
+	got, want int
+}
+
+// thresholdCases are the thresholds (ts:40-43).
+var thresholdCases = []thresholdCase{
+	{40, ampel.JamRedS, 1800},
+	{41, ampel.WarningRedLevel, 3},
+	{42, ampel.WarningAmberLevel, 1},
+	{43, ampel.OnRoadM, 2000},
+}
+
+type bridgeCase struct {
+	at    int
+	text  *string
+	state ampel.BridgeState
+}
+
+// bridgeCases are bridgeStateOf's cases (ts:237-250); null is BridgeNone.
+var bridgeCases = []bridgeCase{
+	{237, str("Brücke gesperrt"), ampel.BridgeClosed},
+	{238, str("Sperrung für alle Fahrzeuge"), ampel.BridgeClosed},
+	{242, str("Windwarnung 100 km/h"), ampel.BridgeRestricted},
+	{244, str("Sperrung aufgehoben"), ampel.BridgeNone},
+	{245, str("nicht gesperrt"), ampel.BridgeNone},
+	{248, str("undefiniert"), ampel.BridgeNone},
+	{249, str("  "), ampel.BridgeNone},
+	{250, nil, ampel.BridgeNone},
+}
+
+type bridgeSignalCase struct {
+	at    int
+	state ampel.BridgeState
+	want  ampel.Signal
+	ok    bool
+}
+
+// bridgeSignalCases are bridgeSignal's cases (ts:239, 243, 251).
+var bridgeSignalCases = []bridgeSignalCase{
+	{239, ampel.BridgeClosed, ampel.Signal{Kind: ampel.SignalBridgeWind}, true},
+	{243, ampel.BridgeStateOf(str("Windwarnung 100 km/h")), ampel.Signal{Kind: ampel.SignalWarning}, true},
+	{251, ampel.BridgeNone, ampel.Signal{}, false},
+}
+
+// confirmNow is the instant of the platform's per-state cases (ts:256).
+var confirmNow = time.Date(2026, 10, 21, 10, 0, 0, 0, time.UTC)
+
+func confirmedAgo(ms int) *ampel.Confirmation {
+	at := confirmNow.Add(-time.Duration(ms) * time.Millisecond)
+	return &ampel.Confirmation{At: &at, IntervalS: secs(600)}
+}
+
+type confirmedCase struct {
+	at   int
+	in   *ampel.Confirmation
+	want ampel.Sight
+}
+
+// confirmedCases are the sight of a source from its newest confirmation
+// (ts:258-261). ts:262 passes a time that is not one, which Go cannot type;
+// the port reads it as ts:260 does.
+var confirmedCases = []confirmedCase{
+	{258, confirmedAgo(1_799_000), ampel.SightFresh},
+	{259, confirmedAgo(1_801_000), ampel.SightStale},
+	{260, &ampel.Confirmation{IntervalS: secs(600)}, ampel.SightMissing},
+	{261, nil, ampel.SightMissing},
+}
+
+// The platform's planted table (ts:265-275), in the service's words: three
+// states with an own message source each, one of them answered only while
+// current, and a source measured to carry the states' messages.
+const (
+	ownSH     = "own-01"
+	ownBW     = "own-08"
+	ownBerlin = "own-11"
+	carrier   = "carrier"
+)
+
+// coverage is the platform's per-state table with the carrier's coverage
+// limited to lands (none: all sixteen, the platform's measured list).
+func coverage(lands ...string) map[string]ampel.Coverage {
+	if lands == nil {
+		for i := 1; i <= 16; i++ {
+			lands = append(lands, fmt.Sprintf("%02d", i))
+		}
+	}
+	own := map[string]string{"01": ownSH, "08": ownBW, "11": ownBerlin}
+	out := map[string]ampel.Coverage{}
+	for l, o := range own {
+		c := ampel.Coverage{Own: []string{o}}
+		if l == "08" {
+			c.CurrentOnly = []string{ownBW}
+		}
+		out[l] = c
+	}
+	for _, l := range lands {
+		c := out[l]
+		c.Carried = []string{carrier}
+		out[l] = c
+	}
+	return out
+}
+
+// sightBy is a source's sight: the carrier's, the BW source's, and every
+// other source's.
+func sightBy(carried, bw, other ampel.Sight) func(string) ampel.Sight {
+	return func(k string) ampel.Sight {
+		switch k {
+		case carrier:
+			return carried
+		case ownBW:
+			return bw
+		}
+		return other
+	}
+}
+
+type coverageCase struct {
+	at       int
+	lands    []string
+	coverage map[string]ampel.Coverage
+	sightOf  func(string) ampel.Sight
+	want     []ampel.SightEntry
+}
+
+func entry(state ampel.Sight, land string) ampel.SightEntry {
+	return ampel.SightEntry{Group: ampel.GroupMessages, State: state, Land: land}
+}
+
+const (
+	fr = ampel.SightFresh
+	st = ampel.SightStale
+	mi = ampel.SightMissing
+)
+
+// coverageCases are the traffic messages' per-state sight (ts:278-306).
+var coverageCases = []coverageCase{
+	{278, []string{"03", "16", "11"}, coverage(), sightBy(fr, mi, mi), []ampel.SightEntry{entry(fr, "03"), entry(fr, "16"), entry(fr, "11")}},
+	{284, []string{"16"}, coverage("03"), sightBy(fr, mi, mi), []ampel.SightEntry{entry(mi, "16")}},
+	{288, []string{"08", "03", "03"}, coverage("03"), sightBy(fr, st, mi), []ampel.SightEntry{entry(st, "08"), entry(fr, "03")}},
+	{294, []string{"11"}, coverage(), sightBy(fr, st, st), []ampel.SightEntry{entry(fr, "11")}},
+	{301, []string{"08"}, coverage("08"), sightBy(fr, st, mi), []ampel.SightEntry{entry(st, "08")}},
+	{304, []string{"08"}, coverage(), sightBy(fr, mi, mi), []ampel.SightEntry{entry(mi, "08")}},
+	{306, []string{"08"}, coverage(), sightBy(fr, fr, fr), []ampel.SightEntry{entry(fr, "08")}},
 }
 
 func sameSignal(a, b ampel.Signal) bool {
@@ -246,7 +407,18 @@ func keys(a ampel.Ampel) []ampel.ReasonKey {
 // port.
 func transcribedCases() int {
 	return len(signalCases) + len(ampelCases) + len(wordCases) + len(closureCases) + len(messageScopeCases) +
-		len(messageCases) + len(rowCases) + len(sightCases) + 1
+		len(messageCases) + len(rowCases) + len(sightCases) + len(thresholdCases) + len(bridgeCases) +
+		len(bridgeSignalCases) + len(confirmedCases) + len(coverageCases) + 1
+}
+
+func sights(a ampel.Ampel) []ampel.SightEntry {
+	var out []ampel.SightEntry
+	for _, r := range a.Reasons {
+		if r.Sight != nil {
+			out = append(out, *r.Sight)
+		}
+	}
+	return out
 }
 
 func TestThePlatformsAmpelCases(t *testing.T) {
@@ -267,6 +439,38 @@ func TestThePlatformsAmpelCases(t *testing.T) {
 		a := ampel.Of(c.signals, c.sight)
 		if a.Lamp != c.lamp || !slices.Equal(keys(a), c.reasons) {
 			t.Errorf("%s: ampelOf = %q %v, want %q %v", at(c.at), a.Lamp, keys(a), c.lamp, c.reasons)
+		}
+		if c.sights != nil && !slices.Equal(sights(a), c.sights) {
+			t.Errorf("%s: ampelOf sight reasons = %v, want %v", at(c.at), sights(a), c.sights)
+		}
+	}
+	for _, c := range thresholdCases {
+		if c.got != c.want {
+			t.Errorf("%s: threshold %d, want %d", at(c.at), c.got, c.want)
+		}
+	}
+	for _, c := range bridgeCases {
+		if got := ampel.BridgeStateOf(c.text); got != c.state {
+			t.Errorf("%s: bridgeStateOf = %q, want %q", at(c.at), got, c.state)
+		}
+	}
+	for _, c := range bridgeSignalCases {
+		got, ok := ampel.BridgeSignal(c.state)
+		if ok != c.ok || !sameSignal(got, c.want) {
+			t.Errorf("%s: bridgeSignal = %+v %v, want %+v %v", at(c.at), got, ok, c.want, c.ok)
+		}
+		if l, _ := ampel.SignalLamp(got); c.at == 239 && l != ampel.LampRed {
+			t.Errorf("%s: a closed bridge is %q, want red", at(c.at), l)
+		}
+	}
+	for _, c := range confirmedCases {
+		if got := ampel.ConfirmedSight(c.in, confirmNow); got != c.want {
+			t.Errorf("%s: sight of a confirmation = %q, want %q", at(c.at), got, c.want)
+		}
+	}
+	for _, c := range coverageCases {
+		if got := ampel.MessageSightOf(c.lands, c.coverage, c.sightOf); !slices.Equal(got, c.want) {
+			t.Errorf("%s: per-state sight = %v, want %v", at(c.at), got, c.want)
 		}
 	}
 	for _, c := range wordCases {
@@ -297,13 +501,13 @@ func TestThePlatformsAmpelCases(t *testing.T) {
 		}
 	}
 	for _, c := range rowCases {
-		if got := ampel.AutobahnEventSignal(c.in); !sameSignal(got, c.want) {
+		if got := ampel.OperatorEventSignal(c.in); !sameSignal(got, c.want) {
 			t.Errorf("%s: autobahnEventSignal = %+v, want %+v", at(c.at), got, c.want)
 		}
 	}
 	for _, c := range sightCases {
-		if got := ampel.DWDSightOf(c.readOK, c.warnings, c.source); got != c.want {
-			t.Errorf("%s: dwdSightOf = %q, want %q", at(c.at), got, c.want)
+		if got := ampel.WarningSightOf(c.readOK, c.warnings, c.confirmation, sightNow); got != c.want {
+			t.Errorf("%s: weather sight = %q, want %q", at(c.at), got, c.want)
 		}
 	}
 	// ts:384: twelve ramp closures are twelve rampClosure reasons.
@@ -320,13 +524,13 @@ func TestThePlatformsAmpelCases(t *testing.T) {
 // TestTheTranscriptionCount pins the number of transcribed cases, so a case
 // dropped from the tables is noticed.
 func TestTheTranscriptionCount(t *testing.T) {
-	if n := transcribedCases(); n != 91 {
-		t.Errorf("%d transcribed cases, want 91", n)
+	if n := transcribedCases(); n != 118 {
+		t.Errorf("%d transcribed cases, want 118", n)
 	}
 }
 
-// TestTheSortIsThePlatformsOrder: ORDER of autobahn-ampel.ts (toolAmpel),
-// jams by delay descending with no delay last, DWD warnings by level
+// TestTheSortIsThePlatformsOrder: ORDER of the platform's tool (toolAmpel),
+// jams by delay descending with no delay last, weather warnings by level
 // descending, every other tie in the caller's order.
 func TestTheSortIsThePlatformsOrder(t *testing.T) {
 	req.Covers(t, "FR-ROAD-004")
@@ -334,11 +538,11 @@ func TestTheSortIsThePlatformsOrder(t *testing.T) {
 		{Kind: ampel.SignalRoadworks, Scope: ampel.ScopeCarriageway},
 		{Kind: ampel.SignalWarning, Word: "a"},
 		{Kind: ampel.SignalSlippery},
-		{Kind: ampel.SignalDWD, Level: 1},
+		{Kind: ampel.SignalWeather, Level: 1},
 		{Kind: ampel.SignalJam},
 		{Kind: ampel.SignalJam, DelayS: secs(0)},
 		{Kind: ampel.SignalJam, DelayS: secs(60)},
-		{Kind: ampel.SignalDWD, Level: 3},
+		{Kind: ampel.SignalWeather, Level: 3},
 		{Kind: ampel.SignalJam, DelayS: secs(600)},
 		{Kind: ampel.SignalJam, DelayS: secs(60)},
 		{Kind: ampel.SignalBridgeWind},
@@ -356,21 +560,66 @@ func TestTheSortIsThePlatformsOrder(t *testing.T) {
 		got = append(got, fmt.Sprintf("%s/%s/%d/%s", s.Kind, d, s.Level, s.Word))
 	}
 	want := []string{"closure/-/0/", "safety/-/0/", "bridgeWind/-/0/", "jam/600/0/", "jam/60/0/", "jam/60/0/", "jam/0/0/", "jam/-/0/",
-		"dwd/-/3/", "dwd/-/1/", "slippery/-/0/", "warning/-/0/a", "warning/-/0/b", "roadworks/-/0/"}
+		"weather/-/3/", "weather/-/1/", "slippery/-/0/", "warning/-/0/a", "warning/-/0/b", "roadworks/-/0/"}
 	if !slices.Equal(got, want) {
 		t.Errorf("order\n got %v\nwant %v", got, want)
 	}
 }
 
-// TestALineScopeSkipsAnAbsentLine: an absent line is skipped, never the end
-// of the description.
-func TestALineScopeSkipsAnAbsentLine(t *testing.T) {
+// TestTheMessageSightReadsTheConfirmations: no state in scope is one missing
+// entry; a source without a confirmation is missing; a confirmed source is
+// judged by its confirmation.
+func TestTheMessageSightReadsTheConfirmations(t *testing.T) {
 	req.Covers(t, "FR-ROAD-004")
-	if s, ok := ampel.LineScope([]*string{nil, str("Auffahrt auf die A9: gesperrt")}); !ok || s != ampel.ScopeRamp {
-		t.Errorf("a ramp line after an absent one: %v %v", s, ok)
+	if got := ampel.MessageSight(nil, coverage(), nil, confirmNow); !slices.Equal(got, []ampel.SightEntry{{Group: ampel.GroupMessages, State: mi}}) {
+		t.Errorf("no state: %v", got)
 	}
-	if _, ok := ampel.LineScope([]*string{nil, str("Stau")}); ok {
-		t.Error("no location line gave a scope")
+	confirmations := map[string]ampel.Confirmation{carrier: *confirmedAgo(1_000), ownBW: *confirmedAgo(1_801_000)}
+	got := ampel.MessageSight([]string{"03", "08", "11"}, coverage("03", "08"), confirmations, confirmNow)
+	if want := []ampel.SightEntry{entry(fr, "03"), entry(st, "08"), entry(mi, "11")}; !slices.Equal(got, want) {
+		t.Errorf("by confirmation: %v, want %v", got, want)
+	}
+}
+
+// TestTheAliveRule: paused updates keep a confirmed source alive however
+// old; a confirmation without an interval takes the default; with no
+// default it is never inside; one inside the window, inclusive, is alive.
+func TestTheAliveRule(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004")
+	old := confirmNow.Add(-24 * time.Hour)
+	if !ampel.Alive(&ampel.Confirmation{At: &old, Paused: true}, confirmNow, 3, nil) {
+		t.Error("paused and confirmed: not alive")
+	}
+	if ampel.Alive(&ampel.Confirmation{Paused: true}, confirmNow, 3, nil) {
+		t.Error("paused and never confirmed: alive")
+	}
+	edge := confirmNow.Add(-1800 * time.Second)
+	if !ampel.Alive(&ampel.Confirmation{At: &edge}, confirmNow, 3, secs(600)) {
+		t.Error("no interval, at the default's edge: not alive")
+	}
+	if ampel.Alive(&ampel.Confirmation{At: &edge}, confirmNow, 3, nil) {
+		t.Error("no interval and no default: alive")
+	}
+	if got := ampel.ConfirmedSight(&ampel.Confirmation{At: &edge}, confirmNow); got != fr {
+		t.Errorf("no interval, 1800 s old: %q, want fresh (600 s default)", got)
+	}
+	if got := ampel.ConfirmedSight(&ampel.Confirmation{At: &old, Paused: true}, confirmNow); got != fr {
+		t.Errorf("paused: %q, want fresh", got)
+	}
+}
+
+// TestAnAstralRuneCountsAsTwo: the platform's bounded repetitions count
+// UTF-16 code units, so a rune above U+FFFF takes two of the forty a
+// closed ramp may lie after "gesperrt".
+func TestAnAstralRuneCountsAsTwo(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004")
+	within := "gesperrt" + strings.Repeat("a", 38) + "\U0001F6A7" + "rampe"
+	beyond := "gesperrt" + strings.Repeat("a", 39) + "\U0001F6A7" + "rampe"
+	if s := ampel.MessageScopeOf(strs(within)); s != ampel.ScopeRamp {
+		t.Errorf("forty code units: %q, want ramp", s)
+	}
+	if s := ampel.MessageScopeOf(strs(beyond)); s != ampel.ScopeCarriageway {
+		t.Errorf("forty-one code units (forty runes): %q, want carriageway", s)
 	}
 }
 

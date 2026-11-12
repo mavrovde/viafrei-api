@@ -9,6 +9,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/ampel"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
@@ -26,12 +27,19 @@ var roadRegister = []access.Terms{
 
 type roadFake struct {
 	*fake
-	road                 roads.Road
-	roadErr, readErr     error
-	sits                 []roads.Situation
-	msgs                 []roads.Message
-	warns                []roads.Warning
-	stale, missing       []string
+	road             roads.Road
+	roadErr, readErr error
+	sits             []roads.Situation
+	msgs             []roads.Message
+	warns            []roads.Warning
+	stale, missing   []string
+	// unconfirmed families have no confirmation; lapsed ones were last
+	// confirmed an hour before now.
+	unconfirmed, lapsed []string
+	// states overrides the states in scope ("01" when nil); coverage the
+	// coverage of state "01" (own r1, carried r2 when nil).
+	states               []string
+	coverage             *ampel.Coverage
 	gotSince             time.Time
 	gotRoad              roads.CorridorQuery
 	gotArea              roads.AreaQuery
@@ -48,14 +56,31 @@ func (f *roadFake) Road(_ context.Context, ref string) (roads.Road, error) {
 }
 
 // page answers every family given fresh at now, except those in f.stale,
-// and leaves out those in f.missing; the warnings only when a weather
-// family was given, as the store reads them.
+// and leaves out those in f.missing; every family it answers is confirmed
+// at now, except those in f.unconfirmed and f.lapsed; the warnings only
+// when a weather family was given, and the coverage only of the roads
+// families given, as the store reads them.
 func (f *roadFake) page(fams roads.Families, more bool) roads.Page {
-	p := roads.Page{Items: f.sits, HasMore: more, Messages: f.msgs}
+	p := roads.Page{Items: f.sits, HasMore: more, Messages: f.msgs, States: []string{"01"},
+		Coverage: map[string]ampel.Coverage{}, Confirmations: map[string]ampel.Confirmation{}}
+	if f.states != nil {
+		p.States = f.states
+	}
 	if len(fams.Weather) > 0 {
 		p.Warnings = append([]roads.Warning{}, f.warns...)
 	}
+	cov := ampel.Coverage{Own: []string{"r1"}, Carried: []string{"r2"}}
+	if f.coverage != nil {
+		cov = *f.coverage
+	}
+	read := func(fs []string) []string {
+		return slices.DeleteFunc(slices.Clone(fs), func(x string) bool { return !slices.Contains(fams.Roads, x) })
+	}
+	if c := (ampel.Coverage{Own: read(cov.Own), Carried: read(cov.Carried), CurrentOnly: read(cov.CurrentOnly)}); len(c.Own)+len(c.Carried) > 0 {
+		p.Coverage["01"] = c
+	}
 	old := now.Add(-2 * time.Minute)
+	gone := now.Add(-time.Hour)
 	for _, fam := range append(slices.Clone(fams.Roads), fams.Weather...) {
 		if slices.Contains(f.missing, fam) {
 			continue
@@ -65,6 +90,13 @@ func (f *roadFake) page(fams roads.Families, more bool) roads.Page {
 			pf.DataAsOf = &old
 		}
 		p.Sources = append(p.Sources, pf)
+		switch {
+		case slices.Contains(f.unconfirmed, fam):
+		case slices.Contains(f.lapsed, fam):
+			p.Confirmations[fam] = ampel.Confirmation{At: &gone}
+		default:
+			p.Confirmations[fam] = ampel.Confirmation{At: &now}
+		}
 	}
 	return p
 }
@@ -106,8 +138,8 @@ var (
 	weatherScope = []access.Scope{"roads", "weather"}
 )
 
-func de(kind roads.Kind, headline string) roads.Message {
-	return roads.Message{Kind: kind, Headline: headline, TextLanguage: "de"}
+func msg(kind roads.Kind, headline string) roads.Message {
+	return roads.Message{Record: roads.RecordTrafficMessage, Kind: kind, Headline: headline}
 }
 
 func lit(t *testing.T, name string, c features.Conditions, lamp roads.Lamp, reason roads.Reason) {
@@ -134,7 +166,7 @@ func TestMotorwayConditionsAreGatedAttributedAndLit(t *testing.T) {
 	f := &roadFake{
 		road: roads.Road{Ref: "A8", Class: roads.ClassMotorway},
 		sits: []roads.Situation{{ID: "a", Family: "r1"}, {ID: "b", Family: "r1"}},
-		msgs: []roads.Message{de(roads.KindRoadworks, "Baustelle")},
+		msgs: []roads.Message{msg(roads.KindRoadworks, "Baustelle")},
 	}
 	commercial := key("commercial", weatherScope, "r1", "r2", "e1", "w1")
 	c, err := roadService(f).MotorwayConditions(ctx, commercial, roads.CorridorQuery{Road: "A8", Limit: 1})
@@ -153,14 +185,14 @@ func TestMotorwayConditionsAreGatedAttributedAndLit(t *testing.T) {
 	f.msgs = nil
 	c, _ = roadService(f).MotorwayConditions(ctx, commercial, roads.CorridorQuery{Road: "A8"})
 	lit(t, "nothing on a partial answer", c, roads.LampAmber, roads.ReasonLimitedSight)
-	// A safety word is red on any kind, even on a partial answer; a word in
-	// a text that is not German is not read.
-	f.msgs = []roads.Message{de(roads.KindOther, "Falschfahrer auf der A8")}
+	// A safety word is red on any kind, even on a partial answer; a word
+	// outside the platform's list is any other message.
+	f.msgs = []roads.Message{msg(roads.KindOther, "Falschfahrer auf der A8")}
 	c, _ = roadService(f).MotorwayConditions(ctx, commercial, roads.CorridorQuery{Road: "A8"})
 	lit(t, "a wrong-way driver", c, roads.LampRed, roads.ReasonSafety)
-	f.msgs[0].TextLanguage = "en"
+	f.msgs = []roads.Message{msg(roads.KindOther, "Wrong-way driver on the A8")}
 	c, _ = roadService(f).MotorwayConditions(ctx, key("consumer", weatherScope, "r1", "r2", "w1", "w2"), roads.CorridorQuery{Road: "A8"})
-	lit(t, "a word in English", c, roads.LampAmber, roads.ReasonWarning)
+	lit(t, "a word outside the list", c, roads.LampAmber, roads.ReasonWarning)
 
 	f = &roadFake{road: roads.Road{Ref: "A8"}}
 	c, err = roadService(f).MotorwayConditions(ctx, key("consumer", weatherScope, "r1", "r2", "w1", "w2"), roads.CorridorQuery{Road: "A8"})
@@ -172,7 +204,7 @@ func TestMotorwayConditionsAreGatedAttributedAndLit(t *testing.T) {
 
 func TestRoadConditionsAnswerAnArea(t *testing.T) {
 	req.Covers(t, "FR-ROAD-006")
-	f := &roadFake{sits: []roads.Situation{{ID: "a", Family: "r2"}}, msgs: []roads.Message{de(roads.KindClosure, "Vollsperrung")}}
+	f := &roadFake{sits: []roads.Situation{{ID: "a", Family: "r2"}}, msgs: []roads.Message{msg(roads.KindClosure, "Vollsperrung")}}
 	q := roads.AreaQuery{RadiusM: 900, Classes: []roads.Class{roads.ClassUrban}}
 	c, err := roadService(f).RoadConditions(context.Background(), key("consumer", roadsScope, "r1", "r2"), q)
 	if err != nil {
@@ -204,9 +236,9 @@ func TestTheLampSeesStaleFamilies(t *testing.T) {
 		t.Errorf("the register was asked %v", f.gotProv)
 	}
 	for name, f := range map[string]*roadFake{
-		"a roads family without data":   {sits: []roads.Situation{{ID: "a", Family: "r2"}}, missing: []string{"r1"}},
-		"a weather family stale":        {stale: []string{"w2"}},
-		"a weather family without data": {missing: []string{"w1"}},
+		"a roads family without data":    {sits: []roads.Situation{{ID: "a", Family: "r2"}}, missing: []string{"r1"}},
+		"a weather family not confirmed": {lapsed: []string{"w2"}},
+		"a weather family without data":  {missing: []string{"w1"}},
 	} {
 		c, err = roadService(f).RoadConditions(context.Background(), consumer, roads.AreaQuery{})
 		if err != nil {
@@ -216,7 +248,7 @@ func TestTheLampSeesStaleFamilies(t *testing.T) {
 	}
 }
 
-func TestTheLampReadsTheDWDWarnings(t *testing.T) {
+func TestTheLampReadsTheWeatherWarnings(t *testing.T) {
 	req.Covers(t, "FR-ROAD-004")
 	ctx := context.Background()
 	consumer := key("consumer", weatherScope, "r1", "r2", "w1", "w2")
@@ -235,7 +267,7 @@ func TestTheLampReadsTheDWDWarnings(t *testing.T) {
 		if err != nil || !slices.Equal(names(got.Families), []string{"w2"}) || !slices.Equal(f.gotFams.Weather, []string{"w1", "w2"}) {
 			t.Errorf("level %d: attributed %v, asked %v, %v", c.level, names(got.Families), f.gotFams, err)
 		}
-		lit(t, "a DWD warning", got, c.lamp, c.reason)
+		lit(t, "a weather warning", got, c.lamp, c.reason)
 	}
 	// A jam of 30 minutes comes before a red warning in the platform's order.
 	delay := 30
@@ -244,7 +276,7 @@ func TestTheLampReadsTheDWDWarnings(t *testing.T) {
 	lit(t, "a long jam and a red warning", c, roads.LampRed, roads.ReasonLongJam)
 
 	// A key without the weather scope, or one that may read only some of
-	// the weather families, or none, does not see the warnings: the DWD
+	// the weather families, or none, does not see the warnings: the weather
 	// group is missing, so the sight is limited.
 	for name, k := range map[string]access.Record{
 		"no weather scope":           key("consumer", roadsScope, "r1", "r2", "w1", "w2"),
@@ -323,5 +355,61 @@ func TestOneSituationIsNeverPartial(t *testing.T) {
 		if _, err := roadService(c.f).RoadSituation(ctx, c.k, "ev-1"); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)
 		}
+	}
+}
+
+func TestTheWeatherSightIsTheConfirmation(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004", "ENV-003")
+	ctx := context.Background()
+	consumer := key("consumer", weatherScope, "r1", "r2", "w1", "w2")
+	// A quiet read of a weather family that is not current by its newest
+	// confirmation is no sight; a warning held is a sight whatever the
+	// confirmation.
+	for name, c := range map[string]struct {
+		f    *roadFake
+		lamp roads.Lamp
+		why  roads.Reason
+	}{
+		"a weather family never confirmed":       {&roadFake{unconfirmed: []string{"w2"}}, roads.LampAmber, roads.ReasonLimitedSight},
+		"a weather family confirmed long ago":    {&roadFake{lapsed: []string{"w1"}}, roads.LampAmber, roads.ReasonLimitedSight},
+		"a warning held, the family not current": {&roadFake{lapsed: []string{"w1", "w2"}, warns: []roads.Warning{{Family: "w1", Level: 1}}}, roads.LampAmber, roads.ReasonWeatherWarning},
+	} {
+		got, err := roadService(c.f).RoadConditions(ctx, consumer, roads.AreaQuery{})
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		lit(t, name, got, c.lamp, c.why)
+	}
+}
+
+func TestTheLampSeesEveryStateInScope(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004", "ENV-003")
+	ctx := context.Background()
+	consumer := key("consumer", weatherScope, "r1", "r2", "w1", "w2")
+	cover := func(own, carried, currentOnly []string) *ampel.Coverage {
+		return &ampel.Coverage{Own: own, Carried: carried, CurrentOnly: currentOnly}
+	}
+	for name, c := range map[string]struct {
+		f    *roadFake
+		key  access.Record
+		lamp roads.Lamp
+	}{
+		"one state covered by its own family":         {&roadFake{}, consumer, roads.LampGreen},
+		"its own family lapsed, a carrier current":    {&roadFake{lapsed: []string{"r1"}}, consumer, roads.LampGreen},
+		"every covering family lapsed":                {&roadFake{lapsed: []string{"r1", "r2"}}, consumer, roads.LampAmber},
+		"no state in scope":                           {&roadFake{states: []string{}}, consumer, roads.LampAmber},
+		"a state nobody covers":                       {&roadFake{states: []string{"01", "02"}}, consumer, roads.LampAmber},
+		"a current-only family lapsed caps the state": {&roadFake{lapsed: []string{"r1"}, coverage: cover([]string{"r1"}, []string{"r2"}, []string{"r1"})}, consumer, roads.LampAmber},
+		"the only covering family not readable":       {&roadFake{coverage: cover(nil, []string{"r2"}, nil)}, key("commercial", weatherScope, "r1", "r2", "w1"), roads.LampAmber},
+	} {
+		got, err := roadService(c.f).RoadConditions(ctx, c.key, roads.AreaQuery{})
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		why := roads.Reason("")
+		if c.lamp != roads.LampGreen {
+			why = roads.ReasonLimitedSight
+		}
+		lit(t, name, got, c.lamp, why)
 	}
 }

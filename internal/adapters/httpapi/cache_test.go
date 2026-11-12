@@ -210,7 +210,7 @@ func TestARepeatedRequestIsACacheHit(t *testing.T) {
 	if w := r.get(t, http.Header{"If-None-Match": {first.Header().Get("ETag")}}); w.Code != http.StatusNotModified {
 		t.Fatalf("stored answer with a matching validator: %d", w.Code)
 	}
-	// A replay says how long ago its answer was read, in whole seconds; the
+	// A replayed body says how long ago it was read, in whole seconds; the
 	// answer read for this request says nothing.
 	if first.Header().Get("Age") != "" || second.Header().Get("Age") != "0" {
 		t.Fatalf("Age of the read %q, of the replay at once %q", first.Header().Get("Age"), second.Header().Get("Age"))
@@ -226,7 +226,8 @@ func TestARepeatedRequestIsACacheHit(t *testing.T) {
 	if m1["generatedAt"] == nil || m1["generatedAt"] != m2["generatedAt"] || fmt.Sprint(decode(t, first)["data"]) != fmt.Sprint(decode(t, later)["data"]) {
 		t.Fatalf("the replay's meta differs from the read's: %v, %v", m2, m1)
 	}
-	if w := r.get(t, http.Header{"If-None-Match": {first.Header().Get("ETag")}}); w.Code != http.StatusNotModified || w.Header().Get("Age") != "30" {
+	// A 304 carries no Age: its max-age counts from the 304.
+	if w := r.get(t, http.Header{"If-None-Match": {first.Header().Get("ETag")}}); w.Code != http.StatusNotModified || w.Header().Get("Age") != "" {
 		t.Fatalf("stored 304 after 30.9 s: %d, Age %q", w.Code, w.Header().Get("Age"))
 	}
 	// Past its max-age the body is read again; the ETag is the same while
@@ -235,6 +236,24 @@ func TestARepeatedRequestIsACacheHit(t *testing.T) {
 	third := r.get(t, nil)
 	if r.features.calls.Load() != 2 || third.Header().Get("ETag") != first.Header().Get("ETag") {
 		t.Fatalf("after max-age: %d reads, etag %q", r.features.calls.Load(), third.Header().Get("ETag"))
+	}
+}
+
+func TestARevalidationAfterTheBodyExpiredCarriesNoAge(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005")
+	r := newCacheRig(t, config.Defaults(), "v1")
+	first := r.get(t, nil)
+	maxAge := first.Header().Get("Cache-Control")
+	// Long past the body's max-age, the entry still answers its validator,
+	// with no read. An Age counted from the first read would pass max-age,
+	// so a client would revalidate on every request.
+	r.clock.add(10 * time.Minute)
+	w := r.get(t, http.Header{"If-None-Match": {first.Header().Get("ETag")}})
+	if w.Code != http.StatusNotModified || r.features.calls.Load() != 1 {
+		t.Fatalf("revalidation after the body expired: %d, %d reads", w.Code, r.features.calls.Load())
+	}
+	if age := w.Header().Get("Age"); age != "" || w.Header().Get("Cache-Control") != maxAge {
+		t.Fatalf("the 304 sends Age %q with %q, want no Age with %q", age, w.Header().Get("Cache-Control"), maxAge)
 	}
 }
 

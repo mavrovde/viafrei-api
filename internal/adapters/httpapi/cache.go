@@ -395,7 +395,7 @@ func (s *server) cache(ctx huma.Context, next func(huma.Context)) {
 	now := s.now()
 	if e := s.results.get(key, now); e != nil && versioned && e.current(vs, now) {
 		if etagMatch(inm, e.etag) {
-			s.sendNotModified(ctx, e, s.age(e))
+			s.sendNotModified(ctx, e)
 			return
 		}
 		if e.body != nil {
@@ -459,7 +459,7 @@ func (s *server) run(ctx huma.Context, next func(huma.Context), key, inm string,
 		stored = e
 	}
 	if !e.unversioned && etagMatch(inm, e.etag) {
-		s.sendNotModified(ctx, e, nil)
+		s.sendNotModified(ctx, e)
 		return
 	}
 	setCacheHeaders(b.header, e)
@@ -557,14 +557,14 @@ func setCacheHeaders(h http.Header, e *entry) {
 	}
 }
 
-// sendNotModified answers a matching validator; age, when not nil, is the
-// Age header of an answer that was read before this request.
-func (s *server) sendNotModified(ctx huma.Context, e *entry, age http.Header) {
+// sendNotModified answers a matching validator. It carries no Age: a 304
+// tells the client its copy is current now, so its max-age counts from this
+// answer. An Age counted from the read the entry was built by would pass
+// max-age once the stored body has expired and make every request a
+// revalidation.
+func (s *server) sendNotModified(ctx huma.Context, e *entry) {
 	h := http.Header{}
 	setCacheHeaders(h, e)
-	for k, v := range age {
-		h[k] = v
-	}
 	send(ctx, http.StatusNotModified, h, nil)
 }
 
@@ -573,21 +573,20 @@ func (s *server) sendNotModified(ctx huma.Context, e *entry, age http.Header) {
 // ageS and generatedAt of that read, so a client adds Age to ageS for the
 // data's age now, and Cache-Control max-age counts from the read, not from
 // the replay.
-func (s *server) age(e *entry) http.Header {
-	return http.Header{"Age": {strconv.FormatInt(int64(max(s.now().Sub(e.built), 0)/time.Second), 10)}}
+func (s *server) age(e *entry) string {
+	return strconv.FormatInt(int64(max(s.now().Sub(e.built), 0)/time.Second), 10)
 }
 
-// sendEntry replays a stored answer under this request's id, or a 304 when
-// it matches inm, with the Age of the read it replays.
+// sendEntry replays a stored answer under this request's id, with the Age
+// of the read it replays, or a 304 when it matches inm.
 func (s *server) sendEntry(ctx huma.Context, e *entry, inm string) {
-	age := s.age(e)
 	if !e.unversioned && etagMatch(inm, e.etag) {
-		s.sendNotModified(ctx, e, age)
+		s.sendNotModified(ctx, e)
 		return
 	}
 	h := e.header.Clone()
 	setCacheHeaders(h, e)
-	h["Age"] = age["Age"]
+	h.Set("Age", s.age(e))
 	body := e.body
 	if id := RequestIDFrom(ctx.Context()); id != e.requestID {
 		body = bytes.Replace(body, []byte(`"requestId":"`+e.requestID+`"`), []byte(`"requestId":"`+id+`"`), 1)

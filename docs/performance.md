@@ -131,8 +131,11 @@ A repeat with no validator is served from memory under the same conditions
 as a 304. A replayed answer carries its own `requestId`, but the
 `generatedAt`, `dataAsOf` and `ageS` of the request that built it. It also
 carries an `Age` header: the whole seconds since that read (RFC 9111). The
-data's age now is `ageS` plus `Age`. A 304 from a stored answer carries
-`Age` too; an answer read for this request carries none.
+data's age now is `ageS` plus `Age`. An answer read for this request carries
+no `Age`, and neither does a 304: it tells the client its copy is current
+now, so its max-age counts from the 304. (An `Age` counted from the first
+read would pass max-age once the stored body expired, and the client would
+revalidate on every request.)
 
 **Identical concurrent requests** share one storage read. The first runs it,
 and the others wait for its answer within their own deadline. A request

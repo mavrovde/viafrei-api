@@ -35,20 +35,21 @@ func TestMappings(t *testing.T) {
 	if energy.MapCurrent(nil) != nil {
 		t.Error("an unpublished current is not nil")
 	}
-	if energy.Other != "other" || len(energy.Accesses) != 4 || len(energy.States) != 6 || len(energy.Currents) != 3 {
+	if energy.Other != "other" || len(energy.Accesses) != 4 || len(energy.States) != 7 || len(energy.Currents) != 3 {
 		t.Error("the enumerations changed")
 	}
 }
 
 func TestAReservedPointIsAnsweredOccupied(t *testing.T) {
 	// #18: the MCP capability answers a reservation as occupied, and so does
-	// the API. No answer states reserved.
+	// the API. reserved stays in the enumeration (VER-002) and no stored code
+	// maps to it.
 	if got := energy.MapState("reserved"); got != energy.StateOccupied {
 		t.Errorf("MapState(reserved) = %q, want occupied", got)
 	}
 	for _, st := range energy.States {
-		if st == "reserved" {
-			t.Error("reserved is a state of the contract")
+		if got := energy.MapState(string(st)); got == energy.StateReserved {
+			t.Errorf("MapState(%q) = reserved", st)
 		}
 	}
 }

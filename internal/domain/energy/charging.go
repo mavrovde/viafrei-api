@@ -59,8 +59,12 @@ type State string
 
 // The known availability states.
 const (
-	StateAvailable  State = "available"
-	StateOccupied   State = "occupied"
+	StateAvailable State = "available"
+	StateOccupied  State = "occupied"
+	// StateReserved stays in the open enumeration, because removing a value
+	// a response may carry is a breaking change (VER-002), but it is never
+	// sent: a reserved report is answered occupied (MapState).
+	StateReserved   State = "reserved"
 	StateOutOfOrder State = "out_of_order"
 	StateUnknown    State = "unknown"
 	StateOther      State = Other
@@ -70,22 +74,20 @@ const (
 	StateStale State = "stale"
 )
 
-// States lists every availability state of the contract. unknown and other
-// stay in the enum but are never sent: a report of either says nothing
+// States lists every availability state of the contract. reserved, unknown
+// and other stay in the enum but are never sent: MapState answers reserved
+// occupied, and a report of unknown or other says nothing
 // (Availability.Says), so its point is answered as availability: null.
-var States = []State{StateAvailable, StateOccupied, StateOutOfOrder, StateUnknown, StateOther, StateStale}
-
-// storedReserved is the stored code of a reserved point. A reserved point
-// is not free to charge at, so it is answered as occupied: the MCP
-// capability's rule (#18), and no answer states reserved.
-const storedReserved = "reserved"
+var States = []State{StateAvailable, StateOccupied, StateReserved, StateOutOfOrder, StateUnknown, StateOther, StateStale}
 
 // MapState maps a stored availability code; reserved is answered occupied.
 func MapState(raw string) State {
-	if raw == storedReserved {
+	// A reserved point is not free to charge at, so it is answered
+	// occupied: the MCP capability's rule (#18). No answer states reserved.
+	if raw == string(StateReserved) {
 		return StateOccupied
 	}
-	return mapCode(raw, States[:4], StateOther)
+	return mapCode(raw, States[:5], StateOther)
 }
 
 func mapCode[T ~string](raw string, known []T, other T) T {

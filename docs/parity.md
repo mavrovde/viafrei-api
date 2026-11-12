@@ -108,8 +108,9 @@ nothing, so that family contributed nothing and neither side credits it.
 
 ## Charging rules both sides follow
 
-- **A reserved point** is answered `occupied`; `reserved` is not a state of
-  the answer.
+- **A reserved point** is answered `occupied`. `reserved` stays in the open
+  enumeration of the contract, because removing a value a response may carry
+  is a breaking change (VER-002), but no answer states it.
 - **A point's status.** A report older than the shorter of the status age
   limit (`charging.status_max_age`; the MCP capability's status age limit,
   30 minutes) and its family's design threshold is answered with

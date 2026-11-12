@@ -120,8 +120,11 @@ type entry struct {
 	header    http.Header // nil when the entry keeps no body
 	body      []byte
 	requestID string
-	expires   time.Time
-	elem      *list.Element
+	// built is the instant the answer was read: a replay says how long ago
+	// in its Age header (sendEntry).
+	built   time.Time
+	expires time.Time
+	elem    *list.Element
 	// unversioned is set when nothing can tell when the answer changes: a
 	// family carried no freshness version, the versions could not be read
 	// before the answer, or the answer is degraded. It gets no ETag, is
@@ -392,7 +395,7 @@ func (s *server) cache(ctx huma.Context, next func(huma.Context)) {
 	now := s.now()
 	if e := s.results.get(key, now); e != nil && versioned && e.current(vs, now) {
 		if etagMatch(inm, e.etag) {
-			s.sendNotModified(ctx, e)
+			s.sendNotModified(ctx, e, s.age(e))
 			return
 		}
 		if e.body != nil {
@@ -456,7 +459,7 @@ func (s *server) run(ctx huma.Context, next func(huma.Context), key, inm string,
 		stored = e
 	}
 	if !e.unversioned && etagMatch(inm, e.etag) {
-		s.sendNotModified(ctx, e)
+		s.sendNotModified(ctx, e, nil)
 		return
 	}
 	setCacheHeaders(b.header, e)
@@ -510,7 +513,7 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 		h.Write([]byte(v))
 	}
 	e.etag = `W/"` + base64.RawURLEncoding.EncodeToString(h.Sum(nil)[:18]) + `"`
-	e.expires = now.Add(e.maxAge)
+	e.built, e.expires = now, now.Add(e.maxAge)
 	return e
 }
 
@@ -554,21 +557,37 @@ func setCacheHeaders(h http.Header, e *entry) {
 	}
 }
 
-func (s *server) sendNotModified(ctx huma.Context, e *entry) {
+// sendNotModified answers a matching validator; age, when not nil, is the
+// Age header of an answer that was read before this request.
+func (s *server) sendNotModified(ctx huma.Context, e *entry, age http.Header) {
 	h := http.Header{}
 	setCacheHeaders(h, e)
+	for k, v := range age {
+		h[k] = v
+	}
 	send(ctx, http.StatusNotModified, h, nil)
 }
 
+// age is the Age header (RFC 9111, section 5.1) of a replay of e: the whole
+// seconds since its answer was read. The replayed body keeps the dataAsOf,
+// ageS and generatedAt of that read, so a client adds Age to ageS for the
+// data's age now, and Cache-Control max-age counts from the read, not from
+// the replay.
+func (s *server) age(e *entry) http.Header {
+	return http.Header{"Age": {strconv.FormatInt(int64(max(s.now().Sub(e.built), 0)/time.Second), 10)}}
+}
+
 // sendEntry replays a stored answer under this request's id, or a 304 when
-// it matches inm.
+// it matches inm, with the Age of the read it replays.
 func (s *server) sendEntry(ctx huma.Context, e *entry, inm string) {
+	age := s.age(e)
 	if !e.unversioned && etagMatch(inm, e.etag) {
-		s.sendNotModified(ctx, e)
+		s.sendNotModified(ctx, e, age)
 		return
 	}
 	h := e.header.Clone()
 	setCacheHeaders(h, e)
+	h["Age"] = age["Age"]
 	body := e.body
 	if id := RequestIDFrom(ctx.Context()); id != e.requestID {
 		body = bytes.Replace(body, []byte(`"requestId":"`+e.requestID+`"`), []byte(`"requestId":"`+id+`"`), 1)

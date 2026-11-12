@@ -15,10 +15,11 @@ p99 budget:
 | conditional (a 304) | 5 ms | 10 ms | 30 ms |
 | lookup | 40 ms | 120 ms | 300 ms |
 | near | 60 ms | 200 ms | 500 ms |
-| transit | 80 ms | 250 ms | 600 ms |
-| along | 120 ms | 400 ms | 900 ms |
 | composed | 300 ms | 800 ms | 1500 ms |
-| history | 150 ms | 400 ms | 1000 ms |
+
+NFR-PERF-003 also sets budgets for three classes no operation has yet:
+transit (80, 250, 600 ms), along (120, 400, 900 ms) and history (150, 400,
+1000 ms). Each is added to the class file with its first operation.
 
 The budgets come from two files:
 
@@ -29,7 +30,7 @@ The budgets come from two files:
 
 - one out of order (p50 ≤ p95 ≤ p99 is required);
 - one that reaches the configured request deadline (`deadline.request`, at most 2 s);
-- one that no operation could use.
+- one that no operation uses (the conditional class is every operation's 304).
 
 `TestEveryOperationHasABudget` fails on any of these:
 
@@ -78,7 +79,10 @@ operation) and `-perf.profile` (`tiny`, `ci` or `benchmark`).
 **Validators.** A data answer carries an `ETag` derived from four things:
 
 - the request: the operation, path, query, `Accept`, `Accept-Language` and the caller's licence permissions;
-- the version of every data family the answer was read from;
+- the version of every data family the answer was read from, which is the
+  family's own version together with its data instant (`dataAsOf`), so a
+  family whose data instant moves has a new version even when nothing else
+  about it changed;
 - the licence register the answer was read under: a fingerprint of every
   family's terms (use classes, acceptance, register version), attribution,
   licence, publisher and notes;
@@ -125,7 +129,10 @@ ends; the entry stays without it, so its validator still answers a 304.
 
 A repeat with no validator is served from memory under the same conditions
 as a 304. A replayed answer carries its own `requestId`, but the
-`generatedAt` and `ageS` of the request that built it.
+`generatedAt`, `dataAsOf` and `ageS` of the request that built it. It also
+carries an `Age` header: the whole seconds since that read (RFC 9111). The
+data's age now is `ageS` plus `Age`. A 304 from a stored answer carries
+`Age` too; an answer read for this request carries none.
 
 **Identical concurrent requests** share one storage read. The first runs it,
 and the others wait for its answer within their own deadline. A request

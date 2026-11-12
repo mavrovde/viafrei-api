@@ -1680,6 +1680,13 @@
             },
             "description": "OK",
             "headers": {
+              "Age": {
+                "description": "Sent when the answer was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
               "Cache-Control": {
                 "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
@@ -1721,6 +1728,13 @@
           "304": {
             "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
             "headers": {
+              "Age": {
+                "description": "Sent when the answer was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
               "Cache-Control": {
                 "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
@@ -2354,6 +2368,13 @@
             },
             "description": "OK",
             "headers": {
+              "Age": {
+                "description": "Sent when the answer was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
               "Cache-Control": {
                 "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
@@ -2395,6 +2416,13 @@
           "304": {
             "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
             "headers": {
+              "Age": {
+                "description": "Sent when the answer was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
               "Cache-Control": {
                 "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
@@ -2851,6 +2879,13 @@
             },
             "description": "OK",
             "headers": {
+              "Age": {
+                "description": "Sent when the answer was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
               "Cache-Control": {
                 "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {
@@ -2892,6 +2927,13 @@
           "304": {
             "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
             "headers": {
+              "Age": {
+                "description": "Sent when the answer was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
               "Cache-Control": {
                 "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
                 "schema": {

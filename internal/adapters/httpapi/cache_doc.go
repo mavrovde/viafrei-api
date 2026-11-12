@@ -9,12 +9,16 @@ import (
 // cacheDoc says what the caching headers of a data answer mean.
 const cacheDoc = "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains."
 
+// ageDoc says what the Age header of a replayed answer means.
+const ageDoc = "Sent when the answer was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read."
+
 // cacheHeaders documents the validator and freshness headers.
 func cacheHeaders() map[string]*huma.Param {
 	out := map[string]*huma.Param{}
 	for _, name := range []string{"ETag", "Cache-Control", "Vary", "Last-Modified"} {
 		out[name] = &huma.Param{Description: cacheDoc, Schema: &huma.Schema{Type: huma.TypeString}}
 	}
+	out["Age"] = &huma.Param{Description: ageDoc, Schema: &huma.Schema{Type: huma.TypeInteger, Minimum: new(float64)}}
 	return out
 }
 

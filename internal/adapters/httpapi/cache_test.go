@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -209,9 +210,28 @@ func TestARepeatedRequestIsACacheHit(t *testing.T) {
 	if w := r.get(t, http.Header{"If-None-Match": {first.Header().Get("ETag")}}); w.Code != http.StatusNotModified {
 		t.Fatalf("stored answer with a matching validator: %d", w.Code)
 	}
+	// A replay says how long ago its answer was read, in whole seconds; the
+	// answer read for this request says nothing.
+	if first.Header().Get("Age") != "" || second.Header().Get("Age") != "0" {
+		t.Fatalf("Age of the read %q, of the replay at once %q", first.Header().Get("Age"), second.Header().Get("Age"))
+	}
+	r.clock.add(30*time.Second + 900*time.Millisecond)
+	later := r.get(t, nil)
+	if later.Header().Get("Age") != "30" || r.features.calls.Load() != 1 {
+		t.Fatalf("a replay 30.9 s after the read: Age %q, %d reads", later.Header().Get("Age"), r.features.calls.Load())
+	}
+	// The body is the one read then: its generatedAt and ageS are as of that
+	// read, which is what Age is added to.
+	m1, m2 := meta(t, decode(t, first)), meta(t, decode(t, later))
+	if m1["generatedAt"] == nil || m1["generatedAt"] != m2["generatedAt"] || fmt.Sprint(decode(t, first)["data"]) != fmt.Sprint(decode(t, later)["data"]) {
+		t.Fatalf("the replay's meta differs from the read's: %v, %v", m2, m1)
+	}
+	if w := r.get(t, http.Header{"If-None-Match": {first.Header().Get("ETag")}}); w.Code != http.StatusNotModified || w.Header().Get("Age") != "30" {
+		t.Fatalf("stored 304 after 30.9 s: %d, Age %q", w.Code, w.Header().Get("Age"))
+	}
 	// Past its max-age the body is read again; the ETag is the same while
 	// the version is.
-	r.clock.add(61 * time.Second)
+	r.clock.add(30 * time.Second)
 	third := r.get(t, nil)
 	if r.features.calls.Load() != 2 || third.Header().Get("ETag") != first.Header().Get("ETag") {
 		t.Fatalf("after max-age: %d reads, etag %q", r.features.calls.Load(), third.Header().Get("ETag"))

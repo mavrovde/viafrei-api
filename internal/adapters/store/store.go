@@ -8,11 +8,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"runtime/debug"
 	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgconn/ctxwatch"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/store/contractdb"
@@ -40,6 +43,14 @@ type Store struct {
 	admit   *admission.Controller
 	budget  SharedBudget
 	pace    pace
+	log     *slog.Logger
+}
+
+// WithLogger names the logger of a read's panic that no caller is left to
+// receive (the default is slog's).
+func (s *Store) WithLogger(l *slog.Logger) *Store {
+	s.log = l
+	return s
 }
 
 // WithAdmission puts the priority admission in front of every read: a read
@@ -78,15 +89,15 @@ func PoolConfig(cfg *config.Config) (*pgxpool.Config, error) {
 	pc.ConnConfig.DefaultQueryExecMode = execModes[cfg.DB.QueryExecMode]
 	pc.ConnConfig.StatementCacheCapacity = cfg.DB.StatementCacheCapacity
 	pc.ConnConfig.DescriptionCacheCapacity = cfg.DB.StatementCacheCapacity
-	// When a request's context ends, the read ends with it: the connection
-	// is cut off at once and a cancel request, bounded by db.cancel_grace,
-	// stops the statement on the server (watcher.go).
-	gone := &abandoned{}
-	pc.ConnConfig.BuildContextWatcherHandler = watcherFor(cfg.DB.CancelGrace, gone)
-	// A connection that was cut off, or comes back in any state other than
-	// idle, is destroyed instead of being returned to the pool.
-	pc.AfterRelease = gone.reusable
-	pc.BeforeClose = func(c *pgx.Conn) { gone.forget(c.PgConn()) }
+	grace := cfg.DB.CancelGrace
+	// When a request's context ends, send a PostgreSQL cancel request at once
+	// and give it the grace period to land before the connection is abandoned.
+	pc.ConnConfig.BuildContextWatcherHandler = func(c *pgconn.PgConn) ctxwatch.Handler {
+		return &pgconn.CancelRequestContextWatcherHandler{Conn: c, CancelRequestDelay: 0, DeadlineDelay: grace}
+	}
+	// A connection that comes back in any state other than idle is destroyed
+	// instead of being returned to the pool.
+	pc.AfterRelease = func(c *pgx.Conn) bool { return c.PgConn().TxStatus() == 'I' }
 	return pc, nil
 }
 
@@ -110,6 +121,7 @@ func New(pool *pgxpool.Pool, cfg *config.Config) *Store {
 		floor:   cfg.DB.StatementTimeoutFloor,
 		nowFn:   time.Now,
 		pace:    realPace,
+		log:     slog.Default(),
 	}
 }
 
@@ -136,34 +148,119 @@ func (s *Store) Budget(ctx context.Context) (time.Duration, bool) {
 	return StatementBudget(now, deadline, s.reserve, s.floor)
 }
 
-// Read runs fn in one read-only transaction bounded by the context's
-// deadline (or deadline.request when the context has none). The statement
-// timeout is set to the remaining budget, so the server stops on its own even
-// if the client-side cancel were lost.
+// Read runs fn in one read-only transaction and answers its error; see
+// ReadValue. fn must not write anything the caller reads after Read returns:
+// past the deadline it may still be running. A read with a result uses
+// ReadValue, which hands the result back only to a caller still waiting.
 func (s *Store) Read(ctx context.Context, fn func(context.Context, pgx.Tx) error) error {
+	_, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (struct{}, error) {
+		return struct{}{}, fn(ctx, tx)
+	})
+	return err
+}
+
+// ReadValue runs fn in one read-only transaction bounded by the context's
+// deadline (or deadline.request when the context has none) and answers what
+// fn returned. The statement timeout is set to the remaining budget, so the
+// server stops on its own even if the client-side cancel were lost.
+//
+// The answer is due at the deadline whatever the connection is doing
+// (NFR-PERF-001). When the context ends, the driver sends a cancel request and
+// abandons the connection only after db.cancel_grace, and both travel the
+// same path as the read: on a slow path the read itself would return past
+// the deadline. So the read runs on its own goroutine and ReadValue answers
+// deadline-exhausted, with the zero T, the moment the context ends. The
+// result is handed over through a channel, and only to a caller still
+// waiting, so nothing the caller holds is written after ReadValue returns.
+// That goroutine abandons the connection and only then gives the permit
+// back, so storage is never asked for more than the pool while a cancel is
+// still landing (NFR-PERF-002).
+func ReadValue[T any](ctx context.Context, s *Store, fn func(context.Context, pgx.Tx) (T, error)) (T, error) {
+	var zero T
 	if _, has := ctx.Deadline(); !has {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, s.request)
 		defer cancel()
 	}
 	if _, ok := s.Budget(ctx); !ok {
-		return ErrDeadlineExhausted
+		return zero, ErrDeadlineExhausted
 	}
+	release := func() {}
 	if s.admit != nil {
-		release, err := s.admit.Acquire(ctx)
+		r, err := s.admit.Acquire(ctx)
 		if err != nil {
 			if errors.Is(err, admission.ErrOverloaded) {
-				return err
+				return zero, err
 			}
-			return fmt.Errorf("%w: %w", ErrDeadlineExhausted, err)
+			return zero, fmt.Errorf("%w: %w", ErrDeadlineExhausted, err)
 		}
-		defer release()
+		release = r
 	}
+	// done is unbuffered and gone is closed by a caller that stops waiting,
+	// so exactly one of the two takes the outcome, even when the read ends
+	// as the deadline arrives: the caller, or the goroutine itself, which
+	// then logs a panic nobody else will see.
+	done, gone := make(chan outcome[T]), make(chan struct{})
+	go func() {
+		o := guarded(ctx, s, fn)
+		release()
+		select {
+		case done <- o:
+		case <-gone:
+			if o.panic != nil {
+				s.log.Error("store: a read panicked after its deadline had passed", "panic", o.panic.Value, "stack", string(o.panic.Stack))
+			}
+		}
+	}()
+	select {
+	case o := <-done:
+		if o.panic != nil {
+			panic(o.panic)
+		}
+		return o.value, o.err
+	case <-ctx.Done():
+		close(gone)
+		return zero, fmt.Errorf("%w: %w", ErrDeadlineExhausted, ctx.Err())
+	}
+}
+
+// ReadPanic is a panic in a read, raised again on the caller's goroutine
+// with the stack of the goroutine it happened on, so the server's panic
+// handling logs where it happened.
+type ReadPanic struct {
+	Value any
+	Stack []byte
+}
+
+func (p *ReadPanic) Error() string { return fmt.Sprintf("%v\n\n%s", p.Value, p.Stack) }
+
+// outcome is what the read goroutine hands back: the result and error of
+// fn, or its panic.
+type outcome[T any] struct {
+	value T
+	err   error
+	panic *ReadPanic
+}
+
+// guarded runs the transaction and turns a panic into an outcome.
+func guarded[T any](ctx context.Context, s *Store, fn func(context.Context, pgx.Tx) (T, error)) (o outcome[T]) {
+	defer func() {
+		if v := recover(); v != nil {
+			o = outcome[T]{panic: &ReadPanic{Value: v, Stack: debug.Stack()}}
+		}
+	}()
+	v, err := transact(ctx, s, fn)
+	return outcome[T]{value: v, err: err}
+}
+
+// transact runs fn in one read-only transaction whose statement timeout is
+// what is left of the budget.
+func transact[T any](ctx context.Context, s *Store, fn func(context.Context, pgx.Tx) (T, error)) (v T, err error) {
 	// The wait for a permit spent part of the budget: what is left is the
 	// statement timeout.
 	budget, ok := s.Budget(ctx)
 	if !ok {
-		return ErrDeadlineExhausted
+		return v, ErrDeadlineExhausted
 	}
 	// One round trip opens the read-only transaction and sets its statement
 	// timeout; the budget is an integer of milliseconds, never caller text.
@@ -171,23 +268,21 @@ func (s *Store) Read(ctx context.Context, fn func(context.Context, pgx.Tx) error
 		BeginQuery: "begin transaction read only; set local statement_timeout = " + strconv.FormatInt(budget.Milliseconds(), 10),
 	})
 	if err != nil {
-		return classify(ctx, err)
+		return v, classify(ctx, err)
 	}
-	// The rollback is bounded by the request too: past its deadline the
-	// connection is cut off and destroyed rather than waited for.
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 	if s.budget.Slots > 0 {
 		if err := s.takeSlot(ctx, tx); err != nil {
-			return err
+			return v, err
 		}
 	}
-	if err := fn(ctx, tx); err != nil {
-		return classify(ctx, err)
+	if v, err = fn(ctx, tx); err != nil {
+		return v, classify(ctx, err)
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return classify(ctx, err)
+		return v, classify(ctx, err)
 	}
-	return nil
+	return v, nil
 }
 
 // takeSlot holds a slot of the shared budget for tx (NFR-CAP-002). A read
@@ -219,13 +314,9 @@ func IsDeadline(err error) bool { return errors.Is(err, ErrDeadlineExhausted) }
 
 // ContractVersion implements health.ContractReader.
 func (s *Store) ContractVersion(ctx context.Context) (string, error) {
-	var v string
-	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		var err error
-		v, err = contractdb.New(tx).ContractVersion(ctx)
-		return err
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (string, error) {
+		return contractdb.New(tx).ContractVersion(ctx)
 	})
-	return v, err
 }
 
 func classify(ctx context.Context, err error) error {

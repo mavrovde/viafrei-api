@@ -29,8 +29,10 @@ select false, source_ref::text, freshness_version::text from contract.source_fre
 // arrive and answer If-None-Match before any feature read
 // (Performance-and-Caching).
 func (s *Store) FreshnessVersions(ctx context.Context) (provenance.Versions, error) {
-	out := provenance.Versions{Families: map[string]string{}}
-	err := s.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (provenance.Versions, error) {
+		// Built inside the read and handed back only to a caller still
+		// waiting: nothing the caller holds is written past its deadline.
+		out := provenance.Versions{Families: map[string]string{}}
 		var register bool
 		var family, version string
 		// A failed query surfaces through ForEachRow.
@@ -43,7 +45,6 @@ func (s *Store) FreshnessVersions(ctx context.Context) (provenance.Versions, err
 			}
 			return nil
 		})
-		return err
+		return out, err
 	})
-	return out, err
 }

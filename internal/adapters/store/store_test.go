@@ -3,7 +3,6 @@ package store_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -86,8 +85,9 @@ func TestPoolConfigCarriesEveryDBKey(t *testing.T) {
 	if pc.ConnConfig.RuntimeParams["application_name"] != "probe-name" {
 		t.Errorf("application_name %q", pc.ConnConfig.RuntimeParams["application_name"])
 	}
-	if h := fmt.Sprint(pc.ConnConfig.BuildContextWatcherHandler(&pgconn.PgConn{})); h != "deadline watcher, cancel grace 250ms" {
-		t.Errorf("the context watcher must cut the read off and bound its cancel request by db.cancel_grace: %s", h)
+	h, ok := pc.ConnConfig.BuildContextWatcherHandler(&pgconn.PgConn{}).(*pgconn.CancelRequestContextWatcherHandler)
+	if !ok || h.DeadlineDelay != 250*time.Millisecond || h.CancelRequestDelay != 0 {
+		t.Errorf("the context watcher must send a cancel request at once and wait db.cancel_grace: %#v", h)
 	}
 }
 

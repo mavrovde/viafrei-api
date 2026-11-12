@@ -255,6 +255,14 @@ jobs:
           name: coverage-a11y-runner
           path: coverage-a11y-runner.lcov
           if-no-files-found: error
+      - name: Self-test of the privacy check, offsite.js at 100 % coverage (#81)
+        run: bash scripts/docs-offsite.test.sh coverage-offsite.lcov
+      - name: Upload the privacy check's coverage for SonarCloud
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-offsite
+          path: coverage-offsite.lcov
+          if-no-files-found: error
       - name: The checker is at the versions the licence exception names (security.yml)
         run: scripts/docs-a11y-pins.sh scripts/a11y-tools/package-lock.json
       - name: The reference baseline only goes down
@@ -269,6 +277,8 @@ jobs:
         run: bash scripts/docs-a11y.test.sh
       - name: Accessibility, WCAG 2.2 AA, every page (NFR-A11Y-001)
         run: scripts/docs-a11y.sh site
+      - name: No page requests anything from another host (#81)
+        run: scripts/docs-offsite.sh site
 
   vulncheck:
     name: govulncheck
@@ -402,6 +412,33 @@ jobs:
           persist-credentials: false
       - run: make compose-test COMMIT=${{ github.sha }}
 
+  load:
+    # The pull-request budget of the soak, stress, spike and fault scenarios
+    # (TST-007, issue #19) on the test stack this job starts; the long run is
+    # load-nightly.yml. Nothing but that stack's loopback is a target.
+    name: Load and faults (pull-request budget)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: Every scenario, pull-request budget
+        run: scripts/load-test.sh pr load-report.md
+      - name: Report in the job summary
+        if: always() && hashFiles('load-report.md') != ''
+        run: cat load-report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: load-report
+          path: load-report.md
+          retention-days: 30
+          if-no-files-found: ignore
+
   sonar:
     name: SonarCloud analysis
     needs: [test, coverage, docs-portal]
@@ -434,8 +471,11 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: coverage-a11y-runner
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-offsite
       - name: The merged coverage report is there
-        run: test -s coverage.out && test -s test-unit.json && test -s coverage-a11y-runner.lcov
+        run: test -s coverage.out && test -s test-unit.json && test -s coverage-a11y-runner.lcov && test -s coverage-offsite.lcov
       - uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

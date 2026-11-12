@@ -71,8 +71,26 @@ else
   echo "not ok: the GitHub link names the file: $(rewrite ../scripts/docs-check.pl)"; fail=$((fail + 1))
 fi
 
+# Resources from another host (#81): each planted one fails, on a guide page
+# and on the reference; a link to another site and a data: URL do not.
+ext() { # ext NAME FILE MARKUP WANT_TEXT
+  clean "$s"; [[ -e $s/$2 ]] || cp "$s/other.html" "$s/$2"; M=$3 perl -0pi -e 's{</main>}{$ENV{M}</main>}' "$s/$2"; expect 1 "$1" "$s" "$4"
+}
+ext "a Google web font stylesheet fails" index.html '<link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">' 'loads a resource from another host: <link href="https://fonts.googleapis.com/'
+ext "a font through @font-face fails" index.html '<style>@font-face{font-family:X;src:url("https://fonts.gstatic.com/s/x.woff2")}</style>' 'CSS url(https://fonts.gstatic.com/s/x.woff2)'
+ext "a stylesheet through @import fails" index.html "<style>@import 'https://fonts.googleapis.com/css2?family=Inter';</style>" 'CSS @import https://fonts.googleapis.com/css2'
+ext "a protocol-relative stylesheet fails" index.html '<link rel=stylesheet href=//cdn.example/x.css>' '<link href="//cdn.example/x.css">'
+ext "a third-party script fails" index.html '<script src="https://cdn.example/redoc.standalone.js"></script>' '<script src="https://cdn.example/redoc.standalone.js">'
+ext "an image from another host fails" index.html '<img alt="badge" src="https://img.example/badge.svg">' '<img src="https://img.example/badge.svg">'
+ext "a srcset candidate from another host fails" index.html '<img alt="x" src="a.png" srcset="a.png 1x, https://img.example/b.png 2x">' '<img srcset="https://img.example/b.png">'
+ext "a background image in a style attribute fails" index.html '<div style="background:url(https://img.example/bg.png)">x</div>' 'CSS url(https://img.example/bg.png)'
+ext "an iframe from another host fails" index.html '<iframe title="x" src="https://video.example/embed"></iframe>' '<iframe src="https://video.example/embed">'
+ext "the reference's resources are checked too" reference.html '<link href="https://fonts.googleapis.com/css?family=Montserrat" rel="stylesheet">' 'reference.html: loads a resource from another host'
+clean "$s"; M='<img alt="x" src="data:image/png;base64,AA"><style>p{background:url(data:image/png;base64,AA)}</style><script>var u="https://not.a.request.example/";</script>' perl -0pi -e 's{</main>}{$ENV{M}</main>}' "$s/index.html"
+expect 0 "a data: URL, a link to another site and a URL inside a script body are no request" "$s"
+
 rm -rf "$s" && mkdir -p "$s"; expect 2 "a site without pages is refused" "$s" 'no page found'
 expect 2 "a missing site is refused" "$tmp/none" 'cannot read'
 
 echo "docs-check self-test: $pass passed, $fail failed"
-(( fail == 0 ))
+(( fail == 0 && pass >= 30 ))

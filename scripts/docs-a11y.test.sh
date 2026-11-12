@@ -126,10 +126,13 @@ report '[]' "[$(row 1), $(issue warning region false '#operation\\/getMeta > div
 expect 1 "a region failure in another place is a new failure" "$s" "FAIL: reference.html: region: 2 distinct failure(s), above the baseline of 1"
 printf '{"reference.html": {"color-contrast": 2}}\n' > "$tmp/baseline.json"
 
+review_fail='FAIL: index.html: color-contrast (review)'
+
 # A needs-review contrast result whose computed pair meets its WCAG ratio is
 # decided: a pass on any page, counted on its own line. Each near miss is not.
 measured() { # measured REVIEW SOURCE RATIO REQUIRED [MESSAGE_KEY]: '-' for no key
-  jq -n --argjson r "$1" --arg src "$2" --argjson ratio "$3" --argjson req "$4" --arg key "${5:-elmPartiallyObscured}" \
+  local review=$1 source=$2 ratio=$3 required=$4 key=${5:-elmPartiallyObscured}
+  jq -n --argjson r "$review" --arg src "$source" --argjson ratio "$ratio" --argjson req "$required" --arg key "$key" \
     '{type: "error", code: "color-contrast",
     message: "planted", selector: "p", runnerExtras: ({needsFurtherReview: $r, target: "td > span", colourSource: $src,
     fgColor: "rgb(0, 0, 0)", bgColor: "rgb(255, 255, 255)", contrastRatio: $ratio, requiredRatio: $req}
@@ -140,15 +143,15 @@ expect 0 "needs-review results partly obscured whose computed pair meets its rat
 report '[]' "[$(measured true computed 21 4.5), $green, $other]"
 expect 0 "a decided result is not counted against the baseline" "$s" "reference.html: 2 distinct failure(s) (2 result(s)) within the baseline"
 report "[$(measured true computed 21 4.5 bgOverlap)]" '[]'
-expect 1 "a result axe left for another reason is not decided" "$s" "FAIL: index.html: color-contrast (review)"
+expect 1 "a result axe left for another reason is not decided" "$s" "$review_fail"
 report "[$(measured true computed 21 4.5 -)]" '[]'
-expect 1 "a result with no reason is not decided" "$s" "FAIL: index.html: color-contrast (review)"
+expect 1 "a result with no reason is not decided" "$s" "$review_fail"
 report "[$(measured true computed 4.49 4.5)]" '[]'
-expect 1 "a computed pair under its ratio is still a finding" "$s" "FAIL: index.html: color-contrast (review)"
+expect 1 "a computed pair under its ratio is still a finding" "$s" "$review_fail"
 report "[$(measured true computed null 4.5)]" '[]'
-expect 1 "a pair with no measured ratio is still a finding" "$s" "FAIL: index.html: color-contrast (review)"
+expect 1 "a pair with no measured ratio is still a finding" "$s" "$review_fail"
 report "[$(measured true axe 21 4.5)]" '[]'
-expect 1 "only a computed pair decides, not one axe compared" "$s" "FAIL: index.html: color-contrast (review)"
+expect 1 "only a computed pair decides, not one axe compared" "$s" "$review_fail"
 report "[$(measured false computed 21 4.5)]" '[]'
 expect 1 "a violation axe decided is never overruled" "$s" "FAIL: index.html: color-contrast (error)"
 
@@ -169,7 +172,7 @@ report '[]' '[{"message": "timed out"}]'
 expect 1 "reference.html not loading fails" "$s" "FAIL: reference.html: could not be checked: timed out"
 
 report "[$cc]" '[]'
-expect 1 "a needs-review result on a guide page fails" "$s" "FAIL: index.html: color-contrast (review)"
+expect 1 "a needs-review result on a guide page fails" "$s" "$review_fail"
 
 report "[$(issue warning heading-order false)]" '[]'
 expect 1 "a moderate result on a guide page fails" "$s" "FAIL: index.html: heading-order (warning)"

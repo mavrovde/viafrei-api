@@ -31,27 +31,28 @@ const run = async () => {
   const issues = [];
   const fail = (code, element, message) => issues.push({code, type: 'error', element, message, runnerExtras: {}});
 
-  const cells = [...doc.querySelectorAll('td[kind=field]')];
-  if (!cells.length) fail('tree-line', null, 'the reference shows no schema field cell; the tree-line check read nothing');
-  for (const td of cells) {
+  // The fault of one field cell's tree line, or null.
+  const treeLine = td => {
     const tr = td.parentElement;
     const first = tr.matches(':first-of-type');
     const last = tr.classList.contains('last');
     const cell = window.getComputedStyle(td);
-    const line = window.getComputedStyle(td, '::before');
     const where = `the field cell "${td.getAttribute('title')}"`;
-    if (cell.backgroundImage !== 'none') {
-      fail('tree-line', td, `${where} still draws its tree line as a background image`);
-    } else if (!first && !last) {
-      if (cell.borderLeftWidth !== '1px') fail('tree-line', td, `${where} (a middle row) has no 1 px left border`);
-    } else {
-      const want = last ? {top: '0px', height: '22px'} : {top: '22px', bottom: '0px'};
-      const drawn = !['none', 'normal'].includes(line.content) && line.position === 'absolute' &&
-        line.borderLeftWidth === '1px' && line.borderLeftStyle === 'solid' &&
-        line.borderLeftColor === cell.borderLeftColor &&
-        Object.entries(want).every(([k, v]) => line[k] === v);
-      if (!drawn) fail('tree-line', td, `${where} (the ${last ? 'last' : 'first'} row) has no 1 px segment ${JSON.stringify(want)} in its line colour`);
-    }
+    if (cell.backgroundImage !== 'none') return `${where} still draws its tree line as a background image`;
+    if (!first && !last) return cell.borderLeftWidth === '1px' ? null : `${where} (a middle row) has no 1 px left border`;
+    const line = window.getComputedStyle(td, '::before');
+    const want = last ? {top: '0px', height: '22px'} : {top: '22px', bottom: '0px'};
+    const drawn = !['none', 'normal'].includes(line.content) && line.position === 'absolute' &&
+      line.borderLeftWidth === '1px' && line.borderLeftStyle === 'solid' &&
+      line.borderLeftColor === cell.borderLeftColor &&
+      Object.entries(want).every(([k, v]) => line[k] === v);
+    return drawn ? null : `${where} (the ${last ? 'last' : 'first'} row) has no 1 px segment ${JSON.stringify(want)} in its line colour`;
+  };
+  const cells = [...doc.querySelectorAll('td[kind=field]')];
+  if (!cells.length) fail('tree-line', null, 'the reference shows no schema field cell; the tree-line check read nothing');
+  for (const td of cells) {
+    const fault = treeLine(td);
+    if (fault) fail('tree-line', td, fault);
   }
 
   const landmark = (e, role, tag) => {

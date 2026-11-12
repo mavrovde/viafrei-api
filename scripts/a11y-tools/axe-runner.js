@@ -124,6 +124,15 @@ const run = async options => {
   // effect (below), a drawn border at the point, a background colour whose
   // alpha cannot be read, or a translucent colour that is not sRGB makes it
   // unreadable.
+  const unreadableLayer = (e, st, x, y) => {
+    if (st.backgroundImage && st.backgroundImage !== 'none') return 'background image';
+    if (paintsBackground(e)) return 'pseudo-element background';
+    const fx = effect(st);
+    if (fx) return fx;
+    if (onBorder(e, st, x, y)) return 'border';
+    if (Number.isNaN(alpha(st.backgroundColor))) return 'unreadable alpha';
+    return null;
+  };
   const background = (element, x, y) => {
     const stack = window.document.elementsFromPoint(x, y);
     const at = stack.indexOf(element);
@@ -137,13 +146,9 @@ const run = async options => {
     let bg = null;
     for (const e of stack.slice(at)) {
       const st = window.getComputedStyle(e);
-      if (st.backgroundImage && st.backgroundImage !== 'none') return {by: 'background image'};
-      if (paintsBackground(e)) return {by: 'pseudo-element background'};
-      const fx = effect(st);
-      if (fx) return {by: fx};
-      if (onBorder(e, st, x, y)) return {by: 'border'};
+      const by = unreadableLayer(e, st, x, y);
+      if (by) return {by};
       const a = alpha(st.backgroundColor);
-      if (Number.isNaN(a)) return {by: 'unreadable alpha'};
       if (a >= 1) {
         bg = st.backgroundColor;
         break;
@@ -169,16 +174,16 @@ const run = async options => {
   // effect on it or an ancestor, an empty box, a box clipped
   // entirely, or a point whose
   // colour cannot be read (background, above).
-  const computedPair = element => {
-    if (!element) return undetermined('no element');
-    const fg = window.getComputedStyle(element).color;
+  const ancestorEffect = element => {
     for (let e = element; e?.nodeType === 1; e = e.parentElement) {
       const fx = effect(window.getComputedStyle(e));
-      if (fx) return undetermined(fx);
+      if (fx) return fx;
     }
-    element.scrollIntoView({block: 'center', inline: 'center'});
-    const box = element.getClientRects()[0];
-    if (!box || !box.width || !box.height) return undetermined('not rendered');
+    return null;
+  };
+  // The part of box shown inside the viewport and every ancestor of element
+  // that clips its overflow.
+  const shownPart = (element, box) => {
     const shown = {left: box.left, top: box.top, right: box.left + box.width, bottom: box.top + box.height};
     const cut = r => {
       shown.left = Math.max(shown.left, r.left);
@@ -191,6 +196,17 @@ const run = async options => {
       const st = window.getComputedStyle(e);
       if ([st.overflowX, st.overflowY].some(v => ['hidden', 'auto', 'scroll', 'clip'].includes(v))) cut(e.getBoundingClientRect());
     }
+    return shown;
+  };
+  const computedPair = element => {
+    if (!element) return undetermined('no element');
+    const fg = window.getComputedStyle(element).color;
+    const fx = ancestorEffect(element);
+    if (fx) return undetermined(fx);
+    element.scrollIntoView({block: 'center', inline: 'center'});
+    const box = element.getClientRects()[0];
+    if (!box?.width || !box.height) return undetermined('not rendered');
+    const shown = shownPart(element, box);
     if (shown.right <= shown.left || shown.bottom <= shown.top) return undetermined('clipped');
     const along = (start, end) => [(start + end) / 2, start + (end - start) / 4, start + (3 * (end - start)) / 4];
     const [xc, x0, x1] = along(shown.left, shown.right);
@@ -203,7 +219,7 @@ const run = async options => {
     const unreadable = found.find(f => f.by);
     if (unreadable) return undetermined(unreadable.by);
     const ratio = bg => contrast(element, {fg, bg}).ratio ?? -1;
-    const worst = found.map(f => f.bg).reduce((w, bg) => (ratio(bg) < ratio(w) ? bg : w));
+    const worst = found.map(f => f.bg).reduce((w, bg) => (ratio(bg) < ratio(w) ? bg : w), found[0].bg);
     return {source: 'computed', fg, bg: worst};
   };
 
@@ -231,6 +247,14 @@ const run = async options => {
     return {ratio: Math.floor(((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)) * 100) / 100, required: large ? 3 : 4.5};
   };
 
+  const resolve = target => {
+    if (target.length !== 1 || typeof target[0] !== 'string') return null;
+    try {
+      return window.document.querySelector(target[0]);
+    } catch {
+      return null;
+    }
+  };
   const issues = [];
   const add = (result, needsFurtherReview) => {
     for (const node of result.nodes) {
@@ -243,14 +267,7 @@ const run = async options => {
       // or shadow-root target is a list of selectors, one per document; its
       // joined string is a descendant selector of the light DOM that may
       // match another element, so such a node has no element here.
-      let element = null;
-      if (node.target.length === 1 && typeof node.target[0] === 'string') {
-        try {
-          element = window.document.querySelector(node.target[0]);
-        } catch {
-          element = null;
-        }
-      }
+      const element = resolve(node.target);
       const extras = {impact: result.impact, needsFurtherReview, target, messageKey: why ? why.messageKey : null};
       if (result.id === 'color-contrast') {
         const pair = axeColours ? {source: 'axe', fg: axeColours.fgColor, bg: axeColours.bgColor} : computedPair(element);

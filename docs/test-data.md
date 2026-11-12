@@ -65,6 +65,23 @@ name parses as syllables of the generator's own lists
   with no events, a stale source per domain, an unmapped code value, zero and
   full occupancy, and the largest price the price column holds.
 
+The store's integration tests also load a few planted rows after `seed.sql`
+(`fixtures.Planted`, drawn without a random number from the same seed and
+profile). They are kept out of `seed.sql`, because the parity bundles were
+answered on that file and must stay valid:
+
+- a road in two parts, `A 990`, with one active situation in the middle of
+  each part;
+- on one road, an active situation with an unmapped value in each coded
+  column: kind, severity, direction and road class.
+
+`seed.sql` carries none of what the road lamp reads beyond the situations
+and the warnings: no junction has a state code, no source covers a state's
+traffic messages, no source has a confirmation, and every situation is a
+traffic message. A lamp over the bare set is therefore never green. The
+tests that need more plant it themselves (the store's integration tests, and
+the documented examples, see `docs/examples.md`).
+
 The generator fails closed: an unknown profile is a usage error (exit 2), and
 a set with an empty table, a Land or family without rows, a missing licence
 class or a missing edge case is an error (exit 1), not an empty success.

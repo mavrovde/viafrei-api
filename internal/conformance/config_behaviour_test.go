@@ -191,6 +191,9 @@ func behaviours() map[string]behaviour {
 		"compose.part_deadline": {"300ms", func(t *testing.T, c *config.Config) string {
 			return wire.FeatureSettings(c).PartDeadline.String()
 		}},
+		"roads.ended_retention_h": {"6", func(t *testing.T, c *config.Config) string {
+			return wire.FeatureSettings(c).EndedRetention.String()
+		}},
 		"sources.disabled": {"alpha", func(t *testing.T, c *config.Config) string {
 			register := []access.Terms{{Family: "alpha", UseClasses: access.UseClasses, Reviewed: true}}
 			return fmt.Sprint(access.NewGate(register, access.Plan{UseClass: "consumer", Sources: []string{"alpha"}}, nil, c.Sources.Disabled).Allowed())

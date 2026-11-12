@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
 	"regexp"
 	"slices"
 	"strconv"
@@ -211,5 +212,45 @@ func TestAGapInTheGeneratedSetIsAnError(t *testing.T) {
 	m, err := fixtures.Generate(&buf, "tiny", 1, "0.1")
 	if err == nil || m == nil || !strings.Contains(err.Error(), "family omega has no rows") {
 		t.Fatalf("manifest %v, error %v, want a coverage-gap error naming omega", m != nil, err)
+	}
+}
+
+// TestPlantedRowsAreReproducibleAndApart: the planted rows are the same for
+// the same seed and profile, carry every planted situation, and are written
+// on their own, so the set's seed.sql is the same with or without them.
+func TestPlantedRowsAreReproducibleAndApart(t *testing.T) {
+	req.Covers(t, "TST-014")
+	var a, b, set bytes.Buffer
+	if err := fixtures.Planted(&a, "tiny", 1, "0.1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := fixtures.Planted(&b, "tiny", 1, "0.1"); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(a.Bytes(), b.Bytes()) {
+		t.Error("two runs planted different rows")
+	}
+	for _, id := range []string{"'" + fixtures.TwoPartRef + "'", "'ev-two-1'", "'ev-two-2'", "'ev-u-kind'", "'ev-u-severity'", "'ev-u-direction'", "'ev-u-class'"} {
+		if !strings.Contains(a.String(), id) {
+			t.Errorf("the planted rows lack %s", id)
+		}
+	}
+	if _, err := fixtures.Generate(&set, "tiny", 1, "0.1"); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(set.String(), "'ev-two-1'") || strings.Contains(set.String(), "'"+fixtures.TwoPartRef+"'") {
+		t.Error("a planted row is in the generated set")
+	}
+}
+
+// TestPlantedRefusesWhatGenerateRefuses: an unknown profile and output that
+// cannot be written are errors, as for the set itself.
+func TestPlantedRefusesWhatGenerateRefuses(t *testing.T) {
+	req.Covers(t, "TST-014")
+	if err := fixtures.Planted(io.Discard, "huge", 1, "0.1"); err == nil || !strings.Contains(err.Error(), "unknown profile") {
+		t.Errorf("an unknown profile: %v", err)
+	}
+	if err := fixtures.Planted(brokenWriter{}, "tiny", 1, "0.1"); err == nil || !strings.Contains(err.Error(), "disk full") {
+		t.Errorf("a broken writer: %v", err)
 	}
 }

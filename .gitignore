@@ -25,6 +25,9 @@ requirement-report.md
 test-completion-report.md
 sarif/
 
+# The mutation run writes its report here (scripts/mutation.sh); it is quoted in the PR, never committed.
+/mutation-report.md
+
 # Built documentation portal (make docs)
 /site/
 

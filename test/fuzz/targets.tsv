@@ -22,3 +22,4 @@ location	internal/domain/geo	ParsePoint	FuzzParsePoint	-
 fields	-	-	-	#10
 lang	-	-	-	#10
 query-body	-	-	-	#10
+road-reference	internal/domain/roads	ParseRoad	FuzzParseRoad	-

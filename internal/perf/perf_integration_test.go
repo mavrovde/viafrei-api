@@ -242,7 +242,7 @@ func open(t *testing.T) *rig {
 	r.key = auth.Principal{Key: access.Record{
 		ID: "benchmarkk", Environment: access.Live, ExpiresAt: r.now.Add(24 * time.Hour),
 		Plan: access.Plan{Name: "benchmark", UseClass: "commercial", Tier: "standard", Sources: sources,
-			Scopes: []access.Scope{"places", "energy", "parking"}},
+			Scopes: []access.Scope{"places", "energy", "parking", "roads", "weather"}},
 	}}
 	near := func(table, path string) {
 		pts, err := pgx.CollectRows(must(conn.Query(ctx, fmt.Sprintf(
@@ -264,6 +264,33 @@ func open(t *testing.T) *rig {
 	for _, id := range ids {
 		r.targets["overview"] = append(r.targets["overview"], "/v1/places/"+id+"/overview")
 	}
+	// The road reads: each motorway's conditions, the conditions near each
+	// junction, and each situation in force at the benchmark's instant.
+	list := func(key, query, prefix, suffix string, args ...any) {
+		vals, err := pgx.CollectRows(must(conn.Query(ctx, query, args...)), pgx.RowTo[string])
+		if err != nil || len(vals) == 0 {
+			t.Fatalf("nothing to ask for %s: %v", key, err)
+		}
+		for _, v := range vals {
+			r.targets[key] = append(r.targets[key], prefix+v+suffix)
+		}
+	}
+	list("motorway", "select replace(road_ref, ' ', '') from contract.road where road_ref like 'A%' order by 1 limit 40",
+		"/v1/motorways/", "/conditions")
+	list("road-conditions", "select round(st_y(location)::numeric, 3)::text || ',' || round(st_x(location)::numeric, 3)::text from contract.junction order by 1 limit 40",
+		"/v1/road-conditions?at=", "&radius_m=50000")
+	// A situation is answered only from a family the key may read: the
+	// licence gate decides, as it does for the request.
+	reg, err := r.st.Register(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	permitted, _, err := access.NewGate(reg, r.key.Key.Plan, nil, cfg.Sources.Disabled).Answer(access.Answering(reg, "roads"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	list("situation", "select event_id from contract.traffic_event where source_ref = any($1) and withdrawn_at is null "+
+		"and (valid_to is null or valid_to > $2) order by 1 limit 40", "/v1/road-situations/", "", permitted, r.now)
 	return r
 }
 
@@ -283,7 +310,7 @@ func (r *rig) handler(t *testing.T, cached bool) http.Handler {
 		Config: &cfg, Build: buildinfo.Info{Version: "bench", Commit: "bench"}, ContractVersion: contract.Version(), Now: now,
 		Readiness: health.NewChecker(r.st, expected, cfg.Health.ReadyTimeout),
 		Auth:      keyAuth{r.key}, Sources: r.st, Versions: r.st,
-		Features: features.New(features.Repositories{Register: r.st, Charging: r.st, Parking: r.st, Places: r.st}, wire.FeatureSettings(&cfg), now),
+		Features: features.New(features.Repositories{Register: r.st, Charging: r.st, Parking: r.st, Places: r.st, Roads: r.st}, wire.FeatureSettings(&cfg), now),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -308,6 +335,12 @@ func (r *rig) targetsOf(op string) []string {
 		return r.targets["/v1/parking-options"]
 	case "getPlaceOverview":
 		return r.targets["overview"]
+	case "getMotorwayConditions":
+		return r.targets["motorway"]
+	case "listRoadConditions":
+		return r.targets["road-conditions"]
+	case "getRoadSituation":
+		return r.targets["situation"]
 	}
 	return nil
 }

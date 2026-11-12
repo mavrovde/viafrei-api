@@ -104,6 +104,9 @@ func operations() []operation {
 		{id: "listChargingOptions", method: http.MethodGet, path: "/v1/charging-options", tag: "energy", keyed: true, scope: "energy", register: registerCharging},
 		{id: "listParkingOptions", method: http.MethodGet, path: "/v1/parking-options", tag: "parking", keyed: true, scope: "parking", register: registerParking},
 		{id: "getPlaceOverview", method: http.MethodGet, path: "/v1/places/{placeId}/overview", tag: "places", keyed: true, scope: "places", register: registerOverview},
+		{id: "getMotorwayConditions", method: http.MethodGet, path: "/v1/motorways/{road}/conditions", tag: "roads", keyed: true, scope: "roads", register: registerMotorwayConditions},
+		{id: "listRoadConditions", method: http.MethodGet, path: "/v1/road-conditions", tag: "roads", keyed: true, scope: "roads", register: registerRoadConditions},
+		{id: "getRoadSituation", method: http.MethodGet, path: "/v1/road-situations/{situationId}", tag: "roads", keyed: true, scope: "roads", register: registerRoadSituation},
 	}
 }
 
@@ -255,6 +258,7 @@ func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 				{Name: "energy", Description: "Where to charge."},
 				{Name: "parking", Description: "Where to park."},
 				{Name: "places", Description: "Places, and what is around them."},
+				{Name: "roads", Description: "What is happening on the roads."},
 			},
 		},
 		Formats:       huma.DefaultFormats,

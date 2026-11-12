@@ -44,10 +44,11 @@ func AuthSettings(cfg *config.Config) auth.Settings {
 // FeatureSettings reads the settings of the feature use cases.
 func FeatureSettings(cfg *config.Config) features.Settings {
 	return features.Settings{
-		Language:     Language,
-		PartDeadline: cfg.Compose.PartDeadline,
-		Disabled:     cfg.Sources.Disabled,
-		IsTimeout:    store.IsDeadline,
+		Language:       Language,
+		PartDeadline:   cfg.Compose.PartDeadline,
+		EndedRetention: time.Duration(cfg.Roads.EndedRetentionH) * time.Hour,
+		Disabled:       cfg.Sources.Disabled,
+		IsTimeout:      store.IsDeadline,
 	}
 }
 

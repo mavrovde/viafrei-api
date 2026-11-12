@@ -1,0 +1,181 @@
+{
+  "title": "The situations on a motorway, two to a page, with its lamp",
+  "request": "/v1/motorways/A101/conditions?limit=2",
+  "attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "roads",
+      "weather"
+    ],
+    "sources": [
+      "src-alpha-roads",
+      "src-eta-weather"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": {
+      "corridor": {
+        "road": "A101",
+        "roadType": "motorway",
+        "direction": "both",
+        "states": [
+          "05",
+          "06",
+          "07",
+          "08",
+          "10",
+          "11",
+          "12",
+          "15",
+          "16"
+        ]
+      },
+      "lamp": "red",
+      "lampReason": "road_closed",
+      "situations": [
+        {
+          "id": "ev-00028",
+          "kind": "weather",
+          "severity": "info",
+          "road": "A101",
+          "roadType": "motorway",
+          "direction": "south",
+          "directionText": "Sackbeiheim",
+          "location": {
+            "lat": 50.000247,
+            "lon": 13.554106
+          },
+          "validity": {
+            "from": "2026-03-29T22:00:00Z",
+            "fromLocal": "2026-03-30T00:00:00+02:00",
+            "until": "2026-03-31T18:00:00Z",
+            "untilLocal": "2026-03-31T20:00:00+02:00"
+          },
+          "lanes": null,
+          "delayMin": null,
+          "lengthM": 4959,
+          "headline": "Weather bei Gieckpückau",
+          "description": null,
+          "textLanguage": "de",
+          "updatedAt": "2026-03-29T22:01:00Z",
+          "updatedAtLocal": "2026-03-30T00:01:00+02:00",
+          "position": {
+            "fromKm": 539.7,
+            "toKm": null,
+            "junctionFrom": null,
+            "junctionTo": null
+          },
+          "sourceFamily": "src-alpha-roads"
+        },
+        {
+          "id": "ev-00020",
+          "kind": "roadworks",
+          "severity": "lane_closed",
+          "road": "A101",
+          "roadType": "motorway",
+          "direction": "unknown",
+          "directionText": "Dirkäningen",
+          "location": {
+            "lat": 50.094131,
+            "lon": 12.752644
+          },
+          "validity": {
+            "from": "2026-03-29T00:59:59Z",
+            "fromLocal": "2026-03-29T01:59:59+01:00",
+            "until": "2026-03-31T02:59:59Z",
+            "untilLocal": "2026-03-31T04:59:59+02:00"
+          },
+          "lanes": {
+            "closed": 1,
+            "total": 2
+          },
+          "delayMin": null,
+          "lengthM": 7554,
+          "headline": "Roadworks bei Zautbrierwerder",
+          "description": null,
+          "textLanguage": "de",
+          "updatedAt": "2026-03-29T01:00:59Z",
+          "updatedAtLocal": "2026-03-29T03:00:59+02:00",
+          "position": {
+            "fromKm": 619.1,
+            "toKm": null,
+            "junctionFrom": null,
+            "junctionTo": null
+          },
+          "sourceFamily": "src-alpha-roads"
+        }
+      ]
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": "2026-03-29T23:57:30Z",
+      "freshness": [
+        {
+          "family": "src-alpha-roads",
+          "dataAsOf": "2026-03-29T23:57:30Z",
+          "ageS": 150,
+          "staleAfterS": 900,
+          "stale": false
+        },
+        {
+          "family": "src-eta-weather",
+          "dataAsOf": "2026-03-29T23:57:30Z",
+          "ageS": 150,
+          "staleAfterS": 1800,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "src-alpha-roads",
+          "domain": "roads",
+          "publisher": "Nimbruß Datenwerk",
+          "text": "Synthetic data from family alpha, licence lic-alpha.",
+          "licence": "Synthetic licence alpha",
+          "licenceUrl": "https://licences.example/alpha",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://alpha.example/terms"
+        },
+        {
+          "family": "src-eta-weather",
+          "domain": "weather",
+          "publisher": "Longkein Datenwerk",
+          "text": "Synthetic data from family eta, licence lic-eta.",
+          "licence": "Synthetic licence eta",
+          "licenceUrl": "https://licences.example/eta",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://eta.example/terms"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ],
+      "page": {
+        "limit": 2,
+        "hasMore": true
+      },
+      "query": {
+        "road": "A101",
+        "direction": "both",
+        "kinds": [],
+        "minSeverity": "info"
+      }
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/motorways/A101/conditions"
+    }
+  }
+}

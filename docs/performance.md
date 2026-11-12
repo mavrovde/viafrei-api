@@ -15,11 +15,14 @@ p99 budget:
 | conditional (a 304) | 5 ms | 10 ms | 30 ms |
 | lookup | 40 ms | 120 ms | 300 ms |
 | near | 60 ms | 200 ms | 500 ms |
+| along (a motorway's conditions) | 120 ms | 400 ms | 900 ms |
 | composed | 300 ms | 800 ms | 1500 ms |
 
-NFR-PERF-003 also sets budgets for three classes no operation has yet:
-transit (80, 250, 600 ms), along (120, 400, 900 ms) and history (150, 400,
-1000 ms). Each is added to the class file with its first operation.
+NFR-PERF-003 also sets budgets for two classes no operation has yet:
+transit (80, 250, 600 ms) and history (150, 400, 1000 ms). Each is added to
+the class file with its first operation. The road reads brought along in:
+a motorway's conditions are along, the conditions near a position near, and
+one road situation a lookup.
 
 The budgets come from two files:
 
@@ -87,8 +90,17 @@ operation) and `-perf.profile` (`tiny`, `ci` or `benchmark`).
   family's terms (use classes, acceptance, register version), attribution,
   licence, publisher and notes;
 - what the answer states that the clock alone changes: each family's
-  `stale` flag, each charge point's shown state, and the sites a `free_min`
-  filter kept.
+  `stale` flag, each charge point's shown state, the sites a `free_min`
+  filter kept, and a road answer's lamp with its reason.
+
+A road conditions answer rests on more than the families it attributes: its
+lamp reads every roads and weather family the caller may use, whether or not
+one contributed. Its validator also carries, for each of those families, the
+data version and the version of its newest confirmation (the instant, the
+interval and whether its updates are paused), and a fingerprint of the
+lamp's reference rows: which families cover each state's traffic messages,
+and each junction's state. A family it read that has no data yet is recorded
+as such, so its first data ends the answer.
 
 The versions and the register fingerprint are read in one snapshot,
 **before** the operation reads its data, and the answer is tagged with
@@ -98,7 +110,9 @@ at worst it is tagged with older ones, and the next check reads it again.
 A repeated request with `If-None-Match` is answered `304 Not Modified` while
 all of these hold:
 
-- no family it read has a new version;
+- no family it read has a new version (for a road conditions answer: no
+  family its lamp read has a new data or confirmation version, and the
+  lamp's reference fingerprint is the same);
 - the register fingerprint is the same;
 - the clock has not reached the instant the answer changes by itself: a
   family turning stale (its data older than `staleAfterS`), a charge point's
@@ -107,7 +121,10 @@ all of these hold:
   report dated after the read taking effect (storage reads no report dated
   after now; the earliest such report of the points shown, or of any
   parking site within the radius whether `free_min` keeps it or not, ends
-  the answer).
+  the answer). For the road answers: a family the lamp read turning stale,
+  its confirmation lapsing (three intervals after it), a situation or a
+  weather warning in the scope starting or ending, or an ended situation
+  leaving `roads.ended_retention_h`.
 
 A 304 runs no feature read. The versions are read once per
 `cache.versions_ttl` for all requests, as the service's own read: it carries
@@ -160,7 +177,8 @@ downstream keeps it either, and an `If-None-Match` never matches it.
 
 - `Cache-Control: private, max-age=N` (or `no-store` for an answer that is
   never stored, above), where N is the smallest
-  `cache.max_age.<domain>` among the domains it answers from, and never
+  `cache.max_age.<domain>` among the domains it answers from (for a road
+  conditions answer, also those its lamp read), and never
   past the instant the answer changes by itself;
 - `Last-Modified` from the newest data instant;
 - `Vary` on the credentials, `Accept`, `Accept-Language` and `Accept-Encoding`.
@@ -175,7 +193,9 @@ When storage cannot answer a request (the answer would be `503`
 same request is sent instead, as a `200`, if it was read no longer than
 its domain's stale allowance ago: `cache.stale_if_error.<domain>`, with the
 domains of `cache.max_age` (default five minutes each). An answer read from
-several domains takes the smallest. It carries:
+several domains takes the smallest; a road conditions answer counts the
+domains of the families its lamp read, and is never served stale when one of
+those families is in `cache.no_stale_families`. It carries:
 
 - the `served_stale` warning in `meta.warnings`, whose detail says how many
   seconds ago it was read;

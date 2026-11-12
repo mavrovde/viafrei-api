@@ -24,6 +24,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/parking"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
+	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/runtime/logging"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
@@ -35,7 +36,12 @@ type fakeFeatures struct {
 	charging   features.Answer[energy.Site]
 	parking    features.Answer[parking.Site]
 	overview   features.Overview
+	conditions features.Conditions
+	situation  features.Answer[roads.Situation]
 	err        error
+	gotRoad    roads.CorridorQuery
+	gotArea    roads.AreaQuery
+	gotSitID   string
 	gotCharge  energy.Query
 	gotPark    parking.Query
 	gotOver    features.OverviewQuery
@@ -124,12 +130,12 @@ func overviewAnswer() features.Overview {
 }
 
 func everyAnswer() *fakeFeatures {
-	return &fakeFeatures{charging: chargingAnswer(), parking: parkingAnswer(), overview: overviewAnswer()}
+	return &fakeFeatures{charging: chargingAnswer(), parking: parkingAnswer(), overview: overviewAnswer(), conditions: conditionsAnswer(), situation: situationAnswer()}
 }
 
 func featureScopes() auth.Principal {
 	p := principal("commercial")
-	p.Key.Plan.Scopes = []access.Scope{"places", "energy", "parking"}
+	p.Key.Plan.Scopes = []access.Scope{"places", "energy", "parking", "roads"}
 	return p
 }
 
@@ -396,7 +402,10 @@ func TestNoPartIsAProblem(t *testing.T) {
 
 func TestFeatureRefusals(t *testing.T) {
 	req.Covers(t, "SEC-030", "SEC-033", "ERR-001")
-	targets := []string{"/v1/charging-options?at=52.52,13.405", "/v1/parking-options?at=52.52,13.405", "/v1/places/pl-01-0001/overview"}
+	targets := []string{
+		"/v1/charging-options?at=52.52,13.405", "/v1/parking-options?at=52.52,13.405", "/v1/places/pl-01-0001/overview",
+		"/v1/motorways/A8/conditions", "/v1/road-conditions?at=52.52,13.405", "/v1/road-situations/ev-1",
+	}
 	cases := []struct {
 		err    error
 		status int
@@ -536,7 +545,10 @@ func TestFeatureOperationsListTheirRefusals(t *testing.T) {
 	if err := json.Unmarshal(contractBytes(t), &d); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"/v1/charging-options", "/v1/parking-options", "/v1/places/{placeId}/overview"} {
+	for _, path := range []string{
+		"/v1/charging-options", "/v1/parking-options", "/v1/places/{placeId}/overview",
+		"/v1/motorways/{road}/conditions", "/v1/road-conditions", "/v1/road-situations/{situationId}",
+	} {
 		for _, status := range []string{"403", "404", "503"} {
 			if _, ok := d.Paths[path]["get"].Responses[status].Content["application/problem+json"]; !ok {
 				t.Errorf("%s does not list its %s problem", path, status)

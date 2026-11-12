@@ -16,6 +16,13 @@ again on every change (DX-003).
   `1`). Every publisher, licence, place and value in them is **fictional**;
   source families are named `src-alpha-…` to `src-eta-…` and every URL ends
   in `.example`. No example shows a real station, price or count.
+- Two kinds of row are planted on top of the set before the examples run,
+  and only there: charge-point reports made minutes before the examples'
+  clock, so a documented charging site shows a live point; and the road
+  lamps' sight, which the set does not carry (each junction placed in the
+  state whose boundary holds it, every such state covered by
+  `src-alpha-roads`, and every source current at the clock confirmed two
+  minutes before it).
 - `make generate` embeds them into `api/openapi.json`: as the response
   example (`examples.example`), as a `curl` code sample (`x-codeSamples`),
   as the request (`x-example-request`) and as the attribution rule

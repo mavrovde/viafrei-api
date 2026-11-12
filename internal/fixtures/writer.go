@@ -125,6 +125,19 @@ func line(pts []lonLat) string {
 	return "'SRID=4326;MULTILINESTRING((" + strings.Join(parts, ",") + "))'"
 }
 
+// lines writes a line of several parts, in their order.
+func lines(parts ...[]lonLat) string {
+	out := make([]string, len(parts))
+	for i, pts := range parts {
+		coords := make([]string, len(pts))
+		for j, p := range pts {
+			coords[j] = coord(p.lon) + " " + coord(p.lat)
+		}
+		out[i] = "(" + strings.Join(coords, ",") + ")"
+	}
+	return "'SRID=4326;MULTILINESTRING(" + strings.Join(out, ",") + ")'"
+}
+
 func array(vals ...string) string {
 	quoted := make([]string, len(vals))
 	for i, v := range vals {

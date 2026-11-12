@@ -188,6 +188,28 @@ func TestStatementTimeoutIsTheRemainingBudget(t *testing.T) {
 	}
 }
 
+// TestReadsDoNotCompile: a read never spends its deadline on JIT
+// compilation, whatever the server's default.
+func TestReadsDoNotCompile(t *testing.T) {
+	req.Covers(t, "NFR-PERF-001")
+	ctx := bounded(t)
+	st := openStore(t, ctx)
+	// reset_val is the connection's own value, the one it has outside a
+	// read: on (the server's default), or the test would hold nothing.
+	var jit, outside string
+	if err := st.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, "select current_setting('jit'), reset_val from pg_settings where name = 'jit'").Scan(&jit, &outside)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if outside != "on" {
+		t.Fatalf("jit is %q outside a read, so off inside proves nothing", outside)
+	}
+	if jit != "off" {
+		t.Fatalf("jit is %q inside a read, want off", jit)
+	}
+}
+
 func TestServerStopsTheStatementOnItsOwn(t *testing.T) {
 	req.Covers(t, "NFR-PERF-004")
 	ctx := bounded(t)

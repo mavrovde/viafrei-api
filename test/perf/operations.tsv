@@ -10,3 +10,6 @@ getKey	lookup
 listChargingOptions	near
 listParkingOptions	near
 getPlaceOverview	composed
+getMotorwayConditions	along
+listRoadConditions	near
+getRoadSituation	lookup

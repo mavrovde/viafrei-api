@@ -172,7 +172,8 @@ func (s *Store) Read(ctx context.Context, fn func(context.Context, pgx.Tx) error
 	return err
 }
 
-// ReadValue runs fn in one read-only transaction bounded by the context's
+// ReadValue runs fn in one read-only, repeatable-read transaction (one
+// snapshot for every statement of fn) bounded by the context's
 // deadline (or deadline.request when the context has none) and answers what
 // fn returned. The statement timeout is set to the remaining budget, so the
 // server stops on its own even if the client-side cancel were lost.
@@ -347,8 +348,15 @@ func transact[T any](ctx context.Context, s *Store, fn func(context.Context, pgx
 	}
 	// One round trip opens the read-only transaction and sets its statement
 	// timeout; the budget is an integer of milliseconds, never caller text.
+	// The isolation is repeatable read, so every statement of fn reads one
+	// snapshot (under read committed each statement takes its own): a page
+	// and the lamp over its scope cannot disagree. JIT compilation is off: a
+	// read answers within deadline.request, and a plan whose estimate crosses
+	// jit_above_cost (PostGIS functions are costed high, so a corridor read
+	// over a few rows does) spent over two seconds compiling for a millisecond
+	// of execution, so the read ran out of its deadline before it started.
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{
-		BeginQuery: "begin transaction read only; set local statement_timeout = " + strconv.FormatInt(budget.Milliseconds(), 10),
+		BeginQuery: "begin transaction isolation level repeatable read read only; set local jit = off; set local statement_timeout = " + strconv.FormatInt(budget.Milliseconds(), 10),
 	})
 	if err != nil {
 		return v, begun, classify(ctx, err)

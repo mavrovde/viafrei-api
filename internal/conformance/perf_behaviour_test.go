@@ -16,6 +16,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/energy"
 	"github.com/mavrovde/viafrei-api/internal/domain/parking"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
+	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
 
@@ -48,6 +49,18 @@ func (f *cachedFeatures) Parking(context.Context, access.Record, parking.Query) 
 
 func (f *cachedFeatures) Overview(context.Context, access.Record, features.OverviewQuery) (features.Overview, error) {
 	return features.Overview{}, features.ErrNoPart
+}
+
+func (f *cachedFeatures) MotorwayConditions(context.Context, access.Record, roads.CorridorQuery) (features.Conditions, error) {
+	return features.Conditions{}, nil
+}
+
+func (f *cachedFeatures) RoadConditions(context.Context, access.Record, roads.AreaQuery) (features.Conditions, error) {
+	return features.Conditions{}, nil
+}
+
+func (f *cachedFeatures) RoadSituation(context.Context, access.Record, string) (features.Answer[roads.Situation], error) {
+	return features.Answer[roads.Situation]{}, nil
 }
 
 // countedVersions answers one fixed version for every family and counts

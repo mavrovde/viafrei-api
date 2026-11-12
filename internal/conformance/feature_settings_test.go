@@ -16,6 +16,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/energy"
 	"github.com/mavrovde/viafrei-api/internal/domain/parking"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
+	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
 
@@ -57,6 +58,21 @@ func featureAsk(target string) func(t *testing.T, c *config.Config) string {
 		h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(context.Background(), http.MethodGet, target, nil))
 		return f.asked
 	}
+}
+
+func (f *askedFeatures) MotorwayConditions(_ context.Context, _ access.Record, q roads.CorridorQuery) (features.Conditions, error) {
+	f.asked = fmt.Sprintf("limit=%d", q.Limit)
+	return features.Conditions{}, roads.ErrUnknownRoad
+}
+
+func (f *askedFeatures) RoadConditions(_ context.Context, _ access.Record, q roads.AreaQuery) (features.Conditions, error) {
+	f.asked = fmt.Sprintf("radius=%d limit=%d", q.RadiusM, q.Limit)
+	return features.Conditions{}, roads.ErrUnknownRoad
+}
+
+func (f *askedFeatures) RoadSituation(_ context.Context, _ access.Record, id string) (features.Answer[roads.Situation], error) {
+	f.asked = id
+	return features.Answer[roads.Situation]{}, roads.ErrUnknownSituation
 }
 
 // tenMinutesOld answers one charging site whose one point was reported

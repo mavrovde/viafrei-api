@@ -1,6 +1,24 @@
 {
   "components": {
     "schemas": {
+      "Area": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "radiusM": {
+            "description": "The radius applied, in metres.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "at",
+          "radiusM"
+        ],
+        "type": "object"
+      },
       "Attribution": {
         "additionalProperties": false,
         "properties": {
@@ -365,6 +383,111 @@
         ],
         "type": "object"
       },
+      "Corridor": {
+        "additionalProperties": false,
+        "properties": {
+          "direction": {
+            "enum": [
+              "north",
+              "east",
+              "south",
+              "west",
+              "both"
+            ],
+            "type": "string"
+          },
+          "road": {
+            "description": "The road reference without spaces.",
+            "type": "string"
+          },
+          "roadType": {
+            "description": "Open enumeration; treat an unknown value as other.",
+            "enum": [
+              "motorway",
+              "federal",
+              "state",
+              "urban",
+              "other"
+            ],
+            "type": "string"
+          },
+          "states": {
+            "description": "The ISO 3166-2 codes of the states the road crosses.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "road",
+          "roadType",
+          "direction",
+          "states"
+        ],
+        "type": "object"
+      },
+      "DataMeta": {
+        "additionalProperties": false,
+        "properties": {
+          "asOf": {
+            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "attribution": {
+            "description": "One entry per contributing source family; clients displaying the data must show its text.",
+            "items": {
+              "$ref": "#/components/schemas/Attribution"
+            },
+            "type": "array"
+          },
+          "freshness": {
+            "description": "One entry per contributing source family.",
+            "items": {
+              "$ref": "#/components/schemas/FreshnessEntry"
+            },
+            "type": "array"
+          },
+          "generatedAt": {
+            "description": "When the service produced this body.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "language": {
+            "description": "The language of the texts in data (BCP 47).",
+            "type": "string"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/Notes"
+          },
+          "requestId": {
+            "description": "The request id, equal to the X-Request-Id header.",
+            "type": "string"
+          },
+          "warnings": {
+            "description": "Warnings about this answer; empty when there is none.",
+            "items": {
+              "$ref": "#/components/schemas/DataWarning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "asOf",
+          "freshness",
+          "attribution",
+          "notes",
+          "warnings",
+          "requestId",
+          "generatedAt",
+          "language"
+        ],
+        "type": "object"
+      },
       "DataWarning": {
         "additionalProperties": false,
         "properties": {
@@ -655,6 +778,175 @@
           "data",
           "meta",
           "links"
+        ],
+        "type": "object"
+      },
+      "MotorwayData": {
+        "additionalProperties": false,
+        "properties": {
+          "corridor": {
+            "$ref": "#/components/schemas/Corridor"
+          },
+          "lamp": {
+            "description": "The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope as its record is read (the motorway operator's event, any other traffic message, a bridge's state) and every official weather warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a closed bridge; a jam with a delay of 30 minutes or more; a weather warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a weather warning of level 1 or 2; any other message (an accident without a closure, a restricted bridge, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the weather warnings not readable with the key or their source not current, or a state in scope whose traffic messages no current roads family the key may read covers. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is current, which is no guarantee that the road is free.",
+            "enum": [
+              "green",
+              "amber",
+              "red"
+            ],
+            "type": "string"
+          },
+          "lampReason": {
+            "description": "Why the lamp has its colour: the first of its reasons, a red one before any amber one, and inside a colour in the platform's order, which is this enumeration's order; null for green. slippery is never given while the read contract holds no road-weather forecast. Open enumeration.",
+            "enum": [
+              "road_closed",
+              "ramp_closed",
+              "safety",
+              "bridge_closed",
+              "long_jam",
+              "jam",
+              "weather_warning",
+              "slippery",
+              "warning",
+              "narrowing",
+              "limited_sight",
+              null
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "situations": {
+            "description": "Ordered by position along the road (those that cannot be placed last), then severity descending, then id.",
+            "items": {
+              "$ref": "#/components/schemas/RoadSituation"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "corridor",
+          "lamp",
+          "lampReason",
+          "situations"
+        ],
+        "type": "object"
+      },
+      "MotorwayEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MotorwayData"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/MotorwayMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "MotorwayMeta": {
+        "additionalProperties": false,
+        "properties": {
+          "asOf": {
+            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "attribution": {
+            "description": "One entry per contributing source family; clients displaying the data must show its text.",
+            "items": {
+              "$ref": "#/components/schemas/Attribution"
+            },
+            "type": "array"
+          },
+          "freshness": {
+            "description": "One entry per contributing source family.",
+            "items": {
+              "$ref": "#/components/schemas/FreshnessEntry"
+            },
+            "type": "array"
+          },
+          "generatedAt": {
+            "description": "When the service produced this body.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "language": {
+            "description": "The language of the texts in data (BCP 47).",
+            "type": "string"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/Notes"
+          },
+          "page": {
+            "$ref": "#/components/schemas/Page"
+          },
+          "query": {
+            "$ref": "#/components/schemas/MotorwayQuery"
+          },
+          "requestId": {
+            "description": "The request id, equal to the X-Request-Id header.",
+            "type": "string"
+          },
+          "warnings": {
+            "description": "Warnings about this answer; empty when there is none.",
+            "items": {
+              "$ref": "#/components/schemas/DataWarning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "page",
+          "query",
+          "asOf",
+          "freshness",
+          "attribution",
+          "notes",
+          "warnings",
+          "requestId",
+          "generatedAt",
+          "language"
+        ],
+        "type": "object"
+      },
+      "MotorwayQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "direction": {
+            "type": "string"
+          },
+          "kinds": {
+            "description": "The kinds asked for; empty for every kind.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "minSeverity": {
+            "type": "string"
+          },
+          "road": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "road",
+          "direction",
+          "kinds",
+          "minSeverity"
         ],
         "type": "object"
       },
@@ -1293,6 +1585,493 @@
           "requestId",
           "generatedAt",
           "language"
+        ],
+        "type": "object"
+      },
+      "RoadConditionsData": {
+        "additionalProperties": false,
+        "properties": {
+          "area": {
+            "$ref": "#/components/schemas/Area"
+          },
+          "lamp": {
+            "description": "The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope as its record is read (the motorway operator's event, any other traffic message, a bridge's state) and every official weather warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a closed bridge; a jam with a delay of 30 minutes or more; a weather warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a weather warning of level 1 or 2; any other message (an accident without a closure, a restricted bridge, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the weather warnings not readable with the key or their source not current, or a state in scope whose traffic messages no current roads family the key may read covers. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is current, which is no guarantee that the road is free.",
+            "enum": [
+              "green",
+              "amber",
+              "red"
+            ],
+            "type": "string"
+          },
+          "lampReason": {
+            "description": "Why the lamp has its colour: the first of its reasons, a red one before any amber one, and inside a colour in the platform's order, which is this enumeration's order; null for green. slippery is never given while the read contract holds no road-weather forecast. Open enumeration.",
+            "enum": [
+              "road_closed",
+              "ramp_closed",
+              "safety",
+              "bridge_closed",
+              "long_jam",
+              "jam",
+              "weather_warning",
+              "slippery",
+              "warning",
+              "narrowing",
+              "limited_sight",
+              null
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "situations": {
+            "description": "Ordered by severity descending, then distance, then id.",
+            "items": {
+              "$ref": "#/components/schemas/RoadSituation"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "area",
+          "lamp",
+          "lampReason",
+          "situations"
+        ],
+        "type": "object"
+      },
+      "RoadConditionsEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RoadConditionsData"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/RoadConditionsMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "RoadConditionsMeta": {
+        "additionalProperties": false,
+        "properties": {
+          "asOf": {
+            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "attribution": {
+            "description": "One entry per contributing source family; clients displaying the data must show its text.",
+            "items": {
+              "$ref": "#/components/schemas/Attribution"
+            },
+            "type": "array"
+          },
+          "freshness": {
+            "description": "One entry per contributing source family.",
+            "items": {
+              "$ref": "#/components/schemas/FreshnessEntry"
+            },
+            "type": "array"
+          },
+          "generatedAt": {
+            "description": "When the service produced this body.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "language": {
+            "description": "The language of the texts in data (BCP 47).",
+            "type": "string"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/Notes"
+          },
+          "page": {
+            "$ref": "#/components/schemas/Page"
+          },
+          "query": {
+            "$ref": "#/components/schemas/RoadConditionsQuery"
+          },
+          "requestId": {
+            "description": "The request id, equal to the X-Request-Id header.",
+            "type": "string"
+          },
+          "warnings": {
+            "description": "Warnings about this answer; empty when there is none.",
+            "items": {
+              "$ref": "#/components/schemas/DataWarning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "page",
+          "query",
+          "asOf",
+          "freshness",
+          "attribution",
+          "notes",
+          "warnings",
+          "requestId",
+          "generatedAt",
+          "language"
+        ],
+        "type": "object"
+      },
+      "RoadConditionsQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "kinds": {
+            "description": "The kinds asked for; empty for every kind.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "minSeverity": {
+            "type": "string"
+          },
+          "radiusM": {
+            "description": "The radius applied, in metres.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "roadClasses": {
+            "description": "The road classes asked for; empty for every class.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "roadClasses",
+          "at",
+          "radiusM",
+          "kinds",
+          "minSeverity"
+        ],
+        "type": "object"
+      },
+      "RoadSituation": {
+        "additionalProperties": false,
+        "properties": {
+          "delayMin": {
+            "description": "The published delay in minutes; null when not published.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "description": {
+            "description": "Plain text, in textLanguage; null when not published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "direction": {
+            "description": "The affected carriageway.",
+            "enum": [
+              "north",
+              "east",
+              "south",
+              "west",
+              "both",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "directionText": {
+            "description": "The signed destination of the carriageway, as published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "distanceM": {
+            "description": "Distance from the asked position in metres. Present on the conditions near a position.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "headline": {
+            "description": "Plain text, in textLanguage.",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "description": "What it is. Open enumeration; treat an unknown value as other.",
+            "enum": [
+              "closure",
+              "roadworks",
+              "jam",
+              "accident",
+              "hazard",
+              "restriction",
+              "weather",
+              "other"
+            ],
+            "type": "string"
+          },
+          "lanes": {
+            "additionalProperties": false,
+            "description": "Closed and total lanes; null when neither is published.",
+            "properties": {
+              "closed": {
+                "description": "Lanes closed; null when not published.",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "total": {
+                "description": "Lanes in total; null when not published.",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "closed",
+              "total"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "lengthM": {
+            "description": "The published length in metres; null when not published.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "location": {
+            "additionalProperties": false,
+            "description": "Where it is; null when not published.",
+            "properties": {
+              "lat": {
+                "description": "Latitude in decimal degrees.",
+                "format": "double",
+                "maximum": 90,
+                "minimum": -90,
+                "type": "number"
+              },
+              "lon": {
+                "description": "Longitude in decimal degrees.",
+                "format": "double",
+                "maximum": 180,
+                "minimum": -180,
+                "type": "number"
+              }
+            },
+            "required": [
+              "lat",
+              "lon"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "position": {
+            "additionalProperties": false,
+            "description": "Chainage along the road; null when the situation cannot be placed on its road, and on answers that are not about one road.",
+            "properties": {
+              "fromKm": {
+                "description": "Kilometre of the situation along the road, one decimal. A projection of its location onto the road's line, measured over the road's parts in their order and scaled to the road's published length; not a signed chainage.",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "junctionFrom": {
+                "description": "The junction before the situation; null while the service does not name junctions.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "junctionTo": {
+                "description": "The junction after the situation; null while the service does not name junctions.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "toKm": {
+                "description": "Kilometre where the situation ends; null while the service holds no extent along the road.",
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "fromKm",
+              "toKm",
+              "junctionFrom",
+              "junctionTo"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "road": {
+            "description": "The road reference without spaces (A8); null when the situation is on no numbered road.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "roadType": {
+            "description": "The class of the road. Open enumeration; treat an unknown value as other.",
+            "enum": [
+              "motorway",
+              "federal",
+              "state",
+              "urban",
+              "other"
+            ],
+            "type": "string"
+          },
+          "severity": {
+            "description": "Effect on traffic, ordered info \u003c minor \u003c lane_closed \u003c major \u003c road_closed; other when it cannot be graded. Open enumeration.",
+            "enum": [
+              "info",
+              "minor",
+              "lane_closed",
+              "major",
+              "road_closed",
+              "other"
+            ],
+            "type": "string"
+          },
+          "sourceFamily": {
+            "description": "The source family of the item; its attribution is in meta.attribution.",
+            "type": "string"
+          },
+          "textLanguage": {
+            "description": "The language of headline and description (BCP 47).",
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "When the situation last changed.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAtLocal": {
+            "description": "updatedAt in Europe/Berlin time.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "validity": {
+            "$ref": "#/components/schemas/TimeWindow"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "severity",
+          "road",
+          "roadType",
+          "direction",
+          "directionText",
+          "location",
+          "validity",
+          "lanes",
+          "delayMin",
+          "lengthM",
+          "headline",
+          "description",
+          "textLanguage",
+          "updatedAt",
+          "updatedAtLocal",
+          "position",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
+      "SituationEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RoadSituation"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DataMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "TimeWindow": {
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "description": "Start of the validity.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "fromLocal": {
+            "description": "from in Europe/Berlin time.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "until": {
+            "description": "End of the validity; null when open-ended.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "untilLocal": {
+            "description": "until in Europe/Berlin time; null when until is.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "from",
+          "fromLocal",
+          "until",
+          "untilLocal"
         ],
         "type": "object"
       },
@@ -2150,7 +2929,7 @@
                       "data": {
                         "apiVersion": "1.0.0-example",
                         "buildSha": "0123456789ab",
-                        "contractVersion": "0.1",
+                        "contractVersion": "0.2",
                         "platformVersion": null,
                         "openapi": "https://api.viafrei.de/v1/openapi.json",
                         "languages": [
@@ -2206,6 +2985,526 @@
           }
         ],
         "x-example-request": "/v1/meta"
+      }
+    },
+    "/v1/motorways/{road}/conditions": {
+      "get": {
+        "description": "The active situations on one road, ordered by their position along it, with the lamp over every situation on the road in the asked direction and every official weather warning in force in an area the road crosses. MCP counterpart: road status. Needs the scope roads; the weather warnings are read with the scope weather, and without it the lamp says its sight is limited.",
+        "operationId": "getMotorwayConditions",
+        "parameters": [
+          {
+            "description": "The road reference, case-insensitive, with an optional space (A8, a 8).",
+            "in": "path",
+            "name": "road",
+            "required": true,
+            "schema": {
+              "description": "The road reference, case-insensitive, with an optional space (A8, a 8).",
+              "examples": [
+                "A8"
+              ],
+              "maxLength": 6,
+              "pattern": "^[AaBb] ?[0-9]{1,4}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The carriageway; both keeps every situation. A direction keeps that carriageway's situations, those on both and those whose direction is unknown.",
+            "explode": false,
+            "in": "query",
+            "name": "direction",
+            "schema": {
+              "default": "both",
+              "description": "The carriageway; both keeps every situation. A direction keeps that carriageway's situations, those on both and those whose direction is unknown.",
+              "enum": [
+                "north",
+                "east",
+                "south",
+                "west",
+                "both"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only these kinds, comma-separated; other keeps the kinds that cannot be mapped. Default: every kind.",
+            "explode": false,
+            "in": "query",
+            "name": "kinds",
+            "schema": {
+              "description": "Only these kinds, comma-separated; other keeps the kinds that cannot be mapped. Default: every kind.",
+              "items": {
+                "enum": [
+                  "closure",
+                  "roadworks",
+                  "jam",
+                  "accident",
+                  "hazard",
+                  "restriction",
+                  "weather",
+                  "other"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          {
+            "description": "Only situations at or above this severity; info also keeps those that cannot be graded.",
+            "explode": false,
+            "in": "query",
+            "name": "min_severity",
+            "schema": {
+              "default": "info",
+              "description": "Only situations at or above this severity; info also keeps those that cannot be graded.",
+              "enum": [
+                "info",
+                "minor",
+                "lane_closed",
+                "major",
+                "road_closed"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Most situations to return. Default: pagination.default_limit.",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "description": "Most situations to return. Default: pagination.default_limit.",
+              "format": "int64",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The situations on a motorway, two to a page, with its lamp",
+                    "value": {
+                      "data": {
+                        "corridor": {
+                          "road": "A101",
+                          "roadType": "motorway",
+                          "direction": "both",
+                          "states": [
+                            "05",
+                            "06",
+                            "07",
+                            "08",
+                            "10",
+                            "11",
+                            "12",
+                            "15",
+                            "16"
+                          ]
+                        },
+                        "lamp": "red",
+                        "lampReason": "road_closed",
+                        "situations": [
+                          {
+                            "id": "ev-00028",
+                            "kind": "weather",
+                            "severity": "info",
+                            "road": "A101",
+                            "roadType": "motorway",
+                            "direction": "south",
+                            "directionText": "Sackbeiheim",
+                            "location": {
+                              "lat": 50.000247,
+                              "lon": 13.554106
+                            },
+                            "validity": {
+                              "from": "2026-03-29T22:00:00Z",
+                              "fromLocal": "2026-03-30T00:00:00+02:00",
+                              "until": "2026-03-31T18:00:00Z",
+                              "untilLocal": "2026-03-31T20:00:00+02:00"
+                            },
+                            "lanes": null,
+                            "delayMin": null,
+                            "lengthM": 4959,
+                            "headline": "Weather bei Gieckpückau",
+                            "description": null,
+                            "textLanguage": "de",
+                            "updatedAt": "2026-03-29T22:01:00Z",
+                            "updatedAtLocal": "2026-03-30T00:01:00+02:00",
+                            "position": {
+                              "fromKm": 539.7,
+                              "toKm": null,
+                              "junctionFrom": null,
+                              "junctionTo": null
+                            },
+                            "sourceFamily": "src-alpha-roads"
+                          },
+                          {
+                            "id": "ev-00020",
+                            "kind": "roadworks",
+                            "severity": "lane_closed",
+                            "road": "A101",
+                            "roadType": "motorway",
+                            "direction": "unknown",
+                            "directionText": "Dirkäningen",
+                            "location": {
+                              "lat": 50.094131,
+                              "lon": 12.752644
+                            },
+                            "validity": {
+                              "from": "2026-03-29T00:59:59Z",
+                              "fromLocal": "2026-03-29T01:59:59+01:00",
+                              "until": "2026-03-31T02:59:59Z",
+                              "untilLocal": "2026-03-31T04:59:59+02:00"
+                            },
+                            "lanes": {
+                              "closed": 1,
+                              "total": 2
+                            },
+                            "delayMin": null,
+                            "lengthM": 7554,
+                            "headline": "Roadworks bei Zautbrierwerder",
+                            "description": null,
+                            "textLanguage": "de",
+                            "updatedAt": "2026-03-29T01:00:59Z",
+                            "updatedAtLocal": "2026-03-29T03:00:59+02:00",
+                            "position": {
+                              "fromKm": 619.1,
+                              "toKm": null,
+                              "junctionFrom": null,
+                              "junctionTo": null
+                            },
+                            "sourceFamily": "src-alpha-roads"
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:57:30Z",
+                        "freshness": [
+                          {
+                            "family": "src-alpha-roads",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          },
+                          {
+                            "family": "src-eta-weather",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 1800,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "src-alpha-roads",
+                            "domain": "roads",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          },
+                          {
+                            "family": "src-eta-weather",
+                            "domain": "weather",
+                            "publisher": "Longkein Datenwerk",
+                            "text": "Synthetic data from family eta, licence lic-eta.",
+                            "licence": "Synthetic licence eta",
+                            "licenceUrl": "https://licences.example/eta",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://eta.example/terms"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 2,
+                          "hasMore": true
+                        },
+                        "query": {
+                          "road": "A101",
+                          "direction": "both",
+                          "kinds": [],
+                          "minSeverity": "info"
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/motorways/A101/conditions"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/MotorwayEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No road with this reference (not-found), or the operation is switched off on this instance (feature-disabled).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "What is happening on a motorway",
+        "tags": [
+          "roads"
+        ],
+        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/motorways/A101/conditions?limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/motorways/A101/conditions?limit=2",
+        "x-required-scope": "roads"
       }
     },
     "/v1/parking-options": {
@@ -3112,6 +4411,828 @@
         "x-example-request": "/v1/places/pl-01-0003/overview?needs=charging,parking\u0026radius_m=20000\u0026per_part_limit=2",
         "x-required-scope": "places"
       }
+    },
+    "/v1/road-conditions": {
+      "get": {
+        "description": "The active situations within the radius of a position on every road class held, by severity descending, then distance, then id, with the lamp over every situation within the radius and every official weather warning in force in an area within it. MCP counterpart: road status (area form). Needs the scope roads; the weather warnings are read with the scope weather, and without it the lamp says its sight is limited.",
+        "operationId": "listRoadConditions",
+        "parameters": [
+          {
+            "description": "The position to search around: lat,lon in decimal degrees (WGS 84).",
+            "explode": false,
+            "in": "query",
+            "name": "at",
+            "required": true,
+            "schema": {
+              "description": "The position to search around: lat,lon in decimal degrees (WGS 84).",
+              "examples": [
+                "52.52,13.405"
+              ],
+              "pattern": "^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Search radius in metres. Default: geo.default_radius_m.",
+            "explode": false,
+            "in": "query",
+            "name": "radius_m",
+            "schema": {
+              "description": "Search radius in metres. Default: geo.default_radius_m.",
+              "format": "int64",
+              "maximum": 50000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Most items to return. Default: pagination.default_limit.",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "description": "Most items to return. Default: pagination.default_limit.",
+              "format": "int64",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Only these kinds, comma-separated; other keeps the kinds that cannot be mapped. Default: every kind.",
+            "explode": false,
+            "in": "query",
+            "name": "kinds",
+            "schema": {
+              "description": "Only these kinds, comma-separated; other keeps the kinds that cannot be mapped. Default: every kind.",
+              "items": {
+                "enum": [
+                  "closure",
+                  "roadworks",
+                  "jam",
+                  "accident",
+                  "hazard",
+                  "restriction",
+                  "weather",
+                  "other"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          {
+            "description": "Only situations at or above this severity; info also keeps those that cannot be graded.",
+            "explode": false,
+            "in": "query",
+            "name": "min_severity",
+            "schema": {
+              "default": "info",
+              "description": "Only situations at or above this severity; info also keeps those that cannot be graded.",
+              "enum": [
+                "info",
+                "minor",
+                "lane_closed",
+                "major",
+                "road_closed"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only situations on roads of these classes, comma-separated; other keeps the classes that cannot be mapped. Default: every class held.",
+            "explode": false,
+            "in": "query",
+            "name": "road_class",
+            "schema": {
+              "description": "Only situations on roads of these classes, comma-separated; other keeps the classes that cannot be mapped. Default: every class held.",
+              "items": {
+                "enum": [
+                  "motorway",
+                  "federal",
+                  "state",
+                  "urban",
+                  "other"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The situations within 50 km, two to a page, with their lamp",
+                    "value": {
+                      "data": {
+                        "area": {
+                          "at": {
+                            "lat": 50.39,
+                            "lon": 10.23
+                          },
+                          "radiusM": 50000
+                        },
+                        "lamp": "amber",
+                        "lampReason": "warning",
+                        "situations": [
+                          {
+                            "id": "ev-00009",
+                            "kind": "other",
+                            "severity": "lane_closed",
+                            "road": "A103",
+                            "roadType": "motorway",
+                            "direction": "unknown",
+                            "directionText": "Giellönfeld",
+                            "location": {
+                              "lat": 50.43293,
+                              "lon": 9.661006
+                            },
+                            "validity": {
+                              "from": "2026-03-28T16:33:33Z",
+                              "fromLocal": "2026-03-28T17:33:33+01:00",
+                              "until": null,
+                              "untilLocal": null
+                            },
+                            "lanes": null,
+                            "delayMin": null,
+                            "lengthM": 9932,
+                            "headline": "Other bei Klespelau",
+                            "description": null,
+                            "textLanguage": "de",
+                            "updatedAt": "2026-03-28T16:34:33Z",
+                            "updatedAtLocal": "2026-03-28T17:34:33+01:00",
+                            "position": null,
+                            "distanceM": 40726,
+                            "sourceFamily": "src-alpha-roads"
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:57:30Z",
+                        "freshness": [
+                          {
+                            "family": "src-alpha-roads",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "src-alpha-roads",
+                            "domain": "roads",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 2,
+                          "hasMore": false
+                        },
+                        "query": {
+                          "at": {
+                            "lat": 50.39,
+                            "lon": 10.23
+                          },
+                          "radiusM": 50000,
+                          "kinds": [],
+                          "minSeverity": "info",
+                          "roadClasses": []
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/road-conditions"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/RoadConditionsEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The operation is switched off on this instance (feature-disabled).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "What is happening on the roads near a position",
+        "tags": [
+          "roads"
+        ],
+        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/road-conditions?at=50.39,10.23\u0026radius_m=50000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/road-conditions?at=50.39,10.23\u0026radius_m=50000\u0026limit=2",
+        "x-required-scope": "roads"
+      }
+    },
+    "/v1/road-situations/{situationId}": {
+      "get": {
+        "description": "One situation by its id, active or ended. A situation that was withdrawn, or that belongs to a source family the key may not read, is not found. Needs the scope roads.",
+        "operationId": "getRoadSituation",
+        "parameters": [
+          {
+            "description": "The situation's id.",
+            "in": "path",
+            "name": "situationId",
+            "required": true,
+            "schema": {
+              "description": "The situation's id.",
+              "examples": [
+                "ev-00001"
+              ],
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.-]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "One road situation",
+                    "value": {
+                      "data": {
+                        "id": "ev-00028",
+                        "kind": "weather",
+                        "severity": "info",
+                        "road": "A101",
+                        "roadType": "motorway",
+                        "direction": "south",
+                        "directionText": "Sackbeiheim",
+                        "location": {
+                          "lat": 50.000247,
+                          "lon": 13.554106
+                        },
+                        "validity": {
+                          "from": "2026-03-29T22:00:00Z",
+                          "fromLocal": "2026-03-30T00:00:00+02:00",
+                          "until": "2026-03-31T18:00:00Z",
+                          "untilLocal": "2026-03-31T20:00:00+02:00"
+                        },
+                        "lanes": null,
+                        "delayMin": null,
+                        "lengthM": 4959,
+                        "headline": "Weather bei Gieckpückau",
+                        "description": null,
+                        "textLanguage": "de",
+                        "updatedAt": "2026-03-29T22:01:00Z",
+                        "updatedAtLocal": "2026-03-30T00:01:00+02:00",
+                        "position": null,
+                        "sourceFamily": "src-alpha-roads"
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:57:30Z",
+                        "freshness": [
+                          {
+                            "family": "src-alpha-roads",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "src-alpha-roads",
+                            "domain": "roads",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": []
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/road-situations/ev-00028"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/SituationEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No situation with this id (not-found), or the operation is switched off on this instance (feature-disabled).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "One road situation",
+        "tags": [
+          "roads"
+        ],
+        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/road-situations/ev-00028\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/road-situations/ev-00028",
+        "x-required-scope": "roads"
+      }
     }
   },
   "servers": [
@@ -3139,6 +5260,10 @@
     {
       "description": "Places, and what is around them.",
       "name": "places"
+    },
+    {
+      "description": "What is happening on the roads.",
+      "name": "roads"
     }
   ]
 }

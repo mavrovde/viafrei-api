@@ -41,6 +41,7 @@ type Config struct {
 	Pagination Pagination `koanf:"pagination"`
 	Charging   Charging   `koanf:"charging"`
 	Compose    Compose    `koanf:"compose"`
+	Roads      Roads      `koanf:"roads"`
 	RateLimit  RateLimit  `koanf:"ratelimit"`
 	Quota      Quota      `koanf:"quota"`
 	Tiers      Tiers      `koanf:"tiers"`
@@ -179,6 +180,11 @@ type Geo struct {
 // Pagination holds the settings of list answers.
 type Pagination struct {
 	DefaultLimit int `koanf:"default_limit" default:"20" validate:"min=1,max=100" desc:"Items a list answer returns when the request names no limit (ENV-021). At most the limit maximum of the interface, 100."`
+}
+
+// Roads holds the settings of the road-conditions answers.
+type Roads struct {
+	EndedRetentionH int `koanf:"ended_retention_h" default:"24" validate:"min=1,max=168" desc:"Hours an ended road situation still answers 200 on its own operation, with validity.until in the past; after that it answers 404 not-found (Spec: Endpoints, Roads, section 6)."`
 }
 
 // Charging holds the settings of charging answers.

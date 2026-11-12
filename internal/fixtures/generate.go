@@ -99,9 +99,16 @@ type gen struct {
 // It fails closed: an unknown profile, an empty table, a family without rows
 // or any coverage gap is an error, never an empty success.
 func Generate(out io.Writer, profile string, seed uint64, contractVersion string) (*Manifest, error) {
+	_, m, err := generate(out, profile, seed, contractVersion)
+	return m, err
+}
+
+// generate writes the seed rows and returns the generator's state with the
+// manifest, so Planted can place its rows on the generated world.
+func generate(out io.Writer, profile string, seed uint64, contractVersion string) (*gen, *Manifest, error) {
 	i := slices.IndexFunc(profiles, func(p Profile) bool { return p.Name == profile })
 	if i < 0 {
-		return nil, fmt.Errorf("fixtures: unknown profile %q (known: %s)", profile, strings.Join(Profiles(), ", "))
+		return nil, nil, fmt.Errorf("fixtures: unknown profile %q (known: %s)", profile, strings.Join(Profiles(), ", "))
 	}
 	r := rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15)) // #nosec G404 -- reproducible test data, not security
 	g := &gen{
@@ -124,7 +131,7 @@ func Generate(out io.Writer, profile string, seed uint64, contractVersion string
 	g.w.end()
 	sum, err := g.w.close()
 	if err != nil {
-		return nil, fmt.Errorf("fixtures: write: %w", err)
+		return nil, nil, fmt.Errorf("fixtures: write: %w", err)
 	}
 	m := &Manifest{
 		GeneratorVersion: GeneratorVersion, Seed: seed, Profile: profile, ContractVersion: contractVersion,
@@ -142,9 +149,9 @@ func Generate(out io.Writer, profile string, seed uint64, contractVersion string
 		m.LicenceClasses[f.Name] = f.Category
 	}
 	if gaps := m.Check(); len(gaps) > 0 {
-		return m, errors.New("fixtures: coverage gaps: " + strings.Join(gaps, "; "))
+		return g, m, errors.New("fixtures: coverage gaps: " + strings.Join(gaps, "; "))
 	}
-	return m, nil
+	return g, m, nil
 }
 
 func (g *gen) day(d int) time.Time { return ReferenceInstant.AddDate(0, 0, d) }
@@ -407,6 +414,11 @@ var (
 	directions = []string{"north", "east", "south", "west", "both", "unknown"}
 )
 
+// eventColumns are the columns of a traffic event row.
+var eventColumns = []string{"event_id", "event_kind", "severity", "road_ref", "road_class", "direction", "direction_label",
+	"location", "valid_from", "valid_to", "lanes_closed", "lanes_total", "delay_min", "affected_length_m",
+	"headline", "description", "text_lang", "source_ref", "origin_key", "published_at", "recorded_at", "changed_at", "withdrawn_at"}
+
 func (g *gen) roadsAndEvents() {
 	n := 6 + g.p.Scale/4
 	g.w.begin("road", "road_ref", "road_class", "name", "length_km", "geometry", "states")
@@ -459,9 +471,7 @@ func (g *gen) roadsAndEvents() {
 		at       time.Time
 	}
 	var events []event
-	g.w.begin("traffic_event", "event_id", "event_kind", "severity", "road_ref", "road_class", "direction", "direction_label",
-		"location", "valid_from", "valid_to", "lanes_closed", "lanes_total", "delay_min", "affected_length_m",
-		"headline", "description", "text_lang", "source_ref", "origin_key", "published_at", "recorded_at", "changed_at", "withdrawn_at")
+	g.w.begin("traffic_event", eventColumns...)
 	emit := func(rd road, kind string, from time.Time, edge string) {
 		id := fmt.Sprintf("ev-%05d", len(events))
 		at := rd.along(g.r.Float64())

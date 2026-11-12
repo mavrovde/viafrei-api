@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -31,17 +32,24 @@ type fakeVersions struct {
 	mu       sync.Mutex
 	vs       map[string]string
 	register string
-	err      error
+	// confirmed are the confirmation versions, lampRef the lamp's reference
+	// fingerprint.
+	confirmed map[string]string
+	lampRef   string
+	err       error
 }
 
 func (f *fakeVersions) FreshnessVersions(context.Context) (provenance.Versions, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	vs := map[string]string{}
-	for k, v := range f.vs {
-		vs[k] = v
-	}
-	return provenance.Versions{Families: vs, Register: f.register}, f.err
+	return provenance.Versions{Families: maps.Clone(f.vs), Register: f.register, Confirmations: maps.Clone(f.confirmed), LampReference: f.lampRef}, f.err
+}
+
+// change runs fn on the versions under their lock.
+func (f *fakeVersions) change(fn func(*fakeVersions)) {
+	f.mu.Lock()
+	fn(f)
+	f.mu.Unlock()
 }
 
 func (f *fakeVersions) set(v string) {

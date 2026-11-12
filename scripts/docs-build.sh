@@ -160,8 +160,8 @@ perl -0pi -e 's{<script src="https://cdn\.redocly\.com/redoc/v[0-9.]+/bundles/re
 title=$(jq -r '.info.title' api/openapi.json)
 grep -qF "$title" "$out/reference.html" || { echo "FAIL: reference.html does not carry the document title '$title'" >&2; exit 1; }
 # WCAG 2.2 AA repairs Redoc's theme cannot make (scripts/docs-a11y.sh;
-# scripts/a11y-tools/layout-runner.js checks the last two in the rendered
-# page):
+# scripts/a11y-tools/layout-runner.js checks the landmark and tree-line
+# repairs in the rendered page):
 # - its JSON expand buttons are 15 px, under the 24 px target size;
 # - its code samples scroll without being reachable by keyboard;
 # - its page sits in no landmark (axe: region, landmark-one-main): the
@@ -175,6 +175,12 @@ grep -qF "$title" "$out/reference.html" || { echo "FAIL: reference.html does not
 #   Redoc's own geometry) is a ::before border whose colour is inherited
 #   from the cell's own border-left-color, Redoc's theme line colour (and
 #   transparent where Redoc hides the line), so no colour is copied here.
+# - an operation's first sub-heading (an h5, "Authorizations" or a parameter
+#   list) follows its h2, a jump of three levels (axe: heading-order). Each
+#   visible heading of the content column is given the level it has in the
+#   outline: at most one below the heading before it (aria-level, which
+#   assistive technology and axe read in place of the tag's), and its own
+#   level when that already holds.
 for c in menu-content api-content; do
   [[ $(grep -o "class=\"[^\"]* $c\"" "$out/reference.html" | wc -l | tr -d ' ') == 1 ]] ||
     { echo "FAIL: reference.html does not carry exactly one Redoc .$c to mark as a landmark; the bundle changed" >&2; exit 1; }
@@ -183,7 +189,7 @@ perl -0pi -e '
   s{(class="[^"]* menu-content")}{$1 role="navigation" aria-label="Reference contents"};
   s{(class="[^"]* api-content")}{$1 role="main"};
   s{</head>}{<style>.redoc-json .collapser{display:none!important}td[kind=field]{background-image:none!important}tr:first-of-type>td[kind=field]::before,tr.last>td[kind=field]::before{content:"";position:absolute;left:0;border-left:1px solid;border-left-color:inherit}tr:first-of-type>td[kind=field]::before{top:22px;bottom:0}tr.last>td[kind=field]::before{top:0;bottom:auto;height:22px}</style></head>};
-  s{</body>}{<script>(function(){function f(){document.querySelectorAll("pre:not([tabindex])").forEach(function(p){p.setAttribute("tabindex","0")});document.querySelectorAll(".menu-content:not([role])").forEach(function(m){m.setAttribute("role","navigation");m.setAttribute("aria-label","Reference contents")});document.querySelectorAll(".api-content:not([role])").forEach(function(m){m.setAttribute("role","main")})}document.addEventListener("DOMContentLoaded",f);new MutationObserver(f).observe(document.documentElement,{childList:true,subtree:true})})();</script></body>};
+  s{</body>}{<script>(function(){function f(){document.querySelectorAll("pre:not([tabindex])").forEach(function(p){p.setAttribute("tabindex","0")});document.querySelectorAll(".menu-content:not([role])").forEach(function(m){m.setAttribute("role","navigation");m.setAttribute("aria-label","Reference contents")});document.querySelectorAll(".api-content:not([role])").forEach(function(m){m.setAttribute("role","main")});document.querySelectorAll(".api-content").forEach(function(a){var prev=0;a.querySelectorAll("h1,h2,h3,h4,h5,h6").forEach(function(h){if(!h.getClientRects().length)return;var own=+h.tagName.charAt(1),lvl=Math.min(own,prev+1);if(lvl!==own){if(h.getAttribute("aria-level")!==String(lvl))h.setAttribute("aria-level",String(lvl))}else if(h.hasAttribute("aria-level")){h.removeAttribute("aria-level")}prev=lvl})})}document.addEventListener("DOMContentLoaded",f);new MutationObserver(f).observe(document.documentElement,{childList:true,subtree:true})})();</script></body>};
 ' "$out/reference.html"
 touch "$out/.nojekyll"
 

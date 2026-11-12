@@ -379,32 +379,39 @@ func TestEveryOperationMeetsItsBudget(t *testing.T) {
 	budgets := loadBudgets(t, r.cfg.Deadline.Request)
 	h := r.handler(t, false)
 	var findings []string
+	// One subtest per operation: each is its own leaf under the per-test
+	// bound (TST-012), so the catalogue can grow without one test carrying
+	// every operation's samples.
 	for _, op := range httpapi.OperationIDs() {
-		targets := r.targetsOf(op)
-		if len(targets) == 0 {
-			t.Errorf("%s has no benchmark request; add one to targetsOf", op)
-			continue
+		t.Run(op, func(t *testing.T) {
+			targets := r.targetsOf(op)
+			if len(targets) == 0 {
+				t.Errorf("%s has no benchmark request; add one to targetsOf", op)
+				return
+			}
+			class, _ := budgets.Of(op)
+			timed(t, h, targets, warmup, http.StatusOK, noValidator)
+			res := perf.Measure(op, timed(t, h, targets, *samples, http.StatusOK, noValidator))
+			t.Logf("%s  budget %s p95=%s p99=%s", res, class.Name, class.P95, class.P99)
+			findings = append(findings, res.Check(class)...)
+		})
+	}
+	t.Run("conditional", func(t *testing.T) {
+		cached := r.handler(t, true)
+		targets := r.targetsOf("listChargingOptions")
+		etags := map[string]string{}
+		for _, target := range targets {
+			code, etag, _ := call(cached, target, "")
+			if code != http.StatusOK || etag == "" {
+				t.Fatalf("%s: %d without an ETag", target, code)
+			}
+			etags[target] = etag
 		}
-		class, _ := budgets.Of(op)
-		timed(t, h, targets, warmup, http.StatusOK, noValidator)
-		res := perf.Measure(op, timed(t, h, targets, *samples, http.StatusOK, noValidator))
+		res := perf.Measure("304 (listChargingOptions)", timed(t, cached, targets, *samples, http.StatusNotModified, func(s string) string { return etags[s] }))
+		class := budgets.Classes[perf.Conditional]
 		t.Logf("%s  budget %s p95=%s p99=%s", res, class.Name, class.P95, class.P99)
 		findings = append(findings, res.Check(class)...)
-	}
-	cached := r.handler(t, true)
-	targets := r.targetsOf("listChargingOptions")
-	etags := map[string]string{}
-	for _, target := range targets {
-		code, etag, _ := call(cached, target, "")
-		if code != http.StatusOK || etag == "" {
-			t.Fatalf("%s: %d without an ETag", target, code)
-		}
-		etags[target] = etag
-	}
-	res := perf.Measure("304 (listChargingOptions)", timed(t, cached, targets, *samples, http.StatusNotModified, func(s string) string { return etags[s] }))
-	class := budgets.Classes[perf.Conditional]
-	t.Logf("%s  budget %s p95=%s p99=%s", res, class.Name, class.P95, class.P99)
-	findings = append(findings, res.Check(class)...)
+	})
 	if *assert {
 		for _, f := range findings {
 			t.Error(f)

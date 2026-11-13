@@ -40,8 +40,10 @@ type Family struct {
 	Source access.Source
 	// StaleAfter is the family's design threshold: older data is stale.
 	StaleAfter time.Duration
-	// DataAsOf is the instant the family's data is current to; nil when
-	// the family has published none.
+	// DataAsOf is the instant up to which the family's data was last known
+	// current. It advances when the data is confirmed unchanged, so it is not
+	// the instant of the last change in the data. Nil when the family's data
+	// has never been known current.
 	DataAsOf *time.Time
 	// Version changes whenever the family's data changes; empty when the
 	// family has published none. An answer's ETag is built from it.
@@ -133,4 +135,8 @@ type Versions struct {
 	// judges its sight by: which families cover each state's traffic
 	// messages, and the state of each junction.
 	LampReference string
+	// RulesReference is a fingerprint of the curated rule rows (every topic
+	// and every rule): a rules answer rests on them, and they carry no
+	// freshness version of their own.
+	RulesReference string
 }

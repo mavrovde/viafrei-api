@@ -13,3 +13,5 @@ getPlaceOverview	composed
 getMotorwayConditions	along
 listRoadConditions	near
 getRoadSituation	lookup
+getWeatherRisk	near
+getDrivingRules	lookup

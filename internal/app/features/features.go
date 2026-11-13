@@ -59,6 +59,8 @@ type Repositories struct {
 	Parking  Parking
 	Places   Places
 	Roads    Roads
+	Weather  Weather
+	Rules    Rules
 }
 
 // Settings are the tunables of the use cases.
@@ -69,6 +71,8 @@ type Settings struct {
 	PartDeadline time.Duration
 	// EndedRetention is how long an ended road situation still answers.
 	EndedRetention time.Duration
+	// MaxWarnings is the most warnings a weather answer lists.
+	MaxWarnings int
 	// Disabled are the families the licence gate always denies.
 	Disabled []string
 	// IsTimeout reports whether a repository error means the time ran out.
@@ -145,6 +149,35 @@ func (s *Service) provenanceOf(ctx context.Context, contributed, consulted []str
 	fams = slices.Clone(fams)
 	slices.Sort(fams)
 	return s.repos.Register.Provenance(ctx, slices.Compact(fams), s.set.Language)
+}
+
+// sight reads every permitted family's provenance once: for a lamp, whether
+// one is missing (no provenance row) or stale, which limits the sight, and
+// the earliest instant after now at which one that is fresh turns stale (nil
+// when none is fresh); for the attribution, those that contributed, or all of
+// them when none did. The gate's post-check keeps contributed inside
+// permitted.
+func (s *Service) sight(ctx context.Context, permitted, contributed []string, now time.Time) ([]provenance.Family, bool, *time.Time, error) {
+	consulted := slices.Clone(permitted)
+	slices.Sort(consulted)
+	consulted = slices.Compact(consulted)
+	all, err := s.repos.Register.Provenance(ctx, consulted, s.set.Language)
+	if err != nil {
+		return nil, false, nil, err
+	}
+	stale, fams := len(all) < len(consulted), []provenance.Family{}
+	var turns *time.Time
+	for _, f := range all {
+		if f.Assess(now).Stale {
+			stale = true
+		} else if t := f.DataAsOf.Add((f.StaleAfter/time.Second + 1) * time.Second); turns == nil || t.Before(*turns) {
+			turns = &t
+		}
+		if len(contributed) == 0 || slices.Contains(contributed, f.Source.Family) {
+			fams = append(fams, f)
+		}
+	}
+	return fams, stale, turns, nil
 }
 
 // withholdConditions drops the condition notes of the withheld families. A

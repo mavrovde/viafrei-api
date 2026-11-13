@@ -60,6 +60,16 @@ type cacheNote struct {
 	// lamp is set when the answer holds a road lamp: it then also rests on
 	// the lamp's reference rows (provenance.Versions.LampReference).
 	lamp bool
+	// read are the families a lamp read by their data alone (no
+	// confirmation), whether or not they contributed: the weather lamp's.
+	read []sightFamily
+	// rules is set when the answer holds curated rules: it then also rests
+	// on the rule rows (provenance.Versions.RulesReference).
+	rules bool
+	// bound is the earliest instant the answer is wrong from, whatever
+	// storage can do: it is never served at or after it, not even stale
+	// (a weather warning starting or ending). Zero when there is none.
+	bound time.Time
 }
 
 // sightFamily is one family a road lamp read, and the domain of its data.
@@ -97,6 +107,43 @@ func noteSight(ctx context.Context, domain string, families []string) {
 		n.lamp = true
 		for _, f := range families {
 			n.sight = append(n.sight, sightFamily{family: f, domain: domain})
+		}
+		n.mu.Unlock()
+	}
+}
+
+// noteRead records that the answer holds a lamp that read families of
+// domain by their data alone: a new version of any of them may change it,
+// and a family with no data yet changes it with its first.
+func noteRead(ctx context.Context, domain string, families []string) {
+	if n, ok := ctx.Value(cacheNoteKey{}).(*cacheNote); ok {
+		n.mu.Lock()
+		for _, f := range families {
+			n.read = append(n.read, sightFamily{family: f, domain: domain})
+		}
+		n.mu.Unlock()
+	}
+}
+
+// noteRules records that the answer holds curated rules: it changes with
+// the rule rows.
+func noteRules(ctx context.Context) {
+	if n, ok := ctx.Value(cacheNoteKey{}).(*cacheNote); ok {
+		n.mu.Lock()
+		n.rules = true
+		n.mu.Unlock()
+	}
+}
+
+// noteBound records that the answer is wrong from t on, whatever storage
+// can do: it changes then with the clock alone (noteChangesAt), and it is
+// never served stale past it either.
+func noteBound(ctx context.Context, t time.Time) {
+	noteChangesAt(ctx, t)
+	if n, ok := ctx.Value(cacheNoteKey{}).(*cacheNote); ok {
+		n.mu.Lock()
+		if n.bound.IsZero() || t.Before(n.bound) {
+			n.bound = t
 		}
 		n.mu.Unlock()
 	}
@@ -144,6 +191,16 @@ type entry struct {
 	sight         []familyVersion
 	lamp          bool
 	lampReference string
+	// read are the families a lamp read by their data alone
+	// (cacheNote.read), each at its version; rules is set when the answer
+	// holds curated rules, and rulesReference is then the fingerprint of the
+	// rule rows it was read under.
+	read           []familyVersion
+	rules          bool
+	rulesReference string
+	// bound is cacheNote.bound: the answer is neither current nor served
+	// stale at or after it.
+	bound time.Time
 	// register is the licence register's fingerprint the answer was read
 	// under: the gate's decision, the attribution and the notes rest on it.
 	register  string
@@ -184,10 +241,13 @@ func (e *entry) current(versions provenance.Versions, now time.Time) bool {
 	if !e.until.IsZero() && !now.Before(e.until) {
 		return false
 	}
-	for _, f := range e.families {
+	for _, f := range slices.Concat(e.families, e.read) {
 		if versions.Families[f.family] != f.version {
 			return false
 		}
+	}
+	if e.rules && versions.RulesReference != e.rulesReference {
+		return false
 	}
 	for _, f := range e.sight {
 		if sightVersion(versions, f.family) != f.version {
@@ -296,8 +356,8 @@ const entryOverhead = 256
 // size is what e holds in memory, as the budget counts it: every string,
 // the stored headers and the body, plus the fixed overhead.
 func (e *entry) size() int {
-	n := entryOverhead + len(e.key) + len(e.etag) + len(e.register) + len(e.lampReference) + len(e.requestID) + len(e.body)
-	for _, f := range append(slices.Clone(e.families), e.sight...) {
+	n := entryOverhead + len(e.key) + len(e.etag) + len(e.register) + len(e.lampReference) + len(e.rulesReference) + len(e.requestID) + len(e.body)
+	for _, f := range slices.Concat(e.families, e.sight, e.read) {
 		n += len(f.family) + len(f.version)
 	}
 	for name, vs := range e.header {
@@ -589,20 +649,12 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 	if note.lamp {
 		e.lamp, e.lampReference = true, vs.LampReference
 	}
-	read := map[string]bool{}
-	for _, f := range note.sight {
-		if !read[f.family] {
-			read[f.family] = true
-			e.sight = append(e.sight, familyVersion{family: f.family, version: sightVersion(vs, f.family)})
-		}
-		if age := maxAge(s.cfg.Cache.MaxAge, f.domain); e.maxAge == 0 || age < e.maxAge {
-			e.maxAge = age
-		}
-		if stale := maxAge(config.CacheMaxAge(s.cfg.Cache.StaleIfError), f.domain); stale < e.stale {
-			e.stale = stale
-		}
+	if note.rules {
+		e.rules, e.rulesReference = true, vs.RulesReference
 	}
-	slices.SortFunc(e.sight, func(a, b familyVersion) int { return strings.Compare(a.family, b.family) })
+	e.bound = note.bound
+	e.sight = s.readFamilies(e, note.sight, func(f string) string { return sightVersion(vs, f) })
+	e.read = s.readFamilies(e, note.read, func(f string) string { return vs.Families[f] })
 	now := s.now()
 	if !e.until.IsZero() && e.until.Sub(now) < e.maxAge {
 		e.maxAge = max(e.until.Sub(now), 0)
@@ -625,6 +677,16 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 		h.Write([]byte{4})
 		h.Write([]byte(e.lampReference))
 	}
+	for _, f := range e.read {
+		h.Write([]byte{5})
+		h.Write([]byte(f.family))
+		h.Write([]byte{0})
+		h.Write([]byte(f.version))
+	}
+	if e.rules {
+		h.Write([]byte{6})
+		h.Write([]byte(e.rulesReference))
+	}
 	h.Write([]byte{1})
 	h.Write([]byte(e.register))
 	for _, v := range note.shown {
@@ -633,13 +695,35 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 	}
 	e.etag = `W/"` + base64.RawURLEncoding.EncodeToString(h.Sum(nil)[:18]) + `"`
 	e.built, e.expires = now, now.Add(e.maxAge)
-	for _, f := range slices.Concat(e.families, e.sight) {
+	for _, f := range slices.Concat(e.families, e.sight, e.read) {
 		if slices.Contains(s.cfg.Cache.NoStale, f.family) {
 			e.stale = 0
 		}
 	}
 	e.keep = now.Add(max(e.maxAge, e.stale))
 	return e
+}
+
+// readFamilies are the families a lamp read, each once at its version, in
+// family order. A family the lamp read changes the answer as much as one it
+// attributes: its domain's max-age and stale allowance bound e's.
+func (s *server) readFamilies(e *entry, fams []sightFamily, version func(string) string) []familyVersion {
+	var out []familyVersion
+	seen := map[string]bool{}
+	for _, f := range fams {
+		if !seen[f.family] {
+			seen[f.family] = true
+			out = append(out, familyVersion{family: f.family, version: version(f.family)})
+		}
+		if age := maxAge(s.cfg.Cache.MaxAge, f.domain); e.maxAge == 0 || age < e.maxAge {
+			e.maxAge = age
+		}
+		if stale := maxAge(config.CacheMaxAge(s.cfg.Cache.StaleIfError), f.domain); stale < e.stale {
+			e.stale = stale
+		}
+	}
+	slices.SortFunc(out, func(a, b familyVersion) int { return strings.Compare(a.family, b.family) })
+	return out
 }
 
 // maxAge is the Cache-Control max-age of a domain's answers, and, given the
@@ -739,12 +823,12 @@ func storageFailed(b *bufferedContext) bool {
 
 // stale returns the stored answer of key while it may still be served stale
 // at now (NFR-RES-004): its body is kept and it was read no longer than its
-// allowance ago.
+// allowance ago, and not at or past its bound (cacheNote.bound).
 func (c *resultCache) stale(key string, now time.Time) *entry {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	e := c.entries[key]
-	if e == nil || e.body == nil || e.stale <= 0 || now.Sub(e.built) > e.stale {
+	if e == nil || e.body == nil || e.stale <= 0 || now.Sub(e.built) > e.stale || (!e.bound.IsZero() && !now.Before(e.bound)) {
 		return nil
 	}
 	return e

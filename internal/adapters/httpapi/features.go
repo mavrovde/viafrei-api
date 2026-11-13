@@ -19,6 +19,8 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
+	"github.com/mavrovde/viafrei-api/internal/domain/rules"
+	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 )
 
 // Features is the port to the feature use cases.
@@ -29,6 +31,8 @@ type Features interface {
 	MotorwayConditions(ctx context.Context, key access.Record, q roads.CorridorQuery) (features.Conditions, error)
 	RoadConditions(ctx context.Context, key access.Record, q roads.AreaQuery) (features.Conditions, error)
 	RoadSituation(ctx context.Context, key access.Record, id string) (features.Answer[roads.Situation], error)
+	WeatherRisk(ctx context.Context, key access.Record, q weather.Query) (features.WeatherRisk, error)
+	DrivingRules(ctx context.Context, key access.Record, topic string) (rules.Topic, features.Answer[rules.Rule], error)
 }
 
 // counterpartExtension names the MCP capability an operation answers the
@@ -52,6 +56,7 @@ var nullableObjects = []struct{ schema, member string }{
 	{"RoadSituation", "location"},
 	{"RoadSituation", "lanes"},
 	{"RoadSituation", "position"},
+	{"WarningArea", "geometry"},
 }
 
 func amendNullableObjects(api huma.API) {
@@ -84,7 +89,7 @@ func position(p geo.Point) Position {
 // FreshnessEntry is one entry of meta.freshness.
 type FreshnessEntry struct {
 	Family      string     `json:"family" doc:"The source family."`
-	DataAsOf    *time.Time `json:"dataAsOf" nullable:"true" doc:"The instant the family's data is current to; null when it published none."`
+	DataAsOf    *time.Time `json:"dataAsOf" nullable:"true" doc:"The instant up to which the family's data was last known current. It advances when the data is confirmed unchanged, so it is not the instant of the last change in the data. Null when the family's data has never been known current."`
 	AgeS        *int64     `json:"ageS" nullable:"true" doc:"generatedAt minus dataAsOf, in whole seconds; null when dataAsOf is."`
 	StaleAfterS int64      `json:"staleAfterS" doc:"The family's design threshold: data older than this is stale."`
 	Stale       bool       `json:"stale" doc:"True when ageS is above staleAfterS, or dataAsOf is unknown."`
@@ -187,6 +192,13 @@ func (s *server) featureProblem(ctx context.Context, err error) *Problem {
 		return newProblem(ctx, SlugNotFound, "No road with this reference.", 0)
 	case errors.Is(err, roads.ErrUnknownSituation):
 		return newProblem(ctx, SlugNotFound, "No situation with this id.", 0)
+	case errors.Is(err, rules.ErrUnknownTopic):
+		return newProblem(ctx, SlugNotFound, "No rule topic with this code.", 0)
+	case errors.Is(err, weather.ErrLevel):
+		// A stored level outside 1 to 4 is never re-graded (FR-WEATHER-002):
+		// the answer fails and the log names the warning.
+		s.log.ErrorContext(ctx, "a stored weather warning level is outside 1 to 4", "requestId", RequestIDFrom(ctx), "error", err)
+		return newProblem(ctx, SlugInternal, "An unexpected fault occurred; quote the request id.", 0)
 	default:
 		return s.storageProblem(ctx, err)
 	}
@@ -221,22 +233,27 @@ func (s *server) featuresOff(ctx context.Context) error {
 	return nil
 }
 
-// Near is the near-a-position input of the list operations.
-type Near struct {
-	At      string `query:"at" required:"true" pattern:"^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$" example:"52.52,13.405" doc:"The position to search around: lat,lon in decimal degrees (WGS 84)."`
-	RadiusM int    `query:"radius_m" minimum:"1" maximum:"50000" doc:"Search radius in metres. Default: geo.default_radius_m."`
-	Limit   int    `query:"limit" minimum:"1" maximum:"100" doc:"Most items to return. Default: pagination.default_limit."`
-	point   geo.Point
+// AtPosition is the at query parameter every position operation shares.
+type AtPosition struct {
+	At    string `query:"at" required:"true" pattern:"^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$" example:"52.52,13.405" doc:"The position: lat,lon in decimal degrees (WGS 84)."`
+	point geo.Point
 }
 
 // Resolve reads the position (huma calls it after the schema checks).
-func (n *Near) Resolve(huma.Context) []error {
-	p, err := geo.ParsePoint(n.At)
+func (a *AtPosition) Resolve(huma.Context) []error {
+	p, err := geo.ParsePoint(a.At)
 	if err != nil {
-		return []error{&huma.ErrorDetail{Location: "query.at", Message: err.Error(), Value: n.At}}
+		return []error{&huma.ErrorDetail{Location: "query.at", Message: err.Error(), Value: a.At}}
 	}
-	n.point = p
+	a.point = p
 	return nil
+}
+
+// Near is the near-a-position input of the list operations.
+type Near struct {
+	AtPosition
+	RadiusM int `query:"radius_m" minimum:"1" maximum:"50000" doc:"Search radius in metres. Default: geo.default_radius_m."`
+	Limit   int `query:"limit" minimum:"1" maximum:"100" doc:"Most items to return. Default: pagination.default_limit."`
 }
 
 func (s *server) radius(r int) int {

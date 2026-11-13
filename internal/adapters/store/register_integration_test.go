@@ -5,6 +5,7 @@ package store_test
 import (
 	"bytes"
 	"context"
+	"maps"
 	"slices"
 	"testing"
 
@@ -278,6 +279,66 @@ func TestTheLampsVersionsMoveWithWhatItJudges(t *testing.T) {
 		refs[moved.LampReference] = true
 		if moved.Register != base.Register {
 			t.Errorf("%s moved the register", change)
+		}
+	}
+}
+
+// TestTheRulesReferenceMovesWithTheRuleRows: the curated rules carry no
+// freshness version of their own, so an edited, added or removed rule or
+// topic moves the rules reference, and nothing else moves with it.
+func TestTheRulesReferenceMovesWithTheRuleRows(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005", "FR-RULES-001")
+	st := seeded(t)
+	ctx := bounded(t)
+	conn, err := db.Owner(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	read := func() provenance.Versions {
+		t.Helper()
+		vs, err := st.FreshnessVersions(ctx)
+		if err != nil || vs.RulesReference == "" {
+			t.Fatalf("versions %+v, %v", vs, err)
+		}
+		return vs
+	}
+	base := read()
+	t.Cleanup(func() {
+		ctx := context.WithoutCancel(ctx)
+		c, err := db.Owner(ctx)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer func() { _ = c.Close(ctx) }()
+		for _, sql := range []string{
+			`delete from contract.rule_statement where topic_code = 'rt_reference'`,
+			`delete from contract.rule_topic where topic_code = 'rt_reference'`,
+		} {
+			if _, err := c.Exec(ctx, sql); err != nil {
+				t.Error(err)
+			}
+		}
+	})
+	refs := map[string]bool{base.RulesReference: true}
+	for _, change := range []string{
+		`insert into contract.rule_topic (topic_code, title, reviewed_on) values ('rt_reference', 'Reference', '2026-01-01')`,
+		`insert into contract.rule_statement (statement_id, topic_code, position, body) values ('rt_reference-1', 'rt_reference', 1, 'One')`,
+		`update contract.rule_statement set body = 'One, edited' where statement_id = 'rt_reference-1'`,
+		`update contract.rule_topic set reviewed_on = '2026-02-01' where topic_code = 'rt_reference'`,
+		`delete from contract.rule_statement where statement_id = 'rt_reference-1'`,
+	} {
+		if _, err := conn.Exec(ctx, change); err != nil {
+			t.Fatal(err)
+		}
+		moved := read()
+		if refs[moved.RulesReference] {
+			t.Errorf("%s did not move the rules reference %q", change, moved.RulesReference)
+		}
+		refs[moved.RulesReference] = true
+		if moved.Register != base.Register || moved.LampReference != base.LampReference || !maps.Equal(moved.Families, base.Families) {
+			t.Errorf("%s moved more than the rules reference: %+v", change, moved)
 		}
 	}
 }

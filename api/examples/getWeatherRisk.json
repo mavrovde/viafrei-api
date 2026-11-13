@@ -1,0 +1,114 @@
+{
+  "title": "The official weather warnings at a position, with their lamp",
+  "request": "/v1/weather-risk?at=52.1,12.2",
+  "attribution": "Weather warnings come from the source families of the weather domain the key is entitled to; the lamp reads every one of them. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "weather"
+    ],
+    "sources": [
+      "src-alpha-weather",
+      "src-eta-weather"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": {
+      "lamp": "red",
+      "warnings": [
+        {
+          "id": "ww-00021",
+          "hazard": "ice",
+          "level": 4,
+          "levelName": "Stufe 4",
+          "issuer": "Synthetischer Wetterdienst",
+          "headline": "Warnung vor ice (Stufe 4)",
+          "textLanguage": "de",
+          "validity": {
+            "from": "2026-03-29T13:36:25Z",
+            "fromLocal": "2026-03-29T15:36:25+02:00",
+            "until": "2026-03-30T08:36:25Z",
+            "untilLocal": "2026-03-30T10:36:25+02:00"
+          },
+          "area": {
+            "name": "Stungrißhausen Kreis",
+            "geometry": null
+          },
+          "sourceFamily": "src-eta-weather"
+        },
+        {
+          "id": "ww-00020",
+          "hazard": "wind",
+          "level": 3,
+          "levelName": "Stufe 3",
+          "issuer": "Synthetischer Wetterdienst",
+          "headline": "Warnung vor wind (Stufe 3)",
+          "textLanguage": "de",
+          "validity": {
+            "from": "2026-03-29T22:22:27Z",
+            "fromLocal": "2026-03-30T00:22:27+02:00",
+            "until": "2026-03-30T22:22:27Z",
+            "untilLocal": "2026-03-31T00:22:27+02:00"
+          },
+          "area": {
+            "name": "Stungrißhausen Kreis",
+            "geometry": null
+          },
+          "sourceFamily": "src-eta-weather"
+        }
+      ],
+      "truncated": false,
+      "roadWeather": []
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": "2026-03-29T23:57:30Z",
+      "freshness": [
+        {
+          "family": "src-eta-weather",
+          "dataAsOf": "2026-03-29T23:57:30Z",
+          "ageS": 150,
+          "staleAfterS": 1800,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "src-eta-weather",
+          "domain": "weather",
+          "publisher": "Longkein Datenwerk",
+          "text": "Synthetic data from family eta, licence lic-eta.",
+          "licence": "Synthetic licence eta",
+          "licenceUrl": "https://licences.example/eta",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://eta.example/terms"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ],
+      "query": {
+        "at": {
+          "lat": 52.1,
+          "lon": 12.2
+        },
+        "minLevel": 1,
+        "hazards": []
+      }
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/weather-risk"
+    }
+  }
+}

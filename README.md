@@ -84,7 +84,7 @@ ViaFrei API has a **service skeleton** in Go with its first data endpoints. The 
 | Keys and the licence gate: hashed keys, scopes, rotation, revocation, audit log, `GET /v1/key` | 🔄 In review (milestone 0.4.0) — [docs/access-keys.md](docs/access-keys.md) |
 | Rate limits, quotas, priority tiers, deadlines, load shedding, usage metering | 🔄 In review (milestone 0.5.0) — [docs/rate-limits.md](docs/rate-limits.md) |
 | Developer documentation: guide, endpoints with recorded examples, attribution rules, error codes, versioning policy | 🔄 In review — [documentation portal](https://mavrovde.github.io/viafrei-api/), built from [docs/](docs/getting-started.md) |
-| v1 feature endpoints | 🔄 In progress (milestone 0.6.0) — first slice: `GET /v1/charging-options`, `GET /v1/parking-options`, `GET /v1/places/{placeId}/overview`; road conditions: `GET /v1/motorways/{road}/conditions`, `GET /v1/road-conditions`, `GET /v1/road-situations/{situationId}` |
+| v1 feature endpoints | 🔄 In progress (milestone 0.6.0) — first slice: `GET /v1/charging-options`, `GET /v1/parking-options`, `GET /v1/places/{placeId}/overview`; road conditions: `GET /v1/motorways/{road}/conditions`, `GET /v1/road-conditions`, `GET /v1/road-situations/{situationId}`; weather and rules: `GET /v1/weather-risk`, `GET /v1/driving-rules` |
 
 Follow progress in the [Roadmap](https://github.com/mavrovde/viafrei-api/wiki/Roadmap) and in [Issues](https://github.com/mavrovde/viafrei-api/issues).
 

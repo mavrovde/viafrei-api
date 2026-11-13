@@ -194,6 +194,9 @@ func behaviours() map[string]behaviour {
 		"roads.ended_retention_h": {"6", func(t *testing.T, c *config.Config) string {
 			return wire.FeatureSettings(c).EndedRetention.String()
 		}},
+		"weather.max_warnings": {"7", func(t *testing.T, c *config.Config) string {
+			return fmt.Sprint(wire.FeatureSettings(c).MaxWarnings)
+		}},
 		"sources.disabled": {"alpha", func(t *testing.T, c *config.Config) string {
 			register := []access.Terms{{Family: "alpha", UseClasses: access.UseClasses, Reviewed: true}}
 			return fmt.Sprint(access.NewGate(register, access.Plan{UseClass: "consumer", Sources: []string{"alpha"}}, nil, c.Sources.Disabled).Allowed())

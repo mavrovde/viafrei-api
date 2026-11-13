@@ -57,6 +57,14 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, "integration tests need a container runtime:", err)
 		os.Exit(1)
 	}
+	// Generating and loading the questions' fixture rows is setup too: it
+	// took about 1.3 s inside the first test that asked for them, which
+	// pushed that test past its bound.
+	if err := seedQuestions(); err != nil {
+		db.Stop()
+		fmt.Fprintln(os.Stderr, "seeding the parity fixture:", err)
+		os.Exit(1)
+	}
 	code := m.Run()
 	db.Stop()
 	os.Exit(code)
@@ -72,33 +80,52 @@ func platform() string {
 
 var seeded = map[parity.Fixture]string{}
 
-// seed loads the fixture rows the bundle names, once, and returns their
-// checksum.
+// seedQuestions loads the fixture rows the questions name, before any test.
+func seedQuestions() error {
+	q, err := parity.LoadQuestions(os.DirFS(dir))
+	if err != nil {
+		return err
+	}
+	_, err = load(q.Fixture)
+	return err
+}
+
+// seed returns the checksum of the fixture rows the bundle names, loading
+// them unless they are loaded already.
 func seed(t *testing.T, fx parity.Fixture) string {
 	t.Helper()
+	sum, err := load(fx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sum
+}
+
+// load loads the fixture rows of fx, once, and returns their checksum.
+func load(fx parity.Fixture) (string, error) {
 	fx.SHA256 = ""
 	if sum, ok := seeded[fx]; ok {
-		return sum
+		return sum, nil
 	}
 	var buf bytes.Buffer
 	if _, err := fixtures.Generate(&buf, fx.Profile, fx.Seed, contract.Version()); err != nil {
-		t.Fatal(err)
+		return "", err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	conn, err := db.Owner(ctx)
 	if err != nil {
-		t.Fatal(err)
+		return "", err
 	}
 	defer func() { _ = conn.Close(ctx) }()
 	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, buf.String())
 		return err
 	}); err != nil {
-		t.Fatal(err)
+		return "", err
 	}
 	seeded[fx] = parity.Checksum(buf.Bytes())
-	return seeded[fx]
+	return seeded[fx], nil
 }
 
 // asker answers a case through the real handler, store and use cases.
@@ -194,8 +221,9 @@ func noteOwners(t *testing.T) parity.Owners {
 }
 
 // compare asks every case of the bundle pinned under name and compares the
-// facts; it returns the bundle.
-func compare(t *testing.T, name string) parity.Bundle {
+// facts; it returns the bundle and the asker it used, whose store and
+// connections a caller reuses rather than opening a second one.
+func compare(t *testing.T, name string) (parity.Bundle, asker) {
 	t.Helper()
 	b, err := parity.Load(os.DirFS(dir), name)
 	if err != nil {
@@ -231,7 +259,7 @@ func compare(t *testing.T, name string) parity.Bundle {
 		t.Logf("compared %s: %d case(s): %s", op, len(ids), strings.Join(ids, ", "))
 	}
 	t.Logf("bundle %s: %d case(s), %d fact(s) compared, %d difference(s)", name, len(b.Cases), facts, differ)
-	return b
+	return b, a
 }
 
 // TestParity asks every case of the bundle pinned for the platform version
@@ -239,7 +267,7 @@ func compare(t *testing.T, name string) parity.Bundle {
 // evidence.
 func TestParity(t *testing.T) {
 	req.Covers(t, "TEST-009", "FR-GEN-002", "CON-007")
-	b := compare(t, platform())
+	b, a := compare(t, platform())
 	switch b.Producer {
 	case parity.ProducerAPI:
 		t.Logf("bundle %s was recorded by the API itself: it is a regression lock, not parity evidence; parity needs a bundle the MCP side produced", platform())
@@ -248,14 +276,14 @@ func TestParity(t *testing.T) {
 	}
 
 	// A planted change in one projection rule must fail and name the fact.
-	a := open(t)
 	planted := parity.Default
 	planted.PositionDecimals = 4
-	got, err := parity.Project(a.ask(t, b.Cases[0]), planted, b.Cases[0].Request, a.owners)
+	answer := a.ask(t, b.Cases[0])
+	got, err := parity.Project(answer, planted, b.Cases[0].Request, a.owners)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, err := parity.Project(a.ask(t, b.Cases[0]), parity.Default, b.Cases[0].Request, a.owners)
+	want, err := parity.Project(answer, parity.Default, b.Cases[0].Request, a.owners)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,7 +306,7 @@ func TestRegressionLock(t *testing.T) {
 	if *record {
 		recordBundle(t)
 	}
-	if b := compare(t, buildinfo.Unsynced); b.Producer != parity.ProducerAPI {
+	if b, _ := compare(t, buildinfo.Unsynced); b.Producer != parity.ProducerAPI {
 		t.Errorf("the regression lock %s is produced by %q; it is the API's own recording", buildinfo.Unsynced, b.Producer)
 	}
 }

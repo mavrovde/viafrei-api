@@ -230,7 +230,7 @@ func TestPlantedRowsAreReproducibleAndApart(t *testing.T) {
 	if !bytes.Equal(a.Bytes(), b.Bytes()) {
 		t.Error("two runs planted different rows")
 	}
-	for _, id := range []string{"'" + fixtures.TwoPartRef + "'", "'ev-two-1'", "'ev-two-2'", "'ev-u-kind'", "'ev-u-severity'", "'ev-u-direction'", "'ev-u-class'"} {
+	for _, id := range []string{"'" + fixtures.TwoPartRef + "'", "'ev-two-1'", "'ev-two-2'", "'ev-u-kind'", "'ev-u-severity'", "'ev-u-direction'", "'ev-u-class'", "'ww-planted-issued'", "'ww-planted-cancelled'", "'ww-planted-withdrawn'"} {
 		if !strings.Contains(a.String(), id) {
 			t.Errorf("the planted rows lack %s", id)
 		}

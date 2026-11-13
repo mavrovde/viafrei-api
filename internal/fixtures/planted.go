@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"time"
 )
 
 // Planted writes the rows the integration tests plant beside a generated
@@ -21,6 +22,7 @@ func Planted(out io.Writer, profile string, seed uint64, contractVersion string)
 	g.w.write("-- Planted rows, written by fixtures.Planted (integration tests only), viafrei-api fixturegen " + GeneratorVersion +
 		". Fictional data, CC0 1.0. Load it after the seed.sql of profile " + profile + ", seed " + fmt.Sprint(seed) + ".\n")
 	g.plantRoads()
+	g.plantWeather()
 	g.w.end()
 	if _, err := g.w.close(); err != nil {
 		return fmt.Errorf("fixtures: write: %w", err)
@@ -85,5 +87,24 @@ func (g *gen) plantRoads() {
 	for i, part := range twoPart {
 		mid := lonLat{(part[0].lon + part[1].lon) / 2, (part[0].lat + part[1].lat) / 2}
 		plant(fmt.Sprintf("ev-two-%d", i+1), "roadworks", "minor", TwoPartRef, "motorway", "both", "Baustelle (planted)", mid)
+	}
+}
+
+// plantWeather plants, in one area of the first Land over the first two
+// days, a warning in force, the same warning cancelled, and one withdrawn
+// from publication; only the first answers.
+func (g *gen) plantWeather() {
+	l := g.lands[0]
+	ref := g.fresh("weather", "eta")
+	from := g.day(0)
+	g.w.begin("weather_warning", warningColumns...)
+	for _, w := range []struct{ id, status, withdrawn string }{
+		{"ww-planted-issued", "issued", null},
+		{"ww-planted-cancelled", "cancelled", null},
+		{"ww-planted-withdrawn", "issued", ts(from.Add(time.Hour))},
+	} {
+		g.w.row(str(w.id), str("ice"), num(2), str("Stufe 2"), str(w.status), str("Synthetischer Wetterdienst"),
+			str("Warnung vor Glätte (Stufe 2)"), str("de"), ts(from), ts(from.Add(48*time.Hour)),
+			ts(from.Add(-30*time.Minute)), str(l.code+"001"), str(ref), ts(from), w.withdrawn)
 	}
 }

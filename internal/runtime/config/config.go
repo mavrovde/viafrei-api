@@ -42,6 +42,7 @@ type Config struct {
 	Charging   Charging   `koanf:"charging"`
 	Compose    Compose    `koanf:"compose"`
 	Roads      Roads      `koanf:"roads"`
+	Weather    Weather    `koanf:"weather"`
 	RateLimit  RateLimit  `koanf:"ratelimit"`
 	Quota      Quota      `koanf:"quota"`
 	Tiers      Tiers      `koanf:"tiers"`
@@ -185,6 +186,11 @@ type Pagination struct {
 // Roads holds the settings of the road-conditions answers.
 type Roads struct {
 	EndedRetentionH int `koanf:"ended_retention_h" default:"24" validate:"min=1,max=168" desc:"Hours an ended road situation still answers 200 on its own operation, with validity.until in the past; after that it answers 404 not-found (Spec: Endpoints, Roads, section 6)."`
+}
+
+// Weather holds the settings of the weather answers.
+type Weather struct {
+	MaxWarnings int `koanf:"max_warnings" default:"100" validate:"min=1,max=500" desc:"Most warnings one weather answer lists, worst first; truncated says when more answer. The lamp reads every warning in force at the position, whatever this keeps."`
 }
 
 // Charging holds the settings of charging answers.

@@ -107,6 +107,8 @@ func operations() []operation {
 		{id: "getMotorwayConditions", method: http.MethodGet, path: "/v1/motorways/{road}/conditions", tag: "roads", keyed: true, scope: "roads", register: registerMotorwayConditions},
 		{id: "listRoadConditions", method: http.MethodGet, path: "/v1/road-conditions", tag: "roads", keyed: true, scope: "roads", register: registerRoadConditions},
 		{id: "getRoadSituation", method: http.MethodGet, path: "/v1/road-situations/{situationId}", tag: "roads", keyed: true, scope: "roads", register: registerRoadSituation},
+		{id: "getWeatherRisk", method: http.MethodGet, path: "/v1/weather-risk", tag: "weather", keyed: true, scope: "weather", register: registerWeatherRisk},
+		{id: "getDrivingRules", method: http.MethodGet, path: "/v1/driving-rules", tag: "rules", keyed: true, scope: "rules", register: registerDrivingRules},
 	}
 }
 
@@ -259,6 +261,8 @@ func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 				{Name: "parking", Description: "Where to park."},
 				{Name: "places", Description: "Places, and what is around them."},
 				{Name: "roads", Description: "What is happening on the roads."},
+				{Name: "weather", Description: "The official weather warnings."},
+				{Name: "rules", Description: "The German driving rules."},
 			},
 		},
 		Formats:       huma.DefaultFormats,

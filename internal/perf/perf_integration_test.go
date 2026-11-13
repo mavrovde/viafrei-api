@@ -242,7 +242,7 @@ func open(t *testing.T) *rig {
 	r.key = auth.Principal{Key: access.Record{
 		ID: "benchmarkk", Environment: access.Live, ExpiresAt: r.now.Add(24 * time.Hour),
 		Plan: access.Plan{Name: "benchmark", UseClass: "commercial", Tier: "standard", Sources: sources,
-			Scopes: []access.Scope{"places", "energy", "parking", "roads", "weather"}},
+			Scopes: []access.Scope{"places", "energy", "parking", "roads", "weather", "rules"}},
 	}}
 	near := func(table, path string) {
 		pts, err := pgx.CollectRows(must(conn.Query(ctx, fmt.Sprintf(
@@ -279,6 +279,12 @@ func open(t *testing.T) *rig {
 		"/v1/motorways/", "/conditions")
 	list("road-conditions", "select round(st_y(location)::numeric, 3)::text || ',' || round(st_x(location)::numeric, 3)::text from contract.junction order by 1 limit 40",
 		"/v1/road-conditions?at=", "&radius_m=50000")
+	// The weather and rules reads: the warnings at a point of each warning
+	// area, and each rule topic.
+	list("weather", "select round(st_y(p)::numeric, 3)::text || ',' || round(st_x(p)::numeric, 3)::text "+
+		"from (select st_pointonsurface(boundary) as p from contract.admin_region where region_level = 'district') d order by 1 limit 40",
+		"/v1/weather-risk?at=", "")
+	list("rules", "select topic_code from contract.rule_topic order by 1 limit 40", "/v1/driving-rules?topic=", "")
 	// A situation is answered only from a family the key may read: the
 	// licence gate decides, as it does for the request.
 	reg, err := r.st.Register(ctx)
@@ -310,7 +316,7 @@ func (r *rig) handler(t *testing.T, cached bool) http.Handler {
 		Config: &cfg, Build: buildinfo.Info{Version: "bench", Commit: "bench"}, ContractVersion: contract.Version(), Now: now,
 		Readiness: health.NewChecker(r.st, expected, cfg.Health.ReadyTimeout),
 		Auth:      keyAuth{r.key}, Sources: r.st, Versions: r.st,
-		Features: features.New(features.Repositories{Register: r.st, Charging: r.st, Parking: r.st, Places: r.st, Roads: r.st}, wire.FeatureSettings(&cfg), now),
+		Features: features.New(features.Repositories{Register: r.st, Charging: r.st, Parking: r.st, Places: r.st, Roads: r.st, Weather: r.st, Rules: r.st}, wire.FeatureSettings(&cfg), now),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -341,6 +347,10 @@ func (r *rig) targetsOf(op string) []string {
 		return r.targets["road-conditions"]
 	case "getRoadSituation":
 		return r.targets["situation"]
+	case "getWeatherRisk":
+		return r.targets["weather"]
+	case "getDrivingRules":
+		return r.targets["rules"]
 	}
 	return nil
 }

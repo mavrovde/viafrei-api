@@ -14,9 +14,10 @@ import (
 // register fingerprint: a digest of every row the licence gate, the
 // attribution and the notes of an answer are read from; and one row (kind l)
 // carrying the fingerprint of the road lamp's reference rows: which families
-// cover each state's traffic messages, and each junction's state. The
-// register and the reference rows are small tables, never an observation, so
-// they are read whole. One statement means one failure path.
+// cover each state's traffic messages, and each junction's state; and one row
+// (kind u) carrying the fingerprint of the curated rule rows, every topic and
+// every rule. The register and the reference rows are small tables, never an
+// observation, so they are read whole. One statement means one failure path.
 const freshnessVersions = `
 select 'r', '', md5(concat_ws('|',
   (select string_agg(t::text, ',' order by t::text) from contract.source t),
@@ -27,6 +28,10 @@ union all
 select 'l', '', md5(concat_ws('|',
   (select string_agg(t::text, ',' order by t::text) from contract.message_coverage t),
   (select string_agg(j.junction_id || '=' || coalesce(j.state_code, ''), ',' order by j.junction_id) from contract.junction j)))
+union all
+select 'u', '', md5(concat_ws('|',
+  (select string_agg(t::text, ',' order by t::text) from contract.rule_topic t),
+  (select string_agg(t::text, ',' order by t::text) from contract.rule_statement t)))
 union all
 select 'f', f.source_ref::text, ` + familyVersion + ` from contract.source_freshness f
 union all
@@ -71,6 +76,8 @@ func (s *Store) FreshnessVersions(ctx context.Context) (provenance.Versions, err
 				out.Register = version
 			case "l":
 				out.LampReference = version
+			case "u":
+				out.RulesReference = version
 			case "f":
 				out.Families[family] = version
 			default:

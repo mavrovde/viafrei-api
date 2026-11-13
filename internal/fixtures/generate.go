@@ -851,9 +851,12 @@ func (g *gen) transit() {
 
 var hazards = []string{"thunderstorm", "wind", "rain", "snow", "ice", "fog", "heat", "frost", "uv", "flood", "other"}
 
+// warningColumns are the columns of a weather warning row.
+var warningColumns = []string{"warning_id", "hazard", "warning_level", "level_label", "message_status", "issuer_name",
+	"headline", "text_lang", "valid_from", "valid_to", "published_at", "region_code", "source_ref", "recorded_at", "withdrawn_at"}
+
 func (g *gen) weather() {
-	g.w.begin("weather_warning", "warning_id", "hazard", "warning_level", "level_label", "message_status", "issuer_name",
-		"headline", "text_lang", "valid_from", "valid_to", "published_at", "region_code", "source_ref", "recorded_at", "withdrawn_at")
+	g.w.begin("weather_warning", warningColumns...)
 	n := 0
 	for _, l := range g.lands {
 		for range 2 * g.p.Scale {

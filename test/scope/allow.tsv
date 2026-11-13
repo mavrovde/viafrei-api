@@ -11,3 +11,5 @@ column	api/openapi.json	placeId	path parameter and meta.query member named by Sp
 column	api/openapi.json	staleAfterS	member name of the freshness entry fixed by Spec: Common Envelope, meta.freshness; the envelope vocabulary, not a storage name
 column	api/openapi.json	delayMin	member name of the road situation fixed by Spec: Endpoints, Roads, section 1 (delayMin, lengthM); the resource vocabulary, not a storage name
 column	api/openapi.json	road_class	query parameter of the conditions in an area fixed by Spec: Endpoints, Roads, section 5 (FR-ROAD-006); the resource vocabulary, not a storage name
+column	api/openapi.json	legalBasis	member name of a driving rule fixed by Spec: Endpoints, Weather, Rules and Composed, section 2 (rules[].legalBasis); the resource vocabulary, not a storage name
+column	api/openapi.json	reviewedOn	member name of a rule topic fixed by Spec: Endpoints, Weather, Rules and Composed, section 2 and FR-RULES-001; the resource vocabulary, not a storage name

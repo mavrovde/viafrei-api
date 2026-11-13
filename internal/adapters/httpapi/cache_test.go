@@ -33,16 +33,17 @@ type fakeVersions struct {
 	vs       map[string]string
 	register string
 	// confirmed are the confirmation versions, lampRef the lamp's reference
-	// fingerprint.
+	// fingerprint, rulesRef the rule rows' fingerprint.
 	confirmed map[string]string
 	lampRef   string
+	rulesRef  string
 	err       error
 }
 
 func (f *fakeVersions) FreshnessVersions(context.Context) (provenance.Versions, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return provenance.Versions{Families: maps.Clone(f.vs), Register: f.register, Confirmations: maps.Clone(f.confirmed), LampReference: f.lampRef}, f.err
+	return provenance.Versions{Families: maps.Clone(f.vs), Register: f.register, Confirmations: maps.Clone(f.confirmed), LampReference: f.lampRef, RulesReference: f.rulesRef}, f.err
 }
 
 // change runs fn on the versions under their lock.

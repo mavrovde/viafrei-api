@@ -22,7 +22,8 @@ NFR-PERF-003 also sets budgets for two classes no operation has yet:
 transit (80, 250, 600 ms) and history (150, 400, 1000 ms). Each is added to
 the class file with its first operation. The road reads brought along in:
 a motorway's conditions are along, the conditions near a position near, and
-one road situation a lookup.
+one road situation a lookup. The weather warnings at a position are near (a
+point in the warning areas), and the driving rules on a topic a lookup.
 
 The budgets come from two files:
 
@@ -91,7 +92,8 @@ operation) and `-perf.profile` (`tiny`, `ci` or `benchmark`).
   licence, publisher and notes;
 - what the answer states that the clock alone changes: each family's
   `stale` flag, each charge point's shown state, the sites a `free_min`
-  filter kept, and a road answer's lamp with its reason.
+  filter kept, a road answer's lamp with its reason, and a weather
+  answer's lamp.
 
 A road conditions answer rests on more than the families it attributes: its
 lamp reads every roads and weather family the caller may use, whether or not
@@ -101,6 +103,13 @@ interval and whether its updates are paused), and a fingerprint of the
 lamp's reference rows: which families cover each state's traffic messages,
 and each junction's state. A family it read that has no data yet is recorded
 as such, so its first data ends the answer.
+
+A weather answer's lamp reads every weather family the caller may use, and
+its validator carries the data version of each of them, whether or not one
+contributed a warning; a family with no data yet is recorded as such. A
+driving-rules answer carries a fingerprint of the curated rule rows (every
+topic and every rule), which have no freshness version of their own, so an
+edited rule ends it.
 
 The versions and the register fingerprint are read in one snapshot,
 **before** the operation reads its data, and the answer is tagged with
@@ -112,7 +121,9 @@ all of these hold:
 
 - no family it read has a new version (for a road conditions answer: no
   family its lamp read has a new data or confirmation version, and the
-  lamp's reference fingerprint is the same);
+  lamp's reference fingerprint is the same; for a weather answer: no family
+  its lamp read has a new data version; for a driving-rules answer: the
+  rule rows' fingerprint is the same);
 - the register fingerprint is the same;
 - the clock has not reached the instant the answer changes by itself: a
   family turning stale (its data older than `staleAfterS`), a charge point's
@@ -124,7 +135,9 @@ all of these hold:
   the answer). For the road answers: a family the lamp read turning stale,
   its confirmation lapsing (three intervals after it), a situation or a
   weather warning in the scope starting or ending, or an ended situation
-  leaving `roads.ended_retention_h`.
+  leaving `roads.ended_retention_h`. For a weather answer: a family its
+  lamp read turning stale, or any warning placed at the position starting
+  or ending, whatever `min_level` and `hazards` keep.
 
 A 304 runs no feature read. The versions are read once per
 `cache.versions_ttl` for all requests, as the service's own read: it carries
@@ -178,7 +191,7 @@ downstream keeps it either, and an `If-None-Match` never matches it.
 - `Cache-Control: private, max-age=N` (or `no-store` for an answer that is
   never stored, above), where N is the smallest
   `cache.max_age.<domain>` among the domains it answers from (for a road
-  conditions answer, also those its lamp read), and never
+  conditions or weather answer, also those its lamp read), and never
   past the instant the answer changes by itself;
 - `Last-Modified` from the newest data instant;
 - `Vary` on the credentials, `Accept`, `Accept-Language` and `Accept-Encoding`.
@@ -195,7 +208,10 @@ its domain's stale allowance ago: `cache.stale_if_error.<domain>`, with the
 domains of `cache.max_age` (default five minutes each). An answer read from
 several domains takes the smallest; a road conditions answer counts the
 domains of the families its lamp read, and is never served stale when one of
-those families is in `cache.no_stale_families`. It carries:
+those families is in `cache.no_stale_families`. A weather answer is the
+same, and is never served stale at or after the next start or end of a
+warning placed at its position: from then on it would state a warning that
+is no longer in force, or miss one that is. It carries:
 
 - the `served_stale` warning in `meta.warnings`, whose detail says how many
   seconds ago it was read;

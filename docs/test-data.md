@@ -74,6 +74,8 @@ answered on that file and must stay valid:
   each part;
 - on one road, an active situation with an unmapped value in each coded
   column: kind, severity, direction and road class.
+- a weather warning in force, the same warning cancelled, and one withdrawn
+  from publication, in one area over the same window.
 
 `seed.sql` carries none of what the road lamp reads beyond the situations
 and the warnings: no junction has a state code, no source covers a state's

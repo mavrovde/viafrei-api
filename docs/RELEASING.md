@@ -199,11 +199,18 @@ way. To try a candidate, build it locally from that commit
 ## Tags
 
 - Only annotated tags `vX.Y.Z`. `release.yml` refuses a lightweight tag, a
-  tag with a suffix (`-rc.N` or any other) and a tag that differs from
-  `version.txt`. Tags `vX.Y.Z-rc.N` made before 0.3.0 stay as history.
+  tag with a suffix (`-rc.N` or any other), a tag that differs from
+  `version.txt`, and a tag that is not on the commit that set `version.txt`
+  (the release commit), so a later commit cannot be released under it.
 - A tag is never moved and never deleted. A broken release is followed by a
   new patch release.
-- Only release maintainers and the release workflow create `v*` tags.
+- Only release maintainers and the release workflow create `v*` tags, and
+  the tag ruleset refuses any name but `vX.Y.Z` (`tag_name_pattern`).
+- **The trust boundary is the ruleset's bypass list.** A tag push runs the
+  `release.yml` of the TAGGED commit, so a tag on a commit older than this
+  rule runs the older, wider workflow. The tag ruleset keeps such tags to
+  its bypass actors (repository admins and the release workflow); they are
+  trusted not to tag an old commit or a suffixed version by hand.
 
 ### Tag ruleset (documented here, applied by a repository admin)
 
@@ -227,11 +234,18 @@ gh api -X POST repos/mavrovde/viafrei-api/rulesets --input - <<'JSON'
     { "type": "creation" },
     { "type": "update" },
     { "type": "deletion" },
-    { "type": "non_fast_forward" }
+    { "type": "non_fast_forward" },
+    { "type": "tag_name_pattern",
+      "parameters": { "name": "release tag name", "operator": "regex",
+                      "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$", "negate": false } }
   ]
 }
 JSON
 ```
+
+The `tag_name_pattern` rule refuses a `v*` tag that is not a confirmed
+release name (an `-rc.N`, any suffix), also for the commits whose older
+`release.yml` would still accept one.
 
 Check it:
 
@@ -271,13 +285,22 @@ What this check cannot see, so the ruleset's owner keeps it true:
   fact is not detected for commits pushed while it did not hold; changes to
   rulesets are visible in the repository's audit log.
 
-1. Branch `hotfix/X.Y.Z+1` from the tag `vX.Y.Z`.
+1. Branch `hotfix/X.Y.Z+1` from the tag `vX.Y.Z`, and as its first
+   reviewed pull request bring the current `.github/workflows/release.yml`
+   (and its helper scripts) from `main` onto it: a tag push runs the
+   workflow file of the tagged commit, and the file at `vX.Y.Z` may be an
+   older, wider one.
 2. Land the fix there through a pull request (`fix:` title), with review.
    CI runs on every push to `hotfix/**`, so the merged head has the check
    runs the release gate requires.
-3. A maintainer creates the annotated tag `vX.Y.(Z+1)` on that branch's
-   head and pushes it; `release.yml` publishes it from the tag push.
-4. Merge or cherry-pick the fix into `main` and add the version to
+3. In a reviewed pull request on the same branch, bump `version.txt` to
+   `X.Y.(Z+1)` and add the version's `CHANGELOG.md` entry. `release.yml`
+   refuses a tag that differs from `version.txt` or does not sit on the
+   commit that set it, so this commit is the one that is tagged.
+4. A maintainer creates the annotated tag `vX.Y.(Z+1)` on that commit (the
+   branch's head) and pushes it; `release.yml` publishes it from the tag
+   push.
+5. Merge or cherry-pick the fix into `main` and add the version to
    `.release-please-manifest.json` there, so release-please continues from it.
 
 ### Hotfix ruleset (documented here, applied by a repository admin)

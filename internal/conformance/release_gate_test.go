@@ -83,6 +83,7 @@ const (
 	minorGuard    = `if [[ $HIGHEST_IN_MINOR == true ]]; then echo "$IMAGE:$MINOR"; fi`
 	confirmedTag  = `[[ $TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || {`
 	versionFile   = `[[ $(tr -d '[:space:]' < version.txt) == "${TAG#v}" ]] || {`
+	releaseCommit = `[[ $(git rev-list -1 "$TAG" -- version.txt) == "$(git rev-parse "$TAG^{commit}")" ]] || {`
 	releaseTags   = "v[0-9]+.[0-9]+.[0-9]+"
 	builtinToken  = "token: ${{ secrets.GITHUB_TOKEN }}"
 	approveScript = "approve-release-runs.sh"
@@ -278,8 +279,33 @@ func shellRuleFindings(files map[string][]byte) []string {
 	return out
 }
 
-// imagePushers are the step texts that publish or sign an image.
-var imagePushers = []string{"push: true", "docker push", "cosign sign", "imagetools create", "oras push", "crane push", "crane copy"}
+// imagePushers are the texts that publish or sign an image, or that grant or
+// obtain what publishing needs (a registry login, packages: write). Only
+// release.yml and the job of release-please.yml that calls it may carry them.
+var imagePushers = []string{
+	"push: true", "--push", "type=registry", "docker push", "docker/login-action", "packages: write",
+	"cosign sign", "imagetools create", "oras push", "crane push", "crane copy",
+}
+
+// withoutJob returns a workflow's text with one top-level job's block cut
+// out, so the job allowed to grant publishing is exempt and its siblings are
+// still read.
+func withoutJob(src, job string) string {
+	lines := strings.SplitAfter(src, "\n")
+	var b strings.Builder
+	skip := false
+	for _, l := range lines {
+		if strings.HasPrefix(l, "  ") && !strings.HasPrefix(l, "   ") && strings.HasSuffix(strings.TrimRight(l, "\n"), ":") {
+			skip = strings.TrimSpace(l) == job+":"
+		} else if l != "" && l != "\n" && !strings.HasPrefix(l, " ") && !strings.HasPrefix(l, "#") {
+			skip = false
+		}
+		if !skip {
+			b.WriteString(l)
+		}
+	}
+	return b.String()
+}
 
 // confirmedReleaseFindings: images are published for confirmed releases only.
 // No workflow but release.yml pushes or signs an image (there is no main-line
@@ -292,8 +318,12 @@ func confirmedReleaseFindings(files map[string][]byte, rel gatedWorkflow) []stri
 		if name == "release.yml" || !strings.HasSuffix(name, ".yml") && !strings.HasSuffix(name, ".yaml") {
 			continue
 		}
+		text := string(src)
+		if name == "release-please.yml" {
+			text = withoutJob(text, "release")
+		}
 		for _, p := range imagePushers {
-			if strings.Contains(string(src), p) {
+			if strings.Contains(text, p) {
 				out = append(out, name+" publishes an image ("+p+"); only release.yml publishes, for a confirmed release")
 			}
 		}
@@ -305,7 +335,11 @@ func confirmedReleaseFindings(files map[string][]byte, rel gatedWorkflow) []stri
 	}
 	src := string(files["release.yml"])
 	build := strings.Index(src, "docker/build-push-action")
-	for rule, text := range map[string]string{"a tag with a suffix": confirmedTag, "a tag that differs from version.txt": versionFile} {
+	for rule, text := range map[string]string{
+		"a tag with a suffix":                  confirmedTag,
+		"a tag that differs from version.txt":  versionFile,
+		"a tag that is not the release commit": releaseCommit,
+	} {
 		if i := strings.Index(src, text); i < 0 || i > build {
 			out = append(out, "release.yml builds without first refusing "+rule)
 		}
@@ -351,6 +385,15 @@ func TestReleaseGateIsWired(t *testing.T) {
 		edge[k] = v
 	}
 	edge["image.yml"] = []byte("on:\n  push:\n    branches: [main]\njobs:\n  publish:\n    steps:\n      - uses: docker/build-push-action@x\n        with:\n          push: true\n")
+	// extra adds a workflow that tries to publish some other way.
+	extra := func(name, steps string) map[string][]byte {
+		m := map[string][]byte{}
+		for k, v := range files {
+			m[k] = v
+		}
+		m[name] = []byte("on:\n  push:\n    branches: [main]\njobs:\n  publish:\n    runs-on: ubuntu-24.04\n    steps:\n" + steps)
+		return m
+	}
 	const pushBranches = "    branches: [main, \"hotfix/**\"]\n"
 	s := string(script)
 	for want, c := range map[string]struct {
@@ -380,6 +423,12 @@ func TestReleaseGateIsWired(t *testing.T) {
 		"release.yml starts on tags":                                                                                                {plant("release.yml", `tags: ["v[0-9]+.[0-9]+.[0-9]+"]`, `tags: ["v*"]`), s},
 		"release.yml builds without first refusing a tag with a suffix":                                                             {plant("release.yml", confirmedTag, `[[ $TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-rc\.[0-9]+)?$ ]] || {`), s},
 		"release.yml builds without first refusing a tag that differs from version.txt":                                             {plant("release.yml", versionFile, `[[ true ]] || {`), s},
+		"release.yml builds without first refusing a tag that is not the release commit":                                            {plant("release.yml", releaseCommit, `[[ true ]] || {`), s},
+		"edge.yml publishes an image (--push)":                                                                                      {extra("edge.yml", "      - run: docker buildx build --platform linux/amd64 --push -t ghcr.io/x/y:edge .\n"), s},
+		"edge.yml publishes an image (type=registry)":                                                                               {extra("edge.yml", "      - uses: docker/build-push-action@x\n        with:\n          outputs: type=registry\n"), s},
+		"edge.yml publishes an image (docker/login-action)":                                                                         {extra("edge.yml", "      - uses: docker/login-action@x\n"), s},
+		"edge.yml publishes an image (packages: write)":                                                                             {extra("edge.yml", "    permissions:\n      packages: write\n"), s},
+		"release-please.yml publishes an image (packages: write)":                                                                   {plant("release-please.yml", "    timeout-minutes: 10\n    permissions:\n      contents: write\n      checks: read\n      actions: read\n    steps:", "    timeout-minutes: 10\n    permissions:\n      contents: write\n      checks: read\n      actions: read\n      packages: write\n    steps:"), s},
 		"does not open the release pull request with the built-in GITHUB_TOKEN alone (other token)":                                 {plant("release-please.yml", builtinToken, "token: ${{ secrets.RELEASE_PLEASE_TOKEN }}"), s},
 		"does not open the release pull request with the built-in GITHUB_TOKEN alone (fallback)":                                    {plant("release-please.yml", builtinToken, "token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}"), s},
 		"does not approve CI and Security on the release pull request (no step)":                                                    {plant("release-please.yml", approveStep, "echo"), s},

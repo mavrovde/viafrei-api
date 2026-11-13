@@ -7,8 +7,9 @@
 #   reference and guide) of the newest release to GitHub Pages.
 # This is the ONLY workflow that pushes an image. An image is published for
 # a confirmed release and nothing else: an annotated vX.Y.Z tag (no -rc or
-# other suffix) whose version equals version.txt, on a commit of main (or of
-# a ruleset-protected hotfix/* branch) that CI passed. There is no main-line
+# other suffix) whose version equals version.txt, on the commit that set
+# version.txt (the release commit) of main (or of a ruleset-protected
+# hotfix/* branch) that CI passed. There is no main-line
 # (:edge, :sha-) image, and a release candidate publishes nothing: CI already
 # builds, lints, scans and smoke-tests the image of every commit without
 # pushing it.
@@ -80,7 +81,10 @@ jobs:
           # release, and no image is published for it (docs/RELEASING.md).
           [[ $TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || { echo "::error::'$TAG' is not a confirmed release vX.Y.Z; an rc or any other suffix publishes no image"; exit 1; }
           major=${BASH_REMATCH[1]} minor=${BASH_REMATCH[2]}
-          [[ $(tr -d '[:space:]' < version.txt) == "${TAG#v}" ]] || { echo "::error::$TAG does not equal version.txt ($(tr -d '[:space:]' < version.txt)) at the tagged commit; only the release commit is released"; exit 1; }
+          [[ $(tr -d '[:space:]' < version.txt) == "${TAG#v}" ]] || { echo "::error::$TAG does not equal version.txt ($(tr -d '[:space:]' < version.txt)) at the tagged commit"; exit 1; }
+          # Every later commit of main also holds version.txt = X.Y.Z, so the
+          # tag must sit on the commit that set it: the release commit itself.
+          [[ $(git rev-list -1 "$TAG" -- version.txt) == "$(git rev-parse "$TAG^{commit}")" ]] || { echo "::error::$TAG is not on the commit that set version.txt to ${TAG#v}; only the release commit is released"; exit 1; }
           [[ $(gh api "repos/$GH_REPO/git/ref/tags/$TAG" --jq .object.type) == tag ]] || { echo "::error::$TAG is a lightweight tag; releases need an annotated tag (git tag -a)"; exit 1; }
           # A release comes from reviewed history: main, or a hotfix branch
           # cut from a release tag (docs/RELEASING.md). Checked before

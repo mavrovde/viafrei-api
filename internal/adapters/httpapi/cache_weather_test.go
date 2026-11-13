@@ -129,6 +129,42 @@ func TestAWeatherFamilyTheLampReadBoundsTheStaleAllowance(t *testing.T) {
 	}
 }
 
+// TestAFamilyTheLampReadTurningStaleEndsAWeatherAnswer: a family the lamp
+// read, but the answer does not attribute, turns stale 10 s on with no
+// warning starting or ending: from then on the lamp is amber, so the stored
+// answer must not answer, though no version moved.
+func TestAFamilyTheLampReadTurningStaleEndsAWeatherAnswer(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005", "FR-WEATHER-001")
+	r := newWeatherRig(t, config.Defaults())
+	a := r.features.risk
+	a.Items, a.Lamp = nil, weather.LampGreen
+	a.ChangesAt, a.WarningChange = tp(fixedNow.Add(10*time.Second)), nil
+	r.features.risk = a
+	first := r.road(t, weatherURL, "")
+	if cc := first.Header().Get("Cache-Control"); cc != "private, max-age=10" {
+		t.Fatalf("the max-age reaches past the turn: %q", cc)
+	}
+	etag := first.Header().Get("ETag")
+	later := a
+	later.Lamp, later.ChangesAt = weather.LampAmber, nil
+	r.features.risk = later
+	r.clock.add(10*time.Second - time.Nanosecond)
+	if w := r.road(t, weatherURL, etag); w.Code != http.StatusNotModified {
+		t.Fatalf("before the turn: %d", w.Code)
+	}
+	if w := r.road(t, weatherURL, ""); w.Header().Get("Age") == "" {
+		t.Fatalf("before the turn the answer was read again: %s", w.Body)
+	}
+	r.clock.add(time.Nanosecond)
+	w := r.road(t, weatherURL, etag)
+	if w.Code != http.StatusOK || w.Header().Get("ETag") == etag {
+		t.Fatalf("at the turn: %d", w.Code)
+	}
+	if data, _ := decode(t, w)["data"].(map[string]any); data["lamp"] != "amber" {
+		t.Fatalf("at the turn the lamp is %v", data["lamp"])
+	}
+}
+
 func TestAnEditedRuleEndsADrivingRulesAnswer(t *testing.T) {
 	req.Covers(t, "NFR-PERF-005", "FR-RULES-001")
 	r := newWeatherRig(t, config.Defaults())

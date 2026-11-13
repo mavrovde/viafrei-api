@@ -71,7 +71,7 @@ Each release page also lists the digest, the tags, these commands and the SBOM a
 
 `compose.yaml` runs two services:
 
-- **db**: PostgreSQL 18 with PostGIS 3.6 (the platform's production database moves to the same major), built from the `devdb` stage. On first start it builds the read-contract stub (`db/contract`), creates the read-only role `api_reader`, publishes the contract version and loads a synthetic fixture set (`tiny`, seed 1, set with `FIXTURE_PROFILE` and `FIXTURE_SEED`). It sits on an internal network, publishes no port and keeps its data in the named volume `db-data`.
+- **db**: PostgreSQL 18 with PostGIS 3.6, built from the `devdb` stage. On first start it builds the read-contract stub (`db/contract`), creates the read-only role `api_reader`, publishes the contract version and loads a synthetic fixture set (`tiny`, seed 1, set with `FIXTURE_PROFILE` and `FIXTURE_SEED`). It sits on an internal network, publishes no port and keeps its data in the named volume `db-data`.
 - **api**: the runtime image. It connects as `api_reader`, runs read-only with every capability dropped, and is published on the IPv6 loopback address `[::1]:8080` only.
 
 ```sh

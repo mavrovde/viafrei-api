@@ -83,7 +83,7 @@ func scanWarning(r pgx.CollectableRow) (weather.Warning, error) {
 
 // WarningsAt reads, in one snapshot, the warnings in the scope
 // (warningScope) at or above the level floor, of the asked hazards; level
-// descending, then start, then id; at most weather.MaxWarnings, and whether
+// descending, then start, then id; at most q.Limit, and whether
 // more answer. It also reads every placed warning (warningPlaced), whatever
 // the floor and the hazards keep: the level of each one in force, for the
 // lamp, and the earliest start or end after now of any, when the scope
@@ -103,7 +103,7 @@ func (s *Store) WarningsAt(ctx context.Context, q weather.Query, families []stri
 	// nothing the caller holds is written after a read past its deadline.
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (weather.Scope, error) {
 		var out weather.Scope
-		rows, _ := tx.Query(ctx, warningsPage, families, now, q.At.Lat, q.At.Lon, int(q.MinLevel), hazards, other, every, weather.MaxWarnings+1)
+		rows, _ := tx.Query(ctx, warningsPage, families, now, q.At.Lat, q.At.Lon, int(q.MinLevel), hazards, other, every, q.Limit+1)
 		var err error
 		if out.Warnings, err = pgx.CollectRows(rows, scanWarning); err != nil {
 			return out, err
@@ -132,8 +132,8 @@ func (s *Store) WarningsAt(ctx context.Context, q weather.Query, families []stri
 	if err != nil {
 		return weather.Scope{}, err
 	}
-	if len(out.Warnings) > weather.MaxWarnings {
-		out.Warnings, out.HasMore = out.Warnings[:weather.MaxWarnings], true
+	if len(out.Warnings) > q.Limit {
+		out.Warnings, out.HasMore = out.Warnings[:q.Limit], true
 	}
 	return out, nil
 }

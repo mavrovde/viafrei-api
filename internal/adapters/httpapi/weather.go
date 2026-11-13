@@ -62,8 +62,8 @@ type RoadWeatherObservation struct {
 // WeatherRiskData is the answer of getWeatherRisk.
 type WeatherRiskData struct {
 	Lamp        string                   `json:"lamp" enum:"green,amber,red" doc:"Over every warning in force at the position, whatever min_level and hazards keep (they filter only the list), first match: red when a warning of level 3 or 4 is in force; amber for a warning of level 1 or 2, or, with no warning in force, when the sight is limited: a weather family the key may not read was left out (meta.partial), or a weather family read has no data or stale data (meta.freshness), since no warning cannot then be told from none heard; green when no warning is in force and every family is fresh."`
-	Warnings    []WeatherWarning         `json:"warnings" doc:"The warnings min_level and hazards keep, ordered by level descending, then validity.from ascending, then id; at most 100."`
-	Truncated   bool                     `json:"truncated" doc:"True when more than 100 warnings answer and only the first 100 are listed; the lamp reads them all."`
+	Warnings    []WeatherWarning         `json:"warnings" doc:"The warnings min_level and hazards keep, ordered by level descending, then validity.from ascending, then id; at most weather.max_warnings."`
+	Truncated   bool                     `json:"truncated" doc:"True when more warnings answer than weather.max_warnings and only the first are listed; the lamp reads them all."`
 	RoadWeather []RoadWeatherObservation `json:"roadWeather" doc:"Road-weather observations near a corridor; present for along questions only, so always empty on a question about one position."`
 }
 

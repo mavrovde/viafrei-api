@@ -47,6 +47,7 @@ func FeatureSettings(cfg *config.Config) features.Settings {
 		Language:       Language,
 		PartDeadline:   cfg.Compose.PartDeadline,
 		EndedRetention: time.Duration(cfg.Roads.EndedRetentionH) * time.Hour,
+		MaxWarnings:    cfg.Weather.MaxWarnings,
 		Disabled:       cfg.Sources.Disabled,
 		IsTimeout:      store.IsDeadline,
 	}

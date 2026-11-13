@@ -26,7 +26,7 @@ func TestFeatureSettings(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Sources.Disabled = []string{"src-x"}
 	s := wire.FeatureSettings(cfg)
-	if s.Language != wire.Language || s.PartDeadline != 800*time.Millisecond || len(s.Disabled) != 1 || s.Disabled[0] != "src-x" {
+	if s.Language != wire.Language || s.PartDeadline != 800*time.Millisecond || len(s.Disabled) != 1 || s.Disabled[0] != "src-x" || s.MaxWarnings != 100 {
 		t.Fatalf("settings %+v", s)
 	}
 	if !s.IsTimeout(store.ErrDeadlineExhausted) || s.IsTimeout(store.ErrUnavailable) {

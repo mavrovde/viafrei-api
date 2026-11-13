@@ -77,7 +77,7 @@ func wxService(f *wxFake) *features.Service {
 	}
 	f.reg = wxRegister
 	return features.New(features.Repositories{Register: f, Weather: f, Rules: f},
-		features.Settings{Language: "en"}, func() time.Time { return now })
+		features.Settings{Language: "en", MaxWarnings: 7}, func() time.Time { return now })
 }
 
 func TestWeatherRiskIsGatedAttributedAndLit(t *testing.T) {
@@ -88,7 +88,7 @@ func TestWeatherRiskIsGatedAttributedAndLit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.gotQuery.MinLevel != 2 || !slices.Equal(f.gotQuery.Hazards, q.Hazards) || !slices.Equal(f.gotFamilies, []string{"w1"}) || !f.gotNow.Equal(now) {
+	if f.gotQuery.MinLevel != 2 || f.gotQuery.Limit != 7 || !slices.Equal(f.gotQuery.Hazards, q.Hazards) || !slices.Equal(f.gotFamilies, []string{"w1"}) || !f.gotNow.Equal(now) {
 		t.Errorf("asked %+v of %v at %v", f.gotQuery, f.gotFamilies, f.gotNow)
 	}
 	if !r.Partial || len(r.Items) != 2 || !r.At.Equal(now) || r.Lamp != weather.LampRed || !slices.Equal(names(r.Families), []string{"w1"}) {

@@ -73,6 +73,10 @@ type Query struct {
 	// Hazards keeps the warnings of these hazards; empty keeps every
 	// hazard. Other keeps the hazards that cannot be mapped.
 	Hazards []Hazard
+	// Limit is the most warnings one answer lists (weather.max_warnings).
+	// Warnings come worst first, so the limit never hides the warning that
+	// decides the lamp, and the lamp reads every warning in force.
+	Limit int
 }
 
 // KnownHazards returns the mapped hazards the query keeps, and whether it
@@ -103,12 +107,8 @@ const (
 // RedLevel is the lowest level that makes the lamp red.
 const RedLevel Level = 3
 
-// MaxWarnings caps the warnings one answer reads. Warnings come worst first,
-// so the cap never hides the warning that decides the lamp.
-const MaxWarnings = 100
-
-// LampOf is the weather lamp, the platform's warning lamp (its dwd signal
-// and sight), in the order of the roads lamp. It reads the levels of every
+// LampOf is the weather lamp, the platform's warning lamp (its
+// weather-warning signal and sight), in the order of the roads lamp. It reads the levels of every
 // warning in force at the position, whatever the list's level floor and
 // hazards keep, whether the answer is partial and whether a weather family
 // read is missing or stale; first match from the top:
@@ -136,9 +136,9 @@ func LampOf(levels []Level, partial, stale bool) Lamp {
 // Scope is one snapshot of the warnings at a position.
 type Scope struct {
 	// Warnings are those the floor and the hazards keep, worst first; at
-	// most MaxWarnings.
+	// most the query's Limit.
 	Warnings []Warning
-	// HasMore is set when more than MaxWarnings answer.
+	// HasMore is set when more than the query's Limit answer.
 	HasMore bool
 	// Levels are the levels of every warning in force at the position,
 	// whatever the floor and the hazards keep: the lamp's.

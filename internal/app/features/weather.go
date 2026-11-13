@@ -14,7 +14,7 @@ type Weather interface {
 	// WarningsAt returns, from one snapshot, the warnings of the given
 	// families in force at now whose area contains q.At, at or above
 	// q.MinLevel, of the asked hazards: level descending, then start, then
-	// id; at most weather.MaxWarnings, and whether more answer. It also
+	// id; at most q.Limit, and whether more answer. It also
 	// returns the level of every warning of the families in force at q.At,
 	// whatever the floor and the hazards keep, for the lamp, and the earliest
 	// instant after now at which any warning of the families placed at q.At
@@ -58,6 +58,7 @@ func (s *Service) WeatherRisk(ctx context.Context, key access.Record, q weather.
 		return WeatherRisk{}, err
 	}
 	now := s.now()
+	q.Limit = s.set.MaxWarnings
 	sc, err := s.repos.Weather.WarningsAt(ctx, q, permitted, now)
 	if err != nil {
 		return WeatherRisk{}, err

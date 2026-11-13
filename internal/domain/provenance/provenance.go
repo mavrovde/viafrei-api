@@ -40,10 +40,10 @@ type Family struct {
 	Source access.Source
 	// StaleAfter is the family's design threshold: older data is stale.
 	StaleAfter time.Duration
-	// DataAsOf is the instant of the family's last successful read from its
-	// publisher (contract.source_freshness.data_as_of), not of the last
-	// change in its data: a source that answers unchanged stays fresh. Nil
-	// when the family has never been read successfully.
+	// DataAsOf is the instant up to which the family's data was last known
+	// current. It advances when the data is confirmed unchanged, so it is not
+	// the instant of the last change in the data. Nil when the family's data
+	// has never been known current.
 	DataAsOf *time.Time
 	// Version changes whenever the family's data changes; empty when the
 	// family has published none. An answer's ETag is built from it.

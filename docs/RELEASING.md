@@ -204,20 +204,40 @@ way. To try a candidate, build it locally from that commit
   (the release commit), so a later commit cannot be released under it.
 - A tag is never moved and never deleted. A broken release is followed by a
   new patch release.
-- Only release maintainers and the release workflow create `v*` tags, and
-  the tag ruleset refuses any name but `vX.Y.Z` (`tag_name_pattern`).
-- **The trust boundary is the ruleset's bypass list.** A tag push runs the
-  `release.yml` of the TAGGED commit, so a tag on a commit older than this
-  rule runs the older, wider workflow. The tag ruleset keeps such tags to
-  its bypass actors (repository admins and the release workflow); they are
-  trusted not to tag an old commit or a suffixed version by hand.
+- Two tag rulesets are live (below). Nobody, admins included, can create or
+  move a `v*` tag that carries a suffix (`-…` or `+…`), and only a repository
+  admin can move or delete any other `v*` tag.
+- **The trust boundary is review plus the collaborators.** A tag push runs the
+  `release.yml` of the TAGGED commit, so a tag on a commit older than the
+  confirmed-release rule runs the older, wider workflow. GitHub cannot limit
+  who CREATES a plain `vX.Y.Z` tag here, for the reason below. So anyone with
+  write access, and release-please's `GITHUB_TOKEN`, can create one. Write access is
+  limited to the repository's collaborators, who are trusted not to tag an
+  old commit by hand. The suffix ruleset keeps an `-rc.N` tag away from every
+  commit, old or new.
 
-### Tag ruleset (documented here, applied by a repository admin)
+### Tag rulesets (live, applied by a repository admin)
 
-These calls protect `v*` tags. They are **not** applied by any workflow; a
-repository admin runs them once. Bypass is granted to repository admins (role
-id 5) and to the GitHub Actions app (integration id 15368), which pushes the
-tag in `release-please.yml`.
+No workflow applies these; a repository admin applied them once.
+
+The first refuses any suffixed `v*` tag for everyone, with no bypass:
+
+```sh
+gh api -X POST repos/mavrovde/viafrei-api/rulesets --input - <<'JSON'
+{
+  "name": "release tags: plain vX.Y.Z only",
+  "target": "tag",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": { "ref_name": {
+    "include": ["refs/tags/v*-*", "refs/tags/v*+*"], "exclude": [] } },
+  "rules": [ { "type": "creation" }, { "type": "update" } ]
+}
+JSON
+```
+
+The second protects every `v*` tag from being moved or deleted. Only the
+repository admin role (id 5) may bypass it:
 
 ```sh
 gh api -X POST repos/mavrovde/viafrei-api/rulesets --input - <<'JSON'
@@ -227,34 +247,39 @@ gh api -X POST repos/mavrovde/viafrei-api/rulesets --input - <<'JSON'
   "enforcement": "active",
   "conditions": { "ref_name": { "include": ["refs/tags/v*"], "exclude": [] } },
   "bypass_actors": [
-    { "actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always" },
-    { "actor_id": 15368, "actor_type": "Integration", "bypass_mode": "always" }
+    { "actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always" }
   ],
   "rules": [
-    { "type": "creation" },
     { "type": "update" },
     { "type": "deletion" },
-    { "type": "non_fast_forward" },
-    { "type": "tag_name_pattern",
-      "parameters": { "name": "release tag name", "operator": "regex",
-                      "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$", "negate": false } }
+    { "type": "non_fast_forward" }
   ]
 }
 JSON
 ```
 
-The `tag_name_pattern` rule refuses a `v*` tag that is not a confirmed
-release name (an `-rc.N`, any suffix), also for the commits whose older
-`release.yml` would still accept one.
+Two rules are absent on purpose:
 
-Check it:
+- **No `tag_name_pattern` rule.** GitHub accepts that rule only on Enterprise
+  plans and refused it here. The suffix ruleset blocks `-rc.N` and any other
+  suffix instead. `release.yml` itself refuses every name but `vX.Y.Z`, a
+  tag that differs from `version.txt`, and a tag that is not on the release
+  commit.
+- **No `creation` rule on plain `vX.Y.Z` tags.** On a personal-account
+  repository GitHub cannot list the GitHub Actions app as a bypass actor, so
+  restricting creation would also block release-please's own tag. The
+  remaining protection is `release.yml`'s refusals, review of the release
+  commit, and the collaborators' trust.
+
+Check them:
 
 ```sh
-gh api repos/mavrovde/viafrei-api/rulesets --jq '.[] | select(.target == "tag") | {id, name, enforcement}'
+gh api repos/mavrovde/viafrei-api/rulesets --jq '.[] | {id, name, target, enforcement}'
+gh api repos/mavrovde/viafrei-api/rules/tags/v1.0.0-rc.1 --jq '[.[].type]'   # creation, update, ...
 ```
 
-With `update` and `deletion` restricted, not even a maintainer moves a tag
-without first changing the ruleset, which is the point.
+With `update` and `deletion` restricted, a maintainer cannot move or delete a
+tag without first changing the ruleset, which is the point.
 
 ## Rollback
 
@@ -303,9 +328,9 @@ What this check cannot see, so the ruleset's owner keeps it true:
 5. Merge or cherry-pick the fix into `main` and add the version to
    `.release-please-manifest.json` there, so release-please continues from it.
 
-### Hotfix ruleset (documented here, applied by a repository admin)
+### Hotfix ruleset (live, applied by a repository admin)
 
-Applied once, like the tag ruleset; no workflow applies it.
+Applied once, like the tag rulesets; no workflow applies it.
 
 ```sh
 gh api -X POST repos/mavrovde/viafrei-api/rulesets --input - <<'JSON'

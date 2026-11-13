@@ -144,8 +144,10 @@ func TestWorkflowRulesCanSayNo(t *testing.T) {
 }
 
 // TestCosignIdentityNamesRealWorkflows: the identity users verify against
-// (docs/container.md, the release notes) names the two publishing workflows,
-// so renaming either would make every published signature unverifiable.
+// (docs/container.md, the release notes) names the one publishing workflow,
+// so renaming it would make every published signature unverifiable, and it
+// accepts release tags without a suffix only: images are published for
+// confirmed releases alone.
 func TestCosignIdentityNamesRealWorkflows(t *testing.T) {
 	req.Covers(t, "SSC-005")
 	wf := readWorkflows(t)
@@ -153,15 +155,14 @@ func TestCosignIdentityNamesRealWorkflows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"image.yml", "release.yml"} {
-		if wf[name] == nil {
-			t.Errorf("the cosign identity names %s, which does not exist", name)
-		}
-		if !strings.Contains(string(wf[name]), `(image|release)\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?)$`) {
-			t.Errorf("%s does not state the identity regexp of docs/container.md", name)
-		}
+	const identity = `/\.github/workflows/release\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$`
+	if wf["release.yml"] == nil {
+		t.Error("the cosign identity names release.yml, which does not exist")
 	}
-	if !strings.Contains(string(doc), `(image|release)\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?)$`) {
+	if !strings.Contains(string(wf["release.yml"]), identity) {
+		t.Error("release.yml does not state the identity regexp of docs/container.md")
+	}
+	if !strings.Contains(string(doc), identity) {
 		t.Error("docs/container.md no longer carries the identity regexp")
 	}
 }

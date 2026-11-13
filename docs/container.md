@@ -20,14 +20,21 @@ This page shows how to use the image.
 
 ### Tags
 
+Images are published for **confirmed releases only**: an annotated tag
+`vX.Y.Z` whose version equals `version.txt`, on a commit CI passed
+([RELEASING.md](RELEASING.md)). A push to `main` and a release candidate
+publish no image; CI builds, lints, scans and smoke-tests the image of every
+commit without pushing it.
+
 | Tag | Set by | Moves |
 |---|---|---|
-| `X.Y.Z`, for example `0.2.0` | a release tag `vX.Y.Z` | never |
-| `X.Y` | a release tag | to the newest patch of that minor |
-| `latest` | a release tag, but not a release candidate | to the newest release |
-| `X.Y.Z-rc.N` | a release-candidate tag | never |
-| `sha-<12 hex>` | a push to `main` once CI passed on it, if that commit is still the head of `main` when `image.yml` starts (otherwise the newer head's run publishes); every release | never |
-| `edge` | a push to `main` once CI passed on it (`image.yml` follows the CI run) | to the newest `main` only, never back to an older commit |
+| `X.Y.Z`, for example `0.2.1` | a release | never |
+| `X.Y` | a release | to the newest patch of that minor |
+| `latest` | a release | to the newest release |
+
+Images published before 0.3.0 also carry `sha-<12 hex>` and `edge` tags from
+builds of `main`. Those tags are no longer written, and they are not releases:
+do not deploy them.
 
 Deploy by digest (`ghcr.io/mavrovde/viafrei-api@sha256:…`), not by a moving tag.
 
@@ -37,7 +44,7 @@ Deploy by digest (`ghcr.io/mavrovde/viafrei-api@sha256:…`), not by a moving ta
 docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
   -p "[::1]:8080:8080" \
   -e VFAPI_DB_URL_FILE=/run/secrets/db_url -v "$PWD/db_url:/run/secrets/db_url:ro" \
-  ghcr.io/mavrovde/viafrei-api:edge
+  ghcr.io/mavrovde/viafrei-api:latest
 ```
 
 The configuration keys are the same as for the binary ([configuration.md](configuration.md)). Every key is set with a `VFAPI_` environment variable. An unknown variable or a value out of bounds stops the container at once with exit status 78.
@@ -48,15 +55,16 @@ Resource limits for one instance are design targets, not yet measured: 256 MiB o
 
 ## Verify an image
 
-Images built from `main` and from release tags are signed with cosign (keyless, GitHub OIDC). They also carry an SBOM and a SLSA build-provenance attestation.
+Release images are signed with cosign (keyless, GitHub OIDC). They also carry an SBOM and a SLSA build-provenance attestation.
 
 ```sh
 IMAGE=ghcr.io/mavrovde/viafrei-api@sha256:<digest>
 
-# Signature: made by this repository's workflows, for main or a v* tag
+# Signature: made by this repository's release workflow for a vX.Y.Z release
+# (a release cut from main runs it at refs/heads/main)
 cosign verify "$IMAGE" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity-regexp '^https://github\.com/mavrovde/viafrei-api/\.github/workflows/(image|release)\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?)$'
+  --certificate-identity-regexp '^https://github\.com/mavrovde/viafrei-api/\.github/workflows/release\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$'
 
 # Build provenance (SLSA)
 gh attestation verify "oci://$IMAGE" --repo mavrovde/viafrei-api

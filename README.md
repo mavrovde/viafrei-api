@@ -117,12 +117,12 @@ The database the service reads is described by a versioned read contract in [`db
 
 ## Run with Docker
 
-The image is distroless, runs as non-root and is built for `linux/amd64` and `linux/arm64`. Releases and `main` are published to `ghcr.io/mavrovde/viafrei-api`, signed with cosign, and carry an SBOM and build provenance.
+The image is distroless, runs as non-root and is built for `linux/amd64` and `linux/arm64`. Confirmed releases, and only those, are published to `ghcr.io/mavrovde/viafrei-api` as `:X.Y.Z`, `:X.Y` and `:latest`, signed with cosign, with an SBOM and build provenance.
 
 ```sh
 docker run --rm --read-only -p "[::1]:8080:8080" \
   -e VFAPI_DB_URL_FILE=/run/secrets/db_url -v "$PWD/db_url:/run/secrets/db_url:ro" \
-  ghcr.io/mavrovde/viafrei-api:edge
+  ghcr.io/mavrovde/viafrei-api:latest
 ```
 
 [docs/container.md](docs/container.md) covers the tags, the `healthcheck` subcommand, resource limits and how to verify an image's signature, SBOM and provenance before running it.

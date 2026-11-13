@@ -371,7 +371,7 @@ func TestScannersUploadSARIF(t *testing.T) {
 func TestWorkflowsAreReadUnderBothExtensions(t *testing.T) {
 	req.Covers(t, "SSC-005")
 	dir := t.TempDir()
-	for _, n := range []string{"a.yml", "b.yml", "c.yml", "d.yaml"} {
+	for _, n := range []string{"a.yml", "b.yml", "c.yml", "e.yml", "d.yaml"} {
 		if err := os.WriteFile(filepath.Join(dir, n), []byte("on: push\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}

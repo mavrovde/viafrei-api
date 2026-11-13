@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -19,16 +20,26 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
-// freeAddr returns a loopback address nothing listens on.
+// handedOut are the addresses freeAddr has returned in this process.
+var handedOut sync.Map
+
+// freeAddr returns a loopback address nothing listens on, and never one it
+// returned before: a port is free again once its probe listener closes, so
+// two calls in a row can get the same port from the kernel, and a test that
+// serves the API and the console on two of them would then bind one twice.
 func freeAddr(t *testing.T) string {
 	t.Helper()
-	l, err := net.Listen("tcp", "localhost:0")
-	if err != nil {
-		t.Fatal(err)
+	for {
+		l, err := net.Listen("tcp", "localhost:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		addr := l.Addr().String()
+		_ = l.Close()
+		if _, seen := handedOut.LoadOrStore(addr, true); !seen {
+			return addr
+		}
 	}
-	addr := l.Addr().String()
-	_ = l.Close()
-	return addr
 }
 
 // dbURL points at a closed port: serve opens its pool without connecting.

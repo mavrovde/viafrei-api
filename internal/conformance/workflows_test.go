@@ -155,7 +155,7 @@ func TestCosignIdentityNamesRealWorkflows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const identity = `/\.github/workflows/release\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$`
+	const identity = `^https://github\.com/mavrovde/viafrei-api/\.github/workflows/release\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$`
 	if wf["release.yml"] == nil {
 		t.Error("the cosign identity names release.yml, which does not exist")
 	}

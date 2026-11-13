@@ -32,9 +32,8 @@ commit without pushing it.
 | `X.Y` | a release | to the newest patch of that minor |
 | `latest` | a release | to the newest release |
 
-Images published before 0.3.0 also carry `sha-<12 hex>` and `edge` tags from
-builds of `main`. Those tags are no longer written, and they are not releases:
-do not deploy them.
+Only confirmed releases are published. Builds of `main` are tested in CI but
+never pushed, and the earlier `sha-<12 hex>` and `edge` images were removed.
 
 Deploy by digest (`ghcr.io/mavrovde/viafrei-api@sha256:…`), not by a moving tag.
 

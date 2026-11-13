@@ -89,9 +89,20 @@ func permissionFindings(name string, perms any) []string {
 
 func readWorkflows(t *testing.T) map[string][]byte {
 	t.Helper()
-	paths, err := filepath.Glob(filepath.Join(root, ".github", "workflows", "*.yml"))
-	if err != nil {
-		t.Fatal(err)
+	return readWorkflowsIn(t, filepath.Join(root, ".github", "workflows"))
+}
+
+// readWorkflowsIn reads every workflow in dir under both extensions GitHub
+// runs, so a .yaml file cannot escape the rules a .yml file is held to.
+func readWorkflowsIn(t *testing.T, dir string) map[string][]byte {
+	t.Helper()
+	var paths []string
+	for _, ext := range []string{"*.yml", "*.yaml"} {
+		m, err := filepath.Glob(filepath.Join(dir, ext))
+		if err != nil {
+			t.Fatal(err)
+		}
+		paths = append(paths, m...)
 	}
 	if len(paths) < 4 {
 		t.Fatalf("read %d workflow file(s); a check over too few files proves nothing", len(paths))
@@ -354,5 +365,18 @@ func TestScannersUploadSARIF(t *testing.T) {
 				t.Errorf("planted %q, the rules said %q", want, got)
 			}
 		})
+	}
+}
+
+func TestWorkflowsAreReadUnderBothExtensions(t *testing.T) {
+	req.Covers(t, "SSC-005")
+	dir := t.TempDir()
+	for _, n := range []string{"a.yml", "b.yml", "c.yml", "d.yaml"} {
+		if err := os.WriteFile(filepath.Join(dir, n), []byte("on: push\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, ok := readWorkflowsIn(t, dir)["d.yaml"]; !ok {
+		t.Error("a .yaml workflow was not read, so no rule is applied to it")
 	}
 }

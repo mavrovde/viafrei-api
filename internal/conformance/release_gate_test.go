@@ -283,7 +283,7 @@ func shellRuleFindings(files map[string][]byte) []string {
 // obtain what publishing needs (a registry login, packages: write). Only
 // release.yml and the job of release-please.yml that calls it may carry them.
 var imagePushers = []string{
-	"push: true", "--push", "type=registry", "docker push", "docker/login-action", "packages: write",
+	"push: true", "push=true", "--push", "type=registry", "docker push", "docker login", "docker/login-action", "packages: write",
 	"cosign sign", "imagetools create", "oras push", "crane push", "crane copy",
 }
 
@@ -427,6 +427,9 @@ func TestReleaseGateIsWired(t *testing.T) {
 		"edge.yml publishes an image (--push)":                                                                                      {extra("edge.yml", "      - run: docker buildx build --platform linux/amd64 --push -t ghcr.io/x/y:edge .\n"), s},
 		"edge.yml publishes an image (type=registry)":                                                                               {extra("edge.yml", "      - uses: docker/build-push-action@x\n        with:\n          outputs: type=registry\n"), s},
 		"edge.yml publishes an image (docker/login-action)":                                                                         {extra("edge.yml", "      - uses: docker/login-action@x\n"), s},
+		"edge.yaml publishes an image (--push)":                                                                                     {extra("edge.yaml", "      - run: docker buildx build --push -t ghcr.io/x/y:edge .\n"), s},
+		"edge.yml publishes an image (docker login)":                                                                                {extra("edge.yml", "      - run: echo \"$T\" | docker login ghcr.io -u x --password-stdin\n"), s},
+		"edge.yml publishes an image (push=true)":                                                                                   {extra("edge.yml", "      - run: docker buildx build --output type=image,name=ghcr.io/x/y:edge,push=true .\n"), s},
 		"edge.yml publishes an image (packages: write)":                                                                             {extra("edge.yml", "    permissions:\n      packages: write\n"), s},
 		"release-please.yml publishes an image (packages: write)":                                                                   {plant("release-please.yml", "    timeout-minutes: 10\n    permissions:\n      contents: write\n      checks: read\n      actions: read\n    steps:", "    timeout-minutes: 10\n    permissions:\n      contents: write\n      checks: read\n      actions: read\n      packages: write\n    steps:"), s},
 		"does not open the release pull request with the built-in GITHUB_TOKEN alone (other token)":                                 {plant("release-please.yml", builtinToken, "token: ${{ secrets.RELEASE_PLEASE_TOKEN }}"), s},

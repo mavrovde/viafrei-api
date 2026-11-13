@@ -275,7 +275,8 @@ Check them:
 
 ```sh
 gh api repos/mavrovde/viafrei-api/rulesets --jq '.[] | {id, name, target, enforcement}'
-gh api repos/mavrovde/viafrei-api/rules/tags/v1.0.0-rc.1 --jq '[.[].type]'   # creation, update, ...
+gh api repos/mavrovde/viafrei-api/rulesets/27228883 --jq '{conditions, rules, bypass_actors}'   # suffix tags
+gh api repos/mavrovde/viafrei-api/rulesets/27229441 --jq '{conditions, rules, bypass_actors}'   # release tags
 ```
 
 With `update` and `deletion` restricted, a maintainer cannot move or delete a
@@ -341,11 +342,14 @@ gh api -X POST repos/mavrovde/viafrei-api/rulesets --input - <<'JSON'
   "conditions": { "ref_name": { "include": ["refs/heads/hotfix/**"], "exclude": [] } },
   "rules": [
     { "type": "pull_request", "parameters": {
+        "allowed_merge_methods": ["merge", "squash", "rebase"],
         "required_approving_review_count": 1,
         "dismiss_stale_reviews_on_push": true,
         "require_code_owner_review": false,
+        "require_extra_approval_for_unattributed_changes": true,
         "require_last_push_approval": true,
-        "required_review_thread_resolution": true } },
+        "required_review_thread_resolution": true,
+        "required_reviewers": [] } },
     { "type": "non_fast_forward" },
     { "type": "deletion" }
   ]

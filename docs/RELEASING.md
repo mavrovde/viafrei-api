@@ -38,28 +38,31 @@ and merge release pull requests.
    workflow holding `checks: write` can create a check run of any name, so a
    same-named run from elsewhere is not evidence. Only then does it create
    the **annotated** tag `vX.Y.Z` on the release commit and push it.
-5. The same run calls `.github/workflows/release.yml`, which:
-   - checks the tag is annotated and well-formed, and that its commit lies on
+5. The same run calls `.github/workflows/release.yml`, the only workflow
+   that pushes an image. Images exist for **confirmed releases only**: a push
+   to `main` and a release candidate publish none. The workflow:
+   - checks the tag is an annotated `vX.Y.Z` with no suffix, that it equals
+     `version.txt` at the tagged commit, and that its commit lies on
      `main` or a `hotfix/*` branch (`git merge-base --is-ancestor`); for a
      hotfix branch, also that the hotfix ruleset protects it (see Hotfix)
    - runs `scripts/ci-gate.sh` on the tagged commit again, before anything is
-     pushed or signed (this also covers a release-candidate tag pushed by hand)
+     pushed or signed (this also covers a `vX.Y.Z` tag pushed by hand)
    - refuses, before anything is built, when the release of that tag is
      already published or the image `:X.Y.Z` already exists: a re-run never
-     builds a second digest, never moves `:X.Y.Z` or `:sha-<12>`, and never
+     builds a second digest, never moves `:X.Y.Z`, and never
      appends the notes twice
    - builds `linux/amd64` and `linux/arm64`, pushes to
-     `ghcr.io/mavrovde/viafrei-api` as `:X.Y.Z` and `:sha-<12>`, plus `:X.Y`
-     and `:latest` for a final release (`:X.Y` only when it is the highest
-     patch of its minor, `:latest` only when it is the highest version, so a
-     backported patch never moves either back)
+     `ghcr.io/mavrovde/viafrei-api` as `:X.Y.Z`, plus `:X.Y` and `:latest`
+     (`:X.Y` only when it is the highest patch of its minor, `:latest` only
+     when it is the highest version, so a backported patch never moves
+     either back)
    - signs the digest with cosign (keyless) and attests SLSA build provenance
      and the SPDX SBOM to the image
    - attaches `openapi.json`, `openapi-changelog.txt`, `openapi-breaking.txt`
      (oasdiff against the previous release), `sbom.spdx.json`,
      `sbom.cdx.json` and `SHA256SUMS`
    - appends the digest, the tags, the verify commands and the milestone link
-     to the notes, marks every 0.x and `-rc` release as a pre-release, and
+     to the notes, marks every 0.x release as a pre-release, and
      publishes the draft
 6. The `verify` job of the same run pulls the image by digest, runs
    `cosign verify` and `gh attestation verify`, checks `SHA256SUMS` against
@@ -73,8 +76,8 @@ and merge release pull requests.
    `api/openapi.json`, and the document itself) and deploys it to GitHub Pages,
    <https://mavrovde.github.io/viafrei-api/>, then reads the published
    `index.html`, `reference.html` and `openapi.json` back and fails unless
-   they serve that version. Only the newest final release publishes; an rc
-   or a backported patch never replaces the site. CI builds the same site on
+   they serve that version. Only the newest release publishes; a backported
+   patch never replaces the site. CI builds the same site on
    every pull request (`OpenAPI lint and breaking changes` job) and checks
    its links, diagrams and accessibility (`Documentation portal` job,
    [accessibility](accessibility.md)).
@@ -184,21 +187,20 @@ After the run:
 
 ## Release candidates
 
-A maintainer creates an rc tag by hand on a commit of `main`:
-
-```sh
-git tag -a v0.3.0-rc.1 -m "Release candidate v0.3.0-rc.1" <sha>
-git push origin v0.3.0-rc.1
-```
-
-The tag push runs `release.yml`: image `:0.3.0-rc.1`, no `:X.Y`, no `:latest`,
-a pre-release page with generated notes. Candidates are never promoted by
-re-tagging; the final release is cut by release-please as usual.
+A release candidate publishes nothing: no image, no release page.
+`release.yml` starts only on a `vX.Y.Z` tag push and refuses any other tag,
+because an image exists for a confirmed release only. A candidate is the
+commit itself: CI's `Image (build, lint, scan, healthz)` job builds, lints,
+scans and smoke-tests the image of every commit on `main` without pushing
+it, and the documentation portal of every pull request is checked the same
+way. To try a candidate, build it locally from that commit
+(`docker build --target runtime .`) or run the Compose stack.
 
 ## Tags
 
-- Only annotated tags `vX.Y.Z` and `vX.Y.Z-rc.N`. `release.yml` refuses a
-  lightweight tag.
+- Only annotated tags `vX.Y.Z`. `release.yml` refuses a lightweight tag, a
+  tag with a suffix (`-rc.N` or any other) and a tag that differs from
+  `version.txt`. Tags `vX.Y.Z-rc.N` made before 0.3.0 stay as history.
 - A tag is never moved and never deleted. A broken release is followed by a
   new patch release.
 - Only release maintainers and the release workflow create `v*` tags.

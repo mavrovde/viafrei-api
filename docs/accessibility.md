@@ -145,7 +145,7 @@ requires.
 
 ## Manual pass, once per minor release
 
-Done by a maintainer on the portal built from the release candidate
+Done by a maintainer on the portal built from the release commit
 (`make docs`, then open `site/index.html`), in a current browser and one
 screen reader (VoiceOver, NVDA or Orca). Record the result in section 6 of
 the release's test completion report: date, tester, browser and screen

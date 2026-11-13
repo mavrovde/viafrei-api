@@ -55,7 +55,6 @@ var gateRules = []gateRule{
 	{"release-please.yml", "tag", "git push origin"},
 	{"release.yml", "publish", "docker/build-push-action"},
 	{"release.yml", "publish", "cosign sign"},
-	{"image.yml", "publish", "docker/build-push-action"},
 }
 
 // gateGrants: the jobs that run the gate, and the caller job that grants
@@ -64,7 +63,6 @@ var gateGrants = [][2]string{
 	{"release-please.yml", "tag"},
 	{"release-please.yml", "release"},
 	{"release.yml", "publish"},
-	{"image.yml", "publish"},
 }
 
 // The conditions a workflow_run job must carry: CI succeeded, and the run
@@ -82,8 +80,11 @@ const (
 	hotfixReviews = `(( reviews >= 1 )) || {`
 	reviewCount   = `select(.type == "pull_request") | .parameters.required_approving_review_count // 0] | max // 0`
 	gateRepo      = `-repo "$GH_REPO"`
-	minorGuard    = `if [[ $FINAL == true && $HIGHEST_IN_MINOR == true ]]; then echo "$IMAGE:$MINOR"; fi`
-	dispatchGuard = `if [[ $EVENT == workflow_dispatch && $REF != refs/heads/main ]]; then`
+	minorGuard    = `if [[ $HIGHEST_IN_MINOR == true ]]; then echo "$IMAGE:$MINOR"; fi`
+	confirmedTag  = `[[ $TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || {`
+	versionFile   = `[[ $(tr -d '[:space:]' < version.txt) == "${TAG#v}" ]] || {`
+	releaseCommit = `[[ $(git rev-list -1 "$TAG" -- version.txt) == "$(git rev-parse "$TAG^{commit}")" ]] || {`
+	releaseTags   = "v[0-9]+.[0-9]+.[0-9]+"
 	builtinToken  = "token: ${{ secrets.GITHUB_TOKEN }}"
 	approveScript = "approve-release-runs.sh"
 	approveStep   = `scripts/approve-release-runs.sh "$branch"`
@@ -98,11 +99,13 @@ const (
 // has not passed, and nothing is built from code this repository's main did
 // not hold. Every publishing job runs scripts/ci-gate.sh before it
 // publishes, the gate requires checks that are real ci.yml job names, the
-// image and the release pull request follow a successful CI run of this
-// repository instead of a bare push and never check out a ref the event
-// names, a dispatched image comes from main only, a release tag must lie on
-// main or a ruleset-protected hotfix branch before it is signed, and :X.Y
-// moves only for the newest patch of its minor.
+// release pull request follows a successful CI run of this repository
+// instead of a bare push and never checks out a ref the event names, a
+// release tag must lie on main or a ruleset-protected hotfix branch before it
+// is signed, and :X.Y moves only for the newest patch of its minor. An image
+// exists for a confirmed release only: release.yml is the one workflow that
+// pushes or signs one, it starts on a vX.Y.Z tag alone, and before it builds
+// it refuses a tag with a suffix and a tag that differs from version.txt.
 func releaseGateFindings(files map[string][]byte, gateScript string) []string {
 	parsed := map[string]gatedWorkflow{}
 	for name, src := range files {
@@ -119,10 +122,9 @@ func releaseGateFindings(files map[string][]byte, gateScript string) []string {
 	out = append(out, ciPushFindings(parsed["ci.yml"])...)
 	out = append(out, gateOrderFindings(parsed)...)
 	out = append(out, gateGrantFindings(parsed)...)
-	for _, name := range []string{"image.yml", "release-please.yml"} {
-		out = append(out, workflowRunFindings(name, parsed[name])...)
-	}
+	out = append(out, workflowRunFindings("release-please.yml", parsed["release-please.yml"])...)
 	out = append(out, shellRuleFindings(files)...)
+	out = append(out, confirmedReleaseFindings(files, parsed["release.yml"])...)
 	slices.Sort(out)
 	return out
 }
@@ -261,9 +263,6 @@ func shellRuleFindings(files map[string][]byte) []string {
 	if !strings.Contains(rel, minorGuard) {
 		out = append(out, "release.yml moves :X.Y without the highest-in-minor guard")
 	}
-	if !strings.Contains(string(files["image.yml"]), dispatchGuard) {
-		out = append(out, "image.yml publishes a dispatch from a branch other than main")
-	}
 	rp := string(files["release-please.yml"])
 	approve := string(files[approveScript])
 	if !strings.Contains(rp, builtinToken) || strings.Contains(rp, "RELEASE_PLEASE_TOKEN") {
@@ -276,6 +275,74 @@ func shellRuleFindings(files map[string][]byte) []string {
 	}
 	if !strings.Contains(rp, approveStep) || !strings.Contains(rp, dispatchGrant) || !strings.Contains(approve, approveRun) || !strings.Contains(approve, "for wf in CI Security; do") {
 		out = append(out, "release-please.yml does not approve CI and Security on the release pull request")
+	}
+	return out
+}
+
+// imagePushers are the texts that publish or sign an image, or that grant or
+// obtain what publishing needs (a registry login, packages: write). Only
+// release.yml and the job of release-please.yml that calls it may carry them.
+var imagePushers = []string{
+	"push: true", "push=true", "--push", "type=registry", "docker push", "docker login", "docker/login-action", "packages: write",
+	"cosign sign", "imagetools create", "oras push", "crane push", "crane copy",
+}
+
+// withoutJob returns a workflow's text with one top-level job's block cut
+// out, so the job allowed to grant publishing is exempt and its siblings are
+// still read.
+func withoutJob(src, job string) string {
+	lines := strings.SplitAfter(src, "\n")
+	var b strings.Builder
+	skip := false
+	for _, l := range lines {
+		if strings.HasPrefix(l, "  ") && !strings.HasPrefix(l, "   ") && strings.HasSuffix(strings.TrimRight(l, "\n"), ":") {
+			skip = strings.TrimSpace(l) == job+":"
+		} else if l != "" && l != "\n" && !strings.HasPrefix(l, " ") && !strings.HasPrefix(l, "#") {
+			skip = false
+		}
+		if !skip {
+			b.WriteString(l)
+		}
+	}
+	return b.String()
+}
+
+// confirmedReleaseFindings: images are published for confirmed releases only.
+// No workflow but release.yml pushes or signs an image (there is no main-line
+// image), release.yml starts on a pushed vX.Y.Z tag alone, and it refuses a
+// tag with a suffix (a release candidate) and a tag that differs from
+// version.txt before anything is built.
+func confirmedReleaseFindings(files map[string][]byte, rel gatedWorkflow) []string {
+	var out []string
+	for name, src := range files {
+		if name == "release.yml" || !strings.HasSuffix(name, ".yml") && !strings.HasSuffix(name, ".yaml") {
+			continue
+		}
+		text := string(src)
+		if name == "release-please.yml" {
+			text = withoutJob(text, "release")
+		}
+		for _, p := range imagePushers {
+			if strings.Contains(text, p) {
+				out = append(out, name+" publishes an image ("+p+"); only release.yml publishes, for a confirmed release")
+			}
+		}
+	}
+	push, _ := rel.On["push"].(map[string]any)
+	tags, _ := push["tags"].([]any)
+	if len(tags) != 1 || tags[0] != releaseTags {
+		out = append(out, fmt.Sprintf("release.yml starts on tags %v, not on %s alone", tags, releaseTags))
+	}
+	src := string(files["release.yml"])
+	build := strings.Index(src, "docker/build-push-action")
+	for rule, text := range map[string]string{
+		"a tag with a suffix":                  confirmedTag,
+		"a tag that differs from version.txt":  versionFile,
+		"a tag that is not the release commit": releaseCommit,
+	} {
+		if i := strings.Index(src, text); i < 0 || i > build {
+			out = append(out, "release.yml builds without first refusing "+rule)
+		}
 	}
 	return out
 }
@@ -308,61 +375,83 @@ func TestReleaseGateIsWired(t *testing.T) {
 		return m
 	}
 	gateStep := "        run: scripts/ci-gate.sh \"$SHA\"\n"
-	// The gate moved after the push: the image step runs it once the image is
+	// The gate moved after the push: the release runs it once the image is
 	// already published.
-	late := plant("image.yml", gateStep, "        run: echo skipped\n")
-	late["image.yml"] = []byte(strings.Replace(string(late["image.yml"]), "        run: cosign sign --yes \"${IMAGE}@${DIGEST}\"\n", "        run: scripts/ci-gate.sh \"$SHA\" && cosign sign --yes \"${IMAGE}@${DIGEST}\"\n", 1))
+	late := plant("release.yml", gateStep, "        run: echo skipped\n")
+	late["release.yml"] = []byte(strings.Replace(string(late["release.yml"]), "        run: cosign sign --yes \"$IMAGE@$DIGEST\"\n", "        run: scripts/ci-gate.sh \"$SHA\" && cosign sign --yes \"$IMAGE@$DIGEST\"\n", 1))
+	// A main-line image workflow comes back.
+	edge := map[string][]byte{}
+	for k, v := range files {
+		edge[k] = v
+	}
+	edge["image.yml"] = []byte("on:\n  push:\n    branches: [main]\njobs:\n  publish:\n    steps:\n      - uses: docker/build-push-action@x\n        with:\n          push: true\n")
+	// extra adds a workflow that tries to publish some other way.
+	extra := func(name, steps string) map[string][]byte {
+		m := map[string][]byte{}
+		for k, v := range files {
+			m[k] = v
+		}
+		m[name] = []byte("on:\n  push:\n    branches: [main]\njobs:\n  publish:\n    runs-on: ubuntu-24.04\n    steps:\n" + steps)
+		return m
+	}
 	const pushBranches = "    branches: [main, \"hotfix/**\"]\n"
-	checkout := "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n        with:\n          persist-credentials: false\n"
 	s := string(script)
 	for want, c := range map[string]struct {
 		files  map[string][]byte
 		script string
 	}{
-		"release-please.yml job tag reaches git push origin without":                                  {plant("release-please.yml", gateStep, "        run: echo skipped\n"), s},
-		"release.yml job publish reaches docker/build-push-action without":                            {plant("release.yml", gateStep, "        run: echo skipped\n"), s},
-		"image.yml job publish reaches docker/build-push-action without":                              {plant("image.yml", gateStep, "        run: echo skipped\n"), s},
-		"image.yml job publish no longer has a step":                                                  {plant("image.yml", "docker/build-push-action", "docker/build-action"), s},
-		"image.yml job publish reaches docker/build-push-action without scripts/ci-gate.sh before it": {late, s},
-		"release-please.yml must follow a completed CI run":                                           {plant("release-please.yml", "  workflow_run:\n    workflows: [CI]\n    types: [completed]\n    branches: [main]\n", ""), s},
-		"image.yml must follow a completed CI run":                                                    {plant("image.yml", "  workflow_run:\n", "  push:\n    branches: [main]\n  workflow_run:\n"), s},
-		"release-please.yml job release-please does not require":                                      {plant("release-please.yml", "(github.event.workflow_run.conclusion == 'success' && ", "("), s},
-		"image.yml job head does not require a successful CI run of this repository":                  {plant("image.yml", " && "+sameRepo, ""), s},
-		"release-please.yml job release-please does not require a successful CI run of this":          {plant("release-please.yml", " && "+sameRepo, ""), s},
-		"image.yml job publish does not require":                                                      {plant("image.yml", "    needs: head\n", ""), s},
-		"release-please.yml job tag does not require":                                                 {plant("release-please.yml", "    needs: release-please\n", "    needs: [other]\n"), s},
-		"image.yml job publish checks out a ref taken from the event":                                 {plant("image.yml", checkout, strings.Replace(checkout, "        with:\n", "        with:\n          ref: ${{ github.event.workflow_run.head_sha }}\n", 1)), s},
-		"image.yml job publish does not grant actions: read":                                          {plant("image.yml", "      actions: read\n      packages: write\n", "      packages: write\n"), s},
-		"release-please.yml job release does not grant checks: read":                                  {plant("release-please.yml", "      checks: read\n      actions: read\n      packages: write\n", "      actions: read\n      packages: write\n"), s},
-		"signs without first checking that the tag lies on main":                                      {plant("release.yml", onMain, "true"), s},
-		"signs a hotfix tag without checking that the hotfix ruleset (rules API)":                     {plant("release.yml", hotfixRules, "echo"), s},
-		"signs a hotfix tag without checking that the hotfix ruleset (rule list)":                     {plant("release.yml", hotfixNeeds, "for rule in; do"), s},
-		"signs a hotfix tag without requiring at least one approving review (no count)":               {plant("release.yml", reviewCount, "length"), s},
-		"signs a hotfix tag without requiring at least one approving review (no test)":                {plant("release.yml", hotfixReviews, "true || {"), s},
-		"signs a hotfix tag without requiring at least one approving review (zero)":                   {plant("release.yml", hotfixReviews, "(( reviews >= 0 )) || {"), s},
-		"ci-gate.sh does not name the repository":                                                     {files, strings.Replace(s, gateRepo, "", 1)},
-		"moves :X.Y without the highest-in-minor guard":                                               {plant("release.yml", "$FINAL == true && $HIGHEST_IN_MINOR == true ]]; then echo \"$IMAGE:$MINOR\"", "$FINAL == true ]]; then echo \"$IMAGE:$MINOR\""), s},
-		"image.yml publishes a dispatch from a branch other than main":                                {plant("image.yml", dispatchGuard, "if false; then"), s},
-		"does not open the release pull request with the built-in GITHUB_TOKEN alone (other token)":   {plant("release-please.yml", builtinToken, "token: ${{ secrets.RELEASE_PLEASE_TOKEN }}"), s},
-		"does not open the release pull request with the built-in GITHUB_TOKEN alone (fallback)":      {plant("release-please.yml", builtinToken, "token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}"), s},
-		"does not approve CI and Security on the release pull request (no step)":                      {plant("release-please.yml", approveStep, "echo"), s},
-		"runs the approval script without checking the repository out first":                          {plant("release-please.yml", "actions/checkout@", "actions/other@"), s},
-		"does not approve CI and Security on the release pull request (no approval)":                  {plant(approveScript, approveRun, "echo"), s},
-		"does not approve CI and Security on the release pull request (no loop)":                      {plant(approveScript, "for wf in CI Security; do", "for wf in CI; do"), s},
-		"does not approve CI and Security on the release pull request (no grant)":                     {plant("release-please.yml", dispatchGrant+" #", "      actions: read #"), s},
-		"rebuilds a release without first checking that it is not published":                          {plant("release.yml", publishedRef, `echo "repos/$GH_REPO"`), s},
-		"rebuilds a release without first checking that :X.Y.Z does not exist":                        {plant("release.yml", imageExists, `echo "$IMAGE:$VERSION"`), s},
-		"appends the image section to notes that may already carry it":                                {plant("release.yml", notesOnce, "if false; then"), s},
-		"which is no job name in ci.yml":                                                              {files, strings.Replace(s, `"Coverage gate (100 % per package)"`, `"Coverage"`, 1)},
-		"does not require Unit and handler tests":                                                     {files, strings.Replace(s, `-require "Unit and handler tests"`, "", 1)},
-		"does not require Image (build, lint, scan, healthz)":                                         {files, strings.Replace(s, `-require "Image (build, lint, scan, healthz)"`, "", 1)},
-		"does not require govulncheck":                                                                {files, strings.Replace(s, `-require "govulncheck"`, "", 1)},
-		"does not require Lint":                                                                       {files, strings.Replace(s, `-require "Lint"`, "", 1)},
-		"push trigger carries tags,":                                                                  {plant("ci.yml", pushBranches, pushBranches+"    tags: [\"hotfix/**\"]\n"), s},
-		"push trigger carries tags-ignore":                                                            {plant("ci.yml", pushBranches, pushBranches+"    tags-ignore: [\"v*\"]\n"), s},
-		"push trigger does not name its branches (bare)":                                              {plant("ci.yml", pushBranches, ""), s},
-		"push trigger does not name its branches (ignore list)":                                       {plant("ci.yml", pushBranches, "    branches-ignore: [docs]\n"), s},
-		"ci.yml does not parse":                                                                       {plant("ci.yml", "jobs:\n", "jobs: [\n"), s},
+		"release-please.yml job tag reaches git push origin without":                                                                {plant("release-please.yml", gateStep, "        run: echo skipped\n"), s},
+		"release.yml job publish reaches docker/build-push-action without":                                                          {plant("release.yml", gateStep, "        run: echo skipped\n"), s},
+		"release-please.yml must follow a completed CI run":                                                                         {plant("release-please.yml", "  workflow_run:\n    workflows: [CI]\n    types: [completed]\n    branches: [main]\n", ""), s},
+		"release-please.yml job release-please does not require":                                                                    {plant("release-please.yml", "(github.event.workflow_run.conclusion == 'success' && ", "("), s},
+		"release-please.yml job release-please does not require a successful CI run of this":                                        {plant("release-please.yml", " && "+sameRepo, ""), s},
+		"release-please.yml job tag does not require":                                                                               {plant("release-please.yml", "    needs: release-please\n", "    needs: [other]\n"), s},
+		"release-please.yml job release does not grant checks: read":                                                                {plant("release-please.yml", "      checks: read\n      actions: read\n      packages: write\n", "      actions: read\n      packages: write\n"), s},
+		"signs without first checking that the tag lies on main":                                                                    {plant("release.yml", onMain, "true"), s},
+		"signs a hotfix tag without checking that the hotfix ruleset (rules API)":                                                   {plant("release.yml", hotfixRules, "echo"), s},
+		"signs a hotfix tag without checking that the hotfix ruleset (rule list)":                                                   {plant("release.yml", hotfixNeeds, "for rule in; do"), s},
+		"signs a hotfix tag without requiring at least one approving review (no count)":                                             {plant("release.yml", reviewCount, "length"), s},
+		"signs a hotfix tag without requiring at least one approving review (no test)":                                              {plant("release.yml", hotfixReviews, "true || {"), s},
+		"signs a hotfix tag without requiring at least one approving review (zero)":                                                 {plant("release.yml", hotfixReviews, "(( reviews >= 0 )) || {"), s},
+		"ci-gate.sh does not name the repository":                                                                                   {files, strings.Replace(s, gateRepo, "", 1)},
+		"moves :X.Y without the highest-in-minor guard":                                                                             {plant("release.yml", minorGuard, `if true; then echo "$IMAGE:$MINOR"; fi`), s},
+		"release.yml job publish reaches docker/build-push-action without scripts/ci-gate.sh before it (gate moved after the push)": {late, s},
+		"release.yml job publish does not grant actions: read":                                                                      {plant("release.yml", "      actions: read\n      packages: write\n", "      packages: write\n"), s},
+		"image.yml publishes an image (push: true)":                                                                                 {edge, s},
+		"ci.yml publishes an image (push: true)":                                                                                    {plant("ci.yml", "push: false", "push: true"), s},
+		"release-please.yml publishes an image (cosign sign)":                                                                       {plant("release-please.yml", "jobs:\n", "# cosign sign\njobs:\n"), s},
+		"release.yml starts on tags":                                                                                                {plant("release.yml", `tags: ["v[0-9]+.[0-9]+.[0-9]+"]`, `tags: ["v*"]`), s},
+		"release.yml builds without first refusing a tag with a suffix":                                                             {plant("release.yml", confirmedTag, `[[ $TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-rc\.[0-9]+)?$ ]] || {`), s},
+		"release.yml builds without first refusing a tag that differs from version.txt":                                             {plant("release.yml", versionFile, `[[ true ]] || {`), s},
+		"release.yml builds without first refusing a tag that is not the release commit":                                            {plant("release.yml", releaseCommit, `[[ true ]] || {`), s},
+		"edge.yml publishes an image (--push)":                                                                                      {extra("edge.yml", "      - run: docker buildx build --platform linux/amd64 --push -t ghcr.io/x/y:edge .\n"), s},
+		"edge.yml publishes an image (type=registry)":                                                                               {extra("edge.yml", "      - uses: docker/build-push-action@x\n        with:\n          outputs: type=registry\n"), s},
+		"edge.yml publishes an image (docker/login-action)":                                                                         {extra("edge.yml", "      - uses: docker/login-action@x\n"), s},
+		"edge.yaml publishes an image (--push)":                                                                                     {extra("edge.yaml", "      - run: docker buildx build --push -t ghcr.io/x/y:edge .\n"), s},
+		"edge.yml publishes an image (docker login)":                                                                                {extra("edge.yml", "      - run: echo \"$T\" | docker login ghcr.io -u x --password-stdin\n"), s},
+		"edge.yml publishes an image (push=true)":                                                                                   {extra("edge.yml", "      - run: docker buildx build --output type=image,name=ghcr.io/x/y:edge,push=true .\n"), s},
+		"edge.yml publishes an image (packages: write)":                                                                             {extra("edge.yml", "    permissions:\n      packages: write\n"), s},
+		"release-please.yml publishes an image (packages: write)":                                                                   {plant("release-please.yml", "    timeout-minutes: 10\n    permissions:\n      contents: write\n      checks: read\n      actions: read\n    steps:", "    timeout-minutes: 10\n    permissions:\n      contents: write\n      checks: read\n      actions: read\n      packages: write\n    steps:"), s},
+		"does not open the release pull request with the built-in GITHUB_TOKEN alone (other token)":                                 {plant("release-please.yml", builtinToken, "token: ${{ secrets.RELEASE_PLEASE_TOKEN }}"), s},
+		"does not open the release pull request with the built-in GITHUB_TOKEN alone (fallback)":                                    {plant("release-please.yml", builtinToken, "token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}"), s},
+		"does not approve CI and Security on the release pull request (no step)":                                                    {plant("release-please.yml", approveStep, "echo"), s},
+		"runs the approval script without checking the repository out first":                                                        {plant("release-please.yml", "actions/checkout@", "actions/other@"), s},
+		"does not approve CI and Security on the release pull request (no approval)":                                                {plant(approveScript, approveRun, "echo"), s},
+		"does not approve CI and Security on the release pull request (no loop)":                                                    {plant(approveScript, "for wf in CI Security; do", "for wf in CI; do"), s},
+		"does not approve CI and Security on the release pull request (no grant)":                                                   {plant("release-please.yml", dispatchGrant+" #", "      actions: read #"), s},
+		"rebuilds a release without first checking that it is not published":                                                        {plant("release.yml", publishedRef, `echo "repos/$GH_REPO"`), s},
+		"rebuilds a release without first checking that :X.Y.Z does not exist":                                                      {plant("release.yml", imageExists, `echo "$IMAGE:$VERSION"`), s},
+		"appends the image section to notes that may already carry it":                                                              {plant("release.yml", notesOnce, "if false; then"), s},
+		"which is no job name in ci.yml":                                                                                            {files, strings.Replace(s, `"Coverage gate (100 % per package)"`, `"Coverage"`, 1)},
+		"does not require Unit and handler tests":                                                                                   {files, strings.Replace(s, `-require "Unit and handler tests"`, "", 1)},
+		"does not require Image (build, lint, scan, healthz)":                                                                       {files, strings.Replace(s, `-require "Image (build, lint, scan, healthz)"`, "", 1)},
+		"does not require govulncheck":                                                                                              {files, strings.Replace(s, `-require "govulncheck"`, "", 1)},
+		"does not require Lint":                                                                                                     {files, strings.Replace(s, `-require "Lint"`, "", 1)},
+		"push trigger carries tags,":                                                                                                {plant("ci.yml", pushBranches, pushBranches+"    tags: [\"hotfix/**\"]\n"), s},
+		"push trigger carries tags-ignore":                                                                                          {plant("ci.yml", pushBranches, pushBranches+"    tags-ignore: [\"v*\"]\n"), s},
+		"push trigger does not name its branches (bare)":                                                                            {plant("ci.yml", pushBranches, ""), s},
+		"push trigger does not name its branches (ignore list)":                                                                     {plant("ci.yml", pushBranches, "    branches-ignore: [docs]\n"), s},
+		"ci.yml does not parse":                                                                                                     {plant("ci.yml", "jobs:\n", "jobs: [\n"), s},
 	} {
 		// One subtest per planted fault, so each is bounded on its own
 		// (TST-012): as one leaf the forty plants crossed 2 s under -race.

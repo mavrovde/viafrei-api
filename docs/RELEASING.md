@@ -38,28 +38,31 @@ and merge release pull requests.
    workflow holding `checks: write` can create a check run of any name, so a
    same-named run from elsewhere is not evidence. Only then does it create
    the **annotated** tag `vX.Y.Z` on the release commit and push it.
-5. The same run calls `.github/workflows/release.yml`, which:
-   - checks the tag is annotated and well-formed, and that its commit lies on
+5. The same run calls `.github/workflows/release.yml`, the only workflow
+   that pushes an image. Images exist for **confirmed releases only**: a push
+   to `main` and a release candidate publish none. The workflow:
+   - checks the tag is an annotated `vX.Y.Z` with no suffix, that it equals
+     `version.txt` at the tagged commit, and that its commit lies on
      `main` or a `hotfix/*` branch (`git merge-base --is-ancestor`); for a
      hotfix branch, also that the hotfix ruleset protects it (see Hotfix)
    - runs `scripts/ci-gate.sh` on the tagged commit again, before anything is
-     pushed or signed (this also covers a release-candidate tag pushed by hand)
+     pushed or signed (this also covers a `vX.Y.Z` tag pushed by hand)
    - refuses, before anything is built, when the release of that tag is
      already published or the image `:X.Y.Z` already exists: a re-run never
-     builds a second digest, never moves `:X.Y.Z` or `:sha-<12>`, and never
+     builds a second digest, never moves `:X.Y.Z`, and never
      appends the notes twice
    - builds `linux/amd64` and `linux/arm64`, pushes to
-     `ghcr.io/mavrovde/viafrei-api` as `:X.Y.Z` and `:sha-<12>`, plus `:X.Y`
-     and `:latest` for a final release (`:X.Y` only when it is the highest
-     patch of its minor, `:latest` only when it is the highest version, so a
-     backported patch never moves either back)
+     `ghcr.io/mavrovde/viafrei-api` as `:X.Y.Z`, plus `:X.Y` and `:latest`
+     (`:X.Y` only when it is the highest patch of its minor, `:latest` only
+     when it is the highest version, so a backported patch never moves
+     either back)
    - signs the digest with cosign (keyless) and attests SLSA build provenance
      and the SPDX SBOM to the image
    - attaches `openapi.json`, `openapi-changelog.txt`, `openapi-breaking.txt`
      (oasdiff against the previous release), `sbom.spdx.json`,
      `sbom.cdx.json` and `SHA256SUMS`
    - appends the digest, the tags, the verify commands and the milestone link
-     to the notes, marks every 0.x and `-rc` release as a pre-release, and
+     to the notes, marks every 0.x release as a pre-release, and
      publishes the draft
 6. The `verify` job of the same run pulls the image by digest, runs
    `cosign verify` and `gh attestation verify`, checks `SHA256SUMS` against
@@ -73,8 +76,8 @@ and merge release pull requests.
    `api/openapi.json`, and the document itself) and deploys it to GitHub Pages,
    <https://mavrovde.github.io/viafrei-api/>, then reads the published
    `index.html`, `reference.html` and `openapi.json` back and fails unless
-   they serve that version. Only the newest final release publishes; an rc
-   or a backported patch never replaces the site. CI builds the same site on
+   they serve that version. Only the newest release publishes; a backported
+   patch never replaces the site. CI builds the same site on
    every pull request (`OpenAPI lint and breaking changes` job) and checks
    its links, diagrams and accessibility (`Documentation portal` job,
    [accessibility](accessibility.md)).
@@ -184,31 +187,57 @@ After the run:
 
 ## Release candidates
 
-A maintainer creates an rc tag by hand on a commit of `main`:
-
-```sh
-git tag -a v0.3.0-rc.1 -m "Release candidate v0.3.0-rc.1" <sha>
-git push origin v0.3.0-rc.1
-```
-
-The tag push runs `release.yml`: image `:0.3.0-rc.1`, no `:X.Y`, no `:latest`,
-a pre-release page with generated notes. Candidates are never promoted by
-re-tagging; the final release is cut by release-please as usual.
+A release candidate publishes nothing: no image, no release page.
+`release.yml` starts only on a `vX.Y.Z` tag push and refuses any other tag,
+because an image exists for a confirmed release only. A candidate is the
+commit itself: CI's `Image (build, lint, scan, healthz)` job builds, lints,
+scans and smoke-tests the image of every commit on `main` without pushing
+it, and the documentation portal of every pull request is checked the same
+way. To try a candidate, build it locally from that commit
+(`docker build --target runtime .`) or run the Compose stack.
 
 ## Tags
 
-- Only annotated tags `vX.Y.Z` and `vX.Y.Z-rc.N`. `release.yml` refuses a
-  lightweight tag.
+- Only annotated tags `vX.Y.Z`. `release.yml` refuses a lightweight tag, a
+  tag with a suffix (`-rc.N` or any other), a tag that differs from
+  `version.txt`, and a tag that is not on the commit that set `version.txt`
+  (the release commit), so a later commit cannot be released under it.
 - A tag is never moved and never deleted. A broken release is followed by a
   new patch release.
-- Only release maintainers and the release workflow create `v*` tags.
+- Two tag rulesets are live (below). Nobody, admins included, can create or
+  move a `v*` tag that carries a suffix (`-…` or `+…`), and only a repository
+  admin can move or delete any other `v*` tag.
+- **The trust boundary is review plus the collaborators.** A tag push runs the
+  `release.yml` of the TAGGED commit, so a tag on a commit older than the
+  confirmed-release rule runs the older, wider workflow. GitHub cannot limit
+  who CREATES a plain `vX.Y.Z` tag here, for the reason below. So anyone with
+  write access, and release-please's `GITHUB_TOKEN`, can create one. Write access is
+  limited to the repository's collaborators, who are trusted not to tag an
+  old commit by hand. The suffix ruleset keeps an `-rc.N` tag away from every
+  commit, old or new.
 
-### Tag ruleset (documented here, applied by a repository admin)
+### Tag rulesets (live, applied by a repository admin)
 
-These calls protect `v*` tags. They are **not** applied by any workflow; a
-repository admin runs them once. Bypass is granted to repository admins (role
-id 5) and to the GitHub Actions app (integration id 15368), which pushes the
-tag in `release-please.yml`.
+No workflow applies these; a repository admin applied them once.
+
+The first refuses any suffixed `v*` tag for everyone, with no bypass:
+
+```sh
+gh api -X POST repos/mavrovde/viafrei-api/rulesets --input - <<'JSON'
+{
+  "name": "release tags: plain vX.Y.Z only",
+  "target": "tag",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": { "ref_name": {
+    "include": ["refs/tags/v*-*", "refs/tags/v*+*"], "exclude": [] } },
+  "rules": [ { "type": "creation" }, { "type": "update" } ]
+}
+JSON
+```
+
+The second protects every `v*` tag from being moved or deleted. Only the
+repository admin role (id 5) may bypass it:
 
 ```sh
 gh api -X POST repos/mavrovde/viafrei-api/rulesets --input - <<'JSON'
@@ -218,11 +247,9 @@ gh api -X POST repos/mavrovde/viafrei-api/rulesets --input - <<'JSON'
   "enforcement": "active",
   "conditions": { "ref_name": { "include": ["refs/tags/v*"], "exclude": [] } },
   "bypass_actors": [
-    { "actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always" },
-    { "actor_id": 15368, "actor_type": "Integration", "bypass_mode": "always" }
+    { "actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always" }
   ],
   "rules": [
-    { "type": "creation" },
     { "type": "update" },
     { "type": "deletion" },
     { "type": "non_fast_forward" }
@@ -231,14 +258,29 @@ gh api -X POST repos/mavrovde/viafrei-api/rulesets --input - <<'JSON'
 JSON
 ```
 
-Check it:
+Two rules are absent on purpose:
+
+- **No `tag_name_pattern` rule.** GitHub accepts that rule only on Enterprise
+  plans and refused it here. The suffix ruleset blocks `-rc.N` and any other
+  suffix instead. `release.yml` itself refuses every name but `vX.Y.Z`, a
+  tag that differs from `version.txt`, and a tag that is not on the release
+  commit.
+- **No `creation` rule on plain `vX.Y.Z` tags.** On a personal-account
+  repository GitHub cannot list the GitHub Actions app as a bypass actor, so
+  restricting creation would also block release-please's own tag. The
+  remaining protection is `release.yml`'s refusals, review of the release
+  commit, and the collaborators' trust.
+
+Check them:
 
 ```sh
-gh api repos/mavrovde/viafrei-api/rulesets --jq '.[] | select(.target == "tag") | {id, name, enforcement}'
+gh api repos/mavrovde/viafrei-api/rulesets --jq '.[] | {id, name, target, enforcement}'
+gh api repos/mavrovde/viafrei-api/rulesets/27228883 --jq '{conditions, rules, bypass_actors}'   # suffix tags
+gh api repos/mavrovde/viafrei-api/rulesets/27229441 --jq '{conditions, rules, bypass_actors}'   # release tags
 ```
 
-With `update` and `deletion` restricted, not even a maintainer moves a tag
-without first changing the ruleset, which is the point.
+With `update` and `deletion` restricted, a maintainer cannot move or delete a
+tag without first changing the ruleset, which is the point.
 
 ## Rollback
 
@@ -269,18 +311,27 @@ What this check cannot see, so the ruleset's owner keeps it true:
   fact is not detected for commits pushed while it did not hold; changes to
   rulesets are visible in the repository's audit log.
 
-1. Branch `hotfix/X.Y.Z+1` from the tag `vX.Y.Z`.
+1. Branch `hotfix/X.Y.Z+1` from the tag `vX.Y.Z`, and as its first
+   reviewed pull request bring the current `.github/workflows/release.yml`
+   (and its helper scripts) from `main` onto it: a tag push runs the
+   workflow file of the tagged commit, and the file at `vX.Y.Z` may be an
+   older, wider one.
 2. Land the fix there through a pull request (`fix:` title), with review.
    CI runs on every push to `hotfix/**`, so the merged head has the check
    runs the release gate requires.
-3. A maintainer creates the annotated tag `vX.Y.(Z+1)` on that branch's
-   head and pushes it; `release.yml` publishes it from the tag push.
-4. Merge or cherry-pick the fix into `main` and add the version to
+3. In a reviewed pull request on the same branch, bump `version.txt` to
+   `X.Y.(Z+1)` and add the version's `CHANGELOG.md` entry. `release.yml`
+   refuses a tag that differs from `version.txt` or does not sit on the
+   commit that set it, so this commit is the one that is tagged.
+4. A maintainer creates the annotated tag `vX.Y.(Z+1)` on that commit (the
+   branch's head) and pushes it; `release.yml` publishes it from the tag
+   push.
+5. Merge or cherry-pick the fix into `main` and add the version to
    `.release-please-manifest.json` there, so release-please continues from it.
 
-### Hotfix ruleset (documented here, applied by a repository admin)
+### Hotfix ruleset (live, applied by a repository admin)
 
-Applied once, like the tag ruleset; no workflow applies it.
+Applied once, like the tag rulesets; no workflow applies it.
 
 ```sh
 gh api -X POST repos/mavrovde/viafrei-api/rulesets --input - <<'JSON'
@@ -291,11 +342,14 @@ gh api -X POST repos/mavrovde/viafrei-api/rulesets --input - <<'JSON'
   "conditions": { "ref_name": { "include": ["refs/heads/hotfix/**"], "exclude": [] } },
   "rules": [
     { "type": "pull_request", "parameters": {
+        "allowed_merge_methods": ["merge", "squash", "rebase"],
         "required_approving_review_count": 1,
         "dismiss_stale_reviews_on_push": true,
         "require_code_owner_review": false,
+        "require_extra_approval_for_unattributed_changes": true,
         "require_last_push_approval": true,
-        "required_review_thread_resolution": true } },
+        "required_review_thread_resolution": true,
+        "required_reviewers": [] } },
     { "type": "non_fast_forward" },
     { "type": "deletion" }
   ]

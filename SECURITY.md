@@ -20,7 +20,7 @@ release; see [docs/RELEASING.md](docs/RELEASING.md) for the hotfix path.
 
 ## Verifying what you run
 
-Every published image is signed with cosign (keyless) and carries SLSA build
+Images are published for confirmed releases only. Every one is signed with cosign (keyless) and carries SLSA build
 provenance and an SBOM. The commands are in
 [docs/container.md](docs/container.md#verify-an-image) and on each release page.
 

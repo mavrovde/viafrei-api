@@ -89,9 +89,20 @@ func permissionFindings(name string, perms any) []string {
 
 func readWorkflows(t *testing.T) map[string][]byte {
 	t.Helper()
-	paths, err := filepath.Glob(filepath.Join(root, ".github", "workflows", "*.yml"))
-	if err != nil {
-		t.Fatal(err)
+	return readWorkflowsIn(t, filepath.Join(root, ".github", "workflows"))
+}
+
+// readWorkflowsIn reads every workflow in dir under both extensions GitHub
+// runs, so a .yaml file cannot escape the rules a .yml file is held to.
+func readWorkflowsIn(t *testing.T, dir string) map[string][]byte {
+	t.Helper()
+	var paths []string
+	for _, ext := range []string{"*.yml", "*.yaml"} {
+		m, err := filepath.Glob(filepath.Join(dir, ext))
+		if err != nil {
+			t.Fatal(err)
+		}
+		paths = append(paths, m...)
 	}
 	if len(paths) < 4 {
 		t.Fatalf("read %d workflow file(s); a check over too few files proves nothing", len(paths))
@@ -144,8 +155,10 @@ func TestWorkflowRulesCanSayNo(t *testing.T) {
 }
 
 // TestCosignIdentityNamesRealWorkflows: the identity users verify against
-// (docs/container.md, the release notes) names the two publishing workflows,
-// so renaming either would make every published signature unverifiable.
+// (docs/container.md, the release notes) names the one publishing workflow,
+// so renaming it would make every published signature unverifiable, and it
+// accepts release tags without a suffix only: images are published for
+// confirmed releases alone.
 func TestCosignIdentityNamesRealWorkflows(t *testing.T) {
 	req.Covers(t, "SSC-005")
 	wf := readWorkflows(t)
@@ -153,15 +166,14 @@ func TestCosignIdentityNamesRealWorkflows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"image.yml", "release.yml"} {
-		if wf[name] == nil {
-			t.Errorf("the cosign identity names %s, which does not exist", name)
-		}
-		if !strings.Contains(string(wf[name]), `(image|release)\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?)$`) {
-			t.Errorf("%s does not state the identity regexp of docs/container.md", name)
-		}
+	const identity = `^https://github\.com/mavrovde/viafrei-api/\.github/workflows/release\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$`
+	if wf["release.yml"] == nil {
+		t.Error("the cosign identity names release.yml, which does not exist")
 	}
-	if !strings.Contains(string(doc), `(image|release)\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?)$`) {
+	if !strings.Contains(string(wf["release.yml"]), identity) {
+		t.Error("release.yml does not state the identity regexp of docs/container.md")
+	}
+	if !strings.Contains(string(doc), identity) {
 		t.Error("docs/container.md no longer carries the identity regexp")
 	}
 }
@@ -353,5 +365,18 @@ func TestScannersUploadSARIF(t *testing.T) {
 				t.Errorf("planted %q, the rules said %q", want, got)
 			}
 		})
+	}
+}
+
+func TestWorkflowsAreReadUnderBothExtensions(t *testing.T) {
+	req.Covers(t, "SSC-005")
+	dir := t.TempDir()
+	for _, n := range []string{"a.yml", "b.yml", "c.yml", "e.yml", "d.yaml"} {
+		if err := os.WriteFile(filepath.Join(dir, n), []byte("on: push\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, ok := readWorkflowsIn(t, dir)["d.yaml"]; !ok {
+		t.Error("a .yaml workflow was not read, so no rule is applied to it")
 	}
 }

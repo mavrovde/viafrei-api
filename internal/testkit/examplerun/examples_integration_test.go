@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -77,20 +78,21 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, "integration tests need a container runtime:", err)
 		os.Exit(1)
 	}
+	// Seeding the fixture set is setup too: done in the first test body
+	// it counted against that test's bound, and grew with every example.
+	if err := seedFixtures(); err != nil {
+		fmt.Fprintln(os.Stderr, "seeding the fixture set:", err)
+		db.Stop()
+		os.Exit(1)
+	}
 	code := m.Run()
 	db.Stop()
 	os.Exit(code)
 }
 
-var seeded bool
-
-// load seeds the fixture set, once, and opens the service's store on it.
+// load opens the service's store on the fixture set TestMain seeded.
 func load(t *testing.T) (*config.Config, *store.Store) {
 	t.Helper()
-	if !seeded {
-		seedFixtures(t)
-		seeded = true
-	}
 	cfg, err := config.Load(config.Options{Environ: []string{"VFAPI_DB_URL=" + db.ReaderURL}, RequireSecrets: true})
 	if err != nil {
 		t.Fatal(err)
@@ -105,20 +107,19 @@ func load(t *testing.T) (*config.Config, *store.Store) {
 	return cfg, st
 }
 
-func seedFixtures(t *testing.T) {
-	t.Helper()
+func seedFixtures() error {
 	var buf bytes.Buffer
 	if _, err := fixtures.Generate(&buf, profile, seed, contract.Version()); err != nil {
-		t.Fatal(err)
+		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	conn, err := db.Owner(ctx)
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 	defer func() { _ = conn.Close(ctx) }()
-	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+	return pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, buf.String()); err != nil {
 			return err
 		}
@@ -126,9 +127,7 @@ func seedFixtures(t *testing.T) {
 			return err
 		}
 		return plantLampSight(ctx, tx)
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
 }
 
 // plantFreshReports runs plantFreshSQL over freshReports and holds it to its
@@ -271,13 +270,19 @@ func ask(t *testing.T, cfg *config.Config, st *store.Store, e api.Example) (int,
 	return w.Code, body
 }
 
-func contractDoc(t *testing.T) *oascheck.Document {
-	t.Helper()
+// readDoc reads and parses api/openapi.json once: every answer is checked
+// against it, and the document does not change during the run.
+var readDoc = sync.OnceValues(func() (*oascheck.Document, error) {
 	raw, err := os.ReadFile(filepath.Join(root, "api", "openapi.json"))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-	d, err := oascheck.Load(raw)
+	return oascheck.Load(raw)
+})
+
+func contractDoc(t *testing.T) *oascheck.Document {
+	t.Helper()
+	d, err := readDoc()
 	if err != nil {
 		t.Fatal(err)
 	}

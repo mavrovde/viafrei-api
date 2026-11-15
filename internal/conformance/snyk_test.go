@@ -57,6 +57,7 @@ type snykStep struct {
 
 type snykJob struct {
 	Uses    string            `yaml:"uses"`
+	If      string            `yaml:"if"`
 	Needs   any               `yaml:"needs"`
 	With    map[string]string `yaml:"with"`
 	Secrets any               `yaml:"secrets"`
@@ -243,6 +244,9 @@ func snykFindings(files map[string][]byte) []string {
 	}
 	if !strings.Contains(string(files["release.yml"]), publishHeader) {
 		out = append(out, "release.yml's publish header is not exactly needs: [commit, snyk] with no condition")
+	}
+	if rel.Jobs["publish"].If != "" {
+		out = append(out, "release.yml's publish carries a condition, which could let it run past a failed scan")
 	}
 	if tag, ok := stepRun(rel.Jobs["publish"], func(s snykStep) bool { return s.ID == "tag" }); !ok || tag.Env["SCANNED"] != "${{ needs.commit.outputs.sha }}" || !strings.Contains(tag.Run, publishBinding) {
 		out = append(out, "release.yml's publish does not refuse a tag that names another commit than the one Snyk scanned")

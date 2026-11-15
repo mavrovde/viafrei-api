@@ -75,7 +75,9 @@ jobs:
           mkdir -p sarif
           ./snyk test --severity-threshold=high --sarif-file-output=sarif/snyk.sarif
       - name: Upload SARIF to code scanning
-        if: always() && hashFiles('sarif/snyk.sarif') != ''
+        # A called run scans another commit than the caller's github.sha; its findings are
+        # uploaded only when they belong to the commit code scanning files them under.
+        if: always() && hashFiles('sarif/snyk.sarif') != '' && (inputs.ref == '' || inputs.ref == github.sha)
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: sarif/snyk.sarif

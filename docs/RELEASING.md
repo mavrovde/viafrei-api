@@ -39,10 +39,12 @@ and merge release pull requests.
    same-named run from elsewhere is not evidence. Only then does it create
    the **annotated** tag `vX.Y.Z` on the release commit and push it.
 5. The same run calls `.github/workflows/release.yml`, which:
-   - resolves the tag to its commit and runs Snyk (`.github/workflows/snyk.yml`,
+   - resolves the tag to its commit (an annotated tag is dereferenced; anything
+     that is not a commit is refused) and runs Snyk (`.github/workflows/snyk.yml`,
      called) on that commit; a high or critical advisory stops the release
-     before anything is built. Snyk also runs weekly on `main` and never on a
-     pull request or a push
+     before anything is built, and the build refuses a tag that by then names
+     another commit than the one Snyk scanned. Snyk also runs weekly on `main`
+     and never on a pull request or a push
    - checks the tag is annotated and well-formed, and that its commit lies on
      `main` or a `hotfix/*` branch (`git merge-base --is-ancestor`); for a
      hotfix branch, also that the hotfix ruleset protects it (see Hotfix)

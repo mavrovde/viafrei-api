@@ -1,8 +1,9 @@
-# Nightly load and fault runs (TST-007, issue #19): the soak (design load for
-# one hour), the stress ramp past the knee, the spike, and every fault of the
-# Performance Test Plan through the fault proxy and container control, on the
-# test stack this job starts. Nothing but that stack's loopback is a target
-# (TST-010): the runner refuses every host not on test/load/allow-list.txt.
+# Weekly load and fault runs with the nightly budget (TST-007, issue #19): the
+# soak (design load for one hour), the stress ramp past the knee, the spike, and
+# every fault of the Performance Test Plan through the fault proxy and container
+# control, on the test stack this job starts. Nothing but that stack's loopback
+# is a target (TST-010): the runner refuses every host not on
+# test/load/allow-list.txt.
 #
 # The report names every scenario, its assertions and its counts; it is the
 # job summary and an artifact kept for the release evidence. A scenario that
@@ -19,7 +20,10 @@ name: Load nightly
 
 on:
   schedule:
-    - cron: "41 3 * * *"
+    # Weekly, Sunday 03:41 UTC (owner 2026-11-15: GitHub by minimum, to save the
+    # free Actions runs; it ran every night, about two hours each). The name keeps
+    # "nightly", the budget's name.
+    - cron: "41 3 * * 0"
   workflow_dispatch:
     inputs:
       profile:

@@ -1,7 +1,6 @@
 # Security checks
 
-Every check below runs on each pull request, on every push to `main` and
-weekly on Monday (`.github/workflows/security.yml`), except where noted. All
+Every check below runs on each pull request and weekly on Monday (`.github/workflows/security.yml`), except where noted. All
 of them run in CI only. None reaches a live data source or production: the
 DAST scan targets the local compose stack.
 
@@ -27,11 +26,11 @@ SARIF, each result located on `api/openapi.json`.
 | Dockerfile | Hadolint 2.15.1 (CI workflow) | a warning or worse | `hadolint` | SSC-005 |
 | Workflows and scripts | actionlint 1.7.7 and shellcheck (CI workflow) | any finding | — (log) | SSC-005, SSC-010 |
 | OpenAPI document | Spectral 6.17.0 with `.spectral.yaml` (CI workflow) | a warning or worse | `spectral` | — |
-| API fuzzing | Schemathesis against the compose stack: a short run on every pull request (CI workflow, `Compose smoke`), a long run nightly with every answer within 2.05 s (`fuzz-nightly.yml`) | any failed property | — (log) | TST-010, TST-016 |
-| Parser fuzzing | Go native fuzzing, one target per parser (`test/fuzz/targets.tsv`): 20 s per target on every pull request (CI workflow, `Fuzz smoke`), 10 min nightly (`fuzz-nightly.yml`) | a crash, a broken invariant, or a target with zero executions | — (report and reproducers as artifacts) | TEST-006, TST-016 |
-| DAST | OWASP ZAP API scan (`zap-stable` 20261016) with the service's OpenAPI document, against the compose stack (`scripts/zap-scan.sh`), on every pull request, on `main` and weekly | a rule at FAIL level in `scripts/zap-rules.tsv`; WARN-level alerts are in the report artifact | `zap` | TST-010 |
+| API fuzzing | Schemathesis against the compose stack: a short run on every pull request (CI workflow, `Compose smoke`), a long run weekly (Sundays, the nightly budget) with every answer within 2.05 s (`fuzz-nightly.yml`) | any failed property | — (log) | TST-010, TST-016 |
+| Parser fuzzing | Go native fuzzing, one target per parser (`test/fuzz/targets.tsv`): 20 s per target on every pull request (CI workflow, `Fuzz smoke`), 10 min weekly on Sundays (`fuzz-nightly.yml`) | a crash, a broken invariant, or a target with zero executions | — (report and reproducers as artifacts) | TEST-006, TST-016 |
+| DAST | OWASP ZAP API scan (`zap-stable` 20261016) with the service's OpenAPI document, against the compose stack (`scripts/zap-scan.sh`), on every pull request and weekly | a rule at FAIL level in `scripts/zap-rules.tsv`; WARN-level alerts are in the report artifact | `zap` | TST-010 |
 | Quality and coverage | SonarCloud, CI-based analysis with the Go coverage report (CI workflow) | the quality gate; fails naming `SONAR_TOKEN` when the secret is absent | — (the `SonarCloud Code Analysis` check) | — |
-| Repository posture | OpenSSF Scorecard (`scorecard.yml`, `main` and weekly only) | published to code scanning; target score 7.0 | Scorecard's own | SSC-012 |
+| Repository posture | OpenSSF Scorecard (`scorecard.yml`, weekly and on a branch-protection change) | published to code scanning; target score 7.0 | Scorecard's own | SSC-012 |
 
 ## One tool per kind of check
 
@@ -83,7 +82,7 @@ unit test. `scripts/fuzz.sh BUDGET [REPORT]` runs every target for BUDGET
 and writes a report with the executions, the new corpus entries and the
 crashes per target. A crash's reproducer is copied to `fuzz-crashers/` in
 the package layout. Commit it with the fix, and it becomes the unit test
-that keeps the fix. The nightly run also uploads the new interesting inputs
+that keeps the fix. The weekly run also uploads the new interesting inputs
 (`FUZZ_CORPUS_OUT`), to grow the corpus.
 
 Fuzzing reaches only the code under test or the compose stack the job

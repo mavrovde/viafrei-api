@@ -4,8 +4,8 @@
 name: Scorecard
 
 on:
-  push:
-    branches: [main]
+  # Weekly and on a branch-protection change, no longer on every push to main
+  # (owner 2026-11-15: GitHub by minimum, to save the free Actions runs).
   schedule:
     - cron: "41 5 * * 1"
   branch_protection_rule:

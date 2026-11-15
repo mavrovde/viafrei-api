@@ -1,15 +1,14 @@
-# Security checks (SAST, secrets, dependencies, licences and DAST) on every
-# pull request, on main and weekly, so a new advisory against an unchanged
-# tree is still found. One tool per kind of check (docs/security-checks.md);
-# the Dockerfile, reachable Go vulnerabilities and the image are checked in
-# ci.yml. Nothing here reaches a live data source or
+# Security checks (SAST, secrets, dependencies, licences and DAST) on every pull
+# request and weekly, so a new advisory against an unchanged tree is still
+# found. No longer on every push to main (owner 2026-11-15, GitHub by minimum):
+# the pull request already ran it on the merged tree. One tool per kind of check
+# (docs/security-checks.md); the Dockerfile, reachable Go vulnerabilities and
+# the image are checked in ci.yml. Nothing here reaches a live data source or
 # production (TST-010): DAST runs against the local compose stack only.
 name: Security
 
 on:
   pull_request:
-  push:
-    branches: [main]
   schedule:
     - cron: "23 4 * * 1"
   workflow_dispatch:

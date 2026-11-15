@@ -111,7 +111,7 @@ breaking change on the release page even when the version rules allow it.
 
 From the "First public release" milestone on, the API's release follows the
 ViaFrei platform's release (REL-001), the way the MCP server's does. The
-sync is `.github/workflows/platform-sync.yml`, daily and by hand, built on
+sync is `.github/workflows/platform-sync.yml`, weekly (Mondays) and by hand, built on
 `go run ./internal/release/platformsync`:
 
 1. `platformsync read` reads the platform's current release from a public

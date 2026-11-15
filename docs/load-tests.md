@@ -8,7 +8,7 @@ the job that runs them, on the loopback. They never reach a deployment.
 | Run | Where | Budget |
 |---|---|---|
 | Pull request | CI workflow, job `Load and faults (pull-request budget)` | design load 20 requests/s, a 30 s soak, faults held 6 s |
-| Nightly | `load-nightly.yml` (and by hand: *Run workflow*) | design load 50 requests/s, a one-hour soak, faults held 1 min |
+| Nightly budget, weekly | `load-nightly.yml`, Sundays (and by hand: *Run workflow*) | design load 50 requests/s, a one-hour soak, faults held 1 min |
 
 Both write `load-report.md`: one row per scenario with its request count,
 its answers by status class, its p95 and its slowest answer, then every
@@ -94,7 +94,7 @@ the answers by status class, p50, p95 and p99 of the 2xx answers, the
 slowest answer and the share refused under load, and for the soak the
 resident memory's growth (TST-021).
 
-The nightly run on `main` fetches the figures of the newest successful
+The scheduled (weekly) run on `main` fetches the figures of the newest successful
 nightly run on `main` of the same budget (`scripts/load-previous.sh`, which
 passes over a newer dispatched run of the other budget, by name) and the
 report gains a comparison section, also in the job summary: each figure, its

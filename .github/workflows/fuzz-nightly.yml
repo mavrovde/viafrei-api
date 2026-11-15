@@ -1,5 +1,6 @@
-# Nightly fuzzing (TEST-006, TST-016): the long budget of every native fuzz
-# target of test/fuzz/targets.tsv, and the long schema-driven run of
+# Weekly fuzzing with the nightly budget (TEST-006, TST-016): the long
+# budget of every native fuzz target of test/fuzz/targets.tsv, and the long
+# schema-driven run of
 # Schemathesis against the compose stack this job starts, with the response
 # time held to the 2 s deadline plus 50 ms. Neither reaches anything but the
 # code under test and that CI-started instance (TST-010).
@@ -12,7 +13,9 @@ name: Fuzz nightly
 
 on:
   schedule:
-    - cron: "23 2 * * *"
+    # Weekly, Sunday 02:23 UTC (owner 2026-11-15: GitHub by minimum, to save the
+    # free Actions runs; it ran every night). The name keeps "nightly", the budget's name.
+    - cron: "23 2 * * 0"
   workflow_dispatch:
     inputs:
       budget:

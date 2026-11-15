@@ -26,5 +26,5 @@ provenance and an SBOM. The commands are in
 
 ## Automated checks
 
-The checks that run on every pull request, on `main` and weekly are listed in
+The checks that run on every pull request and weekly are listed in
 [docs/security-checks.md](docs/security-checks.md).

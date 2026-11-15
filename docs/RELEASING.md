@@ -39,6 +39,10 @@ and merge release pull requests.
    same-named run from elsewhere is not evidence. Only then does it create
    the **annotated** tag `vX.Y.Z` on the release commit and push it.
 5. The same run calls `.github/workflows/release.yml`, which:
+   - resolves the tag to its commit and runs Snyk (`.github/workflows/snyk.yml`,
+     called) on that commit; a high or critical advisory stops the release
+     before anything is built. Snyk also runs weekly on `main` and never on a
+     pull request or a push
    - checks the tag is annotated and well-formed, and that its commit lies on
      `main` or a `hotfix/*` branch (`git merge-base --is-ancestor`); for a
      hotfix branch, also that the hotfix ruleset protects it (see Hotfix)
@@ -89,6 +93,18 @@ once it has succeeded, re-run the failed jobs of the Release Please run
 gate again. If the code is at fault, fix it through a pull request and
 release the next patch; the draft release of the refused version is deleted
 by hand (it never had a tag).
+
+### When Snyk failed in the release run
+
+Nothing is built or published: `publish` needs the `snyk` job.
+
+- **A Snyk outage** (the CLI download, the API, a timeout): re-run the failed
+  jobs of the release run (`gh run rerun <release-run-id> --failed`).
+- **An advisory** (high or critical): fix it on `main` through a pull request
+  and release the next patch; the refused version is not released.
+- **The free plan's monthly test quota is exhausted**: the run fails like an
+  advisory. Wait for the quota to reset, or release the next patch once it
+  has; the refused version is not forced through.
 
 ### When the release run failed part-way
 
@@ -328,8 +344,8 @@ To withdraw one:
 |---|---|---|
 | `GITHUB_TOKEN` (built in) | every workflow | — |
 | `SONAR_TOKEN` | CI `sonar` job | the job fails and names the secret |
-| `SNYK_TOKEN` | security workflow | the job fails and names the secret |
-| `SONAR_TOKEN` and `SNYK_TOKEN` again as **Dependabot secrets** (Settings > Secrets and variables > Dependabot; **the owner adds them**) | the same jobs on a Dependabot pull request, which reads Dependabot secrets and never Actions secrets | both jobs fail on every Dependabot pull request, saying that the Dependabot secret is missing |
+| `SNYK_TOKEN` | the Snyk workflow (weekly on `main`, and called by Release; release-please hands it on by name) | the Snyk job fails and names the secret, and the release stops before anything is built |
+| `SONAR_TOKEN` again as a **Dependabot secret** (Settings > Secrets and variables > Dependabot; **the owner adds it**) | the `sonar` job on a Dependabot pull request, which reads Dependabot secrets and never Actions secrets | the job fails on every Dependabot pull request, saying that the Dependabot secret is missing |
 | Workflow permission "Allow GitHub Actions to create and approve pull requests" (on) | release-please opens the release pull request with `GITHUB_TOKEN` | no release pull request: the job fails with "GitHub Actions is not permitted to create or approve pull requests" |
 | GHCR package visibility public, linked to this repository | image pulls | anonymous pulls fail |
 | GitHub Pages on, source "GitHub Actions"; the `github-pages` environment deploys from `main` | release `pages` job | the deploy step fails |

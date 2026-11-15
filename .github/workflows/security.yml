@@ -3,8 +3,10 @@
 # found. No longer on every push to main (owner 2026-11-15, GitHub by minimum):
 # the pull request already ran it on the merged tree. One tool per kind of check
 # (docs/security-checks.md); the Dockerfile, reachable Go vulnerabilities and
-# the image are checked in ci.yml. Nothing here reaches a live data source or
-# production (TST-010): DAST runs against the local compose stack only.
+# the image are checked in ci.yml. Snyk runs from snyk.yml: weekly on main and
+# once per release, never on a pull request. Nothing here reaches a live data
+# source or production (TST-010): DAST runs against the local compose stack
+# only.
 name: Security
 
 on:
@@ -71,50 +73,6 @@ jobs:
         with:
           sarif_file: sarif/gitleaks.sarif
           category: gitleaks
-
-  snyk:
-    name: Snyk (dependencies)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      security-events: write # uploads SARIF to code scanning
-    steps:
-      - name: SNYK_TOKEN must be set
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-          ACTOR: ${{ github.actor }}
-        run: |
-          if [ -z "$SNYK_TOKEN" ]; then
-            if [ "$ACTOR" = "dependabot[bot]" ]; then
-              echo "::error::SNYK_TOKEN is not visible to this Dependabot pull request: Dependabot runs read Dependabot secrets, not Actions secrets. Add SNYK_TOKEN under Settings > Secrets and variables > Dependabot (docs/RELEASING.md)."
-            else
-              echo "::error::the repository secret SNYK_TOKEN is not set (a pull request from a fork never sees it); Snyk cannot test this run"
-            fi
-            exit 1
-          fi
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
-      - name: Snyk CLI 1.1308.1, checksum verified
-        run: |
-          curl -fsSL --proto '=https' --tlsv1.2 --max-time 60 -o snyk https://static.snyk.io/cli/v1.1308.1/snyk-linux
-          echo "a8b2e420af6d8e61bf1d367c064475ccf699d767fc8763efb0072b9cac250f9a  snyk" | sha256sum -c -
-          chmod +x snyk
-      - env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          mkdir -p sarif
-          ./snyk test --severity-threshold=high --sarif-file-output=sarif/snyk.sarif
-      - name: Upload SARIF to code scanning
-        if: always() && hashFiles('sarif/snyk.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
-        with:
-          sarif_file: sarif/snyk.sarif
-          category: snyk-open-source
 
   dependency-review:
     name: Dependency review

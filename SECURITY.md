@@ -26,5 +26,6 @@ provenance and an SBOM. The commands are in
 
 ## Automated checks
 
-The checks that run on every pull request and weekly are listed in
+The checks that run on every pull request and weekly (Snyk: weekly on `main`
+and once per release, before publish) are listed in
 [docs/security-checks.md](docs/security-checks.md).

@@ -1,6 +1,6 @@
 # Security checks
 
-Every check below runs on each pull request and weekly on Monday (`.github/workflows/security.yml`), except where noted. All
+Every check below runs on each pull request and weekly on Monday (`.github/workflows/security.yml`), except where noted. Snyk runs weekly on `main` (Mondays) and once per release, before anything is published (`.github/workflows/snyk.yml`, called by `release.yml`), and never on a pull request or a push. All
 of them run in CI only. None reaches a live data source or production: the
 DAST scan targets the local compose stack.
 
@@ -20,7 +20,7 @@ SARIF, each result located on `api/openapi.json`.
 | Secrets in the whole history | gitleaks 8.30.1 | any finding (redacted in the log and the report) | `gitleaks` | SSC-017 |
 | Known vulnerabilities, reachable | govulncheck 1.9.0 (CI workflow) | a vulnerable function that is called | `govulncheck` | SSC-014 |
 | Known vulnerabilities, image | Trivy 0.76.0 `image` (CI workflow) | HIGH or CRITICAL with a fix | `trivy-image` | SSC-014 |
-| Known vulnerabilities, every dependency | Snyk Open Source, CLI 1.1308.1 (binary, sha256 checked) | high or critical; fails naming `SNYK_TOKEN` when the secret is absent | `snyk-open-source` | SSC-014 |
+| Known vulnerabilities, every dependency | Snyk Open Source, CLI 1.1308.1 (binary, sha256 checked; `snyk.yml`, weekly on `main` and once per release, never on a pull request) | high or critical, which stops a release before it is built; fails naming `SNYK_TOKEN` when the secret is absent | `snyk-open-source` | SSC-014 |
 | New dependencies in a pull request | GitHub dependency review (pull requests only) | a high advisory, or a licence outside the allow-list | — (pull request comment) | SSC-003 |
 | Licences of every module | go-licenses 2.0.1 | a licence outside the allow-list; the report is an artifact | — (artifact) | SSC-003 |
 | Dockerfile | Hadolint 2.15.1 (CI workflow) | a warning or worse | `hadolint` | SSC-005 |
@@ -42,7 +42,7 @@ fails it.
 | Kind of check | Kept | Removed, and why |
 |---|---|---|
 | SAST | CodeQL (`security-extended`), with gosec in golangci-lint as the lint-level pass | Semgrep: its Go and OWASP rulesets cover the classes CodeQL `security-extended` and gosec already report; its secrets, Dockerfile and workflow rulesets repeat gitleaks, Hadolint and actionlint |
-| Known vulnerabilities in dependencies | govulncheck (reachability: fails only on vulnerable code that is called) and Snyk Open Source (a required check: every advisory against the dependency graph) | OSV-Scanner and Trivy `fs`: the same advisory databases over the same `go.mod`, a third and fourth report of each finding |
+| Known vulnerabilities in dependencies | govulncheck (reachability: fails only on vulnerable code that is called) and Snyk Open Source (every advisory against the dependency graph; weekly on `main` and a gate of every release) | OSV-Scanner and Trivy `fs`: the same advisory databases over the same `go.mod`, a third and fourth report of each finding |
 | Container image | Trivy `image` | Snyk Container: the same base-image and binary advisories, and a second token-metered test per run |
 | Secrets | GitHub secret scanning with push protection (new pushes) and gitleaks (the whole history, which push protection does not scan) | Trivy `fs` secret scanner and Checkov's secrets framework |
 | Dockerfile | Hadolint | Checkov's Dockerfile framework |

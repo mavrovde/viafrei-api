@@ -216,8 +216,9 @@ func TestWorkflowsUseTheGoModToolchain(t *testing.T) {
 	}
 }
 
-// securityJobs are the checks of the Secure SDLC page, one job each (SSC-003, SSC-014).
-var securityJobs = []string{"codeql", "gitleaks", "snyk", "dependency-review", "licenses", "zap"}
+// securityJobs are the checks of the Secure SDLC page run by security.yml, one
+// job each (SSC-003, SSC-014); Snyk runs from snyk.yml (TestSnykRunsWeeklyAndOncePerRelease).
+var securityJobs = []string{"codeql", "gitleaks", "dependency-review", "licenses", "zap"}
 
 func securityFindings(src []byte, zap string) []string {
 	var w workflowFile
@@ -269,7 +270,7 @@ func TestSecurityWorkflowRunsEveryCheck(t *testing.T) {
 // second tool doing a job one of these already does, and is reported.
 var sarifUploads = map[string]string{
 	"security.yml/gitleaks": "gitleaks",
-	"security.yml/snyk":     "snyk-open-source",
+	"snyk.yml/snyk":         "snyk-open-source",
 	"security.yml/zap":      "zap",
 	"ci.yml/openapi":        "spectral",
 	"ci.yml/vulncheck":      "govulncheck",

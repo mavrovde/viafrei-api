@@ -1,0 +1,84 @@
+# Snyk Open Source over the Go module graph: once a week on main, and once per
+# release, called by release.yml on the tagged commit before anything is built
+# or published (owner 2026-11-15). Never on a pull request or a push: a new
+# advisory against an unchanged tree is what the weekly run is for, and a
+# release cannot ship past one. A dispatch is allowed on main only and takes
+# no input, so a dispatch cannot name a commit and pass the guard as a call.
+name: Snyk
+
+on:
+  schedule:
+    - cron: "17 5 * * 1" # Mondays 05:17 UTC
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: the commit release.yml is about to publish (40 hex)
+        type: string
+        required: true
+    secrets:
+      SNYK_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: snyk-${{ inputs.ref || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  snyk:
+    name: Snyk (dependencies)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write # uploads SARIF to code scanning
+    steps:
+      # A called run scans the release's commit; anything else scans main and
+      # nothing but main. A job-level if: would SKIP, and a skipped job is a
+      # green run about a scan that never ran.
+      - name: The run scans main or a release's commit
+        env:
+          REF_IN: ${{ inputs.ref }}
+        run: |
+          if [[ -n $REF_IN ]]; then
+            [[ $REF_IN =~ ^[0-9a-f]{40}$ ]] || { echo "::error::release.yml passed '$REF_IN', not a 40-hex commit"; exit 2; }
+          elif [[ $GITHUB_REF != refs/heads/main ]]; then
+            echo "::error::Snyk runs on main (weekly or by dispatch) or from release.yml, not on $GITHUB_REF"; exit 2
+          fi
+      - name: SNYK_TOKEN must be set
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -z "$SNYK_TOKEN" ]; then
+            echo "::error::the repository secret SNYK_TOKEN is not set; Snyk cannot test this run"
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: Snyk CLI 1.1308.1, checksum verified
+        run: |
+          curl -fsSL --proto '=https' --tlsv1.2 --max-time 60 --retry 3 --retry-all-errors -o snyk https://static.snyk.io/cli/v1.1308.1/snyk-linux
+          echo "a8b2e420af6d8e61bf1d367c064475ccf699d767fc8763efb0072b9cac250f9a  snyk" | sha256sum -c -
+          chmod +x snyk
+      - name: Snyk test
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          mkdir -p sarif
+          ./snyk test --severity-threshold=high --sarif-file-output=sarif/snyk.sarif
+      - name: Upload SARIF to code scanning
+        # A called run scans another commit than the caller's github.sha; its findings are
+        # uploaded only when they belong to the commit code scanning files them under.
+        if: always() && hashFiles('sarif/snyk.sarif') != '' && (inputs.ref == '' || inputs.ref == github.sha)
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: sarif/snyk.sarif
+          category: snyk-open-source

@@ -10,7 +10,9 @@
 # is merged, by a maintainer pushing an rc tag, or by hand for a tag that
 # exists. Tags are never moved or deleted here, and a tag whose release is
 # published, or whose :X.Y.Z image exists, is refused before anything is
-# built. See docs/RELEASING.md.
+# built. Before anything is built, Snyk (snyk.yml, called) tests the tagged
+# commit's dependencies; a high or critical advisory stops the release. See
+# docs/RELEASING.md.
 name: Release
 
 on:
@@ -20,6 +22,9 @@ on:
         description: Annotated tag to release (vX.Y.Z)
         required: true
         type: string
+    secrets:
+      SNYK_TOKEN:
+        required: true
   push:
     tags: ["v*"]
   workflow_dispatch:
@@ -43,8 +48,46 @@ env:
   ISSUER: https://token.actions.githubusercontent.com
 
 jobs:
+  commit:
+    name: The tagged commit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - id: commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          [[ $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]] || { echo "::error::'$TAG' is not vX.Y.Z or vX.Y.Z-rc.N"; exit 1; }
+          read -r type sha < <(gh api "repos/$GH_REPO/git/ref/tags/$TAG" --jq '"\(.object.type) \(.object.sha)"')
+          # An annotated tag is an object of its own; the commit is what it points at.
+          if [[ $type == tag ]]; then read -r type sha < <(gh api "repos/$GH_REPO/git/tags/$sha" --jq '"\(.object.type) \(.object.sha)"'); fi
+          [[ $type == commit ]] || { echo "::error::$TAG does not name a commit (it names a $type)"; exit 1; }
+          [[ $sha =~ ^[0-9a-f]{40}$ ]] || { echo "::error::cannot resolve $TAG to a commit"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+  # Snyk once per release, on the commit about to be published (snyk.yml; it
+  # also runs weekly on main). A high or critical advisory stops the release
+  # before anything is built.
+  snyk:
+    name: Snyk (dependencies)
+    needs: commit
+    permissions:
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/snyk.yml
+    with:
+      ref: ${{ needs.commit.outputs.sha }}
+    secrets:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
   publish:
     name: Build, sign, attest, publish
+    needs: [commit, snyk]
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:
@@ -70,9 +113,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
+          SCANNED: ${{ needs.commit.outputs.sha }}
         run: |
           [[ $TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-rc\.[0-9]+)?$ ]] || { echo "::error::'$TAG' is not vX.Y.Z or vX.Y.Z-rc.N"; exit 1; }
           major=${BASH_REMATCH[1]} minor=${BASH_REMATCH[2]} rc=${BASH_REMATCH[4]}
+          # The commit Snyk scanned is the commit built here: the tag cannot have moved between the two jobs.
+          [[ $(git rev-parse "$TAG^{commit}") == "$SCANNED" ]] || { echo "::error::$TAG names $(git rev-parse "$TAG^{commit}"), not $SCANNED, the commit Snyk scanned"; exit 1; }
           [[ $(gh api "repos/$GH_REPO/git/ref/tags/$TAG" --jq .object.type) == tag ]] || { echo "::error::$TAG is a lightweight tag; releases need an annotated tag (git tag -a)"; exit 1; }
           # A release comes from reviewed history: main, or a hotfix branch
           # cut from a release tag (docs/RELEASING.md). Checked before

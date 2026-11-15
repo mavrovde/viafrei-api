@@ -121,6 +121,9 @@ jobs:
       attestations: write
       issues: write
       pages: write
+      security-events: write # release.yml's Snyk job uploads SARIF
     uses: ./.github/workflows/release.yml
     with:
       tag: ${{ needs.release-please.outputs.tag }}
+    secrets:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}

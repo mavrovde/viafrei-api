@@ -14,3 +14,4 @@ column	api/openapi.json	road_class	query parameter of the conditions in an area 
 column	api/openapi.json	legalBasis	member name of a driving rule fixed by Spec: Endpoints, Weather, Rules and Composed, section 2 (rules[].legalBasis); the resource vocabulary, not a storage name
 column	api/openapi.json	reviewedOn	member name of a rule topic fixed by Spec: Endpoints, Weather, Rules and Composed, section 2 and FR-RULES-001; the resource vocabulary, not a storage name
 vocabulary	test/inventory/mcp.tsv	feeds	the MCP server's own resource URI, exactly as its release lists it (internal/release/inventory); a record of what a consumer asks for, not the API's vocabulary
+vocabulary	internal/fixtures/generate.go	datex	the id the read contract itself gives a Land or city traffic message, written as the view writes it so the fixture plants what the platform holds; an opaque id is asked of the database lane

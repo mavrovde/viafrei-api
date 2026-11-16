@@ -5,8 +5,10 @@ package store_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
@@ -54,13 +56,14 @@ func TestRegisterReadsEveryFamilysTerms(t *testing.T) {
 		byFamily[r.Family] = r
 	}
 	// Expected from docs/test-data.md, not from the code under test.
-	if g := byFamily["src-gamma-energy"]; !slices.Equal(g.UseClasses, []access.UseClass{"consumer"}) || g.AcceptanceRequired {
+	if g := byFamily["chargepool_gamma"]; !slices.Equal(g.UseClasses, []access.UseClass{"consumer"}) || g.AcceptanceRequired {
 		t.Errorf("restricted-purpose family: %+v", g)
 	}
-	if d := byFamily["src-delta-parking"]; !d.AcceptanceRequired || d.Version != "2026-03-01" {
+	// A family that needs accepting is versioned by its terms gate.
+	if d := byFamily["truckpark_sid_static"]; !d.AcceptanceRequired || d.Version != "sid-terms-1" {
 		t.Errorf("terms family: %+v", d)
 	}
-	if e := byFamily["src-epsilon-roads"]; len(e.UseClasses) != 0 {
+	if e := byFamily["roads_epsilon"]; e.Family == "" || len(e.UseClasses) != 0 {
 		t.Errorf("unreviewed family: %+v", e)
 	}
 	if len(reg) < 20 {
@@ -71,14 +74,14 @@ func TestRegisterReadsEveryFamilysTerms(t *testing.T) {
 func TestSourcesReadsTheAllowedFamiliesOnly(t *testing.T) {
 	req.Covers(t, "SEC-031")
 	st := seeded(t)
-	got, err := st.Sources(bounded(t), []string{"src-beta-energy", "src-alpha-roads", "no-such-family"})
+	got, err := st.Sources(bounded(t), []string{"roads_alpha", "afir_beta", "no-such-family"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 2 || got[0].Family != "src-alpha-roads" || got[1].Family != "src-beta-energy" {
+	if len(got) != 2 || got[0].Family != "afir_beta" || got[1].Family != "roads_alpha" {
 		t.Fatalf("read %+v", got)
 	}
-	if b := got[1]; !b.ShareAlike || b.ShareAlikeOffer == nil || b.Publisher == "" || b.TermsURL == nil {
+	if b := got[0]; !b.ShareAlike || b.ShareAlikeOffer == nil || b.Publisher == "" || b.TermsURL == nil {
 		t.Errorf("share-alike attribution: %+v", b)
 	}
 	none, err := st.Sources(bounded(t), nil)
@@ -102,6 +105,7 @@ func TestRegisterAndSourcesReportStorageFaults(t *testing.T) {
 func TestTheRegisterFingerprintMovesWithEveryLicenceInput(t *testing.T) {
 	req.Covers(t, "NFR-PERF-005", "SEC-030")
 	st := seeded(t)
+	seedChanges(t, "source.register_version", "source.use_classes", "source.attribution_text", "source_note.body")
 	ctx := bounded(t)
 	conn, err := db.Owner(ctx)
 	if err != nil {
@@ -113,12 +117,14 @@ func TestTheRegisterFingerprintMovesWithEveryLicenceInput(t *testing.T) {
 		t.Fatalf("versions %+v, %v", base, err)
 	}
 	for _, change := range []struct{ name, do, undo string }{
-		{"register_version", `update contract.source set register_version = register_version + 1 where source_ref = 'src-delta-parking'`,
-			`update contract.source set register_version = register_version - 1 where source_ref = 'src-delta-parking'`},
-		{"use_classes", `update contract.source set use_classes = use_classes || '{probe}' where source_ref = 'src-gamma-energy'`,
-			`update contract.source set use_classes = array_remove(use_classes, 'probe') where source_ref = 'src-gamma-energy'`},
-		{"a note", `update contract.source_note set body = body || ' (probe)' where source_ref = 'src-gamma-energy'`,
-			`update contract.source_note set body = left(body, -8) where source_ref = 'src-gamma-energy'`},
+		{"register_version", `update contract.source set register_version = register_version + 1 where source_ref = 'truckpark_sid_static'`,
+			`update contract.source set register_version = register_version - 1 where source_ref = 'truckpark_sid_static'`},
+		{"use_classes", `update contract.source set use_classes = array_remove(use_classes, 'commercial') where source_ref = 'afir_alpha'`,
+			`update contract.source set use_classes = use_classes || '{commercial}' where source_ref = 'afir_alpha'`},
+		{"a note", `update contract.source_note set body = body || ' (probe)' where source_ref = 'chargepool_gamma'`,
+			`update contract.source_note set body = left(body, -8) where source_ref = 'chargepool_gamma'`},
+		{"an attribution", `update contract.source set attribution_text = attribution_text || ' (probe)' where source_ref = 'afir_beta'`,
+			`update contract.source set attribution_text = left(attribution_text, -8) where source_ref = 'afir_beta'`},
 	} {
 		if _, err := conn.Exec(ctx, change.do); err != nil {
 			t.Fatal(err)
@@ -144,13 +150,14 @@ func TestTheRegisterFingerprintMovesWithEveryLicenceInput(t *testing.T) {
 func TestAFamilyVersionMovesWithItsDataAsOf(t *testing.T) {
 	req.Covers(t, "NFR-PERF-005")
 	st := seeded(t)
+	seedChanges(t, "source_freshness.data_as_of")
 	ctx := bounded(t)
 	conn, err := db.Owner(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
-	const family = "src-gamma-energy"
+	const family = "chargepool_gamma"
 	tagged := func() string {
 		t.Helper()
 		fs, err := st.Provenance(ctx, []string{family}, "en")
@@ -199,13 +206,14 @@ func TestAFamilyVersionMovesWithItsDataAsOf(t *testing.T) {
 func TestTheLampsVersionsMoveWithWhatItJudges(t *testing.T) {
 	req.Covers(t, "NFR-PERF-005", "FR-ROAD-004")
 	st := seeded(t)
+	seedChanges(t, "source_freshness.confirmed_at", "source_freshness.confirm_interval_s", "source_freshness.updates_paused", "message_coverage.current_only", "junction.state_code")
 	ctx := bounded(t)
 	conn, err := db.Owner(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
-	const family = "src-gamma-energy"
+	const family = "chargepool_gamma"
 	read := func() provenance.Versions {
 		t.Helper()
 		vs, err := st.FreshnessVersions(ctx)
@@ -221,6 +229,15 @@ func TestTheLampsVersionsMoveWithWhatItJudges(t *testing.T) {
 		}
 	}
 	base := read()
+	var junction string
+	var state *string
+	owner(t, `select junction_id, state_code from contract.junction order by junction_id limit 1`, &junction, &state)
+	var held struct {
+		at       *string
+		interval *int64
+		paused   bool
+	}
+	owner(t, `select confirmed_at::text, confirm_interval_s::bigint, updates_paused from contract.source_freshness where source_ref = '`+family+`'`, &held.at, &held.interval, &held.paused)
 	t.Cleanup(func() {
 		ctx := context.WithoutCancel(ctx)
 		c, err := db.Owner(ctx)
@@ -230,9 +247,9 @@ func TestTheLampsVersionsMoveWithWhatItJudges(t *testing.T) {
 		}
 		defer func() { _ = c.Close(ctx) }()
 		for _, sql := range []string{
-			`update contract.source_freshness set confirmed_at = null, confirm_interval_s = null, updates_paused = false where source_ref = '` + family + `'`,
+			`update contract.source_freshness set confirmed_at = ` + literal(held.at) + `, confirm_interval_s = ` + literal(held.interval) + `, updates_paused = ` + fmt.Sprint(held.paused) + ` where source_ref = '` + family + `'`,
 			`delete from contract.message_coverage where state_code = '96'`,
-			`update contract.junction set state_code = null`,
+			`update contract.junction set state_code = ` + literal(state) + ` where junction_id = '` + junction + `'`,
 		} {
 			if _, err := c.Exec(ctx, sql); err != nil {
 				t.Error(err)
@@ -241,17 +258,21 @@ func TestTheLampsVersionsMoveWithWhatItJudges(t *testing.T) {
 	})
 	seen := map[string]bool{base.Confirmations[family]: true}
 	for _, change := range []string{
-		`confirmed_at = '2102-01-01T00:30:00Z'`,
-		`confirm_interval_s = 300`,
-		`updates_paused = true`,
+		`update contract.source_freshness set confirmed_at = '2102-01-01T00:30:00Z' where source_ref = '` + family + `'`,
+		`update contract.source_freshness set confirm_interval_s = 301 where source_ref = '` + family + `'`,
+		`update contract.source_freshness set updates_paused = true where source_ref = '` + family + `'`, // paused by its budget
 	} {
-		exec(`update contract.source_freshness set ` + change + ` where source_ref = '` + family + `'`)
+		before := read()
+		exec(change)
 		moved := read()
 		if seen[moved.Confirmations[family]] {
 			t.Errorf("%s did not move the confirmation version %q", change, moved.Confirmations[family])
 		}
 		seen[moved.Confirmations[family]] = true
-		if moved.Families[family] != base.Families[family] || moved.Register != base.Register || moved.LampReference != base.LampReference {
+		// The confirmation interval is the family's freshness target too
+		// (the platform keeps one interval), so it moves the register.
+		registerMoves := strings.Contains(change, "confirm_interval_s")
+		if moved.Families[family] != base.Families[family] || (moved.Register != before.Register) != registerMoves || moved.LampReference != base.LampReference {
 			t.Errorf("%s moved more than the confirmation version: %+v", change, moved)
 		}
 	}
@@ -259,15 +280,16 @@ func TestTheLampsVersionsMoveWithWhatItJudges(t *testing.T) {
 	for _, change := range []string{
 		`insert into contract.message_coverage (state_code, source_ref, coverage_role, current_only) values ('96', '` + family + `', 'own', true)`,
 		`update contract.message_coverage set current_only = false where state_code = '96'`,
-		`update contract.junction set state_code = '96' where junction_id = (select min(junction_id) from contract.junction)`,
+		`update contract.junction set state_code = '96' where junction_id = '` + junction + `'`,
 	} {
+		before := read().Register
 		exec(change)
 		moved := read()
 		if refs[moved.LampReference] {
 			t.Errorf("%s did not move the lamp's reference %q", change, moved.LampReference)
 		}
 		refs[moved.LampReference] = true
-		if moved.Register != base.Register {
+		if moved.Register != before {
 			t.Errorf("%s moved the register", change)
 		}
 	}
@@ -279,6 +301,7 @@ func TestTheLampsVersionsMoveWithWhatItJudges(t *testing.T) {
 func TestTheRulesReferenceMovesWithTheRuleRows(t *testing.T) {
 	req.Covers(t, "NFR-PERF-005", "FR-RULES-001")
 	st := seeded(t)
+	seedChanges(t, "rule_topic.reviewed_on", "rule_statement.body")
 	ctx := bounded(t)
 	conn, err := db.Owner(ctx)
 	if err != nil {
@@ -313,11 +336,12 @@ func TestTheRulesReferenceMovesWithTheRuleRows(t *testing.T) {
 	})
 	refs := map[string]bool{base.RulesReference: true}
 	for _, change := range []string{
-		`insert into contract.rule_topic (topic_code, title, reviewed_on) values ('rt_reference', 'Reference', '2026-01-01')`,
-		`insert into contract.rule_statement (statement_id, topic_code, position, body) values ('rt_reference-1', 'rt_reference', 1, 'One')`,
-		`update contract.rule_statement set body = 'One, edited' where statement_id = 'rt_reference-1'`,
+		`insert into contract.rule_topic (topic_code, title, title_en, reviewed_on) values ('rt_reference', 'Bezug', 'Reference', '2026-01-01')`,
+		`insert into contract.rule_statement (statement_id, topic_code, position, body, body_en, legal_basis, legal_basis_url, reviewed_on, headline)
+values ('rt_reference.one', 'rt_reference', 1, 'Eins', 'One', '§ 0 synthetic', 'https://law.example/rt_reference', '2026-01-01', false)`,
+		`update contract.rule_statement set body = 'Eins, geändert' where statement_id = 'rt_reference.one'`,
 		`update contract.rule_topic set reviewed_on = '2026-02-01' where topic_code = 'rt_reference'`,
-		`delete from contract.rule_statement where statement_id = 'rt_reference-1'`,
+		`delete from contract.rule_statement where statement_id = 'rt_reference.one'`,
 	} {
 		if _, err := conn.Exec(ctx, change); err != nil {
 			t.Fatal(err)
@@ -331,4 +355,20 @@ func TestTheRulesReferenceMovesWithTheRuleRows(t *testing.T) {
 			t.Errorf("%s moved more than the rules reference: %+v", change, moved)
 		}
 	}
+}
+
+// literal writes a nullable value as SQL.
+func literal[T any](v *T) string {
+	if v == nil {
+		return "null"
+	}
+	return "'" + fmt.Sprint(*v) + "'"
+}
+
+// deref is a nullable value, or nil.
+func deref[T any](v *T) any {
+	if v == nil {
+		return nil
+	}
+	return *v
 }

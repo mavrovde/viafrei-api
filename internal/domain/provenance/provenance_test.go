@@ -50,12 +50,37 @@ func TestAssess(t *testing.T) {
 	for _, c := range cases {
 		f := provenance.Family{Source: access.Source{Family: "f"}, StaleAfter: 300 * time.Second, DataAsOf: c.asOf}
 		got := f.Assess(now)
-		if got.Family != "f" || got.StaleAfterS != 300 || got.Stale != c.stale || !reflect.DeepEqual(got.AgeS, c.age) || !reflect.DeepEqual(got.DataAsOf, c.wantAsOf) {
+		if got.Family != "f" || got.StaleAfterS == nil || *got.StaleAfterS != 300 || got.Stale != c.stale || !reflect.DeepEqual(got.AgeS, c.age) || !reflect.DeepEqual(got.DataAsOf, c.wantAsOf) {
 			t.Errorf("%s: %+v (age %v, asOf %v)", c.name, got, deref(got.AgeS), got.DataAsOf)
 		}
 		if got.DataAsOf != nil && got.DataAsOf.Location() != time.UTC {
 			t.Errorf("%s: dataAsOf is not UTC", c.name)
 		}
+	}
+}
+
+// TestAFamilyWithoutAnIntervalIsNeverStale: the read contract gives a family
+// with no fixed interval no threshold; it is never stale, with or without an
+// instant, its age is shown, and it never turns stale.
+func TestAFamilyWithoutAnIntervalIsNeverStale(t *testing.T) {
+	req.Covers(t, "ENV-003")
+	old := now.Add(-400 * 24 * time.Hour)
+	for _, asOf := range []*time.Time{&old, nil} {
+		f := provenance.Family{Source: access.Source{Family: "f"}, NeverStale: true, DataAsOf: asOf}
+		got := f.Assess(now)
+		if got.Stale || got.StaleAfterS != nil || (asOf != nil) != (got.AgeS != nil) {
+			t.Errorf("as of %v: %+v", asOf, got)
+		}
+		if _, ok := f.TurnsStale(); ok {
+			t.Errorf("as of %v: turns stale", asOf)
+		}
+	}
+	f := provenance.Family{StaleAfter: 300 * time.Second, DataAsOf: &old}
+	if at, ok := f.TurnsStale(); !ok || !at.Equal(old.Add(301*time.Second)) {
+		t.Errorf("TurnsStale = %v %v", at, ok)
+	}
+	if _, ok := (provenance.Family{StaleAfter: time.Second}).TurnsStale(); ok {
+		t.Error("a family with no instant turns stale")
 	}
 }
 

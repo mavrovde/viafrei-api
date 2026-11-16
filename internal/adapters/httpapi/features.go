@@ -94,8 +94,8 @@ type FreshnessEntry struct {
 	Family      string     `json:"family" doc:"The source family."`
 	DataAsOf    *time.Time `json:"dataAsOf" nullable:"true" doc:"The instant up to which the family's data was last known current. It advances when the data is confirmed unchanged, so it is not the instant of the last change in the data. Null when the family's data has never been known current."`
 	AgeS        *int64     `json:"ageS" nullable:"true" doc:"generatedAt minus dataAsOf, in whole seconds; null when dataAsOf is."`
-	StaleAfterS int64      `json:"staleAfterS" doc:"The family's design threshold: data older than this is stale."`
-	Stale       bool       `json:"stale" doc:"True when ageS is above staleAfterS, or dataAsOf is unknown."`
+	StaleAfterS *int64     `json:"staleAfterS,omitempty" doc:"The family's design threshold: data older than this is stale. Absent for a family with no fixed interval, which is never stale: its age is shown only."`
+	Stale       bool       `json:"stale" doc:"True when ageS is above staleAfterS, or dataAsOf is unknown; never for a family without staleAfterS."`
 }
 
 // Notes are the verbatim licence notes of the contributing families.
@@ -175,7 +175,9 @@ func noteFreshness(ctx context.Context, f provenance.Family, fr provenance.Fresh
 	if f.DataAsOf.After(at) {
 		noteChangesAt(ctx, *f.DataAsOf)
 	}
-	noteChangesAt(ctx, f.DataAsOf.Add(time.Duration(fr.StaleAfterS+1)*time.Second))
+	if t, ok := f.TurnsStale(); ok {
+		noteChangesAt(ctx, t)
+	}
 }
 
 // featureProblem maps a refusal of the feature use cases to its problem.
@@ -360,6 +362,9 @@ func chargingSites(ctx context.Context, a features.Answer[energy.Site], maxAge t
 	thresholds := map[string]time.Duration{}
 	for _, f := range a.Families {
 		thresholds[f.Source.Family] = f.StaleAfter
+		if f.NeverStale {
+			thresholds[f.Source.Family] = maxAge // no threshold of its own: the status age limit alone
+		}
 	}
 	limit := func(family string) time.Duration { return energy.StatusLimit(maxAge, thresholds[family]) }
 	out := make([]ChargingSite, len(a.Items))
@@ -516,14 +521,16 @@ func noteFreeMin(ctx context.Context, a features.Answer[parking.Site], freeMin i
 	if freeMin <= 0 {
 		return
 	}
-	thresholds := map[string]time.Duration{}
+	thresholds := map[string]*time.Duration{}
 	for _, f := range a.Families {
-		thresholds[f.Source.Family] = f.StaleAfter
+		if !f.NeverStale {
+			thresholds[f.Source.Family] = &f.StaleAfter
+		}
 	}
 	for _, v := range a.Items {
 		noteShown(ctx, "parking "+v.ID)
-		if o := v.Occupancy; o != nil {
-			noteChangesAt(ctx, o.ObservedAt.Add(thresholds[o.Family]+time.Microsecond))
+		if o := v.Occupancy; o != nil && thresholds[o.Family] != nil {
+			noteChangesAt(ctx, o.ObservedAt.Add(*thresholds[o.Family]+time.Microsecond))
 		}
 	}
 }

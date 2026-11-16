@@ -323,6 +323,10 @@ contract.stop_place	withdrawn_at	timestamp with time zone
 contract.stop_place	source_refs	text[]
 contract.stop_place	display_class	text
 contract.stop_place	audience	text
+contract.stop_place	station_category	smallint
+contract.stop_place	municipality_name	text
+contract.stop_place	eva_no	text
+contract.stop_place	ifopt	text
 contract.stop_point	stop_point_id	text
 contract.stop_point	stop_place_id	text
 contract.stop_point	platform_label	text

@@ -299,12 +299,12 @@ order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, s
 				out.Sources, err = pgx.CollectRows(res, func(r pgx.CollectableRow) (provenance.Family, error) {
 					var (
 						f          provenance.Family
-						staleAfter int64
+						staleAfter *int64
 						held       bool
 						c          ampel.Confirmation
 					)
 					err := r.Scan(&f.Source.Family, &staleAfter, &f.DataAsOf, &held, &c.At, &c.IntervalS, &c.Paused)
-					f.StaleAfter = time.Duration(staleAfter) * time.Second
+					f.StaleAfter, f.NeverStale = threshold(staleAfter)
 					if held {
 						out.Confirmations[f.Source.Family] = c
 					}
@@ -349,7 +349,7 @@ order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, s
 // starts where the carriageway's traffic comes from, decided by the line's
 // own ends (a road whose last part ends further north than its first part
 // starts is driven north with rising chainage). Those that cannot be placed
-// come last, then severity descending, then id; and it returns, for the
+// (no position, or a road with no line) come last, then severity descending, then id; and it returns, for the
 // lamp, the view of every situation in the scope (the road and direction),
 // the weather warnings in force in an area the road's line crosses, and the
 // states of the road's junctions.
@@ -358,12 +358,13 @@ order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, s
 func (s *Store) SituationsOnRoad(ctx context.Context, q roads.CorridorQuery, fams roads.Families, now time.Time) (roads.Page, error) {
 	args := append(filterArgs(q.Filter, fams.Roads, now), q.Road, string(q.Direction), codes(roads.Compass()), q.Limit+1)
 	return s.read(ctx, `
-with parts as (
+with road as (
+  select k.road_ref from contract.road k
+  where `+fmt.Sprintf(canonicalRef, "k.road_ref")+` = $8 and `+permitted("k")+` order by k.road_ref limit 1),
+parts as (
   select r.road_ref, d.path[1] n, d.geom g, st_length(d.geom::geography) len, r.length_km::float8 km
   from contract.road r, st_dump(r.geometry) d
-  where `+permitted("r")+`
-    and r.road_ref = (select k.road_ref from contract.road k
-                      where `+fmt.Sprintf(canonicalRef, "k.road_ref")+` = $8 and `+permitted("k")+` order by k.road_ref limit 1)),
+  where r.road_ref = (select road_ref from road)),
 line as (
   select road_ref, max(km) km, sum(len) total,
          st_startpoint((array_agg(g order by n))[1]) first_point,
@@ -379,8 +380,9 @@ travel as (
   from line),
 answering as (
   select e.*, line.km road_km, line.total road_total
-  from contract.traffic_event e, line
+  from contract.traffic_event e left join line on true
   where `+situationFilter+`
+    and exists (select 1 from road)
     and `+fmt.Sprintf(canonicalRef, "e.road_ref")+` = $8
     and ($9::text = 'both' or e.direction = $9::text or not e.direction = any($10))),
 placed as (

@@ -177,7 +177,7 @@ func (s *Service) sight(ctx context.Context, permitted, contributed []string, no
 	for _, f := range all {
 		if f.Assess(now).Stale {
 			stale = true
-		} else if t := f.DataAsOf.Add((f.StaleAfter/time.Second + 1) * time.Second); turns == nil || t.Before(*turns) {
+		} else if t, ok := f.TurnsStale(); ok && (turns == nil || t.Before(*turns)) {
 			turns = &t
 		}
 		if len(contributed) == 0 || slices.Contains(contributed, f.Source.Family) {

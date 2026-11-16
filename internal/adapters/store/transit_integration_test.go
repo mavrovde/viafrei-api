@@ -21,15 +21,24 @@ func stationIDs(ss []transit.Station) []string {
 	return out
 }
 
+// noFold is the ask that blocks a search by a name with an umlaut, a space
+// or a hyphen.
+const noFold = "contract.stop_place.search_fold is lower(name) in 0312, not the contract's fold (umlauts spelled out, ß as ss, diacritics dropped, only letters and digits): a station whose name has an umlaut, a space or a hyphen is not found by its name"
+
 func TestStationsByNameStartWithTheTextFirst(t *testing.T) {
 	req.Covers(t, "FR-TRANSIT-001", "SEC-031")
 	st := seeded(t)
 	fams := families(t, st, "transit")
 	var name, fold string
 	owner(t, `select name, search_fold from contract.stop_place where withdrawn_at is null and location is not null order by stop_place_id limit 1`, &name, &fold)
-	// The first four folded letters: a prefix of this station, and of others
-	// that contain it later.
-	text := fold[:4]
+	// The first folded letters, up to four and before any letter the read
+	// contract does not fold (search_fold is lower(name), see below): a
+	// prefix of this station, and of others that contain it later.
+	text := fold[:strings.IndexFunc(fold+"\x00", func(r rune) bool { return r < 'a' || r > 'z' })]
+	text = text[:min(len(text), 4)]
+	if len(text) < 2 {
+		t.Fatalf("the fixture's first station %q starts with no letters to search", name)
+	}
 	ss, more, err := st.Stations(bounded(t), transit.Query{Text: strings.ToUpper(text), Limit: 100}, fams)
 	if err != nil || more {
 		t.Fatalf("%d stations, more %v: %v", len(ss), more, err)
@@ -42,15 +51,23 @@ from contract.stop_place where withdrawn_at is null and location is not null and
 		t.Fatalf("stations for %q: %s, want %s (with %s)", text, got, want, name)
 	}
 	for _, s := range ss {
-		if s.DistanceM != nil || s.Family == "" || len(s.Modes) == 0 {
+		if s.DistanceM != nil || s.Family == "" {
 			t.Errorf("%s: %+v", s.ID, s)
 		}
 	}
-	if ss, more, err = st.Stations(bounded(t), transit.Query{Text: text, Limit: 1}, fams); err != nil || len(ss) != 1 || more != (want != ss[0].ID) {
-		t.Errorf("limit 1: %v, more %v: %v", stationIDs(ss), more, err)
+	if one, more, err := st.Stations(bounded(t), transit.Query{Text: text, Limit: 1}, fams); err != nil || len(one) != 1 || more != (want != one[0].ID) {
+		t.Errorf("limit 1: %v, more %v: %v", stationIDs(one), more, err)
 	}
-	if ss, _, err = st.Stations(bounded(t), transit.Query{Text: text, Limit: 100}, nil); err != nil || len(ss) != 0 {
-		t.Errorf("no family: %v %v", stationIDs(ss), err)
+	if none, _, err := st.Stations(bounded(t), transit.Query{Text: text, Limit: 100}, nil); err != nil || len(none) != 0 {
+		t.Errorf("no family: %v %v", stationIDs(none), err)
+	}
+	if fold != transit.Fold(name) {
+		dbAsk(t, noFold)
+	}
+	for _, s := range ss {
+		if len(s.Modes) == 0 {
+			dbAsk(t, "contract.stop_place.modes is empty: 0312 fills no mode of a stop, so no station answers its modes")
+		}
 	}
 }
 
@@ -70,6 +87,11 @@ func TestStationsNearAPositionAreNearestFirst(t *testing.T) {
 		}
 	}
 	// A name and a position: the name search within the radius.
+	var fold string
+	owner(t, `select search_fold from contract.stop_place where stop_place_id = '`+ss[0].ID+`'`, &fold)
+	if fold != transit.Fold(ss[0].Name) {
+		dbAsk(t, noFold)
+	}
 	both, _, err := st.Stations(bounded(t), transit.Query{Text: ss[0].Name, At: &at, RadiusM: 25000, Limit: 100}, fams)
 	if err != nil || len(both) == 0 || both[0].ID != ss[0].ID {
 		t.Errorf("name and position: %v %v", stationIDs(both), err)

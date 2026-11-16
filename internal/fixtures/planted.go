@@ -3,7 +3,6 @@ package fixtures
 import (
 	"fmt"
 	"io"
-	"slices"
 	"time"
 )
 
@@ -41,7 +40,7 @@ func (g *gen) fresh(domain, family string) string {
 }
 
 // TwoPartRef is the reference of the planted road in two parts.
-const TwoPartRef = "A 990"
+const TwoPartRef = "A990"
 
 // twoPartRoad is the line of the road in two parts, each a straight
 // segment: the first across land 06 from west to east, the second across
@@ -54,40 +53,36 @@ func (g *gen) twoPartRoad() [][]lonLat {
 	return [][]lonLat{part(g.land("06").cell), part(g.land("07").cell)}
 }
 
+// PlantedEvent is the contract id of a planted traffic event.
+func PlantedEvent(name string) string { return eventID(name) }
+
 // plantRoads plants the road in two parts (a motorway with a gap) with one
-// situation in the middle of each part, and one unmapped value in each
-// coded column of a situation on road 1 (ENV-051).
+// situation in the middle of each part, and, on road 1, an event of a type
+// the platform does not know (kind other) and one on a road of no known
+// class (ENV-051). The platform reads the severity and the direction of
+// every traffic message as other and unknown, so no value of either is
+// planted.
 func (g *gen) plantRoads() {
-	twoPart := g.twoPartRoad()
-	var states []string
-	length := 0.0
-	for _, part := range twoPart {
-		for _, p := range part {
-			if s := landOf(p); !slices.Contains(states, s) {
-				states = append(states, s)
-			}
-		}
-		length += haversineKm(part[0], part[1])
-	}
-	slices.Sort(states)
-	g.w.begin("road", "road_ref", "road_class", "name", "length_km", "geometry", "states")
-	g.w.row(str(TwoPartRef), str("motorway"), null, dec(length, 1), lines(twoPart...), array(states...))
+	g.w.begin("road", "road_ref")
+	g.w.row(str(TwoPartRef))
 
 	g.w.begin("traffic_event", eventColumns...)
-	plant := func(id, kind, sev, roadRef, class, dir, headline string, at lonLat) {
-		g.w.row(str(id), str(kind), str(sev), str(roadRef), str(class), str(dir), null, point(at),
-			ts(g.day(0)), null, null, null, null, null, str(headline), null, str("de"),
-			str(g.fresh("roads", "alpha")), str("o-"+id), ts(g.day(0)), ts(g.day(0)), ts(g.day(0)), null)
+	plant := func(name, kind, roadRef, class string, at lonLat) {
+		g.w.row(str(eventID(name)), str(kind), str(roadRef), str(class), point(at),
+			ts(g.day(0)), null, str(g.fresh("roads", "alpha")), str(name), ts(g.day(0)), ts(g.day(0)), ts(g.day(0)), null)
 	}
 	rd := g.roads[1]
-	plant("ev-u-kind", unknownCode, "minor", rd.ref, "motorway", "both", "Meldung (planted)", rd.along(0.2))
-	plant("ev-u-severity", "restriction", unknownCode, rd.ref, "motorway", "both", "Restriction (planted)", rd.along(0.4))
-	plant("ev-u-direction", "restriction", "minor", rd.ref, "motorway", unknownCode, "Restriction (planted)", rd.along(0.6))
-	plant("ev-u-class", "restriction", "minor", rd.ref, unknownCode, "both", "Restriction (planted)", rd.along(0.8))
-	for i, part := range twoPart {
+	plant("ev-u-kind", "other", rd.ref, "motorway", rd.along(0.2))
+	plant("ev-u-class", "restriction", "K990", "other", rd.along(0.8))
+	for i, part := range g.twoPartRoad() {
 		mid := lonLat{(part[0].lon + part[1].lon) / 2, (part[0].lat + part[1].lat) / 2}
-		plant(fmt.Sprintf("ev-two-%d", i+1), "roadworks", "minor", TwoPartRef, "motorway", "both", "Baustelle (planted)", mid)
+		plant(fmt.Sprintf("ev-two-%d", i+1), "roadworks", TwoPartRef, "motorway", mid)
 	}
+}
+
+// PlantedWarning is the contract id of a planted weather warning.
+func PlantedWarning(name string) string {
+	return map[string]string{"issued": "dwd:900001", "cancelled": "dwd:900002", "withdrawn": "dwd:900003"}[name]
 }
 
 // plantWeather plants, in one area of the first Land over the first two
@@ -98,13 +93,13 @@ func (g *gen) plantWeather() {
 	ref := g.fresh("weather", "eta")
 	from := g.day(0)
 	g.w.begin("weather_warning", warningColumns...)
-	for _, w := range []struct{ id, status, withdrawn string }{
-		{"ww-planted-issued", "issued", null},
-		{"ww-planted-cancelled", "cancelled", null},
-		{"ww-planted-withdrawn", "issued", ts(from.Add(time.Hour))},
+	for _, w := range []struct{ name, status, withdrawn string }{
+		{"issued", "actual", null},
+		{"cancelled", "cancelled", null},
+		{"withdrawn", "actual", ts(from.Add(time.Hour))},
 	} {
-		g.w.row(str(w.id), str("ice"), num(2), str("Stufe 2"), str(w.status), str("Synthetischer Wetterdienst"),
-			str("Warnung vor Glätte (Stufe 2)"), str("de"), ts(from), ts(from.Add(48*time.Hour)),
+		g.w.row(str(PlantedWarning(w.name)), str("ice"), num(2), str("Stufe 2"), str(w.status),
+			str("Warnung vor Glätte (Stufe 2)"), ts(from), ts(from.Add(48*time.Hour)),
 			ts(from.Add(-30*time.Minute)), str(l.code+"001"), str(ref), ts(from), w.withdrawn)
 	}
 }

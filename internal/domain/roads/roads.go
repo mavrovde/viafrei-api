@@ -492,8 +492,7 @@ func (p Page) ChangesAt(now time.Time) *time.Time {
 	}
 	consider(p.NextChange)
 	for _, f := range p.Sources {
-		if f.DataAsOf != nil {
-			t := f.DataAsOf.Add((f.StaleAfter/time.Second + 1) * time.Second)
+		if t, ok := f.TurnsStale(); ok {
 			consider(&t)
 		}
 	}

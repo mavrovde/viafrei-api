@@ -155,7 +155,7 @@ func TestPlantedInstantsArePresent(t *testing.T) {
 		"2026-03-29T00:00:00Z",                         // UTC midnight
 		"2026-03-28T23:00:00Z", "2026-03-29T22:00:00Z", // Berlin midnight, winter and summer time
 		"2026-03-31T22:00:00Z", "2025-12-31T23:00:00Z", // month and year end
-		"999.999", "x_unmapped",
+		"999.999", "'other'", // the largest price, a code the platform reads as other
 		"Straßenbrück-Ölau an der Au", "Oberunterhinterkieselbrückenwaldsiedlungsgemeinschaftsgemarkung",
 	} {
 		if !bytes.Contains(out, []byte(want)) {
@@ -230,7 +230,14 @@ func TestPlantedRowsAreReproducibleAndApart(t *testing.T) {
 	if !bytes.Equal(a.Bytes(), b.Bytes()) {
 		t.Error("two runs planted different rows")
 	}
-	for _, id := range []string{"'" + fixtures.TwoPartRef + "'", "'ev-two-1'", "'ev-two-2'", "'ev-u-kind'", "'ev-u-severity'", "'ev-u-direction'", "'ev-u-class'", "'ww-planted-issued'", "'ww-planted-cancelled'", "'ww-planted-withdrawn'"} {
+	ids := []string{"'" + fixtures.TwoPartRef + "'"}
+	for _, e := range []string{"ev-two-1", "ev-two-2", "ev-u-kind", "ev-u-class"} {
+		ids = append(ids, "'"+fixtures.PlantedEvent(e)+"'")
+	}
+	for _, w := range []string{"issued", "cancelled", "withdrawn"} {
+		ids = append(ids, "'"+fixtures.PlantedWarning(w)+"'")
+	}
+	for _, id := range ids {
 		if !strings.Contains(a.String(), id) {
 			t.Errorf("the planted rows lack %s", id)
 		}
@@ -238,7 +245,7 @@ func TestPlantedRowsAreReproducibleAndApart(t *testing.T) {
 	if _, err := fixtures.Generate(&set, "tiny", 1, "0.1"); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(set.String(), "'ev-two-1'") || strings.Contains(set.String(), "'"+fixtures.TwoPartRef+"'") {
+	if strings.Contains(set.String(), "'"+fixtures.PlantedEvent("ev-two-1")+"'") || strings.Contains(set.String(), "'"+fixtures.TwoPartRef+"'") {
 		t.Error("a planted row is in the generated set")
 	}
 }

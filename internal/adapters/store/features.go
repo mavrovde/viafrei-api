@@ -42,12 +42,13 @@ order by s.source_ref`, families, lang)
 			var (
 				f            provenance.Family
 				v            access.Source
-				staleAfter   int64
+				staleAfter   *int64
 				kinds, texts []string
 			)
 			err := r.Scan(&v.Family, &v.Domain, &v.Publisher, &v.AttributionText, &v.Licence, &v.LicenceURL,
 				&v.ShareAlike, &v.ShareAlikeOffer, &v.TermsURL, &staleAfter, &f.DataAsOf, &f.Version, &kinds, &texts)
-			f.Source, f.StaleAfter = v, time.Duration(staleAfter)*time.Second
+			f.Source = v
+			f.StaleAfter, f.NeverStale = threshold(staleAfter)
 			for i := range min(len(kinds), len(texts)) {
 				f.Notes = append(f.Notes, provenance.Note{Kind: provenance.MapNoteKind(kinds[i]), Text: texts[i]})
 			}
@@ -207,8 +208,9 @@ where f.withdrawn_at is null
   and f.source_ref = any($3)
   and `+held("f")+`
   and st_dwithin(f.location::geography, here.g, $5)
-  and ($6::int <= 0 or (o.free_spaces >= $6 and o.observed_at >= $7::timestamptz - (
-        select make_interval(secs => s.stale_after_s) from contract.source s where s.source_ref = o.source_ref)))
+  and ($6::int <= 0 or (o.free_spaces >= $6 and (
+        select s.stale_after_s is null or o.observed_at >= $7::timestamptz - make_interval(secs => s.stale_after_s)
+        from contract.source s where s.source_ref = o.source_ref)))
 order by 8, f.facility_id
 limit $8`, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, q.FreeMin, now, q.Limit+1)
 		var err error
@@ -268,4 +270,13 @@ where place_id = $1 and withdrawn_at is null and source_ref = any($2) and `+perm
 		err = places.ErrNotFound
 	}
 	return out, err
+}
+
+// threshold reads a family's stale_after_s: NULL is a family with no fixed
+// interval, never stale.
+func threshold(staleAfterS *int64) (time.Duration, bool) {
+	if staleAfterS == nil {
+		return 0, true
+	}
+	return time.Duration(*staleAfterS) * time.Second, false
 }

@@ -46,6 +46,9 @@ order by w.warning_id limit 1`, &id, &region, &at.Lat, &at.Lon, &level, &from, &
 	return id, region, at, level, from, until
 }
 
+// noBoundary is the ask that blocks every read of warnings by position.
+const noBoundary = "contract.admin_region.boundary is NULL (0312 maps no area geometry): no warning is found by position, so warnings_at answers none and the road lamp reads no warning"
+
 func warningIDs(ws []weather.Warning) []string {
 	out := make([]string, len(ws))
 	for i, w := range ws {
@@ -56,6 +59,7 @@ func warningIDs(ws []weather.Warning) []string {
 
 func TestWarningsAtReadTheAreaInForce(t *testing.T) {
 	req.Covers(t, "FR-WEATHER-001", "FR-WEATHER-002", "SEC-031")
+	dbAsk(t, noBoundary)
 	st := seeded(t)
 	fams := families(t, st, "weather")
 	id, region, at, level, from, until := unmappedWarning(t)
@@ -123,6 +127,7 @@ from contract.weather_warning where region_code = '%s' and withdrawn_at is null 
 
 func TestWarningsAtLeaveOutTheCancelledAndTheWithdrawn(t *testing.T) {
 	req.Covers(t, "FR-WEATHER-001")
+	dbAsk(t, noBoundary)
 	st := seeded(t)
 	fams := families(t, st, "weather")
 	// The fixture plants three warnings in one area over the same window:
@@ -133,22 +138,22 @@ func TestWarningsAtLeaveOutTheCancelledAndTheWithdrawn(t *testing.T) {
 	)
 	owner(t, `select st_y(st_centroid(r.boundary)), st_x(st_centroid(r.boundary)), w.valid_from
 from contract.weather_warning w join contract.admin_region r on r.region_code = w.region_code
-where w.warning_id = 'ww-planted-issued'`, &at.Lat, &at.Lon, &from)
+where w.warning_id = 'dwd:900001'`, &at.Lat, &at.Lon, &from)
 	// Without the status and withdrawal filter, the area holds all three at
 	// that instant: the read below has something to leave out.
 	var unfiltered string
 	owner(t, `select string_agg(w.warning_id, ',' order by w.warning_id)
 from contract.weather_warning w join contract.admin_region r on r.region_code = w.region_code
-where w.warning_id like 'ww-planted-%' and w.source_ref in (`+quoted(fams)+`)
+where w.warning_id like 'dwd:90000_' and w.source_ref in (`+quoted(fams)+`)
   and w.valid_from <= '`+from.Format(time.RFC3339Nano)+`' and (w.valid_to is null or w.valid_to > '`+from.Format(time.RFC3339Nano)+`')
   and st_intersects(r.boundary, st_setsrid(st_makepoint(`+fmt.Sprint(at.Lon)+`, `+fmt.Sprint(at.Lat)+`), 4326))`, &unfiltered)
-	if unfiltered != "ww-planted-cancelled,ww-planted-issued,ww-planted-withdrawn" {
+	if unfiltered != "dwd:900002,dwd:900001,dwd:900003" {
 		t.Fatalf("the planted warnings without the filter: %s", unfiltered)
 	}
 	sc, err := st.WarningsAt(bounded(t), weather.Query{Limit: maxWarnings, At: at, MinLevel: 1}, fams, from)
 	ws, levels := sc.Warnings, sc.Levels
 	got := warningIDs(ws)
-	if err != nil || !slices.Contains(got, "ww-planted-issued") || slices.Contains(got, "ww-planted-cancelled") || slices.Contains(got, "ww-planted-withdrawn") || len(levels) != len(ws) {
+	if err != nil || !slices.Contains(got, "dwd:900001") || slices.Contains(got, "dwd:900002") || slices.Contains(got, "dwd:900003") || len(levels) != len(ws) {
 		t.Errorf("answered %v (%d levels), %v", got, len(levels), err)
 	}
 }
@@ -159,7 +164,7 @@ func plantedAt(t *testing.T) (at geo.Point, region string, from time.Time) {
 	t.Helper()
 	owner(t, `select st_y(st_centroid(r.boundary)), st_x(st_centroid(r.boundary)), r.region_code, w.valid_from
 from contract.weather_warning w join contract.admin_region r on r.region_code = w.region_code
-where w.warning_id = 'ww-planted-issued'`, &at.Lat, &at.Lon, &region, &from)
+where w.warning_id = 'dwd:900001'`, &at.Lat, &at.Lon, &region, &from)
 	return at, region, from
 }
 
@@ -170,6 +175,7 @@ where w.warning_id = 'ww-planted-issued'`, &at.Lat, &at.Lon, &region, &from)
 // the next change.
 func TestWarningsAtSayWhenTheScopeChanges(t *testing.T) {
 	req.Covers(t, "FR-WEATHER-001")
+	dbAsk(t, noBoundary)
 	st := seeded(t)
 	fams := families(t, st, "weather")
 	_, _, at, _, from, until := unmappedWarning(t)
@@ -206,6 +212,7 @@ where w.withdrawn_at is null and w.message_status <> 'cancelled' and w.source_re
 // still read for the lamp, with every other warning in force there.
 func TestTheLampLevelsIgnoreTheFilters(t *testing.T) {
 	req.Covers(t, "FR-WEATHER-001")
+	dbAsk(t, noBoundary)
 	st := seeded(t)
 	fams := families(t, st, "weather")
 	at, region, from := plantedAt(t)
@@ -219,7 +226,7 @@ where region_code = '`+region+`' and withdrawn_at is null and message_status <> 
 	} {
 		sc, err := st.WarningsAt(bounded(t), q, fams, from)
 		ws, levels, more := sc.Warnings, sc.Levels, sc.HasMore
-		if err != nil || more || slices.Contains(warningIDs(ws), "ww-planted-issued") || len(levels) != want || !slices.Contains(levels, 2) {
+		if err != nil || more || slices.Contains(warningIDs(ws), "dwd:900001") || len(levels) != want || !slices.Contains(levels, 2) {
 			t.Errorf("%s: listed %v, levels %v (want %d with a 2), more %v: %v", name, warningIDs(ws), levels, want, more, err)
 		}
 		if weather.LampOf(levels, false, false) == weather.LampGreen {
@@ -234,6 +241,7 @@ where region_code = '`+region+`' and withdrawn_at is null and message_status <> 
 // lamp: a warning with no area cannot be placed.
 func TestAWarningWithNoAreaAnswersNoPosition(t *testing.T) {
 	req.Covers(t, "FR-WEATHER-001")
+	dbAsk(t, noBoundary)
 	st := seeded(t)
 	fams := families(t, st, "weather")
 	at, region, _ := plantedAt(t)
@@ -244,7 +252,7 @@ func TestAWarningWithNoAreaAnswersNoPosition(t *testing.T) {
   select v.id, 'ice', 3, 'Stufe 3', 'issued', 'Synthetischer Wetterdienst', 'Glätte', 'de',
     '2103-01-01T00:00:00Z', '2103-01-02T00:00:00Z', null, v.region, w.source_ref, '2103-01-01T00:00:00Z', null
   from contract.weather_warning w, (values ('ww-area-here', '`+region+`'), ('ww-area-none', null)) v(id, region)
-  where w.warning_id = 'ww-planted-issued'
+  where w.warning_id = 'dwd:900001'
   returning 1)
 select count(*) from ins`, &n)
 	t.Cleanup(func() {
@@ -264,6 +272,7 @@ select count(*) from ins`, &n)
 
 func TestWarningsAtRefuseALevelOutsideTheScaleByID(t *testing.T) {
 	req.Covers(t, "FR-WEATHER-002")
+	dbAsk(t, noBoundary)
 	st := seeded(t)
 	fams := families(t, st, "weather")
 	// A row far in the future, so no other test's instant sees it.
@@ -274,12 +283,12 @@ func TestWarningsAtRefuseALevelOutsideTheScaleByID(t *testing.T) {
 	)
 	from := time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC)
 	owner(t, `select region_code, st_y(st_centroid(boundary)), st_x(st_centroid(boundary)) from contract.admin_region
-where region_code = (select region_code from contract.weather_warning where warning_id = 'ww-planted-issued')`, &region, &at.Lat, &at.Lon)
+where region_code = (select region_code from contract.weather_warning where warning_id = 'dwd:900001')`, &region, &at.Lat, &at.Lon)
 	owner(t, `insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
   valid_from, valid_to, published_at, region_code, source_ref, recorded_at, withdrawn_at)
 select 'ww-level-7', 'ice', 7, 'Stufe 7', 'issued', 'Synthetischer Wetterdienst', 'Glätte', 'de',
   '2100-01-01T00:00:00Z', null, null, '`+region+`', source_ref, '2100-01-01T00:00:00Z', null
-from contract.weather_warning where warning_id = 'ww-planted-issued'
+from contract.weather_warning where warning_id = 'dwd:900001'
 returning warning_id`, &id)
 	t.Cleanup(func() {
 		var gone string
@@ -307,12 +316,13 @@ returning warning_id`, &id)
 // the list, and truncation says more answer; the lamp still reads them all.
 func TestWarningsAtStopAtTheCap(t *testing.T) {
 	req.Covers(t, "FR-WEATHER-001")
+	dbAsk(t, noBoundary)
 	st := seeded(t)
 	fams := families(t, st, "weather")
 	var at geo.Point
 	var region string
 	owner(t, `select region_code, st_y(st_centroid(boundary)), st_x(st_centroid(boundary)) from contract.admin_region
-where region_code = (select region_code from contract.weather_warning where warning_id = 'ww-planted-issued')`, &region, &at.Lat, &at.Lon)
+where region_code = (select region_code from contract.weather_warning where warning_id = 'dwd:900001')`, &region, &at.Lat, &at.Lon)
 	var n int
 	owner(t, `with ins as (
   insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
@@ -320,7 +330,7 @@ where region_code = (select region_code from contract.weather_warning where warn
   select 'ww-cap-' || g, 'wind', 1, 'Stufe 1', 'issued', 'Synthetischer Wetterdienst', 'Wind', 'de',
     '2101-01-01T00:00:00Z', null, null, '`+region+`', w.source_ref, '2101-01-01T00:00:00Z', null
   from contract.weather_warning w, generate_series(1, `+fmt.Sprint(capLimit+1)+`) g
-  where w.warning_id = 'ww-planted-issued'
+  where w.warning_id = 'dwd:900001'
   returning 1)
 select count(*) from ins`, &n)
 	t.Cleanup(func() {

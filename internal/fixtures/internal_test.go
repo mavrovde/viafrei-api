@@ -102,3 +102,16 @@ func TestNamesAreBuiltFromOurSyllablesOnly(t *testing.T) {
 		t.Fatal("the grammar accepts a name outside the lists")
 	}
 }
+
+// TestSourceByRefRefusesAnUnknownKey: a key the set has no source of is a
+// generator bug, named.
+func TestSourceByRefRefusesAnUnknownKey(t *testing.T) {
+	defer func() {
+		msg, _ := recover().(string)
+		if !strings.Contains(msg, "no source nowhere") {
+			t.Fatalf("recover() = %q, want a panic naming the key", msg)
+		}
+	}()
+	(&gen{}).sourceByRef("nowhere")
+	t.Fatal("sourceByRef returned without a source")
+}

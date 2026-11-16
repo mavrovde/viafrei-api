@@ -119,7 +119,9 @@ func TestWriteThroughStoreRefused(t *testing.T) {
 	ctx := bounded(t)
 	st := openStore(t, ctx)
 	err := st.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, "delete from contract.contract_info")
+		// The contract views refuse a write themselves (they are read-only
+		// views), so the write is one the role could otherwise make.
+		_, err := tx.Exec(ctx, "create temp table planted (x int)")
 		return err
 	})
 	if !errors.Is(err, store.ErrUnavailable) || sqlState(err) != "25006" {

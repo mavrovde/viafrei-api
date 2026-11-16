@@ -38,6 +38,58 @@ func owner(t *testing.T, sql string, dest ...any) {
 	}
 }
 
+// change runs one statement as the database owner on the read contract. It
+// returns the rows changed.
+func change(t *testing.T, sql string, args ...any) int64 {
+	t.Helper()
+	ctx := bounded(t)
+	conn, err := db.Owner(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(ctx) }()
+	tag, err := conn.Exec(ctx, sql, args...)
+	if err != nil {
+		t.Fatalf("%s: %v", sql, err)
+	}
+	return tag.RowsAffected()
+}
+
+// seedChanges stops a test that changes the given columns ("view.column")
+// or removes rows of their views, before it plants anything: a test names no table under the
+// read contract, and the test seed takes rows through the views (INSERT) and
+// nothing else yet. The skip is the DB-lane ask for the seed's INSTEAD OF
+// UPDATE and DELETE.
+func seedChanges(t *testing.T, columns ...string) {
+	t.Helper()
+	ctx := bounded(t)
+	conn, err := db.Owner(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(ctx) }()
+	for _, vc := range columns {
+		v, c, _ := strings.Cut(vc, ".")
+		for _, probe := range []string{"update contract." + v + " set " + c + " = " + c + " where false", "delete from contract." + v + " where false"} {
+			if _, err := conn.Exec(ctx, probe); err != nil {
+				dbAsk(t, "the test seed changes no contract."+vc+" or removes no row of its view (INSERT only): a test that changes or removes a seeded row cannot run")
+			}
+		}
+	}
+}
+
+// dbAsk stops a test at an expectation the read contract cannot hold yet:
+// its view gives a constant or NULL where the API reads a value. The skip
+// names the ask to the database lane; the count of these is reported with
+// every integration run.
+func dbAsk(t *testing.T, ask string) {
+	t.Helper()
+	t.Skip("DB-lane ask: " + ask)
+}
+
+// fixtureEnergy are the fixture's energy families a public key reads.
+var fixtureEnergy = []string{"afir_alpha", "afir_alpha_stale", "afir_beta", "afir_zeta", "chargepool_gamma"}
+
 // families returns the register's families of one domain.
 func families(t *testing.T, st *store.Store, domain string) []string {
 	t.Helper()
@@ -53,10 +105,13 @@ var everywhere = 50000
 func TestRegisterCarriesTheDomain(t *testing.T) {
 	req.Covers(t, "SEC-032")
 	st := seeded(t)
-	if got := families(t, st, "energy"); !slices.Equal(got, []string{"src-alpha-energy", "src-alpha-energy-stale", "src-beta-energy", "src-gamma-energy"}) {
-		t.Errorf("energy families %v", got)
+	energy := families(t, st, "energy")
+	for _, f := range fixtureEnergy {
+		if !slices.Contains(energy, f) {
+			t.Errorf("energy families %v lack %s", energy, f)
+		}
 	}
-	if got := families(t, st, "parking"); !slices.Contains(got, "src-delta-parking") || slices.Contains(got, "src-alpha-energy") {
+	if got := families(t, st, "parking"); !slices.Contains(got, "truckpark_sid_static") || slices.Contains(got, "afir_alpha") || slices.Contains(energy, "park_alpha") {
 		t.Errorf("parking families %v", got)
 	}
 }
@@ -64,17 +119,25 @@ func TestRegisterCarriesTheDomain(t *testing.T) {
 func TestProvenanceReadsTheGivenFamiliesInOneLanguage(t *testing.T) {
 	req.Covers(t, "ENV-003", "SEC-031")
 	st := seeded(t)
-	got, err := st.Provenance(bounded(t), []string{"src-gamma-energy", "src-delta-parking", "src-alpha-energy-stale", "no-such-family"}, "en")
+	got, err := st.Provenance(bounded(t), []string{"chargepool_gamma", "truckpark_sid_static", "afir_alpha_stale", "geonames", "no-such-family"}, "en")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 3 || got[0].Source.Family != "src-alpha-energy-stale" || got[1].Source.Family != "src-delta-parking" || got[2].Source.Family != "src-gamma-energy" {
+	if len(got) != 4 || got[0].Source.Family != "afir_alpha_stale" || got[1].Source.Family != "chargepool_gamma" || got[2].Source.Family != "geonames" || got[3].Source.Family != "truckpark_sid_static" {
 		t.Fatalf("read %+v", got)
 	}
 	end := fixtures.ReferenceInstant.AddDate(0, 0, 2)
-	stale, delta, gamma := got[0], got[1], got[2]
-	if stale.StaleAfter != time.Hour || stale.DataAsOf == nil || !stale.DataAsOf.Equal(end.Add(-10*time.Hour)) || !stale.Assess(end).Stale {
+	stale, gamma, never, delta := got[0], got[1], got[2], got[3]
+	var staleAfterS int64
+	var asOf time.Time
+	owner(t, `select s.stale_after_s, f.data_as_of from contract.source s join contract.source_freshness f using (source_ref)
+where source_ref = 'afir_alpha_stale'`, &staleAfterS, &asOf)
+	if stale.StaleAfter != time.Duration(staleAfterS)*time.Second || stale.NeverStale || stale.DataAsOf == nil || !stale.DataAsOf.Equal(asOf) || !stale.Assess(end).Stale {
 		t.Errorf("stale family %+v", stale)
+	}
+	// A family with no fixed interval (stale_after_s NULL) is never stale.
+	if !never.NeverStale || never.Assess(end).Stale || never.Assess(end).StaleAfterS != nil {
+		t.Errorf("a family with no interval %+v", never)
 	}
 	if gamma.DataAsOf == nil || gamma.Assess(end).Stale || gamma.Source.Domain != "energy" || gamma.Source.Publisher == "" || gamma.Source.Licence == "" {
 		t.Errorf("fresh family %+v", gamma)
@@ -85,11 +148,11 @@ func TestProvenanceReadsTheGivenFamiliesInOneLanguage(t *testing.T) {
 	if !slices.Equal(delta.Notes, []provenance.Note{{Kind: provenance.Condition, Text: "Use only after accepting the terms (synthetic)."}}) || delta.Source.TermsURL == nil {
 		t.Errorf("condition notes %+v", delta)
 	}
-	de, err := st.Provenance(bounded(t), []string{"src-gamma-energy"}, "de")
+	de, err := st.Provenance(bounded(t), []string{"chargepool_gamma"}, "de")
 	if err != nil || len(de) != 1 || len(de[0].Notes) != 1 || de[0].Notes[0].Text == gamma.Notes[0].Text {
 		t.Errorf("German notes %+v, %v", de, err)
 	}
-	none, err := st.Provenance(bounded(t), []string{"src-gamma-energy"}, "xx")
+	none, err := st.Provenance(bounded(t), []string{"chargepool_gamma"}, "xx")
 	if err != nil || len(none) != 1 || len(none[0].Notes) != 0 {
 		t.Errorf("a language without notes %+v, %v", none, err)
 	}
@@ -139,7 +202,7 @@ func TestChargingNearReadsTheNearestSitesOfTheGivenFamilies(t *testing.T) {
 	owner(t, `select c.site_id, c.source_ref, st_y(c.location), st_x(c.location), o.observed_at
 from contract.charging_site c join contract.charge_point p using (site_id)
 join contract.charge_point_state_observation o using (point_id)
-where o.availability = 'x_unmapped' order by o.observed_at limit 1`, &id, &fam, &at.Lat, &at.Lon, &unknown)
+where o.availability = 'other' order by o.observed_at limit 1`, &id, &fam, &at.Lat, &at.Lon, &unknown)
 	fams := families(t, st, "energy")
 	q := energy.Query{At: at, RadiusM: everywhere, Access: energy.FilterAll, Limit: 100}
 
@@ -175,7 +238,7 @@ where o.availability = 'x_unmapped' order by o.observed_at limit 1`, &id, &fam, 
 		t.Errorf("a report from after now was read: %v", err)
 	}
 	one, more, _, err := st.ChargingNear(bounded(t), energy.Query{At: at, RadiusM: everywhere, Access: energy.FilterAll, Limit: 1}, fams, unknown)
-	if err != nil || len(one) != 1 || !more || one[0].ID != id {
+	if err != nil || len(one) != 1 || more != (len(sites) > 1) || one[0].ID != id {
 		t.Errorf("limit 1: %d sites, more %v, %v", len(one), more, err)
 	}
 	for _, f := range []energy.AccessFilter{energy.FilterPublic, energy.FilterRestricted} {
@@ -209,10 +272,28 @@ where o.availability = 'x_unmapped' order by o.observed_at limit 1`, &id, &fam, 
 	if len(fast) >= len(sites) {
 		t.Errorf("min_kw filtered nothing: %d of %d", len(fast), len(sites))
 	}
+	// A site with points on both sides of the floor keeps its fast ones only.
+	var mixed string
+	var mAt geo.Point
+	owner(t, `select c.site_id, st_y(c.location), st_x(c.location) from contract.charging_site c join contract.charge_point p using (site_id)
+where c.source_ref = any('{`+strings.Join(fams, ",")+`}') group by 1, 2, 3
+having min(p.power_max_kw) < 150 and max(p.power_max_kw) >= 150 order by 1 limit 1`, &mixed, &mAt.Lat, &mAt.Lon)
+	kept, _, _, err := st.ChargingNear(bounded(t), energy.Query{At: mAt, RadiusM: 1, Access: energy.FilterAll, MinKw: 150, Limit: 100}, fams, unknown)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range kept {
+		if s.ID == mixed {
+			dropped++
+			if slices.ContainsFunc(s.Points, func(p energy.ChargePoint) bool { return p.MaxPowerKw == nil || *p.MaxPowerKw < 150 }) {
+				t.Errorf("min_kw 150 kept a slower point of %s: %+v", mixed, s.Points)
+			}
+		}
+	}
 	if dropped == 0 {
 		t.Error("min_kw dropped no slower point of a kept site; the fixture no longer proves the point filter")
 	}
-	other, _, _, err := st.ChargingNear(bounded(t), q, []string{"src-alpha-parking"}, unknown)
+	other, _, _, err := st.ChargingNear(bounded(t), q, []string{"park_alpha"}, unknown)
 	if err != nil || len(other) != 0 {
 		t.Errorf("another domain's family read %d sites: %v", len(other), err)
 	}
@@ -228,7 +309,7 @@ func TestParkingNearReadsOccupancyFromTheOccupancyFamiliesOnly(t *testing.T) {
 	)
 	owner(t, `select f.facility_id, st_y(f.location), st_x(f.location), o.observed_at
 from contract.parking_facility f join contract.occupancy_observation o using (facility_id)
-where o.occupancy_status = 'x_unmapped' order by o.observed_at limit 1`, &id, &at.Lat, &at.Lon, &unknown)
+where o.occupancy_status = 'other' order by o.observed_at limit 1`, &id, &at.Lat, &at.Lon, &unknown)
 	listed := families(t, st, "parking")
 	q := parking.Query{At: at, RadiusM: everywhere, Limit: 100}
 	sites, more, _, err := st.ParkingNear(bounded(t), q, listed, listed, unknown)
@@ -239,7 +320,7 @@ where o.occupancy_status = 'x_unmapped' order by o.observed_at limit 1`, &id, &a
 		t.Errorf("an unmapped status reads as other: %+v", sites[0])
 	}
 	for i, s := range sites {
-		if s.Kind == parking.KindOther || !slices.Contains(listed, s.Family) || i > 0 && s.DistanceM < sites[i-1].DistanceM {
+		if !slices.Contains(listed, s.Family) || i > 0 && s.DistanceM < sites[i-1].DistanceM {
 			t.Errorf("site %+v", s)
 		}
 	}
@@ -247,15 +328,17 @@ where o.occupancy_status = 'x_unmapped' order by o.observed_at limit 1`, &id, &a
 	var delta string
 	var dAt geo.Point
 	owner(t, `select facility_id, st_y(location), st_x(location) from contract.parking_facility
-where source_ref = 'src-delta-parking' order by facility_id limit 1`, &delta, &dAt.Lat, &dAt.Lon)
+where source_ref = 'truckpark_sid_static' order by facility_id limit 1`, &delta, &dAt.Lat, &dAt.Lon)
 	end := fixtures.ReferenceInstant.AddDate(0, 0, 2)
-	occupancy := slices.DeleteFunc(slices.Clone(listed), func(f string) bool { return f == "src-delta-parking" })
+	// The SID's occupancy is its dynamic family's; a request that has not
+	// accepted its terms reads the facility without it.
+	occupancy := slices.DeleteFunc(slices.Clone(listed), func(f string) bool { return f == "truckpark_sid_static" || f == "truckpark_sid_dyn" })
 	got, _, _, err := st.ParkingNear(bounded(t), parking.Query{At: dAt, RadiusM: 1, Limit: 5}, listed, occupancy, end)
 	if err != nil || len(got) != 1 || got[0].ID != delta || got[0].Occupancy != nil || got[0].Kind != parking.KindTruckParking {
 		t.Errorf("a pending family's site carries occupancy: %+v, %v", got, err)
 	}
 	got, _, _, err = st.ParkingNear(bounded(t), parking.Query{At: dAt, RadiusM: 1, Limit: 5}, occupancy, occupancy, end)
-	if err != nil || len(got) != 0 {
+	if err != nil || slices.ContainsFunc(got, func(s parking.Site) bool { return s.ID == delta }) {
 		t.Errorf("an unlisted family's site read: %+v, %v", got, err)
 	}
 
@@ -267,7 +350,10 @@ where source_ref = 'src-delta-parking' order by facility_id limit 1`, &delta, &d
 	)
 	owner(t, `select f.facility_id, st_y(f.location), st_x(f.location), o.free_spaces, o.observed_at
 from contract.parking_facility f join contract.occupancy_observation o using (facility_id)
-where o.free_spaces > 0 and f.source_ref <> 'src-delta-parking' order by o.observed_at desc limit 1`, &fid, &fAt.Lat, &fAt.Lon, &free, &report)
+where o.free_spaces > 0 and f.source_ref <> 'truckpark_sid_static' order by o.observed_at desc limit 1`, &fid, &fAt.Lat, &fAt.Lon, &free, &report)
+	var threshold time.Duration
+	owner(t, `select make_interval(secs => s.stale_after_s) from contract.occupancy_observation o join contract.source s using (source_ref)
+where o.facility_id = '`+fid+`' and o.observed_at = '`+report.Format(time.RFC3339Nano)+`'`, &threshold)
 	near := func(min int, now time.Time) []parking.Site {
 		got, _, _, err := st.ParkingNear(bounded(t), parking.Query{At: fAt, RadiusM: 1, FreeMin: min, Limit: 5}, listed, listed, now)
 		if err != nil {
@@ -281,15 +367,32 @@ where o.free_spaces > 0 and f.source_ref <> 'src-delta-parking' order by o.obser
 	if got := near(free+1, report); len(got) != 0 {
 		t.Errorf("free_min above the report: %+v", got)
 	}
-	if got := near(free, report.Add(30*time.Minute)); len(got) != 1 {
+	if got := near(free, report.Add(threshold)); len(got) != 1 {
 		t.Errorf("a report at the stale threshold is live: %+v", got)
 	}
-	if got := near(free, report.Add(30*time.Minute+time.Second)); len(got) != 0 {
+	if got := near(free, report.Add(threshold+time.Second)); len(got) != 0 {
 		t.Errorf("a stale report satisfies free_min: %+v", got)
 	}
-	if got := near(0, report.Add(30*time.Minute+time.Second)); len(got) != 1 {
+	if got := near(0, report.Add(threshold+time.Second)); len(got) != 1 {
 		t.Errorf("without free_min a stale report still lists the site: %+v", got)
 	}
+	// A family with no fixed interval (stale_after_s NULL) never goes
+	// stale: its report satisfies free_min however old it is.
+	t.Run("a family with no interval", func(t *testing.T) {
+		seedChanges(t, "source.stale_after_s", "source.freshness_target_s")
+		var fam string
+		var target, after *int64
+		owner(t, `select s.source_ref, s.freshness_target_s::bigint, s.stale_after_s::bigint from contract.occupancy_observation o join contract.source s using (source_ref)
+where o.facility_id = '`+fid+`' and o.observed_at = '`+report.Format(time.RFC3339Nano)+`'`, &fam, &target, &after)
+		t.Cleanup(func() {
+			change(t, `update contract.source set freshness_target_s = $2, stale_after_s = $3 where source_ref = $1`, fam, target, after)
+		})
+		change(t, `update contract.source set freshness_target_s = null, stale_after_s = null where source_ref = $1`, fam)
+		if got := near(free, report.AddDate(1, 0, 0)); len(got) != 1 {
+			t.Errorf("a report of a family with no interval is stale: %+v", got)
+		}
+	})
+
 	var crowded geo.Point
 	owner(t, `select st_y(f.location), st_x(f.location) from contract.parking_facility f
 where (select count(*) from contract.parking_facility g
@@ -406,10 +509,10 @@ func TestPlaceReadsOnePlaceOfTheGivenFamilies(t *testing.T) {
 	if err != nil || p.ID != id || p.Family != fam || p.Name != name || p.Location != at || p.Kind == places.Other {
 		t.Errorf("place %+v, %v", p, err)
 	}
-	if _, err := st.Place(bounded(t), id, []string{"src-alpha-energy"}); !errors.Is(err, places.ErrNotFound) {
+	if _, err := st.Place(bounded(t), id, []string{"afir_alpha"}); !errors.Is(err, places.ErrNotFound) {
 		t.Errorf("a place of another family: %v", err)
 	}
-	if _, err := st.Place(bounded(t), "pl-00-9999", []string{fam}); !errors.Is(err, places.ErrNotFound) {
+	if _, err := st.Place(bounded(t), "999999", []string{fam}); !errors.Is(err, places.ErrNotFound) {
 		t.Errorf("an unknown place: %v", err)
 	}
 }

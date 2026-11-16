@@ -17,7 +17,7 @@ import (
 
 // GeneratorVersion changes whenever the output for a given seed and profile
 // changes.
-const GeneratorVersion = "0.2.0"
+const GeneratorVersion = "0.3.0"
 
 // Profile sets the size of a generated set.
 type Profile struct {
@@ -58,13 +58,15 @@ var Tables = []string{
 // profile's window.
 var ReferenceInstant = time.Date(2026, 3, 28, 0, 0, 0, 0, time.UTC)
 
-// unknownCode is the value planted once in each coded column (ENV-051).
-const unknownCode = "x_unmapped"
-
 type source struct {
 	ref, family, domain string
 	stale               bool
-	staleAfter          int
+	target              int // freshness target in seconds; 0 for none
+	feedKey             int // the timetable key of a transit source
+	// platform marks a source the platform registers itself (its
+	// gazetteers, timetables, curated driving rules): the set writes its
+	// rows and its freshness, never its register.
+	platform bool
 }
 
 type place struct {
@@ -206,81 +208,128 @@ func (g *gen) src(domain string, families ...string) string {
 
 // ------------------------------------------------------------- provenance
 
-var domains = []string{"places", "roads", "energy", "parking", "transit", "accessibility", "weather", "rules"}
+// The rows are written in the read contract's columns and loaded through the
+// pinned database image's seed (test-fixtures seed), which writes the
+// platform's own tables and reads every row back through the contract view.
+// So a row gives only what the platform stores: a value the view derives (a
+// licence category, a domain, an envelope, a search fold) is the platform's,
+// and every identifier has the form the view builds it in.
+//
+// A source's key decides its domain and its envelope on the platform, by the
+// patterns of the contract mapping: bkg_ places, dwd_ weather, afir_ and
+// chargepool energy, park and truckpark_sid parking, the timetables and db_ transit,
+// tankerkoenig fuel (own keys only), anything else roads.
 
-// freshness per domain: target and stale-after, in seconds.
-var freshness = map[string][2]int{
-	"places": {86400, 604800}, "roads": {300, 900}, "energy": {600, 3600}, "parking": {300, 1800},
-	"transit": {60, 300}, "accessibility": {900, 3600}, "weather": {300, 1800}, "rules": {2592000, 7776000},
+// licences are the licence label of each family. A family's licence category
+// is the platform's reading of the label; acceptance and the use classes come
+// from the source's key and register row.
+var licences = map[string]string{
+	"alpha": "CC BY 4.0", "beta": "CC BY-SA 4.0", "gamma": "CC BY 4.0", "delta": "Synthetic terms of use 1",
+	"epsilon": "CC BY 4.0", "zeta": "CC0 1.0", "eta": "dl-de/by-2-0",
+}
+
+// sourceList is every source of the set: key, family, domain, stale, and the
+// freshness target in seconds (0: none, never stale). A transit source names
+// its timetable key.
+var sourceList = []source{
+	// Places are the platform's own gazetteer sources, the only keys its
+	// places table takes: their register rows are the platform's.
+	{ref: "bkg_gvisys", family: "eta", domain: "places", platform: true},
+	{ref: "geonames", family: "alpha", domain: "places", platform: true},
+	{ref: "roads_alpha", family: "alpha", domain: "roads", target: 300},
+	{ref: "roads_alpha_stale", family: "alpha", domain: "roads", stale: true, target: 300},
+	{ref: "roads_epsilon", family: "epsilon", domain: "roads", target: 300},
+	{ref: "afir_alpha", family: "alpha", domain: "energy", target: 600},
+	{ref: "afir_alpha_stale", family: "alpha", domain: "energy", stale: true, target: 600},
+	{ref: "afir_beta", family: "beta", domain: "energy", target: 600},
+	{ref: "chargepool_gamma", family: "gamma", domain: "energy", target: 600},
+	{ref: "afir_zeta", family: "zeta", domain: "energy", target: 600},
+	{ref: "tankerkoenig_gamma", family: "gamma", domain: "energy", target: 300},
+	{ref: "park_alpha", family: "alpha", domain: "parking", target: 300},
+	{ref: "park_alpha_stale", family: "alpha", domain: "parking", stale: true, target: 300},
+	{ref: "park_beta", family: "beta", domain: "parking", target: 300},
+	// The SID's facilities and occupancy: the platform's tables take these
+	// two keys only.
+	{ref: "truckpark_sid_static", family: "delta", domain: "parking", target: 86400},
+	{ref: "truckpark_sid_dyn", family: "delta", domain: "parking", target: 300},
+	// The platform's two timetables (keys 1 and 2) and the realtime source of
+	// the first, the only one its call observations are read from.
+	{ref: "delfi_static", family: "alpha", domain: "transit", platform: true, target: 86400, feedKey: 1},
+	{ref: "mobilithek_connect_gtfs", family: "alpha", domain: "transit", platform: true, stale: true, target: 86400, feedKey: 2},
+	{ref: "delfi_rt_tu", family: "alpha", domain: "transit", platform: true, target: 60},
+	// Lift and escalator states: the one key the platform's state table
+	// takes for a station's equipment.
+	{ref: "openstation_siri_fm", family: "alpha", domain: "transit", target: 900},
+	{ref: "dwd_alpha", family: "alpha", domain: "weather", target: 300},
+	{ref: "dwd_alpha_stale", family: "alpha", domain: "weather", stale: true, target: 300},
+	{ref: "dwd_eta", family: "eta", domain: "weather", target: 300},
+	{ref: "viafrei_rules", family: "alpha", domain: "rules", platform: true},
+}
+
+// useClasses are the register's use classes of each family; nil writes no
+// register row, which the platform reads as none (epsilon: never served). A
+// family whose envelope is not open keeps only consumer on the platform.
+var useClasses = map[string][]string{
+	"alpha": {"consumer", "non_commercial", "commercial"}, "beta": {"consumer", "non_commercial", "commercial"},
+	"gamma": {"consumer"}, "delta": {"consumer"}, "epsilon": nil,
+	"zeta": {"consumer", "non_commercial", "commercial"}, "eta": {"consumer", "non_commercial", "commercial"},
+}
+
+// licenceURL is the page of a licence label, on the reserved domain.
+func licenceURL(code string) string {
+	slug := strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
+			return r
+		}
+		if r >= 'A' && r <= 'Z' {
+			return r + 'a' - 'A'
+		}
+		return '-'
+	}, code)
+	return "https://licences.example/" + slug
 }
 
 func (g *gen) provenance() {
+	for _, s := range sourceList {
+		g.sources[s.domain] = append(g.sources[s.domain], s)
+		g.family[s.ref] = s.family
+	}
 	g.w.begin("publisher", "publisher_id", "display_name", "website")
+	for _, s := range sourceList {
+		if s.platform {
+			continue
+		}
+		g.w.row(str(s.ref), str(g.names.person()+" Datenwerk"), str(termsURL(s)))
+	}
+	g.w.begin("licence", "licence_code", "licence_url")
+	var codes []string
 	for _, f := range Families {
-		g.w.row(str("pub-"+f.Name), str(g.names.person()+" Datenwerk"), str("https://"+f.Name+".example"))
-	}
-	g.w.begin("licence", "licence_code", "licence_name", "licence_url", "licence_category", "share_alike", "attribution_required")
-	for _, f := range Families {
-		// "not_permitted" is a licence class of the gate, not a stored
-		// licence category: such a source carries an ordinary licence and an
-		// empty list of use classes, which no plan matches.
-		category := f.Category
-		if category == "not_permitted" {
-			category = "attribution"
+		if c := licences[f.Name]; !slices.Contains(codes, c) {
+			codes = append(codes, c)
+			g.w.row(str(c), str(licenceURL(c)))
 		}
-		g.w.row(str("lic-"+f.Name), str("Synthetic licence "+f.Name), str("https://licences.example/"+f.Name),
-			str(category), boolean(category == "share_alike"), boolean(category != "zero"))
 	}
-	add := func(family, domain string, stale bool) {
-		ref := "src-" + family + "-" + domain
-		if stale {
-			ref += "-stale"
+	g.w.begin("source", "source_ref", "domain", "licence_code", "attribution_text", "changes_statement", "terms_url",
+		"acceptance_required", "use_classes", "freshness_target_s", "stale_after_s", "review_signed_on", "register_version")
+	for _, s := range sourceList {
+		if s.platform {
+			continue
 		}
-		s := source{ref: ref, family: family, domain: domain, stale: stale, staleAfter: freshness[domain][1]}
-		g.sources[domain] = append(g.sources[domain], s)
-		g.family[ref] = family
-	}
-	for _, d := range domains {
-		add("alpha", d, false)
-		add("alpha", d, true)
-	}
-	add("beta", "energy", false)
-	add("beta", "parking", false)
-	add("gamma", "energy", false)
-	add("delta", "parking", false)
-	add("epsilon", "roads", false)
-	add("zeta", "places", false)
-	add("eta", "weather", false)
-
-	useClasses := map[string][]string{
-		"alpha": {"consumer", "non_commercial", "commercial"}, "beta": {"consumer", "non_commercial", "commercial"},
-		"gamma": {"consumer"}, "delta": {"consumer", "commercial"}, "epsilon": {},
-		"zeta": {"consumer", "non_commercial", "commercial"}, "eta": {"consumer", "non_commercial", "commercial"},
-	}
-	g.w.begin("source", "source_ref", "domain", "publisher_id", "licence_code", "attribution_text", "changes_statement",
-		"terms_url", "share_alike_offer_url", "acceptance_required", "use_classes", "freshness_target_s", "stale_after_s",
-		"review_signed_on", "register_version")
-	var all []source
-	for _, d := range domains {
-		all = append(all, g.sources[d]...)
-	}
-	for _, s := range all {
-		signed := date(time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC))
-		if s.family == "epsilon" {
-			signed = null // not signed off: never served
+		uses, signed, version := null, null, null
+		if u := useClasses[s.family]; u != nil {
+			uses, signed, version = array(u...), date(time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)), date(time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC))
 		}
-		offer := null
-		if s.family == "beta" {
-			offer = str("https://" + s.family + ".example/share-alike/" + s.domain)
+		target, staleAfter := null, null
+		if s.target > 0 {
+			target, staleAfter = num(s.target), num(3*s.target)
 		}
-		g.w.row(str(s.ref), str(s.domain), str("pub-"+s.family), str("lic-"+s.family),
-			str("Synthetic data from family "+s.family+", licence lic-"+s.family+"."), optStr(map[bool]string{true: "Reformatted and merged."}[s.family == "beta"]),
-			str("https://"+s.family+".example/terms"), offer, boolean(s.family == "delta"),
-			array(useClasses[s.family]...), num(freshness[s.domain][0]), num(freshness[s.domain][1]),
-			signed, date(time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)))
+		g.w.row(str(s.ref), str(s.domain), str(licences[s.family]),
+			str("Synthetic data from family "+s.family+", licence "+licences[s.family]+"."),
+			optStr(map[bool]string{true: "Reformatted and merged."}[s.family == "beta"]),
+			str(termsURL(s)), boolean(s.family == "delta"), uses, target, staleAfter, signed, version)
 	}
 	g.w.begin("source_note", "source_ref", "note_kind", "lang", "body")
-	for _, s := range all {
+	for _, s := range sourceList {
 		switch s.family {
 		case "gamma":
 			g.w.row(str(s.ref), str("purpose"), str("de"), str("Nur zur Information von Verbraucherinnen und Verbrauchern (synthetisch)."))
@@ -290,28 +339,35 @@ func (g *gen) provenance() {
 			g.w.row(str(s.ref), str("condition"), str("en"), str("Use only after accepting the terms (synthetic)."))
 		}
 	}
-	g.w.begin("source_freshness", "source_ref", "data_as_of", "freshness_version")
-	for _, s := range all {
-		asOf := g.end().Add(-time.Duration(freshness[s.domain][0]/2) * time.Second)
+	// A platform source's interval is its confirmation interval: the
+	// platform reads the freshness target from it.
+	g.w.begin("source_freshness", "source_ref", "data_as_of", "confirmed_at", "confirm_interval_s")
+	for _, s := range sourceList {
+		if s.target == 0 {
+			continue // no interval: never stale, and no state of its own
+		}
+		asOf := g.end().Add(-time.Duration(s.target/2) * time.Second)
 		if s.stale {
-			asOf = g.end().Add(-time.Duration(10*s.staleAfter) * time.Second)
+			asOf = g.end().Add(-time.Duration(30*s.target) * time.Second)
 			g.edges["stale_family"]++
 		}
-		g.w.row(str(s.ref), ts(asOf), str("v1"))
+		g.w.row(str(s.ref), ts(asOf), ts(asOf), num(s.target))
 	}
 }
+
+// termsURL is a source's terms page, on the reserved domain.
+func termsURL(s source) string { return "https://" + s.family + ".example/terms/" + s.ref }
 
 // ---------------------------------------------------------- regions, places
 
 func (g *gen) regionsAndPlaces() {
-	g.w.begin("admin_region", "region_code", "region_level", "name", "parent_code", "boundary")
+	g.w.begin("admin_region", "region_code", "region_level", "name", "parent_code")
 	for _, l := range g.lands {
-		g.w.row(str(l.code), str("state"), str(l.name), null, box(l.cell))
+		g.w.row(str(l.code), str("state"), str(l.name), null)
 	}
 	for _, l := range g.lands {
-		mid := (l.cell.w + l.cell.e) / 2
-		for d, b := range []bbox{{l.cell.w, l.cell.s, mid, l.cell.n}, {mid, l.cell.s, l.cell.e, l.cell.n}} {
-			g.w.row(str(l.code+"0"+twoDigits(d+1)), str("district"), str(g.names.settlement()+" Kreis"), str(l.code), box(b))
+		for d := range 2 {
+			g.w.row(str(l.code+"0"+twoDigits(d+1)), str("district"), str(g.names.settlement()+" Kreis"), str(l.code))
 		}
 	}
 	district := func(l land, p lonLat) string {
@@ -322,23 +378,29 @@ func (g *gen) regionsAndPlaces() {
 	}
 
 	g.w.begin("place", "place_id", "place_kind", "name", "location", "region_code", "official_key", "prominence",
-		"source_ref", "origin_key", "published_at", "recorded_at", "changed_at", "withdrawn_at")
+		"source_ref", "origin_key", "recorded_at", "changed_at", "withdrawn_at")
 	var aliases [][]string
+	n := 0
 	emit := func(l land, kind, name string, at lonLat, edge string) {
-		id := fmt.Sprintf("pl-%s-%04d", l.code, len(g.places[l.code]))
-		d := district(l, at)
-		ref := g.src("places", "alpha", "zeta")
+		n++
+		id := num(100000 + n)
+		d, key := district(l, at), ""
+		if kind == "state" {
+			d, key = l.code, l.code
+		} else {
+			key = d + fmt.Sprintf("%03d", len(g.places[l.code])%1000)
+		}
+		ref := g.src("places", "alpha", "eta")
 		rec := g.instant()
-		g.w.row(str(id), str(kind), str(name), point(at), str(d), str(d+fmt.Sprintf("%03d", len(g.places[l.code])%1000)),
-			num(1+g.r.IntN(5)), str(ref), str("o-"+id), optTS(rec.Add(-time.Hour)), ts(rec), ts(rec), null)
+		g.w.row(str(id), str(kind), str(name), point(at), str(d), str(key),
+			num(1+g.r.IntN(5)), str(ref), str("o-"+id), ts(rec), ts(rec), null)
 		g.counted(l.code, ref)
 		if edge != "" {
 			g.edges[edge]++
 		}
 		g.places[l.code] = append(g.places[l.code], place{id: id, name: name, land: l.code, district: d, at: at})
-		aliases = append(aliases, []string{id, name, "de", "official"})
-		if g.r.IntN(3) == 0 {
-			aliases = append(aliases, []string{id, fmt.Sprintf("%05d", 1001+g.r.IntN(98997)), "", "postcode"})
+		if g.r.IntN(4) == 0 {
+			aliases = append(aliases, []string{id, name + " Town"})
 		}
 	}
 	for _, l := range g.lands {
@@ -372,9 +434,11 @@ func (g *gen) regionsAndPlaces() {
 	emit(l, "locality", g.names.settlement(), lonLat{l.cell.e, (l.cell.s + l.cell.n) / 2}, "land_border")
 	g.edges["empty_area"] = 1 // every sampler rejects positions inside emptyArea
 
-	g.w.begin("place_alias", "place_id", "label", "lang", "name_kind", "search_fold")
+	// The platform keeps a place's own name as its name alias; an exonym is
+	// the one other alias it holds.
+	g.w.begin("place_alias", "place_id", "label", "lang", "name_kind")
 	for _, a := range aliases {
-		g.w.row(str(a[0]), str(a[1]), optStr(a[2]), str(a[3]), str(fold(a[1])))
+		g.w.row(str(a[0]), str(a[1]), str("en"), str("exonym"))
 	}
 }
 
@@ -408,20 +472,23 @@ func (rd road) along(f float64) lonLat {
 	return lonLat{a.lon + t*(b.lon-a.lon), a.lat + t*(b.lat-a.lat)}
 }
 
-var (
-	eventKinds = []string{"closure", "roadworks", "jam", "accident", "hazard", "restriction", "weather", "other"}
-	severities = []string{"info", "minor", "lane_closed", "major", "road_closed"}
-	directions = []string{"north", "east", "south", "west", "both", "unknown"}
-)
+// eventKinds are the event kinds the platform reads a traffic message's event type as.
+var eventKinds = []string{"closure", "roadworks", "jam", "accident", "hazard", "restriction", "weather", "other"}
 
-// eventColumns are the columns of a traffic event row.
-var eventColumns = []string{"event_id", "event_kind", "severity", "road_ref", "road_class", "direction", "direction_label",
-	"location", "valid_from", "valid_to", "lanes_closed", "lanes_total", "delay_min", "affected_length_m",
-	"headline", "description", "text_lang", "source_ref", "origin_key", "published_at", "recorded_at", "changed_at", "withdrawn_at"}
+// eventColumns are the columns of a traffic event row. An event is a Land or
+// city traffic message (see eventID): the platform keeps its history,
+// where an Autobahn tick is only read within a day of now. Its headline is
+// its event type, which the platform reads the kind from.
+var eventColumns = []string{"event_id", "event_kind", "road_ref", "road_class", "location", "valid_from", "valid_to",
+	"source_ref", "origin_key", "published_at", "recorded_at", "changed_at", "withdrawn_at"}
+
+// eventID is the contract id of the traffic message with publication pub, as
+// the read contract writes it.
+func eventID(pub string) string { return "datex:syn:" + pub }
 
 func (g *gen) roadsAndEvents() {
 	n := 6 + g.p.Scale/4
-	g.w.begin("road", "road_ref", "road_class", "name", "length_km", "geometry", "states")
+	g.w.begin("road", "road_ref")
 	for i := range n {
 		from, to := g.lands[g.r.IntN(16)], g.lands[g.r.IntN(16)]
 		pts := []lonLat{within(g.r, from.cell)}
@@ -429,80 +496,59 @@ func (g *gen) roadsAndEvents() {
 			pts = append(pts, within(g.r, g.lands[g.r.IntN(16)].cell))
 		}
 		pts = append(pts, within(g.r, to.cell))
-		rd := road{ref: fmt.Sprintf("A %d", 100+i), points: pts}
-		class := "motorway"
-		if i%5 == 4 {
-			rd.ref, class = fmt.Sprintf("B %d", 300+i), "federal"
-		}
-		var states []string
+		rd := road{ref: fmt.Sprintf("A%d", 100+i), points: pts}
 		for j := 1; j < len(pts); j++ {
 			rd.length += haversineKm(pts[j-1], pts[j])
 		}
-		for f := 0.0; f <= 1.0; f += 0.02 {
-			if s := landOf(rd.along(f)); !slices.Contains(states, s) {
-				states = append(states, s)
-			}
-		}
-		slices.Sort(states)
 		g.roads = append(g.roads, rd)
-		g.w.row(str(rd.ref), str(class), null, dec(rd.length, 1), line(pts), array(states...))
+		g.w.row(str(rd.ref))
 	}
 
-	g.w.begin("junction", "junction_id", "road_ref", "number", "name", "junction_kind", "chainage_km", "location")
+	g.w.begin("junction", "junction_id", "road_ref", "number", "name", "junction_kind", "location", "state_code")
 	for i, rd := range g.roads {
 		count := 8 + g.p.Scale/4
 		for j := range count {
 			f := (float64(j) + 0.5) / float64(count)
-			kind := "exit"
+			kind := "junction"
 			switch {
 			case j%7 == 3:
 				kind = "interchange"
 			case j%5 == 2:
-				kind = "service_area"
+				kind = "triangle"
 			}
-			g.w.row(str(fmt.Sprintf("jn-%02d-%03d", i, j)), str(rd.ref), str(num(j+1)), str(g.names.settlement()),
-				str(kind), dec(f*rd.length, 1), point(rd.along(f)))
+			at := rd.along(f)
+			g.w.row(str(fmt.Sprintf("58:1:%d", 1+i*1000+j)), str(rd.ref), str(num(j+1)), str(g.names.settlement()),
+				str(kind), point(at), str(landOf(at)))
 		}
 	}
 
 	type event struct {
 		id       string
+		ref      string
 		versions int
 		at       time.Time
 	}
 	var events []event
 	g.w.begin("traffic_event", eventColumns...)
 	emit := func(rd road, kind string, from time.Time, edge string) {
-		id := fmt.Sprintf("ev-%05d", len(events))
+		pub := fmt.Sprintf("ev-%05d", len(events))
 		at := rd.along(g.r.Float64())
 		ref := g.src("roads", "alpha", "alpha", "alpha", "epsilon")
-		sev := g.pick(severities)
-		lanesClosed, lanesTotal, delay := null, null, null
-		if kind == "closure" || kind == "roadworks" {
-			total := 2 + g.r.IntN(2)
-			lanesClosed, lanesTotal = num(1+g.r.IntN(total)), num(total)
-		}
-		if kind == "jam" {
-			delay = num(5 + g.r.IntN(60))
-		}
 		var to time.Time
 		if g.r.IntN(4) > 0 {
 			to = from.Add(time.Duration(1+g.r.IntN(72)) * time.Hour)
 		}
-		withdrawn := ""
+		withdrawn := null
 		if g.r.IntN(20) == 0 {
-			withdrawn = "w"
+			withdrawn = ts(from.Add(2 * time.Hour))
 		}
-		g.w.row(str(id), str(kind), str(sev), str(rd.ref), str("motorway"), str(g.pick(directions)),
-			optStr(g.names.settlement()), point(at), ts(from), optTS(to), lanesClosed, lanesTotal, delay,
-			num(100+g.r.IntN(9900)), str(capitalise(kind)+" bei "+g.names.settlement()), null, str("de"),
-			str(ref), str("o-"+id), ts(from), ts(from.Add(time.Minute)), ts(from.Add(time.Minute)),
-			map[bool]string{true: ts(from.Add(2 * time.Hour)), false: null}[withdrawn != ""])
+		g.w.row(str(eventID(pub)), str(kind), str(rd.ref), str("motorway"), point(at), ts(from), optTS(to),
+			str(ref), str(pub), ts(from), ts(from.Add(time.Minute)), ts(from.Add(time.Minute)), withdrawn)
 		g.counted(landOf(at), ref)
 		if edge != "" {
 			g.edges[edge]++
 		}
-		events = append(events, event{id: id, versions: 1 + g.r.IntN(3), at: from})
+		events = append(events, event{id: eventID(pub), ref: ref, versions: 1 + g.r.IntN(3), at: from})
 	}
 	// Road 0 is the road without events.
 	g.edges["road_without_events"] = 1
@@ -524,12 +570,13 @@ func (g *gen) roadsAndEvents() {
 	edge("berlin_midnight", time.Date(2026, 3, 28, 23, 0, 0, 0, time.UTC), time.Date(2026, 3, 29, 22, 0, 0, 0, time.UTC))
 	edge("month_end", time.Date(2026, 3, 31, 21, 59, 59, 0, time.UTC), time.Date(2026, 3, 31, 22, 0, 0, 0, time.UTC))
 	edge("year_end", time.Date(2025, 12, 31, 22, 59, 59, 0, time.UTC), time.Date(2025, 12, 31, 23, 0, 0, 0, time.UTC))
-	emit(g.roads[1], unknownCode, g.day(0).Add(time.Hour), "unknown_code")
+	// The platform reads an event type it does not know as "other".
+	emit(g.roads[1], "other", g.day(0).Add(time.Hour), "unknown_code")
 
-	g.w.begin("traffic_event_observation", "event_id", "observed_at", "version_no")
+	g.w.begin("traffic_event_observation", "event_id", "observed_at", "version_no", "source_ref")
 	for _, e := range events {
 		for v := range e.versions {
-			g.w.row(str(e.id), ts(e.at.Add(time.Duration(v*15)*time.Minute)), num(v+1))
+			g.w.row(str(e.id), ts(e.at.Add(time.Duration(v*15)*time.Minute)), num(v+1), str(e.ref))
 		}
 	}
 }
@@ -537,9 +584,13 @@ func (g *gen) roadsAndEvents() {
 // ---------------------------------------------------------------- energy
 
 var fuelProducts = []struct{ code, label, unit string }{
-	{"e5", "Super E5", "litre"}, {"e10", "Super E10", "litre"}, {"diesel", "Diesel", "litre"},
-	{"lpg", "Autogas", "litre"}, {"h2", "Wasserstoff", "kilogram"},
+	{"e5", "Super E5", "EUR/l"}, {"e10", "Super E10", "EUR/l"}, {"diesel", "Diesel", "EUR/l"},
+	{"lpg", "Autogas", "EUR/l"}, {"h2", "Wasserstoff", "EUR/kg"},
 }
+
+// fuelStationID is the n-th fuel station's id: a UUID, as the platform keys
+// its stations.
+func fuelStationID(n int) string { return fmt.Sprintf("00000000-0000-4000-8000-%012d", n) }
 
 func (g *gen) energy() {
 	g.w.begin("fuel_product", "product_code", "label", "price_unit")
@@ -555,27 +606,27 @@ func (g *gen) energy() {
 		h2      bool
 	}
 	var stations []station
-	g.w.begin("fuel_station", "station_id", "name", "brand", "region_code", "location", "open_state", "open_state_at",
-		"source_ref", "origin_key", "recorded_at", "changed_at", "withdrawn_at")
+	const fuelRef = "tankerkoenig_gamma"
+	g.w.begin("fuel_station", "station_id", "name", "brand", "location", "open_state",
+		"source_ref", "recorded_at", "changed_at", "withdrawn_at")
 	for _, l := range g.lands {
 		for range 3 * g.p.Scale {
 			pl := g.randomPlace(l.code)
-			id := fmt.Sprintf("fs-%s-%04d", l.code, len(stations))
-			ref := g.src("energy", "gamma")
+			id := fuelStationID(len(stations) + 1)
 			brand := g.pick(brands)
 			state := "open"
 			if g.r.IntN(6) == 0 {
 				state = "closed"
 			}
 			if len(stations) == 0 {
-				state = unknownCode
+				state = "unknown"
 				g.edges["unknown_code"]++
 			}
 			rec := g.instant()
-			g.w.row(str(id), str(brand+" "+pl.name), optStr(brand), str(pl.district), point(near(g.r, pl.at, l.cell)),
-				str(state), ts(rec), str(ref), str("o-"+id), ts(rec), ts(rec), null)
-			g.counted(l.code, ref)
-			stations = append(stations, station{id: id, ref: ref, h2: g.r.IntN(15) == 0})
+			g.w.row(str(id), str(brand+" "+pl.name), optStr(brand), point(near(g.r, pl.at, l.cell)),
+				str(state), str(fuelRef), ts(rec), ts(rec), null)
+			g.counted(l.code, fuelRef)
+			stations = append(stations, station{id: id, ref: fuelRef, h2: g.r.IntN(15) == 0})
 		}
 	}
 	perDay := 1 + g.p.Scale/100
@@ -604,31 +655,31 @@ func (g *gen) energy() {
 
 	type chargePoint struct{ id, ref string }
 	var points []chargePoint
-	g.w.begin("charging_site", "site_id", "name", "operator_name", "access", "location", "source_ref", "origin_key",
+	g.w.begin("charging_site", "site_id", "name", "operator_name", "location", "source_ref", "origin_key",
 		"recorded_at", "changed_at", "withdrawn_at")
 	var sites []struct{ id, ref string }
 	for _, l := range g.lands {
 		for range 3 * g.p.Scale {
 			pl := g.randomPlace(l.code)
-			id := fmt.Sprintf("cs-%s-%04d", l.code, len(sites))
-			ref := g.src("energy", "alpha", "beta")
+			key := fmt.Sprintf("cs-%s-%04d", l.code, len(sites))
+			ref := g.src("energy", "alpha", "beta", "gamma", "zeta")
 			rec := g.instant()
-			g.w.row(str(id), optStr(pl.name+" Laden"), str(g.names.person()+" Strom"), str(g.pick([]string{"public", "public", "restricted", "unknown"})),
-				point(near(g.r, pl.at, l.cell)), str(ref), str("o-"+id), ts(rec), ts(rec), null)
+			g.w.row(str(ref+":"+key), optStr(pl.name+" Laden"), str(g.names.person()+" Strom"),
+				point(near(g.r, pl.at, l.cell)), str(ref), str(key), ts(rec), ts(rec), null)
 			g.counted(l.code, ref)
-			sites = append(sites, struct{ id, ref string }{id, ref})
+			sites = append(sites, struct{ id, ref string }{ref + ":" + key, ref})
 		}
 	}
-	g.w.begin("charge_point", "point_id", "site_id", "evse_code", "current_kind", "power_max_kw")
+	g.w.begin("charge_point", "point_id", "site_id", "evse_code", "current_kind", "power_max_kw", "source_ref")
 	for i, s := range sites {
 		for j := range 1 + g.r.IntN(4) {
-			id := fmt.Sprintf("cp-%05d-%d", i, j)
+			evse := fmt.Sprintf("DE*SYN*E%05d%d", i, j)
 			kind, power := "ac", []float64{11, 22}[g.r.IntN(2)]
 			if g.r.IntN(3) == 0 {
 				kind, power = "dc", []float64{50, 150, 300}[g.r.IntN(3)]
 			}
-			g.w.row(str(id), str(s.id), str(fmt.Sprintf("DE*SYN*E%05d%d", i, j)), str(kind), dec(power, 2))
-			points = append(points, chargePoint{id, s.ref})
+			g.w.row(str(evse), str(s.id), str(evse), str(kind), dec(power, 2), str(s.ref))
+			points = append(points, chargePoint{evse, s.ref})
 		}
 	}
 	g.w.begin("charge_point_state_observation", "point_id", "observed_at", "availability", "source_ref")
@@ -636,7 +687,7 @@ func (g *gen) energy() {
 		for d := range g.p.Days {
 			state := g.pick([]string{"available", "available", "occupied", "reserved", "out_of_order", "unknown"})
 			if i == 0 && d == 0 {
-				state = unknownCode
+				state = "other" // a status the platform does not know
 				g.edges["unknown_code"]++
 			}
 			g.w.row(str(p.id), ts(g.day(d).Add(time.Duration(g.r.IntN(86400))*time.Second)), str(state), str(p.ref))
@@ -652,11 +703,12 @@ func (g *gen) energy() {
 	g.edges["foreign_unknown_report"]++
 }
 
-// otherFamily is the first live source of domain whose family is not ref's.
+// otherFamily is the first live charging source of domain whose family is
+// not ref's.
 func (g *gen) otherFamily(domain, ref string) string {
 	fam := g.family[ref]
 	for _, s := range g.sources[domain] {
-		if s.family != fam && !s.stale {
+		if s.family != fam && !s.stale && !strings.HasPrefix(s.ref, "tankerkoenig") {
 			return s.ref
 		}
 	}
@@ -665,36 +717,47 @@ func (g *gen) otherFamily(domain, ref string) string {
 
 // ---------------------------------------------------------------- parking
 
+// parkingKinds are the kinds the platform keeps apart; any other kind is a
+// car park it reads as other.
+var parkingKinds = []string{"other", "other", "park_and_ride", "other", "rest_area", "truck_parking"}
+
 func (g *gen) parking() {
 	type facility struct {
-		id, ref string
+		id, ref string // ref: the source of its occupancy
 		total   int
 	}
 	var fs []facility
-	g.w.begin("parking_facility", "facility_id", "name", "parking_kind", "operator_name", "road_ref", "direction", "location",
+	g.w.begin("parking_facility", "facility_id", "name", "parking_kind", "operator_name", "road_ref", "location",
 		"acceptance_required", "source_ref", "origin_key", "recorded_at", "changed_at", "withdrawn_at")
 	for _, l := range g.lands {
 		for range 2 * g.p.Scale {
-			id := fmt.Sprintf("pk-%s-%04d", l.code, len(fs))
-			kind := g.pick([]string{"garage", "lot", "park_and_ride", "on_street", "rest_area", "truck_parking"})
-			roadRef, dir, ref := null, null, g.src("parking", "alpha", "beta")
+			n := 1 + len(fs)
+			kind := g.pick(parkingKinds)
+			roadRef, ref := null, g.src("parking", "alpha", "beta")
 			pl := g.randomPlace(l.code)
 			at := near(g.r, pl.at, l.cell)
 			if kind == "rest_area" || kind == "truck_parking" {
 				rd := g.roads[g.r.IntN(len(g.roads))]
-				roadRef, dir = str(rd.ref), str(g.pick(directions[:4]))
+				roadRef = str(rd.ref)
 				at = rd.along(g.r.Float64())
 			}
+			id, operator := fmt.Sprintf("p:%d", n), optStr(g.names.person()+" Parkraum")
 			accept := kind == "truck_parking"
 			if accept {
-				ref = "src-delta-parking"
+				// The truck-parking facilities of the SID, whose terms a
+				// request accepts; the platform keeps no operator or road.
+				ref, id, operator, roadRef = "truckpark_sid_static", fmt.Sprintf("sid:%d", n), null, null
 			}
 			rec := g.instant()
 			total := 20 + g.r.IntN(400)
-			g.w.row(str(id), optStr(pl.name+" Parken"), str(kind), optStr(g.names.person()+" Parkraum"), roadRef, dir, point(at),
-				boolean(accept), str(ref), str("o-"+id), ts(rec), ts(rec), null)
+			g.w.row(str(id), optStr(pl.name+" Parken"), str(kind), operator, roadRef, point(at),
+				boolean(accept), str(ref), str(fmt.Sprint(n)), ts(rec), ts(rec), null)
 			g.counted(landOf(at), ref)
-			fs = append(fs, facility{id, ref, total})
+			occ := ref
+			if accept {
+				occ = "truckpark_sid_dyn"
+			}
+			fs = append(fs, facility{id, occ, total})
 		}
 	}
 	g.w.begin("occupancy_observation", "facility_id", "observed_at", "free_spaces", "total_spaces", "occupancy_status", "source_ref")
@@ -717,7 +780,7 @@ func (g *gen) parking() {
 			at := g.day(0).Add(2 * time.Hour)
 			g.w.row(str(f.id), ts(at), num(f.total), num(f.total), str("free"), str(f.ref))
 			g.w.row(str(f.id), ts(at.Add(time.Hour)), num(0), num(f.total), str("full"), str(f.ref))
-			g.w.row(str(f.id), ts(at.Add(2*time.Hour)), null, null, str(unknownCode), str(f.ref))
+			g.w.row(str(f.id), ts(at.Add(2*time.Hour)), null, null, str("other"), str(f.ref))
 			g.counted("", f.ref)
 			g.counted("", f.ref)
 			g.counted("", f.ref)
@@ -730,50 +793,59 @@ func (g *gen) parking() {
 
 // ---------------------------------------------------------------- transit
 
-var modes = []string{"long_distance_rail", "regional_rail", "suburban_rail", "subway", "tram", "bus", "ferry"}
+// lineModes are the transport modes the platform reads a timetable's route type as.
+var lineModes = []string{"rail", "sbahn", "subway", "tram", "bus", "ferry"}
 
 func (g *gen) transit() {
 	type stop struct {
 		id, land string
+		key      int
 		rail     bool
 	}
 	var stops []stop
-	g.w.begin("stop_place", "stop_place_id", "name", "location", "national_stop_code", "region_code", "modes", "search_fold",
-		"source_ref", "origin_key", "recorded_at", "changed_at", "withdrawn_at")
+	pool := map[string][]string{} // stop points of timetable 1 by Land
+	g.w.begin("stop_place", "stop_place_id", "name", "location", "national_stop_code", "region_code", "source_ref",
+		"origin_key")
 	for _, l := range g.lands {
 		for i := range 3 * g.p.Scale {
 			pl := g.randomPlace(l.code)
-			id := fmt.Sprintf("sp-%s-%04d", l.code, i)
-			name := pl.name + " " + g.pick([]string{"Bf", "Mitte", "Markt", "Nord", "Süd"})
-			ms := []string{"bus"}
-			rail := g.r.IntN(3) == 0
-			if rail {
-				ms = []string{g.pick(modes[:3]), "bus"}
-			}
 			ref := g.src("transit", "alpha")
-			rec := g.instant()
-			g.w.row(str(id), str(name), point(near(g.r, pl.at, l.cell)), str(fmt.Sprintf("de:%s:%d", pl.district, i)), str(pl.district),
-				array(ms...), str(fold(name)), str(ref), str("o-"+id), ts(rec), ts(rec), null)
+			if i == 0 {
+				ref = "delfi_static" // every Land has a live stop
+			}
+			s := g.sourceByRef(ref)
+			code := fmt.Sprintf("de:%s:%d", pl.district, i)
+			id := fmt.Sprintf("%d:%s", s.feedKey, code)
+			name := pl.name + " " + g.pick([]string{"Bf", "Mitte", "Markt", "Nord", "Süd"})
+			rail := g.r.IntN(3) == 0
+			g.w.row(str(id), str(name), point(near(g.r, pl.at, l.cell)), str(code), str(pl.district), str(ref), str(code))
 			g.counted(l.code, ref)
-			stops = append(stops, stop{id, l.code, rail})
+			stops = append(stops, stop{id, l.code, s.feedKey, rail})
 			g.stops[l.code] = append(g.stops[l.code], id)
 		}
 	}
-	g.w.begin("stop_point", "stop_point_id", "stop_place_id", "platform_label")
+	g.w.begin("stop_point", "stop_point_id", "stop_place_id", "platform_label", "source_ref")
 	for _, s := range stops {
 		for p := range 2 {
-			g.w.row(str(s.id+"-"+num(p+1)), str(s.id), str(num(p+1)))
+			ref := "delfi_static"
+			if s.key == 2 {
+				ref = "mobilithek_connect_gtfs"
+			}
+			g.w.row(str(s.id+":"+num(p+1)), str(s.id), str(num(p+1)), str(ref))
+			if s.key == 1 {
+				pool[s.land] = append(pool[s.land], s.id+":"+num(p+1))
+			}
 		}
 	}
 	type line struct{ id, land string }
 	var lines []line
-	g.w.begin("transit_line", "line_id", "line_name", "transport_mode")
+	g.w.begin("transit_line", "line_id", "line_name", "transport_mode", "source_ref")
 	for _, l := range g.lands {
 		for i := range 2 * g.p.Scale {
-			mode := g.pick(modes)
-			prefix := map[string]string{"long_distance_rail": "ICX", "regional_rail": "RE", "suburban_rail": "S", "subway": "U", "tram": "T", "bus": "Bus", "ferry": "F"}[mode]
-			id := fmt.Sprintf("ln-%s-%03d", l.code, i)
-			g.w.row(str(id), str(fmt.Sprintf("%s %d", prefix, 1+g.r.IntN(99))), str(mode))
+			mode := g.pick(lineModes)
+			prefix := map[string]string{"rail": "RE", "sbahn": "S", "subway": "U", "tram": "T", "bus": "Bus", "ferry": "F"}[mode]
+			id := fmt.Sprintf("1:ln-%s-%03d", l.code, i)
+			g.w.row(str(id), str(fmt.Sprintf("%s %d", prefix, 1+g.r.IntN(99))), str(mode), str("delfi_static"))
 			lines = append(lines, line{id, l.code})
 		}
 	}
@@ -783,22 +855,22 @@ func (g *gen) transit() {
 		stops []string
 	}
 	var journeys []journey
-	g.w.begin("journey", "journey_id", "line_id", "service_date", "destination_label", "extra")
+	g.w.begin("journey", "journey_id", "line_id", "service_date", "destination_label", "source_ref")
 	for _, ln := range lines {
 		for d := range g.p.Days {
 			for k := range 2 {
-				id := fmt.Sprintf("jy-%s-%d-%d", ln.id[3:], d, k)
-				pool := g.stops[ln.land]
+				day := g.day(d)
+				id := fmt.Sprintf("1:jy-%s-%d-%d:%s", ln.id[5:], d, k, day.Format("20060102"))
 				var calls []string
 				for range 3 + g.r.IntN(3) {
-					calls = append(calls, pool[g.r.IntN(len(pool))]+"-"+num(1+g.r.IntN(2)))
+					calls = append(calls, pool[ln.land][g.r.IntN(len(pool[ln.land]))])
 				}
-				g.w.row(str(id), str(ln.id), date(g.day(d)), optStr(g.names.settlement()), boolean(g.r.IntN(30) == 0))
-				journeys = append(journeys, journey{id, g.day(d).Add(time.Duration(5*3600+g.r.IntN(16*3600)) * time.Second), calls})
+				g.w.row(str(id), str(ln.id), date(day), optStr(g.names.settlement()), str("delfi_static"))
+				journeys = append(journeys, journey{id, day.Add(time.Duration(5*3600+g.r.IntN(16*3600)) * time.Second), calls})
 			}
 		}
 	}
-	g.w.begin("scheduled_call", "journey_id", "call_order", "stop_point_id", "planned_arrival_at", "planned_departure_at", "planned_platform")
+	g.w.begin("scheduled_call", "journey_id", "call_order", "stop_point_id", "planned_arrival_at", "planned_departure_at", "source_ref")
 	for _, j := range journeys {
 		for i, sp := range j.stops {
 			at := j.start.Add(time.Duration(i*7) * time.Minute)
@@ -809,51 +881,68 @@ func (g *gen) transit() {
 			if i == len(j.stops)-1 {
 				dep = null
 			}
-			g.w.row(str(j.id), num(i+1), str(sp), arr, dep, str(sp[len(sp)-1:]))
+			g.w.row(str(j.id), num(i+1), str(sp), arr, dep, str("delfi_static"))
 		}
 	}
 	g.w.begin("call_observation", "journey_id", "call_order", "observed_at", "expected_arrival_at", "expected_departure_at", "call_status", "source_ref")
 	for n, j := range journeys {
 		delay := time.Duration(g.r.IntN(12)) * time.Minute
-		status := g.pick([]string{"scheduled", "scheduled", "scheduled", "cancelled", "extra", "unknown"})
+		status := g.pick([]string{"scheduled", "scheduled", "scheduled", "skipped", "unscheduled", "no_data"})
 		if n == 0 {
-			status = unknownCode
+			status = "other" // a relationship the platform does not know
 			g.edges["unknown_code"]++
 		}
-		ref := g.src("transit", "alpha")
 		for i := range j.stops {
 			at := j.start.Add(time.Duration(i*7)*time.Minute + delay)
-			g.w.row(str(j.id), num(i+1), ts(j.start.Add(-10*time.Minute)), ts(at), ts(at.Add(time.Minute)), str(status), str(ref))
-			g.counted("", ref)
+			arr, dep := ts(at), ts(at.Add(time.Minute))
+			if i == 0 {
+				arr = null
+			}
+			if i == len(j.stops)-1 {
+				dep = null
+			}
+			g.w.row(str(j.id), num(i+1), ts(j.start.Add(-10*time.Minute)), arr, dep, str(status), str("delfi_rt_tu"))
+			g.counted("", "delfi_rt_tu")
 		}
 	}
 	g.w.begin("station_facility", "facility_id", "stop_place_id", "facility_kind", "position_text", "facility_status", "status_observed_at", "source_ref")
-	first := true
+	first, n := true, 0
 	for _, s := range stops {
-		if !s.rail {
+		if !s.rail || s.key != 1 {
 			continue
 		}
 		for k := range 1 + g.r.IntN(2) {
-			status := g.pick([]string{"operative", "operative", "operative", "inoperative", "unknown"})
+			n++
+			status := g.pick([]string{"active", "active", "active", "inactive", "unknown"})
 			if first {
-				status, first = unknownCode, false
-				g.edges["unknown_code"]++
+				status, first = "unknown", false // the platform keeps active, inactive and unknown only
 			}
-			ref := g.src("accessibility", "alpha")
-			g.w.row(str(s.id+"-f"+num(k)), str(s.id), str(g.pick([]string{"elevator", "elevator", "escalator", "ramp"})),
+			const ref = "openstation_siri_fm"
+			g.w.row(str(fmt.Sprintf("equipment:%d", 100000+n)), str(s.id), str(g.pick([]string{"elevator", "elevator", "escalator"})),
 				optStr("zu Gleis "+num(1+k)), str(status), ts(g.instant()), str(ref))
 			g.counted(s.land, ref)
 		}
 	}
 }
 
+// sourceByRef is the source of the set with key ref.
+func (g *gen) sourceByRef(ref string) source {
+	for _, s := range sourceList {
+		if s.ref == ref {
+			return s
+		}
+	}
+	panic("fixtures: no source " + ref)
+}
+
 // ---------------------------------------------------------------- weather
 
-var hazards = []string{"thunderstorm", "wind", "rain", "snow", "ice", "fog", "heat", "frost", "uv", "flood", "other"}
+var hazards = []string{"thunderstorm", "wind", "rain", "snow", "ice", "fog", "heat", "frost", "uv", "flood"}
 
-// warningColumns are the columns of a weather warning row.
-var warningColumns = []string{"warning_id", "hazard", "warning_level", "level_label", "message_status", "issuer_name",
-	"headline", "text_lang", "valid_from", "valid_to", "published_at", "region_code", "source_ref", "recorded_at", "withdrawn_at"}
+// warningColumns are the columns of a weather warning row: the platform reads
+// the issuer, the language and the status from the DWD source itself.
+var warningColumns = []string{"warning_id", "hazard", "warning_level", "level_label", "message_status",
+	"headline", "valid_from", "valid_to", "published_at", "region_code", "source_ref", "recorded_at", "withdrawn_at"}
 
 func (g *gen) weather() {
 	g.w.begin("weather_warning", warningColumns...)
@@ -862,16 +951,16 @@ func (g *gen) weather() {
 		for range 2 * g.p.Scale {
 			hz := g.pick(hazards)
 			if n == 0 {
-				hz = unknownCode
+				hz = "other" // an event the platform does not know
 				g.edges["unknown_code"]++
 			}
 			level := 1 + g.r.IntN(4)
 			from := g.instant()
-			ref := g.src("weather", "eta")
-			g.w.row(str(fmt.Sprintf("ww-%05d", n)), str(hz), num(level), str(fmt.Sprintf("Stufe %d", level)),
-				str(g.pick([]string{"issued", "issued", "updated", "cancelled"})), str("Synthetischer Wetterdienst"),
-				str(fmt.Sprintf("Warnung vor %s (Stufe %d)", hz, level)), str("de"), ts(from), ts(from.Add(time.Duration(3+g.r.IntN(30))*time.Hour)),
-				ts(from.Add(-30*time.Minute)), str(l.code+"00"+num(1+g.r.IntN(2))), str(ref), ts(from), null)
+			ref := g.src("weather", "alpha", "eta")
+			g.w.row(str(fmt.Sprintf("dwd:%d", 100000+n)), str(hz), num(level), str(fmt.Sprintf("Stufe %d", level)),
+				str("actual"), str(fmt.Sprintf("Warnung vor %s (Stufe %d)", hz, level)), ts(from),
+				ts(from.Add(time.Duration(3+g.r.IntN(30))*time.Hour)), ts(from.Add(-30*time.Minute)),
+				str(l.code+"00"+num(1+g.r.IntN(2))), str(ref), ts(from), null)
 			g.counted(l.code, ref)
 			n++
 		}
@@ -882,14 +971,17 @@ func (g *gen) weather() {
 
 func (g *gen) rules() {
 	topics := []string{"lorry_sunday_ban", "holiday_ban", "speed_limits", "winter_tyres", "emission_zones", "emergency_corridor"}
-	g.w.begin("rule_topic", "topic_code", "title", "reviewed_on")
+	g.w.begin("rule_topic", "topic_code", "title", "title_en", "reviewed_on")
 	for _, t := range topics {
-		g.w.row(str(t), str("Synthetic rule topic "+t), date(time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)))
+		g.w.row(str("syn_"+t), str("Synthetisches Regelthema "+t), str("Synthetic rule topic "+t), date(time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)))
 	}
-	g.w.begin("rule_statement", "statement_id", "topic_code", "position", "body", "legal_basis")
+	g.w.begin("rule_statement", "statement_id", "topic_code", "position", "body", "legal_basis", "legal_basis_url")
 	for _, t := range topics {
 		for i := range 3 {
-			g.w.row(str(fmt.Sprintf("%s-%d", t, i+1)), str(t), num(i+1), str(fmt.Sprintf("Synthetic statement %d about %s, for tests only.", i+1, t)), optStr(map[bool]string{true: "§ 0 synthetic"}[i == 0]))
+			g.w.row(str(fmt.Sprintf("syn_%s.%d", t, i+1)), str("syn_"+t), num(i+1),
+				str(fmt.Sprintf("Synthetic statement %d about %s, for tests only.", i+1, t)),
+				str("§ 0 synthetic"), str("https://law.example/"+t))
+			g.counted("", "viafrei_rules")
 		}
 	}
 }

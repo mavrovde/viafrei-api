@@ -130,8 +130,10 @@ contract cannot express; they are not compared here.
 
 ## Known differences that remain
 
-None in the platform 2.6.13 bundle: `TestParity` passes with zero
-differences, `charging-reserved` included. Until #18 one fact differed by
+None in the platform 2.6.18 bundle: `TestParity` passes with zero
+differences, `charging-reserved` included. Its facts are the 2.6.13
+bundle's, case for case and fact for fact; only `platform` and `commit`
+differ. Until #18 one fact differed by
 design: the API stated `reserved` where the MCP side answers `occupied`;
 the API now answers `occupied` too. The bundle's facts
 are the 2.6.12 and 2.6.8 bundles', and so the 2.5.24 bundle's, fact for
@@ -161,8 +163,8 @@ The 2.5.23 bundle differed in 9 facts. All 9 are closed:
 The 2.5.23 and 2.5.24 bundles were answered from producer commits made after
 those versions' tags (each names its commit in `commit`). They are records
 only, not parity evidence; the evidence is the bundle of the pinned platform
-version (2.6.13), answered at that tag's commit, as the 2.6.8 and 2.6.12
-bundles were at their own.
+version (2.6.18), answered at that tag's commit, as the 2.6.8, 2.6.12 and
+2.6.13 bundles were at their own.
 
 The 2.5.23 bundle stays pinned as the record of that version. It was
 projected with rules/3, which this harness no longer reads (`Load` refuses

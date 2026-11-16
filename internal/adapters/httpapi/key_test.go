@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mavrovde/viafrei-api/api"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
@@ -313,5 +314,60 @@ func TestNoKeyReachesTheLog(t *testing.T) {
 	}
 	if strings.Count(log.String(), `"msg":"request"`) != 4 {
 		t.Fatalf("the requests were not logged: %s", log.String())
+	}
+}
+
+// TestEveryDataOperationRefusesWithoutAValidKey: every operation but the
+// service ones needs a key; asked with none, an unknown, an expired or a
+// revoked one, or over its key's limit, each refuses (owner 2026-11-16: keys
+// for authentication and rate limiting, issued by the admin path only). The
+// operations are those the committed examples document, one request each.
+func TestEveryDataOperationRefusesWithoutAValidKey(t *testing.T) {
+	req.Covers(t, "SEC-001", "SEC-003", "RATE-004")
+	examples, err := api.ReadExamples(api.Examples)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyless := []string{}
+	for id, e := range examples {
+		if e.Key == nil {
+			keyless = append(keyless, id)
+		}
+	}
+	slices.Sort(keyless)
+	if !slices.Equal(keyless, []string{"getMeta"}) {
+		t.Fatalf("operations documented without a key: %v, want getMeta alone", keyless)
+	}
+	for _, c := range []struct {
+		err    error
+		status int
+		slug   string
+	}{
+		{access.ErrMissing, 401, "missing-key"},
+		{access.ErrInvalid, 401, "invalid-key"},
+		{access.ErrExpired, 401, "key-expired"},
+		{access.ErrRevoked, 401, "key-revoked"},
+		{auth.ErrLimited, 429, "rate-limited"},
+	} {
+		h, err := httpapi.NewHandler(httpapi.Deps{
+			Config: config.Defaults(), Build: buildinfo.Info{Version: "t", Commit: "c"}, ContractVersion: "0.1",
+			Now: func() time.Time { return fixedNow }, Auth: &fakeAuth{err: c.err}, Sources: &fakeSources{register: fixtureRegister},
+			Features: everyAnswer(),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for id, e := range examples {
+			if e.Key == nil {
+				continue
+			}
+			w := do(t, h, http.MethodGet, e.Request, nil)
+			if w.Code != c.status || !strings.Contains(w.Body.String(), "/problems/"+c.slug) {
+				t.Errorf("%s with %s: %d %s", id, c.slug, w.Code, w.Body)
+			}
+			if c.status == 429 && w.Header().Get("Retry-After") == "" {
+				t.Errorf("%s: a 429 without Retry-After", id)
+			}
+		}
 	}
 }

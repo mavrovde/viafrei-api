@@ -2,7 +2,9 @@
 
 GO        ?= go
 BIN       := bin/viafrei-api
-VERSION   ?= 0.2.0-dev
+# A local build is the released version.txt plus -dev; release.yml passes
+# the tag's version itself.
+VERSION   ?= $(shell tr -d '[:space:]' < version.txt)-dev
 COMMIT    ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 LDFLAGS   := -s -w \
 	-X github.com/mavrovde/viafrei-api/internal/buildinfo.version=$(VERSION) \

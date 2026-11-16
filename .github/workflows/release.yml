@@ -181,6 +181,17 @@ jobs:
           go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
       - name: The database pin is a published release, not a local build or a placeholder (REL-015)
         run: go run ./internal/release/pinguard
+      - name: The inventory is as new as the platform's and the site's newest releases (REL-015)
+        # test/inventory records what the MCP server and the site ask for, from
+        # the releases it names; an API released past a newer consumer release
+        # could miss what that release asks for. Export it again first
+        # (docs/RELEASING.md).
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          platform=$(go run ./internal/release/platformsync read -timeout 10s)
+          web=$(gh api repos/mavrovde/viafrei-web/releases/latest --jq .tag_name)
+          go run ./internal/release/inventory age -dir test/inventory -platform "$platform" -web "${web#v}"
       - name: CI passed on the tagged commit (REL-015)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

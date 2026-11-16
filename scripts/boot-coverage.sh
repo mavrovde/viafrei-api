@@ -62,6 +62,9 @@ invoke() {
     internal/release/platformsync)
       expect 2 "$bin"
       ;;
+    internal/release/inventory)
+      expect 2 "$bin"
+      ;;
     internal/release/pinguard)
       expect 2 "$bin" -dir "$work/run"
       ;;

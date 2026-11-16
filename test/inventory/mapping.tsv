@@ -1,0 +1,21 @@
+# What serves each entry of the inventory (mcp.tsv, web.tsv): one row per
+# entry, tab-separated:
+#   entry        tool:<name>, argument:<tool>.<argument>, resource:<uri> or web:<path>
+#   serves       operationId[?parameter], comma-separated; - with a ruling
+#   parity       the parity case ids (test/parity/questions.json) that check it, comma-separated
+#   ruling       - ; or, when serves is -, the owner's ruling, dated, that the
+#                API need not serve it
+# TestInventoryIsServed fails on an entry with no row, a row with no entry,
+# an operation, parameter or parity case that does not exist, and a ruling
+# without a date. No exception without an owner ruling in this file.
+tool:find_charging_station	listChargingOptions	charging-commercial,charging-all-consumer-fast,charging-status-age-limit,charging-reserved	-
+argument:find_charging_station.lat	listChargingOptions?at	charging-commercial	-
+argument:find_charging_station.lon	listChargingOptions?at	charging-commercial	-
+argument:find_charging_station.radius_km	listChargingOptions?radius_m	charging-commercial	-
+argument:find_charging_station.min_power_kw	listChargingOptions?min_kw	charging-all-consumer-fast	-
+argument:find_charging_station.limit	listChargingOptions?limit	charging-commercial	-
+tool:find_parking	listParkingOptions	parking-terms-pending,parking-terms-accepted	-
+argument:find_parking.lat	listParkingOptions?at	parking-terms-pending	-
+argument:find_parking.lon	listParkingOptions?at	parking-terms-pending	-
+argument:find_parking.radius_km	listParkingOptions?radius_m	parking-terms-pending	-
+argument:find_parking.limit	listParkingOptions?limit	parking-terms-pending	-

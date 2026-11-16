@@ -1,0 +1,2 @@
+go test fuzz v1
+string("sid:v1,sid:v2")

@@ -23,3 +23,4 @@ fields	-	-	-	#10
 lang	-	-	-	#10
 query-body	-	-	-	#10
 road-reference	internal/domain/roads	ParseRoad	FuzzParseRoad	-
+accept-terms	internal/domain/access	ParseAcceptance	FuzzParseAcceptance	-

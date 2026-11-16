@@ -82,6 +82,9 @@ type OverviewQuery struct {
 // least one part is ok (FR-BRIEF-005).
 func (s *Service) Overview(ctx context.Context, key access.Record, q OverviewQuery) (Overview, error) {
 	reg, gate, err := s.gate(ctx, key)
+	if err == nil {
+		err = s.acceptance(ctx, reg)
+	}
 	if err != nil {
 		return Overview{}, err
 	}

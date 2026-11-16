@@ -123,7 +123,9 @@ func (s *server) permittedSources(ctx context.Context, k access.Record) ([]Attri
 	if err != nil {
 		return nil, s.storageProblem(ctx, err)
 	}
-	gate := access.NewGate(register, k.Plan, k.Audience, k.Accepted, s.cfg.Sources.Disabled)
+	// Terms are accepted per request, by the operations whose data they
+	// gate; the key's own sources are those it reads without any.
+	gate := access.NewGate(register, k.Plan, k.Audience, nil, s.cfg.Sources.Disabled)
 	rows, err := s.sources.Sources(ctx, gate.Allowed())
 	if err != nil {
 		return nil, s.storageProblem(ctx, err)

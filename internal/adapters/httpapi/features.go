@@ -180,6 +180,9 @@ func noteFreshness(ctx context.Context, f provenance.Family, fr provenance.Fresh
 
 // featureProblem maps a refusal of the feature use cases to its problem.
 func (s *server) featureProblem(ctx context.Context, err error) *Problem {
+	if p := termsProblem(ctx, err); p != nil {
+		return p
+	}
 	switch {
 	case errors.Is(err, access.ErrTermsNotAccepted):
 		return newProblem(ctx, SlugTermsNotAccepted, "Every source family that could answer needs its terms accepted first.", 0)
@@ -421,7 +424,14 @@ func registerCharging(api huma.API, s *server, op huma.Operation) {
 // ParkingInput is the input of listParkingOptions.
 type ParkingInput struct {
 	Near
+	TermsAcceptance
 	FreeMin int `query:"free_min" minimum:"0" maximum:"10000" doc:"Only sites whose live report has at least this many free spaces. Default 0, every site."`
+}
+
+// Resolve reads the position and the accepted terms: both embedded inputs
+// resolve, and a promoted method would name only one of them.
+func (in *ParkingInput) Resolve(ctx huma.Context) []error {
+	return append(in.AtPosition.Resolve(ctx), in.TermsAcceptance.Resolve(ctx)...)
 }
 
 // Occupancy is the last reported occupancy of a parking site.
@@ -456,6 +466,7 @@ type ParkingMeta struct {
 	DataMeta
 	Page  Page         `json:"page"`
 	Query ParkingQuery `json:"query"`
+	Terms []TermsOffer `json:"terms,omitempty" doc:"The terms of the sites marked termsRequired, with their text: show it to the end user, and pass accept_terms only once the user accepts."`
 }
 
 // ParkingEnvelope is the enveloped answer of listParkingOptions.
@@ -527,7 +538,7 @@ func registerParking(api huma.API, s *server, op huma.Operation) {
 			return nil, err
 		}
 		q := parking.Query{At: in.point, RadiusM: s.radius(in.RadiusM), FreeMin: in.FreeMin, Limit: s.limit(in.Limit)}
-		a, err := s.features.Parking(ctx, principalFrom(ctx).Key, q)
+		a, err := s.features.Parking(in.with(ctx), principalFrom(ctx).Key, q)
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
 		}
@@ -544,6 +555,7 @@ func registerParking(api huma.API, s *server, op huma.Operation) {
 				DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, detail),
 				Page:     Page{Limit: q.Limit, HasMore: a.HasMore},
 				Query:    ParkingQuery{NearQuery: NearQuery{At: position(q.At), RadiusM: q.RadiusM}, FreeMin: q.FreeMin},
+				Terms:    termsOffers(a.Terms),
 			},
 			Links: s.selfLink(ctx),
 		}}, nil
@@ -554,6 +566,7 @@ func registerParking(api huma.API, s *server, op huma.Operation) {
 
 // OverviewInput is the input of getPlaceOverview.
 type OverviewInput struct {
+	TermsAcceptance
 	PlaceID      string   `path:"placeId" maxLength:"64" pattern:"^[A-Za-z0-9_.-]+$" example:"pl-01-0001" doc:"The place's id."`
 	Needs        []string `query:"needs" enum:"charging,parking" doc:"The parts to compute, comma-separated. Default: every part."`
 	RadiusM      int      `query:"radius_m" minimum:"1" maximum:"50000" doc:"Radius around the place, in metres. Default: geo.default_radius_m."`
@@ -606,6 +619,7 @@ type OverviewMeta struct {
 	DataMeta
 	Parts []PartStatus  `json:"parts" doc:"One entry per part."`
 	Query OverviewQuery `json:"query"`
+	Terms []TermsOffer  `json:"terms,omitempty" doc:"The terms of the parking sites marked termsRequired, with their text: show it to the end user, and pass accept_terms only once the user accepts."`
 }
 
 // OverviewEnvelope is the enveloped answer of getPlaceOverview.
@@ -688,7 +702,7 @@ func registerOverview(api huma.API, s *server, op huma.Operation) {
 				q.Needs = append(q.Needs, p)
 			}
 		}
-		o, err := s.features.Overview(ctx, principalFrom(ctx).Key, q)
+		o, err := s.features.Overview(in.with(ctx), principalFrom(ctx).Key, q)
 		if errors.Is(err, features.ErrNoPart) {
 			return nil, noPartProblem(ctx, o.Parts)
 		}
@@ -699,12 +713,14 @@ func registerOverview(api huma.API, s *server, op huma.Operation) {
 			ID: o.Place.ID, Name: o.Place.Name, Kind: string(o.Place.Kind), Location: position(o.Place.Location), SourceFamily: o.Place.Family,
 		}}
 		withheld := false
+		var terms []TermsOffer
 		if o.Charging != nil {
 			data.Charging = &ChargingPart{Sites: chargingSites(ctx, *o.Charging, s.cfg.Charging.StatusMaxAge)}
 		}
 		if o.Parking != nil {
 			var sites []ParkingSite
 			sites, withheld = parkingSites(*o.Parking)
+			terms = termsOffers(o.Parking.Terms)
 			noteNextReport(ctx, o.Parking.NextReport)
 			data.Parking = &ParkingPart{Sites: sites}
 		}
@@ -727,6 +743,7 @@ func registerOverview(api huma.API, s *server, op huma.Operation) {
 			DataMeta: s.dataMeta(ctx, o.Families, s.now(), len(details) > 0, strings.Join(details, " ")),
 			Parts:    []PartStatus{},
 			Query:    OverviewQuery{PlaceID: q.PlaceID, RadiusM: q.RadiusM, PerPartLimit: q.PerPartLimit},
+			Terms:    terms,
 		}
 		for _, r := range o.Parts {
 			meta.Parts = append(meta.Parts, PartStatus{Part: string(r.Part), Status: string(r.Status), ProblemType: s.partProblem(ctx, r)})

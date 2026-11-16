@@ -56,6 +56,7 @@ type fakeFeatures struct {
 	chargeCall int
 	stations   features.Answer[transit.Station]
 	gotStation transit.Query
+	gotAccept  []string
 }
 
 func (f *fakeFeatures) Charging(_ context.Context, key access.Record, q energy.Query) (features.Answer[energy.Site], error) {
@@ -64,13 +65,13 @@ func (f *fakeFeatures) Charging(_ context.Context, key access.Record, q energy.Q
 	return f.charging, f.err
 }
 
-func (f *fakeFeatures) Parking(_ context.Context, key access.Record, q parking.Query) (features.Answer[parking.Site], error) {
-	f.gotKey, f.gotPark = key, q
+func (f *fakeFeatures) Parking(ctx context.Context, key access.Record, q parking.Query) (features.Answer[parking.Site], error) {
+	f.gotKey, f.gotPark, f.gotAccept = key, q, access.AcceptedFrom(ctx)
 	return f.parking, f.err
 }
 
-func (f *fakeFeatures) Overview(_ context.Context, key access.Record, q features.OverviewQuery) (features.Overview, error) {
-	f.gotKey, f.gotOver = key, q
+func (f *fakeFeatures) Overview(ctx context.Context, key access.Record, q features.OverviewQuery) (features.Overview, error) {
+	f.gotKey, f.gotOver, f.gotAccept = key, q, access.AcceptedFrom(ctx)
 	return f.overview, f.err
 }
 
@@ -596,5 +597,56 @@ func TestAnOpenBreakerIsUpstreamUnavailableWithItsRetryAfter(t *testing.T) {
 	w = do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: trial}, nil), http.MethodGet, "/v1/charging-options?at=52.52,13.405", bearer)
 	if got := w.Header().Get("Retry-After"); got != "1" {
 		t.Fatalf("Retry-After %q while the trials run, want 1", got)
+	}
+}
+
+// TestTermsAreAcceptedPerRequest (owner 2026-11-16): without accept_terms a
+// gated site is listed without its occupancy and meta.terms carries the
+// terms' text and the parameter that accepts them; with it, the request's
+// acceptance reaches the licence gate; terms that are not current are
+// refused with the current text; a malformed value is an invalid parameter;
+// and an operation whose data no terms gate ignores the parameter.
+func TestTermsAreAcceptedPerRequest(t *testing.T) {
+	req.Covers(t, "FR-PARK-003", "SEC-030", "FR-BRIEF-008")
+	texts := []access.TermsText{
+		{Gate: "sid-terms-1", ID: "sid-terms", Version: "1", EffectiveOn: time.Date(2026, 10, 27, 0, 0, 0, 0, time.UTC), Lang: "de", Binding: true, Heading: "2. Lkw", Body: "Angaben ...", URL: "https://viafrei.de/nutzungsbedingungen", ProviderURL: "https://provider.example/terms"},
+		{Gate: "sid-terms-1", ID: "sid-terms", Version: "1", EffectiveOn: time.Date(2026, 10, 27, 0, 0, 0, 0, time.UTC), Lang: "en", Heading: "2. Truck", Body: "Figures ...", URL: "https://viafrei.de/en/terms", ProviderURL: "https://provider.example/terms"},
+	}
+	f := everyAnswer()
+	f.parking.Terms = texts
+	h := featureHandler(t, config.Defaults(), f, nil)
+	w := do(t, h, http.MethodGet, "/v1/parking-options?at=52.52,13.405", bearer)
+	meta, _ := decode(t, w)["meta"].(map[string]any)
+	terms, _ := meta["terms"].([]any)
+	if w.Code != 200 || len(terms) != 1 || f.gotAccept != nil {
+		t.Fatalf("without the parameter: %d, accepted %v, %s", w.Code, f.gotAccept, w.Body)
+	}
+	offer := terms[0].(map[string]any)
+	bodies, _ := offer["texts"].([]any)
+	de, _ := bodies[0].(map[string]any)
+	if offer["parameter"] != "accept_terms" || offer["accept"] != "sid-terms-1" || offer["inForceFrom"] != "2026-10-27" || len(bodies) != 2 || de["binding"] != true || de["body"] != "Angaben ..." {
+		t.Errorf("meta.terms %v", offer)
+	}
+
+	if w := do(t, h, http.MethodGet, "/v1/parking-options?at=52.52,13.405&accept_terms=sid-terms-1", bearer); w.Code != 200 || !slices.Equal(f.gotAccept, []string{"sid-terms-1"}) {
+		t.Errorf("with the parameter: %d, accepted %v", w.Code, f.gotAccept)
+	}
+	if w := do(t, h, http.MethodGet, "/v1/places/pl-1/overview?accept_terms=sid-terms-1", bearer); w.Code != 200 || !slices.Equal(f.gotAccept, []string{"sid-terms-1"}) {
+		t.Errorf("the overview with the parameter: %d, accepted %v", w.Code, f.gotAccept)
+	}
+	for _, bad := range []string{"sid", "sid-terms-1,sid-terms-1", "SID-1"} {
+		assertProblem(t, do(t, h, http.MethodGet, "/v1/parking-options?at=52.52,13.405&accept_terms="+bad, bearer), 400, "invalid-parameter")
+	}
+
+	stale := featureHandler(t, config.Defaults(), &fakeFeatures{err: &features.TermsRefusal{Texts: texts}}, nil)
+	for _, target := range []string{"/v1/parking-options?at=52.52,13.405&accept_terms=sid-terms-0", "/v1/places/pl-1/overview?accept_terms=sid-terms-0"} {
+		p := assertProblem(t, do(t, stale, http.MethodGet, target, bearer), 403, "terms-not-accepted")
+		if terms, _ := p["terms"].([]any); len(terms) != 1 || terms[0].(map[string]any)["accept"] != "sid-terms-1" {
+			t.Errorf("%s: %v", target, p)
+		}
+	}
+
+	if w := do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&accept_terms=not-even%20a-gate", bearer); w.Code != 200 {
+		t.Errorf("charging with the parameter: %d %s", w.Code, w.Body)
 	}
 }

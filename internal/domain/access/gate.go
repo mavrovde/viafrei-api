@@ -14,8 +14,9 @@ type Terms struct {
 	// parking: the families that can answer a feature's question.
 	Domain     string
 	UseClasses []UseClass
-	// AcceptanceRequired families are withheld until the key holder has
-	// accepted Version of their terms.
+	// AcceptanceRequired families are withheld from a request that has not
+	// accepted their terms: Version is then their terms gate (sid-terms-1),
+	// the value the request passes in accept_terms.
 	AcceptanceRequired bool
 	Version            string
 	// Audience is who may read the family at all: AudienceOwn families
@@ -72,9 +73,9 @@ const (
 // Decide applies the licence gate to one family for a key of plan and
 // audience: it is readable only if it is not disabled, not held, for the
 // key's audience, in the plan, the plan's use class is permitted by its
-// terms, and any required acceptance of the current terms version is
-// recorded for the key (SEC-030, SEC-034). Anything else is denied.
-func Decide(t Terms, plan Plan, audience Audience, accepted []Acceptance, disabled []string) Refusal {
+// terms, and the request accepted the current terms when they need
+// accepting (SEC-030, SEC-034). Anything else is denied.
+func Decide(t Terms, plan Plan, audience Audience, accepted []string, disabled []string) Refusal {
 	// An if chain, not a switch: a mutation tool reports a switch's case
 	// expressions as uncovered, and these are the rules it must mutate.
 	if slices.Contains(disabled, t.Family) {
@@ -92,7 +93,7 @@ func Decide(t Terms, plan Plan, audience Audience, accepted []Acceptance, disabl
 	if !slices.Contains(t.UseClasses, plan.UseClass) {
 		return UseClassForbidden
 	}
-	if t.AcceptanceRequired && !slices.Contains(accepted, Acceptance{Source: t.Family, Version: t.Version}) {
+	if t.AcceptanceRequired && !slices.Contains(accepted, t.Version) {
 		return TermsNotAccepted
 	}
 	return Allowed
@@ -107,7 +108,7 @@ type Gate struct {
 
 // NewGate decides every family of the register for a key of plan and
 // audience.
-func NewGate(register []Terms, plan Plan, audience Audience, accepted []Acceptance, disabled []string) Gate {
+func NewGate(register []Terms, plan Plan, audience Audience, accepted []string, disabled []string) Gate {
 	g := Gate{refused: map[string]Refusal{}}
 	for _, t := range register {
 		if r := Decide(t, plan, audience, accepted, disabled); r != Allowed {

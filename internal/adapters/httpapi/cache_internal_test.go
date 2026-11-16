@@ -219,7 +219,6 @@ func TestPermissionsSeparateEveryLicenceInput(t *testing.T) {
 		"use class":   func(r *access.Record) { r.Plan.UseClass = "personal" },
 		"sources":     func(r *access.Record) { r.Plan.Sources = []string{"a"} },
 		"scopes":      func(r *access.Record) { r.Plan.Scopes = []access.Scope{"energy"} },
-		"accepted":    func(r *access.Record) { r.Accepted = []access.Acceptance{{Source: "s", Version: "2"}} },
 	} {
 		r := base
 		r.Plan.Sources = slicesClone(base.Plan.Sources)

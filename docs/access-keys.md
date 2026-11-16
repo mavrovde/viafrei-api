@@ -85,8 +85,11 @@ else is denied:
 4. the family is in the key's plan;
 5. the plan's use class (`consumer`, `non_commercial`, `commercial`) is one
    the family's terms permit;
-6. when the terms require acceptance, the key has accepted the current terms
-   version (the family's terms token).
+6. when the terms require acceptance, the request accepted the current terms
+   (`accept_terms`, the family's terms gate such as `sid-terms-1`). Acceptance
+   is never a property of the key (owner decision 2026-11-16): the caller's
+   end user accepts the terms, and each request says so; see
+   [attribution](attribution.md).
 
 The allowed set is passed into the storage read, so a denied family is never
 read. Every returned item is checked against the set again; a violation

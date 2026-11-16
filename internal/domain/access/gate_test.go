@@ -15,7 +15,7 @@ var register = []access.Terms{
 	{Family: "alpha", UseClasses: []access.UseClass{"consumer", "non_commercial", "commercial"}, Version: "v1"},
 	{Family: "beta", UseClasses: []access.UseClass{"consumer", "non_commercial", "commercial"}, Version: "v1"},
 	{Family: "gamma", UseClasses: []access.UseClass{"consumer"}, Version: "v1"},
-	{Family: "delta", UseClasses: []access.UseClass{"consumer", "commercial"}, AcceptanceRequired: true, Version: "v2"},
+	{Family: "delta", UseClasses: []access.UseClass{"consumer", "commercial"}, AcceptanceRequired: true, Version: "delta-terms-2"},
 	{Family: "epsilon", UseClasses: nil, Version: "v1", HoldReason: "no_api_terms"},
 	{Family: "zeta", UseClasses: []access.UseClass{"consumer", "non_commercial", "commercial"}, Version: "v1"},
 	{Family: "eta", UseClasses: []access.UseClass{"consumer", "non_commercial", "commercial"}, Version: "v1", Audience: access.AudienceOwn},
@@ -60,20 +60,20 @@ func TestGateTermsAcceptanceFamily(t *testing.T) {
 	p := plan("commercial", all...)
 	cases := []struct {
 		name     string
-		accepted []access.Acceptance
+		accepted []string
 		want     access.Refusal
 	}{
 		{"none", nil, access.TermsNotAccepted},
-		{"an older version", []access.Acceptance{{Source: "delta", Version: "v1"}}, access.TermsNotAccepted},
-		{"another family", []access.Acceptance{{Source: "alpha", Version: "v2"}}, access.TermsNotAccepted},
-		{"the current version", []access.Acceptance{{Source: "delta", Version: "v2"}}, access.Allowed},
+		{"an older version", []string{"delta-terms-1"}, access.TermsNotAccepted},
+		{"another family", []string{"alpha-terms-2"}, access.TermsNotAccepted},
+		{"the current version", []string{"delta-terms-2"}, access.Allowed},
 	}
 	for _, c := range cases {
 		if got := access.NewGate(register, p, pub, c.accepted, nil).Refused("delta"); got != c.want {
 			t.Errorf("%s: %q, want %q", c.name, got, c.want)
 		}
 	}
-	accepted := []access.Acceptance{{Source: "delta", Version: "v2"}}
+	accepted := []string{"delta-terms-2"}
 	if got := access.NewGate(register, plan("non_commercial", all...), pub, accepted, nil).Refused("delta"); got != access.UseClassForbidden {
 		t.Errorf("acceptance must not lift a use-class refusal: %q", got)
 	}
@@ -258,7 +258,7 @@ func TestPendingIsTermsOnly(t *testing.T) {
 	if got := g.Pending(all); !slices.Equal(got, []string{"delta"}) {
 		t.Errorf("Pending = %v, want only the family waiting for acceptance", got)
 	}
-	accepted := access.NewGate(register, plan("commercial", "delta"), pub, []access.Acceptance{{Source: "delta", Version: "v2"}}, nil)
+	accepted := access.NewGate(register, plan("commercial", "delta"), pub, []string{"delta-terms-2"}, nil)
 	if got := accepted.Pending(all); len(got) != 0 {
 		t.Errorf("Pending after acceptance = %v", got)
 	}

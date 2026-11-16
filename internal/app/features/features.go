@@ -23,6 +23,9 @@ type Register interface {
 	// Provenance returns the attribution, notes in lang and freshness of
 	// the given families only.
 	Provenance(ctx context.Context, families []string, lang string) ([]provenance.Family, error)
+	// TermsTexts returns the texts of the given terms gates, every
+	// language.
+	TermsTexts(ctx context.Context, gates []string) ([]access.TermsText, error)
 }
 
 // Charging is the port to the charging store.
@@ -106,6 +109,9 @@ type Answer[T any] struct {
 	// withheld with that data: Families carries none of them, and a composed
 	// answer that reads the families again must drop them too.
 	Withheld []string
+	// Terms are the texts of the terms the withheld families need accepted,
+	// verbatim, for the caller to show its user before it accepts them.
+	Terms []access.TermsText
 	// At is the instant the answer is computed at.
 	At time.Time
 	// NextReport is the earliest report the read considered that is dated
@@ -127,7 +133,7 @@ func (s *Service) gate(ctx context.Context, key access.Record) ([]access.Terms, 
 	if err != nil {
 		return nil, access.Gate{}, err
 	}
-	return reg, access.NewGate(reg, key.Plan, key.Audience, key.Accepted, s.set.Disabled), nil
+	return reg, access.NewGate(reg, key.Plan, key.Audience, access.AcceptedFrom(ctx), s.set.Disabled), nil
 }
 
 // checkAll is the post-check over a set: every family must be in allowed.
@@ -234,10 +240,56 @@ func (s *Service) charging(ctx context.Context, reg []access.Terms, gate access.
 // family that could answer is such a family.
 func (s *Service) Parking(ctx context.Context, key access.Record, q parking.Query) (Answer[parking.Site], error) {
 	reg, gate, err := s.gate(ctx, key)
+	if err == nil {
+		err = s.acceptance(ctx, reg)
+	}
 	if err != nil {
 		return Answer[parking.Site]{}, err
 	}
 	return s.parking(ctx, reg, gate, q)
+}
+
+// TermsRefusal refuses a request that accepted terms which are not the
+// current terms of a family that needs accepting; it carries the current
+// texts (access.ErrTermsVersion).
+type TermsRefusal struct {
+	Texts []access.TermsText
+}
+
+func (e *TermsRefusal) Error() string { return access.ErrTermsVersion.Error() }
+
+// Unwrap makes errors.Is(err, access.ErrTermsVersion) hold.
+func (e *TermsRefusal) Unwrap() error { return access.ErrTermsVersion }
+
+// acceptance checks the terms the request accepted (accept_terms) against
+// the current terms of the register, in an operation whose data they gate:
+// a wrong or old version is refused with the current texts.
+func (s *Service) acceptance(ctx context.Context, reg []access.Terms) error {
+	err := access.CheckAcceptance(reg, access.AcceptedFrom(ctx))
+	var tv *access.TermsVersionError
+	if !errors.As(err, &tv) {
+		return nil
+	}
+	texts, terr := s.repos.Register.TermsTexts(ctx, tv.Current)
+	if terr != nil {
+		return terr
+	}
+	return &TermsRefusal{Texts: texts}
+}
+
+// termsOf returns the texts of the terms the pending families need.
+func (s *Service) termsOf(ctx context.Context, reg []access.Terms, pending []string) ([]access.TermsText, error) {
+	var gates []string
+	for _, t := range reg {
+		if slices.Contains(pending, t.Family) && !slices.Contains(gates, t.Version) {
+			gates = append(gates, t.Version)
+		}
+	}
+	if len(gates) == 0 {
+		return nil, nil
+	}
+	slices.Sort(gates)
+	return s.repos.Register.TermsTexts(ctx, gates)
 }
 
 // parking answers Parking under a register and gate already read.
@@ -280,5 +332,9 @@ func (s *Service) parking(ctx context.Context, reg []access.Terms, gate access.G
 	if err != nil {
 		return Answer[parking.Site]{}, err
 	}
-	return Answer[parking.Site]{Items: sites, HasMore: more, Families: withholdConditions(fams, pending), Partial: partial, Withheld: pending, At: now, NextReport: next}, nil
+	terms, err := s.termsOf(ctx, reg, pending)
+	if err != nil {
+		return Answer[parking.Site]{}, err
+	}
+	return Answer[parking.Site]{Items: sites, HasMore: more, Families: withholdConditions(fams, pending), Partial: partial, Withheld: pending, Terms: terms, At: now, NextReport: next}, nil
 }

@@ -1,2 +1,2 @@
 go test fuzz v1
-string("sid:v3,open:1")
+string("sid-terms-1,other-terms-2")

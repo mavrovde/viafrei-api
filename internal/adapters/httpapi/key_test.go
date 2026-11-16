@@ -63,7 +63,7 @@ func (f *fakeSources) Sources(_ context.Context, allowed []string) ([]access.Sou
 var fixtureRegister = []access.Terms{
 	{Family: "src-alpha-energy", UseClasses: []access.UseClass{"consumer", "non_commercial", "commercial"}, Version: "2026-03-01"},
 	{Family: "src-gamma-energy", UseClasses: []access.UseClass{"consumer"}, Version: "2026-03-01"},
-	{Family: "src-delta-parking", UseClasses: []access.UseClass{"consumer", "commercial"}, AcceptanceRequired: true, Version: "2026-03-01"},
+	{Family: "src-delta-parking", UseClasses: []access.UseClass{"consumer", "commercial"}, AcceptanceRequired: true, Version: "delta-terms-1"},
 	{Family: "src-epsilon-roads", Version: "2026-03-01"},
 }
 
@@ -195,9 +195,9 @@ func TestKeyAnswer(t *testing.T) {
 	}
 }
 
-func families(t *testing.T, h http.Handler) []string {
+func families(t *testing.T, h http.Handler, query ...string) []string {
 	t.Helper()
-	w := do(t, h, http.MethodGet, "/v1/key", bearer)
+	w := do(t, h, http.MethodGet, "/v1/key"+strings.Join(query, ""), bearer)
 	if w.Code != http.StatusOK {
 		t.Fatalf("%d %s", w.Code, w.Body)
 	}
@@ -227,22 +227,20 @@ func TestRestrictedPurposeFamilyNeverReachesACommercialKey(t *testing.T) {
 	}
 }
 
-func TestTermsFamilyNeedsAcceptanceOfTheCurrentVersion(t *testing.T) {
+// TestTermsFamilyIsNeverAKeysOwn: terms are accepted per request, never
+// stored with a key (owner 2026-11-16), so the key answer never lists a
+// family whose terms need accepting as one the key reads, whatever the key
+// record holds, and the parameter is ignored there.
+func TestTermsFamilyIsNeverAKeysOwn(t *testing.T) {
 	req.Covers(t, "SEC-030", "SEC-034")
-	for _, c := range []struct {
-		accepted []access.Acceptance
-		served   bool
-	}{
-		{nil, false},
-		{[]access.Acceptance{{Source: "src-delta-parking", Version: "2025-01-01"}}, false},
-		{[]access.Acceptance{{Source: "src-delta-parking", Version: "2026-03-01"}}, true},
-	} {
-		p := principal("commercial")
-		p.Key.Accepted = c.accepted
-		got := families(t, keyedHandler(t, config.Defaults(), &fakeAuth{p: p}, &fakeSources{register: fixtureRegister}, nil))
-		if slices.Contains(got, "src-delta-parking") != c.served {
-			t.Errorf("accepted %v: served %v", c.accepted, got)
-		}
+	p := principal("commercial")
+	p.Key.Accepted = []access.Acceptance{{Source: "src-delta-parking", Version: "2026-03-01"}}
+	h := keyedHandler(t, config.Defaults(), &fakeAuth{p: p}, &fakeSources{register: fixtureRegister}, nil)
+	if got := families(t, h); slices.Contains(got, "src-delta-parking") || len(got) == 0 {
+		t.Errorf("served %v", got)
+	}
+	if got := families(t, h, "?accept_terms=delta-terms-1"); slices.Contains(got, "src-delta-parking") {
+		t.Errorf("with accept_terms: served %v", got)
 	}
 }
 

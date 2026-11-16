@@ -57,3 +57,21 @@ order by s.source_ref`, allowed)
 		})
 	})
 }
+
+// TermsTexts reads the texts of the given terms gates, every language, from
+// the read contract's terms: the text a gated answer returns verbatim. The
+// rows the licence envelope permits a key are read, as everywhere.
+func (s *Store) TermsTexts(ctx context.Context, gates []string) ([]access.TermsText, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]access.TermsText, error) {
+		rows, _ := tx.Query(ctx, `
+select t.terms_gate, t.terms_id, t.terms_version, t.effective_on, t.lang, t.binding, t.heading, t.body, t.terms_url, t.provider_terms_url
+from contract.terms t
+where t.terms_gate = any($1) and `+permitted("t")+`
+order by t.terms_gate, t.binding desc, t.lang`, gates)
+		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (access.TermsText, error) {
+			var v access.TermsText
+			err := r.Scan(&v.Gate, &v.ID, &v.Version, &v.EffectiveOn, &v.Lang, &v.Binding, &v.Heading, &v.Body, &v.URL, &v.ProviderURL)
+			return v, err
+		})
+	})
+}

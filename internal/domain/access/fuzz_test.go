@@ -43,10 +43,10 @@ func FuzzParse(f *testing.F) {
 }
 
 // FuzzParseAcceptance (TEST-006, TST-016): accept_terms is caller input. Any
-// string parses or is refused, never a crash; what parses has a non-empty
-// family and version per pair, each family once, and writes back to s.
+// string parses or is refused, never a crash; what parses is a list of terms
+// gates, each once, that writes back to s.
 func FuzzParseAcceptance(f *testing.F) {
-	for _, s := range []string{"", "sid:v3", "sid:v3,open:1", "sid", "sid:v1,sid:v2", ",", "a:b:c"} {
+	for _, s := range []string{"", "sid-terms-1", "sid-terms-1,other-terms-2", "sid", "sid-terms-1,sid-terms-1", ",", "a:b"} {
 		f.Add(s)
 	}
 	f.Fuzz(func(t *testing.T, s string) {
@@ -58,15 +58,13 @@ func FuzzParseAcceptance(f *testing.F) {
 			return
 		}
 		seen := map[string]bool{}
-		parts := make([]string, len(got))
-		for i, a := range got {
-			if a.Source == "" || a.Version == "" || seen[a.Source] {
+		for _, g := range got {
+			if g == "" || seen[g] {
 				t.Fatalf("%q parsed to %v", s, got)
 			}
-			seen[a.Source] = true
-			parts[i] = access.TermsValue(access.Terms{Family: a.Source, Version: a.Version})
+			seen[g] = true
 		}
-		if strings.Join(parts, ",") != s {
+		if strings.Join(got, ",") != s {
 			t.Fatalf("%q parsed to %v, which does not write back", s, got)
 		}
 	})

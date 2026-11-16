@@ -1127,6 +1127,13 @@
             "description": "The request id, equal to the X-Request-Id header.",
             "type": "string"
           },
+          "terms": {
+            "description": "The terms of the parking sites marked termsRequired, with their text: show it to the end user, and pass accept_terms only once the user accepts.",
+            "items": {
+              "$ref": "#/components/schemas/TermsOffer"
+            },
+            "type": "array"
+          },
           "warnings": {
             "description": "Warnings about this answer; empty when there is none.",
             "items": {
@@ -1281,6 +1288,13 @@
           "requestId": {
             "description": "The request id, equal to the X-Request-Id header.",
             "type": "string"
+          },
+          "terms": {
+            "description": "The terms of the sites marked termsRequired, with their text: show it to the end user, and pass accept_terms only once the user accepts.",
+            "items": {
+              "$ref": "#/components/schemas/TermsOffer"
+            },
+            "type": "array"
           },
           "warnings": {
             "description": "Warnings about this answer; empty when there is none.",
@@ -1581,6 +1595,13 @@
             "description": "Equal to the HTTP status.",
             "format": "int64",
             "type": "integer"
+          },
+          "terms": {
+            "description": "The current terms, for terms-not-accepted when the accepted ones are not current.",
+            "items": {
+              "$ref": "#/components/schemas/TermsOffer"
+            },
+            "type": "array"
           },
           "title": {
             "description": "Short title, fixed per type.",
@@ -2335,6 +2356,90 @@
           "q",
           "at",
           "radiusM"
+        ],
+        "type": "object"
+      },
+      "TermsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "binding": {
+            "description": "True on the binding text (German); any other is a translation.",
+            "type": "boolean"
+          },
+          "body": {
+            "type": "string"
+          },
+          "heading": {
+            "type": "string"
+          },
+          "lang": {
+            "description": "BCP 47 language tag.",
+            "type": "string"
+          },
+          "url": {
+            "description": "The page the terms are published on.",
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "lang",
+          "binding",
+          "heading",
+          "body",
+          "url"
+        ],
+        "type": "object"
+      },
+      "TermsOffer": {
+        "additionalProperties": false,
+        "properties": {
+          "accept": {
+            "description": "The value of the parameter that accepts these terms.",
+            "examples": [
+              "sid-terms-1"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "inForceFrom": {
+            "description": "The day this version is in force from.",
+            "format": "date",
+            "type": "string"
+          },
+          "parameter": {
+            "description": "The query parameter that accepts the terms.",
+            "enum": [
+              "accept_terms"
+            ],
+            "type": "string"
+          },
+          "providerTerms": {
+            "description": "The provider's own terms, which bind the recipient as well.",
+            "format": "uri",
+            "type": "string"
+          },
+          "texts": {
+            "description": "The text per language; show it to the end user verbatim before accepting. The binding text is marked.",
+            "items": {
+              "$ref": "#/components/schemas/TermsBody"
+            },
+            "type": "array"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "parameter",
+          "accept",
+          "id",
+          "version",
+          "inForceFrom",
+          "providerTerms",
+          "texts"
         ],
         "type": "object"
       },
@@ -4335,6 +4440,20 @@
             }
           },
           {
+            "description": "The terms the end user has accepted, comma-separated, each as meta.terms names it (accept). Pass it only after showing the user the terms' text (meta.terms) and the user accepting them, as the MCP server asks by elicitation; never on the user's behalf. Without it, the data the terms gate is withheld and meta.terms carries their text. Terms that are not current are refused (terms-not-accepted) with the current text. Nothing is stored with the key: every request states its own acceptance.",
+            "explode": false,
+            "in": "query",
+            "name": "accept_terms",
+            "schema": {
+              "description": "The terms the end user has accepted, comma-separated, each as meta.terms names it (accept). Pass it only after showing the user the terms' text (meta.terms) and the user accepting them, as the MCP server asks by elicitation; never on the user's behalf. Without it, the data the terms gate is withheld and meta.terms carries their text. Terms that are not current are refused (terms-not-accepted) with the current text. Nothing is stored with the key: every request states its own acceptance.",
+              "examples": [
+                "sid-terms-1"
+              ],
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
             "description": "Only sites whose live report has at least this many free spaces. Default 0, every site.",
             "explode": false,
             "in": "query",
@@ -4695,6 +4814,20 @@
         "description": "A composed answer: the place, then each asked part (charging, parking) around it, each under the licence gate on its own and within its own sub-deadline (compose.part_deadline). A part that is not ok is absent from data and named in meta.parts. 200 when at least one part is ok. Needs the scope places; each part also needs its own scope.",
         "operationId": "getPlaceOverview",
         "parameters": [
+          {
+            "description": "The terms the end user has accepted, comma-separated, each as meta.terms names it (accept). Pass it only after showing the user the terms' text (meta.terms) and the user accepting them, as the MCP server asks by elicitation; never on the user's behalf. Without it, the data the terms gate is withheld and meta.terms carries their text. Terms that are not current are refused (terms-not-accepted) with the current text. Nothing is stored with the key: every request states its own acceptance.",
+            "explode": false,
+            "in": "query",
+            "name": "accept_terms",
+            "schema": {
+              "description": "The terms the end user has accepted, comma-separated, each as meta.terms names it (accept). Pass it only after showing the user the terms' text (meta.terms) and the user accepting them, as the MCP server asks by elicitation; never on the user's behalf. Without it, the data the terms gate is withheld and meta.terms carries their text. Terms that are not current are refused (terms-not-accepted) with the current text. Nothing is stored with the key: every request states its own acceptance.",
+              "examples": [
+                "sid-terms-1"
+              ],
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
           {
             "description": "The place's id.",
             "in": "path",

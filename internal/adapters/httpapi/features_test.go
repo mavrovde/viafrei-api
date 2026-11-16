@@ -26,6 +26,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
+	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/runtime/logging"
@@ -53,6 +54,8 @@ type fakeFeatures struct {
 	gotOver    features.OverviewQuery
 	gotKey     access.Record
 	chargeCall int
+	stations   features.Answer[transit.Station]
+	gotStation transit.Query
 }
 
 func (f *fakeFeatures) Charging(_ context.Context, key access.Record, q energy.Query) (features.Answer[energy.Site], error) {
@@ -136,12 +139,12 @@ func overviewAnswer() features.Overview {
 }
 
 func everyAnswer() *fakeFeatures {
-	return &fakeFeatures{charging: chargingAnswer(), parking: parkingAnswer(), overview: overviewAnswer(), conditions: conditionsAnswer(), situation: situationAnswer(), risk: riskAnswer(), topic: topicAnswer()}
+	return &fakeFeatures{charging: chargingAnswer(), parking: parkingAnswer(), overview: overviewAnswer(), conditions: conditionsAnswer(), situation: situationAnswer(), risk: riskAnswer(), topic: topicAnswer(), stations: stationsAnswer()}
 }
 
 func featureScopes() auth.Principal {
 	p := principal("commercial")
-	p.Key.Plan.Scopes = []access.Scope{"places", "energy", "parking", "roads", "weather", "rules"}
+	p.Key.Plan.Scopes = []access.Scope{"places", "energy", "parking", "roads", "weather", "rules", "transit"}
 	return p
 }
 
@@ -411,7 +414,7 @@ func TestFeatureRefusals(t *testing.T) {
 	targets := []string{
 		"/v1/charging-options?at=52.52,13.405", "/v1/parking-options?at=52.52,13.405", "/v1/places/pl-01-0001/overview",
 		"/v1/motorways/A8/conditions", "/v1/road-conditions?at=52.52,13.405", "/v1/road-situations/ev-1",
-		"/v1/weather-risk?at=52.52,13.405", "/v1/driving-rules?topic=winter_tyres",
+		"/v1/weather-risk?at=52.52,13.405", "/v1/driving-rules?topic=winter_tyres", "/v1/stations?q=koeln",
 	}
 	cases := []struct {
 		err    error

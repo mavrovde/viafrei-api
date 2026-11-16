@@ -20,6 +20,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
+	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 )
 
@@ -33,6 +34,7 @@ type Features interface {
 	RoadSituation(ctx context.Context, key access.Record, id string) (features.Answer[roads.Situation], error)
 	WeatherRisk(ctx context.Context, key access.Record, q weather.Query) (features.WeatherRisk, error)
 	DrivingRules(ctx context.Context, key access.Record, topic string) (rules.Topic, features.Answer[rules.Rule], error)
+	Stations(ctx context.Context, key access.Record, q transit.Query) (features.Answer[transit.Station], error)
 }
 
 // counterpartExtension names the MCP capability an operation answers the
@@ -56,6 +58,7 @@ var nullableObjects = []struct{ schema, member string }{
 	{"RoadSituation", "location"},
 	{"RoadSituation", "lanes"},
 	{"RoadSituation", "position"},
+	{"StationsQuery", "at"},
 	{"WarningArea", "geometry"},
 }
 

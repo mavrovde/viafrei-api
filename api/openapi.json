@@ -2134,6 +2134,210 @@
         ],
         "type": "object"
       },
+      "Station": {
+        "additionalProperties": false,
+        "properties": {
+          "distanceM": {
+            "description": "Distance from at, in metres; null when the question named no position.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "districtCode": {
+            "description": "The official code (AGS) of the district the station lies in; null when unknown.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "modes": {
+            "description": "The modes of transport that serve the station. Open enumeration (long_distance_rail, regional_rail, suburban_rail, subway, tram, bus, ferry, other); treat an unknown value as other.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sourceFamily": {
+            "description": "The source family of the item; its attribution is in meta.attribution.",
+            "type": "string"
+          },
+          "stopCode": {
+            "description": "The national stop code (DHID); null when none is recorded.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "location",
+          "stopCode",
+          "districtCode",
+          "modes",
+          "distanceM",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
+      "StationsEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Station"
+            },
+            "type": "array"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/StationsMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "StationsMeta": {
+        "additionalProperties": false,
+        "properties": {
+          "asOf": {
+            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "attribution": {
+            "description": "One entry per contributing source family; clients displaying the data must show its text.",
+            "items": {
+              "$ref": "#/components/schemas/Attribution"
+            },
+            "type": "array"
+          },
+          "freshness": {
+            "description": "One entry per contributing source family.",
+            "items": {
+              "$ref": "#/components/schemas/FreshnessEntry"
+            },
+            "type": "array"
+          },
+          "generatedAt": {
+            "description": "When the service produced this body.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "language": {
+            "description": "The language of the texts in data (BCP 47).",
+            "type": "string"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/Notes"
+          },
+          "page": {
+            "$ref": "#/components/schemas/Page"
+          },
+          "query": {
+            "$ref": "#/components/schemas/StationsQuery"
+          },
+          "requestId": {
+            "description": "The request id, equal to the X-Request-Id header.",
+            "type": "string"
+          },
+          "warnings": {
+            "description": "Warnings about this answer; empty when there is none.",
+            "items": {
+              "$ref": "#/components/schemas/DataWarning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "page",
+          "query",
+          "asOf",
+          "freshness",
+          "attribution",
+          "notes",
+          "warnings",
+          "requestId",
+          "generatedAt",
+          "language"
+        ],
+        "type": "object"
+      },
+      "StationsQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "additionalProperties": false,
+            "description": "The position searched around; null for none.",
+            "properties": {
+              "lat": {
+                "description": "Latitude in decimal degrees.",
+                "format": "double",
+                "maximum": 90,
+                "minimum": -90,
+                "type": "number"
+              },
+              "lon": {
+                "description": "Longitude in decimal degrees.",
+                "format": "double",
+                "maximum": 180,
+                "minimum": -180,
+                "type": "number"
+              }
+            },
+            "required": [
+              "lat",
+              "lon"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "The text searched for; null for none.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "radiusM": {
+            "description": "The radius around at; null without at.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "q",
+          "at",
+          "radiusM"
+        ],
+        "type": "object"
+      },
       "TimeWindow": {
         "additionalProperties": false,
         "properties": {
@@ -5809,6 +6013,410 @@
         ],
         "x-example-request": "/v1/road-situations/ev-00028",
         "x-required-scope": "roads"
+      }
+    },
+    "/v1/stations": {
+      "get": {
+        "description": "The stations whose name contains q, those that start with it first, then by name; or the stations within the radius of at, nearest first; or, with both, the stations named so within the radius, nearest first. Ties go by name, then id. It answers a search field's suggestions as the user types (limit 8) as well as a full search. Needs the scope transit.",
+        "operationId": "listStations",
+        "parameters": [
+          {
+            "description": "A station name, or part of it, as typed: case, umlauts written out (koeln for Köln), accents and punctuation do not matter.",
+            "explode": false,
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "description": "A station name, or part of it, as typed: case, umlauts written out (koeln for Köln), accents and punctuation do not matter.",
+              "examples": [
+                "Köln Hbf"
+              ],
+              "maxLength": 60,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "description": "A position: lat,lon in decimal degrees (WGS 84). With q, the name search within radius_m of it. At least one of q and at.",
+            "explode": false,
+            "in": "query",
+            "name": "at",
+            "schema": {
+              "description": "A position: lat,lon in decimal degrees (WGS 84). With q, the name search within radius_m of it. At least one of q and at.",
+              "examples": [
+                "50.943,6.959"
+              ],
+              "pattern": "^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Search radius around at, in metres. Default: geo.default_radius_m. Ignored without at.",
+            "explode": false,
+            "in": "query",
+            "name": "radius_m",
+            "schema": {
+              "description": "Search radius around at, in metres. Default: geo.default_radius_m. Ignored without at.",
+              "format": "int64",
+              "maximum": 50000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Most stations to return. Default: pagination.default_limit.",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "description": "Most stations to return. Default: pagination.default_limit.",
+              "format": "int64",
+              "maximum": 60,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The stations a typed name finds, umlauts and ß as typed",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "sp-07-0000",
+                          "name": "Düsraßbach Bf",
+                          "location": {
+                            "lat": 50.394582,
+                            "lon": 12.498428
+                          },
+                          "stopCode": "de:07002:0",
+                          "districtCode": "07002",
+                          "modes": [
+                            "suburban_rail",
+                            "bus"
+                          ],
+                          "distanceM": null,
+                          "sourceFamily": "src-alpha-transit"
+                        },
+                        {
+                          "id": "sp-07-0001",
+                          "name": "Düsraßbach Nord",
+                          "location": {
+                            "lat": 50.402968,
+                            "lon": 12.521244
+                          },
+                          "stopCode": "de:07002:1",
+                          "districtCode": "07002",
+                          "modes": [
+                            "bus"
+                          ],
+                          "distanceM": null,
+                          "sourceFamily": "src-alpha-transit"
+                        }
+                      ],
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:59:30Z",
+                        "freshness": [
+                          {
+                            "family": "src-alpha-transit",
+                            "dataAsOf": "2026-03-29T23:59:30Z",
+                            "ageS": 30,
+                            "staleAfterS": 300,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "src-alpha-transit",
+                            "domain": "transit",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence lic-alpha.",
+                            "licence": "Synthetic licence alpha",
+                            "licenceUrl": "https://licences.example/alpha",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [],
+                        "page": {
+                          "limit": 8,
+                          "hasMore": false
+                        },
+                        "query": {
+                          "q": "Düsraßbach",
+                          "at": null,
+                          "radiusM": null
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/stations"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/StationsEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The operation is switched off on this instance (feature-disabled).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "Find stations by name or near a position",
+        "tags": [
+          "transit"
+        ],
+        "x-attribution": "Stations come from the source families of the transit domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/stations?q=D%C3%BCsra%C3%9Fbach\u0026limit=8\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/stations?q=D%C3%BCsra%C3%9Fbach\u0026limit=8",
+        "x-required-scope": "transit"
       }
     },
     "/v1/weather-risk": {

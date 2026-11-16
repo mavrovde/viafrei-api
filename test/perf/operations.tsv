@@ -15,3 +15,4 @@ listRoadConditions	near
 getRoadSituation	lookup
 getWeatherRisk	near
 getDrivingRules	lookup
+listStations	near

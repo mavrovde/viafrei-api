@@ -18,6 +18,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
+	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
@@ -85,6 +86,11 @@ func (f *askedFeatures) WeatherRisk(_ context.Context, _ access.Record, q weathe
 func (f *askedFeatures) DrivingRules(_ context.Context, _ access.Record, topic string) (rules.Topic, features.Answer[rules.Rule], error) {
 	f.asked = topic
 	return rules.Topic{}, features.Answer[rules.Rule]{}, rules.ErrUnknownTopic
+}
+
+func (f *askedFeatures) Stations(_ context.Context, _ access.Record, q transit.Query) (features.Answer[transit.Station], error) {
+	f.asked = fmt.Sprintf("radius=%d limit=%d", q.RadiusM, q.Limit)
+	return features.Answer[transit.Station]{}, nil
 }
 
 // tenMinutesOld answers one charging site whose one point was reported

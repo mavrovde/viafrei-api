@@ -18,6 +18,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
+	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
@@ -71,6 +72,10 @@ func (f *cachedFeatures) WeatherRisk(context.Context, access.Record, weather.Que
 
 func (f *cachedFeatures) DrivingRules(context.Context, access.Record, string) (rules.Topic, features.Answer[rules.Rule], error) {
 	return rules.Topic{}, features.Answer[rules.Rule]{}, nil
+}
+
+func (f *cachedFeatures) Stations(context.Context, access.Record, transit.Query) (features.Answer[transit.Station], error) {
+	return features.Answer[transit.Station]{}, nil
 }
 
 // countedVersions answers one fixed version for every family and counts

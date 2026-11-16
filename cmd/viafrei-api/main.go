@@ -121,7 +121,7 @@ func serve(environ []string, stderr io.Writer) int {
 		Build:           buildinfo.Get(),
 		ContractVersion: dbcontract.ContractVersion,
 		Sources:         st,
-		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st},
+		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st, Transit: st},
 			wire.FeatureSettings(cfg), time.Now),
 		Addresses: addresses,
 		Versions:  st,

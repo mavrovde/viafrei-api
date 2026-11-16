@@ -61,6 +61,7 @@ type Repositories struct {
 	Roads    Roads
 	Weather  Weather
 	Rules    Rules
+	Transit  Transit
 }
 
 // Settings are the tunables of the use cases.

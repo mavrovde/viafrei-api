@@ -1,0 +1,96 @@
+{
+  "title": "The stations a typed name finds, umlauts and ß as typed",
+  "request": "/v1/stations?q=D%C3%BCsra%C3%9Fbach\u0026limit=8",
+  "attribution": "Stations come from the source families of the transit domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "transit"
+    ],
+    "sources": [
+      "src-alpha-transit",
+      "src-alpha-transit-stale"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": [
+      {
+        "id": "sp-07-0000",
+        "name": "Düsraßbach Bf",
+        "location": {
+          "lat": 50.394582,
+          "lon": 12.498428
+        },
+        "stopCode": "de:07002:0",
+        "districtCode": "07002",
+        "modes": [
+          "suburban_rail",
+          "bus"
+        ],
+        "distanceM": null,
+        "sourceFamily": "src-alpha-transit"
+      },
+      {
+        "id": "sp-07-0001",
+        "name": "Düsraßbach Nord",
+        "location": {
+          "lat": 50.402968,
+          "lon": 12.521244
+        },
+        "stopCode": "de:07002:1",
+        "districtCode": "07002",
+        "modes": [
+          "bus"
+        ],
+        "distanceM": null,
+        "sourceFamily": "src-alpha-transit"
+      }
+    ],
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": "2026-03-29T23:59:30Z",
+      "freshness": [
+        {
+          "family": "src-alpha-transit",
+          "dataAsOf": "2026-03-29T23:59:30Z",
+          "ageS": 30,
+          "staleAfterS": 300,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "src-alpha-transit",
+          "domain": "transit",
+          "publisher": "Nimbruß Datenwerk",
+          "text": "Synthetic data from family alpha, licence lic-alpha.",
+          "licence": "Synthetic licence alpha",
+          "licenceUrl": "https://licences.example/alpha",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://alpha.example/terms"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [],
+      "page": {
+        "limit": 8,
+        "hasMore": false
+      },
+      "query": {
+        "q": "Düsraßbach",
+        "at": null,
+        "radiusM": null
+      }
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/stations"
+    }
+  }
+}

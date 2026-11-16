@@ -19,3 +19,6 @@ argument:find_parking.lat	listParkingOptions?at	parking-terms-pending	-
 argument:find_parking.lon	listParkingOptions?at	parking-terms-pending	-
 argument:find_parking.radius_km	listParkingOptions?radius_m	parking-terms-pending	-
 argument:find_parking.limit	listParkingOptions?limit	parking-terms-pending	-
+web:/internal/examples	-	-	lead ruling 2026-11-16, not API: recorded example content of the site, not provider data; a live example question is served by the data operation it asks (mcp-internal-02)
+web:/internal/examples/call	-	-	lead ruling 2026-11-16, not API: recorded example content of the site, not provider data; a live example question is served by the data operation it asks (mcp-internal-03: a recorded call, it forwards no live tool call)
+web:/internal/examples/local	-	-	lead ruling 2026-11-16, not API: recorded example content of the site, not provider data; a live example question is served by the data operation it asks (mcp-internal-04: the answers of a place's example questions, each asked of the data operations the inventory maps)

@@ -78,6 +78,10 @@ type Record struct {
 	ExpiresAt     time.Time
 	RevokedAt     *time.Time
 	Accepted      []Acceptance
+	// Audience is who the key is for: AudienceOwn for ViaFrei's own callers
+	// (its web and MCP), public otherwise. It decides which families and
+	// rows of the licence envelope the key may read.
+	Audience Audience
 }
 
 // The refusals of a key check. ErrInvalid covers an unknown id, a bad

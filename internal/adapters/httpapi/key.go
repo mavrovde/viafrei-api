@@ -123,7 +123,7 @@ func (s *server) permittedSources(ctx context.Context, k access.Record) ([]Attri
 	if err != nil {
 		return nil, s.storageProblem(ctx, err)
 	}
-	gate := access.NewGate(register, k.Plan, k.Accepted, s.cfg.Sources.Disabled)
+	gate := access.NewGate(register, k.Plan, k.Audience, k.Accepted, s.cfg.Sources.Disabled)
 	rows, err := s.sources.Sources(ctx, gate.Allowed())
 	if err != nil {
 		return nil, s.storageProblem(ctx, err)

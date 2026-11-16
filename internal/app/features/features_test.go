@@ -24,11 +24,11 @@ var all = []access.UseClass{"consumer", "non_commercial", "commercial"}
 // register: two energy families (one consumer only), two parking families
 // (one behind acceptance), one places family.
 var register = []access.Terms{
-	{Family: "e1", Domain: "energy", UseClasses: all, Version: "v1", Reviewed: true},
-	{Family: "e2", Domain: "energy", UseClasses: []access.UseClass{"consumer"}, Version: "v1", Reviewed: true},
-	{Family: "p1", Domain: "parking", UseClasses: all, Version: "v1", Reviewed: true},
-	{Family: "p2", Domain: "parking", UseClasses: all, AcceptanceRequired: true, Version: "v1", Reviewed: true},
-	{Family: "pl", Domain: "places", UseClasses: all, Version: "v1", Reviewed: true},
+	{Family: "e1", Domain: "energy", UseClasses: all, Version: "v1"},
+	{Family: "e2", Domain: "energy", UseClasses: []access.UseClass{"consumer"}, Version: "v1"},
+	{Family: "p1", Domain: "parking", UseClasses: all, Version: "v1"},
+	{Family: "p2", Domain: "parking", UseClasses: all, AcceptanceRequired: true, Version: "v1"},
+	{Family: "pl", Domain: "places", UseClasses: all, Version: "v1"},
 }
 
 var errStore = errors.New("store down")
@@ -263,7 +263,7 @@ func TestParkingAttributesOccupancyOfAnotherFamily(t *testing.T) {
 	req.Covers(t, "FR-PARK-002", "SEC-032", "ENV-003")
 	// A site of p1 whose occupancy is reported by p3, a third permitted
 	// family: the report is gate-checked and attributed as p3's.
-	reg := append(slices.Clone(register), access.Terms{Family: "p3", Domain: "parking", UseClasses: all, Version: "v1", Reviewed: true})
+	reg := append(slices.Clone(register), access.Terms{Family: "p3", Domain: "parking", UseClasses: all, Version: "v1"})
 	f := &fake{reg: reg, parks: []parking.Site{{ID: "a", Family: "p1", Occupancy: free(2, "p3")}}}
 	a, err := service(f, nil).Parking(context.Background(), key("commercial", allScopes, "p1", "p3"), parking.Query{})
 	if err != nil {
@@ -284,8 +284,8 @@ func TestParkingListsAKeyWhoseFamiliesAreAllPending(t *testing.T) {
 	// Every parking family that could answer waits for its terms: the sites
 	// are listed without occupancy, partial, rather than refused.
 	reg := []access.Terms{
-		{Family: "p2", Domain: "parking", UseClasses: all, AcceptanceRequired: true, Version: "v1", Reviewed: true},
-		{Family: "p4", Domain: "parking", UseClasses: all, AcceptanceRequired: true, Version: "v1", Reviewed: true},
+		{Family: "p2", Domain: "parking", UseClasses: all, AcceptanceRequired: true, Version: "v1"},
+		{Family: "p4", Domain: "parking", UseClasses: all, AcceptanceRequired: true, Version: "v1"},
 	}
 	f := &fake{reg: reg, parks: []parking.Site{{ID: "b", Family: "p2", Occupancy: free(5, "p2")}, {ID: "d", Family: "p4"}}}
 	a, err := service(f, nil).Parking(context.Background(), key("commercial", allScopes, "p2", "p4"), parking.Query{})

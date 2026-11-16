@@ -18,9 +18,40 @@ type Terms struct {
 	// accepted Version of their terms.
 	AcceptanceRequired bool
 	Version            string
-	// Reviewed is false until the family's licence review is signed off;
-	// an unreviewed family is never served (LIC-009).
-	Reviewed bool
+	// Audience is who may read the family at all: AudienceOwn families
+	// (licences that permit our own display only) are read by ViaFrei's own
+	// keys alone. Anything but AudienceOwn is public.
+	Audience Audience
+	// HoldReason, when set, holds the family back from every key, whatever
+	// its plan, audience or acceptances (LIC-009): the read contract states
+	// why (for example no_api_terms).
+	HoldReason string
+}
+
+// Audience is who a key, a source family or a row is for.
+type Audience string
+
+// The two audiences of the read contract's licence envelope.
+const (
+	// AudiencePublic is any key.
+	AudiencePublic Audience = "public"
+	// AudienceOwn is ViaFrei's own keys only (its web and MCP callers).
+	AudienceOwn Audience = "own"
+)
+
+// RowPermitted is the licence envelope's rule for one row of the read
+// contract, checked for a key of audience key: a row its publisher or the
+// steward withholds (display class withhold), a row held back (hold reason
+// set) and a row for ViaFrei's own keys read by any other key are never
+// served. Any audience but AudienceOwn is public, for a row and a key alike.
+func RowPermitted(displayClass string, rowAudience Audience, holdReason string, key Audience) bool {
+	if displayClass == "withhold" {
+		return false
+	}
+	if holdReason != "" {
+		return false
+	}
+	return rowAudience != AudienceOwn || key == AudienceOwn
 }
 
 // Refusal says why the gate denies one family. The zero value is "allowed".
@@ -32,22 +63,28 @@ const (
 	NotInPlan         Refusal = "not_in_plan"
 	UseClassForbidden Refusal = "use_class_forbidden"
 	TermsNotAccepted  Refusal = "terms_not_accepted"
-	NotReviewed       Refusal = "not_reviewed"
+	Held              Refusal = "held"
+	OwnAudienceOnly   Refusal = "audience_own"
+	Unknown           Refusal = "unknown_family"
 	Disabled          Refusal = "disabled"
 )
 
-// Decide applies the licence gate to one family: it is readable only if it
-// is in the plan, reviewed, not disabled, the plan's use class is permitted
-// by its terms, and any required acceptance of the current terms version is
+// Decide applies the licence gate to one family for a key of plan and
+// audience: it is readable only if it is not disabled, not held, for the
+// key's audience, in the plan, the plan's use class is permitted by its
+// terms, and any required acceptance of the current terms version is
 // recorded for the key (SEC-030, SEC-034). Anything else is denied.
-func Decide(t Terms, plan Plan, accepted []Acceptance, disabled []string) Refusal {
+func Decide(t Terms, plan Plan, audience Audience, accepted []Acceptance, disabled []string) Refusal {
 	// An if chain, not a switch: a mutation tool reports a switch's case
 	// expressions as uncovered, and these are the rules it must mutate.
 	if slices.Contains(disabled, t.Family) {
 		return Disabled
 	}
-	if !t.Reviewed {
-		return NotReviewed
+	if t.HoldReason != "" {
+		return Held
+	}
+	if t.Audience == AudienceOwn && audience != AudienceOwn {
+		return OwnAudienceOnly
 	}
 	if !slices.Contains(plan.Sources, t.Family) {
 		return NotInPlan
@@ -68,11 +105,12 @@ type Gate struct {
 	refused map[string]Refusal
 }
 
-// NewGate decides every family of the register for plan.
-func NewGate(register []Terms, plan Plan, accepted []Acceptance, disabled []string) Gate {
+// NewGate decides every family of the register for a key of plan and
+// audience.
+func NewGate(register []Terms, plan Plan, audience Audience, accepted []Acceptance, disabled []string) Gate {
 	g := Gate{refused: map[string]Refusal{}}
 	for _, t := range register {
-		if r := Decide(t, plan, accepted, disabled); r != Allowed {
+		if r := Decide(t, plan, audience, accepted, disabled); r != Allowed {
 			g.refused[t.Family] = r
 			continue
 		}
@@ -93,7 +131,7 @@ func (g Gate) Permits(family string) bool {
 }
 
 // Refused returns the reason a family is denied; a family missing from the
-// register is denied as not reviewed.
+// register is denied as unknown.
 func (g Gate) Refused(family string) Refusal {
 	if g.Permits(family) {
 		return Allowed
@@ -101,7 +139,7 @@ func (g Gate) Refused(family string) Refusal {
 	if r, ok := g.refused[family]; ok {
 		return r
 	}
-	return NotReviewed
+	return Unknown
 }
 
 // ErrForbiddenItem is the post-check's verdict: storage returned an item of a

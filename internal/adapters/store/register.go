@@ -15,14 +15,14 @@ func (s *Store) Register(ctx context.Context) ([]access.Terms, error) {
 		// A failed query surfaces through CollectRows (pgx returns it from
 		// rows.Err as well).
 		rows, _ := tx.Query(ctx, `
-select source_ref, domain, use_classes, acceptance_required, register_version::text, review_signed_on is not null
+select source_ref, domain, use_classes, acceptance_required, register_version::text
 from contract.source order by source_ref`)
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (access.Terms, error) {
 			var (
 				t       access.Terms
 				classes []string
 			)
-			err := r.Scan(&t.Family, &t.Domain, &classes, &t.AcceptanceRequired, &t.Version, &t.Reviewed)
+			err := r.Scan(&t.Family, &t.Domain, &classes, &t.AcceptanceRequired, &t.Version)
 			for _, c := range classes {
 				t.UseClasses = append(t.UseClasses, access.UseClass(c))
 			}

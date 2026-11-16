@@ -60,9 +60,9 @@ func (f *fakeSources) Sources(_ context.Context, allowed []string) ([]access.Sou
 }
 
 var fixtureRegister = []access.Terms{
-	{Family: "src-alpha-energy", UseClasses: []access.UseClass{"consumer", "non_commercial", "commercial"}, Version: "2026-03-01", Reviewed: true},
-	{Family: "src-gamma-energy", UseClasses: []access.UseClass{"consumer"}, Version: "2026-03-01", Reviewed: true},
-	{Family: "src-delta-parking", UseClasses: []access.UseClass{"consumer", "commercial"}, AcceptanceRequired: true, Version: "2026-03-01", Reviewed: true},
+	{Family: "src-alpha-energy", UseClasses: []access.UseClass{"consumer", "non_commercial", "commercial"}, Version: "2026-03-01"},
+	{Family: "src-gamma-energy", UseClasses: []access.UseClass{"consumer"}, Version: "2026-03-01"},
+	{Family: "src-delta-parking", UseClasses: []access.UseClass{"consumer", "commercial"}, AcceptanceRequired: true, Version: "2026-03-01"},
 	{Family: "src-epsilon-roads", Version: "2026-03-01"},
 }
 

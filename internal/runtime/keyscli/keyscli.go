@@ -22,7 +22,9 @@ import (
 const Usage = `usage: viafrei-api keys COMMAND [flags]
   plan    -name N -use-class consumer|non_commercial|commercial -tier critical|standard|bulk -scopes a,b -sources x,y
           -rate R -burst B [-quota-day D] [-quota-month M] -actor A    a quota of 0 is none
-  issue   -plan N -label L -contact C [-expires 8760h] -actor A     prints the key once
+  issue   -plan N -label L -contact C [-expires 8760h] [-audience public|own] -actor A
+                                                                    prints the key once; own is
+                                                                    ViaFrei's own callers only
   rotate  -id ID -actor A                                           prints the new key once
   revoke  -id ID -reason R -actor A
   move    -id ID -plan N -actor A
@@ -71,6 +73,7 @@ func Run(ctx context.Context, args []string, keys *auth.Keys, stdout, stderr io.
 		day     = fs.Int64("quota-day", 0, "plan units a quota day; 0 is no quota")
 		month   = fs.Int64("quota-month", 0, "plan units a quota month; 0 is no quota")
 		hours   = fs.Int("hours", 24, "usage: the hours to read back")
+		aud     = fs.String("audience", string(access.AudiencePublic), "issue: public, or own for ViaFrei's own callers")
 	)
 	if err := fs.Parse(args); err != nil || fs.NArg() > 0 {
 		fmt.Fprintln(stderr, Usage)
@@ -91,7 +94,7 @@ func Run(ctx context.Context, args []string, keys *auth.Keys, stdout, stderr io.
 		}
 		err = keys.PutPlan(ctx, p, *actor)
 	case "issue":
-		key, err = keys.Issue(ctx, *plan, *label, *contact, *expires, *actor)
+		key, err = keys.IssueAs(ctx, access.Audience(*aud), *plan, *label, *contact, *expires, *actor)
 	case "rotate":
 		key, err = keys.Rotate(ctx, *id, *actor)
 	case "revoke":

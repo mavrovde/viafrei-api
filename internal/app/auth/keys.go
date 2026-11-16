@@ -117,10 +117,20 @@ func (k *Keys) PutPlan(ctx context.Context, p access.Plan, actor string) error {
 	return k.ledger.PutPlan(ctx, Change{Action: ActionPlan, Actor: actor, At: k.now()}, p)
 }
 
-// Issue creates a key and returns it in full: the only time it is ever shown
-// (SEC-012). expiry 0 means auth.default_expiry; the lifetime is held to
-// 1 095 days (SEC-040).
+// Issue creates a key for the public audience and returns it in full: the
+// only time it is ever shown (SEC-012). expiry 0 means auth.default_expiry;
+// the lifetime is held to 1 095 days (SEC-040).
 func (k *Keys) Issue(ctx context.Context, plan, label, contact string, expiry time.Duration, actor string) (access.Key, error) {
+	return k.IssueAs(ctx, access.AudiencePublic, plan, label, contact, expiry, actor)
+}
+
+// IssueAs is Issue for a key of the given audience: access.AudienceOwn for
+// ViaFrei's own callers, which may read the families and rows the licence
+// envelope keeps for them; any other value is refused.
+func (k *Keys) IssueAs(ctx context.Context, audience access.Audience, plan, label, contact string, expiry time.Duration, actor string) (access.Key, error) {
+	if audience != access.AudiencePublic && audience != access.AudienceOwn {
+		return access.Key{}, fmt.Errorf("%w: audience must be %s or %s", ErrInput, access.AudiencePublic, access.AudienceOwn)
+	}
 	for _, f := range []struct{ name, v string }{{"actor", actor}, {"plan", plan}, {"label", label}, {"contact", contact}} {
 		if err := text(f.name, f.v); err != nil {
 			return access.Key{}, err
@@ -139,7 +149,7 @@ func (k *Keys) Issue(ctx context.Context, plan, label, contact string, expiry ti
 	now := k.now()
 	rec := access.Record{
 		ID: key.ID, Environment: k.s.Environment, Plan: access.Plan{Name: plan},
-		MAC: access.MAC(k.s.Peppers.Current, key.ID, key.Secret), ExpiresAt: now.Add(expiry),
+		MAC: access.MAC(k.s.Peppers.Current, key.ID, key.Secret), ExpiresAt: now.Add(expiry), Audience: audience,
 	}
 	if err := k.ledger.Issue(ctx, Change{Action: ActionIssue, KeyID: key.ID, Actor: actor, At: now}, rec, label, contact); err != nil {
 		return access.Key{}, err

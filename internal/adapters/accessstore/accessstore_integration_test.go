@@ -168,6 +168,25 @@ func TestLifecycleAgainstTheStore(t *testing.T) {
 	if !bytes.Equal(rec.MAC, access.MAC([]byte(testPepper[:40]), key.ID, key.Secret)) {
 		t.Fatal("the stored value is not the MAC")
 	}
+	if rec.Audience != access.AudiencePublic {
+		t.Fatalf("a key issued without an audience is %q, not public", rec.Audience)
+	}
+	own, err := k.IssueAs(ctx, access.AudienceOwn, plan, "own", "ops@example.test", 0, "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r, err := s.Lookup(ctx, own.ID); err != nil || r.Audience != access.AudienceOwn {
+		t.Fatalf("own key read back as %q: %v", r.Audience, err)
+	}
+	// A record that names no audience is stored as public.
+	bare := access.Record{ID: "Bare000000", Environment: access.Live, Plan: access.Plan{Name: plan},
+		MAC: access.MAC([]byte("x"), "Bare000000", "s"), ExpiresAt: time.Now().Add(time.Hour)}
+	if err := s.Issue(ctx, auth.Change{Action: auth.ActionIssue, KeyID: bare.ID, Actor: "tester", At: time.Now()}, bare, "l", "c"); err != nil {
+		t.Fatal(err)
+	}
+	if r, err := s.Lookup(ctx, bare.ID); err != nil || r.Audience != access.AudiencePublic {
+		t.Fatalf("a bare record read back as %q: %v", r.Audience, err)
+	}
 	rotated, err := k.Rotate(ctx, key.ID, "tester")
 	if err != nil {
 		t.Fatal(err)

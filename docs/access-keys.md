@@ -75,17 +75,30 @@ does not survive a pepper rotation; print a new one.
 A source family is served to a key only when all of these hold; anything
 else is denied:
 
-1. the family is in the key's plan;
-2. the family's licence review is signed off;
-3. the plan's use class (`consumer`, `non_commercial`, `commercial`) is one
+1. the family is not in `sources.disabled`;
+2. the read contract holds the family back from no key (its `hold_reason` is
+   empty; a family is held, for example, while the API's own terms its
+   licence asks for do not exist yet);
+3. the family is for every key, or the key is one of ViaFrei's own: a family
+   whose `audience` is `own` (licences that permit only ViaFrei's own
+   display) is read by keys of audience `own` alone;
+4. the family is in the key's plan;
+5. the plan's use class (`consumer`, `non_commercial`, `commercial`) is one
    the family's terms permit;
-4. when the terms require acceptance, the key has accepted the current terms
-   version (the family's register version);
-5. the family is not in `sources.disabled`.
+6. when the terms require acceptance, the key has accepted the current terms
+   version (the family's terms token).
 
 The allowed set is passed into the storage read, so a denied family is never
 read. Every returned item is checked against the set again; a violation
 aborts the answer with `500 internal` and is logged as an error.
+
+The read contract also states the licence envelope per row. A row is never
+served when its `display_class` is `withhold` (its publisher marked it
+confidential, or the steward withholds it), when its `hold_reason` is set,
+or when its `audience` is `own` and the key's is not. The refusals the gate
+records are `disabled`, `held`, `audience_own`, `not_in_plan`,
+`use_class_forbidden` and `terms_not_accepted`; a family the register does
+not name is refused as `unknown_family`.
 
 ## The operator's key tool
 
@@ -98,6 +111,7 @@ transaction.
 viafrei-api keys plan   -name standard -use-class commercial -tier standard -scopes roads,energy -sources src-a,src-b \
                         -rate 10 -burst 20 -quota-day 50000 -quota-month 1000000 -actor ops
 viafrei-api keys issue  -plan standard -label "Example GmbH" -contact ops@example.test -actor ops
+viafrei-api keys issue  -plan site -label "ViaFrei web" -contact ops@example.test -audience own -actor ops
 viafrei-api keys rotate -id <keyId> -actor ops          # the old secret stays valid for auth.rotation_overlap
 viafrei-api keys revoke -id <keyId> -reason "leaked" -actor ops
 viafrei-api keys move   -id <keyId> -plan pro -actor ops
@@ -107,7 +121,10 @@ viafrei-api keys usage  -id <keyId> -hours 24           # usage per hour and ope
 ```
 
 A key expires after `auth.default_expiry` unless `-expires` is given (at
-most 1 095 days). A revocation, a plan move, a plan change or an acceptance
+most 1 095 days). A key is for the public unless `-audience own` issues it
+for ViaFrei's own callers (its web and MCP), which may read the families
+and rows the licence envelope keeps for them; any other audience is
+refused. A revocation, a plan move, a plan change or an acceptance
 reaches every running instance within `auth.revocation_propagation`, and at
 the latest after `auth.key_cache_ttl`.
 

@@ -221,8 +221,8 @@ func behaviours() map[string]behaviour {
 			return fmt.Sprint(wire.FeatureSettings(c).MaxWarnings)
 		}},
 		"sources.disabled": {"alpha", func(t *testing.T, c *config.Config) string {
-			register := []access.Terms{{Family: "alpha", UseClasses: access.UseClasses, Reviewed: true}}
-			return fmt.Sprint(access.NewGate(register, access.Plan{UseClass: "consumer", Sources: []string{"alpha"}}, nil, c.Sources.Disabled).Allowed())
+			register := []access.Terms{{Family: "alpha", UseClasses: access.UseClasses}}
+			return fmt.Sprint(access.NewGate(register, access.Plan{UseClass: "consumer", Sources: []string{"alpha"}}, access.AudiencePublic, nil, c.Sources.Disabled).Allowed())
 		}},
 	}
 }

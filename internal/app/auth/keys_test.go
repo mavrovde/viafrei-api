@@ -93,6 +93,34 @@ func newKeys(l *fakeLedger) *auth.Keys {
 	return auth.NewKeys(settings(), l, nil, func() time.Time { return t0 })
 }
 
+func TestIssueAudience(t *testing.T) {
+	req.Covers(t, "SEC-012", "SEC-030")
+	l := &fakeLedger{}
+	k := newKeys(l)
+	ctx := context.Background()
+	if _, err := k.Issue(ctx, "standard", "l", "c", 0, "o"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := k.IssueAs(ctx, access.AudienceOwn, "standard", "l", "c", 0, "o"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := k.IssueAs(ctx, access.AudiencePublic, "standard", "l", "c", 0, "o"); err != nil {
+		t.Fatal(err)
+	}
+	if len(l.issued) != 3 || l.issued[0].Audience != access.AudiencePublic || l.issued[1].Audience != access.AudienceOwn ||
+		l.issued[2].Audience != access.AudiencePublic {
+		t.Fatalf("audiences stored: %+v", l.issued)
+	}
+	for _, a := range []access.Audience{"", "internal", "OWN"} {
+		if _, err := k.IssueAs(ctx, a, "standard", "l", "c", 0, "o"); !errors.Is(err, auth.ErrInput) {
+			t.Errorf("audience %q: %v", a, err)
+		}
+	}
+	if len(l.issued) != 3 {
+		t.Error("a refused audience reached the ledger")
+	}
+}
+
 func TestIssue(t *testing.T) {
 	req.Covers(t, "SEC-040", "SEC-010", "SEC-012")
 	l := &fakeLedger{}

@@ -14,6 +14,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
 	"github.com/mavrovde/viafrei-api/internal/app/console"
+	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/runtime/wire"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
@@ -47,7 +48,7 @@ func TestTheDirectoryReadsKeysPlansAndAudit(t *testing.T) {
 			found = &keys[i]
 		}
 	}
-	if err != nil || found == nil || found.Plan != plan || found.Label != "directory" || found.RevokedAt == nil || found.RevokeReason != "listed" || found.Environment == "" {
+	if err != nil || found == nil || found.Plan != plan || found.Label != "directory" || found.RevokedAt == nil || found.RevokeReason != "listed" || found.Environment == "" || found.Audience != access.AudiencePublic {
 		t.Fatalf("keys %+v %v", found, err)
 	}
 	plans, err := k.PlanList(ctx)

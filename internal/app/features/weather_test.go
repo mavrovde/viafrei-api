@@ -17,9 +17,9 @@ import (
 
 // wxRegister: two weather families (one consumer only), one rules family.
 var wxRegister = []access.Terms{
-	{Family: "w1", Domain: "weather", UseClasses: all, Version: "v1", Reviewed: true},
-	{Family: "w2", Domain: "weather", UseClasses: []access.UseClass{"consumer"}, Version: "v1", Reviewed: true},
-	{Family: "k1", Domain: "rules", UseClasses: all, Version: "v1", Reviewed: true},
+	{Family: "w1", Domain: "weather", UseClasses: all, Version: "v1"},
+	{Family: "w2", Domain: "weather", UseClasses: []access.UseClass{"consumer"}, Version: "v1"},
+	{Family: "k1", Domain: "rules", UseClasses: all, Version: "v1"},
 }
 
 type wxFake struct {

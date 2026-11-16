@@ -64,13 +64,13 @@ func TestRegisterReadsEveryFamilysTerms(t *testing.T) {
 		byFamily[r.Family] = r
 	}
 	// Expected from docs/test-data.md, not from the code under test.
-	if g := byFamily["src-gamma-energy"]; !slices.Equal(g.UseClasses, []access.UseClass{"consumer"}) || !g.Reviewed || g.AcceptanceRequired {
+	if g := byFamily["src-gamma-energy"]; !slices.Equal(g.UseClasses, []access.UseClass{"consumer"}) || g.AcceptanceRequired {
 		t.Errorf("restricted-purpose family: %+v", g)
 	}
 	if d := byFamily["src-delta-parking"]; !d.AcceptanceRequired || d.Version != "2026-03-01" {
 		t.Errorf("terms family: %+v", d)
 	}
-	if e := byFamily["src-epsilon-roads"]; e.Reviewed || len(e.UseClasses) != 0 {
+	if e := byFamily["src-epsilon-roads"]; len(e.UseClasses) != 0 {
 		t.Errorf("unreviewed family: %+v", e)
 	}
 	if len(reg) < 20 {

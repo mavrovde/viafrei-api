@@ -154,7 +154,7 @@ func (l *lifecycle) PruneUsage(_ context.Context, actor string) (int64, error) {
 func (l *lifecycle) KeyList(context.Context) ([]auth.KeyView, error) {
 	revoked := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
 	return []auth.KeyView{
-		{ID: "keyid00001", Environment: access.Test, Plan: "basic", Label: "lab", Contact: "c@example.org", IssuedAt: revoked, ExpiresAt: revoked},
+		{ID: "keyid00001", Environment: access.Test, Audience: access.AudienceOwn, Plan: "basic", Label: "lab", Contact: "c@example.org", IssuedAt: revoked, ExpiresAt: revoked},
 		{ID: "keyid00002", Plan: "basic", RevokedAt: &revoked, RevokeReason: "lost"},
 	}, l.listErr[0]
 }
@@ -456,7 +456,7 @@ func TestEnrolSignInAndRunEveryChange(t *testing.T) {
 	cookie, csrf := r.signIn(a)
 
 	home := r.do(request{method: http.MethodGet, path: "/", cookie: cookie}).Body.String()
-	for _, want := range []string{"keyid00001", "lost", "basic", "read:places", "alice", console.Fingerprint(a.ID), "Sign out alice", "/act/prune"} {
+	for _, want := range []string{"keyid00001", "<td>own</td>", "lost", "basic", "read:places", "alice", console.Fingerprint(a.ID), "Sign out alice", "/act/prune"} {
 		if !strings.Contains(home, want) {
 			t.Fatalf("the home page lacks %q", want)
 		}

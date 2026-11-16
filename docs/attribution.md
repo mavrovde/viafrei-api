@@ -72,17 +72,17 @@ Each operation also states its attribution rule in the OpenAPI document
 
 ## When a family is withheld
 
-The licence gate serves a family only when your key's plan includes it, its
-licence review is signed off, your use class is permitted and any required
-terms are accepted.
+The licence gate serves a family only when the read contract does not hold
+it back, it is not kept for ViaFrei's own keys, your key's plan includes it,
+your use class is permitted and any required terms are accepted.
 
 ```mermaid
 flowchart TD
-  A[Source family could answer] --> B{In the key's plan?}
-  B -- no --> W[Withheld]
-  B -- yes --> C{Licence review signed off?}
-  C -- no --> W
-  C -- yes --> D{Use class permitted?}
+  A[Source family could answer] --> H{Held back, or kept for ViaFrei's own keys?}
+  H -- yes --> W[Withheld]
+  H -- no --> B{In the key's plan?}
+  B -- no --> W
+  B -- yes --> D{Use class permitted?}
   D -- no --> W
   D -- yes --> E{Terms required and not accepted?}
   E -- yes --> T[Listed without restricted values]
@@ -90,9 +90,9 @@ flowchart TD
 ```
 
 Text description: the gate asks four questions of every source family that
-could answer, in order. If the family is not in your key's plan, its licence
-review is not signed off, or your use class is not permitted, the family is
-withheld. Otherwise, if its terms must be accepted and your key has not
+could answer, in order. If the read contract holds the family back or keeps
+it for ViaFrei's own keys, if it is not in your key's plan, or if your use
+class is not permitted, the family is withheld. Otherwise, if its terms must be accepted and your key has not
 accepted them, its items are listed without the restricted values. In every
 other case the family is served, with its attribution.
 
@@ -100,7 +100,9 @@ A family that could have answered but was withheld is named by the warning
 `partial` in `meta.warnings`; when no family may answer, the request is
 refused with `403 source-not-permitted` or
 `403 terms-not-accepted` ([error codes](errors.md)). `GET /v1/key` lists the
-families your key may receive.
+families your key may receive. Inside a family that is served, a row the
+read contract withholds (confidential, held back, or kept for ViaFrei's own
+keys) is never answered.
 
 ## Terms of use
 

@@ -126,7 +126,7 @@ func (s *Service) gate(ctx context.Context, key access.Record) ([]access.Terms, 
 	if err != nil {
 		return nil, access.Gate{}, err
 	}
-	return reg, access.NewGate(reg, key.Plan, key.Accepted, s.set.Disabled), nil
+	return reg, access.NewGate(reg, key.Plan, key.Audience, key.Accepted, s.set.Disabled), nil
 }
 
 // checkAll is the post-check over a set: every family must be in allowed.

@@ -291,7 +291,7 @@ func open(t *testing.T) *rig {
 	if err != nil {
 		t.Fatal(err)
 	}
-	permitted, _, err := access.NewGate(reg, r.key.Key.Plan, nil, cfg.Sources.Disabled).Answer(access.Answering(reg, "roads"))
+	permitted, _, err := access.NewGate(reg, r.key.Key.Plan, r.key.Key.Audience, nil, cfg.Sources.Disabled).Answer(access.Answering(reg, "roads"))
 	if err != nil {
 		t.Fatal(err)
 	}

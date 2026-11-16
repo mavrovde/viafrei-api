@@ -19,6 +19,9 @@ type KeyView struct {
 	ExpiresAt    time.Time
 	RevokedAt    *time.Time
 	RevokeReason string
+	// Audience is who the key is for: public, or own for ViaFrei's own
+	// callers.
+	Audience access.Audience
 }
 
 // AuditEntry is one audit record as the owner reads it: never a secret, a

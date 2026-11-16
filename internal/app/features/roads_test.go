@@ -18,11 +18,11 @@ import (
 // roadRegister: two roads families, one for consumer use only, and two
 // weather families, one for consumer use only.
 var roadRegister = []access.Terms{
-	{Family: "r1", Domain: "roads", UseClasses: all, Version: "v1", Reviewed: true},
-	{Family: "r2", Domain: "roads", UseClasses: []access.UseClass{"consumer"}, Version: "v1", Reviewed: true},
-	{Family: "e1", Domain: "energy", UseClasses: all, Version: "v1", Reviewed: true},
-	{Family: "w1", Domain: "weather", UseClasses: all, Version: "v1", Reviewed: true},
-	{Family: "w2", Domain: "weather", UseClasses: []access.UseClass{"consumer"}, Version: "v1", Reviewed: true},
+	{Family: "r1", Domain: "roads", UseClasses: all, Version: "v1"},
+	{Family: "r2", Domain: "roads", UseClasses: []access.UseClass{"consumer"}, Version: "v1"},
+	{Family: "e1", Domain: "energy", UseClasses: all, Version: "v1"},
+	{Family: "w1", Domain: "weather", UseClasses: all, Version: "v1"},
+	{Family: "w2", Domain: "weather", UseClasses: []access.UseClass{"consumer"}, Version: "v1"},
 }
 
 type roadFake struct {

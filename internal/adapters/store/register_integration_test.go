@@ -11,8 +11,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
@@ -25,10 +25,10 @@ import (
 // in whichever test happened to ask first.
 func seed(ctx context.Context) error {
 	var buf bytes.Buffer
-	if _, err := fixtures.Generate(&buf, "tiny", 1, contract.Version()); err != nil {
+	if _, err := fixtures.Generate(&buf, "tiny", 1, dbcontract.ContractVersion); err != nil {
 		return err
 	}
-	if err := fixtures.Planted(&buf, "tiny", 1, contract.Version()); err != nil {
+	if err := fixtures.Planted(&buf, "tiny", 1, dbcontract.ContractVersion); err != nil {
 		return err
 	}
 	conn, err := db.Owner(ctx)

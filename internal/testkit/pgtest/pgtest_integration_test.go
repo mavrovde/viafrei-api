@@ -5,11 +5,20 @@ package pgtest
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 )
+
+// closedPortAddr is an address nothing listens on.
+func closedPortAddr() string { return "127.0.0.1:1" }
 
 var harness *DB
 
@@ -35,8 +44,8 @@ func bounded(t *testing.T) context.Context {
 	return ctx
 }
 
-// TestHarnessIsUsable: the owner connects, the reader URL names the reader
-// role, and building the stub a second time is refused rather than doubled.
+// TestHarnessIsUsable: the owner connects, each role's URL names its role and
+// connects, and the reader reads the contract version this build expects.
 func TestHarnessIsUsable(t *testing.T) {
 	ctx := bounded(t)
 	conn, err := harness.Owner(ctx)
@@ -44,11 +53,32 @@ func TestHarnessIsUsable(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
-	if !strings.Contains(harness.ReaderURL, "api_reader:") {
-		t.Error("the reader URL does not name the reader role")
+	if !strings.Contains(harness.ReaderURL, "api_reader:") || !strings.Contains(harness.AccessURL, "api_access:") {
+		t.Error("a role URL does not name its role")
 	}
-	if err := prepare(ctx, harness.OwnerURL, "AAAA", "BBBB"); err == nil || !strings.Contains(err.Error(), "build contract stub") {
-		t.Fatalf("a second build of the stub = %v, want a refusal", err)
+	reader, err := pgx.Connect(ctx, harness.ReaderURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = reader.Close(context.WithoutCancel(ctx)) }()
+	var v string
+	if err := reader.QueryRow(ctx, "select contract_version from contract.contract_info").Scan(&v); err != nil || v != dbcontract.ContractVersion {
+		t.Fatalf("contract_info = %q %v, want %s", v, err, dbcontract.ContractVersion)
+	}
+	access, err := pgx.Connect(ctx, harness.AccessURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = access.Close(ctx)
+	if err := passwords(ctx, "postgres://owner:x@"+closedPortAddr()+"/contract?sslmode=disable", "A", "B"); err == nil || !strings.Contains(err.Error(), "connect as owner") {
+		t.Fatalf("passwords on no database = %v", err)
+	}
+	// api_access may not set api_reader's password: the step reports which
+	// role failed. Its own password is set to what it already is.
+	au, _ := url.Parse(harness.AccessURL)
+	own, _ := au.User.Password()
+	if err := passwords(ctx, harness.AccessURL, "A", own); err == nil || !strings.Contains(err.Error(), "set the password of api_reader") {
+		t.Fatalf("passwords as api_access = %v", err)
 	}
 }
 
@@ -85,6 +115,41 @@ func TestThePinnedReleaseBuiltTheSchema(t *testing.T) {
 	}
 	if harness.Pin.Head < 1 {
 		t.Fatalf("the harness names no pin: %+v", harness.Pin)
+	}
+}
+
+// TestContractColumnsMatchThePinnedImage: test/contract/columns.tsv, the
+// column list the scope lint reads, is the catalogue of the schemas the
+// service reads as the pinned image built them, column for column in order.
+// A new pin that changes a column fails here until the list is regenerated.
+func TestContractColumnsMatchThePinnedImage(t *testing.T) {
+	ctx := bounded(t)
+	conn, err := harness.Owner(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	rows, _ := conn.Query(ctx, `select n.nspname || '.' || c.relname || chr(9) || a.attname || chr(9) || format_type(a.atttypid, a.atttypmod)
+from pg_attribute a join pg_class c on c.oid = a.attrelid join pg_namespace n on n.oid = c.relnamespace
+where n.nspname in ('contract', 'access') and c.relkind in ('r', 'v', 'p') and a.attnum > 0 and not a.attisdropped
+order by n.nspname || '.' || c.relname collate "C", a.attnum`)
+	got, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		t.Fatal(err)
+	}
+	wd, _ := os.Getwd()
+	src, err := os.ReadFile(filepath.Join(wd, "..", "..", "..", "test", "contract", "columns.tsv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want []string
+	for _, l := range strings.Split(strings.TrimSpace(string(src)), "\n") {
+		if !strings.HasPrefix(l, "#") {
+			want = append(want, l)
+		}
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("test/contract/columns.tsv differs from the pinned image's catalogue; it is, as the file's format:\n%s", strings.Join(got, "\n"))
 	}
 }
 

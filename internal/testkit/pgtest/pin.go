@@ -16,8 +16,12 @@ const PinFile = "database.pin"
 
 // Pin is the viafrei-database release of database.pin.
 type Pin struct {
-	// Ref is the image, <image>:<X.Y.Z>@sha256:<digest>.
+	// Ref is the image, <image>:<X.Y.Z>@sha256:<digest>, or for a release
+	// not yet published, a locally built <name>:<X.Y.Z>-local.
 	Ref string
+	// Local is set for a locally built image: it is never pulled, and no
+	// release may name one (the release swaps in the published digest).
+	Local bool
 	// Version is the X.Y.Z of Ref.
 	Version string
 	// Head is the schema head the image's `head` must print as READY <Head>.
@@ -25,8 +29,9 @@ type Pin struct {
 }
 
 var (
-	pinRef  = regexp.MustCompile(`^[a-z0-9.-]+(:[0-9]+)?/[a-z0-9._/-]+:([0-9]+\.[0-9]+\.[0-9]+)@sha256:[0-9a-f]{64}$`)
-	pinHead = regexp.MustCompile(`^schema-head ([1-9][0-9]{0,5})$`)
+	pinRef   = regexp.MustCompile(`^[a-z0-9.-]+(:[0-9]+)?/[a-z0-9._/-]+:([0-9]+\.[0-9]+\.[0-9]+)@sha256:[0-9a-f]{64}$`)
+	pinLocal = regexp.MustCompile(`^[a-z0-9._-]+:([0-9]+\.[0-9]+\.[0-9]+)-local$`)
+	pinHead  = regexp.MustCompile(`^schema-head ([1-9][0-9]{0,5})$`)
 )
 
 // ParsePin reads the two lines of a pin, the image reference and then
@@ -43,16 +48,20 @@ func ParsePin(src string) (Pin, error) {
 	if len(lines) != 2 {
 		return Pin{}, fmt.Errorf("%s holds %d lines; it must hold the image reference, then 'schema-head N'", PinFile, len(lines))
 	}
-	ref := pinRef.FindStringSubmatch(lines[0])
-	if ref == nil {
-		return Pin{}, fmt.Errorf("%s: %q is not <image>:<X.Y.Z>@sha256:<digest>", PinFile, lines[0])
+	version, local := "", false
+	if ref := pinRef.FindStringSubmatch(lines[0]); ref != nil {
+		version = ref[2]
+	} else if ref := pinLocal.FindStringSubmatch(lines[0]); ref != nil {
+		version, local = ref[1], true
+	} else {
+		return Pin{}, fmt.Errorf("%s: %q is not <image>:<X.Y.Z>@sha256:<digest> nor a local <name>:<X.Y.Z>-local", PinFile, lines[0])
 	}
 	head := pinHead.FindStringSubmatch(lines[1])
 	if head == nil {
 		return Pin{}, fmt.Errorf("%s: %q is not 'schema-head N'", PinFile, lines[1])
 	}
 	n, _ := strconv.Atoi(head[1]) // six digits at most: always a number
-	return Pin{Ref: lines[0], Version: ref[2], Head: n}, nil
+	return Pin{Ref: lines[0], Version: version, Head: n, Local: local}, nil
 }
 
 // ReadPin reads database.pin from the root of the module that holds dir,

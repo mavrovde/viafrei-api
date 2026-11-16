@@ -84,28 +84,29 @@ sites as (
   from contract.charging_site c, here
   where c.withdrawn_at is null
     and c.source_ref = any($3)
+    and `+permitted("c")+`
     and st_dwithin(c.location::geography, here.g, $4)
     and ($5::text[] is null or c.access = any($5))
     and ($6::float8 <= 0 or exists (
           select 1 from contract.charge_point p
-          where p.site_id = c.site_id and p.power_max_kw >= $6))
+          where p.site_id = c.site_id and p.power_max_kw >= $6 and `+permitted("p")+`))
   order by dist, c.site_id
   limit $7)
 select s.site_id, s.source_ref, s.name, s.operator_name, s.access, s.lat, s.lon, s.dist,
        p.point_id, p.current_kind, p.power_max_kw::float8, o.availability, o.observed_at, o.source_ref,
        nx.next_at
 from sites s
-left join contract.charge_point p on p.site_id = s.site_id and ($6::float8 <= 0 or p.power_max_kw >= $6)
+left join contract.charge_point p on p.site_id = s.site_id and ($6::float8 <= 0 or p.power_max_kw >= $6) and `+permitted("p")+`
 left join lateral (
   select availability, observed_at, source_ref
   from contract.charge_point_state_observation o
-  where o.point_id = p.point_id and o.source_ref = any($3) and o.observed_at <= $8
+  where o.point_id = p.point_id and o.source_ref = any($3) and o.observed_at <= $8 and `+permitted("o")+`
   order by o.observed_at desc
   limit 1) o on true
 left join lateral (
   select min(o.observed_at) next_at
   from contract.charge_point_state_observation o
-  where o.point_id = p.point_id and o.source_ref = any($3) and o.observed_at > $8) nx on true
+  where o.point_id = p.point_id and o.source_ref = any($3) and o.observed_at > $8 and `+permitted("o")+`) nx on true
 order by s.dist, s.site_id, p.point_id`, q.At.Lat, q.At.Lon, families, q.RadiusM, accessCodes, q.MinKw, q.Limit+1, now)
 		return pgx.CollectRows(res, func(r pgx.CollectableRow) (row, error) {
 			var (
@@ -183,9 +184,10 @@ cross join here
 cross join lateral (
   select min(o.observed_at) next_at
   from contract.occupancy_observation o
-  where o.facility_id = f.facility_id and o.source_ref = any($4) and o.observed_at > $6) nx
+  where o.facility_id = f.facility_id and o.source_ref = any($4) and o.observed_at > $6 and `+held("o")+`) nx
 where f.withdrawn_at is null
   and f.source_ref = any($3)
+  and `+held("f")+`
   and st_dwithin(f.location::geography, here.g, $5)`, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, now).Scan(&a.next)
 		rows, _ := tx.Query(ctx, `
 with here as (select st_setsrid(st_makepoint($2, $1), 4326)::geography g)
@@ -198,11 +200,12 @@ cross join here
 left join lateral (
   select free_spaces, total_spaces, occupancy_status, observed_at, source_ref
   from contract.occupancy_observation o
-  where o.facility_id = f.facility_id and o.source_ref = any($4) and o.observed_at <= $7
+  where o.facility_id = f.facility_id and o.source_ref = any($4) and o.observed_at <= $7 and `+held("o")+`
   order by o.observed_at desc
   limit 1) o on true
 where f.withdrawn_at is null
   and f.source_ref = any($3)
+  and `+held("f")+`
   and st_dwithin(f.location::geography, here.g, $5)
   and ($6::int <= 0 or (o.free_spaces >= $6 and o.observed_at >= $7::timestamptz - (
         select make_interval(secs => s.stale_after_s) from contract.source s where s.source_ref = o.source_ref)))
@@ -245,7 +248,7 @@ func (s *Store) Place(ctx context.Context, id string, families []string) (places
 		rows, _ := tx.Query(ctx, `
 select place_id, name, place_kind, st_y(location), st_x(location), source_ref
 from contract.place
-where place_id = $1 and withdrawn_at is null and source_ref = any($2)`, id, families)
+where place_id = $1 and withdrawn_at is null and source_ref = any($2) and `+permitted("place"), id, families)
 		ps, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.Place, error) {
 			var (
 				v    places.Place

@@ -194,7 +194,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
-      - run: make check-generated SQLC="go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1"
+      - run: make check-generated
 
   openapi:
     name: OpenAPI lint and breaking changes

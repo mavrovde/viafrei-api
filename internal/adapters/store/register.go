@@ -9,20 +9,25 @@ import (
 )
 
 // Register reads the licence terms of every source family the read contract
-// publishes: what the licence gate decides on (SEC-030).
+// publishes: what the licence gate decides on (SEC-030), with the family's
+// licence envelope: its audience, its hold and the terms a key accepts (the
+// envelope's terms gate, else the register's version).
 func (s *Store) Register(ctx context.Context) ([]access.Terms, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]access.Terms, error) {
 		// A failed query surfaces through CollectRows (pgx returns it from
 		// rows.Err as well).
 		rows, _ := tx.Query(ctx, `
-select source_ref, domain, use_classes, acceptance_required, register_version::text
+select source_ref, domain, use_classes, acceptance_required,
+       coalesce(terms_gate, register_version::text, ''), audience, coalesce(hold_reason, '')
 from contract.source order by source_ref`)
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (access.Terms, error) {
 			var (
 				t       access.Terms
 				classes []string
 			)
-			err := r.Scan(&t.Family, &t.Domain, &classes, &t.AcceptanceRequired, &t.Version)
+			var audience string
+			err := r.Scan(&t.Family, &t.Domain, &classes, &t.AcceptanceRequired, &t.Version, &audience, &t.HoldReason)
+			t.Audience = access.Audience(audience)
 			for _, c := range classes {
 				t.UseClasses = append(t.UseClasses, access.UseClass(c))
 			}

@@ -14,7 +14,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/mavrovde/viafrei-api/db/contract"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
 	"github.com/mavrovde/viafrei-api/internal/testkit/pgtest"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
@@ -50,7 +50,7 @@ func TestMain(m *testing.M) {
 
 func loadCommitted(ctx context.Context, profile string, seed uint64) (map[string]int, error) {
 	var buf bytes.Buffer
-	m, err := fixtures.Generate(&buf, profile, seed, contract.Version())
+	m, err := fixtures.Generate(&buf, profile, seed, dbcontract.ContractVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func TestTinyLoadsIntoTheContract(t *testing.T) {
 	req.Covers(t, "TST-014")
 	ctx := bounded(t)
 	var buf bytes.Buffer
-	m, err := fixtures.Generate(&buf, "tiny", 1, contract.Version())
+	m, err := fixtures.Generate(&buf, "tiny", 1, dbcontract.ContractVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestCIProfileLoadsAndTheReaderSeesIt(t *testing.T) {
 	if read == 0 {
 		t.Fatal("read zero rows")
 	}
-	t.Logf("read %d rows in %d tables as %s", read, len(fixtures.Tables), contract.ReaderRole)
+	t.Logf("read %d rows in %d tables as %s", read, len(fixtures.Tables), dbcontract.ReaderRole)
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		t.Fatal("the reads ran past the test bound")
 	}

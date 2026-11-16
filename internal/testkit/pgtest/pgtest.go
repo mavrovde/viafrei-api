@@ -1,18 +1,16 @@
 // Package pgtest starts a throwaway PostGIS container for integration tests
 // (testcontainers-go, a random host port, removed when the tests end),
-// migrates it with the viafrei-database release database.pin names, then
-// builds the read contract and the access store in it and creates the
-// service's two roles.
+// migrates it with the viafrei-database release database.pin names and
+// gives the service's two roles a password.
 //
-// The platform's schema comes from the pinned image alone: `version` must
-// name the pinned release and head, `migrate` applies every migration it
-// carries and the role settings it gives each role in this database,
-// `partitions ensure` makes the daily partitions, and `head` must print
-// READY <head>. The read contract (schema contract, role api_reader) and the
-// access store (schema access, role api_access) are not in that release yet
-// (viafrei-database#29); until they are, this package builds them from
-// db/contract and db/access, beside the platform's schema and never in its
-// place.
+// Everything in that database is the pinned image's: `version` must name
+// the pinned release and head, `migrate` applies every migration it carries
+// (the platform's tables, the read contract of schema contract with its
+// role api_reader, the access store of schema access with its role
+// api_access) and the role settings it gives each role in this database,
+// `partitions ensure` makes the daily partitions from PartitionsFrom on,
+// and `head` must print READY <head>. This package runs no DDL: tests seed
+// the platform's own tables, which the contract's views read.
 //
 // It makes no copy of a database (CREATE DATABASE … TEMPLATE): a copy would
 // hold none of the settings the image sets per role IN DATABASE. Each
@@ -31,7 +29,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/moby/moby/api/types/container"
@@ -39,8 +36,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	accessdb "github.com/mavrovde/viafrei-api/db/access"
-	"github.com/mavrovde/viafrei-api/db/contract"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 )
 
 // Image is the PostGIS image every test and development database runs on,
@@ -49,6 +45,15 @@ import (
 // equal). It is published for linux/amd64 only; an arm64 host runs it
 // emulated.
 const Image = "postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5"
+
+// PartitionsFrom is the first day the daily partitions are made for: the day
+// before the synthetic fixtures' first day (fixtures.ReferenceInstant), so a
+// tick of any fixture day, in UTC or Berlin time, has its partition.
+const PartitionsFrom = "2026-03-27"
+
+// maxLocks is the lock table the container gets: making the partitions from
+// PartitionsFrom to today is one transaction over every tick table and day.
+const maxLocks = "max_locks_per_transaction=4096"
 
 // DB is one running test database.
 type DB struct {
@@ -64,9 +69,8 @@ type DB struct {
 }
 
 // Start reads database.pin, runs the container, migrates it with the
-// pinned image, builds the contract and the access store, creates the
-// reader and access roles and publishes the contract version this build
-// expects. On any failure the container is removed.
+// pinned image and gives the reader and access roles a password. On any
+// failure the container is removed.
 func Start(ctx context.Context) (*DB, error) {
 	wd, _ := os.Getwd() // an empty directory finds no module, and ReadPin says so
 	pin, err := ReadPin(wd)
@@ -79,7 +83,10 @@ func Start(ctx context.Context) (*DB, error) {
 		postgres.WithPassword(rand.Text()),
 		postgres.BasicWaitStrategies(),
 		testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
-			ContainerRequest: testcontainers.ContainerRequest{ImagePlatform: "linux/amd64"},
+			ContainerRequest: testcontainers.ContainerRequest{
+				ImagePlatform: "linux/amd64",
+				Cmd:           []string{"-c", "fsync=off", "-c", maxLocks},
+			},
 		}),
 	)
 	db := &DB{container: c, Pin: pin}
@@ -131,7 +138,7 @@ func MigrateWith(ctx context.Context, pin Pin, dbURL string, run Runner) error {
 		return fmt.Errorf("the pinned image says %q, %s says %q", got, PinFile, pin.VersionLine())
 	}
 	env := map[string]string{"DATABASE_URL": dbURL}
-	for _, step := range [][]string{{"migrate"}, {"partitions", "ensure", "--days", "7"}, {"head"}} {
+	for _, step := range [][]string{{"migrate"}, {"partitions", "ensure", "--days", "7", "--from", PartitionsFrom}, {"head"}} {
 		out, code, err = run(ctx, pin.Ref, env, step...)
 		if err := stepError(strings.Join(step, " "), out, code, err); err != nil {
 			return err
@@ -199,8 +206,8 @@ func readExit(ctx context.Context, c exited) (string, int, error) {
 	return string(out), state.ExitCode, err
 }
 
-// finish reads the owner URL from the running container, builds the stub and
-// derives the reader URL.
+// finish reads the owner URL from the running container, gives the two
+// roles the image created a password and derives their URLs.
 func (db *DB) finish(ctx context.Context, connString func(context.Context, ...string) (string, error)) error {
 	owner, err := connString(ctx, "sslmode=disable")
 	if err != nil {
@@ -212,43 +219,28 @@ func (db *DB) finish(ctx context.Context, connString func(context.Context, ...st
 	}
 	// rand.Text is base32: safe inside a quoted SQL literal and a URL.
 	readerPassword, accessPassword := rand.Text(), rand.Text()
-	if err := prepare(ctx, owner, readerPassword, accessPassword); err != nil {
+	if err := passwords(ctx, owner, readerPassword, accessPassword); err != nil {
 		return err
 	}
 	db.OwnerURL = owner
-	u.User = url.UserPassword(contract.ReaderRole, readerPassword)
+	u.User = url.UserPassword(dbcontract.ReaderRole, readerPassword)
 	db.ReaderURL = u.String()
-	u.User = url.UserPassword(accessdb.Role, accessPassword)
+	u.User = url.UserPassword(dbcontract.AccessRole, accessPassword)
 	db.AccessURL = u.String()
 	return nil
 }
 
-type step struct {
-	sql  string
-	args []any
-}
-
-func prepare(ctx context.Context, ownerURL, readerPassword, accessPassword string) error {
+// passwords sets the password of each role, as the image's roles step does
+// in production from its secret files.
+func passwords(ctx context.Context, ownerURL, readerPassword, accessPassword string) error {
 	conn, err := pgx.Connect(ctx, ownerURL)
 	if err != nil {
 		return fmt.Errorf("connect as owner: %w", err)
 	}
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
-	steps := []step{
-		{sql: contract.SchemaSQL()},
-		{sql: contract.ReaderRoleSQL()},
-		{sql: fmt.Sprintf("alter role %s password '%s'", contract.ReaderRole, readerPassword)},
-		{sql: "insert into contract.contract_info (contract_version, published_at) values ($1, $2)",
-			args: []any{contract.Version(), time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}},
-		{sql: accessdb.SchemaSQL()},
-		{sql: accessdb.RoleSQL()},
-		{sql: accessdb.LimitsSQL()},
-		{sql: accessdb.ConsoleSQL()},
-		{sql: fmt.Sprintf("alter role %s password '%s'", accessdb.Role, accessPassword)},
-	}
-	for _, st := range steps {
-		if _, err := conn.Exec(ctx, st.sql, st.args...); err != nil {
-			return fmt.Errorf("build contract stub and access store: %w", err)
+	for role, pw := range map[string]string{dbcontract.ReaderRole: readerPassword, dbcontract.AccessRole: accessPassword} {
+		if _, err := conn.Exec(ctx, fmt.Sprintf("alter role %s password '%s'", role, pw)); err != nil {
+			return fmt.Errorf("set the password of %s: %w", role, err)
 		}
 	}
 	return nil

@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/adapters/accessstore"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/health"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/runtime/logging"
@@ -71,7 +71,7 @@ type slowReader struct{ delay time.Duration }
 func (r slowReader) ContractVersion(ctx context.Context) (string, error) {
 	select {
 	case <-time.After(r.delay):
-		return contract.Version(), nil
+		return dbcontract.ContractVersion, nil
 	case <-ctx.Done():
 		return "", ctx.Err()
 	}
@@ -123,14 +123,14 @@ func behaviours() map[string]behaviour {
 			return b.Round(100 * time.Millisecond).String()
 		}},
 		"contract.expected": {"0.7", func(t *testing.T, c *config.Config) string {
-			v, err := health.ExpectedVersion(c.Contract.Expected, contract.Version())
+			v, err := health.ExpectedVersion(c.Contract.Expected, dbcontract.ContractVersion)
 			if err != nil {
 				t.Fatal(err)
 			}
 			return v.String()
 		}},
 		"health.ready_timeout": {"1s", func(t *testing.T, c *config.Config) string {
-			expected, _ := health.ExpectedVersion("", contract.Version())
+			expected, _ := health.ExpectedVersion("", dbcontract.ContractVersion)
 			return fmt.Sprint(health.NewChecker(slowReader{600 * time.Millisecond}, expected, c.Health.ReadyTimeout).Check(context.Background()).Ready)
 		}},
 		"health.probe_timeout": {"100ms", probeVerdict},

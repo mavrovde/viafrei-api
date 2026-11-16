@@ -1,7 +1,10 @@
 // Command fixturegen writes a synthetic fixture set for the read contract
-// (TST-014): seed.sql, which loads into a database built from db/contract, and
-// manifest.json, which records the generator version, seed, profile, counts,
-// edge cases, input licences and the checksum of seed.sql.
+// (TST-014): seed.sql, the rows in the shape of the read contract's views (the
+// canonical set, whose checksum parity bundles name); platform.sql, the same
+// rows translated into the platform's tables the views read, which loads into
+// a database the image database.pin names migrated; and manifest.json, which
+// records the generator version, seed, profile, counts, edge cases, input
+// licences and the checksum of seed.sql.
 //
 //	fixturegen -profile tiny|ci|benchmark -seed N -out DIR
 //	fixturegen -verify FILE
@@ -30,7 +33,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/mavrovde/viafrei-api/db/contract"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
 	"github.com/mavrovde/viafrei-api/internal/invariant"
 )
@@ -119,7 +122,7 @@ func verify(path string, stdout, stderr io.Writer) int {
 			failed++
 			continue
 		}
-		m, err := fixtures.Generate(io.Discard, g.profile, g.seed, contract.Version())
+		m, err := fixtures.Generate(io.Discard, g.profile, g.seed, dbcontract.ContractVersion)
 		switch {
 		case err != nil:
 			fmt.Fprintf(stderr, "fixturegen: %s seed %d: %v\n", g.profile, g.seed, err)
@@ -143,8 +146,16 @@ func write(dir, profile string, seed uint64) (*fixtures.Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	m, err := fixtures.Generate(f, profile, seed, contract.Version())
+	m, err := fixtures.Generate(f, profile, seed, dbcontract.ContractVersion)
 	if err = errors.Join(err, f.Close()); err != nil {
+		return m, err
+	}
+	p, err := os.Create(filepath.Clean(filepath.Join(dir, "platform.sql")))
+	if err != nil {
+		return m, err
+	}
+	_, err = fixtures.Platform(p, profile, seed, dbcontract.ContractVersion)
+	if err = errors.Join(err, p.Close()); err != nil {
 		return m, err
 	}
 	data := invariant.Must(json.MarshalIndent(m, "", "  "))

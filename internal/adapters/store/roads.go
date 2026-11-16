@@ -32,8 +32,8 @@ func (s *Store) Road(ctx context.Context, ref string) (roads.Road, error) {
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]roads.Road, error) {
 		rows, _ := tx.Query(ctx, `
 select road_ref, road_class, length_km::float8, states
-from contract.road
-where upper(replace(road_ref, ' ', '')) = $1
+from contract.road r
+where upper(replace(road_ref, ' ', '')) = $1 and `+permitted("r")+`
 order by road_ref
 limit 1`, ref)
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (roads.Road, error) {
@@ -69,6 +69,7 @@ const situationColumns = `e.event_id, e.source_ref, e.event_kind, e.severity, e.
 // the list's filters keep.
 const scopeFilter = `e.withdrawn_at is null
   and e.source_ref = any($1)
+  and ` + eventPermitted + `
   and e.valid_from <= $2 and (e.valid_to is null or e.valid_to > $2)`
 
 // situationFilter is the condition every list read applies: the scope's,
@@ -78,6 +79,9 @@ const scopeFilter = `e.withdrawn_at is null
 const situationFilter = scopeFilter + `
   and (e.event_kind = any($3) or ($4 and not e.event_kind = any($5)))
   and coalesce(array_position($6::text[], e.severity), 0) >= $7`
+
+// eventPermitted is rowRule over the traffic events aliased e.
+const eventPermitted = `e.display_class <> 'withhold' and (e.audience = 'public' or ` + ownKeyOn + `)`
 
 // canonicalRef is a stored road reference compared in its canonical form,
 // as Road compares it.
@@ -111,6 +115,7 @@ from contract.traffic_event e
 cross join lateral (select e.valid_from, e.valid_to) x
 where e.withdrawn_at is null
   and e.source_ref = any($1)
+  and ` + eventPermitted + `
   and (e.valid_to is null or e.valid_to > $2)`
 
 // storedMessage is one element of messagesSelect, in stored codes.
@@ -135,6 +140,8 @@ const warningsPending = `from contract.weather_warning w
 join contract.admin_region r on r.region_code = w.region_code
 where w.withdrawn_at is null and w.message_status <> 'cancelled'
   and w.source_ref = any($1)
+  and w.display_class <> 'withhold' and (w.audience = 'public' or ` + ownKeyOn + `)
+  and r.display_class <> 'withhold' and (r.audience = 'public' or ` + ownKeyOn + `)
   and (w.valid_to is null or w.valid_to > $2)`
 
 // sourcesSelect reads the freshness of the given families and the newest
@@ -151,6 +158,7 @@ order by s.source_ref`
 const coverageSelect = `select state_code, source_ref, coverage_role, current_only
 from contract.message_coverage
 where state_code = any($1) and source_ref = any($2)
+  and display_class <> 'withhold' and (audience = 'public' or ` + ownKeyOn + `)
 order by state_code, source_ref`
 
 // statesOf aggregates the distinct, known state codes of the junctions a
@@ -353,8 +361,9 @@ func (s *Store) SituationsOnRoad(ctx context.Context, q roads.CorridorQuery, fam
 with parts as (
   select r.road_ref, d.path[1] n, d.geom g, st_length(d.geom::geography) len, r.length_km::float8 km
   from contract.road r, st_dump(r.geometry) d
-  where r.road_ref = (select road_ref from contract.road
-                      where `+fmt.Sprintf(canonicalRef, "road_ref")+` = $8 order by road_ref limit 1)),
+  where `+permitted("r")+`
+    and r.road_ref = (select k.road_ref from contract.road k
+                      where `+fmt.Sprintf(canonicalRef, "k.road_ref")+` = $8 and `+permitted("k")+` order by k.road_ref limit 1)),
 line as (
   select road_ref, max(km) km, sum(len) total,
          st_startpoint((array_agg(g order by n))[1]) first_point,
@@ -397,10 +406,10 @@ limit $11`, args, q.Limit, fams, now, scope{
   and ($4::text = 'both' or e.direction = $4::text or not e.direction = any($5))`,
 		args: []any{fams.Roads, now, q.Road, string(q.Direction), codes(roads.Compass())},
 		warnings: `st_intersects(r.boundary, (select g.geometry from contract.road g
-                                  where ` + fmt.Sprintf(canonicalRef, "g.road_ref") + ` = $3 order by g.road_ref limit 1))`,
+                                  where ` + fmt.Sprintf(canonicalRef, "g.road_ref") + ` = $3 and ` + permitted("g") + ` order by g.road_ref limit 1))`,
 		warningArgs: []any{q.Road},
-		states: statesOf(`select state_code from contract.junction
-where ` + fmt.Sprintf(canonicalRef, "road_ref") + ` = $1`),
+		states: statesOf(`select j.state_code from contract.junction j
+where ` + fmt.Sprintf(canonicalRef, "j.road_ref") + ` = $1 and ` + permitted("j")),
 		stateArgs: []any{q.Road},
 	})
 }
@@ -435,10 +444,10 @@ limit $14`, args, q.Limit, fams, now, scope{
 		warningArgs: []any{q.At.Lat, q.At.Lon, q.RadiusM},
 		states: statesOf(`with here as (select st_setsrid(st_makepoint($2, $1), 4326) g),
 near as (select j.state_code from contract.junction j, here
-         where st_dwithin(j.location::geography, here.g::geography, $3))
+         where st_dwithin(j.location::geography, here.g::geography, $3) and ` + permitted("j") + `)
 select state_code from near
 union all
-select (select j.state_code from contract.junction j, here order by j.location <-> here.g, j.junction_id limit 1)
+select (select j.state_code from contract.junction j, here where ` + permitted("j") + ` order by j.location <-> here.g, j.junction_id limit 1)
 where not exists (select 1 from near)`),
 		stateArgs: []any{q.At.Lat, q.At.Lon, q.RadiusM},
 	})
@@ -452,6 +461,7 @@ func (s *Store) Situation(ctx context.Context, id string, families []string, end
 select `+situationColumns+`, null::float8, null::int
 from contract.traffic_event e
 where e.event_id = $1 and e.withdrawn_at is null and e.source_ref = any($2)
+  and `+eventPermitted+`
   and (e.valid_to is null or e.valid_to > $3)`, id, families, endedSince)
 		return pgx.CollectRows(res, scanSituation)
 	})

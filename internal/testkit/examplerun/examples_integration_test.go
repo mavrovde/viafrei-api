@@ -28,13 +28,13 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/mavrovde/viafrei-api/api"
-	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/app/health"
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
@@ -109,7 +109,7 @@ func load(t *testing.T) (*config.Config, *store.Store) {
 
 func seedFixtures() error {
 	var buf bytes.Buffer
-	if _, err := fixtures.Generate(&buf, profile, seed, contract.Version()); err != nil {
+	if _, err := fixtures.Generate(&buf, profile, seed, dbcontract.ContractVersion); err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -241,12 +241,12 @@ func principal(k *api.Key) auth.Principal {
 func ask(t *testing.T, cfg *config.Config, st *store.Store, e api.Example) (int, []byte) {
 	t.Helper()
 	clock := func() time.Time { return now }
-	expected, err := health.ExpectedVersion(cfg.Contract.Expected, contract.Version())
+	expected, err := health.ExpectedVersion(cfg.Contract.Expected, dbcontract.ContractVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
 	h, err := httpapi.NewHandler(httpapi.Deps{
-		Config: cfg, Build: build, ContractVersion: contract.Version(), Now: clock,
+		Config: cfg, Build: build, ContractVersion: dbcontract.ContractVersion, Now: clock,
 		Readiness: health.NewChecker(st, expected, cfg.Health.ReadyTimeout),
 		Auth:      keyAuth{principal(e.Key)}, Sources: st,
 		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st}, wire.FeatureSettings(cfg), clock),

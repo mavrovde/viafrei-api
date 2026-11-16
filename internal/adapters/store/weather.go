@@ -25,6 +25,8 @@ const warningPlaced = `from contract.weather_warning w
 join contract.admin_region r on r.region_code = w.region_code
 where w.withdrawn_at is null and w.message_status <> 'cancelled'
   and w.source_ref = any($1)
+  and w.display_class <> 'withhold' and (w.audience = 'public' or ` + ownKeyOn + `)
+  and r.display_class <> 'withhold' and (r.audience = 'public' or ` + ownKeyOn + `)
   and (w.valid_to is null or w.valid_to > $2)
   and st_intersects(r.boundary, st_setsrid(st_makepoint($4, $3), 4326))`
 
@@ -146,8 +148,8 @@ select t.topic_code, t.title, t.reviewed_on,
        coalesce(array_agg(s.body order by s.position, s.statement_id) filter (where s.statement_id is not null), '{}'),
        coalesce(array_agg(s.legal_basis order by s.position, s.statement_id) filter (where s.statement_id is not null), '{}')
 from contract.rule_topic t
-left join contract.rule_statement s on s.topic_code = t.topic_code
-where t.topic_code = $1
+left join contract.rule_statement s on s.topic_code = t.topic_code and `+permitted("s")+`
+where t.topic_code = $1 and `+permitted("t")+`
 group by t.topic_code, t.title, t.reviewed_on`, code)
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (rules.Topic, error) {
 			var (

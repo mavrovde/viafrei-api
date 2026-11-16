@@ -13,9 +13,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	accessdb "github.com/mavrovde/viafrei-api/db/access"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
 	"github.com/mavrovde/viafrei-api/internal/app/metering"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/invariant"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
@@ -67,8 +67,8 @@ func (s *Store) CheckSchema(ctx context.Context) error {
 	if err := s.pool.QueryRow(ctx, `select coalesce(max(version), 0) from access.schema_version`).Scan(&v); err != nil {
 		return err
 	}
-	if v != accessdb.Version {
-		return fmt.Errorf("%w: found %d, expected %d", ErrSchema, v, accessdb.Version)
+	if v != dbcontract.AccessSchemaVersion {
+		return fmt.Errorf("%w: found %d, expected %d", ErrSchema, v, dbcontract.AccessSchemaVersion)
 	}
 	return nil
 }

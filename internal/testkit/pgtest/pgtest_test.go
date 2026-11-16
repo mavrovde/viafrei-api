@@ -74,16 +74,25 @@ func TestParsePin(t *testing.T) {
 		p.VersionLine() != "viafrei-database 0.2.0 schema-head 306" || p.Ready() != "READY 306" {
 		t.Fatalf("parsed %+v", p)
 	}
+	if p.Local {
+		t.Fatal("a published release read as local")
+	}
+	l, err := ParsePin("viafrei-database:0.3.0-local\nschema-head 309\n")
+	if err != nil || !l.Local || l.Version != "0.3.0" || l.Ref != "viafrei-database:0.3.0-local" || l.VersionLine() != "viafrei-database 0.3.0 schema-head 309" {
+		t.Fatalf("a local pin: %+v %v", l, err)
+	}
 	digest := "@sha256:" + strings.Repeat("a", 64)
 	for name, c := range map[string]struct{ src, want string }{
-		"one line":           {"ghcr.io/x/y:1.2.3" + digest, "holds 1 lines"},
-		"three lines":        {pinSrc + "schema-head 307\n", "holds 3 lines"},
-		"a tag, no digest":   {"ghcr.io/x/y:1.2.3\nschema-head 1", "is not <image>"},
-		"a moving tag":       {"ghcr.io/x/y:latest" + digest + "\nschema-head 1", "is not <image>"},
-		"a short digest":     {"ghcr.io/x/y:1.2.3@sha256:abc\nschema-head 1", "is not <image>"},
-		"the lines reversed": {"schema-head 1\nghcr.io/x/y:1.2.3" + digest, "is not <image>"},
-		"no head number":     {"ghcr.io/x/y:1.2.3" + digest + "\nschema-head x", "is not 'schema-head N'"},
-		"a zero head":        {"ghcr.io/x/y:1.2.3" + digest + "\nschema-head 0", "is not 'schema-head N'"},
+		"one line":            {"ghcr.io/x/y:1.2.3" + digest, "holds 1 lines"},
+		"three lines":         {pinSrc + "schema-head 307\n", "holds 3 lines"},
+		"a tag, no digest":    {"ghcr.io/x/y:1.2.3\nschema-head 1", "is not <image>"},
+		"a moving tag":        {"ghcr.io/x/y:latest" + digest + "\nschema-head 1", "is not <image>"},
+		"a short digest":      {"ghcr.io/x/y:1.2.3@sha256:abc\nschema-head 1", "is not <image>"},
+		"a local registry":    {"ghcr.io/x/y:1.2.3-local\nschema-head 1", "is not <image>"},
+		"a local, no version": {"viafrei-database:local\nschema-head 1", "is not <image>"},
+		"the lines reversed":  {"schema-head 1\nghcr.io/x/y:1.2.3" + digest, "is not <image>"},
+		"no head number":      {"ghcr.io/x/y:1.2.3" + digest + "\nschema-head x", "is not 'schema-head N'"},
+		"a zero head":         {"ghcr.io/x/y:1.2.3" + digest + "\nschema-head 0", "is not 'schema-head N'"},
 	} {
 		if _, err := ParsePin(c.src); err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%s: %v, want %q", name, err, c.want)
@@ -172,10 +181,10 @@ func TestMigrateWithRefusesEveryWrongAnswer(t *testing.T) {
 		`says "viafrei-database 0.1.1 schema-head 300"`: func(f *fakeRun) {
 			f.answers["version"] = answer{out: "viafrei-database 0.1.1 schema-head 300"}
 		},
-		"migrate exited 1: relation exists":   func(f *fakeRun) { f.answers["migrate"] = answer{out: "applying\nrelation exists\n", code: 1} },
-		"partitions ensure --days 7 exited 2": func(f *fakeRun) { f.answers["partitions"] = answer{code: 2} },
-		"head: no runtime":                    func(f *fakeRun) { f.answers["head"] = answer{err: errors.New("no runtime")} },
-		`head printed "PENDING 305"`:          func(f *fakeRun) { f.answers["head"] = answer{out: "PENDING 305"} },
+		"migrate exited 1: relation exists":                     func(f *fakeRun) { f.answers["migrate"] = answer{out: "applying\nrelation exists\n", code: 1} },
+		"partitions ensure --days 7 --from 2026-03-27 exited 2": func(f *fakeRun) { f.answers["partitions"] = answer{code: 2} },
+		"head: no runtime":           func(f *fakeRun) { f.answers["head"] = answer{err: errors.New("no runtime")} },
+		`head printed "PENDING 305"`: func(f *fakeRun) { f.answers["head"] = answer{out: "PENDING 305"} },
 	} {
 		f := healthyRun()
 		plant(f)

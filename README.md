@@ -97,7 +97,7 @@ make build              # bin/viafrei-api, static, version and commit stamped in
 make test               # unit and handler tests
 make test-integration   # adds tests against a throwaway PostGIS container
 make coverage           # unit + integration + boot profiles, 100 % per package or it fails
-make generate           # regenerate sqlc code, docs/configuration.md, api/openapi.json
+make generate           # regenerate docs/configuration.md, api/openapi.json
 make fixtures PROFILE=ci SEED=7   # synthetic test data, see docs/test-data.md
 ```
 

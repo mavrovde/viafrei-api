@@ -27,7 +27,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/adapters/accessstore"
 	consoleweb "github.com/mavrovde/viafrei-api/internal/adapters/console"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
@@ -40,6 +39,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/app/metering"
 	"github.com/mavrovde/viafrei-api/internal/app/ratelimit"
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/invariant"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/runtime/consolecli"
@@ -96,7 +96,7 @@ func serve(environ []string, stderr io.Writer) int {
 		return config.ExitCode
 	}
 	log := logging.New(cfg.Log, os.Stdout)
-	expected, err := health.ExpectedVersion(cfg.Contract.Expected, contract.Version())
+	expected, err := health.ExpectedVersion(cfg.Contract.Expected, dbcontract.ContractVersion)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return config.ExitCode
@@ -119,7 +119,7 @@ func serve(environ []string, stderr io.Writer) int {
 		Readiness:       health.NewChecker(st, expected, cfg.Health.ReadyTimeout),
 		Logger:          log,
 		Build:           buildinfo.Get(),
-		ContractVersion: contract.Version(),
+		ContractVersion: dbcontract.ContractVersion,
 		Sources:         st,
 		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st},
 			wire.FeatureSettings(cfg), time.Now),

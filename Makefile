@@ -32,13 +32,12 @@ coverage: ## Unit + integration + boot profiles merged, gated at 100 % per packa
 lint: ## golangci-lint with the repository configuration
 	golangci-lint run ./...
 
-generate: ## Regenerate sqlc code, docs/configuration.md and api/openapi.json
-	$(SQLC) generate
+generate: ## Regenerate docs/configuration.md and api/openapi.json
 	$(GO) run ./cmd/viafrei-api config docs > docs/configuration.md
 	$(GO) run ./cmd/viafrei-api openapi > api/openapi.json
 
 check-generated: generate ## Fail when a generated file differs from the committed one
-	git diff --exit-code -- internal/adapters/store/contractdb docs/configuration.md api/openapi.json
+	git diff --exit-code -- docs/configuration.md api/openapi.json
 
 SITE ?= site
 
@@ -52,7 +51,6 @@ docs-a11y: docs ## Check every page of the built portal against WCAG 2.2 AA and 
 docs-examples: ## Run every documented example against the synthetic fixtures; RECORD=1 rewrites api/examples (DX-003)
 	$(GO) test -count=1 -tags integration ./internal/testkit/examplerun $(if $(RECORD),-args -examples.record)
 
-SQLC ?= sqlc
 PROFILE ?= tiny
 SEED    ?= 1
 

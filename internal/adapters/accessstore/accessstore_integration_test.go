@@ -20,11 +20,11 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/adapters/accessstore"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
@@ -61,7 +61,7 @@ func TestMain(m *testing.M) {
 
 func seed(ctx context.Context) error {
 	var buf bytes.Buffer
-	if _, err := fixtures.Generate(&buf, "tiny", 1, contract.Version()); err != nil {
+	if _, err := fixtures.Generate(&buf, "tiny", 1, dbcontract.ContractVersion); err != nil {
 		return err
 	}
 	conn, err := db.Owner(ctx)
@@ -397,7 +397,7 @@ func newStack(t *testing.T, extra ...string) stack {
 	var log bytes.Buffer
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Config: c, Sources: st, Auth: auth.New(wire.AuthSettings(c), as, nil),
-		Logger: logging.New(c.Log, &log), ContractVersion: contract.Version(),
+		Logger: logging.New(c.Log, &log), ContractVersion: dbcontract.ContractVersion,
 	})
 	if err != nil {
 		t.Fatal(err)

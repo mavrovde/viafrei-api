@@ -14,9 +14,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/health"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/testkit/pgtest"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
@@ -128,7 +128,7 @@ func TestWriteThroughStoreRefused(t *testing.T) {
 	var v string
 	if err := st.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
 		return tx.QueryRow(ctx, "select contract_version from contract.contract_info").Scan(&v)
-	}); err != nil || v != contract.Version() {
+	}); err != nil || v != dbcontract.ContractVersion {
 		t.Fatalf("the row must still be there: %q %v", v, err)
 	}
 }
@@ -143,7 +143,7 @@ func TestReaderRoleLimits(t *testing.T) {
 	defer func() { _ = owner.Close(context.WithoutCancel(ctx)) }()
 	var super, inherit bool
 	var limit int
-	if err := owner.QueryRow(ctx, "select rolsuper, rolinherit, rolconnlimit from pg_roles where rolname = $1", contract.ReaderRole).Scan(&super, &inherit, &limit); err != nil {
+	if err := owner.QueryRow(ctx, "select rolsuper, rolinherit, rolconnlimit from pg_roles where rolname = $1", dbcontract.ReaderRole).Scan(&super, &inherit, &limit); err != nil {
 		t.Fatal(err)
 	}
 	// 16 is the largest db.pool_max (db/contract TestRoleLimitCoversPoolMax).
@@ -319,7 +319,7 @@ func TestReadinessAgainstARealDatabase(t *testing.T) {
 	req.Covers(t, "FR-SVC-004")
 	ctx := bounded(t)
 	st := openStore(t, ctx)
-	expected, err := health.ExpectedVersion("", contract.Version())
+	expected, err := health.ExpectedVersion("", dbcontract.ContractVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -348,7 +348,7 @@ func TestUnreachableStorageIsNotReady(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer st.Close()
-	expected, _ := health.ExpectedVersion("", contract.Version())
+	expected, _ := health.ExpectedVersion("", dbcontract.ContractVersion)
 	r := health.NewChecker(st, expected, 300*time.Millisecond).Check(ctx)
 	if r.Ready || r.Checks[health.CheckStorage] != health.Fail {
 		t.Fatalf("unreachable storage reported %v", r.Checks)

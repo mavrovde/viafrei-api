@@ -21,13 +21,13 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/app/health"
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
 	"github.com/mavrovde/viafrei-api/internal/perf"
@@ -107,7 +107,7 @@ func loadFixtures(ctx context.Context) error {
 		}
 	}
 	var buf bytes.Buffer
-	if _, err := fixtures.Generate(&buf, *profile, 1, contract.Version()); err != nil {
+	if _, err := fixtures.Generate(&buf, *profile, 1, dbcontract.ContractVersion); err != nil {
 		return err
 	}
 	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
@@ -308,12 +308,12 @@ func (r *rig) handler(t *testing.T, cached bool) http.Handler {
 	cfg := *r.cfg
 	cfg.Cache.Enabled = cached
 	now := func() time.Time { return r.now }
-	expected, err := health.ExpectedVersion("", contract.Version())
+	expected, err := health.ExpectedVersion("", dbcontract.ContractVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
 	deps := httpapi.Deps{
-		Config: &cfg, Build: buildinfo.Info{Version: "bench", Commit: "bench"}, ContractVersion: contract.Version(), Now: now,
+		Config: &cfg, Build: buildinfo.Info{Version: "bench", Commit: "bench"}, ContractVersion: dbcontract.ContractVersion, Now: now,
 		Readiness: health.NewChecker(r.st, expected, cfg.Health.ReadyTimeout),
 		Auth:      keyAuth{r.key}, Sources: r.st, Versions: r.st,
 		Features: features.New(features.Repositories{Register: r.st, Charging: r.st, Parking: r.st, Places: r.st, Roads: r.st, Weather: r.st, Rules: r.st}, wire.FeatureSettings(&cfg), now),

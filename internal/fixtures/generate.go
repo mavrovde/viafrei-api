@@ -259,7 +259,7 @@ var sourceList = []source{
 	{ref: "delfi_rt_tu", family: "alpha", domain: "transit", platform: true, target: 60},
 	// Lift and escalator states: the one key the platform's state table
 	// takes for a station's equipment.
-	{ref: "openstation_siri_fm", family: "alpha", domain: "transit", target: 900},
+	{ref: "openstation_siri_fm", family: "alpha", domain: "accessibility", target: 900},
 	{ref: "dwd_alpha", family: "alpha", domain: "weather", target: 300},
 	{ref: "dwd_alpha_stale", family: "alpha", domain: "weather", stale: true, target: 300},
 	{ref: "dwd_eta", family: "eta", domain: "weather", target: 300},

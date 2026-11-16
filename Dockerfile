@@ -6,7 +6,8 @@
 # Stages:
 #   build     compiles the static binary on the build platform for the target platform
 #   fixtures  writes a synthetic fixture set (development database only)
-#   devdb     PostGIS with the read-contract stub, the read-only role and the fixtures
+#   devdb     the platform's PostGIS with the read-contract stub, the read-only role
+#             and the fixtures; compose migrates it with the database.pin release
 #   runtime   distroless static, non-root: the image that is published (the default target)
 #
 # Every base image is pinned by digest; Dependabot proposes updates.
@@ -31,9 +32,12 @@ ARG FIXTURE_SEED=1
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     go run ./cmd/fixturegen -profile "${FIXTURE_PROFILE}" -seed "${FIXTURE_SEED}" -out /out/fixtures
 
-# Development database only; never published. The upstream image is
-# single-architecture (linux/amd64).
-FROM postgis/postgis:18-3.6@sha256:4a43e3c3e5d55b9208240fc71db543b79c638766280c625a425bd0a2390989c4 AS devdb
+# Development database only; never published. The platform's image
+# (postgis/postgis:16-3.4), single-architecture (linux/amd64). Its platform
+# schema is not built here: compose's db-migrate applies the viafrei-database
+# release database.pin names. The read contract and the access store are
+# not in that release yet, so the stub below stays until they are.
+FROM postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5 AS devdb
 # The entrypoint runs these in the order of its glob, which the image's
 # locale collates ignoring punctuation ("20a_" before "20_contract"), so each
 # name starts with its own number: the contract, its partitions and indexes,

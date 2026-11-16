@@ -9,6 +9,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/mavrovde/viafrei-api/internal/testkit/pgtest"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
@@ -115,6 +116,7 @@ func TestDockerignoreKeepsSecretsOut(t *testing.T) {
 
 type composeFile struct {
 	Services map[string]struct {
+		Image       string            `yaml:"image"`
 		Ports       []string          `yaml:"ports"`
 		ReadOnly    bool              `yaml:"read_only"`
 		CapDrop     []string          `yaml:"cap_drop"`
@@ -131,10 +133,11 @@ type composeFile struct {
 }
 
 // composeFindings: the database is never published, the API only on a
-// loopback address, both have healthchecks, the API waits for a healthy
-// database, runs read-only without capabilities, and no secret is written
-// into the file (every one is interpolated from .env).
-func composeFindings(src []byte) []string {
+// loopback address, both have healthchecks, the database is migrated by the
+// release database.pin names (pinRef) and the API waits for that to end
+// well and for a healthy database, runs read-only without capabilities, and
+// no secret is written into the file (every one is interpolated from .env).
+func composeFindings(src []byte, pinRef string) []string {
 	var c composeFile
 	if err := yaml.Unmarshal(src, &c); err != nil {
 		return []string{"compose.yaml does not parse: " + err.Error()}
@@ -160,6 +163,12 @@ func composeFindings(src []byte) []string {
 	if api.DependsOn["db"].Condition != "service_healthy" {
 		out = append(out, "the API does not wait for a healthy database")
 	}
+	if c.Services["db-migrate"].Image != pinRef {
+		out = append(out, "db-migrate does not run the release database.pin names, "+pinRef)
+	}
+	if api.DependsOn["db-migrate"].Condition != "service_completed_successfully" {
+		out = append(out, "the API does not wait for the database to be migrated")
+	}
 	if !api.ReadOnly || len(api.CapDrop) != 1 || api.CapDrop[0] != "ALL" {
 		out = append(out, "the API must run read-only with every capability dropped")
 	}
@@ -181,13 +190,26 @@ func composeFindings(src []byte) []string {
 	return out
 }
 
+func readPin(t *testing.T) pgtest.Pin {
+	t.Helper()
+	abs, err := filepath.Abs(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pin, err := pgtest.ReadPin(abs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pin
+}
+
 func TestComposeRules(t *testing.T) {
 	req.Covers(t, "SSC-017", "SSC-019")
 	src, err := os.ReadFile(filepath.Join(root, "compose.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, f := range composeFindings(src) {
+	for _, f := range composeFindings(src, readPin(t).Ref) {
 		t.Error(f)
 	}
 }
@@ -198,21 +220,25 @@ func TestComposeRulesCanSayNo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	pin := readPin(t)
+	unpinned := strings.SplitN(pin.Ref, "@", 2)[0]
 	// Each plant must produce the finding named for it, not just any finding.
 	for want, edit := range map[string][2]string{
-		"database publishes a port":       {"    networks: [backend]\n\n  api:", "    networks: [backend]\n    ports: [\"5432:5432\"]\n\n  api:"},
-		"on the loopback defaults":        {`"${API_PUBLISH:-[::1]:8080}:8080"`, `"8080:8080"`},
-		"its health listener":             {`"${API_HEALTH_PUBLISH:-[::1]:8082}:8082"`, `"8082:8082"`},
-		"does not wait for a healthy":     {"condition: service_healthy", "condition: service_started"},
-		"written into compose.yaml":       {"POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}", "POSTGRES_PASSWORD: hunter2"},
-		"read-only with every capability": {"read_only: true", "read_only: false"},
-		"non-internal network":            {"    internal: true\n", ""},
+		"does not run the release database.pin": {"image: " + pin.Ref, "image: " + unpinned},
+		"wait for the database to be migrated":  {"condition: service_completed_successfully", "condition: service_started"},
+		"database publishes a port":             {"    networks: [backend]\n\n  # The platform's schema", "    networks: [backend]\n    ports: [\"5432:5432\"]\n\n  # The platform's schema"},
+		"on the loopback defaults":              {`"${API_PUBLISH:-[::1]:8080}:8080"`, `"8080:8080"`},
+		"its health listener":                   {`"${API_HEALTH_PUBLISH:-[::1]:8082}:8082"`, `"8082:8082"`},
+		"does not wait for a healthy":           {"      db:\n        condition: service_healthy\n      db-migrate:", "      db:\n        condition: service_started\n      db-migrate:"},
+		"written into compose.yaml":             {"POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}", "POSTGRES_PASSWORD: hunter2"},
+		"read-only with every capability":       {"read_only: true\n    cap_drop: [ALL]\n    security_opt: [\"no-new-privileges:true\"]\n    # Design", "read_only: false\n    cap_drop: [ALL]\n    security_opt: [\"no-new-privileges:true\"]\n    # Design"},
+		"non-internal network":                  {"    internal: true\n", ""},
 	} {
 		bad := strings.Replace(string(good), edit[0], edit[1], 1)
 		if bad == string(good) {
 			t.Fatalf("plant for %q did not change the file", want)
 		}
-		if got := strings.Join(composeFindings([]byte(bad)), "; "); !strings.Contains(got, want) {
+		if got := strings.Join(composeFindings([]byte(bad), pin.Ref), "; "); !strings.Contains(got, want) {
 			t.Errorf("planted %q, the rules said %q", want, got)
 		}
 	}

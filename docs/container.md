@@ -125,7 +125,8 @@ Each release page also lists the digest, the tags, these commands and the SBOM a
 
 `compose.yaml` runs two services:
 
-- **db**: PostgreSQL 18 with PostGIS 3.6, built from the `devdb` stage. On first start it builds the read-contract stub (`db/contract`), creates the read-only role `api_reader`, publishes the contract version and loads a synthetic fixture set (`tiny`, seed 1, set with `FIXTURE_PROFILE` and `FIXTURE_SEED`). It sits on an internal network, publishes no port and keeps its data in the named volume `db-data`.
+- **db**: PostgreSQL 16 with PostGIS 3.4 (`postgis/postgis:16-3.4`, the platform's own), built from the `devdb` stage. On first start it builds the read-contract stub (`db/contract`), creates the read-only role `api_reader`, publishes the contract version and loads a synthetic fixture set (`tiny`, seed 1, set with `FIXTURE_PROFILE` and `FIXTURE_SEED`). It sits on an internal network, publishes no port and keeps its data in the named volume `db16-data`; a volume of an earlier PostgreSQL major is not read (`make reset` removes it).
+- **db-migrate**: the viafrei-database release `database.pin` names, run once per start: it migrates the database to the platform's schema, with the settings it gives each role in this database, makes the daily partitions and must report `READY` at the pinned head before the API starts. A database already at the head is left as it is.
 - **api**: the runtime image. It connects as `api_reader`, runs read-only with every capability dropped, and is published on the IPv6 loopback address only: its public listener on `[::1]:8080`, which admits every caller that reaches it (`VFAPI_CALLERS_ALLOW_CIDR=0.0.0.0/0,::/0`), and its health listener on `[::1]:8082`.
 
 ```sh

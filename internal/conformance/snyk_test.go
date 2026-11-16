@@ -99,7 +99,7 @@ var commitJobCases = []struct {
 }{
 	{"an annotated tag", "v1.2.3", "tag " + tagObject, "commit " + tagCommit, 0, tagCommit},
 	{"a lightweight tag", "v1.2.3", "commit " + tagCommit, "", 0, tagCommit},
-	{"an rc tag", "v1.2.3-rc.1", "tag " + tagObject, "commit " + tagCommit, 0, tagCommit},
+	{"an rc tag", "v1.2.3-rc.1", "tag " + tagObject, "commit " + tagCommit, 1, ""},
 	{"a tag of a tree", "v1.2.3", "tag " + tagObject, "tree " + tagCommit, 1, ""},
 	{"a tag that does not resolve", "v1.2.3", "", "", 1, ""},
 	{"not a release tag", "v1.2", "commit " + tagCommit, "", 1, ""},
@@ -315,7 +315,9 @@ func TestSnykRunsWeeklyAndOncePerRelease(t *testing.T) {
 		"another commit than the one Snyk scanned":                   plant("release.yml", publishBinding, "true || {"),
 		"for an annotated tag":                                       plant("release.yml", deref, "          if false; then read -r type sha"),
 		"for a tag of a tree":                                        plant("release.yml", "          [[ $type == commit ]] || {", "          true || {"),
-		"security.yml runs the Snyk CLI":                             plant("security.yml", "jobs:\n", "jobs:\n  x:\n    runs-on: ubuntu-24.04\n    steps:\n      - run: ./snyk test\n"),
+		"for an rc tag": plant("release.yml", `[[ $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::'$TAG' is not a confirmed release vX.Y.Z; an rc or any other suffix publishes no image"; exit 1; }
+          read -r type sha`, "read -r type sha"),
+		"security.yml runs the Snyk CLI": plant("security.yml", "jobs:\n", "jobs:\n  x:\n    runs-on: ubuntu-24.04\n    steps:\n      - run: ./snyk test\n"),
 	} {
 		t.Run(want, func(t *testing.T) {
 			if got := strings.Join(snykFindings(m), "; "); !strings.Contains(got, want) {

@@ -206,8 +206,7 @@ func TestMaxAgePerDomain(t *testing.T) {
 }
 
 func TestPermissionsSeparateEveryLicenceInput(t *testing.T) {
-	base := access.Record{Environment: "live", Plan: access.Plan{UseClass: "commercial", Sources: []string{"b", "a"}, Scopes: []access.Scope{"energy", "places"}},
-		Accepted: []access.Acceptance{{Source: "s", Version: "1"}}}
+	base := access.Record{Environment: "live", Plan: access.Plan{UseClass: "commercial", Sources: []string{"b", "a"}, Scopes: []access.Scope{"energy", "places"}}}
 	same := base
 	same.Plan.Sources = []string{"a", "b"}
 	same.Plan.Scopes = []access.Scope{"places", "energy"}

@@ -200,9 +200,6 @@ func TestLifecycleAgainstTheStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	since := time.Now().Add(-time.Second)
-	if err := k.Accept(ctx, key.ID, "src-delta-parking", "2026-03-01", "tester"); err != nil {
-		t.Fatal(err)
-	}
 	other := newPlan(t, k, "commercial")
 	if err := k.Move(ctx, key.ID, other, "tester"); err != nil {
 		t.Fatal(err)
@@ -211,8 +208,8 @@ func TestLifecycleAgainstTheStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec, _ = s.Lookup(ctx, key.ID)
-	if rec.RevokedAt == nil || rec.Plan.Name != other || len(rec.Accepted) != 1 || rec.Accepted[0].Version != "2026-03-01" {
-		t.Fatalf("after accept, move and revoke: %+v", rec)
+	if rec.RevokedAt == nil || rec.Plan.Name != other {
+		t.Fatalf("after move and revoke: %+v", rec)
 	}
 	ids, mark, err := s.ChangedSince(ctx, since)
 	if err != nil || !slices.Contains(ids, key.ID) || mark.Before(since) {
@@ -302,15 +299,6 @@ func TestStoreRefusals(t *testing.T) {
 		{"rotate bad mac", func(ctx context.Context, now time.Time) error {
 			return s.Rotate(ctx, auth.Change{Action: "rotate", KeyID: key.ID, Actor: "t", At: now}, []byte("short"), now)
 		}, code(checkFailed)},
-		{"accept bad id", func(ctx context.Context, now time.Time) error {
-			return s.Accept(ctx, auth.Change{Action: "accept_terms", KeyID: bad, Actor: "t", At: now}, access.Acceptance{Source: "x", Version: "1"})
-		}, code(invalidText)},
-		{"accept unknown", func(ctx context.Context, now time.Time) error {
-			return s.Accept(ctx, auth.Change{Action: "accept_terms", KeyID: "nosuchkey0", Actor: "t", At: now}, access.Acceptance{Source: "x", Version: "1"})
-		}, is(accessstore.ErrNotFound)},
-		{"accept bad source", func(ctx context.Context, now time.Time) error {
-			return s.Accept(ctx, auth.Change{Action: "accept_terms", KeyID: key.ID, Actor: "t", At: now}, access.Acceptance{Source: bad, Version: "1"})
-		}, code(invalidText)},
 		{"audit bad action", func(ctx context.Context, now time.Time) error {
 			return s.Revoke(ctx, auth.Change{Action: "bogus", KeyID: key.ID, Actor: "t", Reason: "r", At: now})
 		}, code(checkFailed)},
@@ -449,25 +437,15 @@ func TestGateRestrictedPurposeFamilyEndToEnd(t *testing.T) {
 	}
 }
 
-func TestGateTermsFamilyEndToEnd(t *testing.T) {
+// TestGateTermsFamilyIsNeverAKeysOwn: no acceptance is stored with a key,
+// so a family whose terms need accepting is never among a key's own
+// families, however the key was issued (owner 2026-11-16).
+func TestGateTermsFamilyIsNeverAKeysOwn(t *testing.T) {
 	req.Covers(t, "SEC-030", "SEC-034")
 	s := newStack(t)
 	key := s.issue(t, "commercial", allFamilies...)
 	if slices.Contains(s.families(t, key.Full), "src-delta-parking") {
-		t.Fatal("served before acceptance")
-	}
-	if err := s.keys.Accept(bounded(t), key.ID, "src-delta-parking", "2025-12-31", "tester"); err != nil {
-		t.Fatal(err)
-	}
-	fresh := newStack(t) // a new instance, no cached copy of the key
-	if slices.Contains(fresh.families(t, key.Full), "src-delta-parking") {
-		t.Fatal("served after accepting an older terms version")
-	}
-	if err := s.keys.Accept(bounded(t), key.ID, "src-delta-parking", "2026-03-01", "tester"); err != nil {
-		t.Fatal(err)
-	}
-	if !slices.Contains(newStack(t).families(t, key.Full), "src-delta-parking") {
-		t.Fatal("withheld after accepting the current terms")
+		t.Fatal("a family whose terms need accepting is served as the key's own")
 	}
 }
 

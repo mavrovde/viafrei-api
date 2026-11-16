@@ -1,7 +1,7 @@
 {
   "title": "Two parking sites within 50 km, with terms accepted",
-  "request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=50000\u0026limit=2",
-  "attribution": "Parking sites and their occupancy come from the source families of the parking domain the key is entitled to; a family whose terms need accepting answers only after the key has accepted them. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=50000\u0026limit=2\u0026accept_terms=delta-terms-1",
+  "attribution": "Parking sites and their occupancy come from the source families of the parking domain the key is entitled to; a family whose terms need accepting answers only to a request that accepts them (accept_terms), which the caller passes after its end user has accepted their text. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
   "key": {
     "useClass": "commercial",
     "scopes": [
@@ -11,12 +11,6 @@
       "src-alpha-parking",
       "src-beta-parking",
       "src-delta-parking"
-    ],
-    "accepted": [
-      {
-        "source": "src-delta-parking",
-        "version": "2026-03-01"
-      }
     ]
   },
   "status": 200,

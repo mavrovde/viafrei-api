@@ -76,8 +76,6 @@ func (s *Store) CheckSchema(ctx context.Context) error {
 const lookupSQL = `
 select k.key_id, k.environment, k.mac, k.previous_mac, coalesce(k.previous_until, 'epoch'), k.expires_at, k.revoked_at,
        p.plan_name, p.use_class, p.tier, p.scopes, p.sources, p.rate_per_second, p.burst, p.quota_day, p.quota_month,
-       coalesce((select array_agg(a.source_family order by a.source_family, a.terms_version) from access.terms_acceptance a where a.key_id = k.key_id), '{}'),
-       coalesce((select array_agg(a.terms_version order by a.source_family, a.terms_version) from access.terms_acceptance a where a.key_id = k.key_id), '{}'),
        k.audience
 from access.api_key k join access.plan p using (plan_name)
 where k.key_id = $1`
@@ -85,13 +83,13 @@ where k.key_id = $1`
 // Lookup implements auth.Store.
 func (s *Store) Lookup(ctx context.Context, id string) (access.Record, error) {
 	var (
-		r                   access.Record
-		env, useClass, aud  string
-		scopes, fams, terms []string
+		r                  access.Record
+		env, useClass, aud string
+		scopes             []string
 	)
 	err := s.pool.QueryRow(ctx, lookupSQL, id).Scan(&r.ID, &env, &r.MAC, &r.PreviousMAC, &r.PreviousUntil, &r.ExpiresAt, &r.RevokedAt,
 		&r.Plan.Name, &useClass, &r.Plan.Tier, &scopes, &r.Plan.Sources,
-		&r.Plan.Rate, &r.Plan.Burst, &r.Plan.QuotaDay, &r.Plan.QuotaMonth, &fams, &terms, &aud)
+		&r.Plan.Rate, &r.Plan.Burst, &r.Plan.QuotaDay, &r.Plan.QuotaMonth, &aud)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return access.Record{}, auth.ErrUnknown
 	}
@@ -101,9 +99,6 @@ func (s *Store) Lookup(ctx context.Context, id string) (access.Record, error) {
 	r.Environment, r.Plan.UseClass, r.Audience = access.Environment(env), access.UseClass(useClass), access.Audience(aud)
 	for _, sc := range scopes {
 		r.Plan.Scopes = append(r.Plan.Scopes, access.Scope(sc))
-	}
-	for i := range fams {
-		r.Accepted = append(r.Accepted, access.Acceptance{Source: fams[i], Version: terms[i]})
 	}
 	return r, nil
 }
@@ -225,24 +220,6 @@ where key_id = $1 and revoked_at is null`, c.KeyID, c.At, c.Reason)
 			return err
 		}
 		return affected(tag.RowsAffected())
-	})
-}
-
-// Accept implements auth.Ledger. The key's change instant moves too, so every
-// instance drops its cached copy (SEC-034).
-func (s *Store) Accept(ctx context.Context, c auth.Change, a access.Acceptance) error {
-	return s.write(ctx, c, nil, nil, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, `update access.api_key set changed_at = $2 where key_id = $1`, c.KeyID, c.At)
-		if err != nil {
-			return err
-		}
-		if err := affected(tag.RowsAffected()); err != nil {
-			return err
-		}
-		_, err = tx.Exec(ctx, `
-insert into access.terms_acceptance (key_id, source_family, terms_version, accepted_at) values ($1, $2, $3, $4)
-on conflict do nothing`, c.KeyID, a.Source, a.Version, c.At)
-		return err
 	})
 }
 

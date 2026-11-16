@@ -80,13 +80,17 @@ type Case struct {
 
 // Key is the caller the question is asked as.
 type Key struct {
-	UseClass string       `json:"useClass"`
-	Scopes   []string     `json:"scopes"`
-	Sources  []string     `json:"sources"`
+	UseClass string   `json:"useClass"`
+	Scopes   []string `json:"scopes"`
+	Sources  []string `json:"sources"`
+	// Accepted is the acceptance a recorded bundle states with its key. It is
+	// decoded so that pinned bundles still read, and never applied to a key:
+	// terms are accepted per request (accept_terms), never by a key.
 	Accepted []Acceptance `json:"accepted"`
 }
 
-// Acceptance is one accepted version of a family's terms.
+// Acceptance is one accepted version of a family's terms, as a recorded
+// bundle states it.
 type Acceptance struct {
 	Source  string `json:"source"`
 	Version string `json:"version"`

@@ -40,19 +40,13 @@ type Example struct {
 	Response json.RawMessage `json:"response"`
 }
 
-// Key describes the fictional key of an example: its plan and the terms it
-// has accepted.
+// Key describes the fictional key of an example: its plan. Terms are
+// accepted per request (accept_terms in the example's request), never by a
+// key.
 type Key struct {
-	UseClass string       `json:"useClass"`
-	Scopes   []string     `json:"scopes"`
-	Sources  []string     `json:"sources"`
-	Accepted []Acceptance `json:"accepted,omitempty"`
-}
-
-// Acceptance is one accepted terms version.
-type Acceptance struct {
-	Source  string `json:"source"`
-	Version string `json:"version"`
+	UseClass string   `json:"useClass"`
+	Scopes   []string `json:"scopes"`
+	Sources  []string `json:"sources"`
 }
 
 // ReadExamples reads every examples/*.json of fsys, keyed by operation id

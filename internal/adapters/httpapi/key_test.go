@@ -229,12 +229,11 @@ func TestRestrictedPurposeFamilyNeverReachesACommercialKey(t *testing.T) {
 
 // TestTermsFamilyIsNeverAKeysOwn: terms are accepted per request, never
 // stored with a key (owner 2026-11-16), so the key answer never lists a
-// family whose terms need accepting as one the key reads, whatever the key
-// record holds, and the parameter is ignored there.
+// family whose terms need accepting as one the key reads, and the parameter
+// is ignored there.
 func TestTermsFamilyIsNeverAKeysOwn(t *testing.T) {
 	req.Covers(t, "SEC-030", "SEC-034")
 	p := principal("commercial")
-	p.Key.Accepted = []access.Acceptance{{Source: "src-delta-parking", Version: "2026-03-01"}}
 	h := keyedHandler(t, config.Defaults(), &fakeAuth{p: p}, &fakeSources{register: fixtureRegister}, nil)
 	if got := families(t, h); slices.Contains(got, "src-delta-parking") || len(got) == 0 {
 		t.Errorf("served %v", got)

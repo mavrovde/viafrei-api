@@ -23,7 +23,6 @@ type fakeLedger struct {
 	issued  []access.Record
 	rotated []time.Time
 	moved   []string
-	accepts []access.Acceptance
 	before  []time.Time
 	kept    []int
 	err     error
@@ -53,11 +52,6 @@ func (l *fakeLedger) Revoke(_ context.Context, c auth.Change) error { return l.n
 
 func (l *fakeLedger) Move(_ context.Context, c auth.Change, plan string) error {
 	l.moved = append(l.moved, plan)
-	return l.note(c)
-}
-
-func (l *fakeLedger) Accept(_ context.Context, c auth.Change, a access.Acceptance) error {
-	l.accepts = append(l.accepts, a)
 	return l.note(c)
 }
 
@@ -235,13 +229,10 @@ func TestLifecycleValidatesAndAudits(t *testing.T) {
 	if err := k.Move(ctx, "abcdefghij", "pro", "o"); err != nil || l.moved[0] != "pro" {
 		t.Fatal(err)
 	}
-	if err := k.Accept(ctx, "abcdefghij", "delta", "2026-03-01", "o"); err != nil || l.accepts[0] != (access.Acceptance{Source: "delta", Version: "2026-03-01"}) {
-		t.Fatal(err)
-	}
 	if n, err := k.Prune(ctx, "o"); err != nil || n != 3 || !l.before[0].Equal(t0.Add(-395*24*time.Hour)) {
 		t.Fatalf("prune %d %v %v", n, err, l.before)
 	}
-	want := []string{auth.ActionPlan, auth.ActionRevoke, auth.ActionMove, auth.ActionAccept, auth.ActionPruned}
+	want := []string{auth.ActionPlan, auth.ActionRevoke, auth.ActionMove, auth.ActionPruned}
 	for i, c := range l.changes {
 		if c.Action != want[i] || c.Actor != "o" {
 			t.Errorf("change %d: %+v", i, c)
@@ -269,7 +260,6 @@ func TestLifecycleValidatesAndAudits(t *testing.T) {
 		{"usage no window", func() error { _, err := k.Usage(ctx, "", 0); return err }()},
 		{"revoke no reason", k.Revoke(ctx, "abcdefghij", "", "o")},
 		{"move no plan", k.Move(ctx, "abcdefghij", "", "o")},
-		{"accept no version", k.Accept(ctx, "abcdefghij", "delta", "", "o")},
 		{"prune no actor", func() error { _, err := k.Prune(ctx, ""); return err }()},
 	}
 	for _, b := range bad {

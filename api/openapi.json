@@ -4796,15 +4796,15 @@
         "tags": [
           "parking"
         ],
-        "x-attribution": "Parking sites and their occupancy come from the source families of the parking domain the key is entitled to; a family whose terms need accepting answers only after the key has accepted them. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-attribution": "Parking sites and their occupancy come from the source families of the parking domain the key is entitled to; a family whose terms need accepting answers only to a request that accepts them (accept_terms), which the caller passes after its end user has accepted their text. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
         "x-codeSamples": [
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/parking-options?at=50.39,10.23\u0026radius_m=50000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/parking-options?at=50.39,10.23\u0026radius_m=50000\u0026limit=2\u0026accept_terms=delta-terms-1\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=50000\u0026limit=2",
+        "x-example-request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=50000\u0026limit=2\u0026accept_terms=delta-terms-1",
         "x-mcp-counterpart": "parking search",
         "x-required-scope": "parking"
       }

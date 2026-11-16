@@ -138,10 +138,6 @@ func (l *lifecycle) Move(_ context.Context, id, plan, actor string) error {
 	return l.record("move " + id + " " + plan + " " + actor)
 }
 
-func (l *lifecycle) Accept(_ context.Context, id, family, version, actor string) error {
-	return l.record("accept " + id + " " + family + " " + version + " " + actor)
-}
-
 func (l *lifecycle) Prune(_ context.Context, actor string) (int64, error) {
 	return 3, l.record("prune " + actor)
 }
@@ -478,7 +474,6 @@ func TestEnrolSignInAndRunEveryChange(t *testing.T) {
 		{"rotate", []string{"id", "keyid00001"}, "rotate keyid00001 console:alice", "Key rotated"},
 		{"revoke", []string{"id", "keyid00001", "reason", "lost laptop"}, "revoke keyid00001 lost laptop console:alice", "Key keyid00001 revoked."},
 		{"move", []string{"id", "keyid00001", "plan", "pro"}, "move keyid00001 pro console:alice", "moved to pro"},
-		{"accept", []string{"id", "keyid00001", "source", "fam", "version", "v1"}, "accept keyid00001 fam v1 console:alice", "Acceptance recorded."},
 		{"prune", nil, "prune_usage console:alice", "3 audit records and 4 usage records removed."},
 	} {
 		id := r.ask(cookie, csrf, tc.action, tc.kv...)

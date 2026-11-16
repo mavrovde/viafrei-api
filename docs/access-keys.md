@@ -33,7 +33,7 @@ licence gate lets it receive, with their attribution. During the last
 
 ## Storage
 
-Keys, plans, terms acceptances and audit records live in the API's own
+Keys, plans and audit records live in the API's own
 access store, schema `access` ([`db/access`](../db/access)). A key is stored
 as HMAC-SHA-256 of its secret under `auth.pepper`, which is held outside the
 store. The full key is printed once, at issue or rotation, and is not
@@ -118,7 +118,6 @@ viafrei-api keys issue  -plan site -label "ViaFrei web" -contact ops@example.tes
 viafrei-api keys rotate -id <keyId> -actor ops          # the old secret stays valid for auth.rotation_overlap
 viafrei-api keys revoke -id <keyId> -reason "leaked" -actor ops
 viafrei-api keys move   -id <keyId> -plan pro -actor ops
-viafrei-api keys accept -id <keyId> -source src-b -version 2026-03-01 -actor ops
 viafrei-api keys prune  -actor ops                      # audit records past audit.retention_days, usage past metering.retention_days
 viafrei-api keys usage  -id <keyId> -hours 24           # usage per hour and operation; without -id, every key
 ```
@@ -127,7 +126,7 @@ A key expires after `auth.default_expiry` unless `-expires` is given (at
 most 1 095 days). A key is for the public unless `-audience own` issues it
 for ViaFrei's own callers (its web and MCP), which may read the families
 and rows the licence envelope keeps for them; any other audience is
-refused. A revocation, a plan move, a plan change or an acceptance
+refused. A revocation, a plan move or a plan change
 reaches every running instance within `auth.revocation_propagation`, and at
 the latest after `auth.key_cache_ttl`.
 
@@ -187,8 +186,8 @@ same way, under the owner's existing user handle.
 The console shows the keys, plans and passkeys and the newest
 `admin.audit_page` audit records, and offers every change of the key tool:
 create or change a plan, issue (the key is shown once, on the page that
-answers the issue), rotate (likewise), revoke with a reason, move, record a
-terms acceptance, prune. Each change is asked for, shown on a confirmation
+answers the issue), rotate (likewise), revoke with a reason, move, prune.
+Each change is asked for, shown on a confirmation
 page, and made only when confirmed. It runs the same use cases as
 `viafrei-api keys`, audited in the same transaction, with `console:<owner>`
 as the actor. Enrolments, added and removed passkeys and sign-ins are

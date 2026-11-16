@@ -230,9 +230,6 @@ func principal(k *api.Key) auth.Principal {
 		for _, s := range k.Scopes {
 			rec.Plan.Scopes = append(rec.Plan.Scopes, access.Scope(s))
 		}
-		for _, a := range k.Accepted {
-			rec.Accepted = append(rec.Accepted, access.Acceptance{Source: a.Source, Version: a.Version})
-		}
 	}
 	return auth.Principal{Key: rec}
 }

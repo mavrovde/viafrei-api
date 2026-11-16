@@ -141,9 +141,6 @@ func principal(c parity.Case) auth.Principal {
 	for _, s := range c.Key.Scopes {
 		k.Plan.Scopes = append(k.Plan.Scopes, access.Scope(s))
 	}
-	for _, a := range c.Key.Accepted {
-		k.Accepted = append(k.Accepted, access.Acceptance{Source: a.Source, Version: a.Version})
-	}
 	return auth.Principal{Key: k}
 }
 

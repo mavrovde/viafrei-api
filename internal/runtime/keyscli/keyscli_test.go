@@ -41,7 +41,6 @@ func (l *ledger) Issue(_ context.Context, _ auth.Change, r access.Record, _, _ s
 func (l *ledger) Rotate(context.Context, auth.Change, []byte, time.Time) error      { return l.err }
 func (l *ledger) Revoke(context.Context, auth.Change) error                         { return l.err }
 func (l *ledger) Move(context.Context, auth.Change, string) error                   { return l.err }
-func (l *ledger) Accept(context.Context, auth.Change, access.Acceptance) error      { return l.err }
 func (l *ledger) PruneAudit(context.Context, auth.Change, time.Time) (int64, error) { return 7, l.err }
 func (l *ledger) PruneUsage(context.Context, auth.Change, int) (int64, error)       { return 4, l.err }
 func (l *ledger) Usage(_ context.Context, id string, since time.Time) ([]metering.Row, error) {
@@ -89,7 +88,6 @@ func TestCommands(t *testing.T) {
 		{[]string{"rotate", "-id", "abcdefghij", "-actor", "o"}, 0, "vf_live_abcdefghij_"},
 		{[]string{"revoke", "-id", "abcdefghij", "-reason", "leaked", "-actor", "o"}, 0, "revoke done"},
 		{[]string{"move", "-id", "abcdefghij", "-plan", "dev", "-actor", "o"}, 0, "move done"},
-		{[]string{"accept", "-id", "abcdefghij", "-source", "delta", "-version", "v1", "-actor", "o"}, 0, "accept done"},
 		{[]string{"prune", "-actor", "o"}, 0, "7 audit records removed\n4 usage records removed"},
 	}
 	for _, c := range cases {

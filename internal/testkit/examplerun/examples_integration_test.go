@@ -354,14 +354,14 @@ func TestADriftedExampleFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e, ok := examples["getHealth"]
+	e, ok := examples["getMeta"]
 	if !ok {
-		t.Fatal("no getHealth example")
+		t.Fatal("no getMeta example")
 	}
 	cfg, st := load(t)
 	_, body := ask(t, cfg, st, e)
 	if !equalJSON(body, e.Response) {
-		t.Fatalf("the committed getHealth example already differs: %s", body)
+		t.Fatalf("the committed getMeta example already differs: %s", body)
 	}
 	if equalJSON(body, []byte(`{"status":"degraded"}`)) || equalJSON(body, []byte(`not json`)) {
 		t.Fatal("a changed body compared equal")

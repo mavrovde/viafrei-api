@@ -28,7 +28,7 @@ func TestPanicThroughTheRouterCarriesTheRequest(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Server.PublicBaseURL = "https://api.example.test"
 	var logs bytes.Buffer
-	h, err := httpapi.NewHandler(httpapi.Deps{
+	h, err := httpapi.NewHealthHandler(httpapi.Deps{
 		Config:    cfg,
 		Readiness: panickingReadiness{},
 		Logger:    slog.New(slog.NewJSONHandler(&logs, nil)),

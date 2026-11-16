@@ -53,7 +53,7 @@ func TestScopeIsEnforcedPerOperation(t *testing.T) {
 		{[]access.Scope{"energy", "roads"}, http.StatusOK},
 	} {
 		a := &stubAuth{p: auth.Principal{Key: access.Record{Plan: access.Plan{Name: "pro", Scopes: c.scopes}}}}
-		h, doc, err := build(Deps{Config: config.Defaults(), Auth: a}, []operation{scoped})
+		h, doc, err := build(Deps{Config: config.Defaults(), Auth: a}, []operation{scoped}, onPublic)
 		if err != nil {
 			t.Fatal(err)
 		}

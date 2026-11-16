@@ -312,16 +312,27 @@ func (r *rig) handler(t *testing.T, cached bool) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := httpapi.NewHandler(httpapi.Deps{
+	deps := httpapi.Deps{
 		Config: &cfg, Build: buildinfo.Info{Version: "bench", Commit: "bench"}, ContractVersion: contract.Version(), Now: now,
 		Readiness: health.NewChecker(r.st, expected, cfg.Health.ReadyTimeout),
 		Auth:      keyAuth{r.key}, Sources: r.st, Versions: r.st,
 		Features: features.New(features.Repositories{Register: r.st, Charging: r.st, Parking: r.st, Places: r.st, Roads: r.st, Weather: r.st, Rules: r.st}, wire.FeatureSettings(&cfg), now),
-	})
+	}
+	h, err := httpapi.NewHandler(deps)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return h
+	// Liveness and readiness are the health listener's (#92); every other
+	// operation is the public one's, measured without the allow-list.
+	hh, err := httpapi.NewHealthHandler(deps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	mux.Handle("/healthz", hh)
+	mux.Handle("/readyz", hh)
+	mux.Handle("/", h)
+	return mux
 }
 
 // targetsOf are the requests one operation is measured with.

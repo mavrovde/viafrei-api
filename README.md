@@ -106,12 +106,15 @@ The service reads its configuration from environment variables with the prefix `
 ```sh
 export VFAPI_DB_URL_FILE=/run/secrets/db_url   # or VFAPI_DB_URL=postgres://...
 bin/viafrei-api config check                    # validate and exit
-bin/viafrei-api                                 # serve on localhost:8080
-curl -s localhost:8080/healthz                  # {"status":"ok"}
+VFAPI_CALLERS_ALLOW_CIDR=127.0.0.0/8,::1/128 \
+  bin/viafrei-api                               # serve on localhost:8080, health on localhost:8082
+curl -s localhost:8082/healthz                  # {"status":"ok"}, on the health listener
 curl -s localhost:8080/v1/meta                  # API, build, read-contract and platform versions
 ```
 
-Other subcommands: `healthcheck` (exit 0 when `/healthz` answers, for container healthchecks), `meta-check` (compare the running service's versions with the expected platform and read-contract versions, [releasing](docs/RELEASING.md#version-sync-with-the-platform)), `config show` (effective values, secrets hidden), `config docs`, `openapi`, `keys` (the operator's key tool, [docs/access-keys.md](docs/access-keys.md)), `version`.
+The public listener answers only the callers of `VFAPI_CALLERS_ALLOW_CIDR` and refuses every other one with `403`; empty, the default, refuses everyone. Liveness and readiness are served on the health listener alone ([docs/container.md](docs/container.md#private-preview)).
+
+Other subcommands: `healthcheck` (exit 0 when `/healthz` on the health listener answers, for container healthchecks), `meta-check` (compare the running service's versions with the expected platform and read-contract versions, [releasing](docs/RELEASING.md#version-sync-with-the-platform)), `config show` (effective values, secrets hidden), `config docs`, `openapi`, `keys` (the operator's key tool, [docs/access-keys.md](docs/access-keys.md)), `version`.
 
 The database the service reads is described by a versioned read contract in [`db/contract/`](db/contract): logical names only, created with a read-only role. Tests build it in a throwaway container. They never reach a live data source or production.
 

@@ -148,8 +148,11 @@ func composeFindings(src []byte) []string {
 	if len(db.Ports) > 0 {
 		out = append(out, "the database publishes a port")
 	}
-	if len(api.Ports) != 1 || !regexp.MustCompile(`^\$\{API_PUBLISH:-\[::1\]:8080\}:8080$`).MatchString(api.Ports[0]) {
-		out = append(out, "the API must be published once, on the loopback default: "+strings.Join(api.Ports, ", "))
+	// The public listener and the health listener (#92), each once, each on
+	// the loopback default.
+	if len(api.Ports) != 2 || !regexp.MustCompile(`^\$\{API_PUBLISH:-\[::1\]:8080\}:8080$`).MatchString(api.Ports[0]) ||
+		!regexp.MustCompile(`^\$\{API_HEALTH_PUBLISH:-\[::1\]:8082\}:8082$`).MatchString(api.Ports[1]) {
+		out = append(out, "the API must be published on the loopback defaults, its public listener then its health listener: "+strings.Join(api.Ports, ", "))
 	}
 	if db.Healthcheck == nil || api.Healthcheck == nil {
 		out = append(out, "a service has no healthcheck")
@@ -198,7 +201,8 @@ func TestComposeRulesCanSayNo(t *testing.T) {
 	// Each plant must produce the finding named for it, not just any finding.
 	for want, edit := range map[string][2]string{
 		"database publishes a port":       {"    networks: [backend]\n\n  api:", "    networks: [backend]\n    ports: [\"5432:5432\"]\n\n  api:"},
-		"on the loopback default":         {`"${API_PUBLISH:-[::1]:8080}:8080"`, `"8080:8080"`},
+		"on the loopback defaults":        {`"${API_PUBLISH:-[::1]:8080}:8080"`, `"8080:8080"`},
+		"its health listener":             {`"${API_HEALTH_PUBLISH:-[::1]:8082}:8082"`, `"8082:8082"`},
 		"does not wait for a healthy":     {"condition: service_healthy", "condition: service_started"},
 		"written into compose.yaml":       {"POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}", "POSTGRES_PASSWORD: hunter2"},
 		"read-only with every capability": {"read_only: true", "read_only: false"},

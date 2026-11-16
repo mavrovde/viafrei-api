@@ -58,8 +58,12 @@ LABEL org.opencontainers.image.title="viafrei-api" \
       org.opencontainers.image.revision="${COMMIT}"
 COPY --from=build /out/app /app
 USER nonroot:nonroot
-ENV VFAPI_SERVER_LISTEN_ADDR=:8080
-EXPOSE 8080
+# The public listener, behind the caller allow-list (callers.allow_cidr,
+# empty by default: every caller is refused until it is set), and the health
+# listener (liveness, readiness, metadata), which the edge never routes.
+ENV VFAPI_SERVER_LISTEN_ADDR=:8080 \
+    VFAPI_HEALTH_LISTEN_ADDR=:8082
+EXPOSE 8080 8082
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 CMD ["/app", "healthcheck"]
 ENTRYPOINT ["/app"]
 CMD ["serve"]

@@ -134,6 +134,29 @@ func behaviours() map[string]behaviour {
 			return fmt.Sprint(health.NewChecker(slowReader{600 * time.Millisecond}, expected, c.Health.ReadyTimeout).Check(context.Background()).Ready)
 		}},
 		"health.probe_timeout": {"100ms", probeVerdict},
+		"health.listen_addr": {"localhost:9098", func(t *testing.T, c *config.Config) string {
+			s, err := httpapi.NewHealthServer(httpapi.Deps{Config: c})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return s.Addr
+		}},
+		"callers.allow_cidr": {"127.0.0.0/8", func(t *testing.T, c *config.Config) string {
+			return callerVerdict(t, c, "127.0.0.1:4000", "")
+		}},
+		// The pair is set together (a cross-field rule), so each key's
+		// proof holds the other at a value and varies only itself: an edge
+		// at 10.0.0.1 names an admitted caller in X-Real-IP.
+		"callers.trusted_proxy_header": {"X-Real-IP", func(t *testing.T, c *config.Config) string {
+			k := *c
+			k.Callers.AllowCIDR, k.Callers.TrustedProxyCIDR = []string{"127.0.0.0/8"}, []string{"10.0.0.0/8"}
+			return callerVerdict(t, &k, "10.0.0.1:4000", "127.0.0.1")
+		}},
+		"callers.trusted_proxy_cidr": {"10.0.0.0/8", func(t *testing.T, c *config.Config) string {
+			k := *c
+			k.Callers.AllowCIDR, k.Callers.TrustedProxyHeader = []string{"127.0.0.0/8"}, "X-Real-IP"
+			return callerVerdict(t, &k, "10.0.0.1:4000", "127.0.0.1")
+		}},
 		"log.level": {"debug", func(t *testing.T, c *config.Config) string {
 			var buf bytes.Buffer
 			logging.New(c.Log, &buf).Debug("probe")
@@ -238,8 +261,26 @@ func probeVerdict(t *testing.T, c *config.Config) string {
 	defer slow.Close()
 	_, port, _ := net.SplitHostPort(slow.Listener.Addr().String())
 	probe := *c
-	probe.Server.ListenAddr = "localhost:" + port
+	probe.Health.ListenAddr = "localhost:" + port
 	return fmt.Sprint(httpapi.Probe(context.Background(), &probe) == nil)
+}
+
+// callerVerdict is the public listener's status for /v1/meta from peer, with
+// X-Real-IP set to realIP when it is not empty.
+func callerVerdict(t *testing.T, c *config.Config, peer, realIP string) string {
+	t.Helper()
+	h, err := httpapi.NewPublicHandler(httpapi.Deps{Config: c, ContractVersion: "0.1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/meta", nil)
+	r.RemoteAddr = peer
+	if realIP != "" {
+		r.Header.Set("X-Real-IP", realIP)
+	}
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	return fmt.Sprint(w.Code)
 }
 
 func TestEveryKeyChangesBehaviour(t *testing.T) {
@@ -274,6 +315,12 @@ func TestEveryKeyChangesBehaviour(t *testing.T) {
 			}
 			if f.Key == "admin.enabled" { // the console needs an access store
 				env = append(env, "VFAPI_ACCESS_URL=postgres://access:pw@db.invalid:6002/x", "VFAPI_AUTH_PEPPER="+strings.Repeat("e", 32))
+			}
+			if f.Key == "callers.trusted_proxy_header" { // set together with its ranges
+				env = append(env, "VFAPI_CALLERS_TRUSTED_PROXY_CIDR=10.0.0.0/8")
+			}
+			if f.Key == "callers.trusted_proxy_cidr" { // set together with its header
+				env = append(env, "VFAPI_CALLERS_TRUSTED_PROXY_HEADER=X-Real-IP")
 			}
 			if f.Key == "admin.rp_id" { // the id must cover the origin's host
 				env = append(env, "VFAPI_ADMIN_ORIGIN=https://console.example.test")

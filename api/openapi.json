@@ -631,22 +631,6 @@
         ],
         "type": "object"
       },
-      "HealthBody": {
-        "additionalProperties": false,
-        "properties": {
-          "status": {
-            "description": "Always ok when the process answers.",
-            "enum": [
-              "ok"
-            ],
-            "type": "string"
-          }
-        },
-        "required": [
-          "status"
-        ],
-        "type": "object"
-      },
       "KeyData": {
         "additionalProperties": false,
         "properties": {
@@ -1618,30 +1602,6 @@
         ],
         "type": "object"
       },
-      "ReadinessBody": {
-        "additionalProperties": false,
-        "properties": {
-          "checks": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "description": "Per check: pass or fail. Present when not ready.",
-            "type": "object"
-          },
-          "status": {
-            "description": "ready when every check passes.",
-            "enum": [
-              "ready",
-              "not_ready"
-            ],
-            "type": "string"
-          }
-        },
-        "required": [
-          "status"
-        ],
-        "type": "object"
-      },
       "ResponseMeta": {
         "additionalProperties": false,
         "properties": {
@@ -2524,135 +2484,6 @@
   },
   "openapi": "3.1.0",
   "paths": {
-    "/healthz": {
-      "get": {
-        "description": "The process runs and answers. Never touches storage (FR-SVC-004).",
-        "operationId": "getHealth",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "examples": {
-                  "example": {
-                    "summary": "The process answers",
-                    "value": {
-                      "status": "ok"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/HealthBody"
-                }
-              }
-            },
-            "description": "OK",
-            "headers": {
-              "Cache-Control": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Liveness",
-        "tags": [
-          "service"
-        ],
-        "x-attribution": "No source data: this answer carries no attribution.",
-        "x-codeSamples": [
-          {
-            "lang": "Shell",
-            "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/healthz\""
-          }
-        ],
-        "x-example-request": "/healthz"
-      }
-    },
-    "/readyz": {
-      "get": {
-        "description": "Storage answers within the readiness timeout and publishes a compatible read contract (FR-SVC-004).",
-        "operationId": "getReadiness",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "examples": {
-                  "example": {
-                    "summary": "Storage answers with a compatible read contract",
-                    "value": {
-                      "status": "ready"
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ReadinessBody"
-                }
-              }
-            },
-            "description": "OK",
-            "headers": {
-              "Cache-Control": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ReadinessBody"
-                }
-              }
-            },
-            "description": "Not ready: a check failed.",
-            "headers": {
-              "Cache-Control": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Readiness",
-        "tags": [
-          "service"
-        ],
-        "x-attribution": "No source data: this answer carries no attribution.",
-        "x-codeSamples": [
-          {
-            "lang": "Shell",
-            "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/readyz\""
-          }
-        ],
-        "x-example-request": "/readyz"
-      }
-    },
     "/v1/charging-options": {
       "get": {
         "description": "Charging sites within the radius of a position, nearest first, then by id, each with its points and their last reported availability. Needs the scope energy.",

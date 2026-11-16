@@ -31,12 +31,14 @@ profile=${1:-}
 report=${2:-load-report.md}
 API_URL="${LOADRUN_API:-http://[::1]:8080}"
 CACHED_URL="${LOADRUN_CACHED_API:-http://[::1]:8081}"
+HEALTH_URL="${LOADRUN_HEALTH:-http://[::1]:8082}"
 PROXY_URL="${LOADRUN_PROXY:-http://[::1]:8474}"
 loopback='^http://(localhost|127\.0\.0\.1|\[::1\]):[0-9]+$'
 
 [[ $profile == pr || $profile == nightly ]] || { echo "usage: load-test.sh pr|nightly [REPORT]" >&2; exit 2; }
 [[ $API_URL =~ $loopback ]] || { echo "FAIL: LOADRUN_API must be this machine's loopback, not $API_URL" >&2; exit 2; }
 [[ $CACHED_URL =~ $loopback ]] || { echo "FAIL: LOADRUN_CACHED_API must be this machine's loopback, not $CACHED_URL" >&2; exit 2; }
+[[ $HEALTH_URL =~ $loopback ]] || { echo "FAIL: LOADRUN_HEALTH must be this machine's loopback, not $HEALTH_URL" >&2; exit 2; }
 [[ $PROXY_URL =~ $loopback ]] || { echo "FAIL: LOADRUN_PROXY must be this machine's loopback, not $PROXY_URL" >&2; exit 2; }
 
 export COMPOSE_FILE=compose.yaml:test/load/compose.yaml
@@ -98,6 +100,6 @@ previous=()
 [[ -n ${LOADRUN_PREVIOUS:-} ]] && previous=(-previous "$LOADRUN_PREVIOUS")
 go run ./internal/testkit/loadrun -profile "$profile" -report "$report" -api "$API_URL" -proxy "$PROXY_URL" -place "$place" \
   -breaker-failures "$brk_failures" -breaker-open-for "$brk_open_for" -breaker-probes "$brk_probes" \
-  -cached-api "$CACHED_URL" -stale-if-error "$stale_for" \
+  -cached-api "$CACHED_URL" -health "$HEALTH_URL" -stale-if-error "$stale_for" \
   -max-age-parking "$max_age_parking" -max-age-energy "$max_age_energy" -versions-ttl "$versions_ttl" \
   -compose-files compose.yaml,test/load/compose.yaml "${previous[@]}"

@@ -48,11 +48,11 @@ func TestBuildRefusesABrokenExample(t *testing.T) {
 		want string
 	}{
 		"no example at all":      {fstest.MapFS{}, "no examples"},
-		"an undocumented status": {fstest.MapFS{"examples/getHealth.json": {Data: []byte(`{"title":"t","request":"/healthz","attribution":"none","status":201,"response":{}}`)}}, "status 201 is not documented"},
+		"an undocumented status": {fstest.MapFS{"examples/getMeta.json": {Data: []byte(`{"title":"t","request":"/v1/meta","attribution":"none","status":201,"response":{}}`)}}, "status 201 is not documented"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			withExamples(t, c.fs)
-			if _, _, err := build(Deps{Config: config.Defaults()}, nil); err == nil || !strings.Contains(err.Error(), c.want) {
+			if _, _, err := build(Deps{Config: config.Defaults()}, nil, onPublic); err == nil || !strings.Contains(err.Error(), c.want) {
 				t.Fatalf("build err = %v, want %q", err, c.want)
 			}
 		})

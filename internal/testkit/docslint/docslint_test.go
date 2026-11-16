@@ -59,7 +59,7 @@ func okExample(op map[string]any) map[string]any {
 // TestDocsLintCanSayNo: each missing piece fails the lint and is named.
 func TestDocsLintCanSayNo(t *testing.T) {
 	req.Covers(t, "DX-003")
-	const data, svc = "/v1/charging-options", "/healthz"
+	const data, svc = "/v1/charging-options", "/v1/meta"
 	firstAttribution := func(op map[string]any) map[string]any {
 		ex := okExample(op)["examples"].(map[string]any)["example"].(map[string]any)["value"].(map[string]any)
 		return ex["meta"].(map[string]any)["attribution"].([]any)[0].(map[string]any)

@@ -1,7 +1,7 @@
 // Command viafrei-api is the ViaFrei API service.
 //
 //	viafrei-api [serve]            run the service (the default)
-//	viafrei-api healthcheck        exit 0 when /healthz answers ok (for container healthchecks)
+//	viafrei-api healthcheck        exit 0 when /healthz on the health listener answers ok (for container healthchecks)
 //	viafrei-api meta-check [-platform X.Y.Z] [-contract M.m]
 //	                               exit 0 when /v1/meta reports these versions, 1 on a mismatch
 //	viafrei-api config check       validate the configuration and exit
@@ -163,12 +163,23 @@ func serve(environ []string, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return config.ExitCode
 	}
-	errc := make(chan error, 1)
+	// The health listener's operations are a subset of the public ones,
+	// so the catalogue that built the public server builds it too.
+	hsrv := invariant.Must(httpapi.NewHealthServer(deps))
+	if len(cfg.Callers.AllowCIDR) == 0 {
+		log.Warn("callers.allow_cidr is empty: the public listener refuses every caller (fail closed)")
+	}
+	errc := make(chan error, 2)
 	go func() { errc <- srv.ListenAndServe() }()
-	log.Info("listening", "addr", cfg.Server.ListenAddr, "version", buildinfo.Get().Version)
+	go func() { errc <- hsrv.ListenAndServe() }()
+	log.Info("listening", "addr", cfg.Server.ListenAddr, "health", cfg.Health.ListenAddr, "version", buildinfo.Get().Version)
 
 	select {
 	case err := <-errc:
+		// Either listener ending ends the process: an instance whose
+		// probes cannot reach it, or that serves nothing, is not running.
+		_ = srv.Close()
+		_ = hsrv.Close()
 		if !errors.Is(err, http.ErrServerClosed) {
 			log.Error("server stopped", "error", err)
 			return 1
@@ -177,7 +188,12 @@ func serve(environ []string, stderr io.Writer) int {
 		log.Info("shutting down")
 		sctx, cancel := httpapi.ShutdownContext(cfg)
 		defer cancel()
-		if err := srv.Shutdown(sctx); err != nil {
+		// Readiness is answered until the public listener has drained.
+		err := srv.Shutdown(sctx)
+		if herr := hsrv.Shutdown(sctx); err == nil {
+			err = herr
+		}
+		if err != nil {
 			log.Error("shutdown incomplete", "error", err)
 			return 1
 		}

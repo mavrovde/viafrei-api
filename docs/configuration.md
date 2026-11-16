@@ -4,7 +4,7 @@
 
 Every tunable of the service is one key below. Sources are layered: the built-in default, then an optional YAML file (path in `VFAPI_CONFIG_FILE`), then environment variables. The service refuses to start on an unknown key, an unknown variable with the prefix, a value out of bounds or a broken cross-field rule, and lists every violation. Secrets are read only from the environment or from a file named by the `_FILE` variant (one of the two, never both), never from the YAML file, and are never printed. Exit status on a configuration error: 78.
 
-Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadline.request`; `health.ready_timeout` ≤ `deadline.request`; `db.statement_timeout_floor` < `deadline.request` − `deadline.reserve`; `compose.part_deadline` × the number of overview parts ≤ `deadline.request` − `deadline.reserve`; the sum of `tiers.*.reserved`, `tiers.bulk.max_inflight` and `tiers.per_key_inflight` are each ≤ `db.pool_max`; every `tiers.*.queue_max_wait` < `deadline.request`.
+Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadline.request`; `health.ready_timeout` ≤ `deadline.request`; `db.statement_timeout_floor` < `deadline.request` − `deadline.reserve`; `compose.part_deadline` × the number of overview parts ≤ `deadline.request` − `deadline.reserve`; the sum of `tiers.*.reserved`, `tiers.bulk.max_inflight` and `tiers.per_key_inflight` are each ≤ `db.pool_max`; every `tiers.*.queue_max_wait` < `deadline.request`; `callers.trusted_proxy_header` and `callers.trusted_proxy_cidr` are set together or not at all; the port of `health.listen_addr` differs from that of `server.listen_addr`.
 
 | Key | Environment | Type | Default | Bounds | Description |
 |---|---|---|---|---|---|
@@ -41,8 +41,9 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `deadline.request` | `VFAPI_DEADLINE_REQUEST` | duration | `2s` | 200ms to 2s | Hard deadline of every request (NFR-PERF-001). |
 | `deadline.reserve` | `VFAPI_DEADLINE_RESERVE` | duration | `50ms` | 0s to 500ms | Margin kept back from the deadline when the statement timeout is set. Less than deadline.request. |
 | `contract.expected` | `VFAPI_CONTRACT_EXPECTED` | string | empty | major.minor | Read-contract version (major.minor) this instance requires; empty means the version built in. Readiness fails on another major or an older minor. |
+| `health.listen_addr` | `VFAPI_HEALTH_LISTEN_ADDR` | string | `localhost:8082` | host:port | Address of the health listener, host:port: liveness (/healthz), readiness (/readyz) and the service metadata (/v1/meta), and nothing else. The edge never routes it, so the platform probes the service without being on callers.allow_cidr. Its port differs from server.listen_addr's. |
 | `health.ready_timeout` | `VFAPI_HEALTH_READY_TIMEOUT` | duration | `500ms` | 50ms to 2s | Time the readiness probe gives storage to answer. At most deadline.request. |
-| `health.probe_timeout` | `VFAPI_HEALTH_PROBE_TIMEOUT` | duration | `1s` | 100ms to 10s | Time the healthcheck subcommand waits for /healthz. |
+| `health.probe_timeout` | `VFAPI_HEALTH_PROBE_TIMEOUT` | duration | `1s` | 100ms to 10s | Time the healthcheck and meta-check subcommands wait for the health listener. |
 | `log.level` | `VFAPI_LOG_LEVEL` | string | `info` | one of debug, info, warn, error | Lowest level written: debug, info, warn or error. |
 | `log.format` | `VFAPI_LOG_FORMAT` | string | `json` | one of json, text | Log line format on standard output: json or text. |
 | `docs.enabled` | `VFAPI_DOCS_ENABLED` | bool | `true` | — | Serve the OpenAPI document at /v1/openapi.json and /openapi.json. |
@@ -140,3 +141,6 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `admin.max_pending` | `VFAPI_ADMIN_MAX_PENDING` | int | `32` | 4 to 256 | Challenges and pending confirmations held at once; when full, expired ones are dropped first and a new one is refused. |
 | `admin.max_sessions` | `VFAPI_ADMIN_MAX_SESSIONS` | int | `4` | 1 to 16 | Console sessions held at once; a new sign-in beyond it ends the oldest session. |
 | `admin.audit_page` | `VFAPI_ADMIN_AUDIT_PAGE` | int | `100` | 10 to 1000 | Audit records the console's audit view shows, newest first. |
+| `callers.allow_cidr` | `VFAPI_CALLERS_ALLOW_CIDR` | list | empty | CIDR list | Networks (CIDR) whose callers the public listener answers; every other caller gets 403 with an empty body, on every route, the OpenAPI document included. Empty refuses every caller (fail closed); 0.0.0.0/0,::/0 admits everyone. Comma-separated in the environment. |
+| `callers.trusted_proxy_header` | `VFAPI_CALLERS_TRUSTED_PROXY_HEADER` | string | empty | HTTP header name | Request header in which the edge in front of the service names the caller's address, such as X-Real-IP. Believed only from a peer inside callers.trusted_proxy_cidr; the rightmost address in it is the caller, and a value that is no address is refused. Empty: the socket peer is the caller. Set together with callers.trusted_proxy_cidr. |
+| `callers.trusted_proxy_cidr` | `VFAPI_CALLERS_TRUSTED_PROXY_CIDR` | list | empty | CIDR list | Networks (CIDR) of the edge whose callers.trusted_proxy_header is believed. A request from any other peer is judged by its socket address, whatever the header says. Comma-separated in the environment. |

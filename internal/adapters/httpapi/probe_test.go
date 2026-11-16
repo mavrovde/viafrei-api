@@ -18,23 +18,23 @@ import (
 func TestReadyzWithoutChecksIsNotReady(t *testing.T) {
 	req.Covers(t, "FR-SVC-004")
 	for name, ready := range map[string]httpapi.Readiness{"no checker": nil, "no checks": &fakeReadiness{}} {
-		w := do(t, newHandler(t, config.Defaults(), ready), http.MethodGet, "/readyz", nil)
+		w := doHealth(t, newHealthHandler(t, config.Defaults(), ready), "/readyz")
 		if w.Code != http.StatusServiceUnavailable || !strings.Contains(w.Body.String(), `"storage":"fail"`) {
 			t.Errorf("%s: %d %s", name, w.Code, w.Body)
 		}
 	}
 }
 
-// probeConfig points the healthcheck at srv.
+// probeConfig points the healthcheck at srv, as the health listener.
 func probeConfig(srv *httptest.Server) *config.Config {
 	cfg := config.Defaults()
-	cfg.Server.ListenAddr = strings.TrimPrefix(srv.URL, "http://")
+	cfg.Health.ListenAddr = strings.TrimPrefix(srv.URL, "http://")
 	return cfg
 }
 
 func TestProbeVerdicts(t *testing.T) {
 	req.Covers(t, "FR-SVC-004")
-	ok := httptest.NewServer(newHandler(t, config.Defaults(), nil))
+	ok := httptest.NewServer(newHealthHandler(t, config.Defaults(), nil))
 	defer ok.Close()
 	if err := httpapi.Probe(context.Background(), probeConfig(ok)); err != nil {
 		t.Fatalf("a healthy service failed the probe: %v", err)
@@ -57,7 +57,7 @@ func TestProbeVerdicts(t *testing.T) {
 	}
 	for _, addr := range []string{"localhost", "localhost:%zz"} {
 		cfg := config.Defaults()
-		cfg.Server.ListenAddr = addr
+		cfg.Health.ListenAddr = addr
 		if err := httpapi.Probe(context.Background(), cfg); err == nil {
 			t.Errorf("listen_addr %q passed the probe", addr)
 		}
@@ -68,7 +68,7 @@ func TestProbeVerdicts(t *testing.T) {
 // /v1/meta compared with the platform release and schema it must match.
 func TestCheckVersions(t *testing.T) {
 	req.Covers(t, "FR-SVC-003", "REL-001")
-	synced, err := httpapi.NewHandler(httpapi.Deps{
+	synced, err := httpapi.NewHealthHandler(httpapi.Deps{
 		Config:          config.Defaults(),
 		Build:           buildinfo.Info{Version: "2.5.21", Commit: "abc1234", Platform: "2.5.21"},
 		ContractVersion: "0.1",
@@ -79,7 +79,7 @@ func TestCheckVersions(t *testing.T) {
 	}
 	syncedSrv := httptest.NewServer(synced)
 	defer syncedSrv.Close()
-	unsyncedSrv := httptest.NewServer(newHandler(t, config.Defaults(), nil))
+	unsyncedSrv := httptest.NewServer(newHealthHandler(t, config.Defaults(), nil))
 	defer unsyncedSrv.Close()
 	ctx := context.Background()
 	for _, want := range []httpapi.Versions{{Platform: "2.5.21", Contract: "0.1"}, {Contract: "0.1"}, {}} {
@@ -110,9 +110,9 @@ func TestCheckVersions(t *testing.T) {
 	garbled := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`<html>`)) }))
 	defer garbled.Close()
 	noPort := config.Defaults()
-	noPort.Server.ListenAddr = "localhost"
+	noPort.Health.ListenAddr = "localhost"
 	badPort := config.Defaults()
-	badPort.Server.ListenAddr = "localhost:%zz"
+	badPort.Health.ListenAddr = "localhost:%zz"
 	for name, cfg := range map[string]*config.Config{"503": probeConfig(failing), "not JSON": probeConfig(garbled), "no port": noPort, "bad port": badPort} {
 		err := httpapi.CheckVersions(ctx, cfg, httpapi.Versions{Platform: "2.5.21"})
 		if err == nil || errors.Is(err, httpapi.ErrVersionMismatch) {

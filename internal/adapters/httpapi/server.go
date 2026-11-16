@@ -84,12 +84,23 @@ type server struct {
 	versions        *versionCache
 }
 
+// surface names the listeners an operation is served on (#92): the public
+// one, behind the caller allow-list, or the health listener, which the edge
+// never routes, or both.
+type surface uint8
+
+const (
+	onPublic surface = 1 << iota
+	onHealth
+)
+
 // operation is one registered API operation.
 type operation struct {
 	id       string
 	method   string
 	path     string
 	tag      string
+	surface  surface      // zero means the public listener only
 	keyed    bool         // needs a key (SEC-001)
 	scope    access.Scope // the scope a keyed operation needs (SEC-020); empty for none
 	register func(api huma.API, s *server, op huma.Operation)
@@ -97,9 +108,9 @@ type operation struct {
 
 func operations() []operation {
 	return []operation{
-		{id: "getHealth", method: http.MethodGet, path: "/healthz", register: registerHealth},
-		{id: "getReadiness", method: http.MethodGet, path: "/readyz", register: registerReadiness},
-		{id: "getMeta", method: http.MethodGet, path: "/v1/meta", register: registerMeta},
+		{id: "getHealth", method: http.MethodGet, path: "/healthz", surface: onHealth, register: registerHealth},
+		{id: "getReadiness", method: http.MethodGet, path: "/readyz", surface: onHealth, register: registerReadiness},
+		{id: "getMeta", method: http.MethodGet, path: "/v1/meta", surface: onPublic | onHealth, register: registerMeta},
 		{id: "getKey", method: http.MethodGet, path: "/v1/key", tag: "access", keyed: true, register: registerKey},
 		{id: "listChargingOptions", method: http.MethodGet, path: "/v1/charging-options", tag: "energy", keyed: true, scope: "energy", register: registerCharging},
 		{id: "listParkingOptions", method: http.MethodGet, path: "/v1/parking-options", tag: "parking", keyed: true, scope: "parking", register: registerParking},
@@ -122,31 +133,68 @@ func OperationIDs() []string {
 	return ids
 }
 
-// NewHandler builds the complete HTTP handler.
+// NewHandler builds the handler of the public operations, without the
+// caller allow-list: what an admitted caller reaches.
 func NewHandler(d Deps) (http.Handler, error) {
-	h, _, err := build(d, nil)
+	h, _, err := build(d, nil, onPublic)
 	return h, err
 }
 
-// OpenAPI returns the OpenAPI document the handler built from cfg would
-// serve. `viafrei-api openapi` writes it to api/openapi.json.
+// NewPublicHandler is the public listener's handler: NewHandler behind the
+// caller allow-list (#92), which refuses every caller outside
+// callers.allow_cidr, and every caller when the list is empty.
+func NewPublicHandler(d Deps) (http.Handler, error) {
+	h, err := NewHandler(d)
+	if err != nil {
+		return nil, err
+	}
+	return newCallerGate(d.Config.Callers, logger(d)).wrap(h), nil
+}
+
+// NewHealthHandler is the health listener's handler: liveness, readiness
+// and the service metadata, and nothing else. It has no caller allow-list
+// and no per-address limit: the edge never routes it, and a probe of the
+// platform must never be refused.
+func NewHealthHandler(d Deps) (http.Handler, error) {
+	d.Addresses = nil
+	h, _, err := build(d, nil, onHealth)
+	return h, err
+}
+
+// OpenAPI returns the OpenAPI document the public handler built from cfg
+// would serve. `viafrei-api openapi` writes it to api/openapi.json.
 func OpenAPI(cfg *config.Config) ([]byte, error) {
-	_, doc, err := build(Deps{Config: cfg}, nil)
+	_, doc, err := build(Deps{Config: cfg}, nil, onPublic)
 	if err != nil {
 		return nil, err
 	}
 	return doc(), nil
 }
 
-// NewServer builds the http.Server with every server.* limit applied.
+// NewServer builds the public http.Server, behind the caller allow-list,
+// with every server.* limit applied.
 func NewServer(d Deps) (*http.Server, error) {
-	h, err := NewHandler(d)
+	h, err := NewPublicHandler(d)
 	if err != nil {
 		return nil, err
 	}
+	return newHTTPServer(d, d.Config.Server.ListenAddr, h), nil
+}
+
+// NewHealthServer builds the health listener's http.Server on
+// health.listen_addr, with the same server.* limits.
+func NewHealthServer(d Deps) (*http.Server, error) {
+	h, err := NewHealthHandler(d)
+	if err != nil {
+		return nil, err
+	}
+	return newHTTPServer(d, d.Config.Health.ListenAddr, h), nil
+}
+
+func newHTTPServer(d Deps, addr string, h http.Handler) *http.Server {
 	sc := d.Config.Server
 	return &http.Server{
-		Addr:              sc.ListenAddr,
+		Addr:              addr,
 		Handler:           h,
 		ReadHeaderTimeout: sc.ReadHeaderTimeout,
 		ReadTimeout:       sc.ReadTimeout,
@@ -154,7 +202,7 @@ func NewServer(d Deps) (*http.Server, error) {
 		IdleTimeout:       sc.IdleTimeout,
 		MaxHeaderBytes:    sc.MaxHeaderBytes,
 		ErrorLog:          slog.NewLogLogger(logger(d).Handler(), slog.LevelWarn),
-	}, nil
+	}
 }
 
 func logger(d Deps) *slog.Logger {
@@ -164,12 +212,13 @@ func logger(d Deps) *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-// build makes the handler and the document it serves; extra operations are
-// registered after the catalogue (tests only). The document is marshalled on
+// build makes the handler of the operations served on surf and the document
+// it serves; extra operations are registered after the catalogue (tests
+// only; one without a surface is public). The document is marshalled on
 // first use, once: it is ~100 KB with its examples, and a handler built for
 // a request path that never asks for it (every test, most processes until
 // the first /v1/openapi.json) should not pay for it.
-func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
+func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte, error) {
 	if d.Config == nil {
 		return nil, nil, errors.New("httpapi: no configuration")
 	}
@@ -272,6 +321,12 @@ func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 	api.UseMiddleware(strictQuery(api), s.authenticate(api), s.cache)
 
 	for _, op := range ops {
+		if op.surface == 0 {
+			op.surface = onPublic
+		}
+		if op.surface&surf == 0 {
+			continue
+		}
 		if disabled[op.id] {
 			router.Method(op.method, op.path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				writeProblem(w, newProblem(r.Context(), SlugFeatureDisabled, "This operation is switched off.", 0))
@@ -293,16 +348,19 @@ func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 		}
 		op.register(api, s, hop)
 	}
-	amendNullableObjects(api)
-	if err := documentExamples(api.OpenAPI(), base); err != nil {
-		return nil, nil, err
-	}
-
-	if d.Config.RateLimit.Headers {
-		documentRateLimit(api)
-	}
-	if d.Config.Cache.Enabled {
-		documentCaching(api)
+	// The document describes the public listener; the health listener
+	// serves none.
+	if surf == onPublic {
+		amendNullableObjects(api)
+		if err := documentExamples(api.OpenAPI(), base); err != nil {
+			return nil, nil, err
+		}
+		if d.Config.RateLimit.Headers {
+			documentRateLimit(api)
+		}
+		if d.Config.Cache.Enabled {
+			documentCaching(api)
+		}
 	}
 
 	// The document is a value of huma's own fixed types: marshalling it
@@ -315,7 +373,7 @@ func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 		return doc.Bytes()
 	})
 
-	if d.Config.Docs.Enabled {
+	if d.Config.Docs.Enabled && surf == onPublic {
 		router.Get("/v1/openapi.json", func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", OpenAPIMediaType)
 			_, _ = w.Write(served())

@@ -51,6 +51,7 @@ type Config struct {
 	Metering   Metering   `koanf:"metering"`
 	Cache      Cache      `koanf:"cache"`
 	Admin      Admin      `koanf:"admin"`
+	Callers    Callers    `koanf:"callers"`
 }
 
 // Server holds the public HTTP listener settings.
@@ -117,8 +118,9 @@ type Contract struct {
 
 // Health holds the probe settings.
 type Health struct {
+	ListenAddr   string        `koanf:"listen_addr" default:"localhost:8082" validate:"required,hostname_port" desc:"Address of the health listener, host:port: liveness (/healthz), readiness (/readyz) and the service metadata (/v1/meta), and nothing else. The edge never routes it, so the platform probes the service without being on callers.allow_cidr. Its port differs from server.listen_addr's."`
 	ReadyTimeout time.Duration `koanf:"ready_timeout" default:"500ms" validate:"min=50ms,max=2s" desc:"Time the readiness probe gives storage to answer. At most deadline.request."`
-	ProbeTimeout time.Duration `koanf:"probe_timeout" default:"1s" validate:"min=100ms,max=10s" desc:"Time the healthcheck subcommand waits for /healthz."`
+	ProbeTimeout time.Duration `koanf:"probe_timeout" default:"1s" validate:"min=100ms,max=10s" desc:"Time the healthcheck and meta-check subcommands wait for the health listener."`
 }
 
 // Log holds the logging settings.

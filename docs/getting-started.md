@@ -12,11 +12,11 @@ You need a container runtime and the repository.
 ```sh
 cp .env.example .env    # replace both placeholders
 make up                 # builds the API and a database with synthetic data
-curl -s localhost:8080/healthz
+curl -s localhost:8082/healthz    # the health listener
 ```
 
-The local stack answers the open operations (`/healthz`, `/readyz`,
-`/v1/meta`, `/v1/openapi.json`). It runs without an access store, so every
+The local stack answers the open operations (`/v1/meta`,
+`/v1/openapi.json`, and `/healthz` and `/readyz` on its health listener). It runs without an access store, so every
 keyed operation answers `404 feature-disabled` until you configure one
 ([container](container.md), [API keys](access-keys.md)).
 

@@ -19,12 +19,12 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
@@ -108,20 +108,12 @@ func load(fx parity.Fixture) (string, error) {
 		return sum, nil
 	}
 	var buf bytes.Buffer
-	if _, err := fixtures.Generate(&buf, fx.Profile, fx.Seed, contract.Version()); err != nil {
+	if _, err := fixtures.Generate(&buf, fx.Profile, fx.Seed, dbcontract.ContractVersion); err != nil {
 		return "", err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	conn, err := db.Owner(ctx)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = conn.Close(ctx) }()
-	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, buf.String())
-		return err
-	}); err != nil {
+	if err := db.Seed(ctx, buf.String()); err != nil {
 		return "", err
 	}
 	seeded[fx] = parity.Checksum(buf.Bytes())
@@ -159,7 +151,7 @@ func (a asker) ask(t *testing.T, c parity.Case) []byte {
 	t.Helper()
 	now := func() time.Time { return c.Now }
 	h, err := httpapi.NewHandler(httpapi.Deps{
-		Config: a.cfg, Build: buildinfo.Info{Version: "parity", Commit: "parity"}, ContractVersion: contract.Version(), Now: now,
+		Config: a.cfg, Build: buildinfo.Info{Version: "parity", Commit: "parity"}, ContractVersion: dbcontract.ContractVersion, Now: now,
 		Auth: keyAuth{principal(c)}, Sources: a.st,
 		Features: features.New(features.Repositories{Register: a.st, Charging: a.st, Parking: a.st, Places: a.st}, wire.FeatureSettings(a.cfg), now),
 	})

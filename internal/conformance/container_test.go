@@ -134,8 +134,8 @@ type composeFile struct {
 
 // composeFindings: the database is never published, the API only on a
 // loopback address, both have healthchecks, the database is migrated by the
-// release database.pin names (pinRef) and the API waits for that to end
-// well and for a healthy database, runs read-only without capabilities, and
+// release database.pin names (pinRef), which also seeds it after that, and
+// the API waits for both to end well and for a healthy database, runs read-only without capabilities, and
 // no secret is written into the file (every one is interpolated from .env).
 func composeFindings(src []byte, pinRef string) []string {
 	var c composeFile
@@ -163,11 +163,16 @@ func composeFindings(src []byte, pinRef string) []string {
 	if api.DependsOn["db"].Condition != "service_healthy" {
 		out = append(out, "the API does not wait for a healthy database")
 	}
-	if c.Services["db-migrate"].Image != pinRef {
-		out = append(out, "db-migrate does not run the release database.pin names, "+pinRef)
+	for _, svc := range []string{"db-migrate", "db-seed"} {
+		if c.Services[svc].Image != pinRef {
+			out = append(out, svc+" does not run the release database.pin names, "+pinRef)
+		}
 	}
-	if api.DependsOn["db-migrate"].Condition != "service_completed_successfully" {
-		out = append(out, "the API does not wait for the database to be migrated")
+	if c.Services["db-seed"].DependsOn["db-migrate"].Condition != "service_completed_successfully" {
+		out = append(out, "the fixtures are seeded before the database is migrated")
+	}
+	if api.DependsOn["db-seed"].Condition != "service_completed_successfully" {
+		out = append(out, "the API does not wait for the database to be migrated and seeded")
 	}
 	if !api.ReadOnly || len(api.CapDrop) != 1 || api.CapDrop[0] != "ALL" {
 		out = append(out, "the API must run read-only with every capability dropped")
@@ -221,18 +226,19 @@ func TestComposeRulesCanSayNo(t *testing.T) {
 		t.Fatal(err)
 	}
 	pin := readPin(t)
-	unpinned := strings.SplitN(pin.Ref, "@", 2)[0]
 	// Each plant must produce the finding named for it, not just any finding.
 	for want, edit := range map[string][2]string{
-		"does not run the release database.pin": {"image: " + pin.Ref, "image: " + unpinned},
-		"wait for the database to be migrated":  {"condition: service_completed_successfully", "condition: service_started"},
-		"database publishes a port":             {"    networks: [backend]\n\n  # The platform's schema", "    networks: [backend]\n    ports: [\"5432:5432\"]\n\n  # The platform's schema"},
-		"on the loopback defaults":              {`"${API_PUBLISH:-[::1]:8080}:8080"`, `"8080:8080"`},
-		"its health listener":                   {`"${API_HEALTH_PUBLISH:-[::1]:8082}:8082"`, `"8082:8082"`},
-		"does not wait for a healthy":           {"      db:\n        condition: service_healthy\n      db-migrate:", "      db:\n        condition: service_started\n      db-migrate:"},
-		"written into compose.yaml":             {"POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}", "POSTGRES_PASSWORD: hunter2"},
-		"read-only with every capability":       {"read_only: true\n    cap_drop: [ALL]\n    security_opt: [\"no-new-privileges:true\"]\n    # Design", "read_only: false\n    cap_drop: [ALL]\n    security_opt: [\"no-new-privileges:true\"]\n    # Design"},
-		"non-internal network":                  {"    internal: true\n", ""},
+		"db-migrate does not run the release":    {"  db-migrate:\n    image: " + pin.Ref, "  db-migrate:\n    image: other/database:9.9.9"},
+		"db-seed does not run the release":       {"  db-seed:\n    image: " + pin.Ref, "  db-seed:\n    image: other/database:9.9.9"},
+		"seeded before the database is migrated": {"      db-migrate:\n        condition: service_completed_successfully", "      db-migrate:\n        condition: service_started"},
+		"wait for the database to be migrated":   {"      db-seed:\n        condition: service_completed_successfully", "      db-seed:\n        condition: service_started"},
+		"database publishes a port":              {"    networks: [backend]\n\n  # The platform's schema", "    networks: [backend]\n    ports: [\"5432:5432\"]\n\n  # The platform's schema"},
+		"on the loopback defaults":               {`"${API_PUBLISH:-[::1]:8080}:8080"`, `"8080:8080"`},
+		"its health listener":                    {`"${API_HEALTH_PUBLISH:-[::1]:8082}:8082"`, `"8082:8082"`},
+		"does not wait for a healthy":            {"      db:\n        condition: service_healthy\n      db-seed:", "      db:\n        condition: service_started\n      db-seed:"},
+		"written into compose.yaml":              {"POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}", "POSTGRES_PASSWORD: hunter2"},
+		"read-only with every capability":        {"read_only: true\n    cap_drop: [ALL]\n    security_opt: [\"no-new-privileges:true\"]\n    # Design", "read_only: false\n    cap_drop: [ALL]\n    security_opt: [\"no-new-privileges:true\"]\n    # Design"},
+		"non-internal network":                   {"    internal: true\n", ""},
 	} {
 		bad := strings.Replace(string(good), edit[0], edit[1], 1)
 		if bad == string(good) {

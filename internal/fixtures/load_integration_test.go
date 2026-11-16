@@ -54,16 +54,7 @@ func loadCommitted(ctx context.Context, profile string, seed uint64) (map[string
 	if err != nil {
 		return nil, err
 	}
-	conn, err := db.Owner(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
-	err = pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, buf.String())
-		return err
-	})
-	return m.Rows, err
+	return m.Rows, db.Seed(ctx, buf.String())
 }
 
 func bounded(t *testing.T) context.Context {

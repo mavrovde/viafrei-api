@@ -10,6 +10,10 @@
 #   schema-head <N>                   the head its `head` prints as READY <N>
 #
 # A schema change is a viafrei-database release first; then both lines here
-# are bumped in one commit, and ci.yml pulls the same reference.
-ghcr.io/mavrovde/viafrei-database:0.2.0@sha256:98f0e01b8bb2f34afac8b482bd701ee61fa7bf142cc03d413e83c3b8b605ec9f
-schema-head 306
+# are bumped in one commit with the image of compose.yaml's db-migrate and
+# db-seed; ci.yml pulls what pinguard prints.
+# A <name>:<X.Y.Z>-local line names a locally built, unpublished release:
+# the tests and the local stack run it, and internal/release/pinguard
+# refuses it, so CI and the release workflow stop on it.
+viafrei-database:0.2.0-local
+schema-head 312

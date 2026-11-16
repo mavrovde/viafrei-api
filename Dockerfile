@@ -1,13 +1,12 @@
 # ViaFrei API container image.
 #
 #   docker buildx build --platform linux/amd64,linux/arm64 \
-#     --build-arg VERSION=0.2.0-dev --build-arg COMMIT=$(git rev-parse --short=12 HEAD) .
+#     --build-arg VERSION=0.3.0-dev --build-arg COMMIT=$(git rev-parse --short=12 HEAD) .
 #
 # Stages:
 #   build     compiles the static binary on the build platform for the target platform
-#   fixtures  writes a synthetic fixture set (development database only)
-#   devdb     the platform's PostGIS with the read-contract stub, the read-only role
-#             and the fixtures; compose migrates it with the database.pin release
+#   fixtures  writes a synthetic fixture set in the read contract's shape (development
+#             stack only; compose hands it to the database.pin release's test seed)
 #   runtime   distroless static, non-root: the image that is published (the default target)
 #
 # Every base image is pinned by digest; Dependabot proposes updates.
@@ -18,7 +17,7 @@ COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY . .
 ARG TARGETOS TARGETARCH
-ARG VERSION=0.2.0-dev
+ARG VERSION=0.3.0-dev
 ARG COMMIT=unknown
 ARG BUILD_DATE=""
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
@@ -32,26 +31,8 @@ ARG FIXTURE_SEED=1
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     go run ./cmd/fixturegen -profile "${FIXTURE_PROFILE}" -seed "${FIXTURE_SEED}" -out /out/fixtures
 
-# Development database only; never published. The platform's image
-# (postgis/postgis:16-3.4), single-architecture (linux/amd64). Its platform
-# schema is not built here: compose's db-migrate applies the viafrei-database
-# release database.pin names. The read contract and the access store are
-# not in that release yet, so the stub below stays until they are.
-FROM postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5 AS devdb
-# The entrypoint runs these in the order of its glob, which the image's
-# locale collates ignoring punctuation ("20a_" before "20_contract"), so each
-# name starts with its own number: the contract, its partitions and indexes,
-# its 0.2 additions, then the reader role, whose grants must see every table.
-COPY db/contract/0001_contract.sql /docker-entrypoint-initdb.d/20_contract.sql
-COPY db/contract/0003_physical.sql /docker-entrypoint-initdb.d/21_physical.sql
-COPY db/contract/0004_road_lamp.sql /docker-entrypoint-initdb.d/22_road_lamp.sql
-COPY db/contract/0002_reader_role.sql /docker-entrypoint-initdb.d/23_reader_role.sql
-COPY deploy/compose/30_seed.sh /docker-entrypoint-initdb.d/30_seed.sh
-COPY db/contract/VERSION /seed/CONTRACT_VERSION
-COPY --from=fixtures /out/fixtures/ /seed/
-
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab AS runtime
-ARG VERSION=0.2.0-dev
+ARG VERSION=0.3.0-dev
 ARG COMMIT=unknown
 LABEL org.opencontainers.image.title="viafrei-api" \
       org.opencontainers.image.description="ViaFrei API: read-only REST access to German mobility data" \

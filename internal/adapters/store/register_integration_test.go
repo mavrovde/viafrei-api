@@ -9,8 +9,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/jackc/pgx/v5"
-
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
@@ -31,15 +29,7 @@ func seed(ctx context.Context) error {
 	if err := fixtures.Planted(&buf, "tiny", 1, dbcontract.ContractVersion); err != nil {
 		return err
 	}
-	conn, err := db.Owner(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = conn.Close(ctx) }()
-	return pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, buf.String())
-		return err
-	})
+	return db.Seed(ctx, buf.String())
 }
 
 // seeded opens a store on the shared test database, which TestMain seeded.

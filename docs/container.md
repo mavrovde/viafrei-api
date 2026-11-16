@@ -123,10 +123,12 @@ Each release page also lists the digest, the tags, these commands and the SBOM a
 
 ## Local development with Compose
 
-`compose.yaml` runs two services:
+`compose.yaml` runs five services:
 
-- **db**: PostgreSQL 16 with PostGIS 3.4 (`postgis/postgis:16-3.4`, the platform's own), built from the `devdb` stage. On first start it builds the read-contract stub (`db/contract`), creates the read-only role `api_reader`, publishes the contract version and loads a synthetic fixture set (`tiny`, seed 1, set with `FIXTURE_PROFILE` and `FIXTURE_SEED`). It sits on an internal network, publishes no port and keeps its data in the named volume `db16-data`; a volume of an earlier PostgreSQL major is not read (`make reset` removes it).
-- **db-migrate**: the viafrei-database release `database.pin` names, run once per start: it migrates the database to the platform's schema, with the settings it gives each role in this database, makes the daily partitions and must report `READY` at the pinned head before the API starts. A database already at the head is left as it is.
+- **db**: PostgreSQL 16 with PostGIS 3.4 (`postgis/postgis:16-3.4`, the platform's own, pinned by digest). Its database is `test_contract`: it only ever holds synthetic data. It sits on an internal network, publishes no port and keeps its data in the named volume `db16-data`; a volume of an earlier PostgreSQL major is not read (`make reset` removes it).
+- **db-migrate**: the viafrei-database release `database.pin` names, run once per start: it migrates the database to the platform's schema, with the read contract, the access store and the settings it gives each role in this database, makes the daily partitions, must report `READY` at the pinned head, and gives the read-only role `api_reader` its password. A database already at the head is left as it is.
+- **fixtures**: writes a synthetic fixture set in the read contract's own shape (`tiny`, seed 1, set with `FIXTURE_PROFILE` and `FIXTURE_SEED`) into the volume `seed`.
+- **db-seed**: the same viafrei-database release's test seed writes that set into the platform's tables, once; the API reads it back through the contract's views, as it reads production. A database that already holds a set is left as it is (`make reset` starts over).
 - **api**: the runtime image. It connects as `api_reader`, runs read-only with every capability dropped, and is published on the IPv6 loopback address only: its public listener on `[::1]:8080`, which admits every caller that reaches it (`VFAPI_CALLERS_ALLOW_CIDR=0.0.0.0/0,::/0`), and its health listener on `[::1]:8082`.
 
 ```sh

@@ -168,7 +168,7 @@ func TestStartWithoutAPinFails(t *testing.T) {
 // TestRunImageReportsAnImageThatCannotRun: a reference no runtime can pull
 // is an error of the runtime, never an exit status.
 func TestRunImageReportsAnImageThatCannotRun(t *testing.T) {
-	if _, _, err := RunImage(bounded(t), "invalid reference::", nil, "version"); err == nil {
+	if _, _, err := RunImage(bounded(t), "invalid reference::", nil, nil, "version"); err == nil {
 		t.Fatal("an invalid reference ran")
 	}
 }

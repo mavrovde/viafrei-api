@@ -64,15 +64,7 @@ func seed(ctx context.Context) error {
 	if _, err := fixtures.Generate(&buf, "tiny", 1, dbcontract.ContractVersion); err != nil {
 		return err
 	}
-	conn, err := db.Owner(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = conn.Close(ctx) }()
-	return pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, buf.String())
-		return err
-	})
+	return db.Seed(ctx, buf.String())
 }
 
 func bounded(t *testing.T) context.Context {

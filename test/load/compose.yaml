@@ -37,8 +37,8 @@ services:
         condition: service_started
     environment:
       # Storage and the access store, both through the fault proxy.
-      VFAPI_DB_URL: postgres://api_reader:${API_READER_PASSWORD:?set API_READER_PASSWORD in .env}@toxiproxy:15432/contract?sslmode=disable
-      VFAPI_ACCESS_URL: postgres://api_access:${API_ACCESS_PASSWORD:?set API_ACCESS_PASSWORD (scripts/load-test.sh does)}@toxiproxy:15433/contract?sslmode=disable
+      VFAPI_DB_URL: postgres://api_reader:${API_READER_PASSWORD:?set API_READER_PASSWORD in .env}@toxiproxy:15432/test_contract?sslmode=disable
+      VFAPI_ACCESS_URL: postgres://api_access:${API_ACCESS_PASSWORD:?set API_ACCESS_PASSWORD (scripts/load-test.sh does)}@toxiproxy:15433/test_contract?sslmode=disable
       VFAPI_AUTH_PEPPER: ${VFAPI_AUTH_PEPPER:?set VFAPI_AUTH_PEPPER (scripts/load-test.sh does)}
       # A cached key outlives every scenario, so "a key in the key cache keeps
       # working while the access store is down" does not depend on when the
@@ -82,8 +82,8 @@ services:
       VFAPI_SERVER_LISTEN_ADDR: ":8080"
       VFAPI_HEALTH_LISTEN_ADDR: ":8082"
       VFAPI_CALLERS_ALLOW_CIDR: "0.0.0.0/0,::/0"
-      VFAPI_DB_URL: postgres://api_reader:${API_READER_PASSWORD:?set API_READER_PASSWORD in .env}@toxiproxy:15432/contract?sslmode=disable
-      VFAPI_ACCESS_URL: postgres://api_access:${API_ACCESS_PASSWORD:?set API_ACCESS_PASSWORD (scripts/load-test.sh does)}@toxiproxy:15433/contract?sslmode=disable
+      VFAPI_DB_URL: postgres://api_reader:${API_READER_PASSWORD:?set API_READER_PASSWORD in .env}@toxiproxy:15432/test_contract?sslmode=disable
+      VFAPI_ACCESS_URL: postgres://api_access:${API_ACCESS_PASSWORD:?set API_ACCESS_PASSWORD (scripts/load-test.sh does)}@toxiproxy:15433/test_contract?sslmode=disable
       VFAPI_AUTH_PEPPER: ${VFAPI_AUTH_PEPPER:?set VFAPI_AUTH_PEPPER (scripts/load-test.sh does)}
       VFAPI_AUTH_KEY_CACHE_TTL: 10m
       VFAPI_RATELIMIT_ANON_RPS: "0"

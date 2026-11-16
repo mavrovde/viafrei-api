@@ -9,8 +9,12 @@
 // role api_reader, the access store of schema access with its role
 // api_access) and the role settings it gives each role in this database,
 // `partitions ensure` makes the daily partitions from PartitionsFrom on,
-// and `head` must print READY <head>. This package runs no DDL: tests seed
-// the platform's own tables, which the contract's views read.
+// and `head` must print READY <head>. This package runs no DDL and names no
+// table of the platform: a test writes its rows in the read contract's shape
+// (the relations and columns of schema contract, as fixtures.Generate writes
+// them), and Seed hands them to the pinned image's test seed, which writes
+// them into the platform's tables the contract's views read. The database is
+// named test_contract: the image's test verbs refuse every other name.
 //
 // It makes no copy of a database (CREATE DATABASE … TEMPLATE): a copy would
 // hold none of the settings the image sets per role IN DATABASE. Each
@@ -41,7 +45,7 @@ import (
 
 // Image is the PostGIS image every test and development database runs on,
 // the platform's own (postgis/postgis:16-3.4), pinned by digest like the
-// Dockerfile's devdb stage (SSC-005; TestTestImagesArePinned holds the two
+// compose.yaml's db image (SSC-005; TestTestImagesArePinned holds the two
 // equal). It is published for linux/amd64 only; an arm64 host runs it
 // emulated.
 const Image = "postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5"
@@ -50,6 +54,14 @@ const Image = "postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e819
 // before the synthetic fixtures' first day (fixtures.ReferenceInstant), so a
 // tick of any fixture day, in UTC or Berlin time, has its partition.
 const PartitionsFrom = "2026-03-27"
+
+// Database is the name of every test database: the pinned image's test
+// verbs (test-fixtures) refuse a database whose name does not start with
+// test_.
+const Database = "test_contract"
+
+// SeedPath is where Seed places the rows inside the pinned image's container.
+const SeedPath = "/tmp/viafrei-api-seed.sql"
 
 // maxLocks is the lock table the container gets: making the partitions from
 // PartitionsFrom to today is one transaction over every tick table and day.
@@ -64,7 +76,10 @@ type DB struct {
 	// AccessURL connects as the API's own access-store role.
 	AccessURL string
 	// Pin is the viafrei-database release the database was migrated by.
-	Pin       Pin
+	Pin Pin
+	// imageURL connects as the owner from the pinned image's container,
+	// over the container network.
+	imageURL  string
 	container testcontainers.Container
 }
 
@@ -78,7 +93,7 @@ func Start(ctx context.Context) (*DB, error) {
 		return nil, fmt.Errorf("pgtest: %w", err)
 	}
 	c, err := postgres.Run(ctx, Image,
-		postgres.WithDatabase("contract"),
+		postgres.WithDatabase(Database),
 		postgres.WithUsername("owner"),
 		postgres.WithPassword(rand.Text()),
 		postgres.BasicWaitStrategies(),
@@ -119,18 +134,36 @@ func (db *DB) migrate(ctx context.Context, containerIP func(context.Context) (st
 		return fmt.Errorf("owner URL: %w", err)
 	}
 	u.Host = net.JoinHostPort(ip, "5432")
-	return MigrateWith(ctx, db.Pin, u.String(), RunImage)
+	db.imageURL = u.String()
+	return MigrateWith(ctx, db.Pin, db.imageURL, RunImage)
 }
 
-// Runner runs ref with env and args to its end and returns what it wrote
+// Seed writes rows, statements of the form `insert into contract.<relation>
+// (<columns>) values ...` in the read contract's own names, into the
+// database through the pinned image's test seed (`test-fixtures seed`): the
+// image owns how a contract row is stored in the platform's tables, so a
+// test reads it back through the contract's views as production would.
+func (db *DB) Seed(ctx context.Context, rows string) error {
+	return SeedWith(ctx, db.Pin, db.imageURL, rows, RunImage)
+}
+
+// SeedWith runs the pinned image's test seed of rows against dbURL with run.
+func SeedWith(ctx context.Context, pin Pin, dbURL, rows string, run Runner) error {
+	env := map[string]string{"DATABASE_URL": dbURL, "VF_TEST_FIXTURES": "1"}
+	out, code, err := run(ctx, pin.Ref, env, map[string]string{SeedPath: rows}, "test-fixtures", "seed", SeedPath)
+	return stepError("test-fixtures seed", out, code, err)
+}
+
+// Runner runs ref with env and args to its end, with each of files (its
+// path in the container to its content) in place, and returns what it wrote
 // and its exit status.
-type Runner func(ctx context.Context, ref string, env map[string]string, args ...string) (string, int, error)
+type Runner func(ctx context.Context, ref string, env, files map[string]string, args ...string) (string, int, error)
 
 // MigrateWith migrates the database at dbURL with the pinned release, run
 // by run: the image must say it is the pinned release, its migrate and
 // partitions steps must succeed, and its head must print READY <head>.
 func MigrateWith(ctx context.Context, pin Pin, dbURL string, run Runner) error {
-	out, code, err := run(ctx, pin.Ref, nil, "version")
+	out, code, err := run(ctx, pin.Ref, nil, nil, "version")
 	if err := stepError("version", out, code, err); err != nil {
 		return err
 	}
@@ -139,7 +172,7 @@ func MigrateWith(ctx context.Context, pin Pin, dbURL string, run Runner) error {
 	}
 	env := map[string]string{"DATABASE_URL": dbURL}
 	for _, step := range [][]string{{"migrate"}, {"partitions", "ensure", "--days", "7", "--from", PartitionsFrom}, {"head"}} {
-		out, code, err = run(ctx, pin.Ref, env, step...)
+		out, code, err = run(ctx, pin.Ref, env, nil, step...)
 		if err := stepError(strings.Join(step, " "), out, code, err); err != nil {
 			return err
 		}
@@ -169,11 +202,16 @@ func lastLine(out string) string {
 
 // RunImage is the Runner of the container runtime: ref runs on the default
 // network to its exit, and its combined output is returned.
-func RunImage(ctx context.Context, ref string, env map[string]string, args ...string) (string, int, error) {
+func RunImage(ctx context.Context, ref string, env, files map[string]string, args ...string) (string, int, error) {
+	var copies []testcontainers.ContainerFile
+	for path, content := range files {
+		copies = append(copies, testcontainers.ContainerFile{Reader: strings.NewReader(content), ContainerFilePath: path, FileMode: 0o444})
+	}
 	c, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
 			Image:      ref,
 			Env:        env,
+			Files:      copies,
 			Cmd:        args,
 			WaitingFor: wait.ForExit(), // bounded by ctx, the caller's bound on setup
 		},

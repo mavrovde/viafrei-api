@@ -25,10 +25,6 @@ type sqlWriter struct {
 	pending []string
 	rows    map[string]int
 	order   []string
-	// capture, when set, is handed every row as it is written: the table,
-	// its columns and the row's SQL literals (Platform translates them).
-	capture  func(table string, cols, vals []string)
-	colNames []string
 }
 
 func newSQLWriter(w io.Writer) *sqlWriter {
@@ -45,7 +41,7 @@ func (s *sqlWriter) write(str string) {
 
 func (s *sqlWriter) begin(table string, cols ...string) {
 	s.end()
-	s.table, s.cols, s.colNames = table, strings.Join(cols, ", "), cols
+	s.table, s.cols = table, strings.Join(cols, ", ")
 	if _, seen := s.rows[table]; !seen {
 		s.order = append(s.order, table)
 		s.rows[table] = 0
@@ -53,9 +49,6 @@ func (s *sqlWriter) begin(table string, cols ...string) {
 }
 
 func (s *sqlWriter) row(vals ...string) {
-	if s.capture != nil {
-		s.capture(s.table, s.colNames, vals)
-	}
 	s.pending = append(s.pending, "("+strings.Join(vals, ", ")+")")
 	s.rows[s.table]++
 	if len(s.pending) == batchRows {

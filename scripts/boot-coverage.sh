@@ -62,6 +62,9 @@ invoke() {
     internal/release/platformsync)
       expect 2 "$bin"
       ;;
+    internal/release/pinguard)
+      expect 2 "$bin" -dir "$work/run"
+      ;;
     *)
       echo "boot-coverage: main package $pkg has no invocation in $0" >&2
       exit 1

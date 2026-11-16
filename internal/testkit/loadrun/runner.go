@@ -237,7 +237,7 @@ func every(ctx context.Context, interval time.Duration, fn func(context.Context)
 // psql runs one statement on the test stack's database as its owner, over
 // docker compose exec: the database is never reached over the network.
 func (r *runner) psql(ctx context.Context, sql string) (string, error) {
-	out, err := r.docker(ctx, "exec", "-T", "db", "psql", "-U", "owner", "-d", "contract", "-v", "ON_ERROR_STOP=1", "-tAqc", sql)
+	out, err := r.docker(ctx, "exec", "-T", "db", "psql", "-U", "owner", "-d", "test_contract", "-v", "ON_ERROR_STOP=1", "-tAqc", sql)
 	return strings.TrimSpace(out), err
 }
 

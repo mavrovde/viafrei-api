@@ -1,7 +1,7 @@
 # Local development stack: the API and a PostGIS database (the platform's
 # postgis/postgis:16-3.4) migrated by the viafrei-database release
-# database.pin names, beside the read-contract stub, the read-only role and a
-# synthetic fixture set.
+# database.pin names, holding a synthetic fixture set that the same release's
+# test seed writes.
 #
 #   cp .env.example .env    # then replace both placeholders
 #   make up                 # build and start, wait until healthy
@@ -9,29 +9,26 @@
 #   curl -s localhost:8082/readyz    # the health listener
 #
 # Only the API is published, on the loopback interface: its public listener
-# and its health listener. The database is reachable from the API container
-# alone. Nothing here holds real data.
+# and its health listener. The database is reachable from the stack alone.
+# Nothing here holds real data: the database is named test_contract, the only
+# kind of name the release's test seed writes into.
 
 name: viafrei-api
 
 services:
   db:
-    build:
-      context: .
-      target: devdb
-      args:
-        FIXTURE_PROFILE: ${FIXTURE_PROFILE:-tiny}
-        FIXTURE_SEED: ${FIXTURE_SEED:-1}
+    image: postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5
     platform: linux/amd64 # the upstream PostGIS image is single-architecture
+    # The partitions of every fixture day are made in one transaction.
+    command: ["-c", "max_locks_per_transaction=4096"]
     environment:
-      POSTGRES_DB: contract
+      POSTGRES_DB: test_contract
       POSTGRES_USER: owner
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
-      API_READER_PASSWORD: ${API_READER_PASSWORD:?set API_READER_PASSWORD in .env}
     volumes:
       - db16-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U owner -d contract && psql -U owner -d contract -tAc 'select 1 from contract.contract_info' | grep -q 1"]
+      test: ["CMD-SHELL", "pg_isready -U owner -d test_contract"]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -41,22 +38,71 @@ services:
   # The platform's schema, from the release database.pin names (the image
   # below must equal its first line; TestComposeRules holds them equal): it
   # says which release it is, applies its migrations and the settings it
-  # gives each role in this database, makes the daily partitions and must
-  # report READY at the pinned head. It runs on every start and changes
-  # nothing on a database already at the head.
+  # gives each role in this database, makes the daily partitions from the day
+  # before the fixtures' first day, must report READY at the pinned head, and
+  # gives the API's read-only role its password. It runs on every start and
+  # changes nothing on a database already at the head.
   db-migrate:
-    image: ghcr.io/mavrovde/viafrei-database:0.2.0@sha256:98f0e01b8bb2f34afac8b482bd701ee61fa7bf142cc03d413e83c3b8b605ec9f
+    image: viafrei-database:0.2.0-local
     depends_on:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://owner:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/contract?sslmode=disable
+      DATABASE_URL: postgres://owner:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/test_contract?sslmode=disable
+      API_READER_PASSWORD: ${API_READER_PASSWORD:?set API_READER_PASSWORD in .env}
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
         node /app/dist/cli.js migrate
-        node /app/dist/cli.js partitions ensure --days 7
+        node /app/dist/cli.js partitions ensure --days 7 --from 2026-03-27
         node /app/dist/cli.js head | tee /dev/stderr | grep -qx "READY $$(node /app/dist/cli.js version | sed -n 's/.* schema-head //p')"
+        echo "alter role api_reader password :'pw';" | psql -X -q -v ON_ERROR_STOP=1 -v pw="$$API_READER_PASSWORD" "$$DATABASE_URL"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [backend]
+
+  # The synthetic fixture set (FIXTURE_PROFILE, FIXTURE_SEED), written by
+  # fixturegen in the read contract's own shape and handed to db-seed in a
+  # volume.
+  fixtures:
+    build:
+      context: .
+      target: fixtures
+      args:
+        FIXTURE_PROFILE: ${FIXTURE_PROFILE:-tiny}
+        FIXTURE_SEED: ${FIXTURE_SEED:-1}
+    entrypoint: ["/bin/sh", "-ec", "cp /out/fixtures/seed.sql /out/fixtures/manifest.json /seed/"]
+    volumes:
+      - seed:/seed
+    network_mode: none
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  # The release's test seed writes the set into the platform's tables, once:
+  # a database whose contract already lists a source is left as it is
+  # (`make reset` starts over). The image must equal db-migrate's.
+  db-seed:
+    image: viafrei-database:0.2.0-local
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      fixtures:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://owner:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/test_contract?sslmode=disable
+      VF_TEST_FIXTURES: "1"
+    volumes:
+      - seed:/seed:ro
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        if [ "$$(psql -X -tA -c 'select exists (select 1 from contract.source)' "$$DATABASE_URL")" = t ]; then
+          echo "fixtures already seeded"
+        else
+          node /app/dist/cli.js test-fixtures seed /seed/seed.sql
+          echo "fixtures seeded: $$(tr -d '\n' < /seed/manifest.json | sed -n 's/.*"checksum": *"\([^"]*\)".*/\1/p')"
+        fi
     read_only: true
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
@@ -67,13 +113,13 @@ services:
       context: .
       target: runtime
       args:
-        VERSION: ${VERSION:-0.2.0-dev}
+        VERSION: ${VERSION:-0.3.0-dev}
         COMMIT: ${COMMIT:-unknown}
     image: viafrei-api:local
     depends_on:
       db:
         condition: service_healthy
-      db-migrate:
+      db-seed:
         condition: service_completed_successfully
     environment:
       VFAPI_SERVER_LISTEN_ADDR: ":8080"
@@ -82,7 +128,7 @@ services:
       # closed). Published on the loopback alone, the local stack admits
       # every caller that reaches it.
       VFAPI_CALLERS_ALLOW_CIDR: "0.0.0.0/0,::/0"
-      VFAPI_DB_URL: postgres://api_reader:${API_READER_PASSWORD:?set API_READER_PASSWORD in .env}@db:5432/contract?sslmode=disable
+      VFAPI_DB_URL: postgres://api_reader:${API_READER_PASSWORD:?set API_READER_PASSWORD in .env}@db:5432/test_contract?sslmode=disable
       # The per-address limit of keyless requests (RATE-001); the fuzzing
       # scripts switch it off with 0, see docs/rate-limits.md.
       VFAPI_RATELIMIT_ANON_RPS: ${VFAPI_RATELIMIT_ANON_RPS:-1}
@@ -112,3 +158,4 @@ networks:
 
 volumes:
   db16-data: {}
+  seed: {}

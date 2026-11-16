@@ -64,7 +64,7 @@ trap teardown EXIT
 
 "${compose[@]}" up --detach --build --wait --wait-timeout 300
 
-sql() { "${compose[@]}" exec -T db psql -U owner -d contract -v ON_ERROR_STOP=1 -tAqc "$1"; }
+sql() { "${compose[@]}" exec -T db psql -U owner -d test_contract -v ON_ERROR_STOP=1 -tAqc "$1"; }
 keys() { "${compose[@]}" exec -T api /app keys "$@"; }
 
 sources=$(sql "select string_agg(source_ref, ',' order by source_ref) from contract.source where review_signed_on is not null")

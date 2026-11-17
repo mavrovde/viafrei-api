@@ -1,4 +1,4 @@
-# source routes 2.6.21 d64764560cbbc9a022267a933eb855f3daf04783
+# source routes 2.6.22 ccd6aff98bf5057c419bd0c5801d56f1c1ac5027
 # method	path
 GET	/internal/pressure
 GET	/healthz

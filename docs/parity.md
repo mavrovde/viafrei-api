@@ -97,6 +97,7 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
 | `data[*].location`, `data[*].districtCode`, `data[*].modes`, in `listStations` only | The MCP stop search states a stop's name, code and distance, not its position, district or modes. The site reads all three from the digest route `/internal/station/:slug` (the page's map and Land line from the stop's position and AGS, the live board's mode filter), so the API answers them; they are not compared. A position in any other operation, a charging site's or a car park's, is compared. |
 | `data.lamp`, `data.lampReason`, in `listStateRoadConditions` only | The MCP motorway status of a Land lists the Land's items and counts, not a lamp. The site reads the Land's lamp (the motorway pages' one rule over the Land's Autobahn items and DWD levels) from the digest route `/internal/state/:slug`, so the API answers it; it is not compared. |
 | `data.lamp`, `data.lampReason`, `data.corridor.states`, in `getMotorwayConditions` asked with `horizon_days` or `from` | The MCP roadworks-ahead answer lists the planned sites of the window, not a lamp or the Länder the road crosses. The site reads the road's lamp and Länder beside its planned works from the digest route `/internal/motorway/:road`, so the API answers them; they are not compared. |
+| `data.watchId`, `data.uri`, in `getWatch` only | Each side mints the id of a watch: the platform a number of the session that opened it, the API a token of the kind, the key and the condition. The watch the id names (kind, key, condition, window) is compared. |
 | `meta.attribution[*].` `domain`, `licence`, `licenceUrl`, `publisher`, `shareAlike`, `shareAlikeOffer`, `termsUrl`, `text` | The fixture's families carry synthetic register texts; the platform credits its own register rows for the sources the producer stores each family as, so the texts cannot be equal on these rows. Which families are credited (`meta.attribution[*].family`) is compared. |
 | The text of a condition note (`meta.notes.condition`) and, since rules/5, of a purpose note (`meta.notes.purpose`) | The same reason, since rules/4 for conditions: the fixture's notes are synthetic and the platform states its own register's. The family of each note and how many each family has are compared (`meta.notes.<kind>[<family>]`, above). |
 
@@ -189,6 +190,13 @@ nothing, so that family contributed nothing and neither side credits it.
   as that sweep's instant, which is all the platform's motorway status
   states of it; the projection of the MCP answer uses that translation,
   never its own.
+- **A watch** reads the person's words as the platform does when the
+  condition names no events: a jam only watches jams, a jam beside a
+  closure or a restriction watches both, and a jam is watched on a motorway
+  only. It states no lamp (the platform's watch states none and no digest
+  route serves one) and credits the families of the situations it reports,
+  none when it reports none, as the platform's watch names the source of
+  the data behind each report.
 - **Road conditions credit the weather.** The lamp reads the DWD warnings
   of every weather family the key may read, with or without the weather
   scope (the warnings are public), and the answer credits those families

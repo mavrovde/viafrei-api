@@ -6137,12 +6137,6 @@
           "kind": {
             "type": "string"
           },
-          "lamp": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "note": {
             "description": "Set when the request asked for something the watch does not report (a jam off a motorway, or around a place).",
             "type": [
@@ -6181,7 +6175,6 @@
           "ended",
           "condition",
           "note",
-          "lamp",
           "situations"
         ],
         "type": "object"

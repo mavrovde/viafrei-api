@@ -11092,7 +11092,7 @@
         },
         {
           "name": "data.condition.events",
-          "value": "null"
+          "value": "[\"jams\"]"
         },
         {
           "name": "data.ended",
@@ -11111,10 +11111,6 @@
           "value": "road"
         },
         {
-          "name": "data.lamp",
-          "value": "amber"
-        },
-        {
           "name": "data.note",
           "value": "null"
         },
@@ -11127,52 +11123,12 @@
           "value": "2026-03-30T03:00:00Z"
         },
         {
-          "name": "data.uri",
-          "value": "viafrei://watch/eyJrIjoicm9hZCIsImtleSI6IkExMDIiLCJjIjp7fX0"
+          "name": "meta.attribution",
+          "value": "[]"
         },
         {
-          "name": "data.watchId",
-          "value": "eyJrIjoicm9hZCIsImtleSI6IkExMDIiLCJjIjp7fX0"
-        },
-        {
-          "name": "meta.attribution[bast_lcl].family",
-          "value": "bast_lcl"
-        },
-        {
-          "name": "meta.attribution[dwd_alpha].family",
-          "value": "dwd_alpha"
-        },
-        {
-          "name": "meta.attribution[dwd_eta].family",
-          "value": "dwd_eta"
-        },
-        {
-          "name": "meta.attribution[lez_alpha].family",
-          "value": "lez_alpha"
-        },
-        {
-          "name": "meta.attribution[lorry_bast_langlkw].family",
-          "value": "lorry_bast_langlkw"
-        },
-        {
-          "name": "meta.attribution[lorry_koeln_beschraenkungen].family",
-          "value": "lorry_koeln_beschraenkungen"
-        },
-        {
-          "name": "meta.attribution[osm_speed_cameras].family",
-          "value": "osm_speed_cameras"
-        },
-        {
-          "name": "meta.attribution[roads_alpha].family",
-          "value": "roads_alpha"
-        },
-        {
-          "name": "meta.attribution[speed_alpha].family",
-          "value": "speed_alpha"
-        },
-        {
-          "name": "meta.notes.condition[lorry_bast_langlkw]",
-          "value": "1"
+          "name": "meta.notes.condition",
+          "value": "[]"
         },
         {
           "name": "meta.notes.purpose",
@@ -11248,10 +11204,6 @@
           "value": "road"
         },
         {
-          "name": "data.lamp",
-          "value": "amber"
-        },
-        {
           "name": "data.note",
           "value": "null"
         },
@@ -11264,52 +11216,12 @@
           "value": "2026-03-30T03:00:00Z"
         },
         {
-          "name": "data.uri",
-          "value": "viafrei://watch/eyJrIjoicm9hZCIsImtleSI6IkExMDIiLCJjIjp7ImV2ZW50cyI6WyJqYW1zIl19fQ"
+          "name": "meta.attribution",
+          "value": "[]"
         },
         {
-          "name": "data.watchId",
-          "value": "eyJrIjoicm9hZCIsImtleSI6IkExMDIiLCJjIjp7ImV2ZW50cyI6WyJqYW1zIl19fQ"
-        },
-        {
-          "name": "meta.attribution[bast_lcl].family",
-          "value": "bast_lcl"
-        },
-        {
-          "name": "meta.attribution[dwd_alpha].family",
-          "value": "dwd_alpha"
-        },
-        {
-          "name": "meta.attribution[dwd_eta].family",
-          "value": "dwd_eta"
-        },
-        {
-          "name": "meta.attribution[lez_alpha].family",
-          "value": "lez_alpha"
-        },
-        {
-          "name": "meta.attribution[lorry_bast_langlkw].family",
-          "value": "lorry_bast_langlkw"
-        },
-        {
-          "name": "meta.attribution[lorry_koeln_beschraenkungen].family",
-          "value": "lorry_koeln_beschraenkungen"
-        },
-        {
-          "name": "meta.attribution[osm_speed_cameras].family",
-          "value": "osm_speed_cameras"
-        },
-        {
-          "name": "meta.attribution[roads_alpha].family",
-          "value": "roads_alpha"
-        },
-        {
-          "name": "meta.attribution[speed_alpha].family",
-          "value": "speed_alpha"
-        },
-        {
-          "name": "meta.notes.condition[lorry_bast_langlkw]",
-          "value": "1"
+          "name": "meta.notes.condition",
+          "value": "[]"
         },
         {
           "name": "meta.notes.purpose",
@@ -11381,10 +11293,6 @@
           "value": "place"
         },
         {
-          "name": "data.lamp",
-          "value": "amber"
-        },
-        {
           "name": "data.note",
           "value": "null"
         },
@@ -11397,48 +11305,8 @@
           "value": "2026-03-30T06:00:00Z"
         },
         {
-          "name": "data.uri",
-          "value": "viafrei://watch/eyJrIjoicGxhY2UiLCJrZXkiOiI0OS4xNjQ2NSw3Ljc5OTAzIiwiYyI6eyJyYWRpdXNfa20iOjEwfX0"
-        },
-        {
-          "name": "data.watchId",
-          "value": "eyJrIjoicGxhY2UiLCJrZXkiOiI0OS4xNjQ2NSw3Ljc5OTAzIiwiYyI6eyJyYWRpdXNfa20iOjEwfX0"
-        },
-        {
-          "name": "meta.attribution[bast_lcl].family",
-          "value": "bast_lcl"
-        },
-        {
-          "name": "meta.attribution[dwd_alpha].family",
-          "value": "dwd_alpha"
-        },
-        {
-          "name": "meta.attribution[dwd_eta].family",
-          "value": "dwd_eta"
-        },
-        {
-          "name": "meta.attribution[lez_alpha].family",
-          "value": "lez_alpha"
-        },
-        {
-          "name": "meta.attribution[lorry_bast_langlkw].family",
-          "value": "lorry_bast_langlkw"
-        },
-        {
-          "name": "meta.attribution[lorry_koeln_beschraenkungen].family",
-          "value": "lorry_koeln_beschraenkungen"
-        },
-        {
-          "name": "meta.attribution[osm_speed_cameras].family",
-          "value": "osm_speed_cameras"
-        },
-        {
-          "name": "meta.attribution[roads_alpha].family",
-          "value": "roads_alpha"
-        },
-        {
-          "name": "meta.attribution[speed_alpha].family",
-          "value": "speed_alpha"
+          "name": "meta.attribution",
+          "value": "[]"
         },
         {
           "name": "meta.notes.condition",
@@ -11518,10 +11386,6 @@
           "value": "road"
         },
         {
-          "name": "data.lamp",
-          "value": "amber"
-        },
-        {
           "name": "data.note",
           "value": "null"
         },
@@ -11534,52 +11398,12 @@
           "value": "2026-03-30T03:00:00Z"
         },
         {
-          "name": "data.uri",
-          "value": "viafrei://watch/eyJrIjoicm9hZCIsImtleSI6IkExMDIiLCJjIjp7ImV2ZW50cyI6WyJqYW1zIl19fQ"
+          "name": "meta.attribution",
+          "value": "[]"
         },
         {
-          "name": "data.watchId",
-          "value": "eyJrIjoicm9hZCIsImtleSI6IkExMDIiLCJjIjp7ImV2ZW50cyI6WyJqYW1zIl19fQ"
-        },
-        {
-          "name": "meta.attribution[bast_lcl].family",
-          "value": "bast_lcl"
-        },
-        {
-          "name": "meta.attribution[dwd_alpha].family",
-          "value": "dwd_alpha"
-        },
-        {
-          "name": "meta.attribution[dwd_eta].family",
-          "value": "dwd_eta"
-        },
-        {
-          "name": "meta.attribution[lez_alpha].family",
-          "value": "lez_alpha"
-        },
-        {
-          "name": "meta.attribution[lorry_bast_langlkw].family",
-          "value": "lorry_bast_langlkw"
-        },
-        {
-          "name": "meta.attribution[lorry_koeln_beschraenkungen].family",
-          "value": "lorry_koeln_beschraenkungen"
-        },
-        {
-          "name": "meta.attribution[osm_speed_cameras].family",
-          "value": "osm_speed_cameras"
-        },
-        {
-          "name": "meta.attribution[roads_alpha].family",
-          "value": "roads_alpha"
-        },
-        {
-          "name": "meta.attribution[speed_alpha].family",
-          "value": "speed_alpha"
-        },
-        {
-          "name": "meta.notes.condition[lorry_bast_langlkw]",
-          "value": "1"
+          "name": "meta.notes.condition",
+          "value": "[]"
         },
         {
           "name": "meta.notes.purpose",

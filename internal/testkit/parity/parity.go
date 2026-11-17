@@ -216,6 +216,8 @@ var Default = Rules{
 		{"data.lampReason", "from", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
 		{"data.corridor.states", "horizon_days", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
 		{"data.corridor.states", "from", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
+		{"data.watchId", "", "getWatch", watchIDReason},
+		{"data.uri", "", "getWatch", watchIDReason},
 		{"meta.attribution[*].domain", "", "", attributionReason},
 		{"meta.attribution[*].licence", "", "", attributionReason},
 		{"meta.attribution[*].licenceUrl", "", "", attributionReason},
@@ -255,6 +257,9 @@ func purposeFree(b Bundle) bool {
 func siteReason(route string) string {
 	return "the MCP capability does not state it; the site reads it from the digest route " + route
 }
+
+// watchIDReason is why a watch's id is not compared: each side mints its own.
+const watchIDReason = "each side mints the id of a watch: the platform a number of its session, the API a token of kind, key and condition; the watch it names is compared"
 
 // attributionReason is why only the credited family of an attribution entry
 // is compared.

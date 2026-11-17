@@ -69,6 +69,7 @@ type Repositories struct {
 	Rules    Rules
 	Transit  Transit
 	Fuel     Fuel
+	Hydrogen Hydrogen
 }
 
 // Settings are the tunables of the use cases.

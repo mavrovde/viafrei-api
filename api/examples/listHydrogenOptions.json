@@ -1,0 +1,85 @@
+{
+  "title": "Hydrogen stations for a car within 50 km",
+  "request": "/v1/hydrogen-options?at=47.95,6.9\u0026vehicle=car\u0026limit=2",
+  "attribution": "Hydrogen stations come from the source families of the energy domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "energy"
+    ],
+    "sources": [
+      "afir_alpha"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": {
+      "stations": [],
+      "nearest": {
+        "id": "afir_alpha:900001",
+        "name": "H2 Schömpingbach",
+        "operator": "H2 Synthetic",
+        "brand": null,
+        "location": {
+          "lat": 48.389598,
+          "lon": 7.422192
+        },
+        "distanceM": 62433,
+        "address": null,
+        "refill": [
+          {
+            "solution": "700bar_car"
+          }
+        ],
+        "opening": null,
+        "providerUpdatedAt": null,
+        "sourceFamily": "afir_alpha"
+      }
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": "2026-03-29T23:55:00Z",
+      "freshness": [
+        {
+          "family": "afir_alpha",
+          "dataAsOf": "2026-03-29T23:55:00Z",
+          "ageS": 300,
+          "staleAfterS": 1800,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "afir_alpha",
+          "domain": "energy",
+          "publisher": "Kleber Datenwerk",
+          "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://alpha.example/terms/afir_alpha"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ],
+      "page": {
+        "limit": 2,
+        "hasMore": false
+      }
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/hydrogen-options"
+    }
+  }
+}

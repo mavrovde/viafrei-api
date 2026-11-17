@@ -51,6 +51,7 @@ var Tables = []string{
 	"parking_facility", "occupancy_observation",
 	"stop_place", "stop_point", "transit_line", "journey", "scheduled_call", "call_observation",
 	"station_facility", "weather_warning", "rule_topic", "rule_statement",
+	"hydrogen_station",
 }
 
 // ReferenceInstant is the start of the first generated day: the Saturday
@@ -130,6 +131,7 @@ func generate(out io.Writer, profile string, seed uint64, contractVersion string
 	g.transit()
 	g.weather()
 	g.rules()
+	g.hydrogen()
 	g.w.end()
 	sum, err := g.w.close()
 	if err != nil {
@@ -982,6 +984,30 @@ func (g *gen) rules() {
 				str(fmt.Sprintf("Synthetic statement %d about %s, for tests only.", i+1, t)),
 				str("§ 0 synthetic"), str("https://law.example/"+t))
 			g.counted("", "viafrei_rules")
+		}
+	}
+}
+
+// hydrogen writes two hydrogen stations per Land, drawn after every other
+// table so the rows before them stay as they were: one for cars (700 bar),
+// every third also for trucks (350 bar).
+func (g *gen) hydrogen() {
+	// The charging family's source carries them: a source of its own would
+	// shift the draws of every table before.
+	const ref = "afir_alpha"
+	g.w.begin("hydrogen_station", "station_id", "name", "operator_name", "location", "refill", "source_ref", "recorded_at")
+	n := 0
+	for _, l := range g.lands {
+		for range 2 {
+			n++
+			pl := g.randomPlace(l.code)
+			refill := `[{"solution":"700bar_car"}]`
+			if n%3 == 0 {
+				refill = `[{"solution":"700bar_car"},{"solution":"350bar_truck"}]`
+			}
+			g.w.row(str(fmt.Sprintf("%s:%d", ref, 900000+n)), str("H2 "+pl.name), str("H2 Synthetic"), point(near(g.r, pl.at, l.cell)),
+				str(refill), str(ref), ts(g.instant()))
+			g.counted(l.code, ref)
 		}
 	}
 }

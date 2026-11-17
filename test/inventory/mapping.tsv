@@ -107,3 +107,10 @@ argument:describe_station.station	listStations?q	stations-text	-
 argument:describe_station.eva_no	listStations?code	stations-code	-
 argument:describe_station.departures	listStationDepartures?limit	departures-day	-
 web:/internal/station/{}/live	listStationDepartures,listStationFacilities	departures-day,facilities-all	-
+tool:find_hydrogen_station	listHydrogenOptions	hydrogen-near,hydrogen-nearest-beyond	-
+argument:find_hydrogen_station.place	listPlaces?q,listHydrogenOptions?at	places-name,hydrogen-near	-
+argument:find_hydrogen_station.lat	listHydrogenOptions?at	hydrogen-near	-
+argument:find_hydrogen_station.lon	listHydrogenOptions?at	hydrogen-near	-
+argument:find_hydrogen_station.radius_km	listHydrogenOptions?radius_m	hydrogen-nearest-beyond	-
+argument:find_hydrogen_station.vehicle	listHydrogenOptions?vehicle	hydrogen-truck	-
+argument:find_hydrogen_station.limit	listHydrogenOptions?limit	hydrogen-near	-

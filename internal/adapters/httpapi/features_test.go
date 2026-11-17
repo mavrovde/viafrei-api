@@ -64,6 +64,8 @@ type fakeFeatures struct {
 	gotPlaces  places.Query
 	facilities features.StationFacilities
 	gotFacil   transit.FacilityQuery
+	hydrogen   features.HydrogenStations
+	gotHydro   energy.HydrogenQuery
 	gotAccept  []string
 }
 

@@ -1270,6 +1270,188 @@
         ],
         "type": "object"
       },
+      "HydrogenData": {
+        "additionalProperties": false,
+        "properties": {
+          "nearest": {
+            "additionalProperties": false,
+            "description": "When no station is inside the radius, the nearest one beyond it; otherwise null.",
+            "properties": {
+              "address": {
+                "description": "The published address object, verbatim; null when not published."
+              },
+              "brand": {
+                "description": "The brand; null when not published.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "distanceM": {
+                "description": "Distance from the asked position in metres.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "id": {
+                "type": "string"
+              },
+              "location": {
+                "$ref": "#/components/schemas/Position"
+              },
+              "name": {
+                "description": "The station's name; null when not published.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "opening": {
+                "description": "The published opening hours, verbatim; null when not published."
+              },
+              "operator": {
+                "description": "The operator; null when not published.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "providerUpdatedAt": {
+                "description": "When the provider last changed the station; null when not published.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "refill": {
+                "description": "The published refill solutions (pressure, vehicle), verbatim; null when not published."
+              },
+              "sourceFamily": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "operator",
+              "brand",
+              "location",
+              "distanceM",
+              "address",
+              "refill",
+              "opening",
+              "providerUpdatedAt",
+              "sourceFamily"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "stations": {
+            "items": {
+              "$ref": "#/components/schemas/HydrogenStation"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "stations",
+          "nearest"
+        ],
+        "type": "object"
+      },
+      "HydrogenEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HydrogenData"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PagedMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "HydrogenStation": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "description": "The published address object, verbatim; null when not published."
+          },
+          "brand": {
+            "description": "The brand; null when not published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "distanceM": {
+            "description": "Distance from the asked position in metres.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "name": {
+            "description": "The station's name; null when not published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "opening": {
+            "description": "The published opening hours, verbatim; null when not published."
+          },
+          "operator": {
+            "description": "The operator; null when not published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "providerUpdatedAt": {
+            "description": "When the provider last changed the station; null when not published.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "refill": {
+            "description": "The published refill solutions (pressure, vehicle), verbatim; null when not published."
+          },
+          "sourceFamily": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "operator",
+          "brand",
+          "location",
+          "distanceM",
+          "address",
+          "refill",
+          "opening",
+          "providerUpdatedAt",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
       "KeyData": {
         "additionalProperties": false,
         "properties": {
@@ -5022,6 +5204,401 @@
         ],
         "x-example-request": "/v1/fuel-options?at=49.17,7.81\u0026radius_m=25000\u0026fuel=e10\u0026sort=price\u0026limit=2",
         "x-mcp-counterpart": "filling station search",
+        "x-required-scope": "energy"
+      }
+    },
+    "/v1/hydrogen-options": {
+      "get": {
+        "description": "The hydrogen stations within the radius, nearest first, optionally only those with a refill solution for a car or a truck; when none is inside, data.nearest names the nearest one beyond. Needs the scope energy.",
+        "operationId": "listHydrogenOptions",
+        "parameters": [
+          {
+            "description": "The position: lat,lon in decimal degrees (WGS 84).",
+            "explode": false,
+            "in": "query",
+            "name": "at",
+            "required": true,
+            "schema": {
+              "description": "The position: lat,lon in decimal degrees (WGS 84).",
+              "examples": [
+                "52.52,13.405"
+              ],
+              "pattern": "^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Search radius in metres (1000 to 150000); default 50000.",
+            "explode": false,
+            "in": "query",
+            "name": "radius_m",
+            "schema": {
+              "description": "Search radius in metres (1000 to 150000); default 50000.",
+              "format": "int64",
+              "maximum": 150000,
+              "minimum": 1000,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Only stations with a refill solution for this vehicle. Default: any.",
+            "explode": false,
+            "in": "query",
+            "name": "vehicle",
+            "schema": {
+              "description": "Only stations with a refill solution for this vehicle. Default: any.",
+              "enum": [
+                "car",
+                "truck"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Most stations to return, nearest first; default 5.",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "description": "Most stations to return, nearest first; default 5.",
+              "format": "int64",
+              "maximum": 10,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "Hydrogen stations for a car within 50 km",
+                    "value": {
+                      "data": {
+                        "stations": [],
+                        "nearest": {
+                          "id": "afir_alpha:900001",
+                          "name": "H2 Schömpingbach",
+                          "operator": "H2 Synthetic",
+                          "brand": null,
+                          "location": {
+                            "lat": 48.389598,
+                            "lon": 7.422192
+                          },
+                          "distanceM": 62433,
+                          "address": null,
+                          "refill": [
+                            {
+                              "solution": "700bar_car"
+                            }
+                          ],
+                          "opening": null,
+                          "providerUpdatedAt": null,
+                          "sourceFamily": "afir_alpha"
+                        }
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:55:00Z",
+                        "freshness": [
+                          {
+                            "family": "afir_alpha",
+                            "dataAsOf": "2026-03-29T23:55:00Z",
+                            "ageS": 300,
+                            "staleAfterS": 1800,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "afir_alpha",
+                            "domain": "energy",
+                            "publisher": "Kleber Datenwerk",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms/afir_alpha"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 2,
+                          "hasMore": false
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/hydrogen-options"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/HydrogenEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not used by this operation.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "Hydrogen filling stations near a position",
+        "tags": [
+          "energy"
+        ],
+        "x-attribution": "Hydrogen stations come from the source families of the energy domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/hydrogen-options?at=47.95,6.9\u0026vehicle=car\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/hydrogen-options?at=47.95,6.9\u0026vehicle=car\u0026limit=2",
+        "x-mcp-counterpart": "hydrogen station search",
         "x-required-scope": "energy"
       }
     },

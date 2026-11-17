@@ -20,3 +20,4 @@ listFuelOptions	near
 listPlaces	lookup
 listStationDepartures	lookup
 listStationFacilities	lookup
+listHydrogenOptions	near

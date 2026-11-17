@@ -165,3 +165,8 @@ func (f *askedFeatures) Facilities(_ context.Context, _ access.Record, q transit
 	f.asked = fmt.Sprintf("limit=%d", q.Limit)
 	return features.StationFacilities{}, nil
 }
+
+func (f *askedFeatures) HydrogenStations(_ context.Context, _ access.Record, q energy.HydrogenQuery) (features.HydrogenStations, error) {
+	f.asked = fmt.Sprintf("limit=%d", q.Limit)
+	return features.HydrogenStations{}, nil
+}

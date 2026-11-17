@@ -2,7 +2,7 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "c584dbac71a17cc52f4c7ffac8e66388fcf55e989c52d96d259662f2d2a66b4c"
+    "sha256": "1bafcd0808da29874fab16d9ba776c317c3238532557c2415e3f0857d527df0b"
   },
   "cases": [
     {
@@ -530,6 +530,57 @@
             "version": "2026-03-01"
           }
         ]
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "hydrogen-near",
+      "operation": "listHydrogenOptions",
+      "counterpart": "hydrogen station search",
+      "request": "/v1/hydrogen-options?at=47.95,6.9&radius_m=150000&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "afir_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "hydrogen-truck",
+      "operation": "listHydrogenOptions",
+      "counterpart": "hydrogen station search",
+      "request": "/v1/hydrogen-options?at=47.95,6.9&radius_m=150000&vehicle=truck&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "afir_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "hydrogen-nearest-beyond",
+      "operation": "listHydrogenOptions",
+      "counterpart": "hydrogen station search",
+      "request": "/v1/hydrogen-options?at=47.95,6.9&radius_m=1000",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "afir_alpha"
+        ],
+        "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
     }

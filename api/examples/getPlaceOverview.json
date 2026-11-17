@@ -44,63 +44,13 @@
       "asOf": null,
       "freshness": [
         {
-          "family": "afir_alpha",
-          "dataAsOf": "2026-03-29T23:55:00Z",
-          "ageS": 300,
-          "staleAfterS": 1800,
-          "stale": false
-        },
-        {
-          "family": "afir_beta",
-          "dataAsOf": "2026-03-29T23:55:00Z",
-          "ageS": 300,
-          "staleAfterS": 1800,
-          "stale": false
-        },
-        {
           "family": "geonames",
           "dataAsOf": null,
           "ageS": null,
           "stale": false
-        },
-        {
-          "family": "park_alpha",
-          "dataAsOf": "2026-03-29T23:57:30Z",
-          "ageS": 150,
-          "staleAfterS": 900,
-          "stale": false
-        },
-        {
-          "family": "park_beta",
-          "dataAsOf": "2026-03-29T23:57:30Z",
-          "ageS": 150,
-          "staleAfterS": 900,
-          "stale": false
         }
       ],
       "attribution": [
-        {
-          "family": "afir_alpha",
-          "domain": "energy",
-          "publisher": "Kleber Datenwerk",
-          "text": "Synthetic data from family alpha, licence CC BY 4.0.",
-          "licence": "CC BY 4.0",
-          "licenceUrl": "https://licences.example/cc-by-4-0",
-          "shareAlike": false,
-          "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms/afir_alpha"
-        },
-        {
-          "family": "afir_beta",
-          "domain": "energy",
-          "publisher": "Deingmeir Datenwerk",
-          "text": "Synthetic data from family beta, licence CC BY-SA 4.0.",
-          "licence": "CC BY-SA 4.0",
-          "licenceUrl": "https://licences.example/cc-by-sa-4-0",
-          "shareAlike": true,
-          "shareAlikeOffer": "https://viafrei.de/impressum",
-          "termsUrl": "https://beta.example/terms/afir_beta"
-        },
         {
           "family": "geonames",
           "domain": "places",
@@ -111,28 +61,6 @@
           "shareAlike": false,
           "shareAlikeOffer": null,
           "termsUrl": "https://download.geonames.org/export/dump/"
-        },
-        {
-          "family": "park_alpha",
-          "domain": "parking",
-          "publisher": "Fäpung Datenwerk",
-          "text": "Synthetic data from family alpha, licence CC BY 4.0.",
-          "licence": "CC BY 4.0",
-          "licenceUrl": "https://licences.example/cc-by-4-0",
-          "shareAlike": false,
-          "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms/park_alpha"
-        },
-        {
-          "family": "park_beta",
-          "domain": "parking",
-          "publisher": "Sückkies Datenwerk",
-          "text": "Synthetic data from family beta, licence CC BY-SA 4.0.",
-          "licence": "CC BY-SA 4.0",
-          "licenceUrl": "https://licences.example/cc-by-sa-4-0",
-          "shareAlike": true,
-          "shareAlikeOffer": "https://viafrei.de/impressum",
-          "termsUrl": "https://beta.example/terms/park_beta"
         }
       ],
       "notes": {

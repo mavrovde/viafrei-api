@@ -33,7 +33,7 @@ func TestPoiAnswer(t *testing.T) {
 	if f.gotPoi.At == nil || f.gotPoi.RadiusM != 10000 || f.gotPoi.Offset != 10 || f.gotPoi.Category != "amenity" {
 		t.Errorf("asked %+v", f.gotPoi)
 	}
-	for _, want := range []string{`"id":"osm:node1"`, `"distanceM":120`, `"nextCursor":"11"`, `"total":12`} {
+	for _, want := range []string{`"name":"Adler Apotheke"`, `"distanceM":120`, `"nextCursor":"11"`, `"total":12`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("answer lacks %s: %s", want, body)
 		}

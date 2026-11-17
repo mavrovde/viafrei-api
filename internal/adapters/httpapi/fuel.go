@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -68,8 +69,8 @@ type FuelStation struct {
 	Brand        *string     `json:"brand" nullable:"true" doc:"The brand; null when not published."`
 	Location     Position    `json:"location"`
 	DistanceM    int         `json:"distanceM" doc:"Distance from the asked position in metres, to the nearest 100 m: the platform's filling-station search states it in kilometres to one decimal (0.1 km). The order is by the exact distance."`
-	OpenState    string      `json:"openingState" doc:"open, closed or unknown at the answer's instant (open_at's, when asked), read from the published opening hours: unknown when there are none or they cannot be read. Open enumeration."`
-	Prices       []FuelPrice `json:"prices" doc:"The newest price per grade the station reported, by grade; empty when it reported none."`
+	OpenState    string      `json:"openingState" doc:"open, closed or unknown at the answer's instant (open_at's, when asked), read from the published opening hours: unknown when there are none or they cannot be read. Under sort=price, the state the station reported, as the platform's cheapest-fuel search states it. Open enumeration."`
+	Prices       []FuelPrice `json:"prices" doc:"The newest price per grade the station reported, by grade; empty when it reported none. Under sort=price, the asked grade's only."`
 	SourceFamily string      `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
 }
 
@@ -130,6 +131,9 @@ func registerFuel(api huma.API, s *server, op huma.Operation) {
 			return nil, s.featureProblem(ctx, err)
 		}
 		data := fuelStations(a, s.cfg.Fuel.PriceFresh)
+		if q.Sort == "price" {
+			data = cheapest(a, data, q.Fuel)
+		}
 		return &FuelOutput{CacheControl: noStore, Body: FuelEnvelope{
 			Data: data,
 			Meta: FuelMeta{
@@ -159,6 +163,27 @@ func fuelStations(a features.FuelStations, window time.Duration) []FuelStation {
 			DistanceM: tenthKm(st.DistanceM), OpenState: st.OpenStateAt(openStateInstant(a)), Prices: prices, SourceFamily: st.Family}
 	}
 	return data
+}
+
+// cheapest restates a price-ordered answer as the platform's cheapest-fuel
+// search states it: each station with the asked grade's price only, and its
+// reported opening state (the price row's), not the published hours'. The
+// cheapest-fuel search reads no hours.
+func cheapest(a features.FuelStations, data []FuelStation, fuel string) []FuelStation {
+	for i, st := range a.Items {
+		data[i].Prices = slices.DeleteFunc(data[i].Prices, func(p FuelPrice) bool { return p.Fuel != fuel })
+		data[i].OpenState = reportedOpenState(st.Open)
+	}
+	return data
+}
+
+// reportedOpenState is a station's reported state as an opening state: open,
+// closed, or unknown when the station reported neither.
+func reportedOpenState(open string) string {
+	if open == "open" || open == "closed" {
+		return open
+	}
+	return "unknown"
 }
 
 // tenthKm states a distance as the platform's filling-station search states

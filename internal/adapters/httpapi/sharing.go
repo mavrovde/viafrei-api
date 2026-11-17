@@ -71,7 +71,6 @@ type SharingData struct {
 	Stations []SharingStation `json:"stations"`
 	InRadius int              `json:"stationsInRadius" doc:"Every station in the radius, available or not."`
 	Vehicles SharingVehicles  `json:"vehicles"`
-	Nearest  *SharingStation  `json:"nearest" doc:"When no station is in the radius, the nearest one within 100 km; otherwise null."`
 }
 
 // SharingEnvelope is the enveloped answer of listSharingOptions.
@@ -96,7 +95,7 @@ func sharingStation(st transit.SharingStation, now time.Time) SharingStation {
 
 func registerSharing(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "Shared bikes near a position"
-	op.Description = "The bike-sharing stations within the radius, nearest first (only those with a bike to take now unless only_available=false), the free-floating vehicles around, and the nearest station within 100 km when none is in the radius. Needs the scope transit."
+	op.Description = "The bike-sharing stations within the radius, nearest first (only those with a bike to take now unless only_available=false) and the free-floating vehicles around; no station beyond the radius is listed, as the platform's sharing search lists none. Needs the scope transit."
 	featureResponses(api, &op, "Not used by this operation.")
 	op.Extensions[counterpartExtension] = "bike sharing search"
 	huma.Register(api, op, func(ctx context.Context, in *SharingInput) (*SharingOutput, error) {
@@ -133,10 +132,6 @@ func sharingEnvelope(s *server, ctx context.Context, a features.SharingAnswer, l
 			data.Vehicles.Nearest = append(data.Vehicles.Nearest, SharingVehicle{DistanceM: v.DistanceM, FormFactor: v.FormFactor,
 				Propulsion: v.Propulsion, RangeM: v.RangeM, SourceFamily: v.Family})
 		}
-	}
-	if a.Nearest != nil {
-		n := sharingStation(*a.Nearest, now)
-		data.Nearest = &n
 	}
 	return SharingEnvelope{Data: data,
 		Meta:  PagedMeta{DataMeta: s.dataMeta(ctx, a.Meta.Families, a.Meta.At, a.Meta.Partial, partialDetail), Page: Page{Limit: limit, HasMore: a.InRadius > len(a.Stations)}},

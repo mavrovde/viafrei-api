@@ -17,7 +17,7 @@ import (
 
 // GeneratorVersion changes whenever the output for a given seed and profile
 // changes.
-const GeneratorVersion = "0.3.0"
+const GeneratorVersion = "0.3.3"
 
 // Profile sets the size of a generated set.
 type Profile struct {
@@ -146,6 +146,7 @@ func generate(out io.Writer, profile string, seed uint64, contractVersion string
 	g.alerts()
 	g.zones()
 	g.lorry()
+	g.plannedWorks()
 	g.w.end()
 	sum, err := g.w.close()
 	if err != nil {
@@ -292,6 +293,10 @@ var sourceList = []source{
 	// the platform holds: the set writes their rows, never their register.
 	{ref: "lorry_bast_langlkw", family: "alpha", domain: "roads", platform: true},
 	{ref: "lorry_koeln_beschraenkungen", family: "alpha", domain: "roads", platform: true},
+	// The planned motorway works, keyed and registered as the platform's
+	// register keeps BASt's (roadworks_bast: CC BY 4.0, every use class,
+	// reviewed): the family a window ahead reads.
+	{ref: PlannedWorksFamily, family: "alpha", domain: "roads", target: 300, publisher: "Baustellwerk Datenwerk"},
 }
 
 // useClasses are the register's use classes of each family; nil writes no
@@ -380,13 +385,27 @@ func (g *gen) provenance() {
 		if s.target == 0 {
 			continue // no interval: never stale, and no state of its own
 		}
-		asOf := g.end().Add(-time.Duration(s.target/2) * time.Second)
+		asOf := g.sweep(s.ref)
 		if s.stale {
-			asOf = g.end().Add(-time.Duration(30*s.target) * time.Second)
 			g.edges["stale_family"]++
 		}
 		g.w.row(str(s.ref), ts(asOf), ts(asOf), num(s.target))
 	}
+}
+
+// sweep is the data_as_of the source_freshness rows state for the source
+// ref: half its target before the end, or thirty targets for a stale one.
+func (g *gen) sweep(ref string) time.Time {
+	for _, s := range sourceList {
+		if s.ref != ref {
+			continue
+		}
+		if s.stale {
+			return g.end().Add(-time.Duration(30*s.target) * time.Second)
+		}
+		return g.end().Add(-time.Duration(s.target/2) * time.Second)
+	}
+	return g.end()
 }
 
 // termsURL is a source's terms page, on the reserved domain.
@@ -509,6 +528,26 @@ func (rd road) along(f float64) lonLat {
 // eventKinds are the event kinds the platform reads a traffic message's event type as.
 var eventKinds = []string{"closure", "roadworks", "jam", "accident", "hazard", "restriction", "weather", "other"}
 
+// autobahnFamily is the source the platform stores as the motorway
+// operator's (Autobahn GmbH) events. Its API publishes three kinds: a closure,
+// roadworks, and a warning, which the platform's read contract states as a
+// hazard of severity info (its traffic type, which would make a warning a
+// jam, is not published here); and no end, since an item is current while its
+// sweep lists it. Its events carry only those kinds and no end, so the rows
+// are ones the platform can hold, and none the newest sweep lists is
+// withdrawn; and each was last seen by the family's
+// newest sweep (its data_as_of), the change time the read contract states
+// for an Autobahn item (the sweep's observation instant).
+const autobahnFamily = "roads_alpha"
+
+// autobahnKind is the kind an event of kind k is as an Autobahn item.
+func autobahnKind(k string) string {
+	if k == "closure" || k == "roadworks" {
+		return k
+	}
+	return "hazard"
+}
+
 // eventColumns are the columns of a traffic event row. An event is a Land or
 // city traffic message (see eventID): the platform keeps its history,
 // where an Autobahn tick is only read within a day of now. Its headline is
@@ -576,11 +615,21 @@ func (g *gen) roadsAndEvents() {
 			to = from.Add(time.Duration(1+g.r.IntN(72)) * time.Hour)
 		}
 		withdrawn := null
-		if g.r.IntN(20) == 0 {
+		gone := g.r.IntN(20) == 0
+		if gone {
 			withdrawn = ts(from.Add(2 * time.Hour))
 		}
+		seen := from.Add(time.Minute)
+		if ref == autobahnFamily {
+			kind, to, seen = autobahnKind(kind), time.Time{}, g.sweep(ref)
+			// An item the newest sweep still lists is not withdrawn: it
+			// leaves the operator's list only with a later sweep.
+			if gone && from.Add(2*time.Hour).After(seen) {
+				withdrawn = null
+			}
+		}
 		g.w.row(str(eventID(pub)), str(kind), str(rd.ref), str("motorway"), point(at), ts(from), optTS(to),
-			str(ref), str(pub), ts(from), ts(from.Add(time.Minute)), ts(from.Add(time.Minute)), withdrawn)
+			str(ref), str(pub), ts(from), ts(seen), ts(seen), withdrawn)
 		g.counted(landOf(at), ref)
 		if edge != "" {
 			g.edges[edge]++
@@ -616,6 +665,38 @@ func (g *gen) roadsAndEvents() {
 			g.w.row(str(e.id), ts(e.at.Add(time.Duration(v*15)*time.Minute)), num(v+1), str(e.ref))
 		}
 	}
+}
+
+// PlannedWorksFamily is the source of the planned motorway works, the
+// platform's key for BASt's planning data.
+const PlannedWorksFamily = "roadworks_bast"
+
+// plannedWorks writes the planned works on road 1, after every other row so
+// no draw moves: one under way, two starting within a fortnight (one after
+// the first week), one starting after it and one ended. Each lies halfway
+// between two junctions of the road, so the platform places none at a
+// junction; each changed at its family's sweep.
+func (g *gen) plannedWorks() {
+	rd := g.roads[1]
+	count := 8 + g.p.Scale/4
+	seen := g.sweep(PlannedWorksFamily)
+	end := g.end()
+	g.w.begin("traffic_event", eventColumns...)
+	for i, w := range []struct{ from, to time.Duration }{
+		{-48 * time.Hour, 5 * 24 * time.Hour},
+		{3 * 24 * time.Hour, 4 * 24 * time.Hour},
+		{10*24*time.Hour + 6*time.Hour, 12 * 24 * time.Hour},
+		{20 * 24 * time.Hour, 22 * 24 * time.Hour},
+		{-5 * 24 * time.Hour, -24 * time.Hour},
+	} {
+		pub := fmt.Sprintf("bast-%04d", i+1)
+		at := rd.along(float64(i+1) / float64(count))
+		from, to := end.Add(w.from), end.Add(w.to)
+		g.w.row(str(eventID(pub)), str("roadworks"), str(rd.ref), str("motorway"), point(at), ts(from), ts(to),
+			str(PlannedWorksFamily), str(pub), ts(from), ts(seen), ts(seen), null)
+		g.counted(landOf(at), PlannedWorksFamily)
+	}
+	g.edges["planned_works"] = 5
 }
 
 // ---------------------------------------------------------------- energy

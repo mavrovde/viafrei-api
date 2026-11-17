@@ -207,6 +207,9 @@ type scope struct {
 	// states selects the codes of the states in scope, over stateArgs.
 	states    string
 	stateArgs []any
+	// placed selects the families that placed the scope's situations in a
+	// Land, over args; empty when the scope is no Land.
+	placed string
 }
 
 func scanSituation(r pgx.CollectableRow) (roads.Situation, error) {
@@ -316,6 +319,12 @@ order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, s
 				return err
 			},
 			func() error { return tx.QueryRow(ctx, sc.states, sc.stateArgs...).Scan(&out.States) },
+			func() error {
+				if sc.placed == "" {
+					return nil
+				}
+				return tx.QueryRow(ctx, sc.placed, sc.args...).Scan(&out.Placed)
+			},
 			func() (err error) {
 				res, _ := tx.Query(ctx, coverageSelect, out.States, fams.Roads)
 				out.Coverage, err = coverageOf(res)
@@ -370,18 +379,8 @@ parts as (
   from contract.road r, st_dump(r.geometry) d
   where r.road_ref = (select road_ref from road)),
 line as (
-  select road_ref, max(km) km, sum(len) total,
-         st_startpoint((array_agg(g order by n))[1]) first_point,
-         st_endpoint((array_agg(g order by n desc))[1]) last_point
+  select road_ref, max(km) km, sum(len) total
   from parts group by road_ref),
-travel as (
-  select case $9::text
-           when 'north' then st_y(last_point) < st_y(first_point)
-           when 'south' then st_y(last_point) > st_y(first_point)
-           when 'east'  then st_x(last_point) < st_x(first_point)
-           when 'west'  then st_x(last_point) > st_x(first_point)
-           else false end falling
-  from line),
 answering as (
   select `+eventRow+`, line.km road_km, line.total road_total
   from contract.traffic_event e left join line on true
@@ -404,8 +403,11 @@ select `+situationColumns+`,
             else round((e.share * e.road_km)::numeric, 1)::float8 end km,
        null::int
 from placed e
-order by case when coalesce((select falling from travel), false) then -1 else 1 end * e.share nulls last,
-         coalesce(array_position($6::text[], e.severity), 0) desc, e.event_id
+order by case when e.event_kind = 'jam' then 0 when e.event_kind = 'closure' then 1
+              when e.event_kind = 'roadworks' then 3 else 2 end,
+         case e.traffic_type when 'QUEUING_TRAFFIC' then 0 when 'STATIONARY_TRAFFIC' then 1
+              when 'HEAVY_TRAFFIC' then 2 when 'SLOW_TRAFFIC' then 3 else 4 end,
+         e.delay_min desc nulls last, e.headline, e.origin_key, e.event_id
 limit $11 offset $14`, args, q.Limit, fams, now, scope{
 		messages: messagesSelect + `
   and ` + fmt.Sprintf(canonicalRef, "e.road_ref") + ` = $3
@@ -492,6 +494,12 @@ limit $12`, args, q.Limit, fams, now, scope{
 		warningArgs: []any{q.State},
 		states:      `select case when $1 = 'de' then (select coalesce(array_agg(r.region_code order by r.region_code), '{}') from contract.admin_region r where r.region_level = 'state') else array[$1::text] end`,
 		stateArgs:   []any{q.State},
+		// The Land form places every situation of the scope by its nearest
+		// municipality: the families that placed them are credited.
+		placed: `select coalesce(array_agg(distinct e.placement_source_ref order by e.placement_source_ref) filter (where e.placement_source_ref is not null), '{}')
+from contract.traffic_event e
+where $3 <> 'de' and e.state_code = $3 and e.withdrawn_at is null and e.source_ref = any($1)
+  and ` + eventPermitted + ` and (e.valid_to is null or e.valid_to > $2)`,
 	})
 }
 

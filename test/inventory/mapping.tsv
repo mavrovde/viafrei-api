@@ -32,12 +32,12 @@ argument:get_departures.when	listStationDepartures?from	departures-day	-
 argument:get_departures.duration_min	listStationDepartures?duration_min	departures-day	-
 argument:get_departures.modes	listStationDepartures?modes	departures-modes	-
 argument:get_departures.limit	listStationDepartures?limit	departures-day	-
-tool:get_train_departures	listStations,listStationDepartures	stations-text,departures-categories	-
+tool:get_train_departures	listStations,listStationDepartures	stations-text,departures-day	-
 argument:get_train_departures.station	listStations?q	stations-text	-
 argument:get_train_departures.when	listStationDepartures?from	departures-day	-
 argument:get_train_departures.duration_min	listStationDepartures?duration_min	departures-day	-
 argument:get_train_departures.limit	listStationDepartures?limit	departures-day	-
-argument:get_train_departures.categories	listStationDepartures?categories	departures-categories	-
+argument:get_train_departures.categories	listStationDepartures?categories	departures-day	-
 web:/internal/station-suggest	listStations?q	stations-text	-
 web:/internal/station/near	listStations?at	stations-near	-
 argument:get_train_departures.eva_no	listStations?code	stations-code	-

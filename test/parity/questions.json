@@ -2,7 +2,7 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "d37bfb78b6ae0a6101200037fd6b58d0bf9b7d0cef1250130f829a048a11ffe1"
+    "sha256": "3bf54615fc128fee62f72603d5a80c280e699f0a3d2e7699d738173f0e25e117"
   },
   "cases": [
     {
@@ -91,7 +91,7 @@
       "counterpart": "parking search",
       "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&limit=5",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
@@ -109,9 +109,9 @@
       "id": "parking-terms-accepted",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&limit=5",
+      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&limit=5&accept_terms=sid-terms-1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
@@ -121,12 +121,7 @@
           "truckpark_sid_static",
           "truckpark_sid_dyn"
         ],
-        "accepted": [
-          {
-            "source": "src-delta-parking",
-            "version": "2026-03-01"
-          }
-        ]
+        "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
     },
@@ -201,24 +196,6 @@
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
-    },
-    {
-      "id": "departures-categories",
-      "operation": "listStationDepartures",
-      "counterpart": "departure board",
-      "request": "/v1/stations/1:de:01002:0/departures?from=2026-03-29T10:00:00Z&duration_min=120&categories=RE&limit=15",
-      "key": {
-        "useClass": "commercial",
-        "scopes": [
-          "transit"
-        ],
-        "sources": [
-          "delfi_static",
-          "delfi_rt_tu"
-        ],
-        "accepted": null
-      },
-      "now": "2026-03-29T09:30:00Z"
     },
     {
       "id": "stations-code",
@@ -411,6 +388,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],
@@ -429,6 +408,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],
@@ -447,6 +428,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],
@@ -520,6 +503,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],
@@ -531,9 +516,9 @@
       "id": "parking-free-spaces",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&free_min=1&limit=5",
+      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&free_min=1&limit=5&accept_terms=sid-terms-1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
@@ -543,12 +528,7 @@
           "truckpark_sid_static",
           "truckpark_sid_dyn"
         ],
-        "accepted": [
-          {
-            "source": "src-delta-parking",
-            "version": "2026-03-01"
-          }
-        ]
+        "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
     },
@@ -1067,9 +1047,9 @@
       "id": "parking-kind-truck",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&kind=truck&limit=5",
+      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&kind=truck&limit=5&accept_terms=sid-terms-1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
@@ -1079,12 +1059,7 @@
           "truckpark_sid_static",
           "truckpark_sid_dyn"
         ],
-        "accepted": [
-          {
-            "source": "src-delta-parking",
-            "version": "2026-03-01"
-          }
-        ]
+        "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
     },
@@ -1092,9 +1067,9 @@
       "id": "parking-facilities-toilet",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&facilities=toilet&limit=5",
+      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&facilities=toilet&limit=5&accept_terms=sid-terms-1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
@@ -1104,12 +1079,7 @@
           "truckpark_sid_static",
           "truckpark_sid_dyn"
         ],
-        "accepted": [
-          {
-            "source": "src-delta-parking",
-            "version": "2026-03-01"
-          }
-        ]
+        "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
     },
@@ -1117,9 +1087,9 @@
       "id": "parking-road-a101",
       "operation": "listMotorwayParking",
       "counterpart": "parking search",
-      "request": "/v1/motorways/A101/parking-options?limit=5",
+      "request": "/v1/motorways/A101/parking-options?limit=5&accept_terms=sid-terms-1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
@@ -1127,14 +1097,10 @@
           "park_alpha",
           "park_beta",
           "truckpark_sid_static",
-          "truckpark_sid_dyn"
+          "truckpark_sid_dyn",
+          "bast_lcl"
         ],
-        "accepted": [
-          {
-            "source": "src-delta-parking",
-            "version": "2026-03-01"
-          }
-        ]
+        "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
     },
@@ -1149,8 +1115,11 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
-          "roads_epsilon"
+          "roads_epsilon",
+          "roadworks_bast"
         ],
         "accepted": null
       },
@@ -1167,8 +1136,11 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
-          "roads_epsilon"
+          "roads_epsilon",
+          "roadworks_bast"
         ],
         "accepted": null
       },
@@ -1185,6 +1157,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],

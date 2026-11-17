@@ -54,6 +54,10 @@ from contract.stop_place where withdrawn_at is null and location is not null and
 		if s.DistanceM != nil || s.Family == "" {
 			t.Errorf("%s: %+v", s.ID, s)
 		}
+		// A station placed in a district names the family that placed it.
+		if (s.RegionCode != nil) != (s.PlacedBy != nil && *s.PlacedBy == "bkg_gvisys") {
+			t.Errorf("%s: district %v, placed by %v", s.ID, s.RegionCode, s.PlacedBy)
+		}
 	}
 	if one, more, err := st.Stations(bounded(t), transit.Query{Text: text, Limit: 1}, fams); err != nil || len(one) != 1 || more != (want != one[0].ID) {
 		t.Errorf("limit 1: %v, more %v: %v", stationIDs(one), more, err)

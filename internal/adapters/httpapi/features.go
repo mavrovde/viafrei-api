@@ -81,7 +81,6 @@ var nullableObjects = []struct{ schema, member string }{
 	{"HydrogenData", "nearest"},
 	{"DisruptionData", "punctuality"},
 	{"SpeedCamera", "location"},
-	{"SharingData", "nearest"},
 	{"LocationData", "address"},
 	{"LocationData", "municipality"},
 	{"LocationData", "district"},
@@ -558,7 +557,7 @@ type ParkingSite struct {
 	Operator      *string    `json:"operator" nullable:"true"`
 	Kind          string     `json:"kind" enum:"garage,lot,park_and_ride,on_street,rest_area,truck_parking,other" doc:"Open enumeration; treat an unknown value as other."`
 	Location      Position   `json:"location"`
-	DistanceM     int        `json:"distanceM" doc:"Distance from the asked position, in metres."`
+	DistanceM     *int       `json:"distanceM" nullable:"true" doc:"Distance from the asked position, in metres; null along a motorway (no point was asked) and for a site whose terms need accepting (a Toll Collect site), which the platform names without a distance."`
 	Occupancy     *Occupancy `json:"occupancy" doc:"The last report; null when none is published, or while the terms are not accepted."`
 	TermsRequired bool       `json:"termsRequired" doc:"True when the occupancy is withheld until the family's terms are accepted."`
 	SourceFamily  string     `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
@@ -608,7 +607,11 @@ func parkingSites(a features.Answer[parking.Site]) ([]ParkingSite, bool) {
 	for i, v := range a.Items {
 		item := ParkingSite{
 			ID: v.ID, Name: v.Name, Operator: v.Operator, Kind: string(v.Kind), Location: position(v.Location),
-			DistanceM: v.DistanceM, TermsRequired: v.TermsRequired, SourceFamily: v.Family,
+			TermsRequired: v.TermsRequired, SourceFamily: v.Family,
+		}
+		if !v.Unranged {
+			d := v.DistanceM
+			item.DistanceM = &d
 		}
 		if o := v.Occupancy; o != nil {
 			item.Occupancy = &Occupancy{Free: o.Free, Total: o.Total, State: string(o.State), ObservedAt: o.ObservedAt.UTC()}
@@ -652,7 +655,7 @@ func noteFreeMin(ctx context.Context, a features.Answer[parking.Site], freeMin i
 
 func registerParking(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "Where to park near a position"
-	op.Description = "Parking sites within the radius of a position, nearest first, then by id, each with its last reported occupancy. A site whose terms need accepting first is listed without its occupancy and marked termsRequired. Needs the scope parking."
+	op.Description = "Parking sites within the radius of a position, nearest first, then by id, each with its last reported occupancy. A site whose terms are not accepted (accept_terms) is not listed; meta.terms offers its terms. Needs the scope parking."
 	op.Extensions[counterpartExtension] = "parking search"
 	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, in *ParkingInput) (*ParkingOutput, error) {
@@ -734,7 +737,7 @@ type MotorwayParkingOutput struct {
 
 func registerMotorwayParking(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "Where to park along a motorway"
-	op.Description = "Parking sites along a motorway, in name order (unnamed last), then by id, each with its last reported occupancy: the sites within 1 500 m of one of the motorway's location-code points, and those their source files under the motorway. distanceM is 0: no point was asked. A site whose terms need accepting first is listed without its occupancy and marked termsRequired. Needs the scope parking."
+	op.Description = "Parking sites along a motorway, in name order (unnamed last), then by id, each with its last reported occupancy: the sites within 1 500 m of one of the motorway's location-code points, and those their source files under the motorway. distanceM is null: no point was asked. A site whose terms are not accepted (accept_terms) is not listed; meta.terms offers its terms. Needs the scope parking."
 	op.Extensions[counterpartExtension] = "parking search"
 	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, in *MotorwayParkingInput) (*MotorwayParkingOutput, error) {

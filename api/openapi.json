@@ -11,9 +11,6 @@
               "null"
             ]
           },
-          "id": {
-            "type": "string"
-          },
           "land": {
             "description": "The Land; null when not known.",
             "type": [
@@ -57,7 +54,6 @@
           }
         },
         "required": [
-          "id",
           "street",
           "number",
           "postcode",
@@ -106,14 +102,9 @@
               "$ref": "#/components/schemas/Address"
             },
             "type": "array"
-          },
-          "query": {
-            "$ref": "#/components/schemas/AddressQuery",
-            "description": "How the typed address was read."
           }
         },
         "required": [
-          "query",
           "addresses"
         ],
         "type": "object"
@@ -135,36 +126,6 @@
           "data",
           "meta",
           "links"
-        ],
-        "type": "object"
-      },
-      "AddressQuery": {
-        "additionalProperties": false,
-        "properties": {
-          "number": {
-            "type": "string"
-          },
-          "place": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "postcode": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "street": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "street",
-          "number",
-          "postcode",
-          "place"
         ],
         "type": "object"
       },
@@ -1792,6 +1753,18 @@
         ],
         "type": "object"
       },
+      "FacilityStation": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
       "FacilitySummary": {
         "additionalProperties": false,
         "properties": {
@@ -2106,11 +2079,11 @@
             ]
           },
           "openingState": {
-            "description": "open, closed or unknown at the answer's instant (open_at's, when asked), read from the published opening hours: unknown when there are none or they cannot be read. Open enumeration.",
+            "description": "open, closed or unknown at the answer's instant (open_at's, when asked), read from the published opening hours: unknown when there are none or they cannot be read. Under sort=price, the state the station reported, as the platform's cheapest-fuel search states it. Open enumeration.",
             "type": "string"
           },
           "prices": {
-            "description": "The newest price per grade the station reported, by grade; empty when it reported none.",
+            "description": "The newest price per grade the station reported, by grade; empty when it reported none. Under sort=price, the asked grade's only.",
             "items": {
               "$ref": "#/components/schemas/FuelPrice"
             },
@@ -2249,9 +2222,6 @@
                 "format": "int64",
                 "type": "integer"
               },
-              "id": {
-                "type": "string"
-              },
               "location": {
                 "$ref": "#/components/schemas/Position"
               },
@@ -2288,7 +2258,6 @@
               }
             },
             "required": [
-              "id",
               "name",
               "operator",
               "brand",
@@ -2356,9 +2325,6 @@
             "format": "int64",
             "type": "integer"
           },
-          "id": {
-            "type": "string"
-          },
           "location": {
             "$ref": "#/components/schemas/Position"
           },
@@ -2395,7 +2361,6 @@
           }
         },
         "required": [
-          "id",
           "name",
           "operator",
           "brand",
@@ -2575,9 +2540,6 @@
                 "format": "int64",
                 "type": "integer"
               },
-              "id": {
-                "type": "string"
-              },
               "land": {
                 "description": "The Land; null when not known.",
                 "type": [
@@ -2622,7 +2584,6 @@
             },
             "required": [
               "distanceM",
-              "id",
               "street",
               "number",
               "postcode",
@@ -2905,6 +2866,7 @@
             ]
           },
           "direction": {
+            "description": "The direction a restriction or a priority route applies in, the publisher's words; null for the long-lorry network.",
             "type": [
               "string",
               "null"
@@ -2923,9 +2885,6 @@
               "type": "string"
             },
             "type": "array"
-          },
-          "id": {
-            "type": "string"
           },
           "kind": {
             "description": "What is restricted (height, weight, width, ban, ...), as published.",
@@ -2999,7 +2958,7 @@
             ]
           },
           "versionDate": {
-            "description": "The date of the publisher's file (YYYY-MM-DD).",
+            "description": "The date of the publisher's file (YYYY-MM-DD), for a priority route and the long-lorry network; null for a restriction or a zone.",
             "type": [
               "string",
               "null"
@@ -3007,7 +2966,6 @@
           }
         },
         "required": [
-          "id",
           "layer",
           "kind",
           "sign",
@@ -3195,7 +3153,7 @@
             ]
           },
           "situations": {
-            "description": "Ordered by position along the road (those that cannot be placed last), then severity descending, then id.",
+            "description": "In the platform's motorway status order: jams, closures, the other reports, then roadworks; within each, by traffic type (queuing, stationary, heavy, slow), delay descending, headline, then the publisher's id.",
             "items": {
               "$ref": "#/components/schemas/RoadSituation"
             },
@@ -3937,6 +3895,7 @@
         "additionalProperties": false,
         "properties": {
           "distanceM": {
+            "description": "Distance in metres, to 0.1 km as the platform's nearby search states it.",
             "format": "int64",
             "type": "integer"
           },
@@ -3945,9 +3904,6 @@
               "string",
               "null"
             ]
-          },
-          "id": {
-            "type": "string"
           },
           "kind": {
             "description": "The OpenStreetMap kind, category=value (shop=bakery).",
@@ -3970,7 +3926,6 @@
           }
         },
         "required": [
-          "id",
           "name",
           "kind",
           "street",
@@ -4405,9 +4360,12 @@
         "additionalProperties": false,
         "properties": {
           "distanceM": {
-            "description": "Distance from the asked position, in metres.",
+            "description": "Distance from the asked position, in metres; null along a motorway (no point was asked) and for a site whose terms need accepting (a Toll Collect site), which the platform names without a distance.",
             "format": "int64",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "id": {
             "type": "string"
@@ -4874,9 +4832,6 @@
               "null"
             ]
           },
-          "id": {
-            "type": "string"
-          },
           "kind": {
             "description": "The value in the family (pharmacy, hotel); null when not mapped.",
             "type": [
@@ -4934,7 +4889,6 @@
           }
         },
         "required": [
-          "id",
           "name",
           "category",
           "kind",
@@ -5042,10 +4996,6 @@
       "PoiPage": {
         "additionalProperties": false,
         "properties": {
-          "atLeast": {
-            "description": "More than 50 matched: narrow the search (a town, a category).",
-            "type": "boolean"
-          },
           "limit": {
             "format": "int64",
             "type": "integer"
@@ -5066,7 +5016,6 @@
         "required": [
           "limit",
           "total",
-          "atLeast",
           "nextCursor"
         ],
         "type": "object"
@@ -5784,144 +5733,6 @@
       "SharingData": {
         "additionalProperties": false,
         "properties": {
-          "nearest": {
-            "additionalProperties": false,
-            "description": "When no station is in the radius, the nearest one within 100 km; otherwise null.",
-            "properties": {
-              "available": {
-                "description": "A bike can be taken: current, renting, and at least one counted.",
-                "type": "boolean"
-              },
-              "bikes": {
-                "description": "Bikes counted; null when no count of the last 24 hours.",
-                "format": "int64",
-                "type": [
-                  "integer",
-                  "null"
-                ]
-              },
-              "capacity": {
-                "description": "Docks; null when not published.",
-                "format": "int64",
-                "type": [
-                  "integer",
-                  "null"
-                ]
-              },
-              "countedAt": {
-                "description": "When the count was read; null when none.",
-                "format": "date-time",
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "current": {
-                "description": "The count stands: counted, and the system's status at most 15 minutes old.",
-                "type": "boolean"
-              },
-              "distanceM": {
-                "description": "Distance from the asked position in metres.",
-                "format": "int64",
-                "type": "integer"
-              },
-              "electricBikes": {
-                "description": "Electric bikes counted; null when not published.",
-                "format": "int64",
-                "type": [
-                  "integer",
-                  "null"
-                ]
-              },
-              "freeDocks": {
-                "description": "Free docks; null when not published.",
-                "format": "int64",
-                "type": [
-                  "integer",
-                  "null"
-                ]
-              },
-              "id": {
-                "type": "string"
-              },
-              "location": {
-                "$ref": "#/components/schemas/Position"
-              },
-              "name": {
-                "description": "The station's name; null when not published.",
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "renting": {
-                "description": "The station rents; null when not published.",
-                "type": [
-                  "boolean",
-                  "null"
-                ]
-              },
-              "reportedAt": {
-                "description": "When the system reported the count; null when not published.",
-                "format": "date-time",
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "sourceFamily": {
-                "type": "string"
-              },
-              "system": {
-                "type": "string"
-              },
-              "systemLabel": {
-                "description": "The system's name; null when not published.",
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "takesReturns": {
-                "description": "The station takes returns; null when not published.",
-                "type": [
-                  "boolean",
-                  "null"
-                ]
-              },
-              "virtual": {
-                "description": "A virtual station (no docks); null when not published.",
-                "type": [
-                  "boolean",
-                  "null"
-                ]
-              }
-            },
-            "required": [
-              "id",
-              "system",
-              "systemLabel",
-              "name",
-              "capacity",
-              "virtual",
-              "location",
-              "distanceM",
-              "current",
-              "available",
-              "bikes",
-              "electricBikes",
-              "freeDocks",
-              "renting",
-              "takesReturns",
-              "countedAt",
-              "reportedAt",
-              "sourceFamily"
-            ],
-            "type": [
-              "object",
-              "null"
-            ]
-          },
           "stations": {
             "items": {
               "$ref": "#/components/schemas/SharingStation"
@@ -5940,8 +5751,7 @@
         "required": [
           "stations",
           "stationsInRadius",
-          "vehicles",
-          "nearest"
+          "vehicles"
         ],
         "type": "object"
       },
@@ -6896,7 +6706,7 @@
             "type": "array"
           },
           "station": {
-            "$ref": "#/components/schemas/BoardStation"
+            "$ref": "#/components/schemas/FacilityStation"
           }
         },
         "required": [
@@ -6915,22 +6725,6 @@
           "kind": {
             "description": "elevator, escalator or other. Open enumeration.",
             "type": "string"
-          },
-          "observedAt": {
-            "description": "When the state was reported; null when never.",
-            "format": "date-time",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "observedAtLocal": {
-            "description": "observedAt in Europe/Berlin time.",
-            "format": "date-time",
-            "type": [
-              "string",
-              "null"
-            ]
           },
           "position": {
             "description": "Where it is, as published (zu Gleis 2); null when not published.",
@@ -6952,8 +6746,6 @@
           "kind",
           "position",
           "state",
-          "observedAt",
-          "observedAtLocal",
           "sourceFamily"
         ],
         "type": "object"
@@ -7534,25 +7326,12 @@
       "WeatherRiskData": {
         "additionalProperties": false,
         "properties": {
-          "lamp": {
-            "description": "Over every warning in force at the position, whatever min_level and hazards keep (they filter only the list), first match: red when a warning of level 3 or 4 is in force; amber for a warning of level 1 or 2, or, with no warning in force, when the sight is limited: a weather family the key may not read was left out (meta.partial), or a weather family read has no data or stale data (meta.freshness), since no warning cannot then be told from none heard; green when no warning is in force and every family is fresh.",
-            "enum": [
-              "green",
-              "amber",
-              "red"
-            ],
-            "type": "string"
-          },
           "roadWeather": {
             "description": "Road-weather observations near a corridor; present for along questions only, so always empty on a question about one position.",
             "items": {
               "$ref": "#/components/schemas/RoadWeatherObservation"
             },
             "type": "array"
-          },
-          "truncated": {
-            "description": "True when more warnings answer than weather.max_warnings and only the first are listed; the lamp reads them all.",
-            "type": "boolean"
           },
           "warnings": {
             "description": "The warnings min_level and hazards keep, ordered by level descending, then validity.from ascending, then id; at most weather.max_warnings.",
@@ -7563,9 +7342,7 @@
           }
         },
         "required": [
-          "lamp",
           "warnings",
-          "truncated",
           "roadWeather"
         ],
         "type": "object"
@@ -8048,15 +7825,8 @@
                     "summary": "An address with its postcode",
                     "value": {
                       "data": {
-                        "query": {
-                          "street": "Marktweg",
-                          "number": "1",
-                          "postcode": "20000",
-                          "place": null
-                        },
                         "addresses": [
                           {
-                            "id": "osm:node650000",
                             "street": "Marktweg",
                             "number": "1",
                             "postcode": "20000",
@@ -10217,27 +9987,13 @@
                             "lon": 7.808793
                           },
                           "distanceM": 100,
-                          "openingState": "unknown",
+                          "openingState": "open",
                           "prices": [
-                            {
-                              "fuel": "diesel",
-                              "priceEur": 1.799,
-                              "reportedAt": "2026-03-29T22:45:59Z",
-                              "reportedAtLocal": "2026-03-30T00:45:59+02:00",
-                              "current": false
-                            },
                             {
                               "fuel": "e10",
                               "priceEur": 1.633,
                               "reportedAt": "2026-03-29T15:24:44Z",
                               "reportedAtLocal": "2026-03-29T17:24:44+02:00",
-                              "current": false
-                            },
-                            {
-                              "fuel": "e5",
-                              "priceEur": 2.062,
-                              "reportedAt": "2026-03-29T21:50:02Z",
-                              "reportedAtLocal": "2026-03-29T23:50:02+02:00",
                               "current": false
                             }
                           ],
@@ -11500,54 +11256,15 @@
                     "value": {
                       "data": {
                         "stations": [],
-                        "nearest": {
-                          "id": "afir_alpha:900001",
-                          "name": "H2 Schömpingbach",
-                          "operator": "H2 Synthetic",
-                          "brand": null,
-                          "location": {
-                            "lat": 48.389598,
-                            "lon": 7.422192
-                          },
-                          "distanceM": 62433,
-                          "address": null,
-                          "refill": [
-                            {
-                              "solution": "700bar_car"
-                            }
-                          ],
-                          "opening": null,
-                          "providerUpdatedAt": null,
-                          "sourceFamily": "afir_alpha"
-                        }
+                        "nearest": null
                       },
                       "meta": {
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
-                        "asOf": "2026-03-29T23:55:00Z",
-                        "freshness": [
-                          {
-                            "family": "afir_alpha",
-                            "dataAsOf": "2026-03-29T23:55:00Z",
-                            "ageS": 300,
-                            "staleAfterS": 1800,
-                            "stale": false
-                          }
-                        ],
-                        "attribution": [
-                          {
-                            "family": "afir_alpha",
-                            "domain": "energy",
-                            "publisher": "Kleber Datenwerk",
-                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
-                            "licence": "CC BY 4.0",
-                            "licenceUrl": "https://licences.example/cc-by-4-0",
-                            "shareAlike": false,
-                            "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/afir_alpha"
-                          }
-                        ],
+                        "asOf": null,
+                        "freshness": [],
+                        "attribution": [],
                         "notes": {
                           "condition": [],
                           "purpose": []
@@ -12389,7 +12106,7 @@
     },
     "/v1/lorry-rules": {
       "get": {
-        "description": "The long-lorry positive network (BASt's extract of the ordinance's annex, which binds; not complete and not fit for navigation) on a road or around a position, or the lorry restrictions and priority routes the publishers hold around a position (NRW, Frankfurt RheinMain, Bremen and the cities' own files); outside their regions none is held, which is no all-clear. By distance, then id. MCP counterpart: road status (vehicle form). Needs the scope roads.",
+        "description": "The long-lorry positive network (BASt's extract of the ordinance's annex, which binds; not complete and not fit for navigation) on a road or around a position, or the lorry restrictions and priority routes the publishers hold around a position (NRW, Frankfurt RheinMain, Bremen and the cities' own files); outside their regions none is held, which is no all-clear. By distance, then the publisher's row. MCP counterpart: road status (vehicle form). Needs the scope roads.",
         "operationId": "listLorryRules",
         "parameters": [
           {
@@ -12476,7 +12193,6 @@
                     "value": {
                       "data": [
                         {
-                          "id": "long:1",
                           "layer": "long_lorry",
                           "kind": null,
                           "sign": null,
@@ -12486,7 +12202,7 @@
                           "road": "A100",
                           "street": null,
                           "municipality": null,
-                          "direction": "both",
+                          "direction": null,
                           "exceptions": [],
                           "times": null,
                           "days": null,
@@ -12956,7 +12672,7 @@
                             "08"
                           ],
                           "junctions": 8,
-                          "situations": 4,
+                          "situations": 8,
                           "sourceFamily": "autobahn"
                         },
                         {
@@ -13276,7 +12992,7 @@
     },
     "/v1/motorways/{road}/conditions": {
       "get": {
-        "description": "The active situations on one road, ordered by their position along it, with the lamp over every situation on the road in the asked direction and every official weather warning in force in an area the road crosses. MCP counterpart: road status. Needs the scope roads; the weather warnings are read with the scope weather, and without it the lamp says its sight is limited.",
+        "description": "The active situations on one road, in the platform's motorway status order (jams, closures, the other reports, roadworks), with the lamp over every situation on the road in the asked direction and every official weather warning in force in an area the road crosses. MCP counterpart: road status. Needs the scope roads; the weather warnings are public and read for every key that may read the weather families, which the answer then credits; without them the lamp says its sight is limited.",
         "operationId": "getMotorwayConditions",
         "parameters": [
           {
@@ -13437,60 +13153,60 @@
                         "lampReason": "warning",
                         "situations": [
                           {
-                            "id": "datex:syn:ev-00020",
-                            "kind": "accident",
-                            "severity": "major",
+                            "id": "datex:syn:ev-00001",
+                            "kind": "hazard",
+                            "severity": "info",
                             "road": "A101",
                             "roadType": "motorway",
                             "direction": "unknown",
                             "directionText": null,
                             "location": {
-                              "lat": 50.470457,
-                              "lon": 10.95832
+                              "lat": 52.201447,
+                              "lon": 9.149344
                             },
                             "validity": {
-                              "from": "2026-03-29T00:59:59Z",
-                              "fromLocal": "2026-03-29T01:59:59+01:00",
+                              "from": "2026-03-28T18:09:13Z",
+                              "fromLocal": "2026-03-28T19:09:13+01:00",
                               "until": null,
                               "untilLocal": null
                             },
                             "lanes": null,
                             "delayMin": null,
                             "lengthM": null,
-                            "headline": "Accident",
+                            "headline": "GeneralObstruction",
                             "description": null,
                             "textLanguage": "de",
-                            "updatedAt": "2026-03-29T01:00:59Z",
-                            "updatedAtLocal": "2026-03-29T03:00:59+02:00",
+                            "updatedAt": "2026-03-29T23:57:30Z",
+                            "updatedAtLocal": "2026-03-30T01:57:30+02:00",
                             "position": null,
                             "sourceFamily": "roads_alpha"
                           },
                           {
-                            "id": "datex:syn:ev-00022",
-                            "kind": "accident",
-                            "severity": "major",
+                            "id": "datex:syn:ev-00003",
+                            "kind": "hazard",
+                            "severity": "info",
                             "road": "A101",
                             "roadType": "motorway",
                             "direction": "unknown",
                             "directionText": null,
                             "location": {
-                              "lat": 50.323326,
-                              "lon": 10.655179
+                              "lat": 52.120986,
+                              "lon": 9.33409
                             },
                             "validity": {
-                              "from": "2026-03-29T01:30:00Z",
-                              "fromLocal": "2026-03-29T03:30:00+02:00",
+                              "from": "2026-03-29T14:03:21Z",
+                              "fromLocal": "2026-03-29T16:03:21+02:00",
                               "until": null,
                               "untilLocal": null
                             },
                             "lanes": null,
                             "delayMin": null,
                             "lengthM": null,
-                            "headline": "Accident",
+                            "headline": "GeneralObstruction",
                             "description": null,
                             "textLanguage": "de",
-                            "updatedAt": "2026-03-29T01:31:00Z",
-                            "updatedAtLocal": "2026-03-29T03:31:00+02:00",
+                            "updatedAt": "2026-03-29T23:57:30Z",
+                            "updatedAtLocal": "2026-03-30T01:57:30+02:00",
                             "position": null,
                             "sourceFamily": "roads_alpha"
                           }
@@ -13503,6 +13219,13 @@
                         "asOf": "2026-03-29T23:57:30Z",
                         "freshness": [
                           {
+                            "family": "dwd_eta",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          },
+                          {
                             "family": "roads_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
@@ -13511,6 +13234,17 @@
                           }
                         ],
                         "attribution": [
+                          {
+                            "family": "dwd_eta",
+                            "domain": "weather",
+                            "publisher": "Golmil Datenwerk",
+                            "text": "Synthetic data from family eta, licence dl-de/by-2-0.",
+                            "licence": "dl-de/by-2-0",
+                            "licenceUrl": "https://licences.example/dl-de-by-2-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://eta.example/terms/dwd_eta"
+                          },
                           {
                             "family": "roads_alpha",
                             "domain": "roads",
@@ -13793,7 +13527,7 @@
         "tags": [
           "roads"
         ],
-        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain the key is entitled to, with or without the scope weather; those families are credited whether or not a warning is in force. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
         "x-codeSamples": [
           {
             "lang": "Shell",
@@ -13807,7 +13541,7 @@
     },
     "/v1/motorways/{road}/parking-options": {
       "get": {
-        "description": "Parking sites along a motorway, in name order (unnamed last), then by id, each with its last reported occupancy: the sites within 1 500 m of one of the motorway's location-code points, and those their source files under the motorway. distanceM is 0: no point was asked. A site whose terms need accepting first is listed without its occupancy and marked termsRequired. Needs the scope parking.",
+        "description": "Parking sites along a motorway, in name order (unnamed last), then by id, each with its last reported occupancy: the sites within 1 500 m of one of the motorway's location-code points, and those their source files under the motorway. distanceM is null: no point was asked. A site whose terms are not accepted (accept_terms) is not listed; meta.terms offers its terms. Needs the scope parking.",
         "operationId": "listMotorwayParking",
         "parameters": [
           {
@@ -13931,7 +13665,7 @@
                             "lat": 52.194239,
                             "lon": 9.165894
                           },
-                          "distanceM": 0,
+                          "distanceM": null,
                           "occupancy": {
                             "free": 32,
                             "total": 229,
@@ -14338,7 +14072,6 @@
                             "widened": true,
                             "places": [
                               {
-                                "id": "osm:node600001",
                                 "name": "Pharmacy Pößfül",
                                 "kind": "amenity=pharmacy",
                                 "street": "Marktweg",
@@ -14347,7 +14080,7 @@
                                   "lat": 47.609833,
                                   "lon": 7.897242
                                 },
-                                "distanceM": 5,
+                                "distanceM": 0,
                                 "sourceFamily": "osm"
                               }
                             ]
@@ -14666,7 +14399,7 @@
     },
     "/v1/parking-options": {
       "get": {
-        "description": "Parking sites within the radius of a position, nearest first, then by id, each with its last reported occupancy. A site whose terms need accepting first is listed without its occupancy and marked termsRequired. Needs the scope parking.",
+        "description": "Parking sites within the radius of a position, nearest first, then by id, each with its last reported occupancy. A site whose terms are not accepted (accept_terms) is not listed; meta.terms offers its terms. Needs the scope parking.",
         "operationId": "listParkingOptions",
         "parameters": [
           {
@@ -16122,63 +15855,13 @@
                         "asOf": null,
                         "freshness": [
                           {
-                            "family": "afir_alpha",
-                            "dataAsOf": "2026-03-29T23:55:00Z",
-                            "ageS": 300,
-                            "staleAfterS": 1800,
-                            "stale": false
-                          },
-                          {
-                            "family": "afir_beta",
-                            "dataAsOf": "2026-03-29T23:55:00Z",
-                            "ageS": 300,
-                            "staleAfterS": 1800,
-                            "stale": false
-                          },
-                          {
                             "family": "geonames",
                             "dataAsOf": null,
                             "ageS": null,
                             "stale": false
-                          },
-                          {
-                            "family": "park_alpha",
-                            "dataAsOf": "2026-03-29T23:57:30Z",
-                            "ageS": 150,
-                            "staleAfterS": 900,
-                            "stale": false
-                          },
-                          {
-                            "family": "park_beta",
-                            "dataAsOf": "2026-03-29T23:57:30Z",
-                            "ageS": 150,
-                            "staleAfterS": 900,
-                            "stale": false
                           }
                         ],
                         "attribution": [
-                          {
-                            "family": "afir_alpha",
-                            "domain": "energy",
-                            "publisher": "Kleber Datenwerk",
-                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
-                            "licence": "CC BY 4.0",
-                            "licenceUrl": "https://licences.example/cc-by-4-0",
-                            "shareAlike": false,
-                            "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/afir_alpha"
-                          },
-                          {
-                            "family": "afir_beta",
-                            "domain": "energy",
-                            "publisher": "Deingmeir Datenwerk",
-                            "text": "Synthetic data from family beta, licence CC BY-SA 4.0.",
-                            "licence": "CC BY-SA 4.0",
-                            "licenceUrl": "https://licences.example/cc-by-sa-4-0",
-                            "shareAlike": true,
-                            "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://beta.example/terms/afir_beta"
-                          },
                           {
                             "family": "geonames",
                             "domain": "places",
@@ -16189,28 +15872,6 @@
                             "shareAlike": false,
                             "shareAlikeOffer": null,
                             "termsUrl": "https://download.geonames.org/export/dump/"
-                          },
-                          {
-                            "family": "park_alpha",
-                            "domain": "parking",
-                            "publisher": "Fäpung Datenwerk",
-                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
-                            "licence": "CC BY 4.0",
-                            "licenceUrl": "https://licences.example/cc-by-4-0",
-                            "shareAlike": false,
-                            "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/park_alpha"
-                          },
-                          {
-                            "family": "park_beta",
-                            "domain": "parking",
-                            "publisher": "Sückkies Datenwerk",
-                            "text": "Synthetic data from family beta, licence CC BY-SA 4.0.",
-                            "licence": "CC BY-SA 4.0",
-                            "licenceUrl": "https://licences.example/cc-by-sa-4-0",
-                            "shareAlike": true,
-                            "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://beta.example/terms/park_beta"
                           }
                         ],
                         "notes": {
@@ -16619,27 +16280,8 @@
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
                         "asOf": null,
-                        "freshness": [
-                          {
-                            "family": "osm",
-                            "dataAsOf": null,
-                            "ageS": null,
-                            "stale": false
-                          }
-                        ],
-                        "attribution": [
-                          {
-                            "family": "osm",
-                            "domain": "places",
-                            "publisher": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0",
-                            "text": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0",
-                            "licence": "ODbL 1.0",
-                            "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
-                            "shareAlike": true,
-                            "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://www.openstreetmap.org/copyright"
-                          }
-                        ],
+                        "freshness": [],
+                        "attribution": [],
                         "notes": {
                           "condition": [],
                           "purpose": []
@@ -16653,7 +16295,6 @@
                         "page": {
                           "limit": 2,
                           "total": 0,
-                          "atLeast": false,
                           "nextCursor": null
                         }
                       },
@@ -16986,7 +16627,7 @@
     },
     "/v1/road-conditions": {
       "get": {
-        "description": "The active situations within the radius of a position on every road class held, by severity descending, then distance, then id, with the lamp over every situation within the radius and every official weather warning in force in an area within it. MCP counterpart: road status (area form). Needs the scope roads; the weather warnings are read with the scope weather, and without it the lamp says its sight is limited.",
+        "description": "The active situations within the radius of a position on every road class held, by severity descending, then distance, then id, with the lamp over every situation within the radius and every official weather warning in force in an area within it. MCP counterpart: road status (area form). Needs the scope roads; the weather warnings are public and read for every key that may read the weather families, which the answer then credits; without them the lamp says its sight is limited.",
         "operationId": "listRoadConditions",
         "parameters": [
           {
@@ -17147,9 +16788,39 @@
                         "lampReason": "warning",
                         "situations": [
                           {
+                            "id": "datex:syn:ev-00032",
+                            "kind": "hazard",
+                            "severity": "info",
+                            "road": "A101",
+                            "roadType": "motorway",
+                            "direction": "unknown",
+                            "directionText": null,
+                            "location": {
+                              "lat": 50.263033,
+                              "lon": 10.530953
+                            },
+                            "validity": {
+                              "from": "2025-12-31T23:00:00Z",
+                              "fromLocal": "2026-01-01T00:00:00+01:00",
+                              "until": null,
+                              "untilLocal": null
+                            },
+                            "lanes": null,
+                            "delayMin": null,
+                            "lengthM": null,
+                            "headline": "GeneralObstruction",
+                            "description": null,
+                            "textLanguage": "de",
+                            "updatedAt": "2026-03-29T23:57:30Z",
+                            "updatedAtLocal": "2026-03-30T01:57:30+02:00",
+                            "position": null,
+                            "distanceM": 25666,
+                            "sourceFamily": "roads_alpha"
+                          },
+                          {
                             "id": "datex:syn:ev-00022",
-                            "kind": "accident",
-                            "severity": "major",
+                            "kind": "hazard",
+                            "severity": "info",
                             "road": "A101",
                             "roadType": "motorway",
                             "direction": "unknown",
@@ -17167,43 +16838,13 @@
                             "lanes": null,
                             "delayMin": null,
                             "lengthM": null,
-                            "headline": "Accident",
+                            "headline": "GeneralObstruction",
                             "description": null,
                             "textLanguage": "de",
-                            "updatedAt": "2026-03-29T01:31:00Z",
-                            "updatedAtLocal": "2026-03-29T03:31:00+02:00",
+                            "updatedAt": "2026-03-29T23:57:30Z",
+                            "updatedAtLocal": "2026-03-30T01:57:30+02:00",
                             "position": null,
                             "distanceM": 31153,
-                            "sourceFamily": "roads_alpha"
-                          },
-                          {
-                            "id": "datex:syn:ev-00019",
-                            "kind": "restriction",
-                            "severity": "minor",
-                            "road": "A105",
-                            "roadType": "motorway",
-                            "direction": "unknown",
-                            "directionText": null,
-                            "location": {
-                              "lat": 50.046305,
-                              "lon": 10.624849
-                            },
-                            "validity": {
-                              "from": "2026-03-29T15:12:30Z",
-                              "fromLocal": "2026-03-29T17:12:30+02:00",
-                              "until": null,
-                              "untilLocal": null
-                            },
-                            "lanes": null,
-                            "delayMin": null,
-                            "lengthM": null,
-                            "headline": "SpeedManagement",
-                            "description": null,
-                            "textLanguage": "de",
-                            "updatedAt": "2026-03-29T15:13:30Z",
-                            "updatedAtLocal": "2026-03-29T17:13:30+02:00",
-                            "position": null,
-                            "distanceM": 47494,
                             "sourceFamily": "roads_alpha"
                           }
                         ]
@@ -17215,6 +16856,13 @@
                         "asOf": "2026-03-29T23:57:30Z",
                         "freshness": [
                           {
+                            "family": "dwd_eta",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          },
+                          {
                             "family": "roads_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
@@ -17223,6 +16871,17 @@
                           }
                         ],
                         "attribution": [
+                          {
+                            "family": "dwd_eta",
+                            "domain": "weather",
+                            "publisher": "Golmil Datenwerk",
+                            "text": "Synthetic data from family eta, licence dl-de/by-2-0.",
+                            "licence": "dl-de/by-2-0",
+                            "licenceUrl": "https://licences.example/dl-de-by-2-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://eta.example/terms/dwd_eta"
+                          },
                           {
                             "family": "roads_alpha",
                             "domain": "roads",
@@ -17247,7 +16906,7 @@
                         ],
                         "page": {
                           "limit": 2,
-                          "hasMore": false
+                          "hasMore": true
                         },
                         "query": {
                           "at": {
@@ -17508,7 +17167,7 @@
         "tags": [
           "roads"
         ],
-        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain the key is entitled to, with or without the scope weather; those families are credited whether or not a warning is in force. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
         "x-codeSamples": [
           {
             "lang": "Shell",
@@ -17551,8 +17210,8 @@
                     "value": {
                       "data": {
                         "id": "datex:syn:ev-00020",
-                        "kind": "accident",
-                        "severity": "major",
+                        "kind": "hazard",
+                        "severity": "info",
                         "road": "A101",
                         "roadType": "motorway",
                         "direction": "unknown",
@@ -17570,11 +17229,11 @@
                         "lanes": null,
                         "delayMin": null,
                         "lengthM": null,
-                        "headline": "Accident",
+                        "headline": "GeneralObstruction",
                         "description": null,
                         "textLanguage": "de",
-                        "updatedAt": "2026-03-29T01:00:59Z",
-                        "updatedAtLocal": "2026-03-29T03:00:59+02:00",
+                        "updatedAt": "2026-03-29T23:57:30Z",
+                        "updatedAtLocal": "2026-03-30T01:57:30+02:00",
                         "position": null,
                         "sourceFamily": "roads_alpha"
                       },
@@ -17859,7 +17518,7 @@
         "tags": [
           "roads"
         ],
-        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain the key is entitled to, with or without the scope weather; those families are credited whether or not a warning is in force. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
         "x-codeSamples": [
           {
             "lang": "Shell",
@@ -17873,7 +17532,7 @@
     },
     "/v1/sharing-options": {
       "get": {
-        "description": "The bike-sharing stations within the radius, nearest first (only those with a bike to take now unless only_available=false), the free-floating vehicles around, and the nearest station within 100 km when none is in the radius. Needs the scope transit.",
+        "description": "The bike-sharing stations within the radius, nearest first (only those with a bike to take now unless only_available=false) and the free-floating vehicles around; no station beyond the radius is listed, as the platform's sharing search lists none. Needs the scope transit.",
         "operationId": "listSharingOptions",
         "parameters": [
           {
@@ -17948,29 +17607,6 @@
                           "electric": 0,
                           "atLeast": false,
                           "nearest": []
-                        },
-                        "nearest": {
-                          "id": "nextbike_syn:023",
-                          "system": "nextbike_syn",
-                          "systemLabel": "nextbike Synthetic",
-                          "name": "Station 6",
-                          "capacity": 10,
-                          "virtual": false,
-                          "location": {
-                            "lat": 48.211289,
-                            "lon": 8.356669
-                          },
-                          "distanceM": 82235,
-                          "current": false,
-                          "available": false,
-                          "bikes": null,
-                          "electricBikes": null,
-                          "freeDocks": null,
-                          "renting": null,
-                          "takesReturns": null,
-                          "countedAt": null,
-                          "reportedAt": null,
-                          "sourceFamily": "gbfs_nextbike"
                         }
                       },
                       "meta": {
@@ -18683,49 +18319,13 @@
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
-                        "asOf": "2026-03-29T12:00:00Z",
-                        "freshness": [
-                          {
-                            "family": "osm_speed_cameras",
-                            "dataAsOf": "2026-03-29T12:00:00Z",
-                            "ageS": 43200,
-                            "staleAfterS": 259200,
-                            "stale": false
-                          },
-                          {
-                            "family": "speed_alpha",
-                            "dataAsOf": "2026-03-29T12:00:00Z",
-                            "ageS": 43200,
-                            "staleAfterS": 259200,
-                            "stale": false
-                          }
-                        ],
-                        "attribution": [
-                          {
-                            "family": "osm_speed_cameras",
-                            "domain": "roads",
-                            "publisher": "Blitzer (OpenStreetMap): © OpenStreetMap-Mitwirkende, ODbL 1.0",
-                            "text": "Blitzer (OpenStreetMap): © OpenStreetMap-Mitwirkende, ODbL 1.0",
-                            "licence": "ODbL 1.0",
-                            "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
-                            "shareAlike": true,
-                            "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://www.openstreetmap.org/copyright"
-                          },
-                          {
-                            "family": "speed_alpha",
-                            "domain": "roads",
-                            "publisher": "Blitzwerk Datenwerk",
-                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
-                            "licence": "CC BY 4.0",
-                            "licenceUrl": "https://licences.example/cc-by-4-0",
-                            "shareAlike": false,
-                            "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/speed_alpha"
-                          }
-                        ],
+                        "asOf": null,
+                        "freshness": [],
+                        "attribution": [],
                         "notes": {
-                          "condition": [],
+                          "condition": [
+                            "Note on use (§ 23 Abs. 1c StVO): a person driving a vehicle may not, while driving, operate or use any technical device or app function that shows or disrupts traffic enforcement. This also applies to a passenger's smartphone if the driver benefits from it (OLG Karlsruhe). A violation costs €75 and one point in Flensburg. This information is meant only for planning before setting off or during a stop. The locations come from official and open sources and may be incomplete or out of date; mobile checks are possible at any time and anywhere. Always keep to the speed limit in force. Not legal advice."
+                          ],
                           "purpose": []
                         },
                         "warnings": [
@@ -19157,8 +18757,8 @@
                             "validity": {
                               "from": "2026-03-29T19:33:04Z",
                               "fromLocal": "2026-03-29T21:33:04+02:00",
-                              "until": "2026-03-30T05:33:04Z",
-                              "untilLocal": "2026-03-30T07:33:04+02:00"
+                              "until": null,
+                              "untilLocal": null
                             },
                             "lanes": null,
                             "delayMin": null,
@@ -19166,15 +18766,44 @@
                             "headline": "MaintenanceWorks",
                             "description": null,
                             "textLanguage": "de",
-                            "updatedAt": "2026-03-29T19:34:04Z",
-                            "updatedAtLocal": "2026-03-29T21:34:04+02:00",
+                            "updatedAt": "2026-03-29T23:57:30Z",
+                            "updatedAtLocal": "2026-03-30T01:57:30+02:00",
+                            "position": null,
+                            "sourceFamily": "roads_alpha"
+                          },
+                          {
+                            "id": "datex:syn:ev-00033",
+                            "kind": "hazard",
+                            "severity": "info",
+                            "road": "A101",
+                            "roadType": "motorway",
+                            "direction": "unknown",
+                            "directionText": null,
+                            "location": {
+                              "lat": 51.887512,
+                              "lon": 9.870164
+                            },
+                            "validity": {
+                              "from": "2026-03-28T01:00:00Z",
+                              "fromLocal": "2026-03-28T02:00:00+01:00",
+                              "until": null,
+                              "untilLocal": null
+                            },
+                            "lanes": null,
+                            "delayMin": null,
+                            "lengthM": null,
+                            "headline": "GeneralObstruction",
+                            "description": null,
+                            "textLanguage": "de",
+                            "updatedAt": "2026-03-29T23:57:30Z",
+                            "updatedAtLocal": "2026-03-30T01:57:30+02:00",
                             "position": null,
                             "sourceFamily": "roads_alpha"
                           },
                           {
                             "id": "datex:syn:ev-00010",
-                            "kind": "other",
-                            "severity": "other",
+                            "kind": "hazard",
+                            "severity": "info",
                             "road": "A103",
                             "roadType": "motorway",
                             "direction": "unknown",
@@ -19186,17 +18815,17 @@
                             "validity": {
                               "from": "2026-03-29T06:42:04Z",
                               "fromLocal": "2026-03-29T08:42:04+02:00",
-                              "until": "2026-03-31T17:42:04Z",
-                              "untilLocal": "2026-03-31T19:42:04+02:00"
+                              "until": null,
+                              "untilLocal": null
                             },
                             "lanes": null,
                             "delayMin": null,
                             "lengthM": null,
-                            "headline": "Other",
+                            "headline": "GeneralObstruction",
                             "description": null,
                             "textLanguage": "de",
-                            "updatedAt": "2026-03-29T06:43:04Z",
-                            "updatedAtLocal": "2026-03-29T08:43:04+02:00",
+                            "updatedAt": "2026-03-29T23:57:30Z",
+                            "updatedAtLocal": "2026-03-30T01:57:30+02:00",
                             "position": null,
                             "sourceFamily": "roads_alpha"
                           }
@@ -19206,8 +18835,14 @@
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
-                        "asOf": "2026-03-29T23:57:30Z",
+                        "asOf": null,
                         "freshness": [
+                          {
+                            "family": "bkg_gvisys",
+                            "dataAsOf": null,
+                            "ageS": null,
+                            "stale": false
+                          },
                           {
                             "family": "roads_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
@@ -19217,6 +18852,17 @@
                           }
                         ],
                         "attribution": [
+                          {
+                            "family": "bkg_gvisys",
+                            "domain": "places",
+                            "publisher": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
+                            "text": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
+                            "licence": "dl-de/by-2-0",
+                            "licenceUrl": "https://licences.example/dl-de-by-2-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+                          },
                           {
                             "family": "roads_alpha",
                             "domain": "roads",
@@ -20331,8 +19977,14 @@
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
-                        "asOf": "2026-03-29T12:00:00Z",
+                        "asOf": null,
                         "freshness": [
+                          {
+                            "family": "bkg_gvisys",
+                            "dataAsOf": null,
+                            "ageS": null,
+                            "stale": false
+                          },
                           {
                             "family": "delfi_static",
                             "dataAsOf": "2026-03-29T12:00:00Z",
@@ -20342,6 +19994,17 @@
                           }
                         ],
                         "attribution": [
+                          {
+                            "family": "bkg_gvisys",
+                            "domain": "places",
+                            "publisher": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
+                            "text": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
+                            "licence": "dl-de/by-2-0",
+                            "licenceUrl": "https://licences.example/dl-de-by-2-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+                          },
                           {
                             "family": "delfi_static",
                             "domain": "transit",
@@ -21115,13 +20778,7 @@
                     "value": {
                       "data": {
                         "station": {
-                          "id": "1:de:04002:2",
-                          "name": "Pienköckheim Nord",
-                          "location": {
-                            "lat": 47.403474,
-                            "lon": 14.561662
-                          },
-                          "stopCode": "de:04002:2"
+                          "name": "Pienköckheim Nord"
                         },
                         "counts": {
                           "active": 0,
@@ -21134,8 +20791,6 @@
                             "kind": "escalator",
                             "position": "zu Gleis 1",
                             "state": "unknown",
-                            "observedAt": "2026-03-29T10:57:39Z",
-                            "observedAtLocal": "2026-03-29T12:57:39+02:00",
                             "sourceFamily": "openstation_siri_fm"
                           },
                           {
@@ -21143,8 +20798,6 @@
                             "kind": "escalator",
                             "position": "zu Gleis 2",
                             "state": "unknown",
-                            "observedAt": "2026-03-29T07:18:26Z",
-                            "observedAtLocal": "2026-03-29T09:18:26+02:00",
                             "sourceFamily": "openstation_siri_fm"
                           }
                         ]
@@ -21994,37 +21647,7 @@
                         },
                         "note": null,
                         "lamp": "amber",
-                        "situations": [
-                          {
-                            "id": "datex:syn:ev-00006",
-                            "kind": "restriction",
-                            "severity": "minor",
-                            "road": "A102",
-                            "roadType": "motorway",
-                            "direction": "unknown",
-                            "directionText": null,
-                            "location": {
-                              "lat": 48.256236,
-                              "lon": 11.230541
-                            },
-                            "validity": {
-                              "from": "2026-03-29T02:18:34Z",
-                              "fromLocal": "2026-03-29T04:18:34+02:00",
-                              "until": "2026-03-31T07:18:34Z",
-                              "untilLocal": "2026-03-31T09:18:34+02:00"
-                            },
-                            "lanes": null,
-                            "delayMin": null,
-                            "lengthM": null,
-                            "headline": "SpeedManagement",
-                            "description": null,
-                            "textLanguage": "de",
-                            "updatedAt": "2026-03-29T02:19:34Z",
-                            "updatedAtLocal": "2026-03-29T04:19:34+02:00",
-                            "position": null,
-                            "sourceFamily": "roads_alpha"
-                          }
-                        ]
+                        "situations": []
                       },
                       "meta": {
                         "requestId": "example-request-0001",
@@ -22326,7 +21949,7 @@
     },
     "/v1/weather-risk": {
       "get": {
-        "description": "Every official weather warning in force now whose area contains the position, with the issuer's level and wording unchanged, and the lamp over every warning in force there, whatever min_level and hazards keep. MCP counterpart: weather warnings check. Needs the scope weather.",
+        "description": "Every official weather warning in force now whose area contains the position, with the issuer's level and wording unchanged, as the platform's weather warnings check states them. MCP counterpart: weather warnings check. Needs the scope weather.",
         "operationId": "getWeatherRisk",
         "parameters": [
           {
@@ -22394,9 +22017,7 @@
                     "summary": "The official weather warnings at a position, with their lamp",
                     "value": {
                       "data": {
-                        "lamp": "amber",
                         "warnings": [],
-                        "truncated": false,
                         "roadWeather": []
                       },
                       "meta": {

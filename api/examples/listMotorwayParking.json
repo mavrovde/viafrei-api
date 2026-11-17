@@ -26,7 +26,7 @@
           "lat": 52.194239,
           "lon": 9.165894
         },
-        "distanceM": 0,
+        "distanceM": null,
         "occupancy": {
           "free": 32,
           "total": 229,

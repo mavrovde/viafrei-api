@@ -21,29 +21,6 @@
         "electric": 0,
         "atLeast": false,
         "nearest": []
-      },
-      "nearest": {
-        "id": "nextbike_syn:023",
-        "system": "nextbike_syn",
-        "systemLabel": "nextbike Synthetic",
-        "name": "Station 6",
-        "capacity": 10,
-        "virtual": false,
-        "location": {
-          "lat": 48.211289,
-          "lon": 8.356669
-        },
-        "distanceM": 82235,
-        "current": false,
-        "available": false,
-        "bikes": null,
-        "electricBikes": null,
-        "freeDocks": null,
-        "renting": null,
-        "takesReturns": null,
-        "countedAt": null,
-        "reportedAt": null,
-        "sourceFamily": "gbfs_nextbike"
       }
     },
     "meta": {

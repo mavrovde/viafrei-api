@@ -38,15 +38,18 @@ func TestHydrogenAnswer(t *testing.T) {
 	if f.gotHydro.RadiusM != 50000 || f.gotHydro.Vehicle != "car" || f.gotHydro.Limit != 1 {
 		t.Errorf("asked %+v", f.gotHydro)
 	}
-	for _, want := range []string{`"id":"h:1"`, `"refill":[{"solution":"700bar"}]`, `"nearest":null`, `"hasMore":true`} {
+	for _, want := range []string{`"name":"H2 Köln"`, `"refill":[{"solution":"700bar"}]`, `"nearest":null`, `"hasMore":true`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("answer lacks %s: %s", want, body)
 		}
 	}
+	if strings.Contains(body, `"h:1"`) {
+		t.Errorf("a station was named by an id the platform does not state: %s", body)
+	}
 	f.hydrogen = features.HydrogenStations{Nearest: &energy.HydrogenStation{ID: "h:9", DistanceM: 90000, Family: "src-alpha-energy"},
 		Answer: features.Answer[energy.HydrogenStation]{At: fixedNow}}
 	w = do(t, h, http.MethodGet, "/v1/hydrogen-options?at=50.94,6.96", bearer)
-	if body = w.Body.String(); w.Code != http.StatusOK || !strings.Contains(body, `"nearest":{"id":"h:9"`) || f.gotHydro.Limit != 5 {
+	if body = w.Body.String(); w.Code != http.StatusOK || !strings.Contains(body, `"nearest":{"name":null`) || f.gotHydro.Limit != 5 {
 		t.Errorf("nearest beyond: %d %s %+v", w.Code, body, f.gotHydro)
 	}
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/hydrogen-options?at=50.94,6.96&vehicle=bus", bearer), 400, "invalid-parameter")

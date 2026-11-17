@@ -57,7 +57,6 @@ func (p *PoiInput) Resolve(huma.Context) []error {
 
 // Poi is a place of interest of an answer.
 type Poi struct {
-	ID           string   `json:"id"`
 	Name         *string  `json:"name" nullable:"true" doc:"The name; null when not mapped."`
 	Category     string   `json:"category" doc:"The OpenStreetMap family."`
 	Kind         *string  `json:"kind" nullable:"true" doc:"The value in the family (pharmacy, hotel); null when not mapped."`
@@ -77,7 +76,6 @@ type Poi struct {
 type PoiPage struct {
 	Limit      int     `json:"limit"`
 	Total      int     `json:"total" doc:"Matches, at most 50."`
-	AtLeast    bool    `json:"atLeast" doc:"More than 50 matched: narrow the search (a town, a category)."`
 	NextCursor *string `json:"nextCursor" nullable:"true" doc:"The cursor of the next page; null on the last."`
 }
 
@@ -127,11 +125,11 @@ func registerPois(api huma.API, s *server, op huma.Operation) {
 func poiEnvelope(s *server, ctx context.Context, a features.PoiAnswer, q places.PoiQuery) PoiEnvelope {
 	data := make([]Poi, len(a.Pois))
 	for i, p := range a.Pois {
-		data[i] = Poi{ID: p.ID, Name: p.Name, Category: p.Category, Kind: p.CategoryValue, Brand: p.Brand, Operator: p.Operator,
+		data[i] = Poi{Name: p.Name, Category: p.Category, Kind: p.CategoryValue, Brand: p.Brand, Operator: p.Operator,
 			Street: p.Street, Number: p.HouseNumber, Postcode: p.Postcode, Place: p.Place, Location: position(p.Location),
 			DistanceM: p.DistanceM, DataAsOf: day(p.DataAsOf), SourceFamily: p.Family}
 	}
-	page := PoiPage{Limit: q.Limit, Total: a.Total, AtLeast: a.Beyond}
+	page := PoiPage{Limit: q.Limit, Total: a.Total}
 	if end := q.Offset + len(a.Pois); end < a.Total {
 		next := strconv.Itoa(end)
 		page.NextCursor = &next

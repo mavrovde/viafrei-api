@@ -62,7 +62,9 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
   texts, so the harness reads which family owns each text from the fixture
   rows (`contract.source_note`; every kind but `purpose`, because the service
   answers an unknown kind as a condition). A text no family owns is an error,
-  not a fact. A bundle stating a condition note's text, or a count that is
+  not a fact, except the notes the platform states on its own behalf (the
+  §23 StVO notice on speed cameras): those are counted under `unowned`,
+  whatever the answer credits. A bundle stating a condition note's text, or a count that is
   not a positive whole number, is refused, and so is a case stating a kind
   both as `[]` and per family.
 - **One value per name.** Two values that project onto one name (two array
@@ -91,6 +93,10 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
 | `meta.warnings` | API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got (for example `partial` when a commercial key withholds a family). |
 | `meta.page.hasMore`, in a case that asks `min_kw` | The MCP capability states no count of the sites a power filter keeps, so under `min_kw` it cannot say whether there are more. Without `min_kw` it states the count of the circle, and the fact is compared. |
 | `meta.asOf` | Each side defines it differently: the API states the oldest `dataAsOf` of its families (ENV-004), the MCP capability the newest current point status, or its clock when none is current. Neither is a format of the other. |
+| `data.station.location`, in `listStationDepartures` only | The MCP departure board states the stop's name and code, not its position. The site reads the station's position from the digest route `/internal/station/:slug`, so the API answers it; it is not compared. |
+| `data[*].location`, `data[*].districtCode`, `data[*].modes`, in `listStations` only | The MCP stop search states a stop's name, code and distance, not its position, district or modes. The site reads all three from the digest route `/internal/station/:slug` (the page's map and Land line from the stop's position and AGS, the live board's mode filter), so the API answers them; they are not compared. A position in any other operation, a charging site's or a car park's, is compared. |
+| `data.lamp`, `data.lampReason`, in `listStateRoadConditions` only | The MCP motorway status of a Land lists the Land's items and counts, not a lamp. The site reads the Land's lamp (the motorway pages' one rule over the Land's Autobahn items and DWD levels) from the digest route `/internal/state/:slug`, so the API answers it; it is not compared. |
+| `data.lamp`, `data.lampReason`, `data.corridor.states`, in `getMotorwayConditions` asked with `horizon_days` or `from` | The MCP roadworks-ahead answer lists the planned sites of the window, not a lamp or the Länder the road crosses. The site reads the road's lamp and Länder beside its planned works from the digest route `/internal/motorway/:road`, so the API answers them; they are not compared. |
 | `meta.attribution[*].` `domain`, `licence`, `licenceUrl`, `publisher`, `shareAlike`, `shareAlikeOffer`, `termsUrl`, `text` | The fixture's families carry synthetic register texts; the platform credits its own register rows for the sources the producer stores each family as, so the texts cannot be equal on these rows. Which families are credited (`meta.attribution[*].family`) is compared. |
 | The text of a condition note (`meta.notes.condition`) and, since rules/5, of a purpose note (`meta.notes.purpose`) | The same reason, since rules/4 for conditions: the fixture's notes are synthetic and the platform states its own register's. The family of each note and how many each family has are compared (`meta.notes.<kind>[<family>]`, above). |
 
@@ -134,8 +140,90 @@ nothing, so that family contributed nothing and neither side credits it.
   each site lists only those points; `summary.chargePoints` counts the
   listed points.
 
+- **An empty answer credits no family**, as the platform's searches credit
+  the registers whose rows they state.
+
+## Other rules both sides follow
+
+- **Parking.** A site whose terms are not accepted is not listed; the
+  answer offers its terms. A Toll Collect site, once accepted, is listed
+  beside the other sites with no distance (`distanceM: null`), and an
+  answer with no other site lists none. A search along a motorway lists no
+  distance and credits the location-code points (`bast_lcl`) its corridor is
+  drawn from. An empty answer credits the families with a site of the kind
+  asked in the circle, else of any kind, before the free-space and amenity
+  filters.
+- **Speed cameras.** An answer listing nothing credits no family, and every
+  answer carries the §23 StVO notice as a condition.
+- **Sharing.** No station beyond the radius is named.
+- **Hydrogen.** A station has no id: the platform names it by name and
+  position. The vehicle filter matches the AFIR solution's ending (`Car`,
+  `Truck`).
+- **Cheapest fuel** (`sort=price`) lists only the asked grade's price, and
+  each station's reported open state.
+- **Addresses** carry no identifier and no reading of the typed text: the
+  platform's address search states neither, so an address is named by its
+  position in the answer.
+- **Places of interest** carry no identifier and no `atLeast` flag; an
+  answer that lists none credits no family. Equal matches rank by trigram
+  similarity to the asked name, then by name, as the platform's search
+  ranks them.
+- **What is around** (`listNearby`): a vehicle category or the junctions
+  that list nothing credit no family; the needs credit the families they
+  consulted. A need's place carries no identifier and its distance is stated
+  to 0.1 km, as the platform's nearby search states them.
+- **Weather warnings** at a position state no lamp and no truncation flag:
+  the platform's weather warnings check states neither, and no digest route
+  the site reads serves a lamp for a position. A family the platform does
+  not read is not credited.
+- **Departure boards** state the station by the read contract's id, its
+  name and its national stop code, and the window asked. A day the
+  timetable holds no trip on is inside the window and answers no departure.
+- **Motorway operator events.** The fixture family the producer stores as the
+  Autobahn GmbH's events (`roads_alpha`) carries only rows the platform can
+  hold for that source (fixture generator 0.3.2): a closure, roadworks, or a
+  hazard, and no end, each last seen by the family's newest sweep (its
+  `data_as_of`). The platform's read contract (`contract.traffic_event`)
+  states an Autobahn warning as kind `hazard`, severity `info`, an item as
+  current while its sweep lists it, and an item's change time (`updatedAt`)
+  as that sweep's instant, which is all the platform's motorway status
+  states of it; the projection of the MCP answer uses that translation,
+  never its own.
+- **Road conditions credit the weather.** The lamp reads the DWD warnings
+  of every weather family the key may read, with or without the weather
+  scope (the warnings are public), and the answer credits those families
+  whether or not a warning is in force, as the platform's motorway status
+  credits the DWD.
+- **Lorry rules** carry no identifier, so a row is named by its place in
+  the answer (by distance, none last). A publisher's file date is stated
+  for a priority route and the long-lorry network only, and the long-lorry
+  network states no direction: the platform's road status states neither.
+  A priority route is the nearest street of its stretch.
+- **Station facilities** name the station only and state no report
+  instant per unit, as the platform's facilities check states them.
+- **A window ahead reads the planned works alone.** A road-conditions
+  answer over a window ahead (`horizon_days`, or `from` and `to`) reads only
+  the families of planned works (`roads.planned_families`, BASt's planning
+  data and its twins) and no weather warning, as the platform's
+  roadworks-ahead answer reads the planning data alone; a site changed at
+  its feed's last check.
+- **Placement credits BKG.** A Land's road conditions credit the family
+  that placed its situations in the Land (the read contract's
+  `placement_source_ref`, BKG's municipalities), and a station name that
+  more than one station answers credits the family that places each in its
+  district and Land, as the platform credits BKG on its Land form and on
+  the town and Land each name candidate is labelled with.
+
 The MCP side has further rules, specific to its sources, that the read
 contract cannot express; they are not compared here.
+
+No question asks the departures of one train category (`categories`,
+the platform's `get_train_departures`). The platform answers it from the DB
+Timetables interface, a live provider call the producer never makes; without
+that call the tool answers that train departures are not enabled, or, when
+the call fails, the timetable as a fallback. Neither is the answer it gives,
+so the case is not asked. The API's category filter is held by its own
+tests; the departures cases compare the board it filters.
 
 ## Known differences that remain
 

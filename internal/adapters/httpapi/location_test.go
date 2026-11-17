@@ -33,7 +33,7 @@ func TestLocationAnswer(t *testing.T) {
 	if w.Code != http.StatusOK || f.gotLoc.At.Lat != 50.94 {
 		t.Fatalf("status %d: %s", w.Code, body)
 	}
-	for _, want := range []string{`"id":"osm:node1"`, `"distanceM":40`, `"municipality":null`, `"name":"Kreis"`, `"state":null`, `"lowEmissionZone":null`} {
+	for _, want := range []string{`"distanceM":40`, `"municipality":null`, `"name":"Kreis"`, `"state":null`, `"lowEmissionZone":null`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("answer lacks %s: %s", want, body)
 		}

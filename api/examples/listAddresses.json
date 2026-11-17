@@ -14,15 +14,8 @@
   "status": 200,
   "response": {
     "data": {
-      "query": {
-        "street": "Marktweg",
-        "number": "1",
-        "postcode": "20000",
-        "place": null
-      },
       "addresses": [
         {
-          "id": "osm:node650000",
           "street": "Marktweg",
           "number": "1",
           "postcode": "20000",

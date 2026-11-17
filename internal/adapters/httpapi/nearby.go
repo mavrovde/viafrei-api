@@ -35,13 +35,12 @@ type NearbyJunction struct {
 
 // NeedPlace is a place of interest answering an everyday need.
 type NeedPlace struct {
-	ID           string   `json:"id"`
 	Name         string   `json:"name"`
 	Kind         string   `json:"kind" doc:"The OpenStreetMap kind, category=value (shop=bakery)."`
 	Street       *string  `json:"street" nullable:"true"`
 	HouseNumber  *string  `json:"houseNo" nullable:"true"`
 	Location     Position `json:"location"`
-	DistanceM    int      `json:"distanceM"`
+	DistanceM    int      `json:"distanceM" doc:"Distance in metres, to 0.1 km as the platform's nearby search states it."`
 	SourceFamily string   `json:"sourceFamily"`
 }
 
@@ -165,8 +164,8 @@ func nearbyEnvelope(s *server, ctx context.Context, a features.NearbyAnswer, q f
 		}
 		b := NeedBlock{Need: c, RadiusM: p.RadiusM, Widened: p.Widened, Places: []NeedPlace{}}
 		for _, v := range p.Places {
-			b.Places = append(b.Places, NeedPlace{ID: v.ID, Name: v.Name, Kind: v.Kind, Street: v.Street, HouseNumber: v.HouseNumber,
-				Location: position(v.Location), DistanceM: v.DistanceM, SourceFamily: v.Family})
+			b.Places = append(b.Places, NeedPlace{Name: v.Name, Kind: v.Kind, Street: v.Street, HouseNumber: v.HouseNumber,
+				Location: position(v.Location), DistanceM: tenthKm(v.DistanceM), SourceFamily: v.Family})
 		}
 		needs = append(needs, b)
 	}

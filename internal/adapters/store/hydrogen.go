@@ -15,6 +15,19 @@ const hydrogenColumns = `h.station_id, h.name, h.operator_name, h.brand, st_y(h.
        h.address, h.refill, h.opening, h.provider_updated_at, h.last_seen_at, h.source_ref
 from contract.hydrogen_station h`
 
+// hydrogenSuffix is the ending of a refill solution's code for a vehicle, as
+// AFIR names them (gaseousHydrogen700barCar, gaseousHydrogen350barTruck) and
+// the platform's hydrogen search matches them; empty for any vehicle.
+func hydrogenSuffix(vehicle string) string {
+	switch vehicle {
+	case "car":
+		return "Car"
+	case "truck":
+		return "Truck"
+	}
+	return ""
+}
+
 // hydrogenVehicle keeps a station with a refill solution for the vehicle $n
 // (null: any), as the platform's hydrogen search does.
 func hydrogenVehicle(n string) string {
@@ -53,7 +66,7 @@ func nullText(s string) *string {
 // whether more are inside (features.Hydrogen).
 func (s *Store) HydrogenNear(ctx context.Context, q energy.HydrogenQuery, families []string) ([]energy.HydrogenStation, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]energy.HydrogenStation, error) {
-		rows, _ := tx.Query(ctx, hydrogenNear, q.At.Lon, q.At.Lat, q.RadiusM, families, nullText(q.Vehicle), q.Limit+1)
+		rows, _ := tx.Query(ctx, hydrogenNear, q.At.Lon, q.At.Lat, q.RadiusM, families, nullText(hydrogenSuffix(q.Vehicle)), q.Limit+1)
 		return pgx.CollectRows(rows, scanHydrogen)
 	})
 }
@@ -62,7 +75,7 @@ func (s *Store) HydrogenNear(ctx context.Context, q energy.HydrogenQuery, famili
 // distance, or none (features.Hydrogen).
 func (s *Store) HydrogenNearest(ctx context.Context, q energy.HydrogenQuery, families []string) ([]energy.HydrogenStation, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]energy.HydrogenStation, error) {
-		rows, _ := tx.Query(ctx, hydrogenNearest, q.At.Lon, q.At.Lat, families, nullText(q.Vehicle))
+		rows, _ := tx.Query(ctx, hydrogenNearest, q.At.Lon, q.At.Lat, families, nullText(hydrogenSuffix(q.Vehicle)))
 		return pgx.CollectRows(rows, scanHydrogen)
 	})
 }

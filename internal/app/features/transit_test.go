@@ -87,6 +87,28 @@ func TestStationsAreGatedAndAttributed(t *testing.T) {
 	}
 }
 
+func TestANameSeveralStationsAnswerCreditsTheirPlacement(t *testing.T) {
+	req.Covers(t, "FR-TRANSIT-001")
+	p := "p1"
+	two := []transit.Station{{ID: "a", Family: "t1", PlacedBy: &p}, {ID: "b", Family: "t1"}}
+	consumer := key("commercial", []access.Scope{"transit"}, "t1")
+	for _, c := range []struct {
+		name     string
+		stations []transit.Station
+		q        transit.Query
+		want     []string
+	}{
+		{"a name two stations answer", two, transit.Query{Text: "nam", Limit: 5}, []string{"p1", "t1"}},
+		{"a name one station answers", two[:1], transit.Query{Text: "nam", Limit: 5}, []string{"t1"}},
+		{"a position", two, transit.Query{Limit: 5}, []string{"t1"}},
+	} {
+		a, err := trService(&trFake{stations: c.stations}).Stations(context.Background(), consumer, c.q)
+		if err != nil || !slices.Equal(names(a.Families), c.want) {
+			t.Errorf("%s: %v %v", c.name, names(a.Families), err)
+		}
+	}
+}
+
 func TestStationsRefusals(t *testing.T) {
 	req.Covers(t, "SEC-030", "SEC-033")
 	full := key("commercial", []access.Scope{"transit"}, "t1")

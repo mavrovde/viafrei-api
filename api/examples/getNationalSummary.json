@@ -28,33 +28,13 @@
     "data": {
       "situations": [
         {
-          "key": "accident",
-          "count": 2,
-          "sourceFamily": "roads_alpha"
-        },
-        {
           "key": "hazard",
-          "count": 1,
-          "sourceFamily": "roads_alpha"
-        },
-        {
-          "key": "jam",
-          "count": 1,
-          "sourceFamily": "roads_alpha"
-        },
-        {
-          "key": "other",
-          "count": 3,
-          "sourceFamily": "roads_alpha"
-        },
-        {
-          "key": "restriction",
-          "count": 3,
+          "count": 14,
           "sourceFamily": "roads_alpha"
         },
         {
           "key": "roadworks",
-          "count": 1,
+          "count": 2,
           "sourceFamily": "roads_alpha"
         }
       ],
@@ -65,8 +45,18 @@
           "sourceFamily": "roads_alpha"
         },
         {
+          "key": "06",
+          "count": 1,
+          "sourceFamily": "roads_alpha"
+        },
+        {
+          "key": "07",
+          "count": 1,
+          "sourceFamily": "roads_alpha"
+        },
+        {
           "key": "10",
-          "count": 2,
+          "count": 3,
           "sourceFamily": "roads_alpha"
         },
         {

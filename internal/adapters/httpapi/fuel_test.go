@@ -38,12 +38,12 @@ func TestFuelStationsAnswer(t *testing.T) {
 		Matched: 3, DroppedClosed: 1, DroppedUnknown: 2,
 	}
 	h := featureHandler(t, config.Defaults(), f, nil)
-	w := do(t, h, http.MethodGet, "/v1/fuel-options?at=50.1,8.6&radius_m=10000&fuel=e5&brand=aral&name=nord&open_now=true&sort=price&limit=1", bearer)
+	w := do(t, h, http.MethodGet, "/v1/fuel-options?at=50.1,8.6&radius_m=10000&fuel=e5&brand=aral&name=nord&open_now=true&sort=name&limit=1", bearer)
 	if w.Code != http.StatusOK || w.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("status %d: %s", w.Code, w.Body)
 	}
 	if g := f.gotFuel; g.At != (geo.Point{Lat: 50.1, Lon: 8.6}) || g.RadiusM != 10000 || g.Fuel != "e5" || g.Brand != "aral" || g.Name != "nord" ||
-		!g.OpenNow || g.Sort != "price" || g.Limit != 1 {
+		!g.OpenNow || g.Sort != "name" || g.Limit != 1 {
 		t.Errorf("asked %+v", g)
 	}
 	body := decode(t, w)
@@ -60,8 +60,22 @@ func TestFuelStationsAnswer(t *testing.T) {
 	}
 	m := meta(t, body)
 	q, _ := m["query"].(map[string]any)
-	if q["matched"] != 3.0 || q["droppedClosed"] != 1.0 || q["droppedUnknown"] != 2.0 || q["sort"] != "price" {
+	if q["matched"] != 3.0 || q["droppedClosed"] != 1.0 || q["droppedUnknown"] != 2.0 || q["sort"] != "name" {
 		t.Errorf("query %v", q)
+	}
+	// By price, the station is stated as the platform's cheapest-fuel search
+	// states it: the asked grade's price only, and the reported state.
+	w = do(t, h, http.MethodGet, "/v1/fuel-options?at=50.1,8.6&fuel=e5&sort=price&limit=1", bearer)
+	data, _ = decode(t, w)["data"].([]any)
+	s0, _ = data[0].(map[string]any)
+	prices, _ = s0["prices"].([]any)
+	if p0, _ := prices[0].(map[string]any); len(prices) != 1 || p0["fuel"] != "e5" || s0["openingState"] != "closed" || f.gotFuel.Sort != "price" {
+		t.Errorf("by price %v", s0)
+	}
+	f.fuel.Items[0].Open = ""
+	data, _ = decode(t, do(t, h, http.MethodGet, "/v1/fuel-options?at=50.1,8.6&fuel=e5&sort=price&limit=1", bearer))["data"].([]any)
+	if s0, _ = data[0].(map[string]any); s0["openingState"] != "unknown" {
+		t.Errorf("by price, no reported state: %v", s0)
 	}
 	f.fuel = features.FuelStations{}
 	if w = do(t, h, http.MethodGet, "/v1/fuel-options?at=50.1,8.6", bearer); w.Code != http.StatusOK {

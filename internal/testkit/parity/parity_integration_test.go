@@ -26,6 +26,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
 	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/runtime/wire"
@@ -219,6 +220,13 @@ func noteOwners(t *testing.T) parity.Owners {
 	for _, p := range pairs {
 		out[p.Body] = append(out[p.Body], p.Family)
 	}
+	// The speed cameras' § 23 Abs. 1c StVO notice is the platform's own
+	// wording, no family's row: it is stated unowned, as the MCP side states it.
+	if n := roads.SpeedNotice(wire.Language); out[n] == nil {
+		out[n] = []string{parity.Unowned}
+	} else {
+		t.Fatal("a fixture family owns the speed cameras' notice")
+	}
 	return out
 }
 
@@ -245,7 +253,7 @@ func compare(t *testing.T, name string) (parity.Bundle, asker) {
 	compared := map[string][]string{}
 	facts, differ := 0, 0
 	for _, c := range b.Cases {
-		got, err := parity.Project(a.ask(t, c), parity.Default, c.Request, a.owners)
+		got, err := parity.Project(a.ask(t, c), parity.Default, c.Operation, c.Request, a.owners)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -281,11 +289,11 @@ func TestParity(t *testing.T) {
 	planted := parity.Default
 	planted.PositionDecimals = 4
 	answer := a.ask(t, b.Cases[0])
-	got, err := parity.Project(answer, planted, b.Cases[0].Request, a.owners)
+	got, err := parity.Project(answer, planted, b.Cases[0].Operation, b.Cases[0].Request, a.owners)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, err := parity.Project(answer, parity.Default, b.Cases[0].Request, a.owners)
+	want, err := parity.Project(answer, parity.Default, b.Cases[0].Operation, b.Cases[0].Request, a.owners)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -350,7 +358,7 @@ func recordBundle(t *testing.T) {
 	a := open(t)
 	for _, qq := range q.Cases {
 		c := parity.Case{ID: qq.ID, Operation: qq.Operation, Counterpart: qq.Counterpart, Request: qq.Request, Key: qq.Key, Now: qq.Now}
-		facts, err := parity.Project(a.ask(t, c), parity.Default, c.Request, a.owners)
+		facts, err := parity.Project(a.ask(t, c), parity.Default, c.Operation, c.Request, a.owners)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -78,6 +78,11 @@ type Site struct {
 	Kind      Kind
 	Location  geo.Point
 	DistanceM int
+	// Unranged is set when the site is stated without a distance, as the
+	// platform states it: along a motorway (no point was asked), and a site
+	// of a family whose terms need accepting (a Toll Collect site, which
+	// the platform names beside its list, never by distance).
+	Unranged bool
 	// TermsRequired is set when the family's terms must be accepted before
 	// its occupancy is given; the occupancy is then withheld.
 	TermsRequired bool

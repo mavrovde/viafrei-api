@@ -46,3 +46,32 @@ type SpeedCameras struct {
 	OSM           []SpeedCamera
 	OSMTotal      int
 }
+
+// The notice every speed-camera answer carries as a condition, as the
+// platform's speed-camera search carries it (§ 23 Abs. 1c StVO): its seven
+// elements, one string per language. German is the master.
+const (
+	speedNoticeDE = "Hinweis zur Nutzung (§ 23 Abs. 1c StVO): Wer ein Fahrzeug führt, darf während der Fahrt kein technisches Gerät und keine App-Funktion betreiben oder nutzen, die Verkehrsüberwachungsmaßnahmen anzeigt oder stört. " +
+		"Das gilt auch für das Smartphone eines Beifahrers, wenn der Fahrer davon profitiert (OLG Karlsruhe). " +
+		"Verstöße kosten 75 € und einen Punkt in Flensburg. " +
+		"Diese Angaben sind nur zur Planung vor Fahrtantritt oder während eines Halts bestimmt. " +
+		"Die Standorte stammen aus amtlichen und offenen Quellen und können unvollständig oder veraltet sein; mobile Kontrollen sind jederzeit und überall möglich. " +
+		"Halten Sie sich immer an die geltende Höchstgeschwindigkeit. " +
+		"Keine Rechtsberatung."
+	speedNoticeEN = "Note on use (§ 23 Abs. 1c StVO): a person driving a vehicle may not, while driving, operate or use any technical device or app function that shows or disrupts traffic enforcement. " +
+		"This also applies to a passenger's smartphone if the driver benefits from it (OLG Karlsruhe). " +
+		"A violation costs €75 and one point in Flensburg. " +
+		"This information is meant only for planning before setting off or during a stop. " +
+		"The locations come from official and open sources and may be incomplete or out of date; mobile checks are possible at any time and anywhere. " +
+		"Always keep to the speed limit in force. " +
+		"Not legal advice."
+)
+
+// SpeedNotice is the § 23 Abs. 1c StVO notice in language: English for
+// "en", the German original otherwise.
+func SpeedNotice(language string) string {
+	if language == "en" {
+		return speedNoticeEN
+	}
+	return speedNoticeDE
+}

@@ -34,8 +34,8 @@
           "validity": {
             "from": "2026-03-29T19:33:04Z",
             "fromLocal": "2026-03-29T21:33:04+02:00",
-            "until": "2026-03-30T05:33:04Z",
-            "untilLocal": "2026-03-30T07:33:04+02:00"
+            "until": null,
+            "untilLocal": null
           },
           "lanes": null,
           "delayMin": null,
@@ -43,15 +43,44 @@
           "headline": "MaintenanceWorks",
           "description": null,
           "textLanguage": "de",
-          "updatedAt": "2026-03-29T19:34:04Z",
-          "updatedAtLocal": "2026-03-29T21:34:04+02:00",
+          "updatedAt": "2026-03-29T23:57:30Z",
+          "updatedAtLocal": "2026-03-30T01:57:30+02:00",
+          "position": null,
+          "sourceFamily": "roads_alpha"
+        },
+        {
+          "id": "datex:syn:ev-00033",
+          "kind": "hazard",
+          "severity": "info",
+          "road": "A101",
+          "roadType": "motorway",
+          "direction": "unknown",
+          "directionText": null,
+          "location": {
+            "lat": 51.887512,
+            "lon": 9.870164
+          },
+          "validity": {
+            "from": "2026-03-28T01:00:00Z",
+            "fromLocal": "2026-03-28T02:00:00+01:00",
+            "until": null,
+            "untilLocal": null
+          },
+          "lanes": null,
+          "delayMin": null,
+          "lengthM": null,
+          "headline": "GeneralObstruction",
+          "description": null,
+          "textLanguage": "de",
+          "updatedAt": "2026-03-29T23:57:30Z",
+          "updatedAtLocal": "2026-03-30T01:57:30+02:00",
           "position": null,
           "sourceFamily": "roads_alpha"
         },
         {
           "id": "datex:syn:ev-00010",
-          "kind": "other",
-          "severity": "other",
+          "kind": "hazard",
+          "severity": "info",
           "road": "A103",
           "roadType": "motorway",
           "direction": "unknown",
@@ -63,17 +92,17 @@
           "validity": {
             "from": "2026-03-29T06:42:04Z",
             "fromLocal": "2026-03-29T08:42:04+02:00",
-            "until": "2026-03-31T17:42:04Z",
-            "untilLocal": "2026-03-31T19:42:04+02:00"
+            "until": null,
+            "untilLocal": null
           },
           "lanes": null,
           "delayMin": null,
           "lengthM": null,
-          "headline": "Other",
+          "headline": "GeneralObstruction",
           "description": null,
           "textLanguage": "de",
-          "updatedAt": "2026-03-29T06:43:04Z",
-          "updatedAtLocal": "2026-03-29T08:43:04+02:00",
+          "updatedAt": "2026-03-29T23:57:30Z",
+          "updatedAtLocal": "2026-03-30T01:57:30+02:00",
           "position": null,
           "sourceFamily": "roads_alpha"
         }
@@ -83,8 +112,14 @@
       "requestId": "example-request-0001",
       "generatedAt": "2026-03-30T00:00:00Z",
       "language": "en",
-      "asOf": "2026-03-29T23:57:30Z",
+      "asOf": null,
       "freshness": [
+        {
+          "family": "bkg_gvisys",
+          "dataAsOf": null,
+          "ageS": null,
+          "stale": false
+        },
         {
           "family": "roads_alpha",
           "dataAsOf": "2026-03-29T23:57:30Z",
@@ -94,6 +129,17 @@
         }
       ],
       "attribution": [
+        {
+          "family": "bkg_gvisys",
+          "domain": "places",
+          "publisher": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
+          "text": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
+          "licence": "dl-de/by-2-0",
+          "licenceUrl": "https://licences.example/dl-de-by-2-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+        },
         {
           "family": "roads_alpha",
           "domain": "roads",

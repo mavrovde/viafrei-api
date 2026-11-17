@@ -1,7 +1,7 @@
 {
   "title": "The situations on a motorway, two to a page, with its lamp",
   "request": "/v1/motorways/A101/conditions?limit=2",
-  "attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain the key is entitled to, with or without the scope weather; those families are credited whether or not a warning is in force. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
   "key": {
     "useClass": "commercial",
     "scopes": [
@@ -31,60 +31,60 @@
       "lampReason": "warning",
       "situations": [
         {
-          "id": "datex:syn:ev-00020",
-          "kind": "accident",
-          "severity": "major",
+          "id": "datex:syn:ev-00001",
+          "kind": "hazard",
+          "severity": "info",
           "road": "A101",
           "roadType": "motorway",
           "direction": "unknown",
           "directionText": null,
           "location": {
-            "lat": 50.470457,
-            "lon": 10.95832
+            "lat": 52.201447,
+            "lon": 9.149344
           },
           "validity": {
-            "from": "2026-03-29T00:59:59Z",
-            "fromLocal": "2026-03-29T01:59:59+01:00",
+            "from": "2026-03-28T18:09:13Z",
+            "fromLocal": "2026-03-28T19:09:13+01:00",
             "until": null,
             "untilLocal": null
           },
           "lanes": null,
           "delayMin": null,
           "lengthM": null,
-          "headline": "Accident",
+          "headline": "GeneralObstruction",
           "description": null,
           "textLanguage": "de",
-          "updatedAt": "2026-03-29T01:00:59Z",
-          "updatedAtLocal": "2026-03-29T03:00:59+02:00",
+          "updatedAt": "2026-03-29T23:57:30Z",
+          "updatedAtLocal": "2026-03-30T01:57:30+02:00",
           "position": null,
           "sourceFamily": "roads_alpha"
         },
         {
-          "id": "datex:syn:ev-00022",
-          "kind": "accident",
-          "severity": "major",
+          "id": "datex:syn:ev-00003",
+          "kind": "hazard",
+          "severity": "info",
           "road": "A101",
           "roadType": "motorway",
           "direction": "unknown",
           "directionText": null,
           "location": {
-            "lat": 50.323326,
-            "lon": 10.655179
+            "lat": 52.120986,
+            "lon": 9.33409
           },
           "validity": {
-            "from": "2026-03-29T01:30:00Z",
-            "fromLocal": "2026-03-29T03:30:00+02:00",
+            "from": "2026-03-29T14:03:21Z",
+            "fromLocal": "2026-03-29T16:03:21+02:00",
             "until": null,
             "untilLocal": null
           },
           "lanes": null,
           "delayMin": null,
           "lengthM": null,
-          "headline": "Accident",
+          "headline": "GeneralObstruction",
           "description": null,
           "textLanguage": "de",
-          "updatedAt": "2026-03-29T01:31:00Z",
-          "updatedAtLocal": "2026-03-29T03:31:00+02:00",
+          "updatedAt": "2026-03-29T23:57:30Z",
+          "updatedAtLocal": "2026-03-30T01:57:30+02:00",
           "position": null,
           "sourceFamily": "roads_alpha"
         }
@@ -97,6 +97,13 @@
       "asOf": "2026-03-29T23:57:30Z",
       "freshness": [
         {
+          "family": "dwd_eta",
+          "dataAsOf": "2026-03-29T23:57:30Z",
+          "ageS": 150,
+          "staleAfterS": 900,
+          "stale": false
+        },
+        {
           "family": "roads_alpha",
           "dataAsOf": "2026-03-29T23:57:30Z",
           "ageS": 150,
@@ -105,6 +112,17 @@
         }
       ],
       "attribution": [
+        {
+          "family": "dwd_eta",
+          "domain": "weather",
+          "publisher": "Golmil Datenwerk",
+          "text": "Synthetic data from family eta, licence dl-de/by-2-0.",
+          "licence": "dl-de/by-2-0",
+          "licenceUrl": "https://licences.example/dl-de-by-2-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://eta.example/terms/dwd_eta"
+        },
         {
           "family": "roads_alpha",
           "domain": "roads",

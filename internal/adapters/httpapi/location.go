@@ -108,7 +108,7 @@ func registerLocation(api huma.API, s *server, op huma.Operation) {
 func locationEnvelope(s *server, ctx context.Context, a features.LocationAnswer) LocationEnvelope {
 	data := LocationData{Municipality: locationPlace(a.Municipality), District: locationPlace(a.District), State: locationPlace(a.State), Zone: locationZone(a.Zone)}
 	if v := a.Address; v != nil {
-		data.Address = &LocationAddress{Address: Address{ID: v.ID, Street: v.Street, HouseNumber: v.HouseNumber, Postcode: v.Postcode, Place: v.Place,
+		data.Address = &LocationAddress{Address: Address{Street: v.Street, HouseNumber: v.HouseNumber, Postcode: v.Postcode, Place: v.Place,
 			Land: v.Land, Location: position(v.Location), DataAsOf: day(v.DataAsOf), SourceFamily: v.Family}}
 		if v.DistanceM != nil {
 			data.Address.DistanceM = *v.DistanceM

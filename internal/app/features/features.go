@@ -89,6 +89,9 @@ type Settings struct {
 	PartDeadline time.Duration
 	// EndedRetention is how long an ended road situation still answers.
 	EndedRetention time.Duration
+	// PlannedWorks are the roads families of planned works: an answer over
+	// a window ahead reads only these.
+	PlannedWorks []string
 	// MaxWarnings is the most warnings a weather answer lists.
 	MaxWarnings int
 	// Disabled are the families the licence gate always denies.

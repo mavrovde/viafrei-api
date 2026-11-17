@@ -17,7 +17,7 @@ import (
 
 // GeneratorVersion changes whenever the output for a given seed and profile
 // changes.
-const GeneratorVersion = "0.3.2"
+const GeneratorVersion = "0.3.3"
 
 // Profile sets the size of a generated set.
 type Profile struct {
@@ -146,6 +146,7 @@ func generate(out io.Writer, profile string, seed uint64, contractVersion string
 	g.alerts()
 	g.zones()
 	g.lorry()
+	g.plannedWorks()
 	g.w.end()
 	sum, err := g.w.close()
 	if err != nil {
@@ -292,6 +293,10 @@ var sourceList = []source{
 	// the platform holds: the set writes their rows, never their register.
 	{ref: "lorry_bast_langlkw", family: "alpha", domain: "roads", platform: true},
 	{ref: "lorry_koeln_beschraenkungen", family: "alpha", domain: "roads", platform: true},
+	// The planned motorway works, keyed and registered as the platform's
+	// register keeps BASt's (roadworks_bast: CC BY 4.0, every use class,
+	// reviewed): the family a window ahead reads.
+	{ref: PlannedWorksFamily, family: "alpha", domain: "roads", target: 300, publisher: "Baustellwerk Datenwerk"},
 }
 
 // useClasses are the register's use classes of each family; nil writes no
@@ -660,6 +665,38 @@ func (g *gen) roadsAndEvents() {
 			g.w.row(str(e.id), ts(e.at.Add(time.Duration(v*15)*time.Minute)), num(v+1), str(e.ref))
 		}
 	}
+}
+
+// PlannedWorksFamily is the source of the planned motorway works, the
+// platform's key for BASt's planning data.
+const PlannedWorksFamily = "roadworks_bast"
+
+// plannedWorks writes the planned works on road 1, after every other row so
+// no draw moves: one under way, two starting within a fortnight (one after
+// the first week), one starting after it and one ended. Each lies halfway
+// between two junctions of the road, so the platform places none at a
+// junction; each changed at its family's sweep.
+func (g *gen) plannedWorks() {
+	rd := g.roads[1]
+	count := 8 + g.p.Scale/4
+	seen := g.sweep(PlannedWorksFamily)
+	end := g.end()
+	g.w.begin("traffic_event", eventColumns...)
+	for i, w := range []struct{ from, to time.Duration }{
+		{-48 * time.Hour, 5 * 24 * time.Hour},
+		{3 * 24 * time.Hour, 4 * 24 * time.Hour},
+		{10*24*time.Hour + 6*time.Hour, 12 * 24 * time.Hour},
+		{20 * 24 * time.Hour, 22 * 24 * time.Hour},
+		{-5 * 24 * time.Hour, -24 * time.Hour},
+	} {
+		pub := fmt.Sprintf("bast-%04d", i+1)
+		at := rd.along(float64(i+1) / float64(count))
+		from, to := end.Add(w.from), end.Add(w.to)
+		g.w.row(str(eventID(pub)), str("roadworks"), str(rd.ref), str("motorway"), point(at), ts(from), ts(to),
+			str(PlannedWorksFamily), str(pub), ts(from), ts(seen), ts(seen), null)
+		g.counted(landOf(at), PlannedWorksFamily)
+	}
+	g.edges["planned_works"] = 5
 }
 
 // ---------------------------------------------------------------- energy

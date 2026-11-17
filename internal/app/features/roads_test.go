@@ -132,7 +132,7 @@ func roadService(f *roadFake) *features.Service {
 	}
 	f.reg = roadRegister
 	return features.New(features.Repositories{Register: f, Roads: f},
-		features.Settings{Language: "en", EndedRetention: 24 * time.Hour}, func() time.Time { return now })
+		features.Settings{Language: "en", EndedRetention: 24 * time.Hour, PlannedWorks: []string{"r2", "r9"}}, func() time.Time { return now })
 }
 
 var (
@@ -216,6 +216,22 @@ func TestRoadConditionsAnswerAnArea(t *testing.T) {
 		t.Errorf("answer %+v, asked %+v", c, f.gotArea)
 	}
 	lit(t, "a closure", c, roads.LampRed, roads.ReasonRoadClosed)
+}
+
+func TestAWindowAheadReadsThePlannedWorksAlone(t *testing.T) {
+	req.Covers(t, "FR-ROAD-006")
+	f := &roadFake{sits: []roads.Situation{{ID: "a", Family: "r2"}}}
+	q := roads.AreaQuery{Filter: roads.Filter{From: now, Until: now.Add(14 * 24 * time.Hour), Ahead: true}}
+	c, err := roadService(f).RoadConditions(context.Background(), key("consumer", weatherScope, "r1", "r2", "w1"), q)
+	if err != nil || !slices.Equal(f.gotFams.Roads, []string{"r2"}) || f.gotFams.Weather != nil || !slices.Equal(names(c.Families), []string{"r2"}) {
+		t.Errorf("a window ahead read %+v, credits %v: %v", f.gotFams, names(c.Families), err)
+	}
+	// A watch's window is not a question ahead: it reads every family.
+	w := &roadFake{}
+	q.Filter.Ahead = false
+	if _, err := roadService(w).RoadConditions(context.Background(), key("consumer", weatherScope, "r1", "r2", "w1"), q); err != nil || !slices.Equal(w.gotFams.Roads, []string{"r1", "r2"}) || w.gotFams.Weather == nil {
+		t.Errorf("a watch window read %+v: %v", w.gotFams, err)
+	}
 }
 
 func TestALandsAnswerCreditsThePlacement(t *testing.T) {

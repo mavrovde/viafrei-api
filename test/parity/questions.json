@@ -2,7 +2,7 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "5160a640d41085c59f7c6dce1298f82ff9c7b7936075d87b6a9c010264a875d2"
+    "sha256": "3bf54615fc128fee62f72603d5a80c280e699f0a3d2e7699d738173f0e25e117"
   },
   "cases": [
     {
@@ -196,24 +196,6 @@
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
-    },
-    {
-      "id": "departures-categories",
-      "operation": "listStationDepartures",
-      "counterpart": "departure board",
-      "request": "/v1/stations/1:de:01002:0/departures?from=2026-03-29T10:00:00Z&duration_min=120&categories=RE&limit=15",
-      "key": {
-        "useClass": "commercial",
-        "scopes": [
-          "transit"
-        ],
-        "sources": [
-          "delfi_static",
-          "delfi_rt_tu"
-        ],
-        "accepted": null
-      },
-      "now": "2026-03-29T09:30:00Z"
     },
     {
       "id": "stations-code",
@@ -1136,7 +1118,8 @@
           "dwd_alpha",
           "dwd_eta",
           "roads_alpha",
-          "roads_epsilon"
+          "roads_epsilon",
+          "roadworks_bast"
         ],
         "accepted": null
       },
@@ -1156,7 +1139,8 @@
           "dwd_alpha",
           "dwd_eta",
           "roads_alpha",
-          "roads_epsilon"
+          "roads_epsilon",
+          "roadworks_bast"
         ],
         "accepted": null
       },

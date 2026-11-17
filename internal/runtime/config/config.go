@@ -189,6 +189,7 @@ type Pagination struct {
 // Roads holds the settings of the road-conditions answers.
 type Roads struct {
 	EndedRetentionH int `koanf:"ended_retention_h" default:"24" validate:"min=1,max=168" desc:"Hours an ended road situation still answers 200 on its own operation, with validity.until in the past; after that it answers 404 not-found (Spec: Endpoints, Roads, section 6)."`
+	PlannedFamilies []string `koanf:"planned_families" default:"roadworks_bast,ald_14d,roadworks_akd" validate:"min=1,dive,required" desc:"The source families of planned motorway works: an answer over a window ahead (horizon_days, or from and to) reads only these, as the platform's roadworks-ahead answer reads the BASt planning data and its twins. Comma-separated in the environment."`
 }
 
 // Weather holds the settings of the weather answers.

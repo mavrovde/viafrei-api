@@ -6,7 +6,7 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "5160a640d41085c59f7c6dce1298f82ff9c7b7936075d87b6a9c010264a875d2"
+    "sha256": "3bf54615fc128fee62f72603d5a80c280e699f0a3d2e7699d738173f0e25e117"
   },
   "cases": [
     {
@@ -1406,102 +1406,6 @@
         {
           "name": "data.window.untilLocal",
           "value": "2026-03-31T04:00:00Z"
-        },
-        {
-          "name": "meta.attribution[delfi_static].family",
-          "value": "delfi_static"
-        },
-        {
-          "name": "meta.notes.condition",
-          "value": "[]"
-        },
-        {
-          "name": "meta.notes.purpose",
-          "value": "[]"
-        },
-        {
-          "name": "meta.page.hasMore",
-          "value": "false"
-        },
-        {
-          "name": "meta.page.limit",
-          "value": "15"
-        }
-      ]
-    },
-    {
-      "id": "departures-categories",
-      "operation": "listStationDepartures",
-      "counterpart": "departure board",
-      "request": "/v1/stations/1:de:01002:0/departures?from=2026-03-29T10:00:00Z\u0026duration_min=120\u0026categories=RE\u0026limit=15",
-      "key": {
-        "useClass": "commercial",
-        "scopes": [
-          "transit"
-        ],
-        "sources": [
-          "delfi_static",
-          "delfi_rt_tu"
-        ],
-        "accepted": null
-      },
-      "now": "2026-03-29T09:30:00Z",
-      "facts": [
-        {
-          "name": "data.departures",
-          "value": "[]"
-        },
-        {
-          "name": "data.station.id",
-          "value": "1:de:01002:0"
-        },
-        {
-          "name": "data.station.name",
-          "value": "Namüningen Süd"
-        },
-        {
-          "name": "data.station.stopCode",
-          "value": "de:01002:0"
-        },
-        {
-          "name": "data.window.dropped[1].code",
-          "value": "1"
-        },
-        {
-          "name": "data.window.dropped[1].count",
-          "value": "1"
-        },
-        {
-          "name": "data.window.dropped[2].code",
-          "value": "2"
-        },
-        {
-          "name": "data.window.dropped[2].count",
-          "value": "1"
-        },
-        {
-          "name": "data.window.from",
-          "value": "2026-03-29T10:00:00Z"
-        },
-        {
-          "name": "data.window.fromLocal",
-          "value": "2026-03-29T10:00:00Z"
-        },
-        {
-          "name": "data.window.matched",
-          "value": "0"
-        },
-        {
-          "name": "data.window.matchedAll",
-          "value": "2"
-        },
-        {
-          "name": "data.window.until",
-          "value": "2026-03-29T12:00:00Z"
-        },
-        {
-          "name": "data.window.untilLocal",
-          "value": "2026-03-29T12:00:00Z"
         },
         {
           "name": "meta.attribution[delfi_static].family",
@@ -6836,7 +6740,8 @@
           "dwd_alpha",
           "dwd_eta",
           "roads_alpha",
-          "roads_epsilon"
+          "roads_epsilon",
+          "roadworks_bast"
         ],
         "accepted": null
       },
@@ -6855,856 +6760,284 @@
           "value": "motorway"
         },
         {
-          "name": "data.corridor.states",
-          "value": "[\"06\",\"07\",\"08\",\"10\"]"
-        },
-        {
-          "name": "data.lamp",
-          "value": "amber"
-        },
-        {
-          "name": "data.lampReason",
-          "value": "warning"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].delayMin",
+          "name": "data.situations[datex:syn:bast-0001].delayMin",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00001].description",
+          "name": "data.situations[datex:syn:bast-0001].description",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00001].direction",
+          "name": "data.situations[datex:syn:bast-0001].direction",
           "value": "unknown"
         },
         {
-          "name": "data.situations[datex:syn:ev-00001].directionText",
+          "name": "data.situations[datex:syn:bast-0001].directionText",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00001].headline",
-          "value": "GeneralObstruction"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].id",
-          "value": "datex:syn:ev-00001"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].kind",
-          "value": "hazard"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].lanes",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].lengthM",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].location.lat",
-          "value": "52.20145"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].location.lon",
-          "value": "9.14934"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].position",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].road",
-          "value": "A101"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].roadType",
-          "value": "motorway"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].severity",
-          "value": "info"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].sourceFamily",
-          "value": "roads_alpha"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].textLanguage",
-          "value": "de"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].updatedAt",
-          "value": "2026-03-29T23:57:30Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].updatedAtLocal",
-          "value": "2026-03-29T23:57:30Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].validity.from",
-          "value": "2026-03-28T18:09:13Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].validity.fromLocal",
-          "value": "2026-03-28T18:09:13Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].validity.until",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00001].validity.untilLocal",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].delayMin",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].description",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].direction",
-          "value": "unknown"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].directionText",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].headline",
-          "value": "GeneralObstruction"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].id",
-          "value": "datex:syn:ev-00003"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].kind",
-          "value": "hazard"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].lanes",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].lengthM",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].location.lat",
-          "value": "52.12099"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].location.lon",
-          "value": "9.33409"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].position",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].road",
-          "value": "A101"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].roadType",
-          "value": "motorway"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].severity",
-          "value": "info"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].sourceFamily",
-          "value": "roads_alpha"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].textLanguage",
-          "value": "de"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].updatedAt",
-          "value": "2026-03-29T23:57:30Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].updatedAtLocal",
-          "value": "2026-03-29T23:57:30Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].validity.from",
-          "value": "2026-03-29T14:03:21Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].validity.fromLocal",
-          "value": "2026-03-29T14:03:21Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].validity.until",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00003].validity.untilLocal",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].delayMin",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].description",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].direction",
-          "value": "unknown"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].directionText",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].headline",
-          "value": "GeneralObstruction"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].id",
-          "value": "datex:syn:ev-00020"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].kind",
-          "value": "hazard"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].lanes",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].lengthM",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].location.lat",
-          "value": "50.47046"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].location.lon",
-          "value": "10.95832"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].position",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].road",
-          "value": "A101"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].roadType",
-          "value": "motorway"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].severity",
-          "value": "info"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].sourceFamily",
-          "value": "roads_alpha"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].textLanguage",
-          "value": "de"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].updatedAt",
-          "value": "2026-03-29T23:57:30Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].updatedAtLocal",
-          "value": "2026-03-29T23:57:30Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].validity.from",
-          "value": "2026-03-29T00:59:59Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].validity.fromLocal",
-          "value": "2026-03-29T00:59:59Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].validity.until",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00020].validity.untilLocal",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].delayMin",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].description",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].direction",
-          "value": "unknown"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].directionText",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].headline",
-          "value": "GeneralObstruction"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].id",
-          "value": "datex:syn:ev-00022"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].kind",
-          "value": "hazard"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].lanes",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].lengthM",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].location.lat",
-          "value": "50.32333"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].location.lon",
-          "value": "10.65518"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].position",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].road",
-          "value": "A101"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].roadType",
-          "value": "motorway"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].severity",
-          "value": "info"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].sourceFamily",
-          "value": "roads_alpha"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].textLanguage",
-          "value": "de"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].updatedAt",
-          "value": "2026-03-29T23:57:30Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].updatedAtLocal",
-          "value": "2026-03-29T23:57:30Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].validity.from",
-          "value": "2026-03-29T01:30:00Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].validity.fromLocal",
-          "value": "2026-03-29T01:30:00Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].validity.until",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00022].validity.untilLocal",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00028].delayMin",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00028].description",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00028].direction",
-          "value": "unknown"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00028].directionText",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00028].headline",
+          "name": "data.situations[datex:syn:bast-0001].headline",
           "value": "MaintenanceWorks"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].id",
-          "value": "datex:syn:ev-00028"
+          "name": "data.situations[datex:syn:bast-0001].id",
+          "value": "datex:syn:bast-0001"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].kind",
+          "name": "data.situations[datex:syn:bast-0001].kind",
           "value": "roadworks"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].lanes",
+          "name": "data.situations[datex:syn:bast-0001].lanes",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].lengthM",
+          "name": "data.situations[datex:syn:bast-0001].lengthM",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].location.lat",
-          "value": "51.44173"
+          "name": "data.situations[datex:syn:bast-0001].location.lat",
+          "value": "51.27241"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].location.lon",
-          "value": "12.95947"
+          "name": "data.situations[datex:syn:bast-0001].location.lon",
+          "value": "11.28249"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].position",
+          "name": "data.situations[datex:syn:bast-0001].position",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].road",
+          "name": "data.situations[datex:syn:bast-0001].road",
           "value": "A101"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].roadType",
+          "name": "data.situations[datex:syn:bast-0001].roadType",
           "value": "motorway"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].severity",
+          "name": "data.situations[datex:syn:bast-0001].severity",
           "value": "lane_closed"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].sourceFamily",
-          "value": "roads_alpha"
+          "name": "data.situations[datex:syn:bast-0001].sourceFamily",
+          "value": "roadworks_bast"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].textLanguage",
+          "name": "data.situations[datex:syn:bast-0001].textLanguage",
           "value": "de"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].updatedAt",
+          "name": "data.situations[datex:syn:bast-0001].updatedAt",
           "value": "2026-03-29T23:57:30Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].updatedAtLocal",
+          "name": "data.situations[datex:syn:bast-0001].updatedAtLocal",
           "value": "2026-03-29T23:57:30Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].validity.from",
-          "value": "2026-03-29T22:00:00Z"
+          "name": "data.situations[datex:syn:bast-0001].validity.from",
+          "value": "2026-03-28T00:00:00Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].validity.fromLocal",
-          "value": "2026-03-29T22:00:00Z"
+          "name": "data.situations[datex:syn:bast-0001].validity.fromLocal",
+          "value": "2026-03-28T00:00:00Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].validity.until",
+          "name": "data.situations[datex:syn:bast-0001].validity.until",
+          "value": "2026-04-04T00:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0001].validity.untilLocal",
+          "value": "2026-04-04T00:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].delayMin",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].validity.untilLocal",
+          "name": "data.situations[datex:syn:bast-0002].description",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].delayMin",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00030].description",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00030].direction",
+          "name": "data.situations[datex:syn:bast-0002].direction",
           "value": "unknown"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].directionText",
+          "name": "data.situations[datex:syn:bast-0002].directionText",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].headline",
-          "value": "Straßensperrung"
+          "name": "data.situations[datex:syn:bast-0002].headline",
+          "value": "MaintenanceWorks"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].id",
-          "value": "datex:syn:ev-00030"
+          "name": "data.situations[datex:syn:bast-0002].id",
+          "value": "datex:syn:bast-0002"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].kind",
-          "value": "closure"
+          "name": "data.situations[datex:syn:bast-0002].kind",
+          "value": "roadworks"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].lanes",
+          "name": "data.situations[datex:syn:bast-0002].lanes",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].lengthM",
+          "name": "data.situations[datex:syn:bast-0002].lengthM",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].location.lat",
-          "value": "51.27379"
+          "name": "data.situations[datex:syn:bast-0002].location.lat",
+          "value": "52.13539"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].location.lon",
-          "value": "13.14124"
+          "name": "data.situations[datex:syn:bast-0002].location.lon",
+          "value": "9.30103"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].position",
+          "name": "data.situations[datex:syn:bast-0002].position",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].road",
+          "name": "data.situations[datex:syn:bast-0002].road",
           "value": "A101"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].roadType",
+          "name": "data.situations[datex:syn:bast-0002].roadType",
           "value": "motorway"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].severity",
-          "value": "road_closed"
+          "name": "data.situations[datex:syn:bast-0002].severity",
+          "value": "lane_closed"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].sourceFamily",
-          "value": "roads_alpha"
+          "name": "data.situations[datex:syn:bast-0002].sourceFamily",
+          "value": "roadworks_bast"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].textLanguage",
+          "name": "data.situations[datex:syn:bast-0002].textLanguage",
           "value": "de"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].updatedAt",
+          "name": "data.situations[datex:syn:bast-0002].updatedAt",
           "value": "2026-03-29T23:57:30Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].updatedAtLocal",
+          "name": "data.situations[datex:syn:bast-0002].updatedAtLocal",
           "value": "2026-03-29T23:57:30Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].validity.from",
-          "value": "2026-03-31T22:00:00Z"
+          "name": "data.situations[datex:syn:bast-0002].validity.from",
+          "value": "2026-04-02T00:00:00Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].validity.fromLocal",
-          "value": "2026-03-31T22:00:00Z"
+          "name": "data.situations[datex:syn:bast-0002].validity.fromLocal",
+          "value": "2026-04-02T00:00:00Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].validity.until",
+          "name": "data.situations[datex:syn:bast-0002].validity.until",
+          "value": "2026-04-03T00:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].validity.untilLocal",
+          "value": "2026-04-03T00:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].delayMin",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00030].validity.untilLocal",
+          "name": "data.situations[datex:syn:bast-0003].description",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].delayMin",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00031].description",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00031].direction",
+          "name": "data.situations[datex:syn:bast-0003].direction",
           "value": "unknown"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].directionText",
+          "name": "data.situations[datex:syn:bast-0003].directionText",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].headline",
-          "value": "GeneralObstruction"
+          "name": "data.situations[datex:syn:bast-0003].headline",
+          "value": "MaintenanceWorks"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].id",
-          "value": "datex:syn:ev-00031"
+          "name": "data.situations[datex:syn:bast-0003].id",
+          "value": "datex:syn:bast-0003"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].kind",
-          "value": "hazard"
+          "name": "data.situations[datex:syn:bast-0003].kind",
+          "value": "roadworks"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].lanes",
+          "name": "data.situations[datex:syn:bast-0003].lanes",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].lengthM",
+          "name": "data.situations[datex:syn:bast-0003].lengthM",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].location.lat",
-          "value": "51.02159"
+          "name": "data.situations[datex:syn:bast-0003].location.lat",
+          "value": "52.36656"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].location.lon",
-          "value": "11.85840"
+          "name": "data.situations[datex:syn:bast-0003].location.lon",
+          "value": "8.55437"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].position",
+          "name": "data.situations[datex:syn:bast-0003].position",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].road",
+          "name": "data.situations[datex:syn:bast-0003].road",
           "value": "A101"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].roadType",
+          "name": "data.situations[datex:syn:bast-0003].roadType",
           "value": "motorway"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].severity",
-          "value": "info"
+          "name": "data.situations[datex:syn:bast-0003].severity",
+          "value": "lane_closed"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].sourceFamily",
-          "value": "roads_alpha"
+          "name": "data.situations[datex:syn:bast-0003].sourceFamily",
+          "value": "roadworks_bast"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].textLanguage",
+          "name": "data.situations[datex:syn:bast-0003].textLanguage",
           "value": "de"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].updatedAt",
+          "name": "data.situations[datex:syn:bast-0003].updatedAt",
           "value": "2026-03-29T23:57:30Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].updatedAtLocal",
+          "name": "data.situations[datex:syn:bast-0003].updatedAtLocal",
           "value": "2026-03-29T23:57:30Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].validity.from",
-          "value": "2025-12-31T22:59:59Z"
+          "name": "data.situations[datex:syn:bast-0003].validity.from",
+          "value": "2026-04-09T06:00:00Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].validity.fromLocal",
-          "value": "2025-12-31T22:59:59Z"
+          "name": "data.situations[datex:syn:bast-0003].validity.fromLocal",
+          "value": "2026-04-09T06:00:00Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].validity.until",
-          "value": "null"
+          "name": "data.situations[datex:syn:bast-0003].validity.until",
+          "value": "2026-04-11T00:00:00Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00031].validity.untilLocal",
-          "value": "null"
+          "name": "data.situations[datex:syn:bast-0003].validity.untilLocal",
+          "value": "2026-04-11T00:00:00Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00032].delayMin",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].description",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].direction",
-          "value": "unknown"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].directionText",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].headline",
-          "value": "GeneralObstruction"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].id",
-          "value": "datex:syn:ev-00032"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].kind",
-          "value": "hazard"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].lanes",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].lengthM",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].location.lat",
-          "value": "50.26303"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].location.lon",
-          "value": "10.53095"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].position",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].road",
-          "value": "A101"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].roadType",
-          "value": "motorway"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].severity",
-          "value": "info"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].sourceFamily",
-          "value": "roads_alpha"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].textLanguage",
-          "value": "de"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].updatedAt",
-          "value": "2026-03-29T23:57:30Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].updatedAtLocal",
-          "value": "2026-03-29T23:57:30Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].validity.from",
-          "value": "2025-12-31T23:00:00Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].validity.fromLocal",
-          "value": "2025-12-31T23:00:00Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].validity.until",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00032].validity.untilLocal",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].delayMin",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].description",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].direction",
-          "value": "unknown"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].directionText",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].headline",
-          "value": "GeneralObstruction"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].id",
-          "value": "datex:syn:ev-00033"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].kind",
-          "value": "hazard"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].lanes",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].lengthM",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].location.lat",
-          "value": "51.88751"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].location.lon",
-          "value": "9.87016"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].position",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].road",
-          "value": "A101"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].roadType",
-          "value": "motorway"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].severity",
-          "value": "info"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].sourceFamily",
-          "value": "roads_alpha"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].textLanguage",
-          "value": "de"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].updatedAt",
-          "value": "2026-03-29T23:57:30Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].updatedAtLocal",
-          "value": "2026-03-29T23:57:30Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].validity.from",
-          "value": "2026-03-28T01:00:00Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].validity.fromLocal",
-          "value": "2026-03-28T01:00:00Z"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].validity.until",
-          "value": "null"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00033].validity.untilLocal",
-          "value": "null"
-        },
-        {
-          "name": "meta.attribution[dwd_alpha].family",
-          "value": "dwd_alpha"
-        },
-        {
-          "name": "meta.attribution[dwd_eta].family",
-          "value": "dwd_eta"
-        },
-        {
-          "name": "meta.attribution[roads_alpha].family",
-          "value": "roads_alpha"
+          "name": "meta.attribution[roadworks_bast].family",
+          "value": "roadworks_bast"
         },
         {
           "name": "meta.notes.condition",
@@ -7742,7 +7075,8 @@
           "dwd_alpha",
           "dwd_eta",
           "roads_alpha",
-          "roads_epsilon"
+          "roads_epsilon",
+          "roadworks_bast"
         ],
         "accepted": null
       },
@@ -7761,120 +7095,376 @@
           "value": "motorway"
         },
         {
-          "name": "data.corridor.states",
-          "value": "[\"06\",\"07\",\"08\",\"10\"]"
-        },
-        {
-          "name": "data.lamp",
-          "value": "amber"
-        },
-        {
-          "name": "data.lampReason",
-          "value": "warning"
-        },
-        {
-          "name": "data.situations[datex:syn:ev-00028].delayMin",
+          "name": "data.situations[datex:syn:bast-0001].delayMin",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].description",
+          "name": "data.situations[datex:syn:bast-0001].description",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].direction",
+          "name": "data.situations[datex:syn:bast-0001].direction",
           "value": "unknown"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].directionText",
+          "name": "data.situations[datex:syn:bast-0001].directionText",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].headline",
+          "name": "data.situations[datex:syn:bast-0001].headline",
           "value": "MaintenanceWorks"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].id",
-          "value": "datex:syn:ev-00028"
+          "name": "data.situations[datex:syn:bast-0001].id",
+          "value": "datex:syn:bast-0001"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].kind",
+          "name": "data.situations[datex:syn:bast-0001].kind",
           "value": "roadworks"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].lanes",
+          "name": "data.situations[datex:syn:bast-0001].lanes",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].lengthM",
+          "name": "data.situations[datex:syn:bast-0001].lengthM",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].location.lat",
-          "value": "51.44173"
+          "name": "data.situations[datex:syn:bast-0001].location.lat",
+          "value": "51.27241"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].location.lon",
-          "value": "12.95947"
+          "name": "data.situations[datex:syn:bast-0001].location.lon",
+          "value": "11.28249"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].position",
+          "name": "data.situations[datex:syn:bast-0001].position",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].road",
+          "name": "data.situations[datex:syn:bast-0001].road",
           "value": "A101"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].roadType",
+          "name": "data.situations[datex:syn:bast-0001].roadType",
           "value": "motorway"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].severity",
+          "name": "data.situations[datex:syn:bast-0001].severity",
           "value": "lane_closed"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].sourceFamily",
-          "value": "roads_alpha"
+          "name": "data.situations[datex:syn:bast-0001].sourceFamily",
+          "value": "roadworks_bast"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].textLanguage",
+          "name": "data.situations[datex:syn:bast-0001].textLanguage",
           "value": "de"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].updatedAt",
+          "name": "data.situations[datex:syn:bast-0001].updatedAt",
           "value": "2026-03-29T23:57:30Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].updatedAtLocal",
+          "name": "data.situations[datex:syn:bast-0001].updatedAtLocal",
           "value": "2026-03-29T23:57:30Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].validity.from",
-          "value": "2026-03-29T22:00:00Z"
+          "name": "data.situations[datex:syn:bast-0001].validity.from",
+          "value": "2026-03-28T00:00:00Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].validity.fromLocal",
-          "value": "2026-03-29T22:00:00Z"
+          "name": "data.situations[datex:syn:bast-0001].validity.fromLocal",
+          "value": "2026-03-28T00:00:00Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].validity.until",
+          "name": "data.situations[datex:syn:bast-0001].validity.until",
+          "value": "2026-04-04T00:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0001].validity.untilLocal",
+          "value": "2026-04-04T00:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].delayMin",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00028].validity.untilLocal",
+          "name": "data.situations[datex:syn:bast-0002].description",
           "value": "null"
         },
         {
-          "name": "meta.attribution[dwd_alpha].family",
-          "value": "dwd_alpha"
+          "name": "data.situations[datex:syn:bast-0002].direction",
+          "value": "unknown"
         },
         {
-          "name": "meta.attribution[dwd_eta].family",
-          "value": "dwd_eta"
+          "name": "data.situations[datex:syn:bast-0002].directionText",
+          "value": "null"
         },
         {
-          "name": "meta.attribution[roads_alpha].family",
-          "value": "roads_alpha"
+          "name": "data.situations[datex:syn:bast-0002].headline",
+          "value": "MaintenanceWorks"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].id",
+          "value": "datex:syn:bast-0002"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].kind",
+          "value": "roadworks"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].lanes",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].lengthM",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].location.lat",
+          "value": "52.13539"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].location.lon",
+          "value": "9.30103"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].position",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].road",
+          "value": "A101"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].roadType",
+          "value": "motorway"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].severity",
+          "value": "lane_closed"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].sourceFamily",
+          "value": "roadworks_bast"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].textLanguage",
+          "value": "de"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].updatedAt",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].updatedAtLocal",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].validity.from",
+          "value": "2026-04-02T00:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].validity.fromLocal",
+          "value": "2026-04-02T00:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].validity.until",
+          "value": "2026-04-03T00:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0002].validity.untilLocal",
+          "value": "2026-04-03T00:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].delayMin",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].description",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].direction",
+          "value": "unknown"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].directionText",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].headline",
+          "value": "MaintenanceWorks"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].id",
+          "value": "datex:syn:bast-0003"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].kind",
+          "value": "roadworks"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].lanes",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].lengthM",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].location.lat",
+          "value": "52.36656"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].location.lon",
+          "value": "8.55437"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].position",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].road",
+          "value": "A101"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].roadType",
+          "value": "motorway"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].severity",
+          "value": "lane_closed"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].sourceFamily",
+          "value": "roadworks_bast"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].textLanguage",
+          "value": "de"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].updatedAt",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].updatedAtLocal",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].validity.from",
+          "value": "2026-04-09T06:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].validity.fromLocal",
+          "value": "2026-04-09T06:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].validity.until",
+          "value": "2026-04-11T00:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0003].validity.untilLocal",
+          "value": "2026-04-11T00:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].delayMin",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].description",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].direction",
+          "value": "unknown"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].directionText",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].headline",
+          "value": "MaintenanceWorks"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].id",
+          "value": "datex:syn:bast-0004"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].kind",
+          "value": "roadworks"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].lanes",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].lengthM",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].location.lat",
+          "value": "51.32331"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].location.lon",
+          "value": "10.29845"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].position",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].road",
+          "value": "A101"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].roadType",
+          "value": "motorway"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].severity",
+          "value": "lane_closed"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].sourceFamily",
+          "value": "roadworks_bast"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].textLanguage",
+          "value": "de"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].updatedAt",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].updatedAtLocal",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].validity.from",
+          "value": "2026-04-19T00:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].validity.fromLocal",
+          "value": "2026-04-19T00:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].validity.until",
+          "value": "2026-04-21T00:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:bast-0004].validity.untilLocal",
+          "value": "2026-04-21T00:00:00Z"
+        },
+        {
+          "name": "meta.attribution[roadworks_bast].family",
+          "value": "roadworks_bast"
         },
         {
           "name": "meta.notes.condition",

@@ -180,6 +180,7 @@ func (s *server) windowed(ctx context.Context, f roads.Filter, w SituationWindow
 	}
 	now := s.now()
 	f.From, f.Until, _ = roads.DayWindow(now, w.HorizonDays, w.From, w.To)
+	f.Ahead = true
 	noteChangesAt(ctx, now)
 	return f
 }

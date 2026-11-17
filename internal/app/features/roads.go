@@ -95,7 +95,11 @@ func sights(p roads.Page, fams roads.Families, partial, weatherRead bool, now ti
 // the weather warnings of the permitted weather families in one snapshot,
 // post-checks and attributes it, and computes the lamp over every situation
 // and warning in the scope with the sight of every group read.
-func (s *Service) conditions(ctx context.Context, key access.Record, read func(fams roads.Families, now time.Time) (roads.Page, error)) (Conditions, error) {
+//
+// An answer over a window ahead (ahead) reads only the families of planned
+// works (Settings.PlannedWorks) and no weather warning, as the platform's
+// roadworks-ahead answer reads the planning data alone.
+func (s *Service) conditions(ctx context.Context, key access.Record, ahead bool, read func(fams roads.Families, now time.Time) (roads.Page, error)) (Conditions, error) {
 	reg, gate, err := s.gate(ctx, key)
 	if err != nil {
 		return Conditions{}, err
@@ -104,6 +108,9 @@ func (s *Service) conditions(ctx context.Context, key access.Record, read func(f
 	if err != nil {
 		return Conditions{}, err
 	}
+	if ahead {
+		permitted = slices.DeleteFunc(permitted, func(f string) bool { return !slices.Contains(s.set.PlannedWorks, f) })
+	}
 	// The weather warnings are public: the lamp reads every weather family
 	// the key may read, whether or not its plan holds the weather scope, as
 	// the platform's road status reads the DWD warnings for every asker. A
@@ -111,6 +118,9 @@ func (s *Service) conditions(ctx context.Context, key access.Record, read func(f
 	// is then missing, never an error of the roads question.
 	w, wpartial, werr := gate.Answer(access.Answering(reg, "weather"))
 	weather, weatherRead := w, werr == nil && !wpartial
+	if ahead {
+		weather, weatherRead = nil, false
+	}
 	fams := roads.Families{Roads: permitted, Weather: weather}
 	now := s.now()
 	p, err := read(fams, now)
@@ -166,7 +176,7 @@ func (s *Service) MotorwayConditions(ctx context.Context, key access.Record, q r
 		return Conditions{}, err
 	}
 	q.Road = road.Ref
-	c, err := s.conditions(ctx, key, func(fams roads.Families, now time.Time) (roads.Page, error) {
+	c, err := s.conditions(ctx, key, q.Filter.Ahead, func(fams roads.Families, now time.Time) (roads.Page, error) {
 		return s.repos.Roads.SituationsOnRoad(ctx, q, fams, now)
 	})
 	if err != nil {
@@ -179,7 +189,7 @@ func (s *Service) MotorwayConditions(ctx context.Context, key access.Record, q r
 // RoadConditions answers "what is happening on the roads near here" for key
 // (FR-ROAD-006).
 func (s *Service) RoadConditions(ctx context.Context, key access.Record, q roads.AreaQuery) (Conditions, error) {
-	return s.conditions(ctx, key, func(fams roads.Families, now time.Time) (roads.Page, error) {
+	return s.conditions(ctx, key, q.Filter.Ahead, func(fams roads.Families, now time.Time) (roads.Page, error) {
 		return s.repos.Roads.SituationsNear(ctx, q, fams, now)
 	})
 }

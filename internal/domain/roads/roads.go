@@ -517,6 +517,9 @@ type Filter struct {
 	// a zero bound is the instant of the read, so a zero window keeps the
 	// situations in force then.
 	From, Until time.Time
+	// Ahead marks a question over the days ahead (horizon_days, or from and
+	// to): it reads the planned works alone. A watch's window is not one.
+	Ahead bool
 }
 
 // Window is the window of the filter at now: its bounds, a zero one now.

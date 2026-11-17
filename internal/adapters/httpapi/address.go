@@ -63,13 +63,6 @@ type AddressOutput struct {
 	Body         AddressEnvelope
 }
 
-func optional(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
 func registerAddress(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "An address"
 	op.Description = "The addresses OpenStreetMap maps for a typed street and house number in a postcode or a town, those in the postcode first. Needs the scope places."

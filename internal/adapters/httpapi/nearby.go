@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 
@@ -140,7 +141,7 @@ func registerNearby(api huma.API, s *server, op huma.Operation) {
 			q.At.RadiusM = nearbyDefaultRadiusM
 		}
 		a, err := s.features.Nearby(ctx, principalFrom(ctx).Key, q)
-		if err == features.ErrNoPart {
+		if errors.Is(err, features.ErrNoPart) {
 			return nil, noPartProblem(ctx, a.Parts)
 		}
 		if err != nil {

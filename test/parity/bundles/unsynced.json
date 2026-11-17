@@ -6,7 +6,7 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "83ef5be6993b7b39a54de372789ace2ce32a2493e86fcdffea35530e68da82ea"
+    "sha256": "5a243015fd5eff6c40f10efb8a9e2aa2c0df2ced16108acaf80fd7b1c1f74374"
   },
   "cases": [
     {
@@ -5338,6 +5338,950 @@
         {
           "name": "meta.attribution[geonames].family",
           "value": "geonames"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "transit-kreis",
+      "operation": "listTransitDisruptions",
+      "counterpart": "transit disruption check",
+      "request": "/v1/transit-disruptions?area=08001",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_sa_alpha",
+          "delfi_rt_tu"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.alertsTotal",
+          "value": "1"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].attachedTo",
+          "value": "route"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].cause",
+          "value": "CONSTRUCTION"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].description",
+          "value": "Ersatzverkehr mit Bussen."
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].effect",
+          "value": "DETOUR"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].header",
+          "value": "Bauarbeiten auf der Linie RE 1"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].id",
+          "value": "delfi_sa_alpha:700021"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].inForceFrom",
+          "value": "2026-03-28T00:00:00Z"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].inForceUntil",
+          "value": "null"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].lines",
+          "value": "[\"RE 1\"]"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].sourceFamily",
+          "value": "delfi_sa_alpha"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].updatedAt",
+          "value": "2026-03-28T00:00:00Z"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].url",
+          "value": "null"
+        },
+        {
+          "name": "data.punctuality",
+          "value": "null"
+        },
+        {
+          "name": "data.windowMin",
+          "value": "60"
+        },
+        {
+          "name": "meta.attribution[delfi_sa_alpha].family",
+          "value": "delfi_sa_alpha"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "6"
+        }
+      ]
+    },
+    {
+      "id": "transit-land",
+      "operation": "listTransitDisruptions",
+      "counterpart": "transit disruption check",
+      "request": "/v1/transit-disruptions?area=08\u0026limit=1",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_sa_alpha",
+          "delfi_rt_tu"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.alertsTotal",
+          "value": "2"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].attachedTo",
+          "value": "route"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].cause",
+          "value": "CONSTRUCTION"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].description",
+          "value": "Ersatzverkehr mit Bussen."
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].effect",
+          "value": "DETOUR"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].header",
+          "value": "Bauarbeiten auf der Linie RE 1"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].id",
+          "value": "delfi_sa_alpha:700021"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].inForceFrom",
+          "value": "2026-03-28T00:00:00Z"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].inForceUntil",
+          "value": "null"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].lines",
+          "value": "[\"RE 1\"]"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].sourceFamily",
+          "value": "delfi_sa_alpha"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].updatedAt",
+          "value": "2026-03-28T00:00:00Z"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700021].url",
+          "value": "null"
+        },
+        {
+          "name": "data.punctuality",
+          "value": "null"
+        },
+        {
+          "name": "data.windowMin",
+          "value": "60"
+        },
+        {
+          "name": "meta.attribution[delfi_sa_alpha].family",
+          "value": "delfi_sa_alpha"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "true"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "id": "transit-line",
+      "operation": "listTransitDisruptions",
+      "counterpart": "transit disruption check",
+      "request": "/v1/transit-disruptions?line=re%201",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_sa_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.alertsTotal",
+          "value": "16"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700000].attachedTo",
+          "value": "route"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700000].cause",
+          "value": "CONSTRUCTION"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700000].description",
+          "value": "Ersatzverkehr mit Bussen."
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700000].effect",
+          "value": "DETOUR"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700000].header",
+          "value": "Bauarbeiten auf der Linie RE 1"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700000].id",
+          "value": "delfi_sa_alpha:700000"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700000].inForceFrom",
+          "value": "2026-03-28T00:00:00Z"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700000].inForceUntil",
+          "value": "null"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700000].lines",
+          "value": "[\"RE 1\"]"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700000].sourceFamily",
+          "value": "delfi_sa_alpha"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700000].updatedAt",
+          "value": "2026-03-28T00:00:00Z"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700000].url",
+          "value": "null"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700003].attachedTo",
+          "value": "route"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700003].cause",
+          "value": "CONSTRUCTION"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700003].description",
+          "value": "Ersatzverkehr mit Bussen."
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700003].effect",
+          "value": "DETOUR"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700003].header",
+          "value": "Bauarbeiten auf der Linie RE 1"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700003].id",
+          "value": "delfi_sa_alpha:700003"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700003].inForceFrom",
+          "value": "2026-03-28T00:00:00Z"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700003].inForceUntil",
+          "value": "null"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700003].lines",
+          "value": "[\"RE 1\"]"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700003].sourceFamily",
+          "value": "delfi_sa_alpha"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700003].updatedAt",
+          "value": "2026-03-28T00:00:00Z"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700003].url",
+          "value": "null"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700006].attachedTo",
+          "value": "route"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700006].cause",
+          "value": "CONSTRUCTION"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700006].description",
+          "value": "Ersatzverkehr mit Bussen."
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700006].effect",
+          "value": "DETOUR"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700006].header",
+          "value": "Bauarbeiten auf der Linie RE 1"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700006].id",
+          "value": "delfi_sa_alpha:700006"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700006].inForceFrom",
+          "value": "2026-03-28T00:00:00Z"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700006].inForceUntil",
+          "value": "null"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700006].lines",
+          "value": "[\"RE 1\"]"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700006].sourceFamily",
+          "value": "delfi_sa_alpha"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700006].updatedAt",
+          "value": "2026-03-28T00:00:00Z"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700006].url",
+          "value": "null"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700009].attachedTo",
+          "value": "route"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700009].cause",
+          "value": "CONSTRUCTION"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700009].description",
+          "value": "Ersatzverkehr mit Bussen."
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700009].effect",
+          "value": "DETOUR"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700009].header",
+          "value": "Bauarbeiten auf der Linie RE 1"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700009].id",
+          "value": "delfi_sa_alpha:700009"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700009].inForceFrom",
+          "value": "2026-03-28T00:00:00Z"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700009].inForceUntil",
+          "value": "null"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700009].lines",
+          "value": "[\"RE 1\"]"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700009].sourceFamily",
+          "value": "delfi_sa_alpha"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700009].updatedAt",
+          "value": "2026-03-28T00:00:00Z"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700009].url",
+          "value": "null"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700012].attachedTo",
+          "value": "route"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700012].cause",
+          "value": "CONSTRUCTION"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700012].description",
+          "value": "Ersatzverkehr mit Bussen."
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700012].effect",
+          "value": "DETOUR"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700012].header",
+          "value": "Bauarbeiten auf der Linie RE 1"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700012].id",
+          "value": "delfi_sa_alpha:700012"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700012].inForceFrom",
+          "value": "2026-03-28T00:00:00Z"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700012].inForceUntil",
+          "value": "null"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700012].lines",
+          "value": "[\"RE 1\"]"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700012].sourceFamily",
+          "value": "delfi_sa_alpha"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700012].updatedAt",
+          "value": "2026-03-28T00:00:00Z"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700012].url",
+          "value": "null"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700015].attachedTo",
+          "value": "route"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700015].cause",
+          "value": "CONSTRUCTION"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700015].description",
+          "value": "Ersatzverkehr mit Bussen."
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700015].effect",
+          "value": "DETOUR"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700015].header",
+          "value": "Bauarbeiten auf der Linie RE 1"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700015].id",
+          "value": "delfi_sa_alpha:700015"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700015].inForceFrom",
+          "value": "2026-03-28T00:00:00Z"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700015].inForceUntil",
+          "value": "null"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700015].lines",
+          "value": "[\"RE 1\"]"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700015].sourceFamily",
+          "value": "delfi_sa_alpha"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700015].updatedAt",
+          "value": "2026-03-28T00:00:00Z"
+        },
+        {
+          "name": "data.alerts[delfi_sa_alpha:700015].url",
+          "value": "null"
+        },
+        {
+          "name": "data.punctuality",
+          "value": "null"
+        },
+        {
+          "name": "data.windowMin",
+          "value": "60"
+        },
+        {
+          "name": "meta.attribution[delfi_sa_alpha].family",
+          "value": "delfi_sa_alpha"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "true"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "6"
+        }
+      ]
+    },
+    {
+      "id": "transit-window",
+      "operation": "listTransitDisruptions",
+      "counterpart": "transit disruption check",
+      "request": "/v1/transit-disruptions?area=08001\u0026line=S1\u0026window_min=30",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_sa_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.alerts",
+          "value": "[]"
+        },
+        {
+          "name": "data.alertsTotal",
+          "value": "0"
+        },
+        {
+          "name": "data.punctuality",
+          "value": "null"
+        },
+        {
+          "name": "data.windowMin",
+          "value": "30"
+        },
+        {
+          "name": "meta.attribution[delfi_sa_alpha].family",
+          "value": "delfi_sa_alpha"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "6"
+        }
+      ]
+    },
+    {
+      "id": "nearby-vehicle",
+      "operation": "listNearby",
+      "counterpart": "nearby search",
+      "request": "/v1/nearby?at=49.17,7.81\u0026radius_m=15000",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "places",
+          "energy",
+          "parking",
+          "transit",
+          "roads"
+        ],
+        "sources": [
+          "tankerkoenig_gamma",
+          "afir_alpha",
+          "park_alpha",
+          "delfi_static",
+          "bast_lcl",
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.charging",
+          "value": "[]"
+        },
+        {
+          "name": "data.fuel",
+          "value": "[]"
+        },
+        {
+          "name": "data.junctions",
+          "value": "[]"
+        },
+        {
+          "name": "data.parking",
+          "value": "[]"
+        },
+        {
+          "name": "data.stations[1:de:01002:0].distanceM",
+          "value": "3005"
+        },
+        {
+          "name": "data.stations[1:de:01002:0].districtCode",
+          "value": "01002"
+        },
+        {
+          "name": "data.stations[1:de:01002:0].id",
+          "value": "1:de:01002:0"
+        },
+        {
+          "name": "data.stations[1:de:01002:0].location.lat",
+          "value": "49.14816"
+        },
+        {
+          "name": "data.stations[1:de:01002:0].location.lon",
+          "value": "7.78575"
+        },
+        {
+          "name": "data.stations[1:de:01002:0].modes",
+          "value": "[]"
+        },
+        {
+          "name": "data.stations[1:de:01002:0].name",
+          "value": "Namüningen Süd"
+        },
+        {
+          "name": "data.stations[1:de:01002:0].sourceFamily",
+          "value": "delfi_static"
+        },
+        {
+          "name": "data.stations[1:de:01002:0].stopCode",
+          "value": "de:01002:0"
+        },
+        {
+          "name": "data.stations[1:de:01002:1].distanceM",
+          "value": "3840"
+        },
+        {
+          "name": "data.stations[1:de:01002:1].districtCode",
+          "value": "01002"
+        },
+        {
+          "name": "data.stations[1:de:01002:1].id",
+          "value": "1:de:01002:1"
+        },
+        {
+          "name": "data.stations[1:de:01002:1].location.lat",
+          "value": "49.16700"
+        },
+        {
+          "name": "data.stations[1:de:01002:1].location.lon",
+          "value": "7.86246"
+        },
+        {
+          "name": "data.stations[1:de:01002:1].modes",
+          "value": "[]"
+        },
+        {
+          "name": "data.stations[1:de:01002:1].name",
+          "value": "Namüningen Mitte"
+        },
+        {
+          "name": "data.stations[1:de:01002:1].sourceFamily",
+          "value": "delfi_static"
+        },
+        {
+          "name": "data.stations[1:de:01002:1].stopCode",
+          "value": "de:01002:1"
+        },
+        {
+          "name": "meta.attribution[afir_alpha].family",
+          "value": "afir_alpha"
+        },
+        {
+          "name": "meta.attribution[bast_lcl].family",
+          "value": "bast_lcl"
+        },
+        {
+          "name": "meta.attribution[delfi_static].family",
+          "value": "delfi_static"
+        },
+        {
+          "name": "meta.attribution[park_alpha].family",
+          "value": "park_alpha"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "nearby-needs",
+      "operation": "listNearby",
+      "counterpart": "nearby search",
+      "request": "/v1/nearby?at=47.6098,7.8972\u0026categories=groceries,health,food,safety",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.needs[0].need",
+          "value": "groceries"
+        },
+        {
+          "name": "data.needs[0].places",
+          "value": "[]"
+        },
+        {
+          "name": "data.needs[0].radiusM",
+          "value": "5000"
+        },
+        {
+          "name": "data.needs[0].widened",
+          "value": "true"
+        },
+        {
+          "name": "data.needs[1].need",
+          "value": "health"
+        },
+        {
+          "name": "data.needs[1].places[osm:node600001].distanceM",
+          "value": "5"
+        },
+        {
+          "name": "data.needs[1].places[osm:node600001].houseNo",
+          "value": "1"
+        },
+        {
+          "name": "data.needs[1].places[osm:node600001].id",
+          "value": "osm:node600001"
+        },
+        {
+          "name": "data.needs[1].places[osm:node600001].kind",
+          "value": "amenity=pharmacy"
+        },
+        {
+          "name": "data.needs[1].places[osm:node600001].location.lat",
+          "value": "47.60983"
+        },
+        {
+          "name": "data.needs[1].places[osm:node600001].location.lon",
+          "value": "7.89724"
+        },
+        {
+          "name": "data.needs[1].places[osm:node600001].name",
+          "value": "Pharmacy Pößfül"
+        },
+        {
+          "name": "data.needs[1].places[osm:node600001].sourceFamily",
+          "value": "osm"
+        },
+        {
+          "name": "data.needs[1].places[osm:node600001].street",
+          "value": "Marktweg"
+        },
+        {
+          "name": "data.needs[1].radiusM",
+          "value": "5000"
+        },
+        {
+          "name": "data.needs[1].widened",
+          "value": "true"
+        },
+        {
+          "name": "data.needs[2].need",
+          "value": "food"
+        },
+        {
+          "name": "data.needs[2].places",
+          "value": "[]"
+        },
+        {
+          "name": "data.needs[2].radiusM",
+          "value": "5000"
+        },
+        {
+          "name": "data.needs[2].widened",
+          "value": "true"
+        },
+        {
+          "name": "data.needs[3].need",
+          "value": "police"
+        },
+        {
+          "name": "data.needs[3].places",
+          "value": "[]"
+        },
+        {
+          "name": "data.needs[3].radiusM",
+          "value": "5000"
+        },
+        {
+          "name": "data.needs[3].widened",
+          "value": "true"
+        },
+        {
+          "name": "data.needs[4].need",
+          "value": "toilets"
+        },
+        {
+          "name": "data.needs[4].places",
+          "value": "[]"
+        },
+        {
+          "name": "data.needs[4].radiusM",
+          "value": "5000"
+        },
+        {
+          "name": "data.needs[4].widened",
+          "value": "true"
+        },
+        {
+          "name": "meta.attribution[osm].family",
+          "value": "osm"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "nearby-small",
+      "operation": "listNearby",
+      "counterpart": "nearby search",
+      "request": "/v1/nearby?at=50.25,10.43\u0026radius_m=1000\u0026categories=parking,station,money",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "places",
+          "parking",
+          "transit"
+        ],
+        "sources": [
+          "park_alpha",
+          "delfi_static",
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.needs[0].need",
+          "value": "money"
+        },
+        {
+          "name": "data.needs[0].places",
+          "value": "[]"
+        },
+        {
+          "name": "data.needs[0].radiusM",
+          "value": "5000"
+        },
+        {
+          "name": "data.needs[0].widened",
+          "value": "true"
+        },
+        {
+          "name": "data.parking",
+          "value": "[]"
+        },
+        {
+          "name": "data.stations",
+          "value": "[]"
+        },
+        {
+          "name": "meta.attribution[delfi_static].family",
+          "value": "delfi_static"
+        },
+        {
+          "name": "meta.attribution[osm].family",
+          "value": "osm"
+        },
+        {
+          "name": "meta.attribution[park_alpha].family",
+          "value": "park_alpha"
         },
         {
           "name": "meta.notes.condition",

@@ -68,6 +68,10 @@ type fakeFeatures struct {
 	gotHydro   energy.HydrogenQuery
 	speed      features.SpeedAnswer
 	gotSpeed   roads.SpeedQuery
+	disruption features.DisruptionAnswer
+	gotDisrupt transit.DisruptionQuery
+	nearby     features.NearbyAnswer
+	gotNearby  features.NearbyQuery
 	sharing    features.SharingAnswer
 	gotSharing transit.SharingQuery
 	addresses  features.AddressAnswer

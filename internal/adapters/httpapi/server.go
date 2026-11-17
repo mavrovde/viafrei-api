@@ -129,6 +129,8 @@ func operations() []operation {
 		{id: "listHydrogenOptions", method: http.MethodGet, path: "/v1/hydrogen-options", tag: "energy", keyed: true, scope: "energy", register: registerHydrogen},
 		{id: "listSpeedCameras", method: http.MethodGet, path: "/v1/speed-cameras", tag: "roads", keyed: true, scope: "roads", register: registerSpeed},
 		{id: "listSharingOptions", method: http.MethodGet, path: "/v1/sharing-options", tag: "transit", keyed: true, scope: "transit", register: registerSharing},
+		{id: "listTransitDisruptions", method: http.MethodGet, path: "/v1/transit-disruptions", tag: "transit", keyed: true, scope: "transit", register: registerDisruptions},
+		{id: "listNearby", method: http.MethodGet, path: "/v1/nearby", tag: "places", keyed: true, scope: "places", register: registerNearby},
 		{id: "listAddresses", method: http.MethodGet, path: "/v1/addresses", tag: "places", keyed: true, scope: "places", register: registerAddress},
 		{id: "listPois", method: http.MethodGet, path: "/v1/pois", tag: "places", keyed: true, scope: "places", register: registerPois},
 		{id: "describeLocation", method: http.MethodGet, path: "/v1/location", tag: "places", keyed: true, scope: "places", register: registerLocation},

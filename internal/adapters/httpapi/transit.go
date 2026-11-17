@@ -8,6 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 )
@@ -310,17 +311,7 @@ func registerStations(api huma.API, s *server, op huma.Operation) {
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
 		}
-		data := make([]Station, len(a.Items))
-		for i, v := range a.Items {
-			modes := make([]string, len(v.Modes))
-			for j, m := range v.Modes {
-				modes[j] = string(m)
-			}
-			data[i] = Station{
-				ID: v.ID, Name: v.Name, Location: position(v.Location), StopCode: v.NationalCode,
-				DistrictCode: v.RegionCode, Modes: modes, DistanceM: v.DistanceM, SourceFamily: v.Family,
-			}
-		}
+		data := stations(a)
 		return &StationsOutput{CacheControl: noStore, Body: StationsEnvelope{
 			Data: data,
 			Meta: StationsMeta{
@@ -331,4 +322,20 @@ func registerStations(api huma.API, s *server, op huma.Operation) {
 			Links: s.selfLink(ctx),
 		}}, nil
 	})
+}
+
+// stations are the stations of a station answer.
+func stations(a features.Answer[transit.Station]) []Station {
+	data := make([]Station, len(a.Items))
+	for i, v := range a.Items {
+		modes := make([]string, len(v.Modes))
+		for j, m := range v.Modes {
+			modes[j] = string(m)
+		}
+		data[i] = Station{
+			ID: v.ID, Name: v.Name, Location: position(v.Location), StopCode: v.NationalCode,
+			DistrictCode: v.RegionCode, Modes: modes, DistanceM: v.DistanceM, SourceFamily: v.Family,
+		}
+	}
+	return data
 }

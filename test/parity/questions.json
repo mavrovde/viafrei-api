@@ -2,7 +2,7 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "83ef5be6993b7b39a54de372789ace2ce32a2493e86fcdffea35530e68da82ea"
+    "sha256": "5a243015fd5eff6c40f10efb8a9e2aa2c0df2ced16108acaf80fd7b1c1f74374"
   },
   "cases": [
     {
@@ -812,6 +812,140 @@
         "accepted": null
       },
       "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "transit-kreis",
+      "operation": "listTransitDisruptions",
+      "counterpart": "transit disruption check",
+      "request": "/v1/transit-disruptions?area=08001",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_sa_alpha",
+          "delfi_rt_tu"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "transit-land",
+      "operation": "listTransitDisruptions",
+      "counterpart": "transit disruption check",
+      "request": "/v1/transit-disruptions?area=08&limit=1",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_sa_alpha",
+          "delfi_rt_tu"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "transit-line",
+      "operation": "listTransitDisruptions",
+      "counterpart": "transit disruption check",
+      "request": "/v1/transit-disruptions?line=re%201",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_sa_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "transit-window",
+      "operation": "listTransitDisruptions",
+      "counterpart": "transit disruption check",
+      "request": "/v1/transit-disruptions?area=08001&line=S1&window_min=30",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_sa_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "nearby-vehicle",
+      "operation": "listNearby",
+      "counterpart": "nearby search",
+      "request": "/v1/nearby?at=49.17,7.81&radius_m=15000",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "places",
+          "energy",
+          "parking",
+          "transit",
+          "roads"
+        ],
+        "sources": [
+          "tankerkoenig_gamma",
+          "afir_alpha",
+          "park_alpha",
+          "delfi_static",
+          "bast_lcl",
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "nearby-needs",
+      "operation": "listNearby",
+      "counterpart": "nearby search",
+      "request": "/v1/nearby?at=47.6098,7.8972&categories=groceries,health,food,safety",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "nearby-small",
+      "operation": "listNearby",
+      "counterpart": "nearby search",
+      "request": "/v1/nearby?at=50.25,10.43&radius_m=1000&categories=parking,station,money",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "places",
+          "parking",
+          "transit"
+        ],
+        "sources": [
+          "park_alpha",
+          "delfi_static",
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
     }
   ]
 }

@@ -143,3 +143,15 @@ argument:find_poi.cursor	listPois?cursor	poi-anywhere-page	-
 tool:describe_location	describeLocation	location-town,location-open-country	-
 argument:describe_location.lat	describeLocation?at	location-town	-
 argument:describe_location.lon	describeLocation?at	location-town	-
+tool:check_transit_disruption	listTransitDisruptions	transit-kreis,transit-land	-
+argument:check_transit_disruption.region	listPlaces?q,listTransitDisruptions?area	places-kind,transit-land	-
+argument:check_transit_disruption.lat	describeLocation?at,listTransitDisruptions?area	location-town,transit-kreis	-
+argument:check_transit_disruption.lon	describeLocation?at,listTransitDisruptions?area	location-town,transit-kreis	-
+argument:check_transit_disruption.line	listTransitDisruptions?line	transit-line	-
+argument:check_transit_disruption.window_min	listTransitDisruptions?window_min	transit-window	-
+tool:find_nearby	listNearby	nearby-vehicle,nearby-needs	-
+argument:find_nearby.place	listPlaces?q,listNearby?at	places-name,nearby-vehicle	-
+argument:find_nearby.lat	listNearby?at	nearby-vehicle	-
+argument:find_nearby.lon	listNearby?at	nearby-vehicle	-
+argument:find_nearby.radius_km	listNearby?radius_m	nearby-small	-
+argument:find_nearby.categories	listNearby?categories	nearby-needs,nearby-small	-

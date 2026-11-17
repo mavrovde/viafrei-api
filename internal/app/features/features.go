@@ -60,21 +60,23 @@ type Places interface {
 
 // Repositories are the ports a Service reads through.
 type Repositories struct {
-	Register  Register
-	Charging  Charging
-	Parking   Parking
-	Places    Places
-	Roads     Roads
-	Weather   Weather
-	Rules     Rules
-	Transit   Transit
-	Fuel      Fuel
-	Hydrogen  Hydrogen
-	Speed     Speed
-	Sharing   Sharing
-	Addresses Addresses
-	Pois      Pois
-	Locations Locations
+	Register    Register
+	Charging    Charging
+	Parking     Parking
+	Places      Places
+	Roads       Roads
+	Weather     Weather
+	Rules       Rules
+	Transit     Transit
+	Fuel        Fuel
+	Hydrogen    Hydrogen
+	Speed       Speed
+	Sharing     Sharing
+	Addresses   Addresses
+	Pois        Pois
+	Locations   Locations
+	Disruptions Disruptions
+	Nearby      Nearby
 }
 
 // Settings are the tunables of the use cases.

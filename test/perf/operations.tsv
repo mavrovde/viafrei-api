@@ -26,3 +26,5 @@ listSharingOptions	near
 listAddresses	lookup
 listPois	lookup
 describeLocation	lookup
+listTransitDisruptions	lookup
+listNearby	composed

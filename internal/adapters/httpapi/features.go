@@ -41,6 +41,8 @@ type Features interface {
 	FuelStations(ctx context.Context, key access.Record, q energy.FuelQuery) (features.FuelStations, error)
 	HydrogenStations(ctx context.Context, key access.Record, q energy.HydrogenQuery) (features.HydrogenStations, error)
 	SpeedCameras(ctx context.Context, key access.Record, q roads.SpeedQuery) (features.SpeedAnswer, error)
+	Disruptions(ctx context.Context, key access.Record, q transit.DisruptionQuery) (features.DisruptionAnswer, error)
+	Nearby(ctx context.Context, key access.Record, q features.NearbyQuery) (features.NearbyAnswer, error)
 	Sharing(ctx context.Context, key access.Record, q transit.SharingQuery) (features.SharingAnswer, error)
 	Addresses(ctx context.Context, key access.Record, q places.AddressQuery) (features.AddressAnswer, error)
 	Pois(ctx context.Context, key access.Record, q places.PoiQuery) (features.PoiAnswer, error)
@@ -65,6 +67,7 @@ const schemaPrefix = "#/components/schemas/"
 var nullableObjects = []struct{ schema, member string }{
 	{"ChargePoint", "availability"},
 	{"HydrogenData", "nearest"},
+	{"DisruptionData", "punctuality"},
 	{"SpeedCamera", "location"},
 	{"SharingData", "nearest"},
 	{"LocationData", "address"},

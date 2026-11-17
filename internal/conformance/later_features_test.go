@@ -34,3 +34,11 @@ func (laterFeatures) Pois(context.Context, access.Record, places.PoiQuery) (feat
 func (laterFeatures) Location(context.Context, access.Record, places.LocationQuery) (features.LocationAnswer, error) {
 	return features.LocationAnswer{}, nil
 }
+
+func (laterFeatures) Disruptions(context.Context, access.Record, transit.DisruptionQuery) (features.DisruptionAnswer, error) {
+	return features.DisruptionAnswer{}, nil
+}
+
+func (laterFeatures) Nearby(context.Context, access.Record, features.NearbyQuery) (features.NearbyAnswer, error) {
+	return features.NearbyAnswer{}, nil
+}

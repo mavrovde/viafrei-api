@@ -51,7 +51,7 @@ var Tables = []string{
 	"parking_facility", "occupancy_observation",
 	"stop_place", "stop_point", "transit_line", "journey", "scheduled_call", "call_observation",
 	"station_facility", "weather_warning", "rule_topic", "rule_statement",
-	"hydrogen_station", "speed_camera", "sharing_station", "sharing_station_status", "sharing_vehicle", "poi", "address",
+	"hydrogen_station", "speed_camera", "sharing_station", "sharing_station_status", "sharing_vehicle", "poi", "address", "service_alert",
 }
 
 // ReferenceInstant is the start of the first generated day: the Saturday
@@ -142,6 +142,7 @@ func generate(out io.Writer, profile string, seed uint64, contractVersion string
 	g.speedCameras()
 	g.sharing()
 	g.pois()
+	g.alerts()
 	g.w.end()
 	sum, err := g.w.close()
 	if err != nil {
@@ -282,6 +283,7 @@ var sourceList = []source{
 	{ref: "osm_speed_cameras", family: "beta", domain: "roads", platform: true, target: 86400},
 	{ref: "gbfs_nextbike", family: "alpha", domain: "transit", platform: true, target: 60},
 	{ref: "osm", family: "beta", domain: "places", platform: true},
+	{ref: "delfi_sa_alpha", family: "alpha", domain: "transit", target: 300, publisher: "StÃ¶rwerk Datenwerk"},
 }
 
 // useClasses are the register's use classes of each family; nil writes no
@@ -1155,5 +1157,28 @@ func (g *gen) pois() {
 		g.w.row(str(fmt.Sprintf("osm:node%d", 650000+i)), str(a.street), str(streetFold(a.street)), str(a.number), str(houseNumberFold(a.number)),
 			str(fmt.Sprintf("%05d", 20000+i)), str(a.place), str(nameFold(a.place)), point(a.at), date(g.day(-30)), str("osm"), ts(g.day(0)))
 		g.counted(landOf(a.at), "osm")
+	}
+}
+
+// alerts writes, per Land, three service alerts: one in force on a route of
+// the Land's first Kreis, one on the Land's whole network, and one whose
+// only period is over; drawn after every other table, without a draw.
+func (g *gen) alerts() {
+	const ref = "delfi_sa_alpha"
+	g.w.begin("service_alert", "alert_id", "header", "description", "cause", "effect", "active_from", "active_to", "active_periods",
+		"line_names", "district_codes", "state_codes", "placed_by", "source_ref", "recorded_at", "changed_at")
+	for i, l := range g.lands {
+		kreis := l.code + "001"
+		from, to := g.day(0), g.day(1)
+		g.w.row(str(fmt.Sprintf("%s:%d", ref, 700000+3*i)), str("Bauarbeiten auf der Linie RE 1"), str("Ersatzverkehr mit Bussen."), str("CONSTRUCTION"),
+			str("DETOUR"), ts(from), null, str("[]"), array("RE 1"), array(kreis), array(l.code), str("route"), str(ref), ts(from), ts(from))
+		g.w.row(str(fmt.Sprintf("%s:%d", ref, 700000+3*i+1)), str("Streik im Netz"), null, str("STRIKE"), str("REDUCED_SERVICE"),
+			null, null, str("[]"), array(), array(), array(l.code), str("network"), str(ref), ts(from), ts(from))
+		g.w.row(str(fmt.Sprintf("%s:%d", ref, 700000+3*i+2)), str("Weichenstörung"), null, null, null, ts(from), ts(to),
+			str(`[{"start":"`+from.Format(time.RFC3339)+`","end":"`+to.Format(time.RFC3339)+`"}]`), array("S1"), array(kreis), array(l.code),
+			str("stop"), str(ref), ts(from), ts(from))
+		for range 3 {
+			g.counted(l.code, ref)
+		}
 	}
 }

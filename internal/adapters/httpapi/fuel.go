@@ -6,6 +6,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/energy"
 )
 
@@ -116,16 +117,7 @@ func registerFuel(api huma.API, s *server, op huma.Operation) {
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
 		}
-		data := make([]FuelStation, len(a.Items))
-		for i, st := range a.Items {
-			prices := make([]FuelPrice, len(st.Prices))
-			for j, p := range st.Prices {
-				prices[j] = FuelPrice{Fuel: p.Product, PriceEur: p.Price, ReportedAt: p.ObservedAt.UTC(),
-					ReportedAtLocal: local(p.ObservedAt), Current: p.Current(a.At, q.Window)}
-			}
-			data[i] = FuelStation{ID: st.ID, Name: st.Name, Brand: st.Brand, Location: position(st.Location),
-				DistanceM: st.DistanceM, OpenState: st.Open, Prices: prices, SourceFamily: st.Family}
-		}
+		data := fuelStations(a, q.Window)
 		return &FuelOutput{CacheControl: noStore, Body: FuelEnvelope{
 			Data: data,
 			Meta: FuelMeta{
@@ -137,4 +129,20 @@ func registerFuel(api huma.API, s *server, op huma.Operation) {
 			Links: s.selfLink(ctx),
 		}}, nil
 	})
+}
+
+// fuelStations are the stations of a fuel answer, each price current when
+// reported within window of the answer's instant.
+func fuelStations(a features.FuelStations, window time.Duration) []FuelStation {
+	data := make([]FuelStation, len(a.Items))
+	for i, st := range a.Items {
+		prices := make([]FuelPrice, len(st.Prices))
+		for j, p := range st.Prices {
+			prices[j] = FuelPrice{Fuel: p.Product, PriceEur: p.Price, ReportedAt: p.ObservedAt.UTC(),
+				ReportedAtLocal: local(p.ObservedAt), Current: p.Current(a.At, window)}
+		}
+		data[i] = FuelStation{ID: st.ID, Name: st.Name, Brand: st.Brand, Location: position(st.Location),
+			DistanceM: st.DistanceM, OpenState: st.Open, Prices: prices, SourceFamily: st.Family}
+	}
+	return data
 }

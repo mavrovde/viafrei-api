@@ -29,3 +29,4 @@ listPois	lookup
 describeLocation	lookup
 listTransitDisruptions	lookup
 listNearby	composed
+listStateRoadConditions	near

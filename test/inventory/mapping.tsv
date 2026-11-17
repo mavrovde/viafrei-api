@@ -197,3 +197,13 @@ web:/internal/tiles/punctuality	listTransitDisruptions	transit-land	-
 web:/internal/tiles/station	listStationDepartures	departures-day	-
 web:/internal/fuel/list	listFuelOptions	fuel-near	-
 web:/internal/charging/list	listChargingOptions	charging-commercial	-
+web:/internal/place/cards	getPlaceOverview	place-overview	-
+web:/internal/place/{}/{}	getPlaceOverview	place-overview	-
+web:/internal/place/{}/card/{}	getPlaceOverview	place-overview	-
+argument:check_autobahn_traffic.land	listStateRoadConditions?state,listStateRoadConditions?road_class	state-roads-10	-
+web:/internal/state/{}	listStateRoadConditions?state	state-roads-10	-
+web:/internal/news/traffic	listStateRoadConditions?kinds	state-roads-de-closures	-
+web:/internal/tiles/jams	listStateRoadConditions?kinds	state-roads-de-closures	-
+web:/internal/tiles/reports	listStateRoadConditions	state-roads-de-closures	-
+web:/internal/motorway/overlay	listStateRoadConditions?road_class	state-roads-de-closures	-
+web:/internal/map/live	listStateRoadConditions?road_class	state-roads-de-closures	-

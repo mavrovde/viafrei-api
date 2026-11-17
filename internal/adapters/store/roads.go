@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -77,6 +78,10 @@ func situationFilter(w int) string {
   and (e.event_kind = any($3) or ($4 and not e.event_kind = any($5)))
   and coalesce(array_position($6::text[], e.severity), 0) >= $7`, w, w+1)
 }
+
+// eventRow is every column of contract.traffic_event a list read carries
+// forward, never state_code: a Land is looked up only where it is asked for.
+var eventRow = "e." + strings.Join(strings.Split("event_id, event_kind, severity, road_ref, road_class, direction, direction_label, location, valid_from, valid_to, lanes_closed, lanes_total, delay_min, affected_length_m, headline, description, text_lang, source_ref, origin_key, published_at, recorded_at, changed_at, withdrawn_at, record_class, subtitle, place_text, is_blocked, traffic_type, delay_s, source_refs, display_class, audience, confidentiality, origin_restriction", ", "), ", e.")
 
 // eventPermitted is rowRule over the traffic events aliased e.
 const eventPermitted = `e.display_class <> 'withhold' and (e.audience = 'public' or ` + ownKeyOn + `)`
@@ -378,7 +383,7 @@ travel as (
            else false end falling
   from line),
 answering as (
-  select e.*, line.km road_km, line.total road_total
+  select `+eventRow+`, line.km road_km, line.total road_total
   from contract.traffic_event e left join line on true
   where `+situationFilter(12)+`
     and exists (select 1 from road)
@@ -421,6 +426,9 @@ where ` + fmt.Sprintf(canonicalRef, "j.road_ref") + ` = $1 and ` + permitted("j"
 // warnings in force in an area within the radius, and the states of the
 // junctions within the radius, else of the junction nearest the position.
 func (s *Store) SituationsNear(ctx context.Context, q roads.AreaQuery, fams roads.Families, now time.Time) (roads.Page, error) {
+	if q.State != "" {
+		return s.situationsInState(ctx, q, fams, now)
+	}
 	classes, other := q.KnownClasses()
 	args := append(filterArgs(q.Filter, fams.Roads, now), q.At.Lat, q.At.Lon, q.RadiusM,
 		codes(classes), other, codes(roads.Classes[:len(roads.Classes)-1]), q.Limit+1)
@@ -429,7 +437,7 @@ func (s *Store) SituationsNear(ctx context.Context, q roads.AreaQuery, fams road
 	return s.read(ctx, `
 with here as (select st_setsrid(st_makepoint($9, $8), 4326)::geography g),
 answering as (
-  select e.*, round(st_distance(e.location::geography, here.g))::int dist
+  select `+eventRow+`, round(st_distance(e.location::geography, here.g))::int dist
   from contract.traffic_event e, here
   where `+situationFilter(15)+`
     and e.location is not null
@@ -453,6 +461,37 @@ union all
 select (select j.state_code from contract.junction j, here where ` + permitted("j") + ` order by j.location <-> here.g, j.junction_id limit 1)
 where not exists (select 1 from near)`),
 		stateArgs: []any{q.At.Lat, q.At.Lon, q.RadiusM},
+	})
+}
+
+// situationsInState reads the active situations of one Land (the Land of
+// the nearest Gemeinde to each situation's point, contract.traffic_event's
+// state_code; de: every situation), by severity descending, then road and id; the lamp's scope is
+// the Land: its situations, the weather warnings of its areas and the Land.
+func (s *Store) situationsInState(ctx context.Context, q roads.AreaQuery, fams roads.Families, now time.Time) (roads.Page, error) {
+	classes, other := q.KnownClasses()
+	args := append(filterArgs(q.Filter, fams.Roads, now), q.State,
+		codes(classes), other, codes(roads.Classes[:len(roads.Classes)-1]), q.Limit+1)
+	start, end := q.Window(now)
+	args = append(args, start, end)
+	return s.read(ctx, `
+with answering as (
+  select `+eventRow+`
+  from contract.traffic_event e
+  where `+situationFilter(13)+`
+    and ($8 = 'de' or e.state_code = $8)
+    and (e.road_class = any($9) or ($10 and not e.road_class = any($11))))
+select `+situationColumns+`, null::float8, null::int
+from answering e
+order by coalesce(array_position($6::text[], e.severity), 0) desc, e.road_ref, e.event_id
+limit $12`, args, q.Limit, fams, now, scope{
+		messages: messagesSelect + `
+  and ($3 = 'de' or e.state_code = $3)`,
+		args:        []any{fams.Roads, now, q.State},
+		warnings:    `($3 = 'de' or r.region_code like $3 || '%')`,
+		warningArgs: []any{q.State},
+		states:      `select case when $1 = 'de' then (select coalesce(array_agg(r.region_code order by r.region_code), '{}') from contract.admin_region r where r.region_level = 'state') else array[$1::text] end`,
+		stateArgs:   []any{q.State},
 	})
 }
 

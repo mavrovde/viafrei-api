@@ -5227,6 +5227,176 @@
         ],
         "type": "object"
       },
+      "StateConditionsData": {
+        "additionalProperties": false,
+        "properties": {
+          "lamp": {
+            "description": "The lamp over every situation of the Land and every official weather warning in force in its areas, by the rules of listRoadConditions.",
+            "enum": [
+              "green",
+              "amber",
+              "red"
+            ],
+            "type": "string"
+          },
+          "lampReason": {
+            "description": "Why the lamp has its colour, as in listRoadConditions; null for green.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "situations": {
+            "description": "Ordered by severity descending, then road, then id. A situation is in the Land of the nearest municipality centre (BKG, within 20 km) to its point; near a Land border that can be the neighbouring Land.",
+            "items": {
+              "$ref": "#/components/schemas/RoadSituation"
+            },
+            "type": "array"
+          },
+          "state": {
+            "description": "The Land's code.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "lamp",
+          "lampReason",
+          "situations"
+        ],
+        "type": "object"
+      },
+      "StateConditionsEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StateConditionsData"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/StateConditionsEnvelopeMetaStruct"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "StateConditionsEnvelopeMetaStruct": {
+        "additionalProperties": false,
+        "properties": {
+          "asOf": {
+            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "attribution": {
+            "description": "One entry per contributing source family; clients displaying the data must show its text.",
+            "items": {
+              "$ref": "#/components/schemas/Attribution"
+            },
+            "type": "array"
+          },
+          "freshness": {
+            "description": "One entry per contributing source family.",
+            "items": {
+              "$ref": "#/components/schemas/FreshnessEntry"
+            },
+            "type": "array"
+          },
+          "generatedAt": {
+            "description": "When the service produced this body.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "language": {
+            "description": "The language of the texts in data (BCP 47).",
+            "type": "string"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/Notes"
+          },
+          "page": {
+            "$ref": "#/components/schemas/Page"
+          },
+          "query": {
+            "$ref": "#/components/schemas/StateConditionsQuery"
+          },
+          "requestId": {
+            "description": "The request id, equal to the X-Request-Id header.",
+            "type": "string"
+          },
+          "warnings": {
+            "description": "Warnings about this answer; empty when there is none.",
+            "items": {
+              "$ref": "#/components/schemas/DataWarning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "page",
+          "query",
+          "asOf",
+          "freshness",
+          "attribution",
+          "notes",
+          "warnings",
+          "requestId",
+          "generatedAt",
+          "language"
+        ],
+        "type": "object"
+      },
+      "StateConditionsQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "kinds": {
+            "description": "The kinds asked for; empty for every kind.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "minSeverity": {
+            "type": "string"
+          },
+          "roadClasses": {
+            "description": "The road classes asked for; empty for every class.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "state": {
+            "type": "string"
+          },
+          "windowFrom": {
+            "description": "The start of the window asked for (horizon_days, or from and to); absent for the situations in force now.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "windowUntil": {
+            "description": "The end of the window asked for; absent for the situations in force now.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "roadClasses",
+          "kinds",
+          "minSeverity"
+        ],
+        "type": "object"
+      },
       "Station": {
         "additionalProperties": false,
         "properties": {
@@ -13764,6 +13934,384 @@
         ],
         "x-example-request": "/v1/speed-cameras?at=47.98,6.95\u0026radius_m=10000\u0026limit=2",
         "x-mcp-counterpart": "speed camera search",
+        "x-required-scope": "roads"
+      }
+    },
+    "/v1/states/{state}/road-conditions": {
+      "get": {
+        "description": "The active situations of one Land (each placed in the Land of the nearest municipality centre to its point, the platform's Land rule), by severity descending, then road, then id, with the lamp over the Land. road_class=motorway answers a Land's motorways. MCP counterpart: motorway traffic (Land form). Needs the scope roads.",
+        "operationId": "listStateRoadConditions",
+        "parameters": [
+          {
+            "description": "The Land's official code, two digits (09 Bayern), as listPlaces or describeLocation give it; de for the whole country (every situation held).",
+            "in": "path",
+            "name": "state",
+            "required": true,
+            "schema": {
+              "description": "The Land's official code, two digits (09 Bayern), as listPlaces or describeLocation give it; de for the whole country (every situation held).",
+              "examples": [
+                "09"
+              ],
+              "pattern": "^([0-9]{2}|de)$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only these kinds, comma-separated; other keeps the kinds that cannot be mapped. Default: every kind.",
+            "explode": false,
+            "in": "query",
+            "name": "kinds",
+            "schema": {
+              "description": "Only these kinds, comma-separated; other keeps the kinds that cannot be mapped. Default: every kind.",
+              "items": {
+                "enum": [
+                  "closure",
+                  "roadworks",
+                  "jam",
+                  "accident",
+                  "hazard",
+                  "restriction",
+                  "weather",
+                  "other"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          {
+            "description": "Only situations at or above this severity; info also keeps those that cannot be graded.",
+            "explode": false,
+            "in": "query",
+            "name": "min_severity",
+            "schema": {
+              "default": "info",
+              "description": "Only situations at or above this severity; info also keeps those that cannot be graded.",
+              "enum": [
+                "info",
+                "minor",
+                "lane_closed",
+                "major",
+                "road_closed"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Also the situations that start within this many days from now: the window is now to now plus the days, and a situation is kept when its validity overlaps it (the platform's road status horizon). 0, the default, keeps those in force now. Not with from or to.",
+            "explode": false,
+            "in": "query",
+            "name": "horizon_days",
+            "schema": {
+              "description": "Also the situations that start within this many days from now: the window is now to now plus the days, and a situation is kept when its validity overlaps it (the platform's road status horizon). 0, the default, keeps those in force now. Not with from or to.",
+              "format": "int64",
+              "maximum": 14,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The first day of a window of German calendar days (Europe/Berlin), YYYY-MM-DD: a situation is kept when its validity overlaps the window (the platform's roadworks window). Default: today, when to is given.",
+            "explode": false,
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "description": "The first day of a window of German calendar days (Europe/Berlin), YYYY-MM-DD: a situation is kept when its validity overlaps the window (the platform's roadworks window). Default: today, when to is given.",
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The last day of the window, inclusive, YYYY-MM-DD. Default: 7 days after from. The window spans at most 92 days.",
+            "explode": false,
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "description": "The last day of the window, inclusive, YYYY-MM-DD. Default: 7 days after from. The window spans at most 92 days.",
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only situations on roads of these classes, comma-separated; motorway for a Land's motorways. Default: every class held.",
+            "explode": false,
+            "in": "query",
+            "name": "road_class",
+            "schema": {
+              "description": "Only situations on roads of these classes, comma-separated; motorway for a Land's motorways. Default: every class held.",
+              "items": {
+                "enum": [
+                  "motorway",
+                  "federal",
+                  "state",
+                  "urban",
+                  "other"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          {
+            "description": "Most situations to return. Default: pagination.default_limit.",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "description": "Most situations to return. Default: pagination.default_limit.",
+              "format": "int64",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateConditionsEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The operation is switched off on this instance (feature-disabled).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "What is happening on the roads of one Land",
+        "tags": [
+          "roads"
+        ],
         "x-required-scope": "roads"
       }
     },

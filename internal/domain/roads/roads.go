@@ -564,6 +564,11 @@ type CorridorQuery struct {
 type AreaQuery struct {
 	At      geo.Point
 	RadiusM int
+	// State, when set, asks for the situations of one Land (its two-digit
+	// code) instead of the radius of At: a situation is in the Land of the
+	// nearest Gemeinde to its point, the platform's Land rule; de asks for
+	// every situation of the country.
+	State string
 	// Classes keeps the situations on roads of these classes; empty keeps
 	// every class.
 	Classes []Class

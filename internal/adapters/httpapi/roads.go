@@ -451,3 +451,78 @@ func registerRoadSituation(api huma.API, s *server, op huma.Operation) {
 		}}, nil
 	})
 }
+
+// ------------------------------------------------------------- one Land
+
+// StateConditionsInput is the input of listStateRoadConditions.
+type StateConditionsInput struct {
+	State string `path:"state" pattern:"^([0-9]{2}|de)$" example:"09" doc:"The Land's official code, two digits (09 Bayern), as listPlaces or describeLocation give it; de for the whole country (every situation held)."`
+	SituationFilters
+	SituationWindow
+	RoadClass []string `query:"road_class" enum:"motorway,federal,state,urban,other" doc:"Only situations on roads of these classes, comma-separated; motorway for a Land's motorways. Default: every class held."`
+	Limit     int      `query:"limit" minimum:"1" maximum:"100" doc:"Most situations to return. Default: pagination.default_limit."`
+}
+
+// Resolve refuses a window that cannot be read.
+func (in *StateConditionsInput) Resolve(huma.Context) []error { return in.check() }
+
+// StateConditionsData is the answer of listStateRoadConditions.
+type StateConditionsData struct {
+	State      string          `json:"state" doc:"The Land's code."`
+	Lamp       string          `json:"lamp" enum:"green,amber,red" doc:"The lamp over every situation of the Land and every official weather warning in force in its areas, by the rules of listRoadConditions."`
+	LampReason *string         `json:"lampReason" nullable:"true" doc:"Why the lamp has its colour, as in listRoadConditions; null for green."`
+	Situations []RoadSituation `json:"situations" doc:"Ordered by severity descending, then road, then id. A situation is in the Land of the nearest municipality centre (BKG, within 20 km) to its point; near a Land border that can be the neighbouring Land."`
+}
+
+// StateConditionsQuery is meta.query of listStateRoadConditions.
+type StateConditionsQuery struct {
+	State string `json:"state"`
+	FilterQuery
+	RoadClasses []string `json:"roadClasses" doc:"The road classes asked for; empty for every class."`
+}
+
+// StateConditionsEnvelope is the enveloped answer of listStateRoadConditions.
+type StateConditionsEnvelope struct {
+	Data StateConditionsData `json:"data"`
+	Meta struct {
+		DataMeta
+		Page  Page                 `json:"page"`
+		Query StateConditionsQuery `json:"query"`
+	} `json:"meta"`
+	Links Links `json:"links"`
+}
+
+// StateConditionsOutput is the response of listStateRoadConditions.
+type StateConditionsOutput struct {
+	CacheControl string `header:"Cache-Control"`
+	Body         StateConditionsEnvelope
+}
+
+func registerStateConditions(api huma.API, s *server, op huma.Operation) {
+	op.Summary = "What is happening on the roads of one Land"
+	op.Description = "The active situations of one Land (each placed in the Land of the nearest municipality centre to its point, the platform's Land rule), by severity descending, then road, then id, with the lamp over the Land. road_class=motorway answers a Land's motorways. MCP counterpart: motorway traffic (Land form). Needs the scope roads."
+	featureResponses(api, &op, featureOffDoc)
+	huma.Register(api, op, func(ctx context.Context, in *StateConditionsInput) (*StateConditionsOutput, error) {
+		if err := s.featuresOff(ctx); err != nil {
+			return nil, err
+		}
+		q := roads.AreaQuery{State: in.State, Filter: s.windowed(ctx, in.filter(), in.SituationWindow), Limit: s.limit(in.Limit)}
+		types := []string{}
+		for _, c := range in.RoadClass {
+			q.Classes = append(q.Classes, roads.Class(c))
+			types = append(types, c)
+		}
+		c, err := s.features.RoadConditions(ctx, principalFrom(ctx).Key, q)
+		if err != nil {
+			return nil, s.featureProblem(ctx, err)
+		}
+		noteLamp(ctx, c)
+		out := &StateConditionsOutput{CacheControl: noStore}
+		out.Body.Data = StateConditionsData{State: q.State, Lamp: string(c.Lamp), LampReason: lampReason(c.Reason), Situations: roadSituations(c.Items)}
+		out.Body.Meta.DataMeta = s.dataMeta(ctx, c.Families, c.At, c.Partial, partialDetail)
+		out.Body.Meta.Page = Page{Limit: q.Limit, HasMore: c.HasMore}
+		out.Body.Meta.Query = StateConditionsQuery{State: q.State, FilterQuery: filterQuery(q.Filter), RoadClasses: types}
+		out.Body.Links = s.selfLink(ctx)
+		return out, nil
+	})
+}

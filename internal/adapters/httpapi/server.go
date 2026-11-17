@@ -96,20 +96,24 @@ const (
 
 // operation is one registered API operation.
 type operation struct {
-	id       string
-	method   string
-	path     string
-	tag      string
-	surface  surface      // zero means the public listener only
-	keyed    bool         // needs a key (SEC-001)
+	id      string
+	method  string
+	path    string
+	tag     string
+	surface surface // zero means the public listener only
+	keyed   bool    // needs a key (SEC-001)
+	// legacy: served on the public listener only as a deprecated alias of
+	// the health listener's answer, with a Deprecation header (0.2 clients
+	// probed the public listener).
+	legacy   bool
 	scope    access.Scope // the scope a keyed operation needs (SEC-020); empty for none
 	register func(api huma.API, s *server, op huma.Operation)
 }
 
 func operations() []operation {
 	return []operation{
-		{id: "getHealth", method: http.MethodGet, path: "/healthz", surface: onHealth, register: registerHealth},
-		{id: "getReadiness", method: http.MethodGet, path: "/readyz", surface: onHealth, register: registerReadiness},
+		{id: "getHealth", method: http.MethodGet, path: "/healthz", surface: onPublic | onHealth, legacy: true, register: registerHealth},
+		{id: "getReadiness", method: http.MethodGet, path: "/readyz", surface: onPublic | onHealth, legacy: true, register: registerReadiness},
 		{id: "getMeta", method: http.MethodGet, path: "/v1/meta", surface: onPublic | onHealth, register: registerMeta},
 		{id: "getKey", method: http.MethodGet, path: "/v1/key", tag: "access", keyed: true, register: registerKey},
 		{id: "listChargingOptions", method: http.MethodGet, path: "/v1/charging-options", tag: "energy", keyed: true, scope: "energy", register: registerCharging},
@@ -349,11 +353,18 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 			hop.Security = []map[string][]string{{schemeBearer: {}}, {schemeHeader: {}}}
 			hop.Responses = keyedResponses(api)
 		}
+		if op.legacy && surf == onPublic {
+			hop.Deprecated = true
+			hop.Middlewares = huma.Middlewares{deprecationHeader}
+		}
 		if op.scope != "" {
 			hop.Metadata = map[string]any{scopeExtension: op.scope}
 			hop.Extensions = map[string]any{scopeExtension: string(op.scope)}
 		}
 		op.register(api, s, hop)
+		if op.legacy && surf == onPublic {
+			documentDeprecation(api.OpenAPI().Paths[op.path].Get)
+		}
 	}
 	// The document describes the public listener; the health listener
 	// serves none.
@@ -390,4 +401,25 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 		})
 	}
 	return router, served, nil
+}
+
+// deprecationHeader marks an answer of a deprecated alias (RFC 9745): the
+// public listener's /healthz and /readyz, which the health listener serves.
+func deprecationHeader(ctx huma.Context, next func(huma.Context)) {
+	ctx.SetHeader("Deprecation", "true")
+	next(ctx)
+}
+
+// documentDeprecation documents the Deprecation header on every answer of a
+// deprecated alias.
+func documentDeprecation(o *huma.Operation) {
+	for _, r := range o.Responses {
+		if r.Headers == nil {
+			r.Headers = map[string]*huma.Param{}
+		}
+		r.Headers["Deprecation"] = &huma.Param{
+			Description: "Always true: this public alias is deprecated; probe the health listener (health.listen_addr), which answers the same.",
+			Schema:      &huma.Schema{Type: "string", Enum: []any{"true"}},
+		}
+	}
 }

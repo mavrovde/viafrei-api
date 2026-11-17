@@ -306,14 +306,15 @@ func TestOpenAPIServedIsTheCommittedDocument(t *testing.T) {
 	if err := json.Unmarshal(committed, &doc); err != nil || doc["openapi"] != "3.1.0" {
 		t.Fatalf("not an OpenAPI 3.1 document: %v", err)
 	}
-	// Liveness and readiness are served on the health listener alone (#92),
-	// so the document of the public listener holds every other operation.
-	if n := len(doc["paths"].(map[string]any)); n != len(httpapi.OperationIDs())-2 {
-		t.Fatalf("document has %d paths, the service %d operations, two of them on the health listener", n, len(httpapi.OperationIDs()))
+	// Liveness and readiness are served on the health listener (#92); the
+	// public document holds every operation, those two as deprecated aliases.
+	if n := len(doc["paths"].(map[string]any)); n != len(httpapi.OperationIDs()) {
+		t.Fatalf("document has %d paths, the service %d operations", n, len(httpapi.OperationIDs()))
 	}
 	for _, p := range []string{"/healthz", "/readyz"} {
-		if _, ok := doc["paths"].(map[string]any)[p]; ok {
-			t.Errorf("the public document describes %s, which the health listener alone serves", p)
+		get, _ := doc["paths"].(map[string]any)[p].(map[string]any)["get"].(map[string]any)
+		if get["deprecated"] != true {
+			t.Errorf("the public document does not mark %s deprecated", p)
 		}
 	}
 	red := do(t, h, http.MethodGet, "/openapi.json", nil)

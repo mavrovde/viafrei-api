@@ -137,9 +137,14 @@ func TestTheHealthListenerHasNoAllowList(t *testing.T) {
 		}
 	}
 	open := publicHandler(t, config.Callers{AllowCIDR: []string{"0.0.0.0/0", "::/0"}}, &bytes.Buffer{})
-	for _, target := range []string{"/healthz", "/readyz"} {
-		if w := ask(open, "203.0.113.1:5000", target, nil); w.Code != http.StatusNotFound {
-			t.Errorf("public %s: %d, want 404", target, w.Code)
+	// The public listener keeps them as deprecated aliases: the same answer,
+	// with a Deprecation header.
+	for target, want := range map[string]int{"/healthz": http.StatusOK, "/readyz": http.StatusServiceUnavailable} {
+		if w := ask(open, "203.0.113.1:5000", target, nil); w.Code != want || w.Header().Get("Deprecation") != "true" {
+			t.Errorf("public %s: %d, Deprecation %q; want %d, true", target, w.Code, w.Header().Get("Deprecation"), want)
+		}
+		if w := ask(h, "203.0.113.1:5000", target, nil); w.Header().Get("Deprecation") != "" {
+			t.Errorf("health %s carries a Deprecation header", target)
 		}
 	}
 }

@@ -292,11 +292,11 @@ func TestServeFailsClosed(t *testing.T) {
 }
 
 // TestServeAdmitsTheAllowList: an admitted caller gets the normal answer on
-// the public listener, which does not serve liveness or readiness.
+// the public listener, liveness and readiness there as deprecated aliases.
 func TestServeAdmitsTheAllowList(t *testing.T) {
 	req.Covers(t, "SEC-001")
 	code := serveUntilTerm(t, []string{allowLoopback}, func(addr string) {
-		for path, want := range map[string]int{"/v1/meta": http.StatusOK, "/v1/openapi.json": http.StatusOK, "/healthz": http.StatusNotFound, "/readyz": http.StatusNotFound} {
+		for path, want := range map[string]int{"/v1/meta": http.StatusOK, "/v1/openapi.json": http.StatusOK, "/healthz": http.StatusOK, "/readyz": http.StatusServiceUnavailable} {
 			if resp, body := answer(t, "http://"+addr+path); resp.StatusCode != want { //nolint:bodyclose // answer reads and closes the body
 				t.Errorf("public %s: %d %.120s, want %d", path, resp.StatusCode, body, want)
 			}

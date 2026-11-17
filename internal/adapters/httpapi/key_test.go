@@ -332,8 +332,8 @@ func TestEveryDataOperationRefusesWithoutAValidKey(t *testing.T) {
 		}
 	}
 	slices.Sort(keyless)
-	if !slices.Equal(keyless, []string{"getMeta"}) {
-		t.Fatalf("operations documented without a key: %v, want getMeta alone", keyless)
+	if !slices.Equal(keyless, []string{"getHealth", "getMeta", "getReadiness"}) {
+		t.Fatalf("operations documented without a key: %v, want the service ones alone", keyless)
 	}
 	for _, c := range []struct {
 		err    error

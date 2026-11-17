@@ -79,8 +79,9 @@ refused, with the method and path, and never the address.
 metadata (`/v1/meta`) are served on the health listener, `health.listen_addr`,
 whose port must differ from the public one. It has no allow-list: the edge
 never routes it, so the platform's probes reach it without being on the list.
-The public listener does not serve `/healthz` or `/readyz`, and the OpenAPI
-document describes the public listener only. `/app healthcheck` and
+The public listener still answers `/healthz` and `/readyz` with the same
+answer, as deprecated aliases marked with a `Deprecation: true` header; probe
+the health listener. The OpenAPI document describes the public listener only. `/app healthcheck` and
 `/app meta-check` ask the health listener.
 
 ## Deploy to a cluster

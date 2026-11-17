@@ -2682,12 +2682,8 @@
           "value": "[]"
         },
         {
-          "name": "meta.attribution[bkg_gvisys].family",
-          "value": "bkg_gvisys"
-        },
-        {
-          "name": "meta.attribution[geonames].family",
-          "value": "geonames"
+          "name": "meta.attribution",
+          "value": "[]"
         },
         {
           "name": "meta.notes.condition",
@@ -2732,12 +2728,8 @@
           "value": "[]"
         },
         {
-          "name": "meta.attribution[bkg_gvisys].family",
-          "value": "bkg_gvisys"
-        },
-        {
-          "name": "meta.attribution[geonames].family",
-          "value": "geonames"
+          "name": "meta.attribution",
+          "value": "[]"
         },
         {
           "name": "meta.notes.condition",
@@ -9478,6 +9470,10 @@
           "value": "2026-02-26"
         },
         {
+          "name": "data.zoneVerdict.distanceM",
+          "value": "null"
+        },
+        {
           "name": "data.zoneVerdict.exemptRoad",
           "value": "null"
         },
@@ -9758,16 +9754,28 @@
           "value": "lez"
         },
         {
-          "name": "meta.attribution[lez_alpha].family",
-          "value": "lez_alpha"
+          "name": "data.zoneCity.covered",
+          "value": "false"
+        },
+        {
+          "name": "data.zoneCity.name",
+          "value": "Matfienland"
+        },
+        {
+          "name": "data.zoneCity.plakette",
+          "value": "null"
+        },
+        {
+          "name": "data.zoneCity.zone",
+          "value": "null"
         },
         {
           "name": "meta.attribution[viafrei_rules].family",
           "value": "viafrei_rules"
         },
         {
-          "name": "meta.notes.condition",
-          "value": "[]"
+          "name": "meta.notes.condition[unowned]",
+          "value": "1"
         },
         {
           "name": "meta.notes.purpose",
@@ -11802,10 +11810,6 @@
           "value": "2026-03-30T00:00:00Z"
         },
         {
-          "name": "data.holds",
-          "value": "false"
-        },
-        {
           "name": "data.key",
           "value": "08001"
         },
@@ -11826,8 +11830,8 @@
           "value": "2026-03-30T03:00:00Z"
         },
         {
-          "name": "meta.attribution[delfi_sa_alpha].family",
-          "value": "delfi_sa_alpha"
+          "name": "meta.attribution",
+          "value": "[]"
         },
         {
           "name": "meta.notes.condition",
@@ -11886,18 +11890,6 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
-          "name": "data.cell.key",
-          "value": "801002000"
-        },
-        {
-          "name": "data.cell.name",
-          "value": "Warngebiet 01002"
-        },
-        {
-          "name": "data.cell.place",
-          "value": "null"
-        },
-        {
           "name": "data.condition.min_level",
           "value": "2"
         },
@@ -11908,10 +11900,6 @@
         {
           "name": "data.from",
           "value": "2026-03-30T00:00:00Z"
-        },
-        {
-          "name": "data.holds",
-          "value": "false"
         },
         {
           "name": "data.key",
@@ -11934,12 +11922,8 @@
           "value": "2026-03-30T03:00:00Z"
         },
         {
-          "name": "meta.attribution[dwd_alpha].family",
-          "value": "dwd_alpha"
-        },
-        {
-          "name": "meta.attribution[dwd_eta].family",
-          "value": "dwd_eta"
+          "name": "meta.attribution",
+          "value": "[]"
         },
         {
           "name": "meta.notes.condition",
@@ -11973,56 +11957,8 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
-          "name": "data.corridor.direction",
-          "value": "both"
-        },
-        {
-          "name": "data.corridor.road",
-          "value": "A999"
-        },
-        {
-          "name": "data.corridor.roadType",
-          "value": "motorway"
-        },
-        {
-          "name": "data.coverage.families",
-          "value": "[\"roadworks_bast\"]"
-        },
-        {
-          "name": "data.coverage.registered",
-          "value": "false"
-        },
-        {
-          "name": "data.coverage.roadType",
-          "value": "motorway"
-        },
-        {
-          "name": "data.situations",
-          "value": "[]"
-        },
-        {
-          "name": "meta.attribution[roadworks_bast].family",
-          "value": "roadworks_bast"
-        },
-        {
-          "name": "meta.notes.condition",
-          "value": "[]"
-        },
-        {
-          "name": "meta.notes.purpose",
-          "value": "[]"
-        },
-        {
-          "name": "meta.page.hasMore",
-          "value": "false"
-        },
-        {
-          "name": "meta.page.limit",
-          "value": "10"
-        },
-        {
-          "name": "meta.page.nextCursor",
-          "value": "null"
+          "name": "error",
+          "value": "true"
         }
       ]
     },
@@ -12125,8 +12061,8 @@
           "value": "[]"
         },
         {
-          "name": "meta.attribution[roadworks_bast].family",
-          "value": "roadworks_bast"
+          "name": "meta.attribution",
+          "value": "[]"
         },
         {
           "name": "meta.notes.condition",
@@ -12201,16 +12137,8 @@
           "value": "[]"
         },
         {
-          "name": "meta.attribution[delfi_sa_alpha].family",
-          "value": "delfi_sa_alpha"
-        },
-        {
-          "name": "meta.attribution[delfi_static].family",
-          "value": "delfi_static"
-        },
-        {
-          "name": "meta.attribution[gbfs_nextbike].family",
-          "value": "gbfs_nextbike"
+          "name": "meta.attribution[openstation_siri_fm].family",
+          "value": "openstation_siri_fm"
         },
         {
           "name": "meta.notes.condition",

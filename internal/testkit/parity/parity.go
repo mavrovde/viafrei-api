@@ -605,6 +605,13 @@ func Project(body []byte, r Rules, operation, request string, owners Owners) ([]
 	if err := dec.Decode(&doc); err != nil {
 		return nil, err
 	}
+	// A refusal (a problem document, RFC 9457) is one fact, as the MCP side
+	// states a tool error: what was refused is compared, not its wording.
+	if st, ok := doc["status"].(json.Number); ok && doc["data"] == nil {
+		if n, err := st.Int64(); err == nil && n >= 400 {
+			return []Fact{{Name: "error", Value: "true"}}, nil
+		}
+	}
 	p := projector{r: r}
 	p.walk("data", "data", doc["data"])
 	meta, _ := doc["meta"].(map[string]any)

@@ -120,6 +120,11 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
 | `meta.attribution[*].` `domain`, `licence`, `licenceUrl`, `publisher`, `shareAlike`, `shareAlikeOffer`, `termsUrl`, `text` | The fixture's families carry synthetic register texts; the platform credits its own register rows for the sources the producer stores each family as, so the texts cannot be equal on these rows. Which families are credited (`meta.attribution[*].family`) is compared. |
 | The text of a condition note (`meta.notes.condition`) and, since rules/5, of a purpose note (`meta.notes.purpose`) | The same reason, since rules/4 for conditions: the fixture's notes are synthetic and the platform states its own register's. The family of each note and how many each family has are compared (`meta.notes.<kind>[<family>]`, above). |
 
+A question the API refuses as unknown (`404`, a problem document) is
+compared as one fact, `error = true`, as the MCP side states a tool's
+`not_found`; the wording of either refusal is not compared. Any other
+status fails the run.
+
 ## The questions
 
 Every question states its `limit`, so neither side's default limit is

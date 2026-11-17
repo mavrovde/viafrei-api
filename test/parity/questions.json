@@ -1876,6 +1876,183 @@
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "watch-region",
+      "operation": "getWatch",
+      "counterpart": "watch situation",
+      "request": "/v1/watch?kind=region&target=08001&hours=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places",
+          "roads",
+          "transit",
+          "weather"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "watch-weather",
+      "operation": "getWatch",
+      "counterpart": "watch situation",
+      "request": "/v1/watch?kind=weather&target=49.16,7.8&hours=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places",
+          "roads",
+          "transit",
+          "weather"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "motorway-unknown-roadworks",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/A999/conditions?kinds=roadworks&from=2026-03-30&to=2026-04-06&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta",
+          "roads_alpha",
+          "roads_epsilon",
+          "roadworks_bast"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "service-pressure",
+      "operation": "getPressure",
+      "counterpart": "pressure",
+      "request": "/v1/pressure",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "road-b-no-sites",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/B999/conditions?kinds=roadworks&from=2026-03-30&to=2026-04-06&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta",
+          "roads_alpha",
+          "roads_epsilon",
+          "roadworks_bast"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
     }
   ]
 }

@@ -162,7 +162,9 @@ func (a asker) ask(t *testing.T, c parity.Case) []byte {
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	body, _ := io.ReadAll(w.Body)
-	if w.Code != http.StatusOK {
+	// A question the platform refuses as unknown (a tool's not_found) is
+	// answered 404 and compared as a refusal; any other status is a fault.
+	if w.Code != http.StatusOK && w.Code != http.StatusNotFound {
 		t.Fatalf("%s: %s answered %d: %s", c.ID, c.Request, w.Code, body)
 	}
 	return body

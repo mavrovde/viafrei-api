@@ -12366,6 +12366,421 @@
           "value": "{}"
         }
       ]
+    },
+    {
+      "id": "watch-region",
+      "operation": "getWatch",
+      "counterpart": "watch situation",
+      "request": "/v1/watch?kind=region\u0026target=08001\u0026hours=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places",
+          "roads",
+          "transit",
+          "weather"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.condition.delay_min",
+          "value": "5"
+        },
+        {
+          "name": "data.condition.late_share",
+          "value": "0.25"
+        },
+        {
+          "name": "data.condition.min_trips",
+          "value": "10"
+        },
+        {
+          "name": "data.ended",
+          "value": "false"
+        },
+        {
+          "name": "data.from",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.holds",
+          "value": "false"
+        },
+        {
+          "name": "data.key",
+          "value": "08001"
+        },
+        {
+          "name": "data.kind",
+          "value": "region"
+        },
+        {
+          "name": "data.note",
+          "value": "null"
+        },
+        {
+          "name": "data.situations",
+          "value": "[]"
+        },
+        {
+          "name": "data.until",
+          "value": "2026-03-30T03:00:00Z"
+        },
+        {
+          "name": "meta.attribution[delfi_sa_alpha].family",
+          "value": "delfi_sa_alpha"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "watch-weather",
+      "operation": "getWatch",
+      "counterpart": "watch situation",
+      "request": "/v1/watch?kind=weather\u0026target=49.16,7.8\u0026hours=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places",
+          "roads",
+          "transit",
+          "weather"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.cell.key",
+          "value": "801002000"
+        },
+        {
+          "name": "data.cell.name",
+          "value": "Warngebiet 01002"
+        },
+        {
+          "name": "data.cell.place",
+          "value": "null"
+        },
+        {
+          "name": "data.condition.min_level",
+          "value": "2"
+        },
+        {
+          "name": "data.ended",
+          "value": "false"
+        },
+        {
+          "name": "data.from",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.holds",
+          "value": "false"
+        },
+        {
+          "name": "data.key",
+          "value": "49.16,7.8"
+        },
+        {
+          "name": "data.kind",
+          "value": "weather"
+        },
+        {
+          "name": "data.note",
+          "value": "null"
+        },
+        {
+          "name": "data.situations",
+          "value": "[]"
+        },
+        {
+          "name": "data.until",
+          "value": "2026-03-30T03:00:00Z"
+        },
+        {
+          "name": "meta.attribution[dwd_alpha].family",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "meta.attribution[dwd_eta].family",
+          "value": "dwd_eta"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "motorway-unknown-roadworks",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/A999/conditions?kinds=roadworks\u0026from=2026-03-30\u0026to=2026-04-06\u0026limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta",
+          "roads_alpha",
+          "roads_epsilon",
+          "roadworks_bast"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.corridor.direction",
+          "value": "both"
+        },
+        {
+          "name": "data.corridor.road",
+          "value": "A999"
+        },
+        {
+          "name": "data.corridor.roadType",
+          "value": "motorway"
+        },
+        {
+          "name": "data.coverage.families",
+          "value": "[\"roadworks_bast\"]"
+        },
+        {
+          "name": "data.coverage.registered",
+          "value": "false"
+        },
+        {
+          "name": "data.coverage.roadType",
+          "value": "motorway"
+        },
+        {
+          "name": "data.situations",
+          "value": "[]"
+        },
+        {
+          "name": "meta.attribution[roadworks_bast].family",
+          "value": "roadworks_bast"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "10"
+        },
+        {
+          "name": "meta.page.nextCursor",
+          "value": "null"
+        }
+      ]
+    },
+    {
+      "id": "service-pressure",
+      "operation": "getPressure",
+      "counterpart": "pressure",
+      "request": "/v1/pressure",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.state",
+          "value": "ok"
+        }
+      ]
+    },
+    {
+      "id": "road-b-no-sites",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/B999/conditions?kinds=roadworks\u0026from=2026-03-30\u0026to=2026-04-06\u0026limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta",
+          "roads_alpha",
+          "roads_epsilon",
+          "roadworks_bast"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.corridor.direction",
+          "value": "both"
+        },
+        {
+          "name": "data.corridor.road",
+          "value": "B999"
+        },
+        {
+          "name": "data.corridor.roadType",
+          "value": "federal"
+        },
+        {
+          "name": "data.coverage.families",
+          "value": "[]"
+        },
+        {
+          "name": "data.coverage.registered",
+          "value": "false"
+        },
+        {
+          "name": "data.coverage.roadType",
+          "value": "federal"
+        },
+        {
+          "name": "data.situations",
+          "value": "[]"
+        },
+        {
+          "name": "meta.attribution[roadworks_bast].family",
+          "value": "roadworks_bast"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "10"
+        },
+        {
+          "name": "meta.page.nextCursor",
+          "value": "null"
+        }
+      ]
     }
   ]
 }

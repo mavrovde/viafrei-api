@@ -65,6 +65,10 @@ func (f *wxFake) Provenance(ctx context.Context, fams []string, lang string) ([]
 	return out, err
 }
 
+func (f *wxFake) Zones(context.Context, rules.ZoneQuery, []string, time.Time) ([]rules.Zone, error) {
+	return nil, nil
+}
+
 func (f *wxFake) Topic(_ context.Context, code string) (rules.Topic, error) {
 	f.readCalls++
 	f.gotCode = code

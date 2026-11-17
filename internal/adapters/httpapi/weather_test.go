@@ -11,6 +11,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
+	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
@@ -20,6 +21,10 @@ import (
 func (f *fakeFeatures) WeatherRisk(_ context.Context, key access.Record, q weather.Query) (features.WeatherRisk, error) {
 	f.gotKey, f.gotRisk = key, q
 	return f.risk, f.err
+}
+
+func (f *fakeFeatures) LowEmissionZones(context.Context, access.Record, rules.ZoneQuery) (features.ZonesAnswer, error) {
+	return features.ZonesAnswer{}, nil
 }
 
 func (f *fakeFeatures) DrivingRules(_ context.Context, key access.Record, topic string) (rules.Topic, features.Answer[rules.Rule], error) {
@@ -142,4 +147,8 @@ func TestWeatherAndRulesRefusals(t *testing.T) {
 	} {
 		assertProblem(t, do(t, h, http.MethodGet, target, bearer), 400, "invalid-parameter")
 	}
+}
+
+func (f *fakeFeatures) LorryRules(context.Context, access.Record, roads.LorryQuery) (features.LorryAnswer, error) {
+	return features.LorryAnswer{}, nil
 }

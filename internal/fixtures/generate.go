@@ -52,6 +52,7 @@ var Tables = []string{
 	"stop_place", "stop_point", "transit_line", "journey", "scheduled_call", "call_observation",
 	"station_facility", "weather_warning", "rule_topic", "rule_statement",
 	"hydrogen_station", "speed_camera", "sharing_station", "sharing_station_status", "sharing_vehicle", "poi", "address", "service_alert",
+	"low_emission_zone", "lorry_rule",
 }
 
 // ReferenceInstant is the start of the first generated day: the Saturday
@@ -143,6 +144,8 @@ func generate(out io.Writer, profile string, seed uint64, contractVersion string
 	g.sharing()
 	g.pois()
 	g.alerts()
+	g.zones()
+	g.lorry()
 	g.w.end()
 	sum, err := g.w.close()
 	if err != nil {
@@ -284,6 +287,11 @@ var sourceList = []source{
 	{ref: "gbfs_nextbike", family: "alpha", domain: "transit", platform: true, target: 60},
 	{ref: "osm", family: "beta", domain: "places", platform: true},
 	{ref: "delfi_sa_alpha", family: "alpha", domain: "transit", target: 300, publisher: "StÃ¶rwerk Datenwerk"},
+	{ref: "lez_alpha", family: "alpha", domain: "roads", target: 86400, publisher: "Zonenwerk Datenwerk"},
+	// The lorry tables accept only their own sources' refs, whose register rows
+	// the platform holds: the set writes their rows, never their register.
+	{ref: "lorry_bast_langlkw", family: "alpha", domain: "roads", platform: true},
+	{ref: "lorry_koeln_beschraenkungen", family: "alpha", domain: "roads", platform: true},
 }
 
 // useClasses are the register's use classes of each family; nil writes no
@@ -1196,4 +1204,61 @@ func (g *gen) alerts() {
 			g.counted(l.code, ref)
 		}
 	}
+}
+
+// square is a closed square polygon of half-side d degrees around c.
+func square(c lonLat, d float64) string {
+	x0, x1, y0, y1 := coord(c.lon-d), coord(c.lon+d), coord(c.lat-d), coord(c.lat+d)
+	return "'SRID=4326;POLYGON((" + x0 + " " + y0 + ", " + x1 + " " + y0 + ", " + x1 + " " + y1 + ", " + x0 + " " + y1 + ", " + x0 + " " + y0 + "))'"
+}
+
+// zones writes a low-emission zone around the first place of each of the
+// first two Länder, with an area released at the first one's eastern edge:
+// no draw of their own, after every other table.
+func (g *gen) zones() {
+	g.w.begin("low_emission_zone", "zone_key", "zone_id", "zone_role", "name", "city", "publisher_name", "geometry", "changed_at", "recorded_at", "source_ref")
+	for i, l := range g.lands[:2] {
+		pl := g.places[l.code][0]
+		id := fmt.Sprintf("z%d", i+1)
+		g.w.row(str("lez_alpha/"+id), str(id), str("zone"), str("Umweltzone "+pl.name), str(pl.name), str("Zonenwerk"),
+			square(pl.at, 0.02), ts(g.day(-30)), ts(g.day(-1)), str("lez_alpha"))
+		g.counted(l.code, "lez_alpha")
+		if i == 0 {
+			edge := lonLat{lon: pl.at.lon + 0.025, lat: pl.at.lat}
+			g.w.row(str("lez_alpha/t1"), str("t1"), str("transfer"), str("Freigabe "+pl.name), str(pl.name), str("Zonenwerk"),
+				square(edge, 0.005), ts(g.day(-30)), ts(g.day(-1)), str("lez_alpha"))
+		}
+	}
+}
+
+// line is a WKT line through the points.
+func line(ps ...lonLat) string {
+	out := "'SRID=4326;LINESTRING("
+	for i, p := range ps {
+		if i > 0 {
+			out += ", "
+		}
+		out += coord(p.lon) + " " + coord(p.lat)
+	}
+	return out + ")'"
+}
+
+// lorry writes the long-lorry network along the first road, and a height
+// limit, a weight limit and a lorry priority route around the first place of
+// the first Land: no draw of their own, after every other table.
+func (g *gen) lorry() {
+	g.w.begin("lorry_rule", "rule_id", "rule_layer", "restriction_kind", "sign", "value", "unit", "published_text", "road_ref", "street",
+		"direction", "network_state", "category", "version_date", "geometry", "recorded_at", "source_ref")
+	rd := g.roads[0]
+	g.w.row(str("long:1"), str("long_lorry"), null, null, null, null, null, str(rd.ref), null, str("both"), str("positive network"), null,
+		date(g.day(-60)), line(rd.points[0], rd.points[1]), ts(g.day(-1)), str("lorry_bast_langlkw"))
+	g.counted(g.lands[0].code, "lorry_bast_langlkw")
+	pl := g.places[g.lands[0].code][0]
+	at := func(dx float64) lonLat { return lonLat{lon: pl.at.lon + dx, lat: pl.at.lat + 0.001} }
+	g.w.row(str("city:1"), str("restriction"), str("height"), str("265"), dec(3.8, 2), str("m"), str("3,80 m"), null, str("Brückenweg"), null, null, null,
+		date(g.day(-60)), point(at(0.002)), ts(g.day(-1)), str("lorry_koeln_beschraenkungen"))
+	g.w.row(str("city:2"), str("restriction"), str("weight"), str("262"), dec(7.5, 2), str("t"), str("7,5 t"), null, str("Hafenstraße"), null, null, null,
+		date(g.day(-60)), point(at(0.01)), ts(g.day(-1)), str("lorry_koeln_beschraenkungen"))
+	g.w.row(str("city:3"), str("priority_route"), null, null, null, null, null, null, str("Lkw-Route Nord"), null, null, str("lorry_priority_route"),
+		date(g.day(-60)), line(at(-0.01), at(0.01)), ts(g.day(-1)), str("lorry_koeln_beschraenkungen"))
 }

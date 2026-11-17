@@ -207,3 +207,9 @@ web:/internal/tiles/jams	listStateRoadConditions?kinds	state-roads-de-closures	-
 web:/internal/tiles/reports	listStateRoadConditions	state-roads-de-closures	-
 web:/internal/motorway/overlay	listStateRoadConditions?road_class	state-roads-de-closures	-
 web:/internal/map/live	listStateRoadConditions?road_class	state-roads-de-closures	-
+argument:get_driving_rules.city	getDrivingRules?city	rules-lez-city	-
+argument:get_driving_rules.lat	getDrivingRules?at	rules-lez-point	-
+argument:get_driving_rules.lon	getDrivingRules?at	rules-lez-point	-
+argument:get_driving_rules.place	listPlaces?q,getDrivingRules?at	places-name,rules-lez-point	-
+argument:check_road_status.vehicle	listLorryRules?vehicle,listLorryRules?road	lorry-long-road,lorry-near	-
+web:/internal/tiles/lorry	listLorryRules?at	lorry-near	-

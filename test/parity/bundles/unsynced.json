@@ -6,7 +6,7 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "04faf0216734ccd42622ae7466159575a0c40727077cb0f79d3e1c430e51d520"
+    "sha256": "d37bfb78b6ae0a6101200037fd6b58d0bf9b7d0cef1250130f829a048a11ffe1"
   },
   "cases": [
     {
@@ -8390,6 +8390,746 @@
         {
           "name": "meta.page.limit",
           "value": "10"
+        }
+      ]
+    },
+    {
+      "id": "rules-lez-point",
+      "operation": "getDrivingRules",
+      "counterpart": "driving rules",
+      "request": "/v1/driving-rules?topic=lez\u0026at=48.2437,7.0162",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "rules"
+        ],
+        "sources": [
+          "viafrei_rules",
+          "lez_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.disclaimer",
+          "value": "Informational, not legal advice."
+        },
+        {
+          "name": "data.reviewedOn",
+          "value": "2026-09-19"
+        },
+        {
+          "name": "data.rules[0].legalBasis",
+          "value": "35. BImSchV"
+        },
+        {
+          "name": "data.rules[0].text",
+          "value": "Viele deutsche Städte haben eine Umweltzone: hineinfahren darf nur, wer eine gültige Feinstaubplakette sichtbar an der Windschutzscheibe hat — ausländische Fahrzeuge eingeschlossen."
+        },
+        {
+          "name": "data.rules[1].legalBasis",
+          "value": "Umweltbundesamt, Umweltzonen in Deutschland"
+        },
+        {
+          "name": "data.rules[1].text",
+          "value": "Praktisch alle ausgeschilderten Umweltzonen verlangen heute die grüne Plakette (Schadstoffgruppe 4). Das Zusatzzeichen unter dem Schild sagt verbindlich, welche Plakette gilt."
+        },
+        {
+          "name": "data.rules[2].legalBasis",
+          "value": "§ 3 35. BImSchV"
+        },
+        {
+          "name": "data.rules[2].text",
+          "value": "Die Plakette gibt es bei Kfz-Zulassungsstellen, technischen Prüfstellen und Überwachungsorganisationen (TÜV, DEKRA, GTÜ, KÜS) und anerkannten Werkstätten. Mitbringen: die Zulassungsbescheinigung Teil I bzw. den ausländischen Fahrzeugschein. Sie gilt unbefristet und klebt fahrzeuggebunden."
+        },
+        {
+          "name": "data.rules[3].legalBasis",
+          "value": "35. BImSchV, Gebühr der Ausgabestelle"
+        },
+        {
+          "name": "data.rules[3].text",
+          "value": "Die Gebühr liegt an der Ausgabestelle üblicherweise im niedrigen einstelligen Euro-Bereich; Online-Händler verlangen deutlich mehr."
+        },
+        {
+          "name": "data.rules[4].legalBasis",
+          "value": "Bußgeldkatalog-Verordnung (BKatV)"
+        },
+        {
+          "name": "data.rules[4].text",
+          "value": "Ohne gültige Plakette in die Umweltzone zu fahren kostet ein Bußgeld in der Größenordnung von 100 €."
+        },
+        {
+          "name": "data.rules[5].legalBasis",
+          "value": "Umweltbundesamt, Umweltzonen in Deutschland"
+        },
+        {
+          "name": "data.rules[5].text",
+          "value": "Eine französische Crit'Air-Vignette oder eine andere ausländische Umweltplakette gilt in Deutschland nicht — es zählt allein die deutsche Feinstaubplakette."
+        },
+        {
+          "name": "data.rules[6].legalBasis",
+          "value": "StVO Anlage 2, Zeichen 270.1 / 270.2"
+        },
+        {
+          "name": "data.rules[6].text",
+          "value": "Die Zone beginnt am Zeichen 270.1 und endet am Zeichen 270.2; das Zusatzzeichen darunter zeigt die zugelassenen Plaketten."
+        },
+        {
+          "name": "data.rules[7].legalBasis",
+          "value": "Umweltbundesamt, Umweltzonen in Deutschland"
+        },
+        {
+          "name": "data.rules[7].text",
+          "value": "Einzelne Städte hatten zusätzlich Diesel-Durchfahrtsverbote, die unabhängig von der Plakette gelten und sich mehrfach geändert haben — vor der Fahrt auf der Seite der Stadt prüfen."
+        },
+        {
+          "name": "data.title",
+          "value": "Umweltzone und Feinstaubplakette"
+        },
+        {
+          "name": "data.topic",
+          "value": "lez"
+        },
+        {
+          "name": "data.zoneVerdict.exemptRoad",
+          "value": "null"
+        },
+        {
+          "name": "data.zoneVerdict.kind",
+          "value": "inside"
+        },
+        {
+          "name": "data.zoneVerdict.transfer",
+          "value": "null"
+        },
+        {
+          "name": "data.zoneVerdict.zone",
+          "value": "lez_alpha/z1"
+        },
+        {
+          "name": "data.zones[0].city",
+          "value": "Matfienland"
+        },
+        {
+          "name": "data.zones[0].distanceM",
+          "value": "0"
+        },
+        {
+          "name": "data.zones[0].inside",
+          "value": "true"
+        },
+        {
+          "name": "data.zones[0].key",
+          "value": "lez_alpha/z1"
+        },
+        {
+          "name": "data.zones[0].name",
+          "value": "Umweltzone Matfienland"
+        },
+        {
+          "name": "data.zones[0].publisher",
+          "value": "Zonenwerk"
+        },
+        {
+          "name": "data.zones[0].role",
+          "value": "zone"
+        },
+        {
+          "name": "data.zones[0].sameZone",
+          "value": "[]"
+        },
+        {
+          "name": "data.zones[0].sourceFamily",
+          "value": "lez_alpha"
+        },
+        {
+          "name": "data.zones[1].city",
+          "value": "Matfienland"
+        },
+        {
+          "name": "data.zones[1].distanceM",
+          "value": "1489"
+        },
+        {
+          "name": "data.zones[1].inside",
+          "value": "false"
+        },
+        {
+          "name": "data.zones[1].key",
+          "value": "lez_alpha/t1"
+        },
+        {
+          "name": "data.zones[1].name",
+          "value": "Freigabe Matfienland"
+        },
+        {
+          "name": "data.zones[1].publisher",
+          "value": "Zonenwerk"
+        },
+        {
+          "name": "data.zones[1].role",
+          "value": "transfer"
+        },
+        {
+          "name": "data.zones[1].sameZone",
+          "value": "[]"
+        },
+        {
+          "name": "data.zones[1].sourceFamily",
+          "value": "lez_alpha"
+        },
+        {
+          "name": "meta.attribution[lez_alpha].family",
+          "value": "lez_alpha"
+        },
+        {
+          "name": "meta.attribution[viafrei_rules].family",
+          "value": "viafrei_rules"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "rules-lez-city",
+      "operation": "getDrivingRules",
+      "counterpart": "driving rules",
+      "request": "/v1/driving-rules?topic=lez\u0026city=Matfienland",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "rules"
+        ],
+        "sources": [
+          "viafrei_rules",
+          "lez_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.disclaimer",
+          "value": "Informational, not legal advice."
+        },
+        {
+          "name": "data.reviewedOn",
+          "value": "2026-09-19"
+        },
+        {
+          "name": "data.rules[0].legalBasis",
+          "value": "35. BImSchV"
+        },
+        {
+          "name": "data.rules[0].text",
+          "value": "Viele deutsche Städte haben eine Umweltzone: hineinfahren darf nur, wer eine gültige Feinstaubplakette sichtbar an der Windschutzscheibe hat — ausländische Fahrzeuge eingeschlossen."
+        },
+        {
+          "name": "data.rules[1].legalBasis",
+          "value": "Umweltbundesamt, Umweltzonen in Deutschland"
+        },
+        {
+          "name": "data.rules[1].text",
+          "value": "Praktisch alle ausgeschilderten Umweltzonen verlangen heute die grüne Plakette (Schadstoffgruppe 4). Das Zusatzzeichen unter dem Schild sagt verbindlich, welche Plakette gilt."
+        },
+        {
+          "name": "data.rules[2].legalBasis",
+          "value": "§ 3 35. BImSchV"
+        },
+        {
+          "name": "data.rules[2].text",
+          "value": "Die Plakette gibt es bei Kfz-Zulassungsstellen, technischen Prüfstellen und Überwachungsorganisationen (TÜV, DEKRA, GTÜ, KÜS) und anerkannten Werkstätten. Mitbringen: die Zulassungsbescheinigung Teil I bzw. den ausländischen Fahrzeugschein. Sie gilt unbefristet und klebt fahrzeuggebunden."
+        },
+        {
+          "name": "data.rules[3].legalBasis",
+          "value": "35. BImSchV, Gebühr der Ausgabestelle"
+        },
+        {
+          "name": "data.rules[3].text",
+          "value": "Die Gebühr liegt an der Ausgabestelle üblicherweise im niedrigen einstelligen Euro-Bereich; Online-Händler verlangen deutlich mehr."
+        },
+        {
+          "name": "data.rules[4].legalBasis",
+          "value": "Bußgeldkatalog-Verordnung (BKatV)"
+        },
+        {
+          "name": "data.rules[4].text",
+          "value": "Ohne gültige Plakette in die Umweltzone zu fahren kostet ein Bußgeld in der Größenordnung von 100 €."
+        },
+        {
+          "name": "data.rules[5].legalBasis",
+          "value": "Umweltbundesamt, Umweltzonen in Deutschland"
+        },
+        {
+          "name": "data.rules[5].text",
+          "value": "Eine französische Crit'Air-Vignette oder eine andere ausländische Umweltplakette gilt in Deutschland nicht — es zählt allein die deutsche Feinstaubplakette."
+        },
+        {
+          "name": "data.rules[6].legalBasis",
+          "value": "StVO Anlage 2, Zeichen 270.1 / 270.2"
+        },
+        {
+          "name": "data.rules[6].text",
+          "value": "Die Zone beginnt am Zeichen 270.1 und endet am Zeichen 270.2; das Zusatzzeichen darunter zeigt die zugelassenen Plaketten."
+        },
+        {
+          "name": "data.rules[7].legalBasis",
+          "value": "Umweltbundesamt, Umweltzonen in Deutschland"
+        },
+        {
+          "name": "data.rules[7].text",
+          "value": "Einzelne Städte hatten zusätzlich Diesel-Durchfahrtsverbote, die unabhängig von der Plakette gelten und sich mehrfach geändert haben — vor der Fahrt auf der Seite der Stadt prüfen."
+        },
+        {
+          "name": "data.title",
+          "value": "Umweltzone und Feinstaubplakette"
+        },
+        {
+          "name": "data.topic",
+          "value": "lez"
+        },
+        {
+          "name": "data.zones[0].city",
+          "value": "Matfienland"
+        },
+        {
+          "name": "data.zones[0].distanceM",
+          "value": "0"
+        },
+        {
+          "name": "data.zones[0].inside",
+          "value": "false"
+        },
+        {
+          "name": "data.zones[0].key",
+          "value": "lez_alpha/z1"
+        },
+        {
+          "name": "data.zones[0].name",
+          "value": "Umweltzone Matfienland"
+        },
+        {
+          "name": "data.zones[0].publisher",
+          "value": "Zonenwerk"
+        },
+        {
+          "name": "data.zones[0].role",
+          "value": "zone"
+        },
+        {
+          "name": "data.zones[0].sameZone",
+          "value": "[]"
+        },
+        {
+          "name": "data.zones[0].sourceFamily",
+          "value": "lez_alpha"
+        },
+        {
+          "name": "meta.attribution[lez_alpha].family",
+          "value": "lez_alpha"
+        },
+        {
+          "name": "meta.attribution[viafrei_rules].family",
+          "value": "viafrei_rules"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "lorry-long-road",
+      "operation": "listLorryRules",
+      "counterpart": "road status",
+      "request": "/v1/lorry-rules?vehicle=long_lorry\u0026road=A100",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data[long:1].category",
+          "value": "null"
+        },
+        {
+          "name": "data[long:1].days",
+          "value": "null"
+        },
+        {
+          "name": "data[long:1].direction",
+          "value": "both"
+        },
+        {
+          "name": "data[long:1].distanceM",
+          "value": "null"
+        },
+        {
+          "name": "data[long:1].exceptions",
+          "value": "[]"
+        },
+        {
+          "name": "data[long:1].id",
+          "value": "long:1"
+        },
+        {
+          "name": "data[long:1].kind",
+          "value": "null"
+        },
+        {
+          "name": "data[long:1].layer",
+          "value": "long_lorry"
+        },
+        {
+          "name": "data[long:1].municipality",
+          "value": "null"
+        },
+        {
+          "name": "data[long:1].networkState",
+          "value": "positive network"
+        },
+        {
+          "name": "data[long:1].publishedText",
+          "value": "null"
+        },
+        {
+          "name": "data[long:1].road",
+          "value": "A100"
+        },
+        {
+          "name": "data[long:1].sign",
+          "value": "null"
+        },
+        {
+          "name": "data[long:1].sourceFamily",
+          "value": "lorry_bast_langlkw"
+        },
+        {
+          "name": "data[long:1].street",
+          "value": "null"
+        },
+        {
+          "name": "data[long:1].times",
+          "value": "null"
+        },
+        {
+          "name": "data[long:1].unit",
+          "value": "null"
+        },
+        {
+          "name": "data[long:1].value",
+          "value": "null"
+        },
+        {
+          "name": "data[long:1].versionDate",
+          "value": "2026-01-27"
+        },
+        {
+          "name": "meta.attribution[lorry_bast_langlkw].family",
+          "value": "lorry_bast_langlkw"
+        },
+        {
+          "name": "meta.notes.condition[lorry_bast_langlkw]",
+          "value": "1"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "20"
+        }
+      ]
+    },
+    {
+      "id": "lorry-near",
+      "operation": "listLorryRules",
+      "counterpart": "road status",
+      "request": "/v1/lorry-rules?vehicle=lorry\u0026at=48.24475,7.01625",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data[city:1].category",
+          "value": "null"
+        },
+        {
+          "name": "data[city:1].days",
+          "value": "null"
+        },
+        {
+          "name": "data[city:1].direction",
+          "value": "null"
+        },
+        {
+          "name": "data[city:1].distanceM",
+          "value": "149"
+        },
+        {
+          "name": "data[city:1].exceptions",
+          "value": "[]"
+        },
+        {
+          "name": "data[city:1].id",
+          "value": "city:1"
+        },
+        {
+          "name": "data[city:1].kind",
+          "value": "height"
+        },
+        {
+          "name": "data[city:1].layer",
+          "value": "restriction"
+        },
+        {
+          "name": "data[city:1].municipality",
+          "value": "null"
+        },
+        {
+          "name": "data[city:1].networkState",
+          "value": "null"
+        },
+        {
+          "name": "data[city:1].publishedText",
+          "value": "3,80 m"
+        },
+        {
+          "name": "data[city:1].road",
+          "value": "null"
+        },
+        {
+          "name": "data[city:1].sign",
+          "value": "265"
+        },
+        {
+          "name": "data[city:1].sourceFamily",
+          "value": "lorry_koeln_beschraenkungen"
+        },
+        {
+          "name": "data[city:1].street",
+          "value": "Brückenweg"
+        },
+        {
+          "name": "data[city:1].times",
+          "value": "null"
+        },
+        {
+          "name": "data[city:1].unit",
+          "value": "m"
+        },
+        {
+          "name": "data[city:1].value",
+          "value": "3.8"
+        },
+        {
+          "name": "data[city:1].versionDate",
+          "value": "2026-01-27"
+        },
+        {
+          "name": "data[city:2].category",
+          "value": "null"
+        },
+        {
+          "name": "data[city:2].days",
+          "value": "null"
+        },
+        {
+          "name": "data[city:2].direction",
+          "value": "null"
+        },
+        {
+          "name": "data[city:2].distanceM",
+          "value": "743"
+        },
+        {
+          "name": "data[city:2].exceptions",
+          "value": "[]"
+        },
+        {
+          "name": "data[city:2].id",
+          "value": "city:2"
+        },
+        {
+          "name": "data[city:2].kind",
+          "value": "weight"
+        },
+        {
+          "name": "data[city:2].layer",
+          "value": "restriction"
+        },
+        {
+          "name": "data[city:2].municipality",
+          "value": "null"
+        },
+        {
+          "name": "data[city:2].networkState",
+          "value": "null"
+        },
+        {
+          "name": "data[city:2].publishedText",
+          "value": "7,5 t"
+        },
+        {
+          "name": "data[city:2].road",
+          "value": "null"
+        },
+        {
+          "name": "data[city:2].sign",
+          "value": "262"
+        },
+        {
+          "name": "data[city:2].sourceFamily",
+          "value": "lorry_koeln_beschraenkungen"
+        },
+        {
+          "name": "data[city:2].street",
+          "value": "Hafenstraße"
+        },
+        {
+          "name": "data[city:2].times",
+          "value": "null"
+        },
+        {
+          "name": "data[city:2].unit",
+          "value": "t"
+        },
+        {
+          "name": "data[city:2].value",
+          "value": "7.5"
+        },
+        {
+          "name": "data[city:2].versionDate",
+          "value": "2026-01-27"
+        },
+        {
+          "name": "data[city:3].category",
+          "value": "lorry_priority_route"
+        },
+        {
+          "name": "data[city:3].days",
+          "value": "null"
+        },
+        {
+          "name": "data[city:3].direction",
+          "value": "null"
+        },
+        {
+          "name": "data[city:3].distanceM",
+          "value": "0"
+        },
+        {
+          "name": "data[city:3].exceptions",
+          "value": "[]"
+        },
+        {
+          "name": "data[city:3].id",
+          "value": "city:3"
+        },
+        {
+          "name": "data[city:3].kind",
+          "value": "null"
+        },
+        {
+          "name": "data[city:3].layer",
+          "value": "priority_route"
+        },
+        {
+          "name": "data[city:3].municipality",
+          "value": "null"
+        },
+        {
+          "name": "data[city:3].networkState",
+          "value": "null"
+        },
+        {
+          "name": "data[city:3].publishedText",
+          "value": "null"
+        },
+        {
+          "name": "data[city:3].road",
+          "value": "null"
+        },
+        {
+          "name": "data[city:3].sign",
+          "value": "null"
+        },
+        {
+          "name": "data[city:3].sourceFamily",
+          "value": "lorry_koeln_beschraenkungen"
+        },
+        {
+          "name": "data[city:3].street",
+          "value": "Lkw-Route Nord"
+        },
+        {
+          "name": "data[city:3].times",
+          "value": "null"
+        },
+        {
+          "name": "data[city:3].unit",
+          "value": "null"
+        },
+        {
+          "name": "data[city:3].value",
+          "value": "null"
+        },
+        {
+          "name": "data[city:3].versionDate",
+          "value": "2026-01-27"
+        },
+        {
+          "name": "meta.attribution[lorry_koeln_beschraenkungen].family",
+          "value": "lorry_koeln_beschraenkungen"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "20"
         }
       ]
     }

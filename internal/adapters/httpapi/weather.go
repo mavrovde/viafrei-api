@@ -7,6 +7,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/mavrovde/viafrei-api/internal/app/features"
+	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 )
@@ -151,6 +152,50 @@ func noteWeatherLamp(ctx context.Context, a features.WeatherRisk) {
 // DrivingRulesInput is the input of getDrivingRules.
 type DrivingRulesInput struct {
 	Topic string `query:"topic" required:"true" maxLength:"64" pattern:"^[a-z][a-z0-9_]*$" example:"winter_tyres" doc:"The rule topic, for example lorry_sunday_ban, holiday_ban, speed_limits, winter_tyres, emission_zones, emergency_corridor. Open enumeration."`
+	At    string `query:"at" pattern:"^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$" example:"48.776,9.18" doc:"With topic lez: a position (lat,lon) checked against the published low-emission-zone boundaries: inside, in an area released at a zone's edge, outside with the nearest zone within 25 km, or unknown. Ignored for any other topic."`
+	City  string `query:"city" minLength:"2" maxLength:"60" example:"Stuttgart" doc:"With topic lez: the city whose published zone is named. Ignored for any other topic."`
+	point *geo.Point
+}
+
+// Resolve reads the position.
+func (in *DrivingRulesInput) Resolve(huma.Context) []error {
+	if in.At == "" {
+		return nil
+	}
+	p, err := geo.ParsePoint(in.At)
+	if err != nil {
+		return []error{&huma.ErrorDetail{Location: "query.at", Message: err.Error(), Value: in.At}}
+	}
+	in.point = &p
+	return nil
+}
+
+// LowEmissionZone is one published zone row of a rules answer.
+type LowEmissionZone struct {
+	Key          string   `json:"key" doc:"<source>/<zone id>."`
+	Role         string   `json:"role" enum:"zone,exempt_road,transfer" doc:"A zone, a road the zone does not apply to, or an area released at its edge."`
+	Name         string   `json:"name"`
+	City         *string  `json:"city" nullable:"true"`
+	Publisher    *string  `json:"publisher" nullable:"true"`
+	Inside       bool     `json:"inside" doc:"Whether the position lies in it (its boundary counts); false without a position."`
+	DistanceM    int      `json:"distanceM" doc:"0 when inside or without a position, else the distance to it in metres."`
+	SameZone     []string `json:"sameZone" doc:"Other publishers' rows of the same zone in this answer (they share at least half of the smaller one's area)."`
+	SourceFamily string   `json:"sourceFamily"`
+}
+
+// ZoneVerdict is the zone answer of a position.
+type ZoneVerdict struct {
+	Kind       string  `json:"kind" enum:"inside,transfer,outside,unknown" doc:"inside a zone; in an area released at its edge; outside (zone names the nearest within 25 km); unknown: none within 25 km, which is not that there is no zone."`
+	Zone       *string `json:"zone" nullable:"true" doc:"The key of the zone it is inside, or of the nearest."`
+	Transfer   *string `json:"transfer" nullable:"true" doc:"The key of the released area it is in."`
+	ExemptRoad *string `json:"exemptRoad" nullable:"true" doc:"The key of an exempt road within 60 m."`
+}
+
+func zoneKey(z *rules.Zone) *string {
+	if z == nil {
+		return nil
+	}
+	return &z.Key
 }
 
 // DrivingRule is one rule of a topic.
@@ -161,11 +206,13 @@ type DrivingRule struct {
 
 // DrivingRulesData is the answer of getDrivingRules.
 type DrivingRulesData struct {
-	Topic      string        `json:"topic"`
-	Title      string        `json:"title"`
-	Rules      []DrivingRule `json:"rules" doc:"In their curated order."`
-	ReviewedOn string        `json:"reviewedOn" format:"date" doc:"When the topic was last reviewed."`
-	Disclaimer Disclaimer    `json:"disclaimer"`
+	Topic      string            `json:"topic"`
+	Title      string            `json:"title"`
+	Rules      []DrivingRule     `json:"rules" doc:"In their curated order."`
+	ReviewedOn string            `json:"reviewedOn" format:"date" doc:"When the topic was last reviewed."`
+	Disclaimer Disclaimer        `json:"disclaimer"`
+	Zones      []LowEmissionZone `json:"zones,omitempty" doc:"With topic lez and a position or city: the published zone rows, inside first, then by distance."`
+	Verdict    *ZoneVerdict      `json:"zoneVerdict,omitempty" doc:"With topic lez and a position: the platform's verdict."`
 }
 
 // Disclaimer is the sentence every rules answer carries. Its schema is an
@@ -205,6 +252,23 @@ func registerDrivingRules(api huma.API, s *server, op huma.Operation) {
 			return nil, s.featureProblem(ctx, err)
 		}
 		noteRules(ctx)
+		var zones []LowEmissionZone
+		var verdict *ZoneVerdict
+		if t.Code == "lez" && (in.point != nil || in.City != "") {
+			z, err := s.features.LowEmissionZones(ctx, principalFrom(ctx).Key, rules.ZoneQuery{At: in.point, City: in.City})
+			if err != nil {
+				return nil, s.featureProblem(ctx, err)
+			}
+			zones = []LowEmissionZone{}
+			for _, r := range z.Zones {
+				zones = append(zones, LowEmissionZone{Key: r.Key, Role: r.Role, Name: r.Name, City: r.City, Publisher: r.Publisher,
+					Inside: r.Inside, DistanceM: r.DistanceM, SameZone: append([]string{}, r.SameZone...), SourceFamily: r.Family})
+			}
+			if v := z.Verdict; v != nil {
+				verdict = &ZoneVerdict{Kind: v.Kind, Zone: zoneKey(v.Zone), Transfer: zoneKey(v.Transfer), ExemptRoad: zoneKey(v.ExemptRoad)}
+			}
+			a.Families = append(a.Families, z.Meta.Families...)
+		}
 		rs := make([]DrivingRule, len(t.Rules))
 		for i, r := range t.Rules {
 			rs[i] = DrivingRule{Text: r.Text, LegalBasis: r.LegalBasis}
@@ -212,7 +276,7 @@ func registerDrivingRules(api huma.API, s *server, op huma.Operation) {
 		return &DrivingRulesOutput{CacheControl: noStore, Body: DrivingRulesEnvelope{
 			Data: DrivingRulesData{
 				Topic: t.Code, Title: t.Title, Rules: rs,
-				ReviewedOn: t.ReviewedOn.Format(time.DateOnly), Disclaimer: rules.Disclaimer,
+				ReviewedOn: t.ReviewedOn.Format(time.DateOnly), Disclaimer: rules.Disclaimer, Zones: zones, Verdict: verdict,
 			},
 			Meta:  s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
 			Links: s.selfLink(ctx),

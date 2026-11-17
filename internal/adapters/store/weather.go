@@ -173,3 +173,49 @@ group by t.topic_code, t.title, t.reviewed_on`, code)
 	}
 	return out[0], nil
 }
+
+// zoneAlive is the platform's freshness gate of a zone source at $3: its last
+// check within three of its own cadences (30 days when it states none), or
+// its refresh paused after a check.
+const zoneAlive = `(z.checked_at > $3::timestamptz - make_interval(secs => 3 * coalesce(z.cadence_s, 2592000))
+    or (z.paused and z.checked_at is not null))`
+
+// Zones reads the low-emission-zone rows at a point (within the platform's
+// reach, inside first, then by distance) or of a city (by name), of the
+// given families whose source is alive at now.
+func (s *Store) Zones(ctx context.Context, q rules.ZoneQuery, families []string, now time.Time) ([]rules.Zone, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]rules.Zone, error) {
+		var res pgx.Rows
+		if q.At != nil {
+			res, _ = tx.Query(ctx, `
+with p as (select st_transform(st_setsrid(st_makepoint($4::float8, $5::float8), 4326), 25832) m, st_setsrid(st_makepoint($4::float8, $5::float8), 4326) g),
+r as (
+  select z.*, (z.zone_role <> 'exempt_road' and st_covers(z.geometry, p.g)) inside,
+         case when z.zone_role <> 'exempt_road' and st_covers(z.geometry, p.g) then 0 else round(st_distance(z.geometry_m, p.m))::int end dist
+  from contract.low_emission_zone z, p
+  where z.source_ref = any($1) and `+permitted("z")+` and `+zoneAlive+`
+    and z.geometry_m && st_expand(p.m, $2::float8)
+    and st_dwithin(z.geometry_m, p.m, case when z.zone_role = 'exempt_road' then $6::float8 else $2::float8 end))
+select r.zone_key, r.zone_id, r.zone_role, r.name, r.city, r.publisher_name, r.inside, r.dist,
+       array(select k from unnest(r.same_zone_keys) k where k in (select o.zone_key from r o where o.zone_role = 'zone') and r.zone_role = 'zone'),
+       r.source_ref
+from r
+order by r.inside desc, r.dist, r.source_ref, r.zone_id`, families, float64(rules.ZoneReachM), now, q.At.Lon, q.At.Lat, float64(rules.ExemptRoadReachM))
+		} else {
+			res, _ = tx.Query(ctx, `
+select z.zone_key, z.zone_id, z.zone_role, z.name, z.city, z.publisher_name, false, 0,
+       array(select k from unnest(z.same_zone_keys) k
+              where k in (select o.zone_key from contract.low_emission_zone o where lower(o.city) = lower($2) and o.source_ref = any($1))),
+       z.source_ref
+from contract.low_emission_zone z
+where z.source_ref = any($1) and `+permitted("z")+` and `+zoneAlive+`
+  and z.zone_role = 'zone' and lower(z.city) = lower($2)
+order by z.source_ref, z.zone_id`, families, q.City, now)
+		}
+		return pgx.CollectRows(res, func(r pgx.CollectableRow) (rules.Zone, error) {
+			var z rules.Zone
+			err := r.Scan(&z.Key, &z.ZoneID, &z.Role, &z.Name, &z.City, &z.Publisher, &z.Inside, &z.DistanceM, &z.SameZone, &z.Family)
+			return z, err
+		})
+	})
+}

@@ -34,6 +34,8 @@ type Features interface {
 	RoadSituation(ctx context.Context, key access.Record, id string) (features.Answer[roads.Situation], error)
 	WeatherRisk(ctx context.Context, key access.Record, q weather.Query) (features.WeatherRisk, error)
 	DrivingRules(ctx context.Context, key access.Record, topic string) (rules.Topic, features.Answer[rules.Rule], error)
+	LowEmissionZones(ctx context.Context, key access.Record, q rules.ZoneQuery) (features.ZonesAnswer, error)
+	LorryRules(ctx context.Context, key access.Record, q roads.LorryQuery) (features.LorryAnswer, error)
 	Stations(ctx context.Context, key access.Record, q transit.Query) (features.Answer[transit.Station], error)
 	Departures(ctx context.Context, key access.Record, q transit.DepartureQuery) (features.Board, error)
 	Facilities(ctx context.Context, key access.Record, q transit.FacilityQuery) (features.StationFacilities, error)

@@ -7,6 +7,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
+	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 )
 
@@ -41,4 +42,12 @@ func (laterFeatures) Disruptions(context.Context, access.Record, transit.Disrupt
 
 func (laterFeatures) Nearby(context.Context, access.Record, features.NearbyQuery) (features.NearbyAnswer, error) {
 	return features.NearbyAnswer{}, nil
+}
+
+func (laterFeatures) LowEmissionZones(context.Context, access.Record, rules.ZoneQuery) (features.ZonesAnswer, error) {
+	return features.ZonesAnswer{}, nil
+}
+
+func (laterFeatures) LorryRules(context.Context, access.Record, roads.LorryQuery) (features.LorryAnswer, error) {
+	return features.LorryAnswer{}, nil
 }

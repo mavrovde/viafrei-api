@@ -1359,6 +1359,17 @@
           },
           "topic": {
             "type": "string"
+          },
+          "zoneVerdict": {
+            "$ref": "#/components/schemas/ZoneVerdict",
+            "description": "With topic lez and a position: the platform's verdict."
+          },
+          "zones": {
+            "description": "With topic lez and a position or city: the published zone rows, inside first, then by distance.",
+            "items": {
+              "$ref": "#/components/schemas/LowEmissionZone"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -2313,6 +2324,233 @@
           "data",
           "meta",
           "links"
+        ],
+        "type": "object"
+      },
+      "LorryEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/LorryRule"
+            },
+            "type": "array"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PagedMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "LorryRule": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "days": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "direction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "distanceM": {
+            "description": "From the position; null without one.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "exceptions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "description": "What is restricted (height, weight, width, ban, ...), as published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "layer": {
+            "description": "long_lorry (the positive network), restriction, priority_route or zone; open enumeration.",
+            "type": "string"
+          },
+          "municipality": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "networkState": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publishedText": {
+            "description": "The publisher's own words, never rewritten as a number.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "road": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sign": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceFamily": {
+            "type": "string"
+          },
+          "street": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "times": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "description": "The figure, as published; null where the publisher's words state none (then the signs on site bind).",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "versionDate": {
+            "description": "The date of the publisher's file (YYYY-MM-DD).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "layer",
+          "kind",
+          "sign",
+          "value",
+          "unit",
+          "publishedText",
+          "road",
+          "street",
+          "municipality",
+          "direction",
+          "exceptions",
+          "times",
+          "days",
+          "category",
+          "networkState",
+          "versionDate",
+          "distanceM",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
+      "LowEmissionZone": {
+        "additionalProperties": false,
+        "properties": {
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "distanceM": {
+            "description": "0 when inside or without a position, else the distance to it in metres.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "inside": {
+            "description": "Whether the position lies in it (its boundary counts); false without a position.",
+            "type": "boolean"
+          },
+          "key": {
+            "description": "\u003csource\u003e/\u003czone id\u003e.",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "publisher": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role": {
+            "description": "A zone, a road the zone does not apply to, or an area released at its edge.",
+            "enum": [
+              "zone",
+              "exempt_road",
+              "transfer"
+            ],
+            "type": "string"
+          },
+          "sameZone": {
+            "description": "Other publishers' rows of the same zone in this answer (they share at least half of the smaller one's area).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "sourceFamily": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "role",
+          "name",
+          "city",
+          "publisher",
+          "inside",
+          "distanceM",
+          "sameZone",
+          "sourceFamily"
         ],
         "type": "object"
       },
@@ -6087,6 +6325,49 @@
           "sourceFamily"
         ],
         "type": "object"
+      },
+      "ZoneVerdict": {
+        "additionalProperties": false,
+        "properties": {
+          "exemptRoad": {
+            "description": "The key of an exempt road within 60 m.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "inside a zone; in an area released at its edge; outside (zone names the nearest within 25 km); unknown: none within 25 km, which is not that there is no zone.",
+            "enum": [
+              "inside",
+              "transfer",
+              "outside",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "transfer": {
+            "description": "The key of the released area it is in.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zone": {
+            "description": "The key of the zone it is inside, or of the nearest.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "zone",
+          "transfer",
+          "exemptRoad"
+        ],
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -7252,6 +7533,35 @@
               ],
               "maxLength": 64,
               "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "With topic lez: a position (lat,lon) checked against the published low-emission-zone boundaries: inside, in an area released at a zone's edge, outside with the nearest zone within 25 km, or unknown. Ignored for any other topic.",
+            "explode": false,
+            "in": "query",
+            "name": "at",
+            "schema": {
+              "description": "With topic lez: a position (lat,lon) checked against the published low-emission-zone boundaries: inside, in an area released at a zone's edge, outside with the nearest zone within 25 km, or unknown. Ignored for any other topic.",
+              "examples": [
+                "48.776,9.18"
+              ],
+              "pattern": "^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "With topic lez: the city whose published zone is named. Ignored for any other topic.",
+            "explode": false,
+            "in": "query",
+            "name": "city",
+            "schema": {
+              "description": "With topic lez: the city whose published zone is named. Ignored for any other topic.",
+              "examples": [
+                "Stuttgart"
+              ],
+              "maxLength": 60,
+              "minLength": 2,
               "type": "string"
             }
           }
@@ -9027,6 +9337,334 @@
         "x-example-request": "/v1/location?at=47.5088,6.9623",
         "x-mcp-counterpart": "location description",
         "x-required-scope": "places"
+      }
+    },
+    "/v1/lorry-rules": {
+      "get": {
+        "description": "The long-lorry positive network (BASt's extract of the ordinance's annex, which binds; not complete and not fit for navigation) on a road or around a position, or the lorry restrictions and priority routes the publishers hold around a position (NRW, Frankfurt RheinMain, Bremen and the cities' own files); outside their regions none is held, which is no all-clear. By distance, then id. MCP counterpart: road status (vehicle form). Needs the scope roads.",
+        "operationId": "listLorryRules",
+        "parameters": [
+          {
+            "description": "lorry: the height, weight, width and lorry-ban restrictions and the lorry priority routes around the position, where a publisher holds them. long_lorry: the long-lorry positive network, on the road or around the position.",
+            "explode": false,
+            "in": "query",
+            "name": "vehicle",
+            "required": true,
+            "schema": {
+              "description": "lorry: the height, weight, width and lorry-ban restrictions and the lorry priority routes around the position, where a publisher holds them. long_lorry: the long-lorry positive network, on the road or around the position.",
+              "enum": [
+                "lorry",
+                "long_lorry"
+              ],
+              "examples": [
+                "long_lorry"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "With long_lorry: the road whose network rows are asked for (is the road in the long-lorry network).",
+            "explode": false,
+            "in": "query",
+            "name": "road",
+            "schema": {
+              "description": "With long_lorry: the road whose network rows are asked for (is the road in the long-lorry network).",
+              "examples": [
+                "A7"
+              ],
+              "maxLength": 6,
+              "pattern": "^[AaBb] ?[0-9]{1,4}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "A position: lat,lon. Give road or at.",
+            "explode": false,
+            "in": "query",
+            "name": "at",
+            "schema": {
+              "description": "A position: lat,lon. Give road or at.",
+              "examples": [
+                "51.2,6.98"
+              ],
+              "pattern": "^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The radius around at in metres; default 5000 for lorry, 25000 for long_lorry (the platform's reach).",
+            "explode": false,
+            "in": "query",
+            "name": "radius_m",
+            "schema": {
+              "description": "The radius around at in metres; default 5000 for lorry, 25000 for long_lorry (the platform's reach).",
+              "format": "int64",
+              "maximum": 50000,
+              "minimum": 100,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Most rows; default pagination.default_limit.",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "description": "Most rows; default pagination.default_limit.",
+              "format": "int64",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LorryEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The operation is switched off on this instance (feature-disabled).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "Where a lorry or a long lorry may go",
+        "tags": [
+          "roads"
+        ],
+        "x-required-scope": "roads"
       }
     },
     "/v1/meta": {

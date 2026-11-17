@@ -27,6 +27,8 @@ type Rules interface {
 	// Topic returns one rule topic with its rules in order, or
 	// rules.ErrUnknownTopic.
 	Topic(ctx context.Context, code string) (rules.Topic, error)
+	// Zones reads the low-emission-zone rows at a point or of a city.
+	Zones(ctx context.Context, q rules.ZoneQuery, families []string, now time.Time) ([]rules.Zone, error)
 }
 
 // WeatherRisk is the answer about the warnings at a position.
@@ -111,4 +113,32 @@ func (s *Service) DrivingRules(ctx context.Context, key access.Record, code stri
 		return rules.Topic{}, Answer[rules.Rule]{}, err
 	}
 	return topic, Answer[rules.Rule]{Items: topic.Rules, Families: fams, Partial: partial, At: s.now()}, nil
+}
+
+// ZonesAnswer is the zone part of a rules answer: the rows read and, for a
+// point, the platform's verdict.
+type ZonesAnswer struct {
+	Zones   []rules.Zone
+	Verdict *rules.Verdict
+	Meta    Answer[struct{}]
+}
+
+// LowEmissionZones answers "am I in a low-emission zone" for a point, or
+// "which zone does this city publish", from the zone sources the key may read
+// (domain roads) that are alive now.
+func (s *Service) LowEmissionZones(ctx context.Context, key access.Record, q rules.ZoneQuery) (ZonesAnswer, error) {
+	v, meta, err := listed(ctx, s, key, "roads", func(permitted []string) ([]rules.Zone, []string, error) {
+		zs, err := s.repos.Rules.Zones(ctx, q, permitted, s.now())
+		var fams []string
+		for _, z := range zs {
+			fams = append(fams, z.Family)
+		}
+		return zs, fams, err
+	})
+	out := ZonesAnswer{Zones: v, Meta: meta}
+	if q.At != nil && err == nil {
+		vd := rules.VerdictOf(v)
+		out.Verdict = &vd
+	}
+	return out, err
 }

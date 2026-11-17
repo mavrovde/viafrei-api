@@ -30,3 +30,4 @@ describeLocation	lookup
 listTransitDisruptions	lookup
 listNearby	composed
 listStateRoadConditions	near
+listLorryRules	near

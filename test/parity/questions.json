@@ -2,7 +2,7 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "04faf0216734ccd42622ae7466159575a0c40727077cb0f79d3e1c430e51d520"
+    "sha256": "d37bfb78b6ae0a6101200037fd6b58d0bf9b7d0cef1250130f829a048a11ffe1"
   },
   "cases": [
     {
@@ -1268,6 +1268,78 @@
         "sources": [
           "roads_alpha",
           "roads_epsilon"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "rules-lez-point",
+      "operation": "getDrivingRules",
+      "counterpart": "driving rules",
+      "request": "/v1/driving-rules?topic=lez&at=48.2437,7.0162",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "rules"
+        ],
+        "sources": [
+          "viafrei_rules",
+          "lez_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "rules-lez-city",
+      "operation": "getDrivingRules",
+      "counterpart": "driving rules",
+      "request": "/v1/driving-rules?topic=lez&city=Matfienland",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "rules"
+        ],
+        "sources": [
+          "viafrei_rules",
+          "lez_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "lorry-long-road",
+      "operation": "listLorryRules",
+      "counterpart": "road status",
+      "request": "/v1/lorry-rules?vehicle=long_lorry&road=A100",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "lorry-near",
+      "operation": "listLorryRules",
+      "counterpart": "road status",
+      "request": "/v1/lorry-rules?vehicle=lorry&at=48.24475,7.01625",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen"
         ],
         "accepted": null
       },

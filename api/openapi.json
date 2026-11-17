@@ -1562,6 +1562,86 @@
         ],
         "type": "object"
       },
+      "DisruptionPunctuality": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "late": {
+            "description": "Of those, trips late at least once.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "level": {
+            "type": "string"
+          },
+          "medianWorstDelaySeconds": {
+            "description": "The median of each trip's worst delay in seconds; null when none.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "observed": {
+            "description": "Trips with a delay report in the window.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "observedAt": {
+            "description": "The newest report counted.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceFamily": {
+            "type": "string"
+          },
+          "stopsReporting": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "tripsSkippingStops": {
+            "description": "Trips with at least one skipped stop.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "untimed": {
+            "description": "Trips reported without a delay to count.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "windowMin": {
+            "description": "The window the source counts over, in minutes.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "level",
+          "code",
+          "name",
+          "windowMin",
+          "observed",
+          "late",
+          "tripsSkippingStops",
+          "untimed",
+          "medianWorstDelaySeconds",
+          "stopsReporting",
+          "observedAt",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
       "DrivingRule": {
         "additionalProperties": false,
         "properties": {
@@ -4465,15 +4545,8 @@
             "description": "The place kind (city, town, village, suburb, admin, station, junction, ...). Open enumeration.",
             "type": "string"
           },
-          "newestLoad": {
-            "description": "When the newest of them was recorded; null when unknown.",
-            "format": "date-time",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "sourceFamily": {
+            "description": "Its family; when the family was last loaded is in meta.freshness.",
             "type": "string"
           }
         },
@@ -4481,7 +4554,6 @@
           "kind",
           "count",
           "englishNames",
-          "newestLoad",
           "sourceFamily"
         ],
         "type": "object"
@@ -7037,12 +7109,23 @@
             "description": "The condition applied, defaults filled in.",
             "type": "object"
           },
+          "departures": {
+            "description": "station: the departures of the window cancelled or at least delay_min late.",
+            "items": {
+              "$ref": "#/components/schemas/Departure"
+            },
+            "type": "array"
+          },
           "ended": {
             "type": "boolean"
           },
           "from": {
             "format": "date-time",
             "type": "string"
+          },
+          "holds": {
+            "description": "station, region, weather, charger: whether the condition holds now (the platform's watch would report it).",
+            "type": "boolean"
           },
           "key": {
             "type": "string"
@@ -7063,8 +7146,16 @@
               "null"
             ]
           },
+          "punctuality": {
+            "$ref": "#/components/schemas/DisruptionPunctuality",
+            "description": "region: the area's punctuality; the condition holds when at least min_trips were observed and at least late_share of them were 5 minutes late or more."
+          },
+          "site": {
+            "$ref": "#/components/schemas/ChargingSite",
+            "description": "charger: the site and its points; the condition holds when a point (point_id when given) is reported available."
+          },
           "situations": {
-            "description": "The situations in the window, changed after since when given.",
+            "description": "road, place: the situations in the window, changed after since when given; empty for the other kinds.",
             "items": {
               "$ref": "#/components/schemas/RoadSituation"
             },
@@ -7078,6 +7169,13 @@
           "uri": {
             "description": "The platform's resource uri of this watch.",
             "type": "string"
+          },
+          "warnings": {
+            "description": "weather: the official warnings in force at the position of at least min_level.",
+            "items": {
+              "$ref": "#/components/schemas/WeatherWarning"
+            },
+            "type": "array"
           },
           "watchId": {
             "description": "Read it again with watch_id and since to see what changed.",
@@ -15122,7 +15220,7 @@
     },
     "/v1/places/coverage": {
       "get": {
-        "description": "What place and address search can find: the places per family and kind with how many carry an English name and when the newest was recorded, the Länder the gazetteer holds, and the Länder the addresses cover with each one's extract date. Read from the places families the key may read. Needs the scope places.",
+        "description": "What place and address search can find: the places per family and kind with how many carry an English name (each family's last load is in meta.freshness), the Länder the gazetteer holds, and the Länder the addresses cover with each one's extract date. Read from the places families the key may read. Needs the scope places.",
         "operationId": "getPlacesCoverage",
         "responses": {
           "200": {
@@ -15138,42 +15236,36 @@
                             "kind": "locality",
                             "count": 11,
                             "englishNames": 2,
-                            "newestLoad": "2026-03-29T19:51:15Z",
                             "sourceFamily": "bkg_gvisys"
                           },
                           {
                             "kind": "municipality",
                             "count": 75,
                             "englishNames": 6,
-                            "newestLoad": "2026-11-17T12:23:08.225116Z",
                             "sourceFamily": "bkg_gvisys"
                           },
                           {
                             "kind": "state",
                             "count": 7,
                             "englishNames": 0,
-                            "newestLoad": "2026-03-29T19:12:55Z",
                             "sourceFamily": "bkg_gvisys"
                           },
                           {
                             "kind": "locality",
                             "count": 10,
                             "englishNames": 2,
-                            "newestLoad": "2026-03-29T22:35:07Z",
                             "sourceFamily": "geonames"
                           },
                           {
                             "kind": "municipality",
                             "count": 25,
                             "englishNames": 8,
-                            "newestLoad": "2026-03-29T18:43:47Z",
                             "sourceFamily": "geonames"
                           },
                           {
                             "kind": "state",
                             "count": 9,
                             "englishNames": 1,
-                            "newestLoad": "2026-03-29T19:17:24Z",
                             "sourceFamily": "geonames"
                           }
                         ],
@@ -20748,7 +20840,7 @@
     },
     "/v1/watch": {
       "get": {
-        "description": "The platform's watch as a plain read: the situations of a road (closures, restrictions and, on a motorway, jams) or around a place (closures and restrictions only) in force in the window, and with since only those changed after it. Read it again with watch_id and since; there is nothing to stop. MCP counterpart: watch situation, stop watch. Needs the scope roads.",
+        "description": "The platform's watch as a plain read: the situations of a road (closures, restrictions and, on a motorway, jams) or around a place (closures and restrictions only) in force in the window, and with since only those changed after it; a station's departures delayed or cancelled, a region's punctuality, the weather warnings at a position or a charging site's free points, with whether the condition holds now. Read it again with watch_id (and since); there is nothing to stop. MCP counterpart: watch situation, stop watch. Needs the scope roads, and for a station or region watch transit, for a weather watch weather, for a charger watch energy.",
         "operationId": "getWatch",
         "parameters": [
           {
@@ -20764,12 +20856,12 @@
             }
           },
           {
-            "description": "What is watched: road (key A8, B27) or place (key lat,lon); station, region, weather and charger are answered by their own reads (listStationDepartures, listTransitDisruptions, getWeatherRisk, listChargingOptions).",
+            "description": "What is watched: road (target A8, B27), place (target lat,lon), station (a station id as listStations answers it), region (an official key: two digits a Land, five a Kreis), weather (target lat,lon) or charger (a charging site id).",
             "explode": false,
             "in": "query",
             "name": "kind",
             "schema": {
-              "description": "What is watched: road (key A8, B27) or place (key lat,lon); station, region, weather and charger are answered by their own reads (listStationDepartures, listTransitDisruptions, getWeatherRisk, listChargingOptions).",
+              "description": "What is watched: road (target A8, B27), place (target lat,lon), station (a station id as listStations answers it), region (an official key: two digits a Land, five a Kreis), weather (target lat,lon) or charger (a charging site id).",
               "enum": [
                 "road",
                 "place",
@@ -20785,12 +20877,12 @@
             }
           },
           {
-            "description": "The thing watched: a road number for road, a position lat,lon for place.",
+            "description": "The thing watched: a road number, a position lat,lon (place, weather), a station id, an official region key or a charging site id.",
             "explode": false,
             "in": "query",
             "name": "target",
             "schema": {
-              "description": "The thing watched: a road number for road, a position lat,lon for place.",
+              "description": "The thing watched: a road number, a position lat,lon (place, weather), a station id, an official region key or a charging site id.",
               "examples": [
                 "A7"
               ],
@@ -20834,12 +20926,12 @@
             }
           },
           {
-            "description": "The threshold as JSON: road {\"event\": \"reopen\"|\"any\", \"events\": [\"restrictions\",\"jams\"]}; place {\"radius_km\": 10}. Any other key is refused by name.",
+            "description": "The threshold as JSON: road {\"event\": \"reopen\"|\"any\", \"events\": [\"restrictions\",\"jams\"]}; place {\"radius_km\": 25}; station {\"delay_min\": 10}; region {\"late_share\": 0.25, \"delay_min\": 5, \"min_trips\": 10}; weather {\"min_level\": 2}; charger {\"point_id\": \"...\"}. The values shown are the defaults. A key of another kind is refused by name.",
             "explode": false,
             "in": "query",
             "name": "condition",
             "schema": {
-              "description": "The threshold as JSON: road {\"event\": \"reopen\"|\"any\", \"events\": [\"restrictions\",\"jams\"]}; place {\"radius_km\": 10}. Any other key is refused by name.",
+              "description": "The threshold as JSON: road {\"event\": \"reopen\"|\"any\", \"events\": [\"restrictions\",\"jams\"]}; place {\"radius_km\": 25}; station {\"delay_min\": 10}; region {\"late_share\": 0.25, \"delay_min\": 5, \"min_trips\": 10}; weather {\"min_level\": 2}; charger {\"point_id\": \"...\"}. The values shown are the defaults. A key of another kind is refused by name.",
               "maxLength": 500,
               "type": "string"
             }
@@ -21192,7 +21284,7 @@
             "headerKey": []
           }
         ],
-        "summary": "Watch a road or a place: a repeated read of what changed",
+        "summary": "Watch a road, a place, a station, a region, the weather or a charger: a repeated read",
         "tags": [
           "roads"
         ],

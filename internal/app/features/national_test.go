@@ -148,7 +148,9 @@ type covFake struct {
 	err error
 }
 
-func (f *covFake) PlacesCoverage(context.Context, []string) (places.Coverage, error) { return f.c, f.err }
+func (f *covFake) PlacesCoverage(context.Context, []string) (places.Coverage, error) {
+	return f.c, f.err
+}
 
 func TestPlacesCoverageCreditsItsFamilies(t *testing.T) {
 	f := &covFake{fake: &fake{reg: []access.Terms{{Family: "g1", Domain: "places", UseClasses: all, Version: "v1"}}},

@@ -21,42 +21,36 @@
           "kind": "locality",
           "count": 11,
           "englishNames": 2,
-          "newestLoad": "2026-03-29T19:51:15Z",
           "sourceFamily": "bkg_gvisys"
         },
         {
           "kind": "municipality",
           "count": 75,
           "englishNames": 6,
-          "newestLoad": "2026-11-17T12:23:08.225116Z",
           "sourceFamily": "bkg_gvisys"
         },
         {
           "kind": "state",
           "count": 7,
           "englishNames": 0,
-          "newestLoad": "2026-03-29T19:12:55Z",
           "sourceFamily": "bkg_gvisys"
         },
         {
           "kind": "locality",
           "count": 10,
           "englishNames": 2,
-          "newestLoad": "2026-03-29T22:35:07Z",
           "sourceFamily": "geonames"
         },
         {
           "kind": "municipality",
           "count": 25,
           "englishNames": 8,
-          "newestLoad": "2026-03-29T18:43:47Z",
           "sourceFamily": "geonames"
         },
         {
           "kind": "state",
           "count": 9,
           "englishNames": 1,
-          "newestLoad": "2026-03-29T19:17:24Z",
           "sourceFamily": "geonames"
         }
       ],

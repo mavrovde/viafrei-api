@@ -26,3 +26,4 @@ road-reference	internal/domain/roads	ParseRoad	FuzzParseRoad	-
 accept-terms	internal/domain/access	ParseAcceptance	FuzzParseAcceptance	-
 address	internal/domain/places	ParseAddress	FuzzParseAddress	-
 opening-hours	internal/domain/energy	ReadSchedule,ParseDays,ParseClock,ResolveOpenAt	FuzzReadSchedule	-
+watch	internal/adapters/httpapi	Resolve,parseAt,conditionKeysOf,resolveOtherKind	FuzzWatch	-

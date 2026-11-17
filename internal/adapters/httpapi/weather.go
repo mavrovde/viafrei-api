@@ -114,14 +114,7 @@ func registerWeatherRisk(api huma.API, s *server, op huma.Operation) {
 			return nil, s.featureProblem(ctx, err)
 		}
 		noteWeatherLamp(ctx, a)
-		ws := make([]WeatherWarning, len(a.Items))
-		for i, w := range a.Items {
-			ws[i] = WeatherWarning{
-				ID: w.ID, Hazard: string(w.Hazard), Level: int(w.Level), LevelName: w.LevelName, Issuer: w.Issuer,
-				Headline: w.Headline, TextLanguage: w.TextLanguage, Validity: timeWindow(w.From, w.Until),
-				Area: WarningArea{Name: w.AreaName}, SourceFamily: w.Family,
-			}
-		}
+		ws := weatherWarnings(a.Items)
 		return &WeatherRiskOutput{CacheControl: noStore, Body: WeatherRiskEnvelope{
 			Data: WeatherRiskData{Lamp: string(a.Lamp), Warnings: ws, Truncated: a.HasMore, RoadWeather: []RoadWeatherObservation{}},
 			Meta: WeatherRiskMeta{
@@ -282,4 +275,17 @@ func registerDrivingRules(api huma.API, s *server, op huma.Operation) {
 			Links: s.selfLink(ctx),
 		}}, nil
 	})
+}
+
+// weatherWarnings are the answers of the warnings.
+func weatherWarnings(items []weather.Warning) []WeatherWarning {
+	ws := make([]WeatherWarning, len(items))
+	for i, w := range items {
+		ws[i] = WeatherWarning{
+			ID: w.ID, Hazard: string(w.Hazard), Level: int(w.Level), LevelName: w.LevelName, Issuer: w.Issuer,
+			Headline: w.Headline, TextLanguage: w.TextLanguage, Validity: timeWindow(w.From, w.Until),
+			Area: WarningArea{Name: w.AreaName}, SourceFamily: w.Family,
+		}
+	}
+	return ws
 }

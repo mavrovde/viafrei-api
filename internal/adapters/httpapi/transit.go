@@ -166,14 +166,7 @@ func registerDepartures(api huma.API, s *server, op huma.Operation) {
 			Departures: make([]Departure, len(b.Items)),
 		}
 		for i, d := range b.Items {
-			data.Departures[i] = Departure{
-				ID: d.JourneyID + "/" + strconv.Itoa(d.CallOrder), JourneyID: d.JourneyID, Line: d.Line, Mode: string(d.Mode),
-				RouteType: d.RouteType, TrainNumber: d.TrainNumber, Category: d.Category, Destination: d.Destination,
-				PlannedAt: d.PlannedAt.UTC(), PlannedAtLocal: local(d.PlannedAt), Platform: d.Platform,
-				PlannedPlatform: d.PlannedPlatform, PlatformChanged: d.PlatformChanged, Realtime: d.Live,
-				RealtimeSource: d.Source, Cancelled: d.Cancelled, DelayMin: d.DelayMin, ExpectedAt: utc(d.ExpectedAt),
-				NoForecast: d.NoForecast, SourceFamily: d.Family,
-			}
+			data.Departures[i] = departureRow(d)
 		}
 		modes := make([]string, len(in.modes))
 		for i, m := range in.modes {
@@ -342,5 +335,17 @@ func station(v transit.Station) Station {
 	return Station{
 		ID: v.ID, Name: v.Name, Location: position(v.Location), StopCode: v.NationalCode,
 		DistrictCode: v.RegionCode, Modes: modes, DistanceM: v.DistanceM, SourceFamily: v.Family,
+	}
+}
+
+// departureRow is the answer of one departure.
+func departureRow(d transit.Departure) Departure {
+	return Departure{
+		ID: d.JourneyID + "/" + strconv.Itoa(d.CallOrder), JourneyID: d.JourneyID, Line: d.Line, Mode: string(d.Mode),
+		RouteType: d.RouteType, TrainNumber: d.TrainNumber, Category: d.Category, Destination: d.Destination,
+		PlannedAt: d.PlannedAt.UTC(), PlannedAtLocal: local(d.PlannedAt), Platform: d.Platform,
+		PlannedPlatform: d.PlannedPlatform, PlatformChanged: d.PlatformChanged, Realtime: d.Live,
+		RealtimeSource: d.Source, Cancelled: d.Cancelled, DelayMin: d.DelayMin, ExpectedAt: utc(d.ExpectedAt),
+		NoForecast: d.NoForecast, SourceFamily: d.Family,
 	}
 }

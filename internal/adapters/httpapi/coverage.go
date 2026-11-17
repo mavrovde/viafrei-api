@@ -9,11 +9,10 @@ import (
 
 // PlaceKindCount is how many places of one kind one family holds.
 type PlaceKindCount struct {
-	Kind         string     `json:"kind" doc:"The place kind (city, town, village, suburb, admin, station, junction, ...). Open enumeration."`
-	Count        int        `json:"count"`
-	EnglishNames int        `json:"englishNames" doc:"How many of them carry an English name, the names a search in English finds."`
-	NewestLoad   *time.Time `json:"newestLoad" nullable:"true" doc:"When the newest of them was recorded; null when unknown."`
-	SourceFamily string     `json:"sourceFamily"`
+	Kind         string `json:"kind" doc:"The place kind (city, town, village, suburb, admin, station, junction, ...). Open enumeration."`
+	Count        int    `json:"count"`
+	EnglishNames int    `json:"englishNames" doc:"How many of them carry an English name, the names a search in English finds."`
+	SourceFamily string `json:"sourceFamily" doc:"Its family; when the family was last loaded is in meta.freshness."`
 }
 
 // CoverageLand is a Land the gazetteer holds.
@@ -52,7 +51,7 @@ type PlacesCoverageOutput struct {
 
 func registerPlacesCoverage(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "What the gazetteer and the addresses hold"
-	op.Description = "What place and address search can find: the places per family and kind with how many carry an English name and when the newest was recorded, the Länder the gazetteer holds, and the Länder the addresses cover with each one's extract date. Read from the places families the key may read. Needs the scope places."
+	op.Description = "What place and address search can find: the places per family and kind with how many carry an English name (each family's last load is in meta.freshness), the Länder the gazetteer holds, and the Länder the addresses cover with each one's extract date. Read from the places families the key may read. Needs the scope places."
 	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, _ *struct{}) (*PlacesCoverageOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
@@ -64,12 +63,7 @@ func registerPlacesCoverage(api huma.API, s *server, op huma.Operation) {
 		}
 		d := PlacesCoverageData{Kinds: []PlaceKindCount{}, Lands: []CoverageLand{}, Addresses: []AddressCoverage{}}
 		for _, k := range c.Kinds {
-			var newest *time.Time
-			if k.NewestLoad != nil {
-				u := k.NewestLoad.UTC()
-				newest = &u
-			}
-			d.Kinds = append(d.Kinds, PlaceKindCount{Kind: k.Kind, Count: k.Rows, EnglishNames: k.EnglishNames, NewestLoad: newest, SourceFamily: k.Family})
+			d.Kinds = append(d.Kinds, PlaceKindCount{Kind: k.Kind, Count: k.Rows, EnglishNames: k.EnglishNames, SourceFamily: k.Family})
 		}
 		for _, l := range c.Lands {
 			d.Lands = append(d.Lands, CoverageLand{Code: l.Code, Name: l.Name, SourceFamily: l.Family})

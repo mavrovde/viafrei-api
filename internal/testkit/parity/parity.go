@@ -230,6 +230,11 @@ var Default = Rules{
 		{"data.openapi", "", "getMeta", serviceMetaReason},
 		{"data.platformVersion", "", "getMeta", serviceMetaReason},
 		{"data.bays[*].distanceM", "", "listParkingBays", "the parking tool states a bay's distance in kilometres to two decimals, the API in metres, so they agree only to the tool's 10 m; the bay's point both measure from is compared"},
+		{"data.departures[*].line", "", "getTrainBoard", trainLabelReason},
+		{"data.departures[*].number", "", "getTrainBoard", trainLabelReason},
+		{"data.fresh", "", "getTrainBoard", trainAgeReason},
+		{"data.fetchedAt", "", "getTrainBoard", trainAgeReason},
+		{"data.ageSeconds", "", "getTrainBoard", trainAgeReason},
 		{"data.watchId", "", "getWatch", watchIDReason},
 		{"data.uri", "", "getWatch", watchIDReason},
 		{"meta.attribution[*].domain", "", "", attributionReason},
@@ -282,6 +287,13 @@ const motorwayListReason = "API-only: the site's motorway list, index and pages 
 // serviceMetaReason is why the members of the service description are not
 // compared: they describe the running build, which the site shows none of.
 const serviceMetaReason = "API-only: the versions and the document of the running service; the site reads only whether it is saturated (the digest route /internal/pressure), which the API states by answering at all"
+
+// trainLabelReason is why a departure's line and train number are not
+// compared: the train tool states one label, which cannot be split back.
+const trainLabelReason = "the train tool states one label, what a person reads on the board (ICE 571, RE 1), the API the board's line and train number apart; a label of a category and a number cannot be split back into the two"
+
+// trainAgeReason is why the age of a train board is not compared.
+const trainAgeReason = "API-only: the age of the recorded board the API serves (fresh, fetchedAt, ageSeconds); the train tool asks the timetable provider at the time of the question"
 
 // watchIDReason is why a watch's id is not compared: each side mints its own.
 const watchIDReason = "each side mints the id of a watch: the platform a number of its session, the API a token of kind, key and condition; the watch it names is compared"

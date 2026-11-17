@@ -218,6 +218,23 @@
       "now": "2026-03-30T00:00:00Z"
     },
     {
+      "id": "train-board",
+      "operation": "getTrainBoard",
+      "counterpart": "train departures",
+      "request": "/v1/train-boards/8001001",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "db_timetables"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
       "id": "stations-code",
       "operation": "listStations",
       "counterpart": "station search",

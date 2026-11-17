@@ -1564,6 +1564,161 @@
       ]
     },
     {
+      "id": "train-board",
+      "operation": "getTrainBoard",
+      "counterpart": "train departures",
+      "request": "/v1/train-boards/8001001",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "db_timetables"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.departures[0].cancelled",
+          "value": "false"
+        },
+        {
+          "name": "data.departures[0].category",
+          "value": "ICE"
+        },
+        {
+          "name": "data.departures[0].delayMin",
+          "value": "5"
+        },
+        {
+          "name": "data.departures[0].destination",
+          "value": "Schömpingbach"
+        },
+        {
+          "name": "data.departures[0].expectedAt",
+          "value": "2026-03-30T00:08:50Z"
+        },
+        {
+          "name": "data.departures[0].plannedAt",
+          "value": "2026-03-30T00:03:50Z"
+        },
+        {
+          "name": "data.departures[0].plannedPlatform",
+          "value": "5"
+        },
+        {
+          "name": "data.departures[0].platform",
+          "value": "7"
+        },
+        {
+          "name": "data.departures[0].platformChanged",
+          "value": "true"
+        },
+        {
+          "name": "data.departures[0].sourceFamily",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.departures[1].cancelled",
+          "value": "true"
+        },
+        {
+          "name": "data.departures[1].category",
+          "value": "RE"
+        },
+        {
+          "name": "data.departures[1].delayMin",
+          "value": "0"
+        },
+        {
+          "name": "data.departures[1].destination",
+          "value": "Schömpingbach"
+        },
+        {
+          "name": "data.departures[1].expectedAt",
+          "value": "2026-03-30T00:11:50Z"
+        },
+        {
+          "name": "data.departures[1].plannedAt",
+          "value": "2026-03-30T00:11:50Z"
+        },
+        {
+          "name": "data.departures[1].plannedPlatform",
+          "value": "2"
+        },
+        {
+          "name": "data.departures[1].platform",
+          "value": "2"
+        },
+        {
+          "name": "data.departures[1].platformChanged",
+          "value": "false"
+        },
+        {
+          "name": "data.departures[1].sourceFamily",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.departures[2].cancelled",
+          "value": "false"
+        },
+        {
+          "name": "data.departures[2].category",
+          "value": "S"
+        },
+        {
+          "name": "data.departures[2].delayMin",
+          "value": "0"
+        },
+        {
+          "name": "data.departures[2].destination",
+          "value": "Schömpingbach"
+        },
+        {
+          "name": "data.departures[2].expectedAt",
+          "value": "2026-03-30T00:19:50Z"
+        },
+        {
+          "name": "data.departures[2].plannedAt",
+          "value": "2026-03-30T00:19:50Z"
+        },
+        {
+          "name": "data.departures[2].plannedPlatform",
+          "value": "null"
+        },
+        {
+          "name": "data.departures[2].platform",
+          "value": "null"
+        },
+        {
+          "name": "data.departures[2].platformChanged",
+          "value": "false"
+        },
+        {
+          "name": "data.departures[2].sourceFamily",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.eva",
+          "value": "8001001"
+        },
+        {
+          "name": "meta.attribution[db_timetables].family",
+          "value": "db_timetables"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
       "id": "stations-code",
       "operation": "listStations",
       "counterpart": "station search",

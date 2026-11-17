@@ -210,7 +210,22 @@ type scope struct {
 	// placed selects the families that placed the scope's situations in a
 	// Land, over args; empty when the scope is no Land.
 	placed string
+	// covering selects, over coveringArgs, the families read that hold a
+	// situation on a road of an unregistered road's class; empty for any
+	// other scope.
+	covering     string
+	coveringArgs []any
 }
+
+// coveringSelect reads which of the given families hold a situation that
+// has not ended on a road of a class, in name order. $1 families, $2 the
+// stored class, $3 now.
+const coveringSelect = `select coalesce(array_agg(f order by f), '{}')
+from unnest($1::text[]) f
+where exists (select 1 from contract.traffic_event e
+              where e.source_ref = f and e.withdrawn_at is null and e.road_class = $2
+                and (e.valid_to is null or e.valid_to > $3)
+                and ` + eventPermitted + `)`
 
 func scanSituation(r pgx.CollectableRow) (roads.Situation, error) {
 	var (
@@ -325,6 +340,12 @@ order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, s
 				}
 				return tx.QueryRow(ctx, sc.placed, sc.args...).Scan(&out.Placed)
 			},
+			func() error {
+				if sc.covering == "" {
+					return nil
+				}
+				return tx.QueryRow(ctx, sc.covering, sc.coveringArgs...).Scan(&out.Covering)
+			},
 			func() (err error) {
 				res, _ := tx.Query(ctx, coverageSelect, out.States, fams.Roads)
 				out.Coverage, err = coverageOf(res)
@@ -369,7 +390,11 @@ order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, s
 // road's is: A1 and A 1 are one road.
 func (s *Store) SituationsOnRoad(ctx context.Context, q roads.CorridorQuery, fams roads.Families, now time.Time) (roads.Page, error) {
 	start, end := q.Window(now)
-	args := append(filterArgs(q.Filter, fams.Roads, now), q.Road, string(q.Direction), codes(roads.Compass()), q.Limit+1, start, end, q.Offset)
+	args := append(filterArgs(q.Filter, fams.Roads, now), q.Road, string(q.Direction), codes(roads.Compass()), q.Limit+1, start, end, q.Offset, q.Unregistered)
+	var sc scope
+	if q.Unregistered {
+		sc.covering, sc.coveringArgs = coveringSelect, []any{fams.Roads, string(q.Class), now}
+	}
 	return s.read(ctx, `
 with road as (
   select k.road_ref from contract.road k
@@ -385,7 +410,7 @@ answering as (
   select `+eventRow+`, line.km road_km, line.total road_total
   from contract.traffic_event e left join line on true
   where `+situationFilter(12)+`
-    and exists (select 1 from road)
+    and ($15 or exists (select 1 from road))
     and `+fmt.Sprintf(canonicalRef, "e.road_ref")+` = $8
     and ($9::text = 'both' or e.direction = $9::text or not e.direction = any($10))),
 placed as (
@@ -409,6 +434,7 @@ order by case when e.event_kind = 'jam' then 0 when e.event_kind = 'closure' the
               when 'HEAVY_TRAFFIC' then 2 when 'SLOW_TRAFFIC' then 3 else 4 end,
          e.delay_min desc nulls last, e.headline, e.origin_key, e.event_id
 limit $11 offset $14`, args, q.Limit, fams, now, scope{
+		covering: sc.covering, coveringArgs: sc.coveringArgs,
 		messages: messagesSelect + `
   and ` + fmt.Sprintf(canonicalRef, "e.road_ref") + ` = $3
   and ($4::text = 'both' or e.direction = $4::text or not e.direction = any($5))`,

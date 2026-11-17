@@ -2,6 +2,7 @@ package features
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"time"
 
@@ -43,6 +44,10 @@ type Conditions struct {
 	Road   *roads.Road
 	Lamp   roads.Lamp
 	Reason *roads.Reason
+	// Covering are, for a road the register does not hold, the roads
+	// families read that hold a situation on a road of its class; nil for a
+	// registered road or an area.
+	Covering []string
 	// Read are every family the lamp read, whether or not it contributed
 	// (Families names only those): a new version of any of them, or of its
 	// confirmation, may change the lamp.
@@ -165,15 +170,23 @@ func (s *Service) conditions(ctx context.Context, key access.Record, ahead, lamp
 	return Conditions{
 		Answer: Answer[roads.Situation]{Items: p.Items, HasMore: p.HasMore, Families: attributed, Partial: partial, At: now,
 			ChangesAt: p.ChangesAt(now)},
-		Lamp: lamp, Reason: reason, Read: fams,
+		Lamp: lamp, Reason: reason, Read: fams, Covering: p.Covering,
 	}, nil
 }
 
 // MotorwayConditions answers "what is happening on this road" for key
-// (FR-ROAD-003, FR-ROAD-004). The road is resolved first, so an unknown road
-// is roads.ErrUnknownRoad whatever the key may read.
+// (FR-ROAD-003, FR-ROAD-004). The road is resolved first. A road the
+// register does not hold (roads.ErrUnknownRoad: a federal or Land road, or a
+// motorway it lacks) is answered as the platform's roadworks-ahead answer
+// answers it: from the situations whose reference names it, with the
+// families that hold any situation on a road of its class (Covering), so an
+// empty list says what was read, never that the road is unknown.
 func (s *Service) MotorwayConditions(ctx context.Context, key access.Record, q roads.CorridorQuery) (Conditions, error) {
 	road, err := s.repos.Roads.Road(ctx, q.Road)
+	if errors.Is(err, roads.ErrUnknownRoad) {
+		road, err = roads.Road{Ref: q.Road, Class: roads.ClassOf(q.Road), States: []string{}}, nil
+		q.Unregistered, q.Class = true, road.Class
+	}
 	if err != nil {
 		return Conditions{}, err
 	}
@@ -185,6 +198,9 @@ func (s *Service) MotorwayConditions(ctx context.Context, key access.Record, q r
 		return Conditions{}, err
 	}
 	c.Road = &road
+	if q.Unregistered && c.Covering == nil {
+		c.Covering = []string{}
+	}
 	return c, nil
 }
 

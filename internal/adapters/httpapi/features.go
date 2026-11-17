@@ -89,6 +89,7 @@ var nullableObjects = []struct{ schema, member string }{
 	{"LocationData", "district"},
 	{"LocationData", "state"},
 	{"LocationData", "lowEmissionZone"},
+	{"MotorwayData", "coverage"},
 	{"ParkingSite", "occupancy"},
 	{"RoadSituation", "location"},
 	{"RoadSituation", "lanes"},

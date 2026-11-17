@@ -761,3 +761,44 @@ func TestSituationsOnRoadOverAWindowAndAPage(t *testing.T) {
 		t.Errorf("near over the window: %d, %v", len(a.Items), err)
 	}
 }
+
+// TestAnUnregisteredRoadIsReadByItsReference (G6): a road the register does
+// not hold is read from the situations whose reference names it, none
+// placed along a line, with the families read that hold a situation on a
+// road of its class; a class no family holds names none.
+func TestAnUnregisteredRoadIsReadByItsReference(t *testing.T) {
+	req.Covers(t, "FR-ROAD-001", "FR-ROAD-003")
+	st := seeded(t)
+	// The seed is insert-only, so the planted situation stays: it has no
+	// position (no read near a position or in a Land sees it) and lies on a
+	// road no other test asks for, in 2102; a second run plants it once.
+	var family string
+	owner(t, `select source_ref from contract.traffic_event where event_id = '`+fixtures.PlantedEvent("ev-u-kind")+`'`, &family)
+	change(t, `insert into contract.traffic_event (event_id, event_kind, road_ref, road_class, valid_from, headline, source_ref,
+    origin_key, published_at, recorded_at, changed_at)
+  select $1, 'other', 'L 1025', 'state', '2102-01-01T00:00:00Z', 'Baustelle', $2,
+    'ev-land-l', '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z'
+  where not exists (select 1 from contract.traffic_event where event_id = $1)`, fixtures.PlantedEvent("ev-land-l"), family)
+	now := time.Date(2102, 1, 1, 1, 0, 0, 0, time.UTC)
+	id := fixtures.PlantedEvent("ev-land-l")
+	fams := roads.Families{Roads: families(t, st, "roads")}
+	q := roads.CorridorQuery{Road: "L1025", Unregistered: true, Class: roads.ClassState, Direction: roads.DirectionBoth,
+		Filter: roads.Filter{MinSeverity: roads.SeverityInfo}, Limit: 10}
+	p, err := st.SituationsOnRoad(bounded(t), q, fams, now)
+	if err != nil || !slices.Equal(ids(p.Items), []string{id}) || p.Items[0].AtKm != nil {
+		t.Fatalf("L1025: %+v, %v", p.Items, err)
+	}
+	if !slices.Equal(p.Covering, []string{family}) {
+		t.Errorf("covering %v, want [%s]", p.Covering, family)
+	}
+	q.Road, q.Class = "B6", roads.ClassFederal
+	p, err = st.SituationsOnRoad(bounded(t), q, fams, now)
+	if err != nil || len(p.Items) != 0 || p.Covering == nil || len(p.Covering) != 0 {
+		t.Errorf("B6: %+v, covering %#v, %v", p.Items, p.Covering, err)
+	}
+	// A registered road names no coverage.
+	q.Road, q.Unregistered, q.Class = "A101", false, ""
+	if p, err = st.SituationsOnRoad(bounded(t), q, fams, now); err != nil || p.Covering != nil {
+		t.Errorf("A101: covering %v, %v", p.Covering, err)
+	}
+}

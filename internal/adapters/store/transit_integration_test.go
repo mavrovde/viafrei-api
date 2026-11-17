@@ -118,8 +118,10 @@ func TestStationsStateTheirEVANumbers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The disruption test plants a DB station of its own in area 09999
+	// (insert-only seed); every fixture stop but the board's states none.
 	for _, s := range all {
-		if s.ID != ss[0].ID && (s.EVA != nil || len(s.EVANumbers) != 0) {
+		if s.ID != ss[0].ID && !strings.HasPrefix(s.ID, "1:de:09999:") && (s.EVA != nil || len(s.EVANumbers) != 0) {
 			t.Errorf("%s states numbers %v %v", s.ID, s.EVA, s.EVANumbers)
 		}
 	}

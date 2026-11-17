@@ -9132,6 +9132,2758 @@
           "value": "20"
         }
       ]
+    },
+    {
+      "id": "sources-all",
+      "operation": "listSources",
+      "counterpart": "attribution",
+      "request": "/v1/sources",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads",
+          "energy",
+          "parking",
+          "places",
+          "transit",
+          "weather",
+          "rules"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data[afir_alpha].attribution",
+          "value": "Synthetic data from family alpha, licence CC BY 4.0."
+        },
+        {
+          "name": "data[afir_alpha].dataAsOf",
+          "value": "2026-03-29T23:55:00Z"
+        },
+        {
+          "name": "data[afir_alpha].domain",
+          "value": "energy"
+        },
+        {
+          "name": "data[afir_alpha].family",
+          "value": "afir_alpha"
+        },
+        {
+          "name": "data[afir_alpha].licence",
+          "value": "CC BY 4.0"
+        },
+        {
+          "name": "data[afir_alpha].licenceUrl",
+          "value": "https://licences.example/cc-by-4-0"
+        },
+        {
+          "name": "data[afir_alpha].publisher",
+          "value": "Kleber Datenwerk"
+        },
+        {
+          "name": "data[afir_alpha].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[afir_alpha].staleAfterS",
+          "value": "1800"
+        },
+        {
+          "name": "data[afir_alpha].status",
+          "value": "green"
+        },
+        {
+          "name": "data[afir_alpha].termsUrl",
+          "value": "https://alpha.example/terms/afir_alpha"
+        },
+        {
+          "name": "data[afir_beta].attribution",
+          "value": "Synthetic data from family beta, licence CC BY-SA 4.0."
+        },
+        {
+          "name": "data[afir_beta].dataAsOf",
+          "value": "2026-03-29T23:55:00Z"
+        },
+        {
+          "name": "data[afir_beta].domain",
+          "value": "energy"
+        },
+        {
+          "name": "data[afir_beta].family",
+          "value": "afir_beta"
+        },
+        {
+          "name": "data[afir_beta].licence",
+          "value": "CC BY-SA 4.0"
+        },
+        {
+          "name": "data[afir_beta].licenceUrl",
+          "value": "https://licences.example/cc-by-sa-4-0"
+        },
+        {
+          "name": "data[afir_beta].publisher",
+          "value": "Deingmeir Datenwerk"
+        },
+        {
+          "name": "data[afir_beta].shareAlike",
+          "value": "true"
+        },
+        {
+          "name": "data[afir_beta].staleAfterS",
+          "value": "1800"
+        },
+        {
+          "name": "data[afir_beta].status",
+          "value": "green"
+        },
+        {
+          "name": "data[afir_beta].termsUrl",
+          "value": "https://beta.example/terms/afir_beta"
+        },
+        {
+          "name": "data[bast_lcl].attribution",
+          "value": "TMC Location Code List (LCL 22.0): Bundesanstalt für Straßenwesen (BASt), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), bearbeitet"
+        },
+        {
+          "name": "data[bast_lcl].dataAsOf",
+          "value": "null"
+        },
+        {
+          "name": "data[bast_lcl].domain",
+          "value": "roads"
+        },
+        {
+          "name": "data[bast_lcl].family",
+          "value": "bast_lcl"
+        },
+        {
+          "name": "data[bast_lcl].licence",
+          "value": "CC BY 4.0"
+        },
+        {
+          "name": "data[bast_lcl].licenceUrl",
+          "value": "https://licences.example/cc-by-4-0"
+        },
+        {
+          "name": "data[bast_lcl].publisher",
+          "value": "TMC Location Code List (LCL 22.0): Bundesanstalt für Straßenwesen (BASt), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), bearbeitet"
+        },
+        {
+          "name": "data[bast_lcl].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[bast_lcl].status",
+          "value": "grey"
+        },
+        {
+          "name": "data[bast_lcl].termsUrl",
+          "value": "https://www.bast.de/DE/Themen/Digitales/HF_1/Massnahmen/LCL/location-code-list.html"
+        },
+        {
+          "name": "data[bkg_gvisys].attribution",
+          "value": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)"
+        },
+        {
+          "name": "data[bkg_gvisys].dataAsOf",
+          "value": "null"
+        },
+        {
+          "name": "data[bkg_gvisys].domain",
+          "value": "places"
+        },
+        {
+          "name": "data[bkg_gvisys].family",
+          "value": "bkg_gvisys"
+        },
+        {
+          "name": "data[bkg_gvisys].licence",
+          "value": "dl-de/by-2-0"
+        },
+        {
+          "name": "data[bkg_gvisys].licenceUrl",
+          "value": "https://licences.example/dl-de-by-2-0"
+        },
+        {
+          "name": "data[bkg_gvisys].publisher",
+          "value": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)"
+        },
+        {
+          "name": "data[bkg_gvisys].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[bkg_gvisys].status",
+          "value": "grey"
+        },
+        {
+          "name": "data[bkg_gvisys].termsUrl",
+          "value": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+        },
+        {
+          "name": "data[delfi_sa_alpha].attribution",
+          "value": "Synthetic data from family alpha, licence CC BY 4.0."
+        },
+        {
+          "name": "data[delfi_sa_alpha].dataAsOf",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data[delfi_sa_alpha].domain",
+          "value": "transit"
+        },
+        {
+          "name": "data[delfi_sa_alpha].family",
+          "value": "delfi_sa_alpha"
+        },
+        {
+          "name": "data[delfi_sa_alpha].licence",
+          "value": "CC BY 4.0"
+        },
+        {
+          "name": "data[delfi_sa_alpha].licenceUrl",
+          "value": "https://licences.example/cc-by-4-0"
+        },
+        {
+          "name": "data[delfi_sa_alpha].publisher",
+          "value": "StÃ¶rwerk Datenwerk"
+        },
+        {
+          "name": "data[delfi_sa_alpha].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[delfi_sa_alpha].staleAfterS",
+          "value": "900"
+        },
+        {
+          "name": "data[delfi_sa_alpha].status",
+          "value": "green"
+        },
+        {
+          "name": "data[delfi_sa_alpha].termsUrl",
+          "value": "https://alpha.example/terms/delfi_sa_alpha"
+        },
+        {
+          "name": "data[delfi_static].attribution",
+          "value": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet"
+        },
+        {
+          "name": "data[delfi_static].dataAsOf",
+          "value": "2026-03-29T12:00:00Z"
+        },
+        {
+          "name": "data[delfi_static].domain",
+          "value": "transit"
+        },
+        {
+          "name": "data[delfi_static].family",
+          "value": "delfi_static"
+        },
+        {
+          "name": "data[delfi_static].licence",
+          "value": "CC BY 4.0"
+        },
+        {
+          "name": "data[delfi_static].licenceUrl",
+          "value": "https://licences.example/cc-by-4-0"
+        },
+        {
+          "name": "data[delfi_static].publisher",
+          "value": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet"
+        },
+        {
+          "name": "data[delfi_static].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[delfi_static].staleAfterS",
+          "value": "259200"
+        },
+        {
+          "name": "data[delfi_static].status",
+          "value": "green"
+        },
+        {
+          "name": "data[delfi_static].termsUrl",
+          "value": "https://www.opendata-oepnv.de"
+        },
+        {
+          "name": "data[dwd_alpha].attribution",
+          "value": "Synthetic data from family alpha, licence CC BY 4.0."
+        },
+        {
+          "name": "data[dwd_alpha].dataAsOf",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data[dwd_alpha].domain",
+          "value": "weather"
+        },
+        {
+          "name": "data[dwd_alpha].family",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "data[dwd_alpha].licence",
+          "value": "CC BY 4.0"
+        },
+        {
+          "name": "data[dwd_alpha].licenceUrl",
+          "value": "https://licences.example/cc-by-4-0"
+        },
+        {
+          "name": "data[dwd_alpha].publisher",
+          "value": "Sirfeim Datenwerk"
+        },
+        {
+          "name": "data[dwd_alpha].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[dwd_alpha].staleAfterS",
+          "value": "900"
+        },
+        {
+          "name": "data[dwd_alpha].status",
+          "value": "green"
+        },
+        {
+          "name": "data[dwd_alpha].termsUrl",
+          "value": "https://alpha.example/terms/dwd_alpha"
+        },
+        {
+          "name": "data[dwd_eta].attribution",
+          "value": "Synthetic data from family eta, licence dl-de/by-2-0."
+        },
+        {
+          "name": "data[dwd_eta].dataAsOf",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data[dwd_eta].domain",
+          "value": "weather"
+        },
+        {
+          "name": "data[dwd_eta].family",
+          "value": "dwd_eta"
+        },
+        {
+          "name": "data[dwd_eta].licence",
+          "value": "dl-de/by-2-0"
+        },
+        {
+          "name": "data[dwd_eta].licenceUrl",
+          "value": "https://licences.example/dl-de-by-2-0"
+        },
+        {
+          "name": "data[dwd_eta].publisher",
+          "value": "Golmil Datenwerk"
+        },
+        {
+          "name": "data[dwd_eta].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[dwd_eta].staleAfterS",
+          "value": "900"
+        },
+        {
+          "name": "data[dwd_eta].status",
+          "value": "green"
+        },
+        {
+          "name": "data[dwd_eta].termsUrl",
+          "value": "https://eta.example/terms/dwd_eta"
+        },
+        {
+          "name": "data[gbfs_nextbike].attribution",
+          "value": "Bikesharing: nextbike GmbH (GBFS), CC0 1.0"
+        },
+        {
+          "name": "data[gbfs_nextbike].dataAsOf",
+          "value": "2026-03-29T23:59:30Z"
+        },
+        {
+          "name": "data[gbfs_nextbike].domain",
+          "value": "transit"
+        },
+        {
+          "name": "data[gbfs_nextbike].family",
+          "value": "gbfs_nextbike"
+        },
+        {
+          "name": "data[gbfs_nextbike].licence",
+          "value": "CC0 1.0"
+        },
+        {
+          "name": "data[gbfs_nextbike].licenceUrl",
+          "value": "https://licences.example/cc0-1-0"
+        },
+        {
+          "name": "data[gbfs_nextbike].publisher",
+          "value": "Bikesharing: nextbike GmbH (GBFS), CC0 1.0"
+        },
+        {
+          "name": "data[gbfs_nextbike].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[gbfs_nextbike].staleAfterS",
+          "value": "180"
+        },
+        {
+          "name": "data[gbfs_nextbike].status",
+          "value": "green"
+        },
+        {
+          "name": "data[gbfs_nextbike].termsUrl",
+          "value": "https://www.nextbike.de"
+        },
+        {
+          "name": "data[geonames].attribution",
+          "value": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet"
+        },
+        {
+          "name": "data[geonames].dataAsOf",
+          "value": "null"
+        },
+        {
+          "name": "data[geonames].domain",
+          "value": "places"
+        },
+        {
+          "name": "data[geonames].family",
+          "value": "geonames"
+        },
+        {
+          "name": "data[geonames].licence",
+          "value": "CC BY 4.0"
+        },
+        {
+          "name": "data[geonames].licenceUrl",
+          "value": "https://licences.example/cc-by-4-0"
+        },
+        {
+          "name": "data[geonames].publisher",
+          "value": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet"
+        },
+        {
+          "name": "data[geonames].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[geonames].status",
+          "value": "grey"
+        },
+        {
+          "name": "data[geonames].termsUrl",
+          "value": "https://download.geonames.org/export/dump/"
+        },
+        {
+          "name": "data[lez_alpha].attribution",
+          "value": "Synthetic data from family alpha, licence CC BY 4.0."
+        },
+        {
+          "name": "data[lez_alpha].dataAsOf",
+          "value": "2026-03-29T12:00:00Z"
+        },
+        {
+          "name": "data[lez_alpha].domain",
+          "value": "roads"
+        },
+        {
+          "name": "data[lez_alpha].family",
+          "value": "lez_alpha"
+        },
+        {
+          "name": "data[lez_alpha].licence",
+          "value": "CC BY 4.0"
+        },
+        {
+          "name": "data[lez_alpha].licenceUrl",
+          "value": "https://licences.example/cc-by-4-0"
+        },
+        {
+          "name": "data[lez_alpha].publisher",
+          "value": "Zonenwerk Datenwerk"
+        },
+        {
+          "name": "data[lez_alpha].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[lez_alpha].staleAfterS",
+          "value": "259200"
+        },
+        {
+          "name": "data[lez_alpha].status",
+          "value": "green"
+        },
+        {
+          "name": "data[lez_alpha].termsUrl",
+          "value": "https://alpha.example/terms/lez_alpha"
+        },
+        {
+          "name": "data[lorry_bast_langlkw].attribution",
+          "value": "Lang-Lkw-Netz: Bundesanstalt für Straßen- und Verkehrswesen (BASt), Positivnetz Lang-LKW (Auszug Bundesfernstraßen), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), bearbeitet"
+        },
+        {
+          "name": "data[lorry_bast_langlkw].dataAsOf",
+          "value": "null"
+        },
+        {
+          "name": "data[lorry_bast_langlkw].domain",
+          "value": "roads"
+        },
+        {
+          "name": "data[lorry_bast_langlkw].family",
+          "value": "lorry_bast_langlkw"
+        },
+        {
+          "name": "data[lorry_bast_langlkw].licence",
+          "value": "CC BY 4.0"
+        },
+        {
+          "name": "data[lorry_bast_langlkw].licenceUrl",
+          "value": "https://licences.example/cc-by-4-0"
+        },
+        {
+          "name": "data[lorry_bast_langlkw].publisher",
+          "value": "Lang-Lkw-Netz: Bundesanstalt für Straßen- und Verkehrswesen (BASt), Positivnetz Lang-LKW (Auszug Bundesfernstraßen), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), bearbeitet"
+        },
+        {
+          "name": "data[lorry_bast_langlkw].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[lorry_bast_langlkw].status",
+          "value": "grey"
+        },
+        {
+          "name": "data[lorry_bast_langlkw].termsUrl",
+          "value": "https://www.bast.de/DE/Publikationen/Daten/Verkehrstechnik/Lang-Lkw.html"
+        },
+        {
+          "name": "data[lorry_koeln_beschraenkungen].attribution",
+          "value": "Straßenbeschränkungen Köln: Stadt Köln, Datenlizenz Deutschland – Zero – Version 2.0"
+        },
+        {
+          "name": "data[lorry_koeln_beschraenkungen].dataAsOf",
+          "value": "null"
+        },
+        {
+          "name": "data[lorry_koeln_beschraenkungen].domain",
+          "value": "roads"
+        },
+        {
+          "name": "data[lorry_koeln_beschraenkungen].family",
+          "value": "lorry_koeln_beschraenkungen"
+        },
+        {
+          "name": "data[lorry_koeln_beschraenkungen].licence",
+          "value": "dl-de/zero-2-0"
+        },
+        {
+          "name": "data[lorry_koeln_beschraenkungen].licenceUrl",
+          "value": "https://www.govdata.de/dl-de/zero-2-0"
+        },
+        {
+          "name": "data[lorry_koeln_beschraenkungen].publisher",
+          "value": "Straßenbeschränkungen Köln: Stadt Köln, Datenlizenz Deutschland – Zero – Version 2.0"
+        },
+        {
+          "name": "data[lorry_koeln_beschraenkungen].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[lorry_koeln_beschraenkungen].status",
+          "value": "grey"
+        },
+        {
+          "name": "data[lorry_koeln_beschraenkungen].termsUrl",
+          "value": "https://www.offenedaten-koeln.de/dataset/strassenbeschraenkungen-koeln"
+        },
+        {
+          "name": "data[openstation_siri_fm].attribution",
+          "value": "Synthetic data from family alpha, licence CC BY 4.0."
+        },
+        {
+          "name": "data[openstation_siri_fm].dataAsOf",
+          "value": "2026-03-29T23:52:30Z"
+        },
+        {
+          "name": "data[openstation_siri_fm].domain",
+          "value": "accessibility"
+        },
+        {
+          "name": "data[openstation_siri_fm].family",
+          "value": "openstation_siri_fm"
+        },
+        {
+          "name": "data[openstation_siri_fm].licence",
+          "value": "CC BY 4.0"
+        },
+        {
+          "name": "data[openstation_siri_fm].licenceUrl",
+          "value": "https://licences.example/cc-by-4-0"
+        },
+        {
+          "name": "data[openstation_siri_fm].publisher",
+          "value": "Bengdün Datenwerk"
+        },
+        {
+          "name": "data[openstation_siri_fm].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[openstation_siri_fm].staleAfterS",
+          "value": "2700"
+        },
+        {
+          "name": "data[openstation_siri_fm].status",
+          "value": "green"
+        },
+        {
+          "name": "data[openstation_siri_fm].termsUrl",
+          "value": "https://alpha.example/terms/openstation_siri_fm"
+        },
+        {
+          "name": "data[osm].attribution",
+          "value": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0"
+        },
+        {
+          "name": "data[osm].dataAsOf",
+          "value": "null"
+        },
+        {
+          "name": "data[osm].domain",
+          "value": "places"
+        },
+        {
+          "name": "data[osm].family",
+          "value": "osm"
+        },
+        {
+          "name": "data[osm].licence",
+          "value": "ODbL 1.0"
+        },
+        {
+          "name": "data[osm].licenceUrl",
+          "value": "https://opendatacommons.org/licenses/odbl/1-0/"
+        },
+        {
+          "name": "data[osm].publisher",
+          "value": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0"
+        },
+        {
+          "name": "data[osm].shareAlike",
+          "value": "true"
+        },
+        {
+          "name": "data[osm].status",
+          "value": "grey"
+        },
+        {
+          "name": "data[osm].termsUrl",
+          "value": "https://www.openstreetmap.org/copyright"
+        },
+        {
+          "name": "data[osm_speed_cameras].attribution",
+          "value": "Blitzer (OpenStreetMap): © OpenStreetMap-Mitwirkende, ODbL 1.0"
+        },
+        {
+          "name": "data[osm_speed_cameras].dataAsOf",
+          "value": "2026-03-29T12:00:00Z"
+        },
+        {
+          "name": "data[osm_speed_cameras].domain",
+          "value": "roads"
+        },
+        {
+          "name": "data[osm_speed_cameras].family",
+          "value": "osm_speed_cameras"
+        },
+        {
+          "name": "data[osm_speed_cameras].licence",
+          "value": "ODbL 1.0"
+        },
+        {
+          "name": "data[osm_speed_cameras].licenceUrl",
+          "value": "https://opendatacommons.org/licenses/odbl/1-0/"
+        },
+        {
+          "name": "data[osm_speed_cameras].publisher",
+          "value": "Blitzer (OpenStreetMap): © OpenStreetMap-Mitwirkende, ODbL 1.0"
+        },
+        {
+          "name": "data[osm_speed_cameras].shareAlike",
+          "value": "true"
+        },
+        {
+          "name": "data[osm_speed_cameras].staleAfterS",
+          "value": "259200"
+        },
+        {
+          "name": "data[osm_speed_cameras].status",
+          "value": "green"
+        },
+        {
+          "name": "data[osm_speed_cameras].termsUrl",
+          "value": "https://www.openstreetmap.org/copyright"
+        },
+        {
+          "name": "data[park_alpha].attribution",
+          "value": "Synthetic data from family alpha, licence CC BY 4.0."
+        },
+        {
+          "name": "data[park_alpha].dataAsOf",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data[park_alpha].domain",
+          "value": "parking"
+        },
+        {
+          "name": "data[park_alpha].family",
+          "value": "park_alpha"
+        },
+        {
+          "name": "data[park_alpha].licence",
+          "value": "CC BY 4.0"
+        },
+        {
+          "name": "data[park_alpha].licenceUrl",
+          "value": "https://licences.example/cc-by-4-0"
+        },
+        {
+          "name": "data[park_alpha].publisher",
+          "value": "Fäpung Datenwerk"
+        },
+        {
+          "name": "data[park_alpha].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[park_alpha].staleAfterS",
+          "value": "900"
+        },
+        {
+          "name": "data[park_alpha].status",
+          "value": "green"
+        },
+        {
+          "name": "data[park_alpha].termsUrl",
+          "value": "https://alpha.example/terms/park_alpha"
+        },
+        {
+          "name": "data[park_beta].attribution",
+          "value": "Synthetic data from family beta, licence CC BY-SA 4.0."
+        },
+        {
+          "name": "data[park_beta].dataAsOf",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data[park_beta].domain",
+          "value": "parking"
+        },
+        {
+          "name": "data[park_beta].family",
+          "value": "park_beta"
+        },
+        {
+          "name": "data[park_beta].licence",
+          "value": "CC BY-SA 4.0"
+        },
+        {
+          "name": "data[park_beta].licenceUrl",
+          "value": "https://licences.example/cc-by-sa-4-0"
+        },
+        {
+          "name": "data[park_beta].publisher",
+          "value": "Sückkies Datenwerk"
+        },
+        {
+          "name": "data[park_beta].shareAlike",
+          "value": "true"
+        },
+        {
+          "name": "data[park_beta].staleAfterS",
+          "value": "900"
+        },
+        {
+          "name": "data[park_beta].status",
+          "value": "green"
+        },
+        {
+          "name": "data[park_beta].termsUrl",
+          "value": "https://beta.example/terms/park_beta"
+        },
+        {
+          "name": "data[roads_alpha].attribution",
+          "value": "Synthetic data from family alpha, licence CC BY 4.0."
+        },
+        {
+          "name": "data[roads_alpha].dataAsOf",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data[roads_alpha].domain",
+          "value": "roads"
+        },
+        {
+          "name": "data[roads_alpha].family",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "data[roads_alpha].licence",
+          "value": "CC BY 4.0"
+        },
+        {
+          "name": "data[roads_alpha].licenceUrl",
+          "value": "https://licences.example/cc-by-4-0"
+        },
+        {
+          "name": "data[roads_alpha].publisher",
+          "value": "Nimbruß Datenwerk"
+        },
+        {
+          "name": "data[roads_alpha].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[roads_alpha].staleAfterS",
+          "value": "900"
+        },
+        {
+          "name": "data[roads_alpha].status",
+          "value": "green"
+        },
+        {
+          "name": "data[roads_alpha].termsUrl",
+          "value": "https://alpha.example/terms/roads_alpha"
+        },
+        {
+          "name": "data[speed_alpha].attribution",
+          "value": "Synthetic data from family alpha, licence CC BY 4.0."
+        },
+        {
+          "name": "data[speed_alpha].dataAsOf",
+          "value": "2026-03-29T12:00:00Z"
+        },
+        {
+          "name": "data[speed_alpha].domain",
+          "value": "roads"
+        },
+        {
+          "name": "data[speed_alpha].family",
+          "value": "speed_alpha"
+        },
+        {
+          "name": "data[speed_alpha].licence",
+          "value": "CC BY 4.0"
+        },
+        {
+          "name": "data[speed_alpha].licenceUrl",
+          "value": "https://licences.example/cc-by-4-0"
+        },
+        {
+          "name": "data[speed_alpha].publisher",
+          "value": "Blitzwerk Datenwerk"
+        },
+        {
+          "name": "data[speed_alpha].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[speed_alpha].staleAfterS",
+          "value": "259200"
+        },
+        {
+          "name": "data[speed_alpha].status",
+          "value": "green"
+        },
+        {
+          "name": "data[speed_alpha].termsUrl",
+          "value": "https://alpha.example/terms/speed_alpha"
+        },
+        {
+          "name": "data[viafrei_rules].attribution",
+          "value": "Verkehrsregeln: ViaFrei, eigene Zusammenstellung aus amtlichen Quellen (StVO, StVZO, 35. BImSchV, StVG, EmoG, AFIR); jede Aussage mit Quelle und Prüfdatum — informativ, keine Rechtsberatung / Road rules: ViaFrei, our own compilation from official sources; every statement carries its source and the date it was read — informational, not legal advice"
+        },
+        {
+          "name": "data[viafrei_rules].dataAsOf",
+          "value": "null"
+        },
+        {
+          "name": "data[viafrei_rules].domain",
+          "value": "rules"
+        },
+        {
+          "name": "data[viafrei_rules].family",
+          "value": "viafrei_rules"
+        },
+        {
+          "name": "data[viafrei_rules].licence",
+          "value": "ViaFrei editorial content (informational, not legal advice)"
+        },
+        {
+          "name": "data[viafrei_rules].licenceUrl",
+          "value": "https://viafrei.de"
+        },
+        {
+          "name": "data[viafrei_rules].publisher",
+          "value": "Verkehrsregeln: ViaFrei, eigene Zusammenstellung aus amtlichen Quellen (StVO, StVZO, 35. BImSchV, StVG, EmoG, AFIR); jede Aussage mit Quelle und Prüfdatum — informativ, keine Rechtsberatung / Road rules: ViaFrei, our own compilation from official sources; every statement carries its source and the date it was read — informational, not legal advice"
+        },
+        {
+          "name": "data[viafrei_rules].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[viafrei_rules].status",
+          "value": "grey"
+        },
+        {
+          "name": "data[viafrei_rules].termsUrl",
+          "value": "https://viafrei.de"
+        },
+        {
+          "name": "meta.attribution[afir_alpha].family",
+          "value": "afir_alpha"
+        },
+        {
+          "name": "meta.attribution[afir_beta].family",
+          "value": "afir_beta"
+        },
+        {
+          "name": "meta.attribution[bast_lcl].family",
+          "value": "bast_lcl"
+        },
+        {
+          "name": "meta.attribution[bkg_gvisys].family",
+          "value": "bkg_gvisys"
+        },
+        {
+          "name": "meta.attribution[delfi_sa_alpha].family",
+          "value": "delfi_sa_alpha"
+        },
+        {
+          "name": "meta.attribution[delfi_static].family",
+          "value": "delfi_static"
+        },
+        {
+          "name": "meta.attribution[dwd_alpha].family",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "meta.attribution[dwd_eta].family",
+          "value": "dwd_eta"
+        },
+        {
+          "name": "meta.attribution[gbfs_nextbike].family",
+          "value": "gbfs_nextbike"
+        },
+        {
+          "name": "meta.attribution[geonames].family",
+          "value": "geonames"
+        },
+        {
+          "name": "meta.attribution[lez_alpha].family",
+          "value": "lez_alpha"
+        },
+        {
+          "name": "meta.attribution[lorry_bast_langlkw].family",
+          "value": "lorry_bast_langlkw"
+        },
+        {
+          "name": "meta.attribution[lorry_koeln_beschraenkungen].family",
+          "value": "lorry_koeln_beschraenkungen"
+        },
+        {
+          "name": "meta.attribution[openstation_siri_fm].family",
+          "value": "openstation_siri_fm"
+        },
+        {
+          "name": "meta.attribution[osm].family",
+          "value": "osm"
+        },
+        {
+          "name": "meta.attribution[osm_speed_cameras].family",
+          "value": "osm_speed_cameras"
+        },
+        {
+          "name": "meta.attribution[park_alpha].family",
+          "value": "park_alpha"
+        },
+        {
+          "name": "meta.attribution[park_beta].family",
+          "value": "park_beta"
+        },
+        {
+          "name": "meta.attribution[roads_alpha].family",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "meta.attribution[speed_alpha].family",
+          "value": "speed_alpha"
+        },
+        {
+          "name": "meta.attribution[viafrei_rules].family",
+          "value": "viafrei_rules"
+        },
+        {
+          "name": "meta.notes.condition[lorry_bast_langlkw]",
+          "value": "1"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "sources-places",
+      "operation": "listSources",
+      "counterpart": "gazetteer",
+      "request": "/v1/sources?domain=places",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data[bkg_gvisys].attribution",
+          "value": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)"
+        },
+        {
+          "name": "data[bkg_gvisys].dataAsOf",
+          "value": "null"
+        },
+        {
+          "name": "data[bkg_gvisys].domain",
+          "value": "places"
+        },
+        {
+          "name": "data[bkg_gvisys].family",
+          "value": "bkg_gvisys"
+        },
+        {
+          "name": "data[bkg_gvisys].licence",
+          "value": "dl-de/by-2-0"
+        },
+        {
+          "name": "data[bkg_gvisys].licenceUrl",
+          "value": "https://licences.example/dl-de-by-2-0"
+        },
+        {
+          "name": "data[bkg_gvisys].publisher",
+          "value": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)"
+        },
+        {
+          "name": "data[bkg_gvisys].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[bkg_gvisys].status",
+          "value": "grey"
+        },
+        {
+          "name": "data[bkg_gvisys].termsUrl",
+          "value": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+        },
+        {
+          "name": "data[geonames].attribution",
+          "value": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet"
+        },
+        {
+          "name": "data[geonames].dataAsOf",
+          "value": "null"
+        },
+        {
+          "name": "data[geonames].domain",
+          "value": "places"
+        },
+        {
+          "name": "data[geonames].family",
+          "value": "geonames"
+        },
+        {
+          "name": "data[geonames].licence",
+          "value": "CC BY 4.0"
+        },
+        {
+          "name": "data[geonames].licenceUrl",
+          "value": "https://licences.example/cc-by-4-0"
+        },
+        {
+          "name": "data[geonames].publisher",
+          "value": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet"
+        },
+        {
+          "name": "data[geonames].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[geonames].status",
+          "value": "grey"
+        },
+        {
+          "name": "data[geonames].termsUrl",
+          "value": "https://download.geonames.org/export/dump/"
+        },
+        {
+          "name": "data[osm].attribution",
+          "value": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0"
+        },
+        {
+          "name": "data[osm].dataAsOf",
+          "value": "null"
+        },
+        {
+          "name": "data[osm].domain",
+          "value": "places"
+        },
+        {
+          "name": "data[osm].family",
+          "value": "osm"
+        },
+        {
+          "name": "data[osm].licence",
+          "value": "ODbL 1.0"
+        },
+        {
+          "name": "data[osm].licenceUrl",
+          "value": "https://opendatacommons.org/licenses/odbl/1-0/"
+        },
+        {
+          "name": "data[osm].publisher",
+          "value": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0"
+        },
+        {
+          "name": "data[osm].shareAlike",
+          "value": "true"
+        },
+        {
+          "name": "data[osm].status",
+          "value": "grey"
+        },
+        {
+          "name": "data[osm].termsUrl",
+          "value": "https://www.openstreetmap.org/copyright"
+        },
+        {
+          "name": "meta.attribution[bkg_gvisys].family",
+          "value": "bkg_gvisys"
+        },
+        {
+          "name": "meta.attribution[geonames].family",
+          "value": "geonames"
+        },
+        {
+          "name": "meta.attribution[osm].family",
+          "value": "osm"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "motorways-all",
+      "operation": "listMotorways",
+      "counterpart": "motorway traffic",
+      "request": "/v1/motorways?limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data[0].junctions",
+          "value": "8"
+        },
+        {
+          "name": "data[0].kilometres",
+          "value": "null"
+        },
+        {
+          "name": "data[0].name",
+          "value": "A100"
+        },
+        {
+          "name": "data[0].road",
+          "value": "A100"
+        },
+        {
+          "name": "data[0].situations",
+          "value": "0"
+        },
+        {
+          "name": "data[0].sourceFamily",
+          "value": "autobahn"
+        },
+        {
+          "name": "data[0].states",
+          "value": "[\"01\",\"06\",\"08\",\"10\",\"11\"]"
+        },
+        {
+          "name": "data[1].junctions",
+          "value": "8"
+        },
+        {
+          "name": "data[1].kilometres",
+          "value": "null"
+        },
+        {
+          "name": "data[1].name",
+          "value": "A101"
+        },
+        {
+          "name": "data[1].road",
+          "value": "A101"
+        },
+        {
+          "name": "data[1].situations",
+          "value": "4"
+        },
+        {
+          "name": "data[1].sourceFamily",
+          "value": "autobahn"
+        },
+        {
+          "name": "data[1].states",
+          "value": "[\"06\",\"07\",\"08\",\"10\"]"
+        },
+        {
+          "name": "data[2].junctions",
+          "value": "8"
+        },
+        {
+          "name": "data[2].kilometres",
+          "value": "null"
+        },
+        {
+          "name": "data[2].name",
+          "value": "A102"
+        },
+        {
+          "name": "data[2].road",
+          "value": "A102"
+        },
+        {
+          "name": "data[2].situations",
+          "value": "2"
+        },
+        {
+          "name": "data[2].sourceFamily",
+          "value": "autobahn"
+        },
+        {
+          "name": "data[2].states",
+          "value": "[\"03\",\"04\",\"07\",\"10\",\"11\",\"14\"]"
+        },
+        {
+          "name": "data[3].junctions",
+          "value": "8"
+        },
+        {
+          "name": "data[3].kilometres",
+          "value": "null"
+        },
+        {
+          "name": "data[3].name",
+          "value": "A103"
+        },
+        {
+          "name": "data[3].road",
+          "value": "A103"
+        },
+        {
+          "name": "data[3].situations",
+          "value": "2"
+        },
+        {
+          "name": "data[3].sourceFamily",
+          "value": "autobahn"
+        },
+        {
+          "name": "data[3].states",
+          "value": "[\"05\",\"07\",\"10\",\"12\",\"14\",\"15\"]"
+        },
+        {
+          "name": "data[4].junctions",
+          "value": "8"
+        },
+        {
+          "name": "data[4].kilometres",
+          "value": "null"
+        },
+        {
+          "name": "data[4].name",
+          "value": "A104"
+        },
+        {
+          "name": "data[4].road",
+          "value": "A104"
+        },
+        {
+          "name": "data[4].situations",
+          "value": "1"
+        },
+        {
+          "name": "data[4].sourceFamily",
+          "value": "autobahn"
+        },
+        {
+          "name": "data[4].states",
+          "value": "[\"03\",\"07\",\"11\",\"12\",\"15\",\"16\"]"
+        },
+        {
+          "name": "meta.attribution[bast_lcl].family",
+          "value": "bast_lcl"
+        },
+        {
+          "name": "meta.attribution[lez_alpha].family",
+          "value": "lez_alpha"
+        },
+        {
+          "name": "meta.attribution[lorry_bast_langlkw].family",
+          "value": "lorry_bast_langlkw"
+        },
+        {
+          "name": "meta.attribution[lorry_koeln_beschraenkungen].family",
+          "value": "lorry_koeln_beschraenkungen"
+        },
+        {
+          "name": "meta.attribution[osm_speed_cameras].family",
+          "value": "osm_speed_cameras"
+        },
+        {
+          "name": "meta.attribution[roads_alpha].family",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "meta.attribution[speed_alpha].family",
+          "value": "speed_alpha"
+        },
+        {
+          "name": "meta.notes.condition[lorry_bast_langlkw]",
+          "value": "1"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "motorways-exits",
+      "operation": "listMotorways",
+      "counterpart": "motorway traffic",
+      "request": "/v1/motorways?road=A100",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data[0].exits[58:1:1].id",
+          "value": "58:1:1"
+        },
+        {
+          "name": "data[0].exits[58:1:1].kind",
+          "value": "junction"
+        },
+        {
+          "name": "data[0].exits[58:1:1].lat",
+          "value": "49.26477"
+        },
+        {
+          "name": "data[0].exits[58:1:1].lon",
+          "value": "12.94870"
+        },
+        {
+          "name": "data[0].exits[58:1:1].name",
+          "value": "Seirkieckwerder"
+        },
+        {
+          "name": "data[0].exits[58:1:1].number",
+          "value": "1"
+        },
+        {
+          "name": "data[0].exits[58:1:1].state",
+          "value": "08"
+        },
+        {
+          "name": "data[0].exits[58:1:2].id",
+          "value": "58:1:2"
+        },
+        {
+          "name": "data[0].exits[58:1:2].kind",
+          "value": "junction"
+        },
+        {
+          "name": "data[0].exits[58:1:2].lat",
+          "value": "50.54542"
+        },
+        {
+          "name": "data[0].exits[58:1:2].lon",
+          "value": "13.50888"
+        },
+        {
+          "name": "data[0].exits[58:1:2].name",
+          "value": "Klösstumau"
+        },
+        {
+          "name": "data[0].exits[58:1:2].number",
+          "value": "2"
+        },
+        {
+          "name": "data[0].exits[58:1:2].state",
+          "value": "08"
+        },
+        {
+          "name": "data[0].exits[58:1:3].id",
+          "value": "58:1:3"
+        },
+        {
+          "name": "data[0].exits[58:1:3].kind",
+          "value": "triangle"
+        },
+        {
+          "name": "data[0].exits[58:1:3].lat",
+          "value": "51.61367"
+        },
+        {
+          "name": "data[0].exits[58:1:3].lon",
+          "value": "12.39889"
+        },
+        {
+          "name": "data[0].exits[58:1:3].name",
+          "value": "Homdücktal"
+        },
+        {
+          "name": "data[0].exits[58:1:3].number",
+          "value": "3"
+        },
+        {
+          "name": "data[0].exits[58:1:3].state",
+          "value": "11"
+        },
+        {
+          "name": "data[0].exits[58:1:4].id",
+          "value": "58:1:4"
+        },
+        {
+          "name": "data[0].exits[58:1:4].kind",
+          "value": "interchange"
+        },
+        {
+          "name": "data[0].exits[58:1:4].lat",
+          "value": "52.65054"
+        },
+        {
+          "name": "data[0].exits[58:1:4].lon",
+          "value": "11.04205"
+        },
+        {
+          "name": "data[0].exits[58:1:4].name",
+          "value": "Schusnötkamp"
+        },
+        {
+          "name": "data[0].exits[58:1:4].number",
+          "value": "4"
+        },
+        {
+          "name": "data[0].exits[58:1:4].state",
+          "value": "11"
+        },
+        {
+          "name": "data[0].exits[58:1:5].id",
+          "value": "58:1:5"
+        },
+        {
+          "name": "data[0].exits[58:1:5].kind",
+          "value": "junction"
+        },
+        {
+          "name": "data[0].exits[58:1:5].lat",
+          "value": "52.90588"
+        },
+        {
+          "name": "data[0].exits[58:1:5].lon",
+          "value": "9.88094"
+        },
+        {
+          "name": "data[0].exits[58:1:5].name",
+          "value": "Fügeintal"
+        },
+        {
+          "name": "data[0].exits[58:1:5].number",
+          "value": "5"
+        },
+        {
+          "name": "data[0].exits[58:1:5].state",
+          "value": "10"
+        },
+        {
+          "name": "data[0].exits[58:1:6].id",
+          "value": "58:1:6"
+        },
+        {
+          "name": "data[0].exits[58:1:6].kind",
+          "value": "junction"
+        },
+        {
+          "name": "data[0].exits[58:1:6].lat",
+          "value": "51.67058"
+        },
+        {
+          "name": "data[0].exits[58:1:6].lon",
+          "value": "9.09312"
+        },
+        {
+          "name": "data[0].exits[58:1:6].name",
+          "value": "Woßpistal"
+        },
+        {
+          "name": "data[0].exits[58:1:6].number",
+          "value": "6"
+        },
+        {
+          "name": "data[0].exits[58:1:6].state",
+          "value": "10"
+        },
+        {
+          "name": "data[0].exits[58:1:7].id",
+          "value": "58:1:7"
+        },
+        {
+          "name": "data[0].exits[58:1:7].kind",
+          "value": "junction"
+        },
+        {
+          "name": "data[0].exits[58:1:7].lat",
+          "value": "50.43527"
+        },
+        {
+          "name": "data[0].exits[58:1:7].lon",
+          "value": "8.30530"
+        },
+        {
+          "name": "data[0].exits[58:1:7].name",
+          "value": "Schesgrultal"
+        },
+        {
+          "name": "data[0].exits[58:1:7].number",
+          "value": "7"
+        },
+        {
+          "name": "data[0].exits[58:1:7].state",
+          "value": "06"
+        },
+        {
+          "name": "data[0].exits[58:1:8].id",
+          "value": "58:1:8"
+        },
+        {
+          "name": "data[0].exits[58:1:8].kind",
+          "value": "triangle"
+        },
+        {
+          "name": "data[0].exits[58:1:8].lat",
+          "value": "49.19997"
+        },
+        {
+          "name": "data[0].exits[58:1:8].lon",
+          "value": "7.51748"
+        },
+        {
+          "name": "data[0].exits[58:1:8].name",
+          "value": "Diembrämwerder"
+        },
+        {
+          "name": "data[0].exits[58:1:8].number",
+          "value": "8"
+        },
+        {
+          "name": "data[0].exits[58:1:8].state",
+          "value": "01"
+        },
+        {
+          "name": "data[0].junctions",
+          "value": "8"
+        },
+        {
+          "name": "data[0].kilometres",
+          "value": "null"
+        },
+        {
+          "name": "data[0].name",
+          "value": "A100"
+        },
+        {
+          "name": "data[0].road",
+          "value": "A100"
+        },
+        {
+          "name": "data[0].situations",
+          "value": "0"
+        },
+        {
+          "name": "data[0].sourceFamily",
+          "value": "autobahn"
+        },
+        {
+          "name": "data[0].states",
+          "value": "[\"01\",\"06\",\"08\",\"10\",\"11\"]"
+        },
+        {
+          "name": "meta.attribution[bast_lcl].family",
+          "value": "bast_lcl"
+        },
+        {
+          "name": "meta.attribution[lez_alpha].family",
+          "value": "lez_alpha"
+        },
+        {
+          "name": "meta.attribution[lorry_bast_langlkw].family",
+          "value": "lorry_bast_langlkw"
+        },
+        {
+          "name": "meta.attribution[lorry_koeln_beschraenkungen].family",
+          "value": "lorry_koeln_beschraenkungen"
+        },
+        {
+          "name": "meta.attribution[osm_speed_cameras].family",
+          "value": "osm_speed_cameras"
+        },
+        {
+          "name": "meta.attribution[roads_alpha].family",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "meta.attribution[speed_alpha].family",
+          "value": "speed_alpha"
+        },
+        {
+          "name": "meta.notes.condition[lorry_bast_langlkw]",
+          "value": "1"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "motorways-state",
+      "operation": "listMotorways",
+      "counterpart": "motorway traffic",
+      "request": "/v1/motorways?state=01",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data[0].junctions",
+          "value": "8"
+        },
+        {
+          "name": "data[0].kilometres",
+          "value": "null"
+        },
+        {
+          "name": "data[0].name",
+          "value": "A100"
+        },
+        {
+          "name": "data[0].road",
+          "value": "A100"
+        },
+        {
+          "name": "data[0].situations",
+          "value": "0"
+        },
+        {
+          "name": "data[0].sourceFamily",
+          "value": "autobahn"
+        },
+        {
+          "name": "data[0].states",
+          "value": "[\"01\",\"06\",\"08\",\"10\",\"11\"]"
+        },
+        {
+          "name": "meta.attribution[bast_lcl].family",
+          "value": "bast_lcl"
+        },
+        {
+          "name": "meta.attribution[lez_alpha].family",
+          "value": "lez_alpha"
+        },
+        {
+          "name": "meta.attribution[lorry_bast_langlkw].family",
+          "value": "lorry_bast_langlkw"
+        },
+        {
+          "name": "meta.attribution[lorry_koeln_beschraenkungen].family",
+          "value": "lorry_koeln_beschraenkungen"
+        },
+        {
+          "name": "meta.attribution[osm_speed_cameras].family",
+          "value": "osm_speed_cameras"
+        },
+        {
+          "name": "meta.attribution[roads_alpha].family",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "meta.attribution[speed_alpha].family",
+          "value": "speed_alpha"
+        },
+        {
+          "name": "meta.notes.condition[lorry_bast_langlkw]",
+          "value": "1"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "watch-road",
+      "operation": "getWatch",
+      "counterpart": "watch situation",
+      "request": "/v1/watch?kind=road\u0026target=A102\u0026hours=3\u0026request=Sag%20mir%20Bescheid%2C%20wenn%20sich%20ein%20Stau%20bildet",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.condition.event",
+          "value": "any"
+        },
+        {
+          "name": "data.condition.events",
+          "value": "null"
+        },
+        {
+          "name": "data.ended",
+          "value": "false"
+        },
+        {
+          "name": "data.from",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.key",
+          "value": "A102"
+        },
+        {
+          "name": "data.kind",
+          "value": "road"
+        },
+        {
+          "name": "data.lamp",
+          "value": "amber"
+        },
+        {
+          "name": "data.note",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].delayMin",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].description",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].direction",
+          "value": "unknown"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].directionText",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].headline",
+          "value": "SpeedManagement"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].id",
+          "value": "datex:syn:ev-00006"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].kind",
+          "value": "restriction"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].lanes",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].lengthM",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].location.lat",
+          "value": "48.25624"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].location.lon",
+          "value": "11.23054"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].position",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].road",
+          "value": "A102"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].roadType",
+          "value": "motorway"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].severity",
+          "value": "minor"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].sourceFamily",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].textLanguage",
+          "value": "de"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].updatedAt",
+          "value": "2026-03-29T02:19:34Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].updatedAtLocal",
+          "value": "2026-03-29T02:19:34Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].validity.from",
+          "value": "2026-03-29T02:18:34Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].validity.fromLocal",
+          "value": "2026-03-29T02:18:34Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].validity.until",
+          "value": "2026-03-31T07:18:34Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00006].validity.untilLocal",
+          "value": "2026-03-31T07:18:34Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].delayMin",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].description",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].direction",
+          "value": "unknown"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].directionText",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].headline",
+          "value": "AbnormalTraffic"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].id",
+          "value": "datex:syn:ev-00007"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].kind",
+          "value": "jam"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].lanes",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].lengthM",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].location.lat",
+          "value": "52.06978"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].location.lon",
+          "value": "10.34101"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].position",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].road",
+          "value": "A102"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].roadType",
+          "value": "motorway"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].severity",
+          "value": "minor"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].sourceFamily",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].textLanguage",
+          "value": "de"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].updatedAt",
+          "value": "2026-03-29T01:09:37Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].updatedAtLocal",
+          "value": "2026-03-29T01:09:37Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].validity.from",
+          "value": "2026-03-29T01:08:37Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].validity.fromLocal",
+          "value": "2026-03-29T01:08:37Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].validity.until",
+          "value": "2026-03-31T06:08:37Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].validity.untilLocal",
+          "value": "2026-03-31T06:08:37Z"
+        },
+        {
+          "name": "data.until",
+          "value": "2026-03-30T03:00:00Z"
+        },
+        {
+          "name": "data.uri",
+          "value": "viafrei://watch/eyJrIjoicm9hZCIsImtleSI6IkExMDIiLCJjIjp7fX0"
+        },
+        {
+          "name": "data.watchId",
+          "value": "eyJrIjoicm9hZCIsImtleSI6IkExMDIiLCJjIjp7fX0"
+        },
+        {
+          "name": "meta.attribution[roads_alpha].family",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "watch-road-since",
+      "operation": "getWatch",
+      "counterpart": "watch situation",
+      "request": "/v1/watch?kind=road\u0026target=A102\u0026condition=%7B%22events%22%3A%5B%22jams%22%5D%7D\u0026since=2026-03-29T00:00:00Z",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.condition.event",
+          "value": "any"
+        },
+        {
+          "name": "data.condition.events",
+          "value": "[\"jams\"]"
+        },
+        {
+          "name": "data.ended",
+          "value": "false"
+        },
+        {
+          "name": "data.from",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.key",
+          "value": "A102"
+        },
+        {
+          "name": "data.kind",
+          "value": "road"
+        },
+        {
+          "name": "data.lamp",
+          "value": "amber"
+        },
+        {
+          "name": "data.note",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].delayMin",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].description",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].direction",
+          "value": "unknown"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].directionText",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].headline",
+          "value": "AbnormalTraffic"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].id",
+          "value": "datex:syn:ev-00007"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].kind",
+          "value": "jam"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].lanes",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].lengthM",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].location.lat",
+          "value": "52.06978"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].location.lon",
+          "value": "10.34101"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].position",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].road",
+          "value": "A102"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].roadType",
+          "value": "motorway"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].severity",
+          "value": "minor"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].sourceFamily",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].textLanguage",
+          "value": "de"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].updatedAt",
+          "value": "2026-03-29T01:09:37Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].updatedAtLocal",
+          "value": "2026-03-29T01:09:37Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].validity.from",
+          "value": "2026-03-29T01:08:37Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].validity.fromLocal",
+          "value": "2026-03-29T01:08:37Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].validity.until",
+          "value": "2026-03-31T06:08:37Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].validity.untilLocal",
+          "value": "2026-03-31T06:08:37Z"
+        },
+        {
+          "name": "data.until",
+          "value": "2026-03-30T03:00:00Z"
+        },
+        {
+          "name": "data.uri",
+          "value": "viafrei://watch/eyJrIjoicm9hZCIsImtleSI6IkExMDIiLCJjIjp7ImV2ZW50cyI6WyJqYW1zIl19fQ"
+        },
+        {
+          "name": "data.watchId",
+          "value": "eyJrIjoicm9hZCIsImtleSI6IkExMDIiLCJjIjp7ImV2ZW50cyI6WyJqYW1zIl19fQ"
+        },
+        {
+          "name": "meta.attribution[roads_alpha].family",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "watch-place",
+      "operation": "getWatch",
+      "counterpart": "watch situation",
+      "request": "/v1/watch?kind=place\u0026target=49.16465,7.79903\u0026condition=%7B%22radius_km%22%3A10%7D\u0026until=2026-03-30T06:00:00Z",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.condition.radius_km",
+          "value": "10"
+        },
+        {
+          "name": "data.ended",
+          "value": "false"
+        },
+        {
+          "name": "data.from",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.key",
+          "value": "49.16465,7.79903"
+        },
+        {
+          "name": "data.kind",
+          "value": "place"
+        },
+        {
+          "name": "data.lamp",
+          "value": "amber"
+        },
+        {
+          "name": "data.note",
+          "value": "null"
+        },
+        {
+          "name": "data.situations",
+          "value": "[]"
+        },
+        {
+          "name": "data.until",
+          "value": "2026-03-30T06:00:00Z"
+        },
+        {
+          "name": "data.uri",
+          "value": "viafrei://watch/eyJrIjoicGxhY2UiLCJrZXkiOiI0OS4xNjQ2NSw3Ljc5OTAzIiwiYyI6eyJyYWRpdXNfa20iOjEwfX0"
+        },
+        {
+          "name": "data.watchId",
+          "value": "eyJrIjoicGxhY2UiLCJrZXkiOiI0OS4xNjQ2NSw3Ljc5OTAzIiwiYyI6eyJyYWRpdXNfa20iOjEwfX0"
+        },
+        {
+          "name": "meta.attribution[bast_lcl].family",
+          "value": "bast_lcl"
+        },
+        {
+          "name": "meta.attribution[lez_alpha].family",
+          "value": "lez_alpha"
+        },
+        {
+          "name": "meta.attribution[lorry_bast_langlkw].family",
+          "value": "lorry_bast_langlkw"
+        },
+        {
+          "name": "meta.attribution[lorry_koeln_beschraenkungen].family",
+          "value": "lorry_koeln_beschraenkungen"
+        },
+        {
+          "name": "meta.attribution[osm_speed_cameras].family",
+          "value": "osm_speed_cameras"
+        },
+        {
+          "name": "meta.attribution[roads_alpha].family",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "meta.attribution[speed_alpha].family",
+          "value": "speed_alpha"
+        },
+        {
+          "name": "meta.notes.condition[lorry_bast_langlkw]",
+          "value": "1"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "watch-by-id",
+      "operation": "getWatch",
+      "counterpart": "stop watch",
+      "request": "/v1/watch?watch_id=eyJrIjoicm9hZCIsImtleSI6IkExMDIiLCJjIjp7ImV2ZW50cyI6WyJqYW1zIl19fQ\u0026since=2026-03-29T00:00:00Z",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.condition.event",
+          "value": "any"
+        },
+        {
+          "name": "data.condition.events",
+          "value": "[\"jams\"]"
+        },
+        {
+          "name": "data.ended",
+          "value": "false"
+        },
+        {
+          "name": "data.from",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.key",
+          "value": "A102"
+        },
+        {
+          "name": "data.kind",
+          "value": "road"
+        },
+        {
+          "name": "data.lamp",
+          "value": "amber"
+        },
+        {
+          "name": "data.note",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].delayMin",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].description",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].direction",
+          "value": "unknown"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].directionText",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].headline",
+          "value": "AbnormalTraffic"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].id",
+          "value": "datex:syn:ev-00007"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].kind",
+          "value": "jam"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].lanes",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].lengthM",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].location.lat",
+          "value": "52.06978"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].location.lon",
+          "value": "10.34101"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].position",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].road",
+          "value": "A102"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].roadType",
+          "value": "motorway"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].severity",
+          "value": "minor"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].sourceFamily",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].textLanguage",
+          "value": "de"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].updatedAt",
+          "value": "2026-03-29T01:09:37Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].updatedAtLocal",
+          "value": "2026-03-29T01:09:37Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].validity.from",
+          "value": "2026-03-29T01:08:37Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].validity.fromLocal",
+          "value": "2026-03-29T01:08:37Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].validity.until",
+          "value": "2026-03-31T06:08:37Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00007].validity.untilLocal",
+          "value": "2026-03-31T06:08:37Z"
+        },
+        {
+          "name": "data.until",
+          "value": "2026-03-30T03:00:00Z"
+        },
+        {
+          "name": "data.uri",
+          "value": "viafrei://watch/eyJrIjoicm9hZCIsImtleSI6IkExMDIiLCJjIjp7ImV2ZW50cyI6WyJqYW1zIl19fQ"
+        },
+        {
+          "name": "data.watchId",
+          "value": "eyJrIjoicm9hZCIsImtleSI6IkExMDIiLCJjIjp7ImV2ZW50cyI6WyJqYW1zIl19fQ"
+        },
+        {
+          "name": "meta.attribution[roads_alpha].family",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "service-meta",
+      "operation": "getMeta",
+      "counterpart": "pressure",
+      "request": "/v1/meta",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.apiVersion",
+          "value": "parity"
+        },
+        {
+          "name": "data.buildSha",
+          "value": "parity"
+        },
+        {
+          "name": "data.contractVersion",
+          "value": "0.3"
+        },
+        {
+          "name": "data.languages",
+          "value": "[\"en\"]"
+        },
+        {
+          "name": "data.openapi",
+          "value": "https://api.viafrei.de/v1/openapi.json"
+        },
+        {
+          "name": "data.platformVersion",
+          "value": "null"
+        }
+      ]
     }
   ]
 }

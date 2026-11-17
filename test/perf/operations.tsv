@@ -31,3 +31,6 @@ listTransitDisruptions	lookup
 listNearby	composed
 listStateRoadConditions	near
 listLorryRules	near
+listSources	near
+listMotorways	near
+getWatch	near

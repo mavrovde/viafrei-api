@@ -165,7 +165,7 @@ func ask(t *testing.T, cfg *config.Config, st *store.Store, e api.Example) (int,
 		Config: cfg, Build: build, ContractVersion: dbcontract.ContractVersion, Now: clock,
 		Readiness: health.NewChecker(st, expected, cfg.Health.ReadyTimeout),
 		Auth:      keyAuth{principal(e.Key)}, Sources: st,
-		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st, Transit: st, Fuel: st, Hydrogen: st, Speed: st, Sharing: st, Addresses: st, Pois: st, Locations: st, Disruptions: st, Nearby: st, Lorry: st}, wire.FeatureSettings(cfg), clock),
+		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st, Transit: st, Fuel: st, Hydrogen: st, Speed: st, Sharing: st, Addresses: st, Pois: st, Locations: st, Disruptions: st, Nearby: st, Lorry: st, Catalogue: st}, wire.FeatureSettings(cfg), clock),
 	})
 	if err != nil {
 		t.Fatal(err)

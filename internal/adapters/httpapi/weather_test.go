@@ -152,3 +152,11 @@ func TestWeatherAndRulesRefusals(t *testing.T) {
 func (f *fakeFeatures) LorryRules(context.Context, access.Record, roads.LorryQuery) (features.LorryAnswer, error) {
 	return features.LorryAnswer{}, nil
 }
+
+func (f *fakeFeatures) Sources(context.Context, access.Record, string) ([]provenance.Family, features.Answer[struct{}], error) {
+	return nil, features.Answer[struct{}]{}, nil
+}
+
+func (f *fakeFeatures) Motorways(context.Context, access.Record, roads.CatalogueQuery) (features.MotorwaysAnswer, error) {
+	return features.MotorwaysAnswer{}, nil
+}

@@ -36,6 +36,8 @@ type Features interface {
 	DrivingRules(ctx context.Context, key access.Record, topic string) (rules.Topic, features.Answer[rules.Rule], error)
 	LowEmissionZones(ctx context.Context, key access.Record, q rules.ZoneQuery) (features.ZonesAnswer, error)
 	LorryRules(ctx context.Context, key access.Record, q roads.LorryQuery) (features.LorryAnswer, error)
+	Motorways(ctx context.Context, key access.Record, q roads.CatalogueQuery) (features.MotorwaysAnswer, error)
+	Sources(ctx context.Context, key access.Record, domain string) ([]provenance.Family, features.Answer[struct{}], error)
 	Stations(ctx context.Context, key access.Record, q transit.Query) (features.Answer[transit.Station], error)
 	Departures(ctx context.Context, key access.Record, q transit.DepartureQuery) (features.Board, error)
 	Facilities(ctx context.Context, key access.Record, q transit.FacilityQuery) (features.StationFacilities, error)

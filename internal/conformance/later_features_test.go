@@ -6,6 +6,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
@@ -50,4 +51,12 @@ func (laterFeatures) LowEmissionZones(context.Context, access.Record, rules.Zone
 
 func (laterFeatures) LorryRules(context.Context, access.Record, roads.LorryQuery) (features.LorryAnswer, error) {
 	return features.LorryAnswer{}, nil
+}
+
+func (laterFeatures) Sources(context.Context, access.Record, string) ([]provenance.Family, features.Answer[struct{}], error) {
+	return nil, features.Answer[struct{}]{}, nil
+}
+
+func (laterFeatures) Motorways(context.Context, access.Record, roads.CatalogueQuery) (features.MotorwaysAnswer, error) {
+	return features.MotorwaysAnswer{}, nil
 }

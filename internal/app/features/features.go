@@ -78,6 +78,7 @@ type Repositories struct {
 	Disruptions Disruptions
 	Nearby      Nearby
 	Lorry       Lorry
+	Catalogue   Catalogue
 }
 
 // Settings are the tunables of the use cases.

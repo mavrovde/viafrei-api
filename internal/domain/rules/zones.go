@@ -2,13 +2,13 @@ package rules
 
 import "github.com/mavrovde/viafrei-api/internal/domain/geo"
 
-// The platform's reach of a low-emission-zone check (analysis/lez-zones):
+// The platform's reach of a low-emission-zone check:
 // a zone or released area within ZoneReachM of the point is named, an
 // exempt road within ExemptRoadReachM.
 const (
 	ZoneReachM       = 25000
 	ExemptRoadReachM = 60
-	// FreshCadences is how many of its own cadences a zone feed's last check
+	// FreshCadences is how many of its own cadences a zone source's last check
 	// may lie back before its rows drop out; DefaultCadenceS when it states
 	// none (30 days).
 	FreshCadences   = 3

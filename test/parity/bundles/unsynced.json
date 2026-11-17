@@ -5838,6 +5838,7 @@
           "bast_lcl",
           "osm"
         ],
+        "audience": "own",
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z",
@@ -5847,8 +5848,52 @@
           "value": "[]"
         },
         {
-          "name": "data.fuel",
-          "value": "[]"
+          "name": "data.fuel[00000000-0000-4000-8000-000000000002].brand",
+          "value": "Belnan"
+        },
+        {
+          "name": "data.fuel[00000000-0000-4000-8000-000000000002].distanceM",
+          "value": "100"
+        },
+        {
+          "name": "data.fuel[00000000-0000-4000-8000-000000000002].id",
+          "value": "00000000-0000-4000-8000-000000000002"
+        },
+        {
+          "name": "data.fuel[00000000-0000-4000-8000-000000000002].location.lat",
+          "value": "49.16941"
+        },
+        {
+          "name": "data.fuel[00000000-0000-4000-8000-000000000002].location.lon",
+          "value": "7.80879"
+        },
+        {
+          "name": "data.fuel[00000000-0000-4000-8000-000000000002].name",
+          "value": "Belnan Namüningen"
+        },
+        {
+          "name": "data.fuel[00000000-0000-4000-8000-000000000002].prices[0].current",
+          "value": "true"
+        },
+        {
+          "name": "data.fuel[00000000-0000-4000-8000-000000000002].prices[0].fuel",
+          "value": "e5"
+        },
+        {
+          "name": "data.fuel[00000000-0000-4000-8000-000000000002].prices[0].priceEur",
+          "value": "2.062"
+        },
+        {
+          "name": "data.fuel[00000000-0000-4000-8000-000000000002].prices[0].reportedAt",
+          "value": "2026-03-29T21:50:02Z"
+        },
+        {
+          "name": "data.fuel[00000000-0000-4000-8000-000000000002].prices[0].reportedAtLocal",
+          "value": "2026-03-29T21:50:02Z"
+        },
+        {
+          "name": "data.fuel[00000000-0000-4000-8000-000000000002].sourceFamily",
+          "value": "tankerkoenig_gamma"
         },
         {
           "name": "data.junctions",
@@ -5859,88 +5904,20 @@
           "value": "[]"
         },
         {
-          "name": "data.stations[1:de:01002:0].distanceM",
-          "value": "3005"
-        },
-        {
-          "name": "data.stations[1:de:01002:0].districtCode",
-          "value": "01002"
-        },
-        {
-          "name": "data.stations[1:de:01002:0].id",
-          "value": "1:de:01002:0"
-        },
-        {
-          "name": "data.stations[1:de:01002:0].location.lat",
-          "value": "49.14816"
-        },
-        {
-          "name": "data.stations[1:de:01002:0].location.lon",
-          "value": "7.78575"
-        },
-        {
-          "name": "data.stations[1:de:01002:0].modes",
+          "name": "data.stations",
           "value": "[]"
         },
         {
-          "name": "data.stations[1:de:01002:0].name",
-          "value": "Namüningen Süd"
-        },
-        {
-          "name": "data.stations[1:de:01002:0].sourceFamily",
-          "value": "delfi_static"
-        },
-        {
-          "name": "data.stations[1:de:01002:0].stopCode",
-          "value": "de:01002:0"
-        },
-        {
-          "name": "data.stations[1:de:01002:1].distanceM",
-          "value": "3840"
-        },
-        {
-          "name": "data.stations[1:de:01002:1].districtCode",
-          "value": "01002"
-        },
-        {
-          "name": "data.stations[1:de:01002:1].id",
-          "value": "1:de:01002:1"
-        },
-        {
-          "name": "data.stations[1:de:01002:1].location.lat",
-          "value": "49.16700"
-        },
-        {
-          "name": "data.stations[1:de:01002:1].location.lon",
-          "value": "7.86246"
-        },
-        {
-          "name": "data.stations[1:de:01002:1].modes",
-          "value": "[]"
-        },
-        {
-          "name": "data.stations[1:de:01002:1].name",
-          "value": "Namüningen Mitte"
-        },
-        {
-          "name": "data.stations[1:de:01002:1].sourceFamily",
-          "value": "delfi_static"
-        },
-        {
-          "name": "data.stations[1:de:01002:1].stopCode",
-          "value": "de:01002:1"
-        },
-        {
-          "name": "meta.attribution[delfi_static].family",
-          "value": "delfi_static"
+          "name": "meta.attribution[tankerkoenig_gamma].family",
+          "value": "tankerkoenig_gamma"
         },
         {
           "name": "meta.notes.condition",
           "value": "[]"
         },
         {
-          "name": "meta.notes.purpose",
-          "value": "[]"
+          "name": "meta.notes.purpose[tankerkoenig_gamma]",
+          "value": "1"
         }
       ]
     },

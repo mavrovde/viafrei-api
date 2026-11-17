@@ -70,6 +70,10 @@ type Query struct {
 	At      *geo.Point
 	RadiusM int
 	Limit   int
+	// Railway keeps the railway stations only, those of the DB station
+	// register (an EVA number): what the platform's nearby search lists as
+	// a station.
+	Railway bool
 }
 
 // Fold is the search form of a text, the form contract.stop_place keeps in

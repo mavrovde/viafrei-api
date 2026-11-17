@@ -3021,9 +3021,9 @@
             "type": "array"
           },
           "fuel": {
-            "description": "The cheapest current E5 prices first, three at most.",
+            "description": "The cheapest current E5 prices first, three at most, each with its E5 price only.",
             "items": {
-              "$ref": "#/components/schemas/FuelStation"
+              "$ref": "#/components/schemas/NearbyFuelStation"
             },
             "type": "array"
           },
@@ -3075,6 +3075,56 @@
           "data",
           "meta",
           "links"
+        ],
+        "type": "object"
+      },
+      "NearbyFuelStation": {
+        "additionalProperties": false,
+        "properties": {
+          "brand": {
+            "description": "The brand; null when not published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "distanceM": {
+            "description": "Distance in metres, to 0.1 km as the platform's nearby search states it.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "name": {
+            "description": "The station's name; null when not published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prices": {
+            "description": "The station's E5 price.",
+            "items": {
+              "$ref": "#/components/schemas/FuelPrice"
+            },
+            "type": "array"
+          },
+          "sourceFamily": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "brand",
+          "location",
+          "distanceM",
+          "prices",
+          "sourceFamily"
         ],
         "type": "object"
       },

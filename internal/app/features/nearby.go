@@ -131,7 +131,7 @@ func (s *Service) nearbyPart(ctx context.Context, key access.Record, c string, q
 		}
 		return meta(a), err
 	case "station":
-		a, err := s.Stations(ctx, key, transit.Query{At: &at, RadiusM: r, Limit: n})
+		a, err := s.Stations(ctx, key, transit.Query{At: &at, RadiusM: r, Limit: n, Railway: true})
 		if err == nil {
 			out.Stations = &a
 		}

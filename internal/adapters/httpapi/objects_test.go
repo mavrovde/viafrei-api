@@ -186,8 +186,9 @@ func TestPlacesCoverageNamesKindsLandsAndAddresses(t *testing.T) {
 	f := everyAnswer()
 	at := fixedNow.Add(-time.Hour).In(time.FixedZone("x", 3600))
 	berlin := "Berlin"
+	loaded := time.Date(2026, 3, 28, 2, 0, 0, 0, time.FixedZone("x", 3600))
 	f.objects.coverage = places.Coverage{
-		Kinds:     []places.KindCount{{Family: "g", Kind: "city", Rows: 3, EnglishNames: 1}, {Family: "g", Kind: "junction", Rows: 2}},
+		Kinds:     []places.KindCount{{Family: "g", Kind: "city", Rows: 3, EnglishNames: 1, NewestLoad: &loaded}, {Family: "g", Kind: "junction", Rows: 2}},
 		Lands:     []places.Land{{Code: "05", Name: "Nordrhein-Westfalen", Family: "b"}},
 		Addresses: []places.AddressLand{{Land: &berlin, DataAsOf: &at, Family: "o"}, {Family: "o"}},
 	}
@@ -201,7 +202,7 @@ func TestPlacesCoverageNamesKindsLandsAndAddresses(t *testing.T) {
 	if len(kinds) != 2 || len(lands) != 1 || len(addrs) != 2 || addrs[1].(map[string]any)["land"] != nil {
 		t.Fatalf("data %v", data)
 	}
-	if k := kinds[0].(map[string]any); k["englishNames"] != 1.0 || k["sourceFamily"] != "g" {
+	if k := kinds[0].(map[string]any); k["englishNames"] != 1.0 || k["sourceFamily"] != "g" || k["newestLoad"] != "2026-03-28T01:00:00Z" || kinds[1].(map[string]any)["newestLoad"] != nil {
 		t.Errorf("kinds %v", kinds)
 	}
 	if addrs[0].(map[string]any)["land"] != "Berlin" || lands[0].(map[string]any)["code"] != "05" {

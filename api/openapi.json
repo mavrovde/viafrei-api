@@ -4545,6 +4545,14 @@
             "description": "The place kind (city, town, village, suburb, admin, station, junction, ...). Open enumeration.",
             "type": "string"
           },
+          "newestLoad": {
+            "description": "When the newest place of this kind and family was last loaded (UTC); null when unknown.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "sourceFamily": {
             "description": "Its family; when the family was last loaded is in meta.freshness.",
             "type": "string"
@@ -4554,6 +4562,7 @@
           "kind",
           "count",
           "englishNames",
+          "newestLoad",
           "sourceFamily"
         ],
         "type": "object"
@@ -7101,9 +7110,42 @@
         ],
         "type": "object"
       },
+      "WatchCell": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "description": "The cell's id, or the DWD's name of its area when the target named one.",
+            "type": "string"
+          },
+          "name": {
+            "description": "The DWD's name of the cell's area, when held.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "place": {
+            "description": "The place a name target resolved to, the first listPlaces answers.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "place"
+        ],
+        "type": "object"
+      },
       "WatchData": {
         "additionalProperties": false,
         "properties": {
+          "cell": {
+            "$ref": "#/components/schemas/WatchCell",
+            "description": "weather: the DWD warn cell the target resolved to."
+          },
           "condition": {
             "additionalProperties": {},
             "description": "The condition applied, defaults filled in.",
@@ -7148,7 +7190,7 @@
           },
           "punctuality": {
             "$ref": "#/components/schemas/DisruptionPunctuality",
-            "description": "region: the area's punctuality; the condition holds when at least min_trips were observed and at least late_share of them were 5 minutes late or more."
+            "description": "region: the area's punctuality, as listDisruptions reports it."
           },
           "site": {
             "$ref": "#/components/schemas/ChargingSite",
@@ -7161,6 +7203,10 @@
             },
             "type": "array"
           },
+          "trips": {
+            "$ref": "#/components/schemas/WatchTrips",
+            "description": "region: the distinct trips observed at the area's stops in the last half hour and those more than delay_min late at one of them; the condition holds when at least min_trips were observed and at least late_share of them were late. Absent when none was observed."
+          },
           "until": {
             "description": "The end of the window; a read after it answers ended.",
             "format": "date-time",
@@ -7171,7 +7217,7 @@
             "type": "string"
           },
           "warnings": {
-            "description": "weather: the official warnings in force at the position of at least min_level.",
+            "description": "weather: the official warnings in force of the warn cell of at least min_level.",
             "items": {
               "$ref": "#/components/schemas/WeatherWarning"
             },
@@ -7214,6 +7260,38 @@
           "data",
           "meta",
           "links"
+        ],
+        "type": "object"
+      },
+      "WatchTrips": {
+        "additionalProperties": false,
+        "properties": {
+          "late": {
+            "description": "Those more than delay_min minutes late at one of the area's stops.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "lateShare": {
+            "description": "late over observed, rounded to three decimals.",
+            "format": "double",
+            "type": "number"
+          },
+          "observed": {
+            "description": "Distinct trips observed at the area's stops in the last 30 minutes.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "observedAt": {
+            "description": "The newest observation counted.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "observed",
+          "late",
+          "lateShare",
+          "observedAt"
         ],
         "type": "object"
       },
@@ -15236,36 +15314,42 @@
                             "kind": "locality",
                             "count": 11,
                             "englishNames": 2,
+                            "newestLoad": "2026-03-29T19:51:15Z",
                             "sourceFamily": "bkg_gvisys"
                           },
                           {
                             "kind": "municipality",
                             "count": 75,
                             "englishNames": 6,
+                            "newestLoad": "2026-03-29T22:15:32Z",
                             "sourceFamily": "bkg_gvisys"
                           },
                           {
                             "kind": "state",
                             "count": 7,
                             "englishNames": 0,
+                            "newestLoad": "2026-03-29T19:12:55Z",
                             "sourceFamily": "bkg_gvisys"
                           },
                           {
                             "kind": "locality",
                             "count": 10,
                             "englishNames": 2,
+                            "newestLoad": "2026-03-29T22:35:07Z",
                             "sourceFamily": "geonames"
                           },
                           {
                             "kind": "municipality",
                             "count": 25,
                             "englishNames": 8,
+                            "newestLoad": "2026-03-29T18:43:47Z",
                             "sourceFamily": "geonames"
                           },
                           {
                             "kind": "state",
                             "count": 9,
                             "englishNames": 1,
+                            "newestLoad": "2026-03-29T19:17:24Z",
                             "sourceFamily": "geonames"
                           }
                         ],
@@ -20877,12 +20961,12 @@
             }
           },
           {
-            "description": "The thing watched: a road number, a position lat,lon (place, weather), a station id, an official region key or a charging site id.",
+            "description": "The thing watched: a road number, a position lat,lon (place, weather), a DWD warn cell id or a place or cell name (weather), a station id, an official region key or a charging site id.",
             "explode": false,
             "in": "query",
             "name": "target",
             "schema": {
-              "description": "The thing watched: a road number, a position lat,lon (place, weather), a station id, an official region key or a charging site id.",
+              "description": "The thing watched: a road number, a position lat,lon (place, weather), a DWD warn cell id or a place or cell name (weather), a station id, an official region key or a charging site id.",
               "examples": [
                 "A7"
               ],

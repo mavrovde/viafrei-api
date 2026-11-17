@@ -46,6 +46,9 @@ type fakeFeatures struct {
 	risk       features.WeatherRisk
 	topic      rules.Topic
 	gotRisk    weather.Query
+	cell       features.CellAnswer
+	cellErr    error
+	gotCell    weather.CellQuery
 	gotTopic   string
 	err        error
 	gotRoad    roads.CorridorQuery

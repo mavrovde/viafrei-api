@@ -9,9 +9,9 @@ import (
 )
 
 // coverageKinds counts the places of the families ($1) per family and kind:
-// rows and those with an English name.
+// rows, when the newest was last loaded, and those with an English name.
 const coverageKinds = `
-select p.source_ref, p.place_kind, count(*)::int,
+select p.source_ref, p.place_kind, count(*)::int, max(p.changed_at),
        count(*) filter (where exists (select 1 from contract.place_alias a
                                        where a.place_id = p.place_id and a.lang = 'en' and ` + "a.display_class <> 'withhold' and (a.audience = 'public' or " + ownKeyOn + ")" + `))::int
 from contract.place p
@@ -60,7 +60,7 @@ func (s *Store) PlacesCoverage(ctx context.Context, families []string) (places.C
 		rows, _ := tx.Query(ctx, coverageKinds, families)
 		kinds, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.KindCount, error) {
 			var v places.KindCount
-			return v, r.Scan(&v.Family, &v.Kind, &v.Rows, &v.EnglishNames)
+			return v, r.Scan(&v.Family, &v.Kind, &v.Rows, &v.NewestLoad, &v.EnglishNames)
 		})
 		if err != nil {
 			return c, err

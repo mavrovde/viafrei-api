@@ -34,6 +34,9 @@ func (s *Service) Disruptions(ctx context.Context, key access.Record, q transit.
 		if v.Punctuality != nil {
 			contributed = append(contributed, v.Punctuality.Family)
 		}
+		if v.Trips != nil {
+			contributed = append(contributed, v.Trips.Family)
+		}
 		return v, contributed, err
 	})
 	return DisruptionAnswer{Disruptions: v, Meta: meta}, err

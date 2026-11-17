@@ -20,6 +20,10 @@ type Weather interface {
 	// instant after now at which any warning of the families placed at q.At
 	// starts or ends.
 	WarningsAt(ctx context.Context, q weather.Query, families []string, now time.Time) (weather.Scope, error)
+	// CellWarnings resolves q to its warn cell and returns the cell's
+	// warnings of the given families in force at now, at or above
+	// q.MinLevel, worst first; weather.ErrNoCell when no cell answers.
+	CellWarnings(ctx context.Context, q weather.CellQuery, families []string, now time.Time) (weather.Cell, error)
 }
 
 // Rules is the port to the driving-rules store.

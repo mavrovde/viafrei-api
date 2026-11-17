@@ -3,6 +3,8 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"math"
 	"regexp"
 	"slices"
 	"sort"
@@ -12,8 +14,8 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
-	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 )
 
 // The platform's watch conditions per kind (watch_situation), their
@@ -44,6 +46,44 @@ var watchConditionKeys = map[string][]string{
 var watchScopes = map[string]access.Scope{"station": "transit", "region": "transit", "weather": "weather", "charger": "energy"}
 
 var regionKey = regexp.MustCompile(`^[0-9]{2,12}$`)
+
+// conditionBounds are the bounds the platform takes each numeric condition
+// value in (watch_situation's schema); a value outside is refused by name.
+var conditionBounds = []struct {
+	key    string
+	lo, hi float64
+	of     func(*watchCondition) (float64, bool)
+}{
+	{"delay_min", 1, 600, func(c *watchCondition) (float64, bool) { return float64(c.DelayMin), c.DelayMin != 0 }},
+	{"late_share", 0.01, 1, func(c *watchCondition) (float64, bool) { return c.LateShare, c.LateShare != 0 }},
+	{"min_trips", 1, 10000, func(c *watchCondition) (float64, bool) { return float64(c.MinTrips), c.MinTrips != 0 }},
+	{"radius_km", 0.1, 200, func(c *watchCondition) (float64, bool) { return c.RadiusKm, c.RadiusKm != 0 }},
+	{"min_level", 0, 4, func(c *watchCondition) (float64, bool) {
+		if c.MinLevel == nil {
+			return 0, false
+		}
+		return float64(*c.MinLevel), true
+	}},
+}
+
+// bounds refuses a condition value outside the platform's bounds. A zero
+// given for a key whose bounds exclude it is refused too: raw says which keys
+// were given.
+func (c *watchCondition) bounds(raw string) []error {
+	var given map[string]json.RawMessage
+	_ = json.Unmarshal([]byte(raw), &given)
+	for _, b := range conditionBounds {
+		v, set := b.of(c)
+		_, named := given[b.key]
+		if !set && !named {
+			continue
+		}
+		if v < b.lo || v > b.hi {
+			return bad("query.condition", fmt.Sprintf("condition %s must lie between %g and %g", b.key, b.lo, b.hi), raw)
+		}
+	}
+	return nil
+}
 
 // conditionKeysOf refuses a condition key the kind does not take.
 func conditionKeysOf(kind, raw string) []error {
@@ -81,9 +121,6 @@ func (in *WatchInput) resolveOtherKind() []error {
 		if c.DelayMin == 0 {
 			c.DelayMin = watchRegionDelayMin
 		}
-		if c.DelayMin != watchRegionDelayMin {
-			return bad("query.condition", "the regional punctuality counts the trips 5 minutes late or more; delay_min must be 5", in.Condition)
-		}
 		if c.LateShare == 0 {
 			c.LateShare = watchRegionLateShare
 		}
@@ -91,11 +128,14 @@ func (in *WatchInput) resolveOtherKind() []error {
 			c.MinTrips = watchRegionMinTrips
 		}
 	case "weather":
-		if err := in.parseAt(); err != nil {
-			return err
+		// a position is the cell it lies in; anything else is a cell or a
+		// place, resolved on the read
+		if p, err := geo.ParsePoint(in.Key); err == nil {
+			in.at = &p
 		}
-		if c.MinLevel == 0 {
-			c.MinLevel = watchWeatherMinLevel
+		if c.MinLevel == nil {
+			l := watchWeatherMinLevel
+			c.MinLevel = &l
 		}
 	}
 	return nil
@@ -133,7 +173,7 @@ func (s *server) readOtherKind(ctx context.Context, in *WatchInput, now, end tim
 		holds = len(r.data.Departures) > 0
 		r.meta = s.dataMeta(ctx, b.Families, b.At, b.Partial, partialDetail)
 	case "region":
-		q := transit.DisruptionQuery{Area: in.Key, WindowMin: disruptionDefaultWindowMin, Limit: disruptionDefaultLimit}
+		q := transit.DisruptionQuery{Area: in.Key, WindowMin: disruptionDefaultWindowMin, Limit: disruptionDefaultLimit, LateOverMin: c.DelayMin}
 		a, err := s.features.Disruptions(ctx, key, q)
 		if err != nil {
 			return r, s.featureProblem(ctx, err)
@@ -141,18 +181,24 @@ func (s *server) readOtherKind(ctx context.Context, in *WatchInput, now, end tim
 		r.data.Condition = map[string]any{"late_share": c.LateShare, "delay_min": c.DelayMin, "min_trips": c.MinTrips}
 		env := disruptionEnvelope(s, ctx, a, q)
 		r.data.Punctuality = env.Data.Punctuality
-		p := a.Punctuality
-		holds = p != nil && p.TripsObserved >= c.MinTrips && float64(p.TripsLate) >= c.LateShare*float64(p.TripsObserved)
+		if t := a.Trips; t != nil {
+			r.data.Trips = &WatchTrips{Observed: t.Observed, Late: t.Late, LateShare: math.Round(float64(t.Late)/float64(t.Observed)*1000) / 1000, ObservedAt: t.ObservedAt}
+			holds = t.Observed >= c.MinTrips && float64(t.Late) >= c.LateShare*float64(t.Observed)
+		}
 		r.meta = env.Meta.DataMeta
 	case "weather":
-		a, err := s.features.WeatherRisk(ctx, key, weather.Query{At: *in.at, MinLevel: weather.Level(c.MinLevel)})
+		a, err := s.features.WeatherCell(ctx, key, in.Key, in.at, *c.MinLevel)
 		if err != nil {
 			return r, s.featureProblem(ctx, err)
 		}
-		r.data.Condition = map[string]any{"min_level": c.MinLevel}
-		r.data.Warnings = weatherWarnings(a.Items)
-		holds = len(a.Items) > 0
-		r.meta = s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail)
+		r.data.Condition = map[string]any{"min_level": *c.MinLevel}
+		r.data.Cell = &WatchCell{Key: a.Key, Name: a.Name}
+		if a.Place != nil {
+			r.data.Cell.Place = &a.Place.Name
+		}
+		r.data.Warnings = weatherWarnings(a.Warnings)
+		holds = len(a.Warnings) > 0
+		r.meta = s.dataMeta(ctx, a.Meta.Families, a.Meta.At, a.Meta.Partial, partialDetail)
 	case "charger":
 		a, err := s.features.ChargingSite(ctx, key, in.Key, s.cfg.Charging.StatusMaxAge)
 		if err != nil {

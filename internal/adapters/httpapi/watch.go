@@ -27,7 +27,7 @@ const (
 type WatchInput struct {
 	WatchID   string  `query:"watch_id" maxLength:"512" pattern:"^[A-Za-z0-9_-]+$" doc:"A watch's id as an earlier answer gave it: it stands for kind, target and condition. Give it, or kind and target (the platform's key)."`
 	Kind      string  `query:"kind" enum:"road,place,station,region,weather,charger" example:"road" doc:"What is watched: road (target A8, B27), place (target lat,lon), station (a station id as listStations answers it), region (an official key: two digits a Land, five a Kreis), weather (target lat,lon) or charger (a charging site id)."`
-	Key       string  `query:"target" maxLength:"120" example:"A7" doc:"The thing watched: a road number, a position lat,lon (place, weather), a station id, an official region key or a charging site id."`
+	Key       string  `query:"target" maxLength:"120" example:"A7" doc:"The thing watched: a road number, a position lat,lon (place, weather), a DWD warn cell id or a place or cell name (weather), a station id, an official region key or a charging site id."`
 	Request   string  `query:"request" maxLength:"500" doc:"The person's request in their own words; a jam is watched on a motorway only, and the answer says so."`
 	Hours     float64 `query:"hours" minimum:"0.25" maximum:"24" doc:"How long the window runs from now, in hours (default 3). Give hours or until, not both."`
 	Until     string  `query:"until" format:"date-time" doc:"The window's end instant, at most 24 hours ahead. Give hours or until, not both."`
@@ -47,8 +47,10 @@ type watchCondition struct {
 	// LateShare is the share of observed trips late for a region watch.
 	LateShare float64 `json:"late_share,omitempty"`
 	MinTrips  int     `json:"min_trips,omitempty"`
-	MinLevel  int     `json:"min_level,omitempty"`
-	PointID   string  `json:"point_id,omitempty"`
+	// MinLevel is a pointer: 0 is a level the platform takes (every
+	// warning), not an absent key.
+	MinLevel *int   `json:"min_level,omitempty"`
+	PointID  string `json:"point_id,omitempty"`
 }
 
 // watchToken is the id of a watch: kind, key and condition.
@@ -82,6 +84,9 @@ func (in *WatchInput) Resolve(huma.Context) []error {
 		return bad("query.kind", "give watch_id, or kind and target", in.Kind)
 	}
 	if errs := conditionKeysOf(in.Kind, in.Condition); errs != nil {
+		return errs
+	}
+	if errs := in.cond.bounds(in.Condition); errs != nil {
 		return errs
 	}
 	if in.Hours != 0 && in.Until != "" {
@@ -142,9 +147,26 @@ type WatchData struct {
 	// Holds and the lists below answer the other kinds.
 	Holds       *bool                  `json:"holds,omitempty" doc:"station, region, weather, charger: whether the condition holds now (the platform's watch would report it)."`
 	Departures  []Departure            `json:"departures,omitempty" doc:"station: the departures of the window cancelled or at least delay_min late."`
-	Punctuality *DisruptionPunctuality `json:"punctuality,omitempty" doc:"region: the area's punctuality; the condition holds when at least min_trips were observed and at least late_share of them were 5 minutes late or more."`
-	Warnings    []WeatherWarning       `json:"warnings,omitempty" doc:"weather: the official warnings in force at the position of at least min_level."`
+	Punctuality *DisruptionPunctuality `json:"punctuality,omitempty" doc:"region: the area's punctuality, as listDisruptions reports it."`
+	Trips       *WatchTrips            `json:"trips,omitempty" doc:"region: the distinct trips observed at the area's stops in the last half hour and those more than delay_min late at one of them; the condition holds when at least min_trips were observed and at least late_share of them were late. Absent when none was observed."`
+	Cell        *WatchCell             `json:"cell,omitempty" doc:"weather: the DWD warn cell the target resolved to."`
+	Warnings    []WeatherWarning       `json:"warnings,omitempty" doc:"weather: the official warnings in force of the warn cell of at least min_level."`
 	Site        *ChargingSite          `json:"site,omitempty" doc:"charger: the site and its points; the condition holds when a point (point_id when given) is reported available."`
+}
+
+// WatchTrips is the trip count a region watch holds on.
+type WatchTrips struct {
+	Observed   int       `json:"observed" doc:"Distinct trips observed at the area's stops in the last 30 minutes."`
+	Late       int       `json:"late" doc:"Those more than delay_min minutes late at one of the area's stops."`
+	LateShare  float64   `json:"lateShare" doc:"late over observed, rounded to three decimals."`
+	ObservedAt time.Time `json:"observedAt" doc:"The newest observation counted."`
+}
+
+// WatchCell is the warn cell a weather watch reads.
+type WatchCell struct {
+	Key   string  `json:"key" doc:"The cell's id, or the DWD's name of its area when the target named one."`
+	Name  *string `json:"name" nullable:"true" doc:"The DWD's name of the cell's area, when held."`
+	Place *string `json:"place" nullable:"true" doc:"The place a name target resolved to, the first listPlaces answers."`
 }
 
 // WatchEnvelope is the enveloped answer of getWatch.

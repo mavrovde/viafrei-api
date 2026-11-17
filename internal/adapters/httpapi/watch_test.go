@@ -12,8 +12,10 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
+	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
 
@@ -26,8 +28,11 @@ func watchAnswer() *fakeFeatures {
 		{JourneyID: "j2", CallOrder: 1, Mode: "rail", PlannedAt: fixedNow.Add(20 * time.Minute), DelayMin: &onTime, Family: "t"},
 		{JourneyID: "j3", CallOrder: 1, Mode: "rail", PlannedAt: fixedNow.Add(30 * time.Minute), Cancelled: true, Family: "t"},
 	}, Families: []provenance.Family{fresh}, At: fixedNow}}
-	f.disruption = features.DisruptionAnswer{Disruptions: transit.Disruptions{Punctuality: &transit.Punctuality{AreaLevel: "state", AreaCode: "05", TripsObserved: 40, TripsLate: 12, Family: "t"}},
+	f.disruption = features.DisruptionAnswer{Disruptions: transit.Disruptions{Punctuality: &transit.Punctuality{AreaLevel: "state", AreaCode: "05", TripsObserved: 40, TripsLate: 2, Family: "t"},
+		Trips: &transit.TripCount{Observed: 40, Late: 12, ObservedAt: fixedNow, Family: "t"}},
 		Meta: features.Answer[struct{}]{Families: []provenance.Family{fresh}, At: fixedNow}}
+	cellName := "Stadt Berlin"
+	f.cell = features.CellAnswer{Cell: weather.Cell{Key: "811000000", Name: &cellName, Warnings: f.risk.Items}, Meta: features.Answer[struct{}]{Families: []provenance.Family{fresh}, At: fixedNow}}
 	return f
 }
 
@@ -54,6 +59,9 @@ func TestWatchTheOtherKinds(t *testing.T) {
 		{"region", "05", "", "punctuality", -1, true},
 		{"region", "05", `{"late_share":0.5}`, "punctuality", -1, false},
 		{"region", "05", `{"min_trips":100}`, "punctuality", -1, false},
+		{"region", "05", `{"delay_min":20}`, "punctuality", -1, true},
+		{"weather", "811000000", `{"min_level":0}`, "warnings", 2, true},
+		{"weather", "Berlin", "", "warnings", 2, true},
 		{"weather", "52.52,13.405", "", "warnings", 2, true},
 		{"charger", "cs-01-0000", "", "site", -1, true},
 		{"charger", "cs-01-0000", `{"point_id":"cp-2"}`, "site", -1, false},
@@ -77,12 +85,25 @@ func TestWatchTheOtherKinds(t *testing.T) {
 			t.Errorf("%s again by id: %d %v", c.kind, code, again)
 		}
 	}
-	if f.gotBoard.StationID != "1:de:05315:11201" || f.gotBoard.Window != 3*time.Hour || f.gotRisk.MinLevel != 2 || f.gotDisrupt.Area != "05" {
-		t.Errorf("reads: %+v %+v %+v", f.gotBoard, f.gotRisk, f.gotDisrupt)
+	if f.gotBoard.StationID != "1:de:05315:11201" || f.gotBoard.Window != 3*time.Hour || f.gotCell.MinLevel != 2 ||
+		f.gotDisrupt.Area != "05" || f.gotDisrupt.LateOverMin != 20 {
+		t.Errorf("reads: %+v %+v %+v", f.gotBoard, f.gotCell, f.gotDisrupt)
 	}
-	f.disruption.Punctuality = nil
-	if _, d := watch(t, h, url.Values{"kind": {"region"}, "target": {"05"}}); d["holds"] != false {
-		t.Errorf("no punctuality holds nothing: %v", d)
+	_, d := watch(t, h, url.Values{"kind": {"region"}, "target": {"05"}, "condition": {`{"delay_min":15}`}})
+	if tr, _ := d["trips"].(map[string]any); f.gotDisrupt.LateOverMin != 15 || tr["lateShare"] != 0.3 || tr["observed"] != 40.0 {
+		t.Errorf("region trips: %v %+v", d, f.gotDisrupt)
+	}
+	_, d = watch(t, h, url.Values{"kind": {"weather"}, "target": {"52.52,13.405"}})
+	if c, _ := d["cell"].(map[string]any); f.gotCell.At == nil || f.gotCell.At.Lat != 52.52 || c["key"] != "811000000" || c["name"] != "Stadt Berlin" || c["place"] != nil {
+		t.Errorf("weather at a position: %v %+v", d, f.gotCell)
+	}
+	f.cell.Place = &places.Place{Name: "Berlin"}
+	if _, d = watch(t, h, url.Values{"kind": {"weather"}, "target": {"Berlin"}}); d["cell"].(map[string]any)["place"] != "Berlin" || f.gotCell.Cell != "Berlin" || f.gotCell.At != nil {
+		t.Errorf("weather by name: %v %+v", d, f.gotCell)
+	}
+	f.disruption.Trips = nil
+	if _, d := watch(t, h, url.Values{"kind": {"region"}, "target": {"05"}}); d["holds"] != false || d["trips"] != nil {
+		t.Errorf("no trips observed holds nothing: %v", d)
 	}
 }
 
@@ -91,8 +112,12 @@ func TestWatchRefusesWhatDoesNotFit(t *testing.T) {
 	for _, q := range []url.Values{
 		{"kind": {"station"}, "target": {"x:1"}, "condition": {`{"radius_km":5}`}},
 		{"kind": {"region"}, "target": {"Hamburg"}},
-		{"kind": {"region"}, "target": {"05"}, "condition": {`{"delay_min":10}`}},
-		{"kind": {"weather"}, "target": {"Kiel"}},
+		{"kind": {"region"}, "target": {"05"}, "condition": {`{"delay_min":0}`}},
+		{"kind": {"region"}, "target": {"05"}, "condition": {`{"delay_min":601}`}},
+		{"kind": {"region"}, "target": {"05"}, "condition": {`{"late_share":0.001}`}},
+		{"kind": {"region"}, "target": {"05"}, "condition": {`{"min_trips":10001}`}},
+		{"kind": {"place"}, "target": {"52.5,13.4"}, "condition": {`{"radius_km":201}`}},
+		{"kind": {"weather"}, "target": {"Kiel"}, "condition": {`{"min_level":5}`}},
 		{"kind": {"road"}, "target": {"A7"}, "condition": {`{"min_level":2}`}},
 		{"kind": {"station"}, "target": {"x:1"}, "hours": {"2"}, "until": {fixedNow.Add(time.Hour).Format(time.RFC3339)}},
 		{"watch_id": {"!!"}},
@@ -105,8 +130,15 @@ func TestWatchRefusesWhatDoesNotFit(t *testing.T) {
 	if code, _ := watch(t, h, url.Values{"kind": {"weather"}, "target": {"52.5,13.4"}, "until": {fixedNow.Add(30 * time.Hour).Format(time.RFC3339)}}); code != http.StatusBadRequest {
 		t.Errorf("a window over 24 hours: %d", code)
 	}
+	cells := watchAnswer()
+	h = featureHandler(t, config.Defaults(), cells, nil)
+	cells.cellErr = features.ErrAreaNotCell
+	assertProblem(t, do(t, h, http.MethodGet, "/v1/watch?kind=weather&target=Bayern", bearer), 400, "invalid-parameter")
+	cells.cellErr = weather.ErrNoCell
+	assertProblem(t, do(t, h, http.MethodGet, "/v1/watch?kind=weather&target=Nirgendwo", bearer), 404, "not-found")
 	errs := watchAnswer()
 	errs.err = access.ErrNonePermitted
+	errs.cellErr = access.ErrNonePermitted
 	he := featureHandler(t, config.Defaults(), errs, nil)
 	for _, k := range [][2]string{{"station", "x:1"}, {"region", "05"}, {"weather", "52.5,13.4"}, {"charger", "cs-1"}} {
 		w := do(t, he, http.MethodGet, "/v1/watch?kind="+k[0]+"&target="+url.QueryEscape(k[1]), bearer)

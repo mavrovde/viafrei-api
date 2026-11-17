@@ -7,6 +7,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/energy"
+	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
@@ -81,4 +82,8 @@ func (laterFeatures) AffectedStations(context.Context, access.Record, int) ([]tr
 
 func (laterFeatures) PlacesCoverage(context.Context, access.Record) (places.Coverage, features.Answer[struct{}], error) {
 	return places.Coverage{}, features.Answer[struct{}]{}, nil
+}
+
+func (laterFeatures) WeatherCell(context.Context, access.Record, string, *geo.Point, int) (features.CellAnswer, error) {
+	return features.CellAnswer{}, nil
 }

@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -36,6 +37,14 @@ where p.area_code = $1 and p.source_ref = any($2) and ` + permitted("p") + `
 order by p.area_level
 limit 1`
 
+// areaTrips counts the trips observed at the stops whose official key starts
+// with $1, and those more than $2 minutes late at one of them, of the
+// families $3: the platform's region watch count.
+var areaTrips = `select count(distinct t.trip_ref)::int, (count(distinct t.trip_ref) filter (where t.worst_delay_s > $2::int * 60))::int,
+       max(t.observed_at), coalesce(min(t.source_ref), '')
+from contract.transit_trip_delay t
+where starts_with(t.area_code, $1) and t.source_ref = any($3) and ` + permitted("t")
+
 // Disruptions reads the alerts and the punctuality q asks for
 // (features.Disruptions).
 func (s *Store) Disruptions(ctx context.Context, q transit.DisruptionQuery, families []string) (transit.Disruptions, error) {
@@ -65,6 +74,20 @@ func (s *Store) Disruptions(ctx context.Context, q transit.DisruptionQuery, fami
 		if len(ps) > 0 {
 			out.Punctuality = &ps[0]
 		}
-		return out, err
+		if err != nil || q.LateOverMin <= 0 {
+			return out, err
+		}
+		var (
+			c  transit.TripCount
+			at *time.Time
+		)
+		if err := tx.QueryRow(ctx, areaTrips, q.Area, q.LateOverMin, families).Scan(&c.Observed, &c.Late, &at, &c.Family); err != nil {
+			return out, err
+		}
+		if c.Observed > 0 {
+			c.ObservedAt = at.UTC()
+			out.Trips = &c
+		}
+		return out, nil
 	})
 }

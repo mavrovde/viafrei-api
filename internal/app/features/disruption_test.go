@@ -62,6 +62,8 @@ func TestDisruptionsRefusals(t *testing.T) {
 		"read":       {&disruptionFake{err: errStore}, full, errStore},
 		"post-check": {&disruptionFake{v: transit.Disruptions{Punctuality: &transit.Punctuality{Family: "f2"}}}, full, features.ErrGateViolation},
 		"provenance": {&disruptionFake{fake: &fake{provErr: errStore}}, full, errStore},
+		// the trip count is gated like the rest: a family the key may not read fails the answer
+		"trips post-check": {&disruptionFake{v: transit.Disruptions{Trips: &transit.TripCount{Observed: 1, Family: "f2"}}}, full, features.ErrGateViolation},
 	} {
 		if _, err := disruptionService(c.f).Disruptions(context.Background(), c.k, transit.DisruptionQuery{Limit: 6}); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)

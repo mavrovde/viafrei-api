@@ -12,7 +12,9 @@ type PlaceKindCount struct {
 	Kind         string `json:"kind" doc:"The place kind (city, town, village, suburb, admin, station, junction, ...). Open enumeration."`
 	Count        int    `json:"count"`
 	EnglishNames int    `json:"englishNames" doc:"How many of them carry an English name, the names a search in English finds."`
-	SourceFamily string `json:"sourceFamily" doc:"Its family; when the family was last loaded is in meta.freshness."`
+	// NewestLoad is when the newest place of the kind was last loaded.
+	NewestLoad   *time.Time `json:"newestLoad" nullable:"true" doc:"When the newest place of this kind and family was last loaded (UTC); null when unknown."`
+	SourceFamily string     `json:"sourceFamily" doc:"Its family; when the family was last loaded is in meta.freshness."`
 }
 
 // CoverageLand is a Land the gazetteer holds.
@@ -63,7 +65,7 @@ func registerPlacesCoverage(api huma.API, s *server, op huma.Operation) {
 		}
 		d := PlacesCoverageData{Kinds: []PlaceKindCount{}, Lands: []CoverageLand{}, Addresses: []AddressCoverage{}}
 		for _, k := range c.Kinds {
-			d.Kinds = append(d.Kinds, PlaceKindCount{Kind: k.Kind, Count: k.Rows, EnglishNames: k.EnglishNames, SourceFamily: k.Family})
+			d.Kinds = append(d.Kinds, PlaceKindCount{Kind: k.Kind, Count: k.Rows, EnglishNames: k.EnglishNames, NewestLoad: utc(k.NewestLoad), SourceFamily: k.Family})
 		}
 		for _, l := range c.Lands {
 			d.Lands = append(d.Lands, CoverageLand{Code: l.Code, Name: l.Name, SourceFamily: l.Family})

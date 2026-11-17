@@ -15,6 +15,6 @@
 # A <name>:<X.Y.Z>-local line names a locally built, unpublished release:
 # the tests and the local stack run it, and internal/release/pinguard
 # refuses it, so CI and the release workflow stop on it.
-# The local build is viafrei-database at commit ff146d7 (git archive of that commit, docker build).
+# The local build is viafrei-database at commit a680b83 (git archive of that commit, docker build).
 viafrei-database:0.2.0-local
 schema-head 313

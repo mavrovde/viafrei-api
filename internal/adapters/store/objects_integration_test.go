@@ -157,8 +157,11 @@ func TestPlacesCoverageCountsKindsLandsAndAddresses(t *testing.T) {
 	sum := 0
 	for _, k := range c.Kinds {
 		sum += k.Rows
-		if k.EnglishNames > k.Rows || k.Family == "" {
-			t.Errorf("kind %+v", k)
+		var newest time.Time
+		owner(t, `select max(changed_at) from contract.place where withdrawn_at is null and display_class <> 'withhold' and audience = 'public'
+  and source_ref = '`+k.Family+`' and place_kind = '`+k.Kind+`'`, &newest)
+		if k.EnglishNames > k.Rows || k.Family == "" || k.NewestLoad == nil || !k.NewestLoad.Equal(newest) {
+			t.Errorf("kind %+v, newest load %v", k, newest)
 		}
 	}
 	if sum != places || len(c.Lands) != lands {

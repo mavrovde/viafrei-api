@@ -9,6 +9,9 @@ type KindCount struct {
 	Rows   int
 	// EnglishNames is how many of them carry an English name (exonym).
 	EnglishNames int
+	// NewestLoad is when the newest of them was last loaded; nil when
+	// unknown.
+	NewestLoad *time.Time
 }
 
 // Land is a Land the gazetteer holds.

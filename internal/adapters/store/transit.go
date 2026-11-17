@@ -175,10 +175,9 @@ func (s *Store) Facilities(ctx context.Context, station string, families []strin
 
 // The affected-stations board reads each licence boundary in a statement of
 // its own and puts the answers side by side, as the platform's board does:
-// the service alerts in force and the lifts out of service name the stations
-// (by stop place id or IFOPT); then the departures of the next hour at those
-// stations, read station by station through contract.departure; then the
-// stations themselves.
+// the departures of the next hour cancelled or late, the service alerts in
+// force and the lifts out of service name the stations (by stop place id or
+// IFOPT); then the stations themselves.
 
 // affectedAlerts are the refs the alerts in force at $2 of the families ($1)
 // name, with the alert and its family.
@@ -197,6 +196,25 @@ where f.facility_status = 'inactive' and f.stop_place_id is not null and f.sourc
   and ` + "f.display_class <> 'withhold' and (f.audience = 'public' or " + ownKeyOn + ")" + `
 group by 1`
 
+// affectedCalls are the stations (by IFOPT) with departures of the next hour
+// cancelled or late, of the families ($1), as the platform's board counts
+// them: per station, minute and line the sources are folded (the most
+// cancelled, and as late the most cancelled or late less the most
+// cancelled), then summed per station; with the families read.
+const affectedCalls = `
+with d as (
+  select d.station_ifopt, d.aimed_minute, d.line_key, d.cancelled, d.late, d.source_ref
+  from contract.station_disruption d
+  where d.source_ref = any($1) and ` + "d.display_class <> 'withhold' and (d.audience = 'public' or " + ownKeyOn + ")" + `
+), f as (
+  select station_ifopt, aimed_minute, line_key, max(cancelled) as c, greatest(max(cancelled + late) - max(cancelled), 0) as l
+  from d group by 1, 2, 3
+), s as (
+  select station_ifopt, sum(c)::int as c, sum(l)::int as l from f group by 1 having sum(c) + sum(l) > 0
+)
+select s.station_ifopt, s.c, s.l, (select array_agg(distinct d.source_ref order by d.source_ref) from d where d.station_ifopt = s.station_ifopt)
+from s`
+
 // affectedPlaces are the stations of the families ($1) with these ids or
 // IFOPTs ($2), each with the ref it was named by.
 const affectedPlaces = `
@@ -206,28 +224,21 @@ join contract.stop_place s on s.stop_place_id = r.ref or s.ifopt = r.ref
 where s.withdrawn_at is null and s.location is not null and s.source_ref = any($1)
   and ` + "s.display_class <> 'withhold' and (s.audience = 'public' or " + ownKeyOn + ")"
 
-// affectedDepartures counts one station's ($1) boarding departures planned
-// in the hour from $3, of the families ($2): cancelled, and late by $4
-// seconds or more and not cancelled.
-const affectedDepartures = `
-select count(*) filter (where d.cancelled)::int, count(*) filter (where not d.cancelled and coalesce(d.delay_s, 0) >= $4)::int,
-       coalesce(array_agg(distinct d.source_ref order by d.source_ref), '{}')
-from contract.departure d
-where d.stop_place_id = $1 and d.planned_departure_at >= $3::timestamptz and d.planned_departure_at < $3::timestamptz + interval '60 minutes'
-  and d.boarding and d.source_ref = any($2) and ` + "d.display_class <> 'withhold' and (d.audience = 'public' or " + ownKeyOn + ")"
-
 // affectedRef is what one ref (a stop place id or an IFOPT) is named by.
 type affectedRef struct {
-	alerts map[string]bool
-	lifts  int
-	fams   []string
+	alerts          map[string]bool
+	lifts           int
+	cancelled, late int
+	fams            []string
 }
 
 // AffectedStations ranks the stations of the families by what affects them
 // at now (features.Affected): cancelled departures of the next hour first,
 // then late ones, then alerts in force, then lifts out of service; ties by
-// name, then id. A station is listed when an alert in force or a lift out of
-// service names it.
+// name, then id. A station is listed when it has a departure of the next
+// hour cancelled or late, or an alert in force or a lift out of service
+// names it. The departures are counted by the read contract at the instant
+// of the read.
 func (s *Store) AffectedStations(ctx context.Context, families []string, now time.Time, limit int) ([]transit.Affected, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.Affected, error) {
 		by, err := affectedRefs(ctx, tx, families, now)
@@ -240,11 +251,7 @@ func (s *Store) AffectedStations(ctx context.Context, families []string, now tim
 		}
 		out := make([]transit.Affected, 0, len(stations))
 		for _, a := range stations {
-			var more []string
-			if err := tx.QueryRow(ctx, affectedDepartures, a.Station.ID, families, now, transit.AffectedLateS).Scan(&a.Cancelled, &a.Late, &more); err != nil {
-				return nil, err
-			}
-			fs := append(append([]string{}, a.Families...), more...)
+			fs := slices.Clone(a.Families)
 			slices.Sort(fs)
 			own := a.Station.Family
 			a.Families = append([]string{own}, slices.DeleteFunc(slices.Compact(fs), func(f string) bool { return f == own })...)
@@ -282,9 +289,18 @@ func affectedRefs(ctx context.Context, tx pgx.Tx, families []string, now time.Ti
 		return nil, err
 	}
 	rows, _ = tx.Query(ctx, affectedLifts, families)
-	_, err := pgx.ForEachRow(rows, []any{&ref, &lifts, &fams}, func() error {
+	if _, err := pgx.ForEachRow(rows, []any{&ref, &lifts, &fams}, func() error {
 		n := at(ref)
 		n.lifts, n.fams = lifts, append(n.fams, fams...)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	var cancelled, late int
+	rows, _ = tx.Query(ctx, affectedCalls, families)
+	_, err := pgx.ForEachRow(rows, []any{&ref, &cancelled, &late, &fams}, func() error {
+		n := at(ref)
+		n.cancelled, n.late, n.fams = cancelled, late, append(n.fams, fams...)
 		return nil
 	})
 	return by, err
@@ -315,6 +331,8 @@ func affectedPlacesOf(ctx context.Context, tx pgx.Tx, families []string, by map[
 		}
 		n := by[ref]
 		a.LiftsOut += n.lifts
+		a.Cancelled += n.cancelled
+		a.Late += n.late
 		for k := range n.alerts {
 			alerts[st.ID][k] = true
 		}

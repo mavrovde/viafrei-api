@@ -56,6 +56,7 @@ type Features interface {
 	National(ctx context.Context, key access.Record, fuelWindow time.Duration) (features.NationalAnswer, error)
 	AffectedStations(ctx context.Context, key access.Record, limit int) ([]transit.Affected, features.Answer[struct{}], error)
 	PlacesCoverage(ctx context.Context, key access.Record) (places.Coverage, features.Answer[struct{}], error)
+	WeatherCell(ctx context.Context, key access.Record, target string, at *geo.Point, minLevel int) (features.CellAnswer, error)
 }
 
 // counterpartExtension names the MCP capability an operation answers the
@@ -235,6 +236,10 @@ func (s *server) featureProblem(ctx context.Context, err error) *Problem {
 		return newProblem(ctx, SlugNotFound, "No situation with this id.", 0)
 	case errors.Is(err, rules.ErrUnknownTopic):
 		return newProblem(ctx, SlugNotFound, "No rule topic with this code.", 0)
+	case errors.Is(err, weather.ErrNoCell):
+		return newProblem(ctx, SlugNotFound, "No DWD warn cell is held at this place or under this name.", 0)
+	case errors.Is(err, features.ErrAreaNotCell):
+		return newProblem(ctx, SlugInvalidParameter, "A Land, Regierungsbezirk or Kreis takes no single warn cell: name a town in it, or give a warn cell.", 0)
 	case errors.Is(err, weather.ErrLevel):
 		// A stored level outside 1 to 4 is never re-graded (FR-WEATHER-002):
 		// the answer fails and the log names the warning.

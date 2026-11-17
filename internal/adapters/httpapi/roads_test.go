@@ -213,7 +213,7 @@ func TestMotorwayReferencesAreNormalised(t *testing.T) {
 }
 
 // TestTheLampEnumerationsAreTheDomains: the served document's lamp and
-// lampReason enumerations of both conditions answers are the domain's lists,
+// lampReason enumerations of the motorway answer are the domain's lists,
 // in the domain's order, which is the platform's order of the reasons.
 func TestTheLampEnumerationsAreTheDomains(t *testing.T) {
 	req.Covers(t, "FR-ROAD-004", "FR-SVC-005")
@@ -238,7 +238,12 @@ func TestTheLampEnumerationsAreTheDomains(t *testing.T) {
 	for _, l := range roads.Lamps {
 		lamps = append(lamps, string(l))
 	}
-	for _, name := range []string{"MotorwayData", "RoadConditionsData"} {
+	// The conditions near a position state no lamp, as the platform's road
+	// status states none there.
+	if p := doc.Components.Schemas["RoadConditionsData"].Properties; p == nil || p["lamp"].Enum != nil || p["lampReason"].Enum != nil {
+		t.Errorf("RoadConditionsData states a lamp: %v", p)
+	}
+	for _, name := range []string{"MotorwayData"} {
 		p := doc.Components.Schemas[name].Properties
 		if got := slices.DeleteFunc(slices.Clone(p["lampReason"].Enum), func(v any) bool { return v == nil }); !slices.Equal(got, reasons) {
 			t.Errorf("%s.lampReason %v, want %v", name, got, reasons)

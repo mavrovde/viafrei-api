@@ -520,7 +520,16 @@ type Filter struct {
 	// Ahead marks a question over the days ahead (horizon_days, or from and
 	// to): it reads the planned works alone. A watch's window is not one.
 	Ahead bool
+	// Listed, when not nil, are the only kinds the question lists at all,
+	// whatever Kinds asks: the conditions near a position list what the
+	// platform's road status lists there (AreaKinds), never its warnings.
+	Listed []Kind
 }
+
+// AreaKinds are the kinds the platform's road status lists around a
+// position: the closures, the roadworks and lane restrictions, and the jams;
+// a hazard, an accident or a weather report it reads for its lamp only.
+var AreaKinds = []Kind{KindClosure, KindRoadworks, KindJam, KindRestriction}
 
 // Window is the window of the filter at now: its bounds, a zero one now.
 func (f Filter) Window(now time.Time) (start, end time.Time) {
@@ -537,7 +546,15 @@ func (f Filter) Window(now time.Time) (start, end time.Time) {
 // KnownKinds returns the mapped kinds a filter keeps, and whether it keeps
 // the kinds that cannot be mapped. No kinds keeps every kind: every mapped
 // one and the unmapped ones.
-func (f Filter) KnownKinds() ([]Kind, bool) { return split(f.Kinds, Kinds) }
+//
+// Listed narrows both: only its kinds are kept, and never an unmapped one.
+func (f Filter) KnownKinds() ([]Kind, bool) {
+	known, other := split(f.Kinds, Kinds)
+	if f.Listed == nil {
+		return known, other
+	}
+	return slices.DeleteFunc(known, func(k Kind) bool { return !slices.Contains(f.Listed, k) }), false
+}
 
 // split separates the mapped values of a filter list from its other, the
 // last value of every. An empty list keeps everything.

@@ -19,27 +19,8 @@
       "generatedAt": "2026-03-30T00:00:00Z",
       "language": "en",
       "asOf": null,
-      "freshness": [
-        {
-          "family": "osm",
-          "dataAsOf": null,
-          "ageS": null,
-          "stale": false
-        }
-      ],
-      "attribution": [
-        {
-          "family": "osm",
-          "domain": "places",
-          "publisher": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0",
-          "text": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0",
-          "licence": "ODbL 1.0",
-          "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
-          "shareAlike": true,
-          "shareAlikeOffer": "https://viafrei.de/impressum",
-          "termsUrl": "https://www.openstreetmap.org/copyright"
-        }
-      ],
+      "freshness": [],
+      "attribution": [],
       "notes": {
         "condition": [],
         "purpose": []
@@ -53,7 +34,6 @@
       "page": {
         "limit": 2,
         "total": 0,
-        "atLeast": false,
         "nextCursor": null
       }
     },

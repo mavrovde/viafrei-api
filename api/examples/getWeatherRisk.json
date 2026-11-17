@@ -15,9 +15,7 @@
   "status": 200,
   "response": {
     "data": {
-      "lamp": "amber",
       "warnings": [],
-      "truncated": false,
       "roadWeather": []
     },
     "meta": {

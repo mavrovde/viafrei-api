@@ -27,7 +27,6 @@
           "widened": true,
           "places": [
             {
-              "id": "osm:node600001",
               "name": "Pharmacy Pößfül",
               "kind": "amenity=pharmacy",
               "street": "Marktweg",
@@ -36,7 +35,7 @@
                 "lat": 47.609833,
                 "lon": 7.897242
               },
-              "distanceM": 5,
+              "distanceM": 0,
               "sourceFamily": "osm"
             }
           ]

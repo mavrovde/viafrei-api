@@ -19,13 +19,7 @@
   "response": {
     "data": {
       "station": {
-        "id": "1:de:04002:2",
-        "name": "Pienköckheim Nord",
-        "location": {
-          "lat": 47.403474,
-          "lon": 14.561662
-        },
-        "stopCode": "de:04002:2"
+        "name": "Pienköckheim Nord"
       },
       "counts": {
         "active": 0,
@@ -38,8 +32,6 @@
           "kind": "escalator",
           "position": "zu Gleis 1",
           "state": "unknown",
-          "observedAt": "2026-03-29T10:57:39Z",
-          "observedAtLocal": "2026-03-29T12:57:39+02:00",
           "sourceFamily": "openstation_siri_fm"
         },
         {
@@ -47,8 +39,6 @@
           "kind": "escalator",
           "position": "zu Gleis 2",
           "state": "unknown",
-          "observedAt": "2026-03-29T07:18:26Z",
-          "observedAtLocal": "2026-03-29T09:18:26+02:00",
           "sourceFamily": "openstation_siri_fm"
         }
       ]

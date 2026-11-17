@@ -2136,7 +2136,7 @@
                 ]
               },
               "distanceM": {
-                "description": "Distance from the asked position in metres; null for the Land.",
+                "description": "Distance from the asked position in metres, to 100 m (under 50 m to the metre); null for the Land of a district.",
                 "format": "int64",
                 "type": [
                   "integer",
@@ -2169,19 +2169,16 @@
               "null"
             ]
           },
+          "mayLieOutsideGermany": {
+            "description": "True when the position may lie outside Germany, off the coast or near the border: no address within 1.5 km, and at least half of the circle of 15 km around it, in neighbouring eighths, holds none. The facts are then the nearest in Germany and may not describe the position itself.",
+            "type": "boolean"
+          },
           "municipality": {
             "additionalProperties": false,
             "description": "The nearest municipality within 50 km; null when none.",
             "properties": {
-              "code": {
-                "description": "The official region code; null when none.",
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
               "distanceM": {
-                "description": "Distance from the asked position in metres; null for the Land.",
+                "description": "Distance from the asked position in metres, to 100 m (under 50 m to the metre).",
                 "format": "int64",
                 "type": [
                   "integer",
@@ -2204,7 +2201,6 @@
             "required": [
               "id",
               "name",
-              "code",
               "location",
               "distanceM",
               "sourceFamily"
@@ -2216,7 +2212,7 @@
           },
           "state": {
             "additionalProperties": false,
-            "description": "The Land of the district; null when no district.",
+            "description": "The Land of the district; with no district, the nearest Land within 250 km; null when none.",
             "properties": {
               "code": {
                 "description": "The official region code; null when none.",
@@ -2226,7 +2222,7 @@
                 ]
               },
               "distanceM": {
-                "description": "Distance from the asked position in metres; null for the Land.",
+                "description": "Distance from the asked position in metres, to 100 m (under 50 m to the metre); null for the Land of a district.",
                 "format": "int64",
                 "type": [
                   "integer",
@@ -2264,7 +2260,8 @@
           "address",
           "municipality",
           "district",
-          "state"
+          "state",
+          "mayLieOutsideGermany"
         ],
         "type": "object"
       },
@@ -9002,7 +8999,7 @@
     },
     "/v1/location": {
       "get": {
-        "description": "A coordinate as a person understands it: the nearest address, municipality and district, and the district's Land; each fact on its own, null when none is within its reach. Needs the scope places.",
+        "description": "A coordinate as a person understands it: the nearest address, municipality and district, and the district's Land (with no district, the nearest Land); each fact on its own, null when none is within its reach; and whether the position may lie outside Germany. Needs the scope places.",
         "operationId": "describeLocation",
         "parameters": [
           {

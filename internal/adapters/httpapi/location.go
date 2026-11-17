@@ -26,17 +26,28 @@ type LocationPlace struct {
 	Name         string   `json:"name"`
 	Code         *string  `json:"code" nullable:"true" doc:"The official region code; null when none."`
 	Location     Position `json:"location"`
-	DistanceM    *int     `json:"distanceM" nullable:"true" doc:"Distance from the asked position in metres; null for the Land."`
+	DistanceM    *int     `json:"distanceM" nullable:"true" doc:"Distance from the asked position in metres, to 100 m (under 50 m to the metre); null for the Land of a district."`
+	SourceFamily string   `json:"sourceFamily"`
+}
+
+// LocationSettlement is the settlement nearest a position: the platform
+// names it by its name and point, without a code.
+type LocationSettlement struct {
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Location     Position `json:"location"`
+	DistanceM    *int     `json:"distanceM" nullable:"true" doc:"Distance from the asked position in metres, to 100 m (under 50 m to the metre)."`
 	SourceFamily string   `json:"sourceFamily"`
 }
 
 // LocationData is the data of describeLocation: independent facts, each
 // null when none is within its reach.
 type LocationData struct {
-	Address      *LocationAddress `json:"address" doc:"The nearest address within 5 km; null when none."`
-	Municipality *LocationPlace   `json:"municipality" doc:"The nearest municipality within 50 km; null when none."`
-	District     *LocationPlace   `json:"district" doc:"The nearest district within 100 km; null when none."`
-	State        *LocationPlace   `json:"state" doc:"The Land of the district; null when no district."`
+	Address              *LocationAddress    `json:"address" doc:"The nearest address within 5 km; null when none."`
+	Municipality         *LocationSettlement `json:"municipality" doc:"The nearest municipality within 50 km; null when none."`
+	District             *LocationPlace      `json:"district" doc:"The nearest district within 100 km; null when none."`
+	State                *LocationPlace      `json:"state" doc:"The Land of the district; with no district, the nearest Land within 250 km; null when none."`
+	MayLieOutsideGermany bool                `json:"mayLieOutsideGermany" doc:"True when the position may lie outside Germany, off the coast or near the border: no address within 1.5 km, and at least half of the circle of 15 km around it, in neighbouring eighths, holds none. The facts are then the nearest in Germany and may not describe the position itself."`
 }
 
 // LocationEnvelope is the enveloped answer of describeLocation.
@@ -61,7 +72,7 @@ func locationPlace(p *places.Place) *LocationPlace {
 
 func registerLocation(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "What lies at a position"
-	op.Description = "A coordinate as a person understands it: the nearest address, municipality and district, and the district's Land; each fact on its own, null when none is within its reach. Needs the scope places."
+	op.Description = "A coordinate as a person understands it: the nearest address, municipality and district, and the district's Land (with no district, the nearest Land); each fact on its own, null when none is within its reach; and whether the position may lie outside Germany. Needs the scope places."
 	featureResponses(api, &op, "Not used by this operation.")
 	op.Extensions[counterpartExtension] = "location description"
 	huma.Register(api, op, func(ctx context.Context, in *LocationInput) (*LocationOutput, error) {
@@ -77,7 +88,10 @@ func registerLocation(api huma.API, s *server, op huma.Operation) {
 }
 
 func locationEnvelope(s *server, ctx context.Context, a features.LocationAnswer) LocationEnvelope {
-	data := LocationData{Municipality: locationPlace(a.Municipality), District: locationPlace(a.District), State: locationPlace(a.State)}
+	data := LocationData{District: locationPlace(a.District), State: locationPlace(a.State), MayLieOutsideGermany: a.MayLieAbroad}
+	if p := a.Municipality; p != nil {
+		data.Municipality = &LocationSettlement{ID: p.ID, Name: p.Name, Location: position(p.Location), DistanceM: p.DistanceM, SourceFamily: p.Family}
+	}
 	if v := a.Address; v != nil {
 		data.Address = &LocationAddress{Address: Address{Street: v.Street, HouseNumber: v.HouseNumber, Postcode: v.Postcode, Place: v.Place,
 			Land: v.Land, Location: position(v.Location), DataAsOf: day(v.DataAsOf), SourceFamily: v.Family}}

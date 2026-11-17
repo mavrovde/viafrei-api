@@ -1,9 +1,12 @@
 package places_test
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
+	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
 func TestFoldsAreThePlatforms(t *testing.T) {
@@ -50,4 +53,26 @@ func FuzzParseAddress(f *testing.F) {
 			t.Fatalf("ParseAddress(%q) = %+v: read an address without its parts", s, q)
 		}
 	})
+}
+
+func TestTheAbroadJudgementIsThePlatforms(t *testing.T) {
+	req.Covers(t, "ENV-040")
+	for _, c := range []struct {
+		hits []bool
+		want int
+	}{
+		{[]bool{false, false, false, false, false, false, false, false}, 8},
+		{[]bool{true, true, true, true, true, true, true, true}, 0},
+		{[]bool{false, false, true, true, true, true, false, false}, 4},
+		{[]bool{true, false, false, false, true, false, false, true}, 3},
+	} {
+		if got := places.LongestEmptyRun(c.hits); got != c.want {
+			t.Errorf("%v: %d, want %d", c.hits, got, c.want)
+		}
+	}
+	w := places.SectorWedges(geo.Point{Lat: 60, Lon: 10}, 111320, 4)
+	// North of the centre one degree, east two (cos 60° halves a degree of longitude).
+	if len(w) != 4 || !strings.HasPrefix(w[0], "POLYGON((10.000000 60.000000,10.000000 61.000000,") || !strings.Contains(w[1], ",12.000000 60.000000,") || !strings.HasSuffix(w[3], ",10.000000 60.000000))") {
+		t.Errorf("wedges %q", w)
+	}
 }

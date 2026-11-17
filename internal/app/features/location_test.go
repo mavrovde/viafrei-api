@@ -38,6 +38,12 @@ func TestLocation(t *testing.T) {
 	if err != nil || a.Address == nil || a.Municipality != nil || !a.Meta.At.Equal(now) {
 		t.Errorf("answer %+v %v", a, err)
 	}
+	// A position that may lie abroad credits the addresses it was judged by.
+	abroad := places.Location{State: &places.Place{Family: "f1"}, MayLieAbroad: true, AbroadFamily: "f2"}
+	a, err = locationService(&locationFake{v: abroad}).Location(context.Background(), key("consumer", []access.Scope{"places"}, "f1", "f2"), places.LocationQuery{})
+	if err != nil || len(a.Meta.Families) != 2 {
+		t.Errorf("abroad %+v %v", a.Meta.Families, err)
+	}
 	for name, c := range map[string]struct {
 		f    *locationFake
 		want error

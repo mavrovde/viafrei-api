@@ -34,6 +34,11 @@ func (s *Service) Location(ctx context.Context, key access.Record, q places.Loca
 				contributed = append(contributed, p.Family)
 			}
 		}
+		// The judgement that the position may lie abroad is read from the
+		// addresses: their family is credited, as the platform credits it.
+		if v.MayLieAbroad && v.AbroadFamily != "" {
+			contributed = append(contributed, v.AbroadFamily)
+		}
 		return v, contributed, err
 	})
 	return LocationAnswer{Location: v, Meta: meta}, err

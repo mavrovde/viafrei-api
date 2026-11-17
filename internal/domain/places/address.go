@@ -1,6 +1,8 @@
 package places
 
 import (
+	"fmt"
+	"math"
 	"regexp"
 	"strings"
 	"time"
@@ -103,12 +105,58 @@ type Address struct {
 
 // The reaches of a description of a position, as on the platform: the
 // nearest address within 5 km, municipality within 50 km, district within
-// 100 km.
+// 100 km, and, with no district, the nearest Land within 250 km.
 const (
 	AddressReachM      = 5000
 	MunicipalityReachM = 50000
 	DistrictReachM     = 100000
+	StateReachM        = 250000
 )
+
+// A position may lie outside Germany, as the platform judges it, when no
+// address is within AbroadNearestM and at least AbroadEmptyRun neighbouring
+// of AbroadSectors wedges of AbroadScanM around it hold no address.
+const (
+	AbroadNearestM = 1500
+	AbroadScanM    = 15000
+	AbroadSectors  = 8
+	AbroadEmptyRun = 4
+)
+
+// SectorWedges returns n wedges of radiusM around at, clockwise from north,
+// as WKT polygons: the platform's sectors, each arc of six steps on a flat
+// projection of the position's latitude.
+func SectorWedges(at geo.Point, radiusM float64, n int) []string {
+	const perDegLat, steps = 111320.0, 6
+	perDegLon := perDegLat * math.Cos(at.Lat*math.Pi/180)
+	centre := fmt.Sprintf("%.6f %.6f", at.Lon, at.Lat)
+	out := make([]string, n)
+	for i := range n {
+		pts := []string{centre}
+		for j := 0; j <= steps; j++ {
+			az := (float64(i) + float64(j)/steps) * 2 * math.Pi / float64(n)
+			pts = append(pts, fmt.Sprintf("%.6f %.6f", at.Lon+radiusM*math.Sin(az)/perDegLon, at.Lat+radiusM*math.Cos(az)/perDegLat))
+		}
+		out[i] = "POLYGON((" + strings.Join(append(pts, centre), ",") + "))"
+	}
+	return out
+}
+
+// LongestEmptyRun is the longest run of neighbouring sectors without a hit,
+// the circle closed.
+func LongestEmptyRun(hits []bool) int {
+	best, run := 0, 0
+	for range 2 {
+		for _, h := range hits {
+			run++
+			if h {
+				run = 0
+			}
+			best = max(best, run)
+		}
+	}
+	return min(best, len(hits))
+}
 
 // LocationQuery asks what lies at a position.
 type LocationQuery struct {
@@ -121,6 +169,11 @@ type Location struct {
 	Address      *Address
 	Municipality *Place
 	District     *Place
-	// State is the Land of the district.
+	// State is the Land of the district; with no district, the nearest Land.
 	State *Place
+	// MayLieAbroad is the platform's judgement that the position may lie
+	// outside Germany (AbroadSectors); AbroadFamily is then the family of
+	// the nearest address, the table it is read from.
+	MayLieAbroad bool
+	AbroadFamily string
 }

@@ -5352,16 +5352,40 @@
           "value": "null"
         },
         {
+          "name": "data.mayLieOutsideGermany",
+          "value": "true"
+        },
+        {
           "name": "data.municipality",
           "value": "null"
         },
         {
-          "name": "data.state",
-          "value": "null"
+          "name": "data.state.code",
+          "value": "01"
         },
         {
-          "name": "meta.attribution[bkg_gvisys].family",
-          "value": "bkg_gvisys"
+          "name": "data.state.distanceM",
+          "value": "81800"
+        },
+        {
+          "name": "data.state.id",
+          "value": "100001"
+        },
+        {
+          "name": "data.state.location.lat",
+          "value": "48.24375"
+        },
+        {
+          "name": "data.state.location.lon",
+          "value": "7.01625"
+        },
+        {
+          "name": "data.state.name",
+          "value": "Matfienland"
+        },
+        {
+          "name": "data.state.sourceFamily",
+          "value": "geonames"
         },
         {
           "name": "meta.attribution[geonames].family",
@@ -5409,12 +5433,12 @@
           "value": "null"
         },
         {
-          "name": "data.municipality.code",
-          "value": "01002"
+          "name": "data.mayLieOutsideGermany",
+          "value": "true"
         },
         {
           "name": "data.municipality.distanceM",
-          "value": "37896"
+          "value": "37900"
         },
         {
           "name": "data.municipality.id",
@@ -5437,12 +5461,40 @@
           "value": "geonames"
         },
         {
-          "name": "data.state",
-          "value": "null"
+          "name": "data.state.code",
+          "value": "01"
+        },
+        {
+          "name": "data.state.distanceM",
+          "value": "54300"
+        },
+        {
+          "name": "data.state.id",
+          "value": "100001"
+        },
+        {
+          "name": "data.state.location.lat",
+          "value": "48.24375"
+        },
+        {
+          "name": "data.state.location.lon",
+          "value": "7.01625"
+        },
+        {
+          "name": "data.state.name",
+          "value": "Matfienland"
+        },
+        {
+          "name": "data.state.sourceFamily",
+          "value": "geonames"
         },
         {
           "name": "meta.attribution[geonames].family",
           "value": "geonames"
+        },
+        {
+          "name": "meta.attribution[osm].family",
+          "value": "osm"
         },
         {
           "name": "meta.notes.condition",

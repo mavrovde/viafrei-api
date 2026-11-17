@@ -263,3 +263,28 @@ func TestPendingIsTermsOnly(t *testing.T) {
 		t.Errorf("Pending after acceptance = %v", got)
 	}
 }
+
+// TestGateUnreviewedFamily: a family whose terms grant no use class is never
+// served; a source list names it to ViaFrei's own keys alone.
+func TestGateUnreviewedFamily(t *testing.T) {
+	req.Covers(t, "SEC-030")
+	reg := []access.Terms{
+		{Family: "open", UseClasses: access.UseClasses},
+		{Family: "unrev"},
+		{Family: "unrev-held", HoldReason: "x"},
+	}
+	fams := []string{"open", "unrev", "unrev-held", "missing"}
+	for _, aud := range []access.Audience{pub, access.AudienceOwn} {
+		g := access.NewGate(reg, plan("consumer", "open", "unrev", "unrev-held"), aud, nil, nil)
+		if got := g.Refused("unrev"); got != access.Unreviewed {
+			t.Errorf("unrev for %s: %q", aud, got)
+		}
+		want := []string(nil)
+		if aud == access.AudienceOwn {
+			want = []string{"unrev"}
+		}
+		if got := g.Catalogued(fams); !slices.Equal(got, want) {
+			t.Errorf("catalogued for %s: %v, want %v", aud, got, want)
+		}
+	}
+}

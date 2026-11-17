@@ -25,7 +25,9 @@ func (s *Service) Sources(ctx context.Context, key access.Record, domain string)
 	var permitted []string
 	partial := false
 	for _, d := range domains {
-		p, part, err := gate.Answer(access.Answering(reg, d))
+		answering := access.Answering(reg, d)
+		permitted = append(permitted, gate.Catalogued(answering)...)
+		p, part, err := gate.Answer(answering)
 		if err != nil {
 			partial = true
 			continue

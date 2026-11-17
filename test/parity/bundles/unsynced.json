@@ -10200,7 +10200,7 @@
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z",
-      "ruling": "Lead ruling 2026-11-17: compared are the live-feed families viafrei://coverage lists (family, staleAfterS, shareAlike); the reference families (bast_lcl, bkg_gvisys, delfi_static, geonames, osm, osm_speed_cameras, viafrei_rules), the domain and the domain filter are API-only.",
+      "ruling": "Lead ruling 2026-11-17: compared are the live-feed families viafrei://coverage lists (family, staleAfterS, shareAlike); the reference families (bast_lcl, bkg_gvisys, delfi_static, geonames, osm, osm_speed_cameras, viafrei_rules), the domain and the domain filter are API-only. Lead ruling 2026-11-17 (round 3): its condition and purpose notes are register texts and are left out (meta.notes); a family not reviewed yet (no use class) is listed to ViaFrei's own keys, as the coverage resource lists it, and served to none.",
       "facts": [
         {
           "name": "data[afir_alpha].family",
@@ -10375,6 +10375,18 @@
           "value": "900"
         },
         {
+          "name": "data[roads_epsilon].family",
+          "value": "roads_epsilon"
+        },
+        {
+          "name": "data[roads_epsilon].shareAlike",
+          "value": "false"
+        },
+        {
+          "name": "data[roads_epsilon].staleAfterS",
+          "value": "900"
+        },
+        {
           "name": "data[speed_alpha].family",
           "value": "speed_alpha"
         },
@@ -10459,24 +10471,16 @@
           "value": "roads_alpha"
         },
         {
+          "name": "meta.attribution[roads_epsilon].family",
+          "value": "roads_epsilon"
+        },
+        {
           "name": "meta.attribution[speed_alpha].family",
           "value": "speed_alpha"
         },
         {
           "name": "meta.attribution[tankerkoenig_gamma].family",
           "value": "tankerkoenig_gamma"
-        },
-        {
-          "name": "meta.notes.condition[lorry_bast_langlkw]",
-          "value": "1"
-        },
-        {
-          "name": "meta.notes.purpose[chargepool_gamma]",
-          "value": "1"
-        },
-        {
-          "name": "meta.notes.purpose[tankerkoenig_gamma]",
-          "value": "1"
         }
       ]
     },
@@ -10527,14 +10531,6 @@
         {
           "name": "data",
           "value": "{}"
-        },
-        {
-          "name": "meta.notes.condition",
-          "value": "[]"
-        },
-        {
-          "name": "meta.notes.purpose",
-          "value": "[]"
         }
       ]
     },

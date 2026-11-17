@@ -113,6 +113,37 @@ contract.charging_site	access_private	boolean
 contract.charging_site	operator_is_person	boolean
 contract.contract_info	contract_version	text
 contract.contract_info	published_at	timestamp with time zone
+contract.departure	stop_place_id	text
+contract.departure	stop_point_id	text
+contract.departure	journey_id	text
+contract.departure	call_order	integer
+contract.departure	line_id	text
+contract.departure	line_name	text
+contract.departure	transport_mode	text
+contract.departure	route_type	integer
+contract.departure	train_number	text
+contract.departure	train_category	text
+contract.departure	destination_label	text
+contract.departure	planned_arrival_at	timestamp with time zone
+contract.departure	planned_departure_at	timestamp with time zone
+contract.departure	planned_platform	text
+contract.departure	platform	text
+contract.departure	platform_changed	boolean
+contract.departure	boarding	boolean
+contract.departure	terminates	boolean
+contract.departure	realtime	boolean
+contract.departure	realtime_source	text
+contract.departure	cancelled	boolean
+contract.departure	delay_s	integer
+contract.departure	delay_min	integer
+contract.departure	expected_arrival_at	timestamp with time zone
+contract.departure	expected_departure_at	timestamp with time zone
+contract.departure	no_forecast	boolean
+contract.departure	observed_at	timestamp with time zone
+contract.departure	source_ref	text
+contract.departure	source_refs	text[]
+contract.departure	display_class	text
+contract.departure	audience	text
 contract.fuel_price_observation	station_id	text
 contract.fuel_price_observation	product_code	text
 contract.fuel_price_observation	observed_at	timestamp with time zone
@@ -236,6 +267,7 @@ contract.road	states	text[]
 contract.road	source_ref	text
 contract.road	display_class	text
 contract.road	audience	text
+contract.road	source_refs	text[]
 contract.rule_statement	statement_id	text
 contract.rule_statement	topic_code	text
 contract.rule_statement	position	integer
@@ -333,6 +365,7 @@ contract.stop_point	platform_label	text
 contract.stop_point	source_ref	text
 contract.stop_point	display_class	text
 contract.stop_point	audience	text
+contract.stop_point	name	text
 contract.terms	terms_gate	text
 contract.terms	terms_id	text
 contract.terms	terms_version	text

@@ -164,6 +164,10 @@ nothing, so that family contributed nothing and neither side credits it.
   answer that lists none credits no family. Equal matches rank by trigram
   similarity to the asked name, then by name, as the platform's search
   ranks them.
+- **What is around** (`listNearby`): a vehicle category or the junctions
+  that list nothing credit no family; the needs credit the families they
+  consulted. A need's place carries no identifier and its distance is stated
+  to 0.1 km, as the platform's nearby search states them.
 
 The MCP side has further rules, specific to its sources, that the read
 contract cannot express; they are not compared here.

@@ -5536,14 +5536,6 @@
           "value": "de:01002:1"
         },
         {
-          "name": "meta.attribution[afir_alpha].family",
-          "value": "afir_alpha"
-        },
-        {
-          "name": "meta.attribution[bast_lcl].family",
-          "value": "bast_lcl"
-        },
-        {
           "name": "meta.attribution[delfi_static].family",
           "value": "delfi_static"
         },
@@ -5595,39 +5587,35 @@
           "value": "health"
         },
         {
-          "name": "data.needs[1].places[osm:node600001].distanceM",
-          "value": "5"
+          "name": "data.needs[1].places[0].distanceM",
+          "value": "0"
         },
         {
-          "name": "data.needs[1].places[osm:node600001].houseNo",
+          "name": "data.needs[1].places[0].houseNo",
           "value": "1"
         },
         {
-          "name": "data.needs[1].places[osm:node600001].id",
-          "value": "osm:node600001"
-        },
-        {
-          "name": "data.needs[1].places[osm:node600001].kind",
+          "name": "data.needs[1].places[0].kind",
           "value": "amenity=pharmacy"
         },
         {
-          "name": "data.needs[1].places[osm:node600001].location.lat",
+          "name": "data.needs[1].places[0].location.lat",
           "value": "47.60983"
         },
         {
-          "name": "data.needs[1].places[osm:node600001].location.lon",
+          "name": "data.needs[1].places[0].location.lon",
           "value": "7.89724"
         },
         {
-          "name": "data.needs[1].places[osm:node600001].name",
+          "name": "data.needs[1].places[0].name",
           "value": "Pharmacy Pößfül"
         },
         {
-          "name": "data.needs[1].places[osm:node600001].sourceFamily",
+          "name": "data.needs[1].places[0].sourceFamily",
           "value": "osm"
         },
         {
-          "name": "data.needs[1].places[osm:node600001].street",
+          "name": "data.needs[1].places[0].street",
           "value": "Marktweg"
         },
         {
@@ -5744,10 +5732,6 @@
         {
           "name": "data.stations",
           "value": "[]"
-        },
-        {
-          "name": "meta.attribution[delfi_static].family",
-          "value": "delfi_static"
         },
         {
           "name": "meta.attribution[osm].family",

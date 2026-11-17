@@ -3255,6 +3255,7 @@
         "additionalProperties": false,
         "properties": {
           "distanceM": {
+            "description": "Distance in metres, to 0.1 km as the platform's nearby search states it.",
             "format": "int64",
             "type": "integer"
           },
@@ -3263,9 +3264,6 @@
               "string",
               "null"
             ]
-          },
-          "id": {
-            "type": "string"
           },
           "kind": {
             "description": "The OpenStreetMap kind, category=value (shop=bakery).",
@@ -3288,7 +3286,6 @@
           }
         },
         "required": [
-          "id",
           "name",
           "kind",
           "street",

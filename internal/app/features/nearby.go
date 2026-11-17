@@ -139,7 +139,7 @@ func (s *Service) nearbyPart(ctx context.Context, key access.Record, c string, q
 	}
 	jq := q.At
 	jq.Limit = n
-	js, m, err := listed(ctx, s, key, "roads", func(permitted []string) ([]places.Junction, []string, error) {
+	js, m, err := listedOwn(ctx, s, key, "roads", func(permitted []string) ([]places.Junction, []string, error) {
 		js, err := s.repos.Nearby.Junctions(ctx, jq, permitted)
 		var contributed []string
 		for _, j := range js {
@@ -180,6 +180,12 @@ func (s *Service) nearbyNeeds(ctx context.Context, key access.Record, q NearbyQu
 	return m, nil
 }
 
+// meta is a vehicle category's meta in the what-is-around answer: a
+// category that lists nothing credits no family, as the platform's nearby
+// search credits the rows it states (docs/parity.md).
 func meta[T any](a Answer[T]) Answer[struct{}] {
+	if len(a.Items) == 0 {
+		return Answer[struct{}]{Partial: a.Partial, At: a.At}
+	}
 	return Answer[struct{}]{Families: a.Families, Partial: a.Partial, At: a.At}
 }

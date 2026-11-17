@@ -9,6 +9,8 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/geo"
+	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
@@ -83,6 +85,12 @@ func (f *wxFake) Provenance(ctx context.Context, fams []string, lang string) ([]
 }
 
 func (f *wxFake) Zones(context.Context, rules.ZoneQuery, []string, time.Time) ([]rules.Zone, error) {
+	return nil, nil
+}
+
+func (f *wxFake) ZoneEntries(context.Context, []string) ([]rules.ListEntry, error) { return nil, nil }
+
+func (f *wxFake) GemeindeAt(context.Context, geo.Point, int, []string) (*places.Place, error) {
 	return nil, nil
 }
 

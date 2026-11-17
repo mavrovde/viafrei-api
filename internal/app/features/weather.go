@@ -33,6 +33,7 @@ type Rules interface {
 	Topic(ctx context.Context, code string) (rules.Topic, error)
 	// Zones reads the low-emission-zone rows at a point or of a city.
 	Zones(ctx context.Context, q rules.ZoneQuery, families []string, now time.Time) ([]rules.Zone, error)
+	ZonePlaques
 }
 
 // WeatherRisk is the answer about the warnings at a position.
@@ -120,10 +121,11 @@ func (s *Service) DrivingRules(ctx context.Context, key access.Record, code stri
 }
 
 // ZonesAnswer is the zone part of a rules answer: the rows read and, for a
-// point, the platform's verdict.
+// point, the platform's verdict and what its answer states beside it.
 type ZonesAnswer struct {
 	Zones   []rules.Zone
 	Verdict *rules.Verdict
+	Answer  *rules.ZoneAnswer
 	Meta    Answer[struct{}]
 }
 
@@ -140,9 +142,26 @@ func (s *Service) LowEmissionZones(ctx context.Context, key access.Record, q rul
 		return zs, fams, err
 	})
 	out := ZonesAnswer{Zones: v, Meta: meta}
-	if q.At != nil && err == nil {
-		vd := rules.VerdictOf(v)
-		out.Verdict = &vd
+	if q.At == nil || err != nil {
+		return out, err
 	}
-	return out, err
+	vd := rules.VerdictOf(v)
+	out.Verdict = &vd
+	reg, gate, err := s.gate(ctx, key)
+	if err != nil {
+		return ZonesAnswer{}, err
+	}
+	a, extra, err := s.zoneAnswer(ctx, reg, gate, vd, q.At, nil)
+	if err != nil {
+		return ZonesAnswer{}, err
+	}
+	out.Answer = &a
+	if len(extra) > 0 {
+		fams, err := s.creditsOf(ctx, extra)
+		if err != nil {
+			return ZonesAnswer{}, err
+		}
+		out.Meta.Families = append(out.Meta.Families, fams...)
+	}
+	return out, nil
 }

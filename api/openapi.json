@@ -2647,6 +2647,22 @@
             "additionalProperties": false,
             "description": "The low-emission zone the position lies in, as the platform's description of a position states it; null when the key may read no zone source.",
             "properties": {
+              "boundaryReadAt": {
+                "description": "When the deciding publisher's document was last read; null for unknown.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "dataDate": {
+                "description": "The zone data's own date where the publisher states one.",
+                "format": "date",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "distanceM": {
                 "description": "Outside: the distance to the nearest zone in metres; else null.",
                 "format": "int64",
@@ -2661,6 +2677,18 @@
                   "string",
                   "null"
                 ]
+              },
+              "liftedOn": {
+                "description": "The day the curated list says the deciding zone was lifted; null for a zone in force.",
+                "format": "date",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "plaque": {
+                "$ref": "#/components/schemas/ZonePlaque",
+                "description": "Stated only of a zone the position is in and not released from; else null."
               },
               "releasedArea": {
                 "description": "The name of the released area at the zone's edge the position is in.",
@@ -2680,7 +2708,7 @@
                 "type": "string"
               },
               "zone": {
-                "description": "The name of the zone it is inside, or of the nearest.",
+                "description": "The zone's name as the platform prints it (a register zone by its city): the zone it is inside, or the nearest; in a released area, that area's name.",
                 "type": [
                   "string",
                   "null"
@@ -2700,7 +2728,11 @@
               "zoneKey",
               "distanceM",
               "exemptRoad",
-              "releasedArea"
+              "releasedArea",
+              "plaque",
+              "liftedOn",
+              "dataDate",
+              "boundaryReadAt"
             ],
             "type": [
               "object",
@@ -7528,9 +7560,66 @@
         ],
         "type": "object"
       },
+      "ZonePlaque": {
+        "additionalProperties": false,
+        "properties": {
+          "covered": {
+            "description": "false where the zone's data is under a closed licence we may not pass on; null for the national fact.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "entry": {
+            "description": "The list entry's name; null for the national fact.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "from": {
+            "description": "curated_entry: the curated zone list's entry for the zone's Gemeinde; national_fact: no entry speaks for it, and every signposted zone today asks for the green plaque.",
+            "enum": [
+              "curated_entry",
+              "national_fact"
+            ],
+            "type": "string"
+          },
+          "plakette": {
+            "description": "green; null where the entry deliberately states no plaque (a lifted zone, a zone whose data we may not carry).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "from",
+          "entry",
+          "plakette",
+          "covered"
+        ],
+        "type": "object"
+      },
       "ZoneVerdict": {
         "additionalProperties": false,
         "properties": {
+          "boundaryReadAt": {
+            "description": "When the deciding publisher's document was last read; null for unknown.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dataDate": {
+            "description": "The zone data's own date where the publisher states one.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "exemptRoad": {
             "description": "The key of an exempt road within 60 m.",
             "type": [
@@ -7547,6 +7636,18 @@
               "unknown"
             ],
             "type": "string"
+          },
+          "liftedOn": {
+            "description": "The day the curated list says the deciding zone was lifted; null for a zone in force.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plaque": {
+            "$ref": "#/components/schemas/ZonePlaque",
+            "description": "Stated only of a zone the position is in and not released from; else null."
           },
           "transfer": {
             "description": "The key of the released area it is in.",
@@ -7567,7 +7668,11 @@
           "kind",
           "zone",
           "transfer",
-          "exemptRoad"
+          "exemptRoad",
+          "plaque",
+          "liftedOn",
+          "dataDate",
+          "boundaryReadAt"
         ],
         "type": "object"
       }
@@ -10698,33 +10803,13 @@
                       "data": {
                         "situations": [
                           {
-                            "key": "accident",
-                            "count": 2,
-                            "sourceFamily": "roads_alpha"
-                          },
-                          {
                             "key": "hazard",
-                            "count": 1,
-                            "sourceFamily": "roads_alpha"
-                          },
-                          {
-                            "key": "jam",
-                            "count": 1,
-                            "sourceFamily": "roads_alpha"
-                          },
-                          {
-                            "key": "other",
-                            "count": 3,
-                            "sourceFamily": "roads_alpha"
-                          },
-                          {
-                            "key": "restriction",
-                            "count": 3,
+                            "count": 14,
                             "sourceFamily": "roads_alpha"
                           },
                           {
                             "key": "roadworks",
-                            "count": 1,
+                            "count": 2,
                             "sourceFamily": "roads_alpha"
                           }
                         ],
@@ -10735,8 +10820,18 @@
                             "sourceFamily": "roads_alpha"
                           },
                           {
+                            "key": "06",
+                            "count": 1,
+                            "sourceFamily": "roads_alpha"
+                          },
+                          {
+                            "key": "07",
+                            "count": 1,
+                            "sourceFamily": "roads_alpha"
+                          },
+                          {
                             "key": "10",
-                            "count": 2,
+                            "count": 3,
                             "sourceFamily": "roads_alpha"
                           },
                           {

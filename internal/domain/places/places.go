@@ -35,6 +35,9 @@ type Place struct {
 	// RegionCode is the official key of the district or Land it lies in;
 	// nil when not recorded.
 	RegionCode *string
+	// OfficialKey is the place's own official key (a Gemeinde's eight
+	// digits); nil when not recorded.
+	OfficialKey *string
 	// DistanceM is the distance from the asked position; nil without one.
 	DistanceM *int
 	Family    string

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
@@ -45,16 +46,28 @@ func TestLocationAnswer(t *testing.T) {
 	zone := rules.Zone{Key: "k1", Name: "Umweltzone Köln", DistanceM: 1200}
 	road := rules.Zone{Key: "k2", Name: "A 4"}
 	area := rules.Zone{Key: "k3", Name: "Freigabe"}
+	read := time.Date(2026, 11, 16, 8, 0, 0, 0, time.UTC)
+	changed := time.Date(2025, 6, 24, 0, 0, 0, 0, time.UTC)
+	lifted := time.Date(2024, 2, 22, 0, 0, 0, 0, time.UTC)
+	printed, green := "Umweltzone Hannover", "green"
+	none := `"plaque":null,"liftedOn":null,"dataDate":null,"boundaryReadAt":null}`
 	for _, c := range []struct {
 		v    rules.Verdict
+		a    *rules.ZoneAnswer
 		want string
 	}{
-		{rules.Verdict{Kind: "inside", Zone: &zone, ExemptRoad: &road}, `"lowEmissionZone":{"verdict":"inside","zone":"Umweltzone Köln","zoneKey":"k1","distanceM":null,"exemptRoad":"A 4","releasedArea":null}`},
-		{rules.Verdict{Kind: "outside", Zone: &zone}, `"lowEmissionZone":{"verdict":"outside","zone":"Umweltzone Köln","zoneKey":"k1","distanceM":1200,"exemptRoad":null,"releasedArea":null}`},
-		{rules.Verdict{Kind: "transfer", Transfer: &area}, `"lowEmissionZone":{"verdict":"transfer","zone":null,"zoneKey":null,"distanceM":null,"exemptRoad":null,"releasedArea":"Freigabe"}`},
-		{rules.Verdict{Kind: "unknown"}, `"lowEmissionZone":{"verdict":"unknown","zone":null,"zoneKey":null,"distanceM":null,"exemptRoad":null,"releasedArea":null}`},
+		{rules.Verdict{Kind: "inside", Zone: &zone, ExemptRoad: &road}, nil, `"lowEmissionZone":{"verdict":"inside","zone":"Umweltzone Köln","zoneKey":"k1","distanceM":null,"exemptRoad":"A 4","releasedArea":null,` + none},
+		{rules.Verdict{Kind: "outside", Zone: &zone}, nil, `"lowEmissionZone":{"verdict":"outside","zone":"Umweltzone Köln","zoneKey":"k1","distanceM":1200,"exemptRoad":null,"releasedArea":null,` + none},
+		{rules.Verdict{Kind: "transfer", Transfer: &area}, nil, `"lowEmissionZone":{"verdict":"transfer","zone":null,"zoneKey":null,"distanceM":null,"exemptRoad":null,"releasedArea":"Freigabe",` + none},
+		{rules.Verdict{Kind: "unknown"}, &rules.ZoneAnswer{}, `"lowEmissionZone":{"verdict":"unknown","zone":null,"zoneKey":null,"distanceM":null,"exemptRoad":null,"releasedArea":null,` + none},
+		{rules.Verdict{Kind: "inside", Zone: &zone}, &rules.ZoneAnswer{Name: &printed, Plaque: true, Entry: &rules.ListEntry{Name: "Hannover", Covered: true}, LiftedOn: &lifted, DataDate: &changed, BoundaryReadAt: &read},
+			`"zone":"Umweltzone Hannover","zoneKey":"k1","distanceM":null,"exemptRoad":null,"releasedArea":null,"plaque":{"from":"curated_entry","entry":"Hannover","plakette":null,"covered":true},"liftedOn":"2024-02-22","dataDate":"2025-06-24","boundaryReadAt":"2026-11-16T08:00:00Z"}`},
+		{rules.Verdict{Kind: "inside", Zone: &zone}, &rules.ZoneAnswer{Name: &printed, Plaque: true, Entry: &rules.ListEntry{Name: "München", Plaque: &green, Covered: true}, BoundaryReadAt: &read},
+			`"plaque":{"from":"curated_entry","entry":"München","plakette":"green","covered":true},"liftedOn":null,"dataDate":null`},
+		{rules.Verdict{Kind: "inside", Zone: &zone}, &rules.ZoneAnswer{Name: &printed, Plaque: true, BoundaryReadAt: &read},
+			`"plaque":{"from":"national_fact","entry":null,"plakette":"green","covered":null}`},
 	} {
-		f.location = features.LocationAnswer{Zone: &c.v, Meta: features.Answer[struct{}]{At: fixedNow}}
+		f.location = features.LocationAnswer{Zone: &c.v, ZoneAnswer: c.a, Meta: features.Answer[struct{}]{At: fixedNow}}
 		if w = do(t, h, http.MethodGet, "/v1/location?at=50.94,6.96", bearer); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), c.want) {
 			t.Errorf("%s: %d %s", c.v.Kind, w.Code, w.Body.String())
 		}

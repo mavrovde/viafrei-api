@@ -11,7 +11,7 @@ import (
 // nearestPlace reads the nearest place of the kind $3 within $4 metres of
 // ($1, $2), of the families $5.
 var nearestPlace = `select p.place_id, p.name, p.place_kind, st_y(p.location), st_x(p.location), p.region_code, p.source_ref,
-       round(st_distance(p.location::geography, st_setsrid(st_makepoint($1, $2), 4326)::geography))::int
+       round(st_distance(p.location::geography, st_setsrid(st_makepoint($1, $2), 4326)::geography))::int, p.official_key
 from contract.place p
 where p.place_kind = $3 and p.withdrawn_at is null and p.location is not null
   and st_dwithin(p.location::geography, st_setsrid(st_makepoint($1, $2), 4326)::geography, $4)
@@ -20,7 +20,7 @@ order by p.location::geography <-> st_setsrid(st_makepoint($1, $2), 4326)::geogr
 limit 1`
 
 // stateOf reads the Land whose region code begins the code $1.
-var stateOf = `select p.place_id, p.name, p.place_kind, st_y(p.location), st_x(p.location), p.region_code, p.source_ref, null::int
+var stateOf = `select p.place_id, p.name, p.place_kind, st_y(p.location), st_x(p.location), p.region_code, p.source_ref, null::int, p.official_key
 from contract.place p
 where p.place_kind = 'state' and p.withdrawn_at is null and p.location is not null and p.region_code = left($1, 2)
   and p.source_ref = any($2) and ` + permitted("p") + `
@@ -40,7 +40,7 @@ limit 1`
 func scanPlace(r pgx.CollectableRow) (places.Place, error) {
 	var v places.Place
 	var kind string
-	err := r.Scan(&v.ID, &v.Name, &kind, &v.Location.Lat, &v.Location.Lon, &v.RegionCode, &v.Family, &v.DistanceM)
+	err := r.Scan(&v.ID, &v.Name, &kind, &v.Location.Lat, &v.Location.Lon, &v.RegionCode, &v.Family, &v.DistanceM, &v.OfficialKey)
 	v.Kind = places.MapKind(kind)
 	return v, err
 }

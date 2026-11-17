@@ -22,7 +22,11 @@ type LocationAnswer struct {
 	// platform's description of a position gives it; nil when the key may
 	// read no zone source.
 	Zone *rules.Verdict
-	Meta Answer[struct{}]
+	// ZoneAnswer is what the platform's zone answer states beside the
+	// verdict: the zone's printed name, its plaque, the day it was lifted,
+	// the data's date and the boundary's last read; nil with Zone.
+	ZoneAnswer *rules.ZoneAnswer
+	Meta       Answer[struct{}]
 }
 
 // Location answers "where is this position" for key as the platform's
@@ -54,7 +58,7 @@ func (s *Service) Location(ctx context.Context, key access.Record, q places.Loca
 	if err := gate.Check(contributed); err != nil {
 		return LocationAnswer{}, err
 	}
-	zone, zoneFams, err := s.zoneAt(ctx, reg, gate, q)
+	zone, zoneAnswer, zoneFams, err := s.zoneAt(ctx, reg, gate, q, v.Municipality)
 	if err != nil {
 		return LocationAnswer{}, err
 	}
@@ -70,34 +74,38 @@ func (s *Service) Location(ctx context.Context, key access.Record, q places.Loca
 	if err != nil {
 		return LocationAnswer{}, err
 	}
-	return LocationAnswer{Location: v, Zone: zone, Meta: Answer[struct{}]{Families: prov, Partial: partial, At: s.now()}}, nil
+	return LocationAnswer{Location: v, Zone: zone, ZoneAnswer: zoneAnswer, Meta: Answer[struct{}]{Families: prov, Partial: partial, At: s.now()}}, nil
 }
 
 // zoneAt is the zone verdict at q.At from the zone sources (domain roads)
-// the key may read, with the families of the rows the verdict names: an
-// unknown verdict names none, so it adds no attribution. A key that may read
-// no zone source gets no verdict, not an error: the zone is one fact of the
-// description, not its subject.
-func (s *Service) zoneAt(ctx context.Context, reg []access.Terms, gate access.Gate, q places.LocationQuery) (*rules.Verdict, []string, error) {
+// the key may read, with what the answer states beside it (the list entry
+// found by the deciding source's Gemeinde or by gemeinde, the position's) and
+// the families of the rows the verdict names: an unknown verdict names
+// none, so it adds no attribution. A key that may read no zone source gets
+// no verdict, not an error: the zone is one fact of the description, not
+// its subject.
+func (s *Service) zoneAt(ctx context.Context, reg []access.Terms, gate access.Gate, q places.LocationQuery, gemeinde *places.Place) (*rules.Verdict, *rules.ZoneAnswer, []string, error) {
 	permitted, _, err := gate.Answer(access.Answering(reg, "roads"))
 	if err != nil {
 		// ErrNonePermitted or ErrTermsNotAccepted, the only refusals.
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 	at := q.At
 	zs, err := s.repos.Rules.Zones(ctx, rules.ZoneQuery{At: &at}, permitted, s.now())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	vd := rules.VerdictOf(zs)
 	var contributed []string
-	for _, z := range []*rules.Zone{vd.Zone, vd.Transfer, vd.ExemptRoad} {
-		if z != nil {
-			contributed = append(contributed, z.Family)
-		}
+	for _, z := range vd.Rows() {
+		contributed = append(contributed, z.Family)
 	}
 	if err := gate.Check(contributed); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return &vd, contributed, nil
+	a, _, err := s.zoneAnswer(ctx, reg, gate, vd, nil, gemeinde)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return &vd, &a, contributed, nil
 }

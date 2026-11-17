@@ -44,14 +44,15 @@ type LocationData struct {
 // LocationZone is the low-emission-zone verdict at a position.
 type LocationZone struct {
 	Verdict      string  `json:"verdict" enum:"inside,transfer,outside,unknown" doc:"inside a zone; in an area released at its edge; outside (zone names the nearest within 25 km); unknown: none within 25 km, which is not that there is no zone."`
-	Zone         *string `json:"zone" nullable:"true" doc:"The name of the zone it is inside, or of the nearest."`
+	Zone         *string `json:"zone" nullable:"true" doc:"The zone's name as the platform prints it (a register zone by its city): the zone it is inside, or the nearest; in a released area, that area's name."`
 	ZoneKey      *string `json:"zoneKey" nullable:"true" doc:"The key of that zone row, as getDrivingRules lists it."`
 	DistanceM    *int    `json:"distanceM" nullable:"true" doc:"Outside: the distance to the nearest zone in metres; else null."`
 	ExemptRoad   *string `json:"exemptRoad" nullable:"true" doc:"The name of an exempt road within 60 m, a road the zone does not apply to."`
 	ReleasedArea *string `json:"releasedArea" nullable:"true" doc:"The name of the released area at the zone's edge the position is in."`
+	ZoneFacts
 }
 
-func locationZone(v *rules.Verdict) *LocationZone {
+func locationZone(v *rules.Verdict, a *rules.ZoneAnswer) *LocationZone {
 	if v == nil {
 		return nil
 	}
@@ -61,7 +62,10 @@ func locationZone(v *rules.Verdict) *LocationZone {
 		}
 		return &z.Name
 	}
-	out := &LocationZone{Verdict: v.Kind, Zone: name(v.Zone), ZoneKey: zoneKey(v.Zone), ExemptRoad: name(v.ExemptRoad), ReleasedArea: name(v.Transfer)}
+	out := &LocationZone{Verdict: v.Kind, Zone: name(v.Zone), ZoneKey: zoneKey(v.Zone), ExemptRoad: name(v.ExemptRoad), ReleasedArea: name(v.Transfer), ZoneFacts: zoneFacts(a)}
+	if a != nil {
+		out.Zone = a.Name
+	}
 	if v.Kind == "outside" {
 		out.DistanceM = &v.Zone.DistanceM
 	}
@@ -106,7 +110,7 @@ func registerLocation(api huma.API, s *server, op huma.Operation) {
 }
 
 func locationEnvelope(s *server, ctx context.Context, a features.LocationAnswer) LocationEnvelope {
-	data := LocationData{Municipality: locationPlace(a.Municipality), District: locationPlace(a.District), State: locationPlace(a.State), Zone: locationZone(a.Zone)}
+	data := LocationData{Municipality: locationPlace(a.Municipality), District: locationPlace(a.District), State: locationPlace(a.State), Zone: locationZone(a.Zone, a.ZoneAnswer)}
 	if v := a.Address; v != nil {
 		data.Address = &LocationAddress{Address: Address{Street: v.Street, HouseNumber: v.HouseNumber, Postcode: v.Postcode, Place: v.Place,
 			Land: v.Land, Location: position(v.Location), DataAsOf: day(v.DataAsOf), SourceFamily: v.Family}}

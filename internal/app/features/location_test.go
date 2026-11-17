@@ -23,6 +23,10 @@ type locationFake struct {
 	zoneErr error
 	gotZone []rules.ZoneQuery
 	roads   bool
+	// entries the zone list holds, the codes asked and its error.
+	entries  []rules.ListEntry
+	gotCodes []string
+	entryErr error
 }
 
 func (f *locationFake) Zones(_ context.Context, q rules.ZoneQuery, _ []string, _ time.Time) ([]rules.Zone, error) {
@@ -31,6 +35,15 @@ func (f *locationFake) Zones(_ context.Context, q rules.ZoneQuery, _ []string, _
 }
 
 func (f *locationFake) Topic(context.Context, string) (rules.Topic, error) { return rules.Topic{}, nil }
+
+func (f *locationFake) ZoneEntries(_ context.Context, codes []string) ([]rules.ListEntry, error) {
+	f.gotCodes = codes
+	return f.entries, f.entryErr
+}
+
+func (f *locationFake) GemeindeAt(context.Context, geo.Point, int, []string) (*places.Place, error) {
+	return nil, nil
+}
 
 func (f *locationFake) Location(context.Context, places.LocationQuery, []string) (places.Location, error) {
 	return f.v, f.err

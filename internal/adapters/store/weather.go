@@ -8,6 +8,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/mavrovde/viafrei-api/internal/domain/geo"
+	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 )
@@ -198,7 +200,7 @@ r as (
     and st_dwithin(z.geometry_m, p.m, case when z.zone_role = 'exempt_road' then $6::float8 else $2::float8 end))
 select r.zone_key, r.zone_id, r.zone_role, r.name, r.city, r.publisher_name, r.inside, r.dist,
        array(select k from unnest(r.same_zone_keys) k where k in (select o.zone_key from r o where o.zone_role = 'zone') and r.zone_role = 'zone'),
-       r.source_ref
+       r.source_ref, r.changed_at, r.recorded_at, r.source_scope, r.source_place_code, r.source_city
 from r
 order by r.inside desc, r.dist, r.source_ref, r.zone_id`, families, float64(rules.ZoneReachM), now, q.At.Lon, q.At.Lat, float64(rules.ExemptRoadReachM))
 		} else {
@@ -206,7 +208,7 @@ order by r.inside desc, r.dist, r.source_ref, r.zone_id`, families, float64(rule
 select z.zone_key, z.zone_id, z.zone_role, z.name, z.city, z.publisher_name, false, 0,
        array(select k from unnest(z.same_zone_keys) k
               where k in (select o.zone_key from contract.low_emission_zone o where lower(o.city) = lower($2) and o.source_ref = any($1))),
-       z.source_ref
+       z.source_ref, z.changed_at, z.recorded_at, z.source_scope, z.source_place_code, z.source_city
 from contract.low_emission_zone z
 where z.source_ref = any($1) and `+permitted("z")+` and `+zoneAlive+`
   and z.zone_role = 'zone' and lower(z.city) = lower($2)
@@ -214,8 +216,36 @@ order by z.source_ref, z.zone_id`, families, q.City, now)
 		}
 		return pgx.CollectRows(res, func(r pgx.CollectableRow) (rules.Zone, error) {
 			var z rules.Zone
-			err := r.Scan(&z.Key, &z.ZoneID, &z.Role, &z.Name, &z.City, &z.Publisher, &z.Inside, &z.DistanceM, &z.SameZone, &z.Family)
+			err := r.Scan(&z.Key, &z.ZoneID, &z.Role, &z.Name, &z.City, &z.Publisher, &z.Inside, &z.DistanceM, &z.SameZone, &z.Family,
+				&z.ChangedAt, &z.RecordedAt, &z.Scope, &z.PlaceCode, &z.SourceCity)
 			return z, err
 		})
+	})
+}
+
+// ZoneEntries reads the entries of the curated zone list that speak for any
+// of the Gemeinde keys codes.
+func (s *Store) ZoneEntries(ctx context.Context, codes []string) ([]rules.ListEntry, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]rules.ListEntry, error) {
+		res, _ := tx.Query(ctx, `
+select e.entry_key, e.name, e.place_codes, e.plaque, e.covered, e.lifted_on
+from contract.low_emission_zone_entry e
+where e.place_codes && $1::text[] and `+permitted("e")+`
+order by e.entry_key`, codes)
+		return pgx.CollectRows(res, func(r pgx.CollectableRow) (rules.ListEntry, error) {
+			var e rules.ListEntry
+			err := r.Scan(&e.Key, &e.Name, &e.PlaceCodes, &e.Plaque, &e.Covered, &e.LiftedOn)
+			return e, err
+		})
+	})
+}
+
+// GemeindeAt reads the nearest municipality of the families within reachM
+// metres of at: the Gemeinde whose key finds a zone list entry.
+func (s *Store) GemeindeAt(ctx context.Context, at geo.Point, reachM int, families []string) (*places.Place, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (*places.Place, error) {
+		rows, _ := tx.Query(ctx, nearestPlace, at.Lon, at.Lat, "municipality", reachM, families)
+		ps, err := pgx.CollectRows(rows, scanPlace)
+		return first(ps), err
 	})
 }

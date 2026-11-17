@@ -10,7 +10,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/testkit/parity"
 )
 
-const good = `{"format":"viafrei.parity/2","platform":"1.2.3","producer":"api","rules":"viafrei.parity.rules/4",
+const good = `{"format":"viafrei.parity/2","platform":"1.2.3","producer":"api","rules":"viafrei.parity.rules/5",
 "fixture":{"profile":"tiny","seed":1,"sha256":"ab"},
 "cases":[{"id":"c1","operation":"listX","counterpart":"x search","request":"/v1/x","key":{"useClass":"consumer","scopes":["x"],"sources":["s"],"accepted":null},
 "now":"2026-03-30T00:00:00Z","facts":[{"name":"data[a].id","value":"a"}]}]}`
@@ -66,7 +66,7 @@ func TestParseRefusesWhatItCannotCompare(t *testing.T) {
 		"unknown member": strings.Replace(good, `"rules"`, `"extra":1,"rules"`, 1),
 		"other format":   strings.Replace(good, "viafrei.parity/2", "viafrei.parity/1", 1),
 		"other platform": strings.Replace(good, `"1.2.3"`, `"1.2.4"`, 1),
-		"other rules":    strings.Replace(good, "rules/4", "rules/3", 1),
+		"other rules":    strings.Replace(good, "rules/5", "rules/3", 1),
 		"no facts":       strings.Replace(good, `[{"name":"data[a].id","value":"a"}]`, `[]`, 1),
 		"no id":          strings.Replace(good, `"id":"c1"`, `"id":""`, 1),
 		"no operation":   strings.Replace(good, `"operation":"listX"`, `"operation":""`, 1),

@@ -152,3 +152,16 @@ func TestWithoutDropsOneKindAndLeavesTheFamily(t *testing.T) {
 		t.Errorf("without purposes: %+v", got)
 	}
 }
+
+// TestUnconditioned: an answer that states no row carries no condition;
+// every other note stays, and the families passed in are not changed.
+func TestUnconditioned(t *testing.T) {
+	in := []provenance.Family{{Notes: []provenance.Note{{Kind: provenance.Condition, Text: "c"}, {Kind: provenance.Purpose, Text: "p"}}}, {}}
+	got := provenance.Unconditioned(in)
+	if len(got) != 2 || len(got[0].Notes) != 1 || got[0].Notes[0].Kind != provenance.Purpose || len(got[1].Notes) != 0 {
+		t.Errorf("unconditioned: %+v", got)
+	}
+	if len(in[0].Notes) != 2 {
+		t.Errorf("the input was changed: %+v", in[0].Notes)
+	}
+}

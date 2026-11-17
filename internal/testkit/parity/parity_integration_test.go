@@ -185,10 +185,12 @@ func open(t *testing.T) asker {
 	return asker{cfg: cfg, st: st, owners: noteOwners(t)}
 }
 
-// noteOwners reads which families' condition notes carry each text, from the
-// fixture rows: the API states its notes as texts, and rules/4 states a
-// condition note by its family. A kind the service does not know is a
-// condition (provenance.MapNoteKind), so every kind but purpose is read.
+// noteOwners reads which families' notes carry each text, from the fixture
+// rows: the API states its notes as texts, and rules/5 states a condition or
+// purpose note by its family. A kind the service does not know is a
+// condition (provenance.MapNoteKind), so every kind but purpose is read as a
+// condition. One map serves both kinds, so a text that is a purpose of one
+// row and a condition of another would be owned ambiguously: it is refused.
 func noteOwners(t *testing.T) parity.Owners {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), testBound)
@@ -198,10 +200,20 @@ func noteOwners(t *testing.T) parity.Owners {
 		t.Fatal(err)
 	}
 	defer func() { _ = conn.Close(ctx) }()
-	rows, _ := conn.Query(ctx, `select body, source_ref from contract.source_note where note_kind <> 'purpose' order by body, source_ref`)
-	pairs, err := pgx.CollectRows(rows, pgx.RowToStructByPos[struct{ Body, Family string }])
+	rows, _ := conn.Query(ctx, `select body, source_ref, note_kind = 'purpose' from contract.source_note order by body, source_ref`)
+	pairs, err := pgx.CollectRows(rows, pgx.RowToStructByPos[struct {
+		Body, Family string
+		Purpose      bool
+	}])
 	if err != nil {
 		t.Fatal(err)
+	}
+	purpose := map[string]bool{}
+	for _, p := range pairs {
+		if was, ok := purpose[p.Body]; ok && was != p.Purpose {
+			t.Fatalf("a note text of %d character(s) is both a purpose and a condition", len(p.Body))
+		}
+		purpose[p.Body] = p.Purpose
 	}
 	out := parity.Owners{}
 	for _, p := range pairs {

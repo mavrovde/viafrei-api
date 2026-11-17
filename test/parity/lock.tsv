@@ -6,10 +6,12 @@
 # 2.5.23 is projected with viafrei.parity.rules/3: kept as that version's record,
 # Load refuses it under rules/4 (lock_test.go). It is compared only by a
 # checkout of its own time.
+# 2.5.24 to 2.6.18 are projected with viafrei.parity.rules/4 and state no
+# purpose note, which rules/5 states alike: Load reads them under rules/5.
 2.5.23	bundles/2.5.23.json	4c08b7035d68399cf7c6578f6be1a2f584455173d012f64af7b131dc11fc58ac
 2.5.24	bundles/2.5.24.json	5ab94136763df1c4fe385f02caa948842011b60aec3686a288925989267955a3
 2.6.8	bundles/2.6.8.json	c635fc26e779f15853cb7afc5f117ea669799dcfc8a4fd7251fd6225122e2e65
 2.6.12	bundles/2.6.12.json	256e58ddb09cccc8f72f0b188bdc8d14361cb5eeb8e5ebe5bd525f3f32840ce0
 2.6.13	bundles/2.6.13.json	19bf69046b519dfaf99ec794a3d12b80f75da6e22bfd5834a4d623e0c71b4cb8
 2.6.18	bundles/2.6.18.json	48c9b757c47d281f6668e05cbfff6e5277b51dd710df5d115e1e5a8589719576
-unsynced	bundles/unsynced.json	2dc40865a4d673a245c5359eafc4872739d352214be25b78017ba632e9e2d8b8
+unsynced	bundles/unsynced.json	4ca41d3db6010f413145b64265dbfbf898d907485f7e138f732c9f33e7cf37e0

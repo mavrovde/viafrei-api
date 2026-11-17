@@ -2,7 +2,7 @@
   "format": "viafrei.parity/2",
   "platform": "unsynced",
   "producer": "api",
-  "rules": "viafrei.parity.rules/4",
+  "rules": "viafrei.parity.rules/5",
   "fixture": {
     "profile": "tiny",
     "seed": 1,
@@ -1765,8 +1765,8 @@
           "value": "[]"
         },
         {
-          "name": "meta.notes.purpose",
-          "value": "[\"For consumer information only (synthetic).\"]"
+          "name": "meta.notes.purpose[tankerkoenig_gamma]",
+          "value": "1"
         },
         {
           "name": "meta.page.hasMore",
@@ -1897,8 +1897,8 @@
           "value": "[]"
         },
         {
-          "name": "meta.notes.purpose",
-          "value": "[\"For consumer information only (synthetic).\"]"
+          "name": "meta.notes.purpose[tankerkoenig_gamma]",
+          "value": "1"
         },
         {
           "name": "meta.page.hasMore",
@@ -1941,8 +1941,8 @@
           "value": "[]"
         },
         {
-          "name": "meta.notes.purpose",
-          "value": "[\"For consumer information only (synthetic).\"]"
+          "name": "meta.notes.purpose[tankerkoenig_gamma]",
+          "value": "1"
         },
         {
           "name": "meta.page.hasMore",
@@ -2073,8 +2073,8 @@
           "value": "[]"
         },
         {
-          "name": "meta.notes.purpose",
-          "value": "[\"For consumer information only (synthetic).\"]"
+          "name": "meta.notes.purpose[tankerkoenig_gamma]",
+          "value": "1"
         },
         {
           "name": "meta.page.hasMore",
@@ -6708,8 +6708,8 @@
           "value": "[]"
         },
         {
-          "name": "meta.notes.purpose",
-          "value": "[\"For consumer information only (synthetic).\"]"
+          "name": "meta.notes.purpose[tankerkoenig_gamma]",
+          "value": "1"
         },
         {
           "name": "meta.page.hasMore",
@@ -6752,8 +6752,8 @@
           "value": "[]"
         },
         {
-          "name": "meta.notes.purpose",
-          "value": "[\"For consumer information only (synthetic).\"]"
+          "name": "meta.notes.purpose[tankerkoenig_gamma]",
+          "value": "1"
         },
         {
           "name": "meta.page.hasMore",
@@ -10842,8 +10842,8 @@
           "value": "speed_alpha"
         },
         {
-          "name": "meta.notes.condition[lorry_bast_langlkw]",
-          "value": "1"
+          "name": "meta.notes.condition",
+          "value": "[]"
         },
         {
           "name": "meta.notes.purpose",
@@ -10951,8 +10951,8 @@
           "value": "speed_alpha"
         },
         {
-          "name": "meta.notes.condition[lorry_bast_langlkw]",
-          "value": "1"
+          "name": "meta.notes.condition",
+          "value": "[]"
         },
         {
           "name": "meta.notes.purpose",
@@ -11554,8 +11554,8 @@
           "value": "speed_alpha"
         },
         {
-          "name": "meta.notes.condition[lorry_bast_langlkw]",
-          "value": "1"
+          "name": "meta.notes.condition",
+          "value": "[]"
         },
         {
           "name": "meta.notes.purpose",

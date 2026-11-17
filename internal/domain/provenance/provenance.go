@@ -160,3 +160,16 @@ type Versions struct {
 	// freshness version of their own.
 	RulesReference string
 }
+
+// Unconditioned is fams without their condition notes: an answer that states
+// no row names the families it consulted, but carries none of their
+// conditions, as the platform's answers carry a register's condition only
+// beside the rows it governs. The input is not changed.
+func Unconditioned(fams []Family) []Family {
+	out := make([]Family, len(fams))
+	for i, f := range fams {
+		f.Notes = slices.DeleteFunc(slices.Clone(f.Notes), func(n Note) bool { return n.Kind == Condition })
+		out[i] = f
+	}
+	return out
+}

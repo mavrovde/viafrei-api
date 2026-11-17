@@ -179,7 +179,7 @@ func exclusionPattern(p string) *regexp.Regexp {
 
 // Default is the projection rule set of this format.
 var Default = Rules{
-	ID:               "viafrei.parity.rules/4",
+	ID:               "viafrei.parity.rules/5",
 	PositionDecimals: 5,
 	Positions:        []string{"lat", "lon"},
 	Keys:             []string{"id", "family", "code"},
@@ -201,10 +201,29 @@ var Default = Rules{
 		{"meta.attribution[*].termsUrl", "", attributionReason},
 		{"meta.attribution[*].text", "", attributionReason},
 	},
-	// The fixture's condition notes are synthetic register texts and the
-	// platform states its own register's (attributionReason): which family
-	// a condition belongs to and how many it has are compared, the text is not.
-	OwnedNotes: []string{"condition"},
+	// The fixture's condition and purpose notes are synthetic register texts
+	// and the platform states its own register's (attributionReason): which
+	// family a note belongs to and how many it has are compared, the text is
+	// not. Purpose notes are owned since rules/5.
+	OwnedNotes: []string{"condition", "purpose"},
+}
+
+// previousRules is the rule set before purpose notes were owned. A bundle
+// projected with it is read under Default when it states no purpose note
+// (every meta.notes.purpose fact is []): the two rule sets state such an
+// answer alike. One that states a purpose text is refused.
+const previousRules = "viafrei.parity.rules/4"
+
+// purposeFree reports whether b states no purpose note.
+func purposeFree(b Bundle) bool {
+	for _, c := range b.Cases {
+		for _, f := range c.Facts {
+			if strings.HasPrefix(f.Name, "meta.notes.purpose") && (f.Name != "meta.notes.purpose" || f.Value != "[]") {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // attributionReason is why only the credited family of an attribution entry
@@ -281,8 +300,8 @@ func Parse(raw []byte, platform string) (Bundle, error) {
 		return Bundle{}, fmt.Errorf("%w: format %q, want %q", ErrMalformed, b.Format, Format)
 	case b.Platform != platform:
 		return Bundle{}, fmt.Errorf("%w: platform %q, pinned for %q", ErrMalformed, b.Platform, platform)
-	case b.Rules != Default.ID:
-		return Bundle{}, fmt.Errorf("%w: rules %q, want %q", ErrMalformed, b.Rules, Default.ID)
+	case b.Rules != Default.ID && (b.Rules != previousRules || !purposeFree(b)):
+		return Bundle{}, fmt.Errorf("%w: rules %q, want %q (or %q with no purpose note)", ErrMalformed, b.Rules, Default.ID, previousRules)
 	case b.Producer != ProducerAPI && b.Producer != ProducerMCP:
 		return Bundle{}, fmt.Errorf("%w: producer %q, want %q or %q", ErrMalformed, b.Producer, ProducerAPI, ProducerMCP)
 	case b.Producer == ProducerMCP && !commitPattern.MatchString(b.Commit):
@@ -544,6 +563,18 @@ type projector struct {
 
 func (p *projector) add(name, value string) { p.out = append(p.out, Fact{name, value}) }
 
+// credited are the families meta.attribution credits, as stated so far
+// (attribution is walked before notes).
+func (p *projector) credited() map[string]bool {
+	out := map[string]bool{}
+	for _, f := range p.out {
+		if strings.HasPrefix(f.Name, "meta.attribution[") && strings.HasSuffix(f.Name, "].family") {
+			out[normalise(f.Value)] = true
+		}
+	}
+	return out
+}
+
 // notes states meta.notes: an owned kind per family as a count, every other
 // member as walk states it.
 func (p *projector) notes(notes map[string]any, owners Owners) error {
@@ -562,8 +593,15 @@ func (p *projector) notes(notes map[string]any, owners Owners) error {
 			return fmt.Errorf("%w: %s is not a list of texts", ErrMalformed, path)
 		}
 		count := map[string]map[string]bool{}
+		credited := p.credited()
 		for _, text := range texts {
 			fams := owners[text]
+			if len(credited) > 0 {
+				// A text two families own (a register's shared wording) is
+				// the note of the one the answer credits: an answer's notes
+				// are its credited families'.
+				fams = slices.DeleteFunc(slices.Clone(fams), func(f string) bool { return !credited[normalise(f)] })
+			}
 			if len(fams) == 0 {
 				return fmt.Errorf("%w: %s, %d character(s)", ErrUnownedNote, path, len(text))
 			}

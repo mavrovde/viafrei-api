@@ -461,7 +461,8 @@ func (f *catFake) Motorways(context.Context, roads.CatalogueQuery, []string, tim
 
 func TestMotorwayCatalogueCreditsOnlyTheFamiliesItsRoadsState(t *testing.T) {
 	req.Covers(t, "SEC-030")
-	f := &catFake{fake: &fake{reg: roadRegister}, ms: []roads.Motorway{
+	cond := []provenance.Note{{Kind: provenance.Condition, Text: "c"}, {Kind: provenance.Purpose, Text: "p"}}
+	f := &catFake{fake: &fake{reg: roadRegister, notes: map[string][]provenance.Note{"r1": cond}}, ms: []roads.Motorway{
 		{Road: "A1", Family: "ref", Sources: []string{"r1"}},
 		{Road: "A2", Family: "ref"},
 	}}
@@ -470,11 +471,14 @@ func TestMotorwayCatalogueCreditsOnlyTheFamiliesItsRoadsState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(a.Motorways) != 2 || !slices.Equal(names(a.Meta.Families), []string{"r1"}) {
+	if len(a.Motorways) != 2 || !slices.Equal(names(a.Meta.Families), []string{"r1"}) || len(a.Meta.Families[0].Notes) != 2 {
 		t.Errorf("answer %+v", a.Meta)
 	}
 	f.ms = nil
 	if a, err = s.Motorways(context.Background(), key("commercial", []access.Scope{"roads"}, "r1"), roads.CatalogueQuery{Limit: 3}); err != nil || !slices.Equal(names(a.Meta.Families), []string{"r1"}) {
 		t.Errorf("a catalogue with no situation names the families consulted: %+v %v", a.Meta, err)
+	}
+	if n := a.Meta.Families[0].Notes; len(n) != 1 || n[0].Kind != provenance.Purpose {
+		t.Errorf("a catalogue with no situation carries no condition: %+v", n)
 	}
 }

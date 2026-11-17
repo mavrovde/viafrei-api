@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 )
 
@@ -27,10 +28,14 @@ func (s *Service) Motorways(ctx context.Context, key access.Record, q roads.Cata
 		// platform's answers do: those of the situations its roads count.
 		// A family that stated nothing (a lorry or zone register, say) is
 		// not credited, and its condition is not carried; with no situation,
-		// the families consulted are named.
+		// the families consulted are named, and none of their conditions is
+		// carried (the platform's rule for an answer that states no row).
 		ms, err := s.repos.Catalogue.Motorways(ctx, q, permitted, s.now())
 		return ms, motorwayFamilies(ms), err
 	})
+	if err == nil && len(motorwayFamilies(v)) == 0 {
+		meta.Families = provenance.Unconditioned(meta.Families)
+	}
 	return MotorwaysAnswer{Motorways: v, Meta: meta}, err
 }
 

@@ -18,7 +18,7 @@ A bundle (`format: viafrei.parity/2`) names the side that produced its facts
 (`producer`: `mcp` or `api`), for an `mcp` bundle the platform commit it
 answered from (`commit`, 40 hex digits; an `api` bundle names none), the fixture rows it was taken on (`profile`,
 `seed` and the SHA-256 of the generated SQL), the rule set it was projected
-with (`viafrei.parity.rules/4`) and its cases. A case is one
+with (`viafrei.parity.rules/5`) and its cases. A case is one
 question: the operation, its MCP counterpart, the request, the key it is
 asked as (use class, scopes, source families, accepted terms), a fixed
 `now`, and the expected facts.
@@ -26,7 +26,7 @@ asked as (use class, scopes, source families, accepted terms), a fixed
 ## Projection rules
 
 Both sides state an answer as a sorted list of facts, `name = value`. The
-rule set `viafrei.parity.rules/4` (`parity.Default`):
+rule set `viafrei.parity.rules/5` (`parity.Default`):
 
 - **Facts** are the members of `data` and the members `asOf`, `attribution`,
   `freshness`, `notes`, `page` and `warnings` of `meta`. The rest of `meta`
@@ -44,7 +44,16 @@ rule set `viafrei.parity.rules/4` (`parity.Default`):
 - **Instants** are UTC, RFC 3339.
 - **Lists of values** (families, codes, notes) are sets: sorted and stated as
   a JSON array (`["a","b"]`), so no value can be read as a separator.
-  Purpose notes are compared verbatim.
+- **Purpose notes** follow the condition notes' rule below since rules/5:
+  `meta.notes.purpose[<family>]` is how many distinct purpose notes of that
+  family the answer carries, `meta.notes.purpose` is `[]` when it carries
+  none, and the text is not compared (the fixture's purpose notes are
+  synthetic, the platform states its own register's). A rules/4 bundle,
+  which compared purpose texts verbatim, is read under rules/5 only when it
+  states no purpose note: the two rule sets state such an answer alike.
+- **A note text two families own** (a register's shared wording) is the note
+  of the family the answer credits (`meta.attribution[*].family`): an
+  answer's notes are its credited families'.
 - **Condition notes** are stated by the family each belongs to:
   `meta.notes.condition[<family>]` is how many distinct condition notes of
   that family the answer carries, and `meta.notes.condition` is `[]` when it
@@ -83,7 +92,7 @@ rule set `viafrei.parity.rules/4` (`parity.Default`):
 | `meta.page.hasMore`, in a case that asks `min_kw` | The MCP capability states no count of the sites a power filter keeps, so under `min_kw` it cannot say whether there are more. Without `min_kw` it states the count of the circle, and the fact is compared. |
 | `meta.asOf` | Each side defines it differently: the API states the oldest `dataAsOf` of its families (ENV-004), the MCP capability the newest current point status, or its clock when none is current. Neither is a format of the other. |
 | `meta.attribution[*].` `domain`, `licence`, `licenceUrl`, `publisher`, `shareAlike`, `shareAlikeOffer`, `termsUrl`, `text` | The fixture's families carry synthetic register texts; the platform credits its own register rows for the sources the producer stores each family as, so the texts cannot be equal on these rows. Which families are credited (`meta.attribution[*].family`) is compared. |
-| The text of a condition note (`meta.notes.condition`) | The same reason, since rules/4: the fixture's condition notes are synthetic and the platform states its own register's condition. The family of each note and how many each family has are compared (`meta.notes.condition[<family>]`, above). |
+| The text of a condition note (`meta.notes.condition`) and, since rules/5, of a purpose note (`meta.notes.purpose`) | The same reason, since rules/4 for conditions: the fixture's notes are synthetic and the platform states its own register's. The family of each note and how many each family has are compared (`meta.notes.<kind>[<family>]`, above). |
 
 ## The questions
 

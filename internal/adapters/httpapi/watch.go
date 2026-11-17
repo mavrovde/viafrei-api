@@ -11,6 +11,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 )
 
@@ -199,7 +200,13 @@ func registerWatch(api huma.API, s *server, op huma.Operation) {
 				return nil, s.featureProblem(ctx, err)
 			}
 			l := string(c.Lamp)
-			list, lamp, meta = c.Items, &l, s.dataMeta(ctx, c.Families, c.At, c.Partial, partialDetail)
+			fams := c.Families
+			if len(c.Items) == 0 {
+				// An answer that states no situation carries no register's
+				// condition, as the platform's watch answers it.
+				fams = provenance.Unconditioned(fams)
+			}
+			list, lamp, meta = c.Items, &l, s.dataMeta(ctx, fams, c.At, c.Partial, partialDetail)
 		}
 		if in.since != nil {
 			list = slices.DeleteFunc(slices.Clone(list), func(x roads.Situation) bool { return !x.UpdatedAt.After(*in.since) })

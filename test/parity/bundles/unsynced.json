@@ -1332,14 +1332,6 @@
           "value": "1:de:01002:0"
         },
         {
-          "name": "data.station.location.lat",
-          "value": "49.14816"
-        },
-        {
-          "name": "data.station.location.lon",
-          "value": "7.78575"
-        },
-        {
           "name": "data.station.name",
           "value": "Namüningen Süd"
         },
@@ -1424,14 +1416,6 @@
           "value": "1:de:01002:0"
         },
         {
-          "name": "data.station.location.lat",
-          "value": "49.14816"
-        },
-        {
-          "name": "data.station.location.lon",
-          "value": "7.78575"
-        },
-        {
           "name": "data.station.name",
           "value": "Namüningen Süd"
         },
@@ -1514,14 +1498,6 @@
         {
           "name": "data.station.id",
           "value": "1:de:01002:0"
-        },
-        {
-          "name": "data.station.location.lat",
-          "value": "49.14816"
-        },
-        {
-          "name": "data.station.location.lon",
-          "value": "7.78575"
         },
         {
           "name": "data.station.name",

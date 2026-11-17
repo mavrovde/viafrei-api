@@ -200,6 +200,7 @@ var Default = Rules{
 		{"meta.warnings", "", "API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got"},
 		{"meta.page.hasMore", "min_kw", "the MCP capability states no count of the sites a power filter keeps, so it cannot say whether there are more"},
 		{"meta.asOf", "", "each side defines it differently: the API the oldest family dataAsOf (ENV-004), MCP the newest current status or its clock"},
+		{"data.station.location", "", siteReason("/internal/station/:slug")},
 		{"meta.attribution[*].domain", "", attributionReason},
 		{"meta.attribution[*].licence", "", attributionReason},
 		{"meta.attribution[*].licenceUrl", "", attributionReason},
@@ -232,6 +233,12 @@ func purposeFree(b Bundle) bool {
 		}
 	}
 	return true
+}
+
+// siteReason is why a fact the MCP capability does not state is answered
+// and not compared: a digest route the site reads serves it (docs/parity.md).
+func siteReason(route string) string {
+	return "the MCP capability does not state it; the site reads it from the digest route " + route
 }
 
 // attributionReason is why only the credited family of an attribution entry

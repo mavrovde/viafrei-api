@@ -93,6 +93,7 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
 | `meta.warnings` | API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got (for example `partial` when a commercial key withholds a family). |
 | `meta.page.hasMore`, in a case that asks `min_kw` | The MCP capability states no count of the sites a power filter keeps, so under `min_kw` it cannot say whether there are more. Without `min_kw` it states the count of the circle, and the fact is compared. |
 | `meta.asOf` | Each side defines it differently: the API states the oldest `dataAsOf` of its families (ENV-004), the MCP capability the newest current point status, or its clock when none is current. Neither is a format of the other. |
+| `data.station.location` | The MCP departure board states the stop's name and code, not its position. The site reads the station's position from the digest route `/internal/station/:slug`, so the API answers it; it is not compared. |
 | `meta.attribution[*].` `domain`, `licence`, `licenceUrl`, `publisher`, `shareAlike`, `shareAlikeOffer`, `termsUrl`, `text` | The fixture's families carry synthetic register texts; the platform credits its own register rows for the sources the producer stores each family as, so the texts cannot be equal on these rows. Which families are credited (`meta.attribution[*].family`) is compared. |
 | The text of a condition note (`meta.notes.condition`) and, since rules/5, of a purpose note (`meta.notes.purpose`) | The same reason, since rules/4 for conditions: the fixture's notes are synthetic and the platform states its own register's. The family of each note and how many each family has are compared (`meta.notes.<kind>[<family>]`, above). |
 
@@ -172,6 +173,9 @@ nothing, so that family contributed nothing and neither side credits it.
   the platform's weather warnings check states neither, and no digest route
   the site reads serves a lamp for a position. A family the platform does
   not read is not credited.
+- **Departure boards** state the station by the read contract's id, its
+  name and its national stop code, and the window asked. A day the
+  timetable holds no trip on is inside the window and answers no departure.
 - **Station facilities** name the station only and state no report
   instant per unit, as the platform's facilities check states them.
 

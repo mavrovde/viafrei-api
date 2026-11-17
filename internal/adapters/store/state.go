@@ -45,7 +45,7 @@ func (s *Store) StateWarnings(ctx context.Context, land string, families []strin
 // message each belongs to and the Länder of the districts their stops lie
 // in, of the messages touching the Land $3, as the platform's Land page reads
 // them. Rows sharing a dedupe key are one message; its key is the row of the
-// primary family (the GTFS-RT alerts) where one carries it, and every family
+// primary family (the realtime alerts) where one carries it, and every family
 // carrying it is listed.
 var stateAlerts = `
 with f as materialized (

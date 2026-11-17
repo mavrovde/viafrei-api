@@ -6444,7 +6444,7 @@
             "type": "integer"
           },
           "osm": {
-            "description": "Fixed cameras OpenStreetMap maps, by name; none where an official list of fixed cameras covers the area.",
+            "description": "Fixed cameras OpenStreetMap maps, by name; none in a municipality (the nearest official municipality point) whose fixed cameras an official list holds.",
             "items": {
               "$ref": "#/components/schemas/SpeedCamera"
             },

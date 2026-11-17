@@ -55,10 +55,8 @@ values ('delfi_rt_sa:pm-1', 'Gleisarbeiten', '[]', '{U 3}', '{09162,08111}', '{0
 	if n != 2 {
 		t.Fatalf("planted %d of 2", n)
 	}
-	t.Cleanup(func() {
-		// the read contract takes no delete: the rows go from the table under it
-		plant(t, `delete from public.delfi_service_alerts where (source_feed, alert_id) in (('delfi_rt_sa', 'pm-1'), ('delfi_siri_sx', 'pm-0'))`)
-	})
+	// the read contract takes no delete and no other test of the package
+	// reads a message, so the rows stay, as the planted departures do
 }
 
 func TestStateAlertsReadAsTheLandPage(t *testing.T) {

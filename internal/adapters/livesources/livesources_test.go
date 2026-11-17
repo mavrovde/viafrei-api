@@ -16,11 +16,14 @@ import (
 )
 
 // registryFile is the repository's registry, test/live/registry.json: a
-// byte copy of the live refresher's generated registry.json, pinned by its
-// SHA-256 (registrySHA256). A new copy is a new pin, in the same commit.
+// copy of the live refresher's generated registry.json, byte for byte but
+// for a lookup's table, whose platform storage name is masked (the scope
+// lint; the API resolves a lookup by its name, never by its table), pinned
+// by its SHA-256 (registrySHA256). A new copy is a new pin, in the same
+// commit.
 var registryFile = filepath.Join("..", "..", "..", "test", "live", "registry.json")
 
-const registrySHA256 = "add33c6cdea5140c0c60b82aeb01383eca75cea933eee94741c531a459e8ccbe"
+const registrySHA256 = "93e195a12799af567672ce690d3cde5620f2d6fbd8f9a5423e34bed45c3bf176"
 
 func registry(t *testing.T) *livesources.Registry {
 	t.Helper()

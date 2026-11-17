@@ -192,6 +192,12 @@ func TestAnOpenRefreshAnswersPendingAtTheDeadline(t *testing.T) {
 // leaves the waiting asks to their deadlines and is opened again, after
 // which a settle answers its asks at once again.
 func TestALostListenerIsOpenedAgain(t *testing.T) {
+	// The listeners of the stores earlier tests closed may linger a moment
+	// in pg_stat_activity: only this store's, opened after since, is ended.
+	var since time.Time
+	if err := owner(t).QueryRow(bounded(t), `select clock_timestamp()`).Scan(&since); err != nil {
+		t.Fatal(err)
+	}
 	s, err := accessstore.Open(context.Background(), cfg(t, "VFAPI_DB_CONNECT_TIMEOUT=200ms"))
 	if err != nil {
 		t.Fatal(err)
@@ -206,7 +212,7 @@ func TestALostListenerIsOpenedAgain(t *testing.T) {
 	}
 	var lost int
 	if err := owner(t).QueryRow(ctx, `select count(pg_terminate_backend(pid)) from pg_stat_activity
-		where usename = 'api_access' and query like '%listen "live_refresh_settled"%'`).Scan(&lost); err != nil || lost != 1 {
+		where usename = 'api_access' and query like '%listen "live_refresh_settled"%' and backend_start >= $1`, since).Scan(&lost); err != nil || lost != 1 {
 		t.Fatalf("%d listeners ended: %v", lost, err)
 	}
 	start := time.Now()

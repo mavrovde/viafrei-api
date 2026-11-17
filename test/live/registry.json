@@ -82,7 +82,7 @@
       "subject_key": {
         "lookups": {
           "eva": {
-            "table": "db_station_numbers",
+            "table": "masked",
             "match_column": "name",
             "value_column": "eva_no",
             "fold": "lower",

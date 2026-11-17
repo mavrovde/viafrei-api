@@ -63,11 +63,14 @@ const (
 	Allowed           Refusal = ""
 	NotInPlan         Refusal = "not_in_plan"
 	UseClassForbidden Refusal = "use_class_forbidden"
-	TermsNotAccepted  Refusal = "terms_not_accepted"
-	Held              Refusal = "held"
-	OwnAudienceOnly   Refusal = "audience_own"
-	Unknown           Refusal = "unknown_family"
-	Disabled          Refusal = "disabled"
+	// Unreviewed is a family whose terms grant no use class yet: it is
+	// never served, though ViaFrei's own keys see it listed (Catalogued).
+	Unreviewed       Refusal = "unreviewed"
+	TermsNotAccepted Refusal = "terms_not_accepted"
+	Held             Refusal = "held"
+	OwnAudienceOnly  Refusal = "audience_own"
+	Unknown          Refusal = "unknown_family"
+	Disabled         Refusal = "disabled"
 )
 
 // Decide applies the licence gate to one family for a key of plan and
@@ -90,6 +93,9 @@ func Decide(t Terms, plan Plan, audience Audience, accepted []string, disabled [
 	if !slices.Contains(plan.Sources, t.Family) {
 		return NotInPlan
 	}
+	if len(t.UseClasses) == 0 {
+		return Unreviewed
+	}
 	if !slices.Contains(t.UseClasses, plan.UseClass) {
 		return UseClassForbidden
 	}
@@ -104,12 +110,13 @@ func Decide(t Terms, plan Plan, audience Audience, accepted []string, disabled [
 type Gate struct {
 	allowed []string
 	refused map[string]Refusal
+	own     bool
 }
 
 // NewGate decides every family of the register for a key of plan and
 // audience.
 func NewGate(register []Terms, plan Plan, audience Audience, accepted []string, disabled []string) Gate {
-	g := Gate{refused: map[string]Refusal{}}
+	g := Gate{refused: map[string]Refusal{}, own: audience == AudienceOwn}
 	for _, t := range register {
 		if r := Decide(t, plan, audience, accepted, disabled); r != Allowed {
 			g.refused[t.Family] = r
@@ -220,6 +227,21 @@ func (g Gate) Pending(answering []string) []string {
 	var out []string
 	for _, f := range answering {
 		if g.Refused(f) == TermsNotAccepted {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// Catalogued returns the families among answering that a source list names
+// although the key may not read them: for ViaFrei's own keys, the families of
+// their plan whose terms are not reviewed yet, as the own catalogue lists them
+// (the platform's coverage resource). No data of theirs is served to any key
+// (SEC-030); any other key gets none.
+func (g Gate) Catalogued(answering []string) []string {
+	var out []string
+	for _, f := range answering {
+		if g.own && g.Refused(f) == Unreviewed {
 			out = append(out, f)
 		}
 	}

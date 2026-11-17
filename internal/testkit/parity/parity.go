@@ -286,6 +286,7 @@ var Default = Rules{
 		{"data[*].licenceUrl", "", "listSources", sourcesTextReason},
 		{"data[*].publisher", "", "listSources", sourcesTextReason},
 		{"data[*].termsUrl", "", "listSources", sourcesTextReason},
+		{"meta.notes", "", "listSources", sourcesNotesReason},
 		{"data.watchId", "", "getWatch", watchIDReason},
 		{"data.uri", "", "getWatch", watchIDReason},
 		{"meta.attribution[*].domain", "", "", attributionReason},
@@ -366,6 +367,8 @@ const sourcesLiveReason = "live-varying: the API states a family's status and da
 const sourcesReferenceReason = "API-only (lead ruling 2026-11-17): viafrei://coverage lists the live sources of the deployment, not the reference families (places, the road register, timetables, rules), and states no domain; the live-source families it lists are compared"
 
 const sourcesTextReason = "prose: the fixture's families carry synthetic register texts and the platform states its own register's; which families are listed, their domain, stale threshold and share-alike flag are compared"
+
+const sourcesNotesReason = "register texts, lead ruling 2026-11-17: a source list's condition and purpose notes are the register's prose about its families, which the sources comparison leaves out; the platform's coverage resource states none"
 
 const watchIDReason = "each side mints the id of a watch: the platform a number of its session, the API a token of kind, key and condition; the watch it names is compared"
 

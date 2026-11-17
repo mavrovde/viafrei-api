@@ -50,6 +50,10 @@ func TestBuildRefusesABrokenExample(t *testing.T) {
 	}{
 		"no example at all":      {fstest.MapFS{}, "no examples"},
 		"an undocumented status": {fstest.MapFS{"examples/getMeta.json": {Data: []byte(`{"title":"t","request":"/v1/meta","attribution":"none","status":201,"response":{}}`)}}, "status 201 is not documented"},
+		"a variant of an undocumented status": {fstest.MapFS{
+			"examples/getMeta.json":      {Data: []byte(`{"title":"t","request":"/v1/meta","attribution":"none","status":200,"response":{}}`)},
+			"examples/getMeta.gone.json": {Data: []byte(`{"title":"t","request":"/v1/meta","attribution":"none","status":201,"response":{}}`)},
+		}, "getMeta.gone.json: status 201 is not documented"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			withExamples(t, c.fs)

@@ -39,6 +39,8 @@ import (
 // records what it was asked.
 type fakeFeatures struct {
 	trainBoard features.TrainBoardAnswer
+	lorry      features.LorryAnswer
+	zonesErr   error
 	refresh    refresh.Request
 	refreshErr error
 	gotRefresh refresh.Ask

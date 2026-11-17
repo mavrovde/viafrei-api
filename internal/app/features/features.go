@@ -394,23 +394,27 @@ const CorridorFamily = "bast_lcl"
 // families left out; empty when the scope holds none.
 func (s *Service) parkingCoverage(ctx context.Context, q parking.Query, listed, permitted []string, gated map[string]bool, now time.Time) ([]string, error) {
 	q.FreeMin, q.Amenities, q.Limit = 0, nil, coverageScan
-	for _, kind := range []string{q.Kind, ""} {
-		q.Kind = kind
-		sites, _, _, err := s.repos.Parking.ParkingNear(ctx, q, listed, permitted, now)
-		if err != nil {
-			return nil, err
-		}
-		var out []string
-		for _, site := range sites {
-			if !gated[site.Family] {
-				out = append(out, site.Family)
-			}
-		}
-		if len(out) > 0 || kind == "" {
-			return out, nil
+	out, err := s.coverageOfKind(ctx, q, listed, permitted, gated, now)
+	if err != nil || len(out) > 0 || q.Kind == "" {
+		return out, err
+	}
+	q.Kind = ""
+	return s.coverageOfKind(ctx, q, listed, permitted, gated, now)
+}
+
+// coverageOfKind are the families of the sites of q, gated families left out.
+func (s *Service) coverageOfKind(ctx context.Context, q parking.Query, listed, permitted []string, gated map[string]bool, now time.Time) ([]string, error) {
+	sites, _, _, err := s.repos.Parking.ParkingNear(ctx, q, listed, permitted, now)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, site := range sites {
+		if !gated[site.Family] {
+			out = append(out, site.Family)
 		}
 	}
-	return nil, nil
+	return out, nil
 }
 
 // coverageScan bounds the sites a coverage read takes.

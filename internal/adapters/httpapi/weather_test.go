@@ -30,7 +30,7 @@ func (f *fakeFeatures) WeatherCell(_ context.Context, key access.Record, target 
 
 func (f *fakeFeatures) LowEmissionZones(_ context.Context, _ access.Record, q rules.ZoneQuery) (features.ZonesAnswer, error) {
 	f.gotZones = &q
-	return f.zones, nil
+	return f.zones, f.zonesErr
 }
 
 func (f *fakeFeatures) DrivingRules(_ context.Context, key access.Record, topic string) (rules.Topic, features.Answer[rules.Rule], error) {
@@ -194,11 +194,11 @@ func TestWeatherAndRulesRefusals(t *testing.T) {
 }
 
 func (f *fakeFeatures) LorryRules(context.Context, access.Record, roads.LorryQuery) (features.LorryAnswer, error) {
-	return features.LorryAnswer{}, nil
+	return f.lorry, f.err
 }
 
 func (f *fakeFeatures) Sources(context.Context, access.Record, string) ([]provenance.Family, features.Answer[struct{}], error) {
-	return nil, features.Answer[struct{}]{}, nil
+	return nil, features.Answer[struct{}]{}, f.err
 }
 
 func (f *fakeFeatures) Motorways(context.Context, access.Record, roads.CatalogueQuery) (features.MotorwaysAnswer, error) {

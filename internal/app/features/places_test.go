@@ -44,3 +44,39 @@ func TestPlacesAreGatedAndAttributed(t *testing.T) {
 		}
 	}
 }
+
+// TestAJunctionIsAskedByItsName: a junction word in front of the name asks
+// for a junction by the name after it, kind or none; a plain name keeps its
+// kind and text (G5).
+func TestAJunctionIsAskedByItsName(t *testing.T) {
+	req.Covers(t, "FR-PLACE-001")
+	k := key("commercial", []access.Scope{"places"}, "pl")
+	for _, c := range []struct {
+		text, kind, wantText, wantKind string
+	}{
+		{"AK Hilden", "", "hilden", "junction"},
+		{"Hilden (A3)", "junction", "hilden", "junction"},
+		{"Kreuzberg", "", "Kreuzberg", ""},
+		{"AS Baden-Baden", "municipality", "AS Baden-Baden", "municipality"},
+	} {
+		f := &fake{}
+		if _, err := service(f, nil).Places(context.Background(), k, places.Query{Text: c.text, Kind: places.Kind(c.kind), Limit: 1}); err != nil ||
+			f.gotPlaceQ.Text != c.wantText || string(f.gotPlaceQ.Kind) != c.wantKind {
+			t.Errorf("%q/%q: %+v %v", c.text, c.kind, f.gotPlaceQ, err)
+		}
+	}
+}
+
+// TestPlacesHandTheRoadsFamilies: the roads families a key may read go to the
+// store for the motorway places; a key that may read none hands none (G5).
+func TestPlacesHandTheRoadsFamilies(t *testing.T) {
+	req.Covers(t, "FR-PLACE-001")
+	f := &fake{}
+	if _, err := service(f, nil).Places(context.Background(), key("commercial", []access.Scope{"places"}, "pl", "rd"), places.Query{Text: "A9", Limit: 1}); err != nil || !slices.Equal(f.gotPlaceRoads, []string{"rd"}) {
+		t.Errorf("roads %v, %v", f.gotPlaceRoads, err)
+	}
+	f = &fake{}
+	if _, err := service(f, nil).Places(context.Background(), key("commercial", []access.Scope{"places"}, "pl"), places.Query{Text: "A9", Limit: 1}); err != nil || f.gotPlaceRoads != nil {
+		t.Errorf("roads %v, %v", f.gotPlaceRoads, err)
+	}
+}

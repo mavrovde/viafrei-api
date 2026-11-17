@@ -17,7 +17,7 @@ const placesDefaultLimit = 5
 // PlacesInput is the input of listPlaces.
 type PlacesInput struct {
 	Q       string `query:"q" required:"true" minLength:"2" maxLength:"80" example:"Neustadt" doc:"The place name as typed: case, umlauts written out (koeln for Köln), accents and punctuation do not matter; any of its names (an English one too) answers."`
-	Kind    string `query:"kind" enum:"municipality,district,locality,region,state,station_area" doc:"Only places of this kind. Default: every kind."`
+	Kind    string `query:"kind" enum:"municipality,district,locality,region,state,station_area,motorway,junction" doc:"Only places of this kind. Default: every kind. motorway and junction are the gazetteer's motorway places; a q that starts with a junction word (AK, AD, AS, Kreuz, Dreieck, Anschlussstelle, interchange, junction, exit ...) asks for a junction by the name after it."`
 	At      string `query:"at" pattern:"^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$" example:"53.55,10.0" doc:"A position to tell same-named places apart: lat,lon in decimal degrees (WGS 84). Every place then carries its distance from it."`
 	RadiusM int    `query:"radius_m" minimum:"1000" maximum:"200000" doc:"With at, keep only places within this many metres. Default: none dropped."`
 	Limit   int    `query:"limit" minimum:"1" maximum:"10" doc:"Most places to return, best match first; default 5."`

@@ -232,12 +232,68 @@ contract.junction	state_code	text
 contract.junction	source_ref	text
 contract.junction	display_class	text
 contract.junction	audience	text
+contract.junction	placement_source_ref	text
 contract.licence	licence_code	text
 contract.licence	licence_name	text
 contract.licence	licence_url	text
 contract.licence	licence_category	text
 contract.licence	share_alike	boolean
 contract.licence	attribution_required	boolean
+contract.lorry_rule	rule_id	text
+contract.lorry_rule	rule_layer	text
+contract.lorry_rule	restriction_kind	text
+contract.lorry_rule	sign	text
+contract.lorry_rule	value	numeric
+contract.lorry_rule	unit	text
+contract.lorry_rule	published_text	text
+contract.lorry_rule	road_ref	text
+contract.lorry_rule	street	text
+contract.lorry_rule	municipality	text
+contract.lorry_rule	direction	text
+contract.lorry_rule	exceptions	text[]
+contract.lorry_rule	times	text
+contract.lorry_rule	days	text
+contract.lorry_rule	category	text
+contract.lorry_rule	network_state	text
+contract.lorry_rule	version_date	date
+contract.lorry_rule	geometry	geometry
+contract.lorry_rule	recorded_at	timestamp with time zone
+contract.lorry_rule	source_ref	text
+contract.lorry_rule	display_class	text
+contract.lorry_rule	audience	text
+contract.low_emission_zone	zone_key	text
+contract.low_emission_zone	zone_id	text
+contract.low_emission_zone	zone_role	text
+contract.low_emission_zone	name	text
+contract.low_emission_zone	city	text
+contract.low_emission_zone	publisher_name	text
+contract.low_emission_zone	geometry	geometry(Geometry,4326)
+contract.low_emission_zone	geometry_m	geometry(Geometry,25832)
+contract.low_emission_zone	same_zone_keys	text[]
+contract.low_emission_zone	checked_at	timestamp with time zone
+contract.low_emission_zone	cadence_s	integer
+contract.low_emission_zone	paused	boolean
+contract.low_emission_zone	changed_at	timestamp with time zone
+contract.low_emission_zone	recorded_at	timestamp with time zone
+contract.low_emission_zone	source_scope	text
+contract.low_emission_zone	source_place_code	text
+contract.low_emission_zone	source_city	text
+contract.low_emission_zone	source_ref	text
+contract.low_emission_zone	display_class	text
+contract.low_emission_zone	audience	text
+contract.low_emission_zone_entry	entry_key	text
+contract.low_emission_zone_entry	name	text
+contract.low_emission_zone_entry	aliases	text[]
+contract.low_emission_zone_entry	place_codes	text[]
+contract.low_emission_zone_entry	plaque	text
+contract.low_emission_zone_entry	covered	boolean
+contract.low_emission_zone_entry	lifted_on	date
+contract.low_emission_zone_entry	reviewed_on	date
+contract.low_emission_zone_entry	source_url	text
+contract.low_emission_zone_entry	source_name	text
+contract.low_emission_zone_entry	source_ref	text
+contract.low_emission_zone_entry	display_class	text
+contract.low_emission_zone_entry	audience	text
 contract.message_coverage	state_code	text
 contract.message_coverage	source_ref	text
 contract.message_coverage	coverage_role	text
@@ -388,6 +444,12 @@ contract.service_alert	dedupe_key	text
 contract.service_alert	source_ref	text
 contract.service_alert	recorded_at	timestamp with time zone
 contract.service_alert	changed_at	timestamp with time zone
+contract.service_alert	seen_at	timestamp with time zone
+contract.service_alert	message_ref	text
+contract.service_alert	primary_source	boolean
+contract.service_alert	checked_at	timestamp with time zone
+contract.service_alert	cadence_s	integer
+contract.service_alert	paused	boolean
 contract.service_alert	display_class	text
 contract.service_alert	audience	text
 contract.service_alert	confidentiality	text
@@ -476,6 +538,16 @@ contract.speed_camera	last_seen_at	timestamp with time zone
 contract.speed_camera	display_class	text
 contract.speed_camera	audience	text
 contract.speed_camera	origin_restriction	text
+contract.station_disruption	station_ifopt	text
+contract.station_disruption	window_start	timestamp with time zone
+contract.station_disruption	aimed_minute	timestamp with time zone
+contract.station_disruption	line_key	text
+contract.station_disruption	departures	integer
+contract.station_disruption	cancelled	integer
+contract.station_disruption	late	integer
+contract.station_disruption	source_ref	text
+contract.station_disruption	display_class	text
+contract.station_disruption	audience	text
 contract.station_facility	facility_id	text
 contract.station_facility	stop_place_id	text
 contract.station_facility	facility_kind	text
@@ -504,6 +576,8 @@ contract.stop_place	station_category	smallint
 contract.stop_place	municipality_name	text
 contract.stop_place	eva_no	text
 contract.stop_place	ifopt	text
+contract.stop_place	placement_source_ref	text
+contract.stop_place	eva_numbers	text[]
 contract.stop_point	stop_point_id	text
 contract.stop_point	stop_place_id	text
 contract.stop_point	platform_label	text
@@ -576,12 +650,31 @@ contract.traffic_event	display_class	text
 contract.traffic_event	audience	text
 contract.traffic_event	confidentiality	text
 contract.traffic_event	origin_restriction	text
+contract.traffic_event	state_code	text
+contract.traffic_event	placement_source_ref	text
 contract.traffic_event_observation	event_id	text
 contract.traffic_event_observation	observed_at	timestamp with time zone
 contract.traffic_event_observation	version_no	integer
 contract.traffic_event_observation	source_ref	text
 contract.traffic_event_observation	display_class	text
 contract.traffic_event_observation	audience	text
+contract.train_board	station_eva	text
+contract.train_board	fetched_at	timestamp with time zone
+contract.train_board	planned_departure_at	timestamp with time zone
+contract.train_board	changed_departure_at	timestamp with time zone
+contract.train_board	platform	text
+contract.train_board	changed_platform	text
+contract.train_board	category	text
+contract.train_board	train_number	text
+contract.train_board	line	text
+contract.train_board	destination	text
+contract.train_board	cancelled	boolean
+contract.train_board	attribution	text
+contract.train_board	licence	text
+contract.train_board	source_ref	text
+contract.train_board	recorded_at	timestamp with time zone
+contract.train_board	display_class	text
+contract.train_board	audience	text
 contract.transit_line	line_id	text
 contract.transit_line	line_name	text
 contract.transit_line	transport_mode	text
@@ -601,6 +694,13 @@ contract.transit_punctuality	observed_at	timestamp with time zone
 contract.transit_punctuality	source_ref	text
 contract.transit_punctuality	display_class	text
 contract.transit_punctuality	audience	text
+contract.transit_trip_delay	trip_ref	text
+contract.transit_trip_delay	area_code	text
+contract.transit_trip_delay	worst_delay_s	integer
+contract.transit_trip_delay	observed_at	timestamp with time zone
+contract.transit_trip_delay	source_ref	text
+contract.transit_trip_delay	display_class	text
+contract.transit_trip_delay	audience	text
 contract.weather_warning	warning_id	text
 contract.weather_warning	hazard	text
 contract.weather_warning	warning_level	integer
@@ -618,3 +718,9 @@ contract.weather_warning	recorded_at	timestamp with time zone
 contract.weather_warning	withdrawn_at	timestamp with time zone
 contract.weather_warning	display_class	text
 contract.weather_warning	audience	text
+contract.weather_warning	warn_cell_id	text
+contract.weather_warning	area_name	text
+contract.weather_warning	area	geometry(MultiPolygon,4326)
+contract.weather_warning	event	text
+contract.weather_warning	identifier	text
+contract.weather_warning	seen_at	timestamp with time zone

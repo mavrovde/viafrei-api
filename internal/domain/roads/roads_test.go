@@ -96,6 +96,28 @@ func TestRoadReferencesAreCanonical(t *testing.T) {
 	}
 }
 
+// TestAnyRoadReferenceAdmitsTheLandRoads (G6): the conditions read a
+// Landesstraße and a Staatsstraße as well, never a Kreisstraße, and name a
+// reference's class by its letter.
+func TestAnyRoadReferenceAdmitsTheLandRoads(t *testing.T) {
+	req.Covers(t, "FR-ROAD-001")
+	for in, want := range map[string]string{"A8": "A8", "b 27": "B27", "l1025": "L1025", "S 0296": "S296"} {
+		if got, err := roads.ParseAnyRoad(in); err != nil || got != want {
+			t.Errorf("%q -> %q, %v; want %q", in, got, err, want)
+		}
+	}
+	for _, in := range []string{"", "K7864", "L12345", "S", "L-1"} {
+		if _, err := roads.ParseAnyRoad(in); !errors.Is(err, roads.ErrRoadReference) {
+			t.Errorf("%q read without error", in)
+		}
+	}
+	for ref, want := range map[string]roads.Class{"A8": roads.ClassMotorway, "B27": roads.ClassFederal, "L1025": roads.ClassState, "S296": roads.ClassState, "K1": roads.ClassOther} {
+		if got := roads.ClassOf(ref); got != want {
+			t.Errorf("ClassOf(%q) = %s, want %s", ref, got, want)
+		}
+	}
+}
+
 func why(r roads.Reason) *roads.Reason { return &r }
 
 func delay(m int) *int { return &m }

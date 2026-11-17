@@ -332,7 +332,7 @@ func TestEveryDataOperationRefusesWithoutAValidKey(t *testing.T) {
 		}
 	}
 	slices.Sort(keyless)
-	if !slices.Equal(keyless, []string{"getHealth", "getMeta", "getReadiness"}) {
+	if !slices.Equal(keyless, []string{"getHealth", "getMeta", "getPressure", "getReadiness"}) {
 		t.Fatalf("operations documented without a key: %v, want the service ones alone", keyless)
 	}
 	for _, c := range []struct {
@@ -358,7 +358,7 @@ func TestEveryDataOperationRefusesWithoutAValidKey(t *testing.T) {
 			if e.Key == nil {
 				continue
 			}
-			w := do(t, h, http.MethodGet, e.Request, nil)
+			w := do(t, h, e.HTTPMethod(), e.Request, nil)
 			if w.Code != c.status || !strings.Contains(w.Body.String(), "/problems/"+c.slug) {
 				t.Errorf("%s with %s: %d %s", id, c.slug, w.Code, w.Body)
 			}

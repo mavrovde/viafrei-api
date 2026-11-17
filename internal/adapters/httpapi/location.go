@@ -7,6 +7,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
+	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 )
 
 // LocationInput is the input of describeLocation.
@@ -48,6 +49,38 @@ type LocationData struct {
 	District             *LocationPlace      `json:"district" doc:"The nearest district within 100 km; null when none."`
 	State                *LocationPlace      `json:"state" doc:"The Land of the district; with no district, the nearest Land within 250 km; null when none."`
 	MayLieOutsideGermany bool                `json:"mayLieOutsideGermany" doc:"True when the position may lie outside Germany, off the coast or near the border: no address within 1.5 km, and at least half of the circle of 15 km around it, in neighbouring eighths, holds none. The facts are then the nearest in Germany and may not describe the position itself."`
+	Zone                 *LocationZone       `json:"lowEmissionZone" doc:"The low-emission zone the position lies in, as the platform's description of a position states it; null when the key may read no zone source."`
+}
+
+// LocationZone is the low-emission-zone verdict at a position.
+type LocationZone struct {
+	Verdict      string  `json:"verdict" enum:"inside,transfer,outside,unknown" doc:"inside a zone; in an area released at its edge; outside (zone names the nearest within 25 km); unknown: none within 25 km, which is not that there is no zone."`
+	Zone         *string `json:"zone" nullable:"true" doc:"The zone's name as the platform prints it (a register zone by its city): the zone it is inside, or the nearest; in a released area, that area's name."`
+	ZoneKey      *string `json:"zoneKey" nullable:"true" doc:"The key of that zone row, as getDrivingRules lists it."`
+	DistanceM    *int    `json:"distanceM" nullable:"true" doc:"Outside: the distance to the nearest zone in metres; else null."`
+	ExemptRoad   *string `json:"exemptRoad" nullable:"true" doc:"The name of an exempt road within 60 m, a road the zone does not apply to."`
+	ReleasedArea *string `json:"releasedArea" nullable:"true" doc:"The name of the released area at the zone's edge the position is in."`
+	ZoneFacts
+}
+
+func locationZone(v *rules.Verdict, a *rules.ZoneAnswer) *LocationZone {
+	if v == nil {
+		return nil
+	}
+	name := func(z *rules.Zone) *string {
+		if z == nil {
+			return nil
+		}
+		return &z.Name
+	}
+	out := &LocationZone{Verdict: v.Kind, Zone: name(v.Zone), ZoneKey: zoneKey(v.Zone), ExemptRoad: name(v.ExemptRoad), ReleasedArea: name(v.Transfer), ZoneFacts: zoneFacts(a)}
+	if a != nil {
+		out.Zone = a.Name
+	}
+	if v.Kind == "outside" {
+		out.DistanceM = &v.Zone.DistanceM
+	}
+	return out
 }
 
 // LocationEnvelope is the enveloped answer of describeLocation.
@@ -72,7 +105,7 @@ func locationPlace(p *places.Place) *LocationPlace {
 
 func registerLocation(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "What lies at a position"
-	op.Description = "A coordinate as a person understands it: the nearest address, municipality and district, and the district's Land (with no district, the nearest Land); each fact on its own, null when none is within its reach; and whether the position may lie outside Germany. Needs the scope places."
+	op.Description = "A coordinate as a person understands it: the nearest address, municipality and district, and the district's Land (with no district, the nearest Land); each fact on its own, null when none is within its reach; the low-emission zone it lies in; and whether the position may lie outside Germany. Needs the scope places."
 	featureResponses(api, &op, "Not used by this operation.")
 	op.Extensions[counterpartExtension] = "location description"
 	huma.Register(api, op, func(ctx context.Context, in *LocationInput) (*LocationOutput, error) {
@@ -88,7 +121,7 @@ func registerLocation(api huma.API, s *server, op huma.Operation) {
 }
 
 func locationEnvelope(s *server, ctx context.Context, a features.LocationAnswer) LocationEnvelope {
-	data := LocationData{District: locationPlace(a.District), State: locationPlace(a.State), MayLieOutsideGermany: a.MayLieAbroad}
+	data := LocationData{District: locationPlace(a.District), State: locationPlace(a.State), MayLieOutsideGermany: a.MayLieAbroad, Zone: locationZone(a.Zone, a.ZoneAnswer)}
 	if p := a.Municipality; p != nil {
 		data.Municipality = &LocationSettlement{ID: p.ID, Name: p.Name, Location: position(p.Location), DistanceM: p.DistanceM, SourceFamily: p.Family}
 	}

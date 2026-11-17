@@ -1,0 +1,19 @@
+{
+  "title": "Whether the service is saturated now",
+  "request": "/v1/pressure",
+  "attribution": "No source data: this answer carries no attribution.",
+  "status": 200,
+  "response": {
+    "data": {
+      "state": "ok"
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en"
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/pressure"
+    }
+  }
+}

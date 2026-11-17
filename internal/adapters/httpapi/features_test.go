@@ -37,6 +37,18 @@ import (
 // fakeFeatures answers every feature operation from fixed values and
 // records what it was asked.
 type fakeFeatures struct {
+	trainBoard features.TrainBoardAnswer
+	refresh    energy.RefreshAnswer
+	refreshErr error
+	gotRefresh energy.RefreshAsk
+	gotTrain   transit.TrainBoard
+	gotEVA     string
+	gotLang    string
+	bays       features.BaysAnswer
+	gotBays    parking.BayQuery
+	boardErr   error
+	objects    objectsFake
+	states     statesFake
 	charging   features.Answer[energy.Site]
 	parking    features.Answer[parking.Site]
 	overview   features.Overview
@@ -45,6 +57,9 @@ type fakeFeatures struct {
 	risk       features.WeatherRisk
 	topic      rules.Topic
 	gotRisk    weather.Query
+	cell       features.CellAnswer
+	cellErr    error
+	gotCell    weather.CellQuery
 	gotTopic   string
 	err        error
 	gotRoad    roads.CorridorQuery
@@ -165,7 +180,8 @@ func overviewAnswer() features.Overview {
 }
 
 func everyAnswer() *fakeFeatures {
-	return &fakeFeatures{charging: chargingAnswer(), parking: parkingAnswer(), overview: overviewAnswer(), conditions: conditionsAnswer(), situation: situationAnswer(), risk: riskAnswer(), topic: topicAnswer(), stations: stationsAnswer()}
+	return &fakeFeatures{charging: chargingAnswer(), parking: parkingAnswer(), overview: overviewAnswer(), conditions: conditionsAnswer(), situation: situationAnswer(), risk: riskAnswer(), topic: topicAnswer(), stations: stationsAnswer(),
+		refresh: energy.RefreshAnswer{State: energy.RefreshNoneDue, Reused: true}}
 }
 
 func featureScopes() auth.Principal {

@@ -41,8 +41,14 @@ type Features interface {
 	Stations(ctx context.Context, key access.Record, q transit.Query) (features.Answer[transit.Station], error)
 	Departures(ctx context.Context, key access.Record, q transit.DepartureQuery) (features.Board, error)
 	Facilities(ctx context.Context, key access.Record, q transit.FacilityQuery) (features.StationFacilities, error)
+	RecordTrainBoard(ctx context.Context, key access.Record, b transit.TrainBoard) error
+	FuelRefresh(ctx context.Context, key access.Record, a energy.RefreshAsk) (energy.RefreshAnswer, error)
+	ParkingBays(ctx context.Context, key access.Record, q parking.BayQuery) (features.BaysAnswer, error)
+	TrainBoard(ctx context.Context, key access.Record, eva string) (features.TrainBoardAnswer, error)
 	Places(ctx context.Context, key access.Record, q places.Query) (features.Answer[places.Place], error)
 	FuelStations(ctx context.Context, key access.Record, q energy.FuelQuery) (features.FuelStations, error)
+	FuelStation(ctx context.Context, key access.Record, id string, held time.Duration) (energy.FuelStationPage, features.Answer[struct{}], error)
+	ChargingSite(ctx context.Context, key access.Record, id string, statusMaxAge time.Duration) (features.Answer[energy.Site], error)
 	HydrogenStations(ctx context.Context, key access.Record, q energy.HydrogenQuery) (features.HydrogenStations, error)
 	SpeedCameras(ctx context.Context, key access.Record, q roads.SpeedQuery) (features.SpeedAnswer, error)
 	Disruptions(ctx context.Context, key access.Record, q transit.DisruptionQuery) (features.DisruptionAnswer, error)
@@ -51,6 +57,12 @@ type Features interface {
 	Addresses(ctx context.Context, key access.Record, q places.AddressQuery) (features.AddressAnswer, error)
 	Pois(ctx context.Context, key access.Record, q places.PoiQuery) (features.PoiAnswer, error)
 	Location(ctx context.Context, key access.Record, q places.LocationQuery) (features.LocationAnswer, error)
+	National(ctx context.Context, key access.Record, fuelWindow time.Duration) (features.NationalAnswer, error)
+	AffectedStations(ctx context.Context, key access.Record, limit int) ([]transit.Affected, features.Answer[struct{}], error)
+	StateWarnings(ctx context.Context, key access.Record, land string) ([]weather.StateWarning, features.Answer[struct{}], error)
+	StateAlerts(ctx context.Context, key access.Record, land string, limit int) (features.StateAlertsAnswer, error)
+	PlacesCoverage(ctx context.Context, key access.Record) (places.Coverage, features.Answer[struct{}], error)
+	WeatherCell(ctx context.Context, key access.Record, target string, at *geo.Point, minLevel int) (features.CellAnswer, error)
 }
 
 // counterpartExtension names the MCP capability an operation answers the
@@ -70,6 +82,7 @@ const schemaPrefix = "#/components/schemas/"
 
 var nullableObjects = []struct{ schema, member string }{
 	{"ChargePoint", "availability"},
+	{"FuelRefreshData", "queue"},
 	{"HydrogenData", "nearest"},
 	{"DisruptionData", "punctuality"},
 	{"SpeedCamera", "location"},
@@ -77,6 +90,8 @@ var nullableObjects = []struct{ schema, member string }{
 	{"LocationData", "municipality"},
 	{"LocationData", "district"},
 	{"LocationData", "state"},
+	{"LocationData", "lowEmissionZone"},
+	{"MotorwayData", "coverage"},
 	{"ParkingSite", "occupancy"},
 	{"RoadSituation", "location"},
 	{"RoadSituation", "lanes"},
@@ -219,6 +234,8 @@ func (s *server) featureProblem(ctx context.Context, err error) *Problem {
 		return newProblem(ctx, SlugInternal, "An unexpected fault occurred; quote the request id.", 0)
 	case errors.Is(err, transit.ErrNotFound):
 		return newProblem(ctx, SlugNotFound, "No station with this id.", 0)
+	case errors.Is(err, energy.ErrNotFound):
+		return newProblem(ctx, SlugNotFound, "No filling station or charging site with this id.", 0)
 	case errors.Is(err, places.ErrNotFound):
 		return newProblem(ctx, SlugNotFound, "No place with this id.", 0)
 	case errors.Is(err, roads.ErrUnknownRoad):
@@ -227,6 +244,10 @@ func (s *server) featureProblem(ctx context.Context, err error) *Problem {
 		return newProblem(ctx, SlugNotFound, "No situation with this id.", 0)
 	case errors.Is(err, rules.ErrUnknownTopic):
 		return newProblem(ctx, SlugNotFound, "No rule topic with this code.", 0)
+	case errors.Is(err, weather.ErrNoCell):
+		return newProblem(ctx, SlugNotFound, "No DWD warn cell is held at this place or under this name.", 0)
+	case errors.Is(err, features.ErrAreaNotCell):
+		return newProblem(ctx, SlugInvalidParameter, "A Land, Regierungsbezirk or Kreis takes no single warn cell: name a town in it, or give a warn cell.", 0)
 	case errors.Is(err, weather.ErrLevel):
 		// A stored level outside 1 to 4 is never re-graded (FR-WEATHER-002):
 		// the answer fails and the log names the warning.

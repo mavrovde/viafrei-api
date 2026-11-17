@@ -110,23 +110,31 @@ func serve(environ []string, stderr io.Writer) int {
 		return config.ExitCode
 	}
 	defer st.Close()
-	st.WithAdmission(admission.New(wire.AdmissionSettings(cfg), nil)).WithSharedBudget(wire.SharedBudget(cfg)).WithLogger(log).WithBreaker(wire.Breaker(cfg, log))
+	adm := admission.New(wire.AdmissionSettings(cfg), nil)
+	st.WithAdmission(adm).WithSharedBudget(wire.SharedBudget(cfg)).WithLogger(log).WithBreaker(wire.Breaker(cfg, log))
 	addresses := ratelimit.NewIPLimiter(wire.AddressSettings(cfg), nil)
 	go addresses.Run(ctx)
 
 	deps := httpapi.Deps{
 		Config:          cfg,
 		Readiness:       health.NewChecker(st, expected, cfg.Health.ReadyTimeout),
+		Pressure:        adm,
 		Logger:          log,
 		Build:           buildinfo.Get(),
 		ContractVersion: dbcontract.ContractVersion,
 		Sources:         st,
-		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st, Transit: st, Fuel: st, Hydrogen: st, Speed: st, Sharing: st, Addresses: st, Pois: st, Locations: st, Disruptions: st, Nearby: st, Lorry: st, Catalogue: st},
+		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st, Transit: st, Fuel: st, Hydrogen: st, Speed: st, Sharing: st, Addresses: st, Pois: st, Locations: st, Disruptions: st, Nearby: st, Lorry: st, Catalogue: st, National: st, Affected: st, Coverage: st, States: st, TrainBoards: st, Bays: st},
 			wire.FeatureSettings(cfg), time.Now),
 		Addresses: addresses,
 		Versions:  st,
 	}
 
+	// The fuel refresh asks go to the refresher that holds the provider key.
+	if svc, ok := deps.Features.(*features.Service); ok {
+		if r := wire.FuelRefresher(cfg); r != nil {
+			svc.WithFuelRefresher(r)
+		}
+	}
 	if cfg.Access.URL.IsSet() {
 		as, err := accessstore.Open(ctx, cfg)
 		if err != nil {
@@ -137,6 +145,10 @@ func serve(environ []string, stderr io.Writer) int {
 		authn := auth.New(wire.AuthSettings(cfg), as, nil)
 		go authn.Run(ctx)
 		deps.Auth = authn
+		// The API's writer role appends the boards the MCP server fetched.
+		if svc, ok := deps.Features.(*features.Service); ok {
+			svc.WithTrainBoardWriter(as)
+		}
 		deps.Keys = ratelimit.NewKeyLimiter(wire.QuotaZone(cfg), as, nil)
 		meter := metering.New(wire.MeteringSettings(cfg), as, nil)
 		deps.Meter = meter

@@ -147,3 +147,7 @@ func TestNearbyRefusals(t *testing.T) {
 		t.Errorf("provenance: %v", err)
 	}
 }
+
+func (f *nbFake) FuelStation(context.Context, string, []string, time.Time, time.Duration) (energy.FuelStationPage, error) {
+	return energy.FuelStationPage{}, energy.ErrNotFound
+}

@@ -85,13 +85,14 @@ func PlantedWarning(name string) string {
 	return map[string]string{"issued": "dwd:900001", "cancelled": "dwd:900002", "withdrawn": "dwd:900003"}[name]
 }
 
-// plantWeather plants, in one area of the first Land over the first two
-// days, a warning in force, the same warning cancelled, and one withdrawn
+// plantWeather plants, in one warn cell of the first Land (its western
+// district) over the first two days, a warning in force, the same warning cancelled, and one withdrawn
 // from publication; only the first answers.
 func (g *gen) plantWeather() {
 	l := g.lands[0]
 	ref := g.fresh("weather", "eta")
 	from := g.day(0)
+	cell, cellName, area := warnCell(l, l.code+"001")
 	g.w.begin("weather_warning", warningColumns...)
 	for _, w := range []struct{ name, status, withdrawn string }{
 		{"issued", "actual", null},
@@ -100,7 +101,7 @@ func (g *gen) plantWeather() {
 	} {
 		g.w.row(str(PlantedWarning(w.name)), str("ice"), num(2), str("Stufe 2"), str(w.status),
 			str("Warnung vor Glätte (Stufe 2)"), ts(from), ts(from.Add(48*time.Hour)),
-			ts(from.Add(-30*time.Minute)), str(l.code+"001"), str(ref), ts(from), w.withdrawn)
+			ts(from.Add(-30*time.Minute)), str(l.code+"001"), str(ref), ts(from), w.withdrawn, str(cell), str(cellName), area, ts(from))
 	}
 }
 

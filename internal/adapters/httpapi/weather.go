@@ -112,14 +112,7 @@ func registerWeatherRisk(api huma.API, s *server, op huma.Operation) {
 			return nil, s.featureProblem(ctx, err)
 		}
 		noteWeatherLamp(ctx, a)
-		ws := make([]WeatherWarning, len(a.Items))
-		for i, w := range a.Items {
-			ws[i] = WeatherWarning{
-				ID: w.ID, Hazard: string(w.Hazard), Level: int(w.Level), LevelName: w.LevelName, Issuer: w.Issuer,
-				Headline: w.Headline, TextLanguage: w.TextLanguage, Validity: timeWindow(w.From, w.Until),
-				Area: WarningArea{Name: w.AreaName}, SourceFamily: w.Family,
-			}
-		}
+		ws := weatherWarnings(a.Items)
 		return &WeatherRiskOutput{CacheControl: noStore, Body: WeatherRiskEnvelope{
 			Data: WeatherRiskData{Warnings: ws, RoadWeather: []RoadWeatherObservation{}},
 			Meta: WeatherRiskMeta{
@@ -187,6 +180,7 @@ type ZoneVerdict struct {
 	Zone       *string `json:"zone" nullable:"true" doc:"The key of the zone it is inside, or of the nearest."`
 	Transfer   *string `json:"transfer" nullable:"true" doc:"The key of the released area it is in."`
 	ExemptRoad *string `json:"exemptRoad" nullable:"true" doc:"The key of an exempt road within 60 m."`
+	ZoneFacts
 }
 
 func zoneKey(z *rules.Zone) *string {
@@ -267,7 +261,7 @@ func registerDrivingRules(api huma.API, s *server, op huma.Operation) {
 					Inside: r.Inside, DistanceM: r.DistanceM, SameZone: append([]string{}, r.SameZone...), SourceFamily: r.Family})
 			}
 			if v := z.Verdict; v != nil {
-				verdict = &ZoneVerdict{Kind: v.Kind, Zone: zoneKey(v.Zone), Transfer: zoneKey(v.Transfer), ExemptRoad: zoneKey(v.ExemptRoad)}
+				verdict = &ZoneVerdict{Kind: v.Kind, Zone: zoneKey(v.Zone), Transfer: zoneKey(v.Transfer), ExemptRoad: zoneKey(v.ExemptRoad), ZoneFacts: zoneFacts(z.Answer)}
 			}
 			a.Families = append(a.Families, z.Meta.Families...)
 		}
@@ -285,4 +279,17 @@ func registerDrivingRules(api huma.API, s *server, op huma.Operation) {
 			Links: s.selfLink(ctx),
 		}}, nil
 	})
+}
+
+// weatherWarnings are the answers of the warnings.
+func weatherWarnings(items []weather.Warning) []WeatherWarning {
+	ws := make([]WeatherWarning, len(items))
+	for i, w := range items {
+		ws[i] = WeatherWarning{
+			ID: w.ID, Hazard: string(w.Hazard), Level: int(w.Level), LevelName: w.LevelName, Issuer: w.Issuer,
+			Headline: w.Headline, TextLanguage: w.TextLanguage, Validity: timeWindow(w.From, w.Until),
+			Area: WarningArea{Name: w.AreaName}, SourceFamily: w.Family,
+		}
+	}
+	return ws
 }

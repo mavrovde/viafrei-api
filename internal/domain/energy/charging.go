@@ -235,4 +235,7 @@ type Query struct {
 	// Filter narrows the points and sites further (the platform's filter).
 	Filter Filter
 	Limit  int
+	// SiteID, when set, reads that one site by its id instead of the sites
+	// within the radius of At (the site's own page).
+	SiteID string
 }

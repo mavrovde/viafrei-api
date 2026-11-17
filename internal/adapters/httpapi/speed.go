@@ -48,7 +48,7 @@ type SpeedCamera struct {
 type SpeedData struct {
 	Official      []SpeedCamera `json:"official" doc:"The towns' official lists, by kind (fixed, section control, announced, measuring site), then first day and street; an announced check only until its last day."`
 	OfficialTotal int           `json:"officialTotal" doc:"Official locations in the area before the limit."`
-	OSM           []SpeedCamera `json:"osm" doc:"Fixed cameras OpenStreetMap maps, by name; none where an official list of fixed cameras covers the area."`
+	OSM           []SpeedCamera `json:"osm" doc:"Fixed cameras OpenStreetMap maps, by name; none in a municipality (the nearest official municipality point) whose fixed cameras an official list holds."`
 	OSMTotal      int           `json:"osmTotal" doc:"OpenStreetMap's cameras kept in the area before the limit."`
 }
 

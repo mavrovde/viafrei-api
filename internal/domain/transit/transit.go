@@ -57,6 +57,12 @@ type Station struct {
 	// PlacedBy is the family that places the station in its district and
 	// Land (contract.stop_place's placement_source_ref); nil when none does.
 	PlacedBy *string
+	// EVA is the railway's main station number (DB StaDa); nil for a stop
+	// that is no DB station. EVANumbers are every number of the station, the
+	// main one first: a station of several parts files each part's trains
+	// under the part's own number (G2).
+	EVA        *string
+	EVANumbers []string
 }
 
 // Query is a station search: by name (Text), near a position (At), or both.

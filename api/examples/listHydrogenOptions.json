@@ -27,7 +27,7 @@
           "address": null,
           "refill": [
             {
-              "solution": "700bar_car"
+              "solution": "gaseousHydrogen700barCar"
             }
           ],
           "opening": null,
@@ -46,7 +46,7 @@
           "address": null,
           "refill": [
             {
-              "solution": "700bar_car"
+              "solution": "gaseousHydrogen700barCar"
             }
           ],
           "opening": null,

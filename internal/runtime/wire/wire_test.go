@@ -67,3 +67,14 @@ func TestConsoleSettings(t *testing.T) {
 		t.Fatalf("web %+v", w)
 	}
 }
+
+func TestFuelRefresherIsBuiltOnlyWithAURL(t *testing.T) {
+	cfg := config.Defaults()
+	if wire.FuelRefresher(cfg) != nil {
+		t.Fatal("a refresher with no URL")
+	}
+	cfg.Fuel.RefreshURL = "http://refresher.invalid/refresh"
+	if wire.FuelRefresher(cfg) == nil {
+		t.Fatal("no refresher with a URL")
+	}
+}

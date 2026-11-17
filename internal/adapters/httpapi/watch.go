@@ -26,12 +26,12 @@ const (
 // API keeps no watch: the same read again, with since, answers what changed.
 type WatchInput struct {
 	WatchID   string  `query:"watch_id" maxLength:"512" pattern:"^[A-Za-z0-9_-]+$" doc:"A watch's id as an earlier answer gave it: it stands for kind, target and condition. Give it, or kind and target (the platform's key)."`
-	Kind      string  `query:"kind" enum:"road,place,station,region,weather,charger" example:"road" doc:"What is watched: road (key A8, B27) or place (key lat,lon); station, region, weather and charger are answered by their own reads (listStationDepartures, listTransitDisruptions, getWeatherRisk, listChargingOptions)."`
-	Key       string  `query:"target" maxLength:"120" example:"A7" doc:"The thing watched: a road number for road, a position lat,lon for place."`
+	Kind      string  `query:"kind" enum:"road,place,station,region,weather,charger" example:"road" doc:"What is watched: road (target A8, B27), place (target lat,lon), station (a station id as listStations answers it), region (an official key: two digits a Land, five a Kreis), weather (target lat,lon) or charger (a charging site id)."`
+	Key       string  `query:"target" maxLength:"120" example:"A7" doc:"The thing watched: a road number, a position lat,lon (place, weather), a DWD warn cell id or a place or cell name (weather), a station id, an official region key or a charging site id."`
 	Request   string  `query:"request" maxLength:"500" doc:"The person's request in their own words; a jam is watched on a motorway only, and the answer says so."`
 	Hours     float64 `query:"hours" minimum:"0.25" maximum:"24" doc:"How long the window runs from now, in hours (default 3). Give hours or until, not both."`
 	Until     string  `query:"until" format:"date-time" doc:"The window's end instant, at most 24 hours ahead. Give hours or until, not both."`
-	Condition string  `query:"condition" maxLength:"500" doc:"The threshold as JSON: road {\"event\": \"reopen\"|\"any\", \"events\": [\"restrictions\",\"jams\"]}; place {\"radius_km\": 10}. Any other key is refused by name."`
+	Condition string  `query:"condition" maxLength:"500" doc:"The threshold as JSON: road {\"event\": \"reopen\"|\"any\", \"events\": [\"restrictions\",\"jams\"]}; place {\"radius_km\": 25}; station {\"delay_min\": 10}; region {\"late_share\": 0.25, \"delay_min\": 5, \"min_trips\": 10}; weather {\"min_level\": 2}; charger {\"point_id\": \"...\"}. The values shown are the defaults. A key of another kind is refused by name."`
 	Since     string  `query:"since" format:"date-time" doc:"Only the situations changed after this instant: the cursor of a repeated read, the previous answer's generatedAt."`
 	cond      watchCondition
 	at        *geo.Point
@@ -43,6 +43,14 @@ type watchCondition struct {
 	Event    string   `json:"event,omitempty"`
 	Events   []string `json:"events,omitempty"`
 	RadiusKm float64  `json:"radius_km,omitempty"`
+	DelayMin int      `json:"delay_min,omitempty"`
+	// LateShare is the share of observed trips late for a region watch.
+	LateShare float64 `json:"late_share,omitempty"`
+	MinTrips  int     `json:"min_trips,omitempty"`
+	// MinLevel is a pointer: 0 is a level the platform takes (every
+	// warning), not an absent key.
+	MinLevel *int   `json:"min_level,omitempty"`
+	PointID  string `json:"point_id,omitempty"`
 }
 
 // watchToken is the id of a watch: kind, key and condition.
@@ -75,6 +83,12 @@ func (in *WatchInput) Resolve(huma.Context) []error {
 	if in.Kind == "" || in.Key == "" {
 		return bad("query.kind", "give watch_id, or kind and target", in.Kind)
 	}
+	if errs := conditionKeysOf(in.Kind, in.Condition); errs != nil {
+		return errs
+	}
+	if errs := in.cond.bounds(in.Condition); errs != nil {
+		return errs
+	}
 	if in.Hours != 0 && in.Until != "" {
 		return bad("query.until", "give hours or until, not both", in.Until)
 	}
@@ -94,7 +108,7 @@ func (in *WatchInput) Resolve(huma.Context) []error {
 	}
 	switch in.Kind {
 	case "station", "region", "weather", "charger":
-		return bad("query.kind", "kind "+in.Kind+" is answered by its own read", in.Kind)
+		return in.resolveOtherKind()
 	case "road":
 		r, err := roads.ParseRoad(in.Key)
 		if err != nil {
@@ -102,12 +116,18 @@ func (in *WatchInput) Resolve(huma.Context) []error {
 		}
 		in.Key = r
 	case "place":
-		p, err := geo.ParsePoint(in.Key)
-		if err != nil {
-			return bad("query.target", err.Error(), in.Key)
-		}
-		in.at = &p
+		return in.parseAt()
 	}
+	return nil
+}
+
+// parseAt reads the target as a position.
+func (in *WatchInput) parseAt() []error {
+	p, err := geo.ParsePoint(in.Key)
+	if err != nil {
+		return bad("query.target", err.Error(), in.Key)
+	}
+	in.at = &p
 	return nil
 }
 
@@ -122,7 +142,30 @@ type WatchData struct {
 	Ended      bool            `json:"ended"`
 	Condition  map[string]any  `json:"condition" doc:"The condition applied, defaults filled in."`
 	Note       *string         `json:"note" nullable:"true" doc:"Set when the request asked for something the watch does not report (a jam off a motorway, or around a place)."`
-	Situations []RoadSituation `json:"situations" doc:"The situations in the window, changed after since when given."`
+	Situations []RoadSituation `json:"situations" doc:"road, place: the situations in the window, changed after since when given; empty for the other kinds."`
+	// Holds and the lists below answer the other kinds.
+	Holds       *bool                  `json:"holds,omitempty" doc:"station, region, weather, charger: whether the condition holds now (the platform's watch would report it)."`
+	Departures  []Departure            `json:"departures,omitempty" doc:"station: the departures of the window cancelled or at least delay_min late."`
+	Punctuality *DisruptionPunctuality `json:"punctuality,omitempty" doc:"region: the area's punctuality, as listDisruptions reports it."`
+	Trips       *WatchTrips            `json:"trips,omitempty" doc:"region: the distinct trips observed at the area's stops in the last half hour and those more than delay_min late at one of them; the condition holds when at least min_trips were observed and at least late_share of them were late. Absent when none was observed."`
+	Cell        *WatchCell             `json:"cell,omitempty" doc:"weather: the DWD warn cell the target resolved to."`
+	Warnings    []WeatherWarning       `json:"warnings,omitempty" doc:"weather: the official warnings in force of the warn cell of at least min_level."`
+	Site        *ChargingSite          `json:"site,omitempty" doc:"charger: the site and its points; the condition holds when a point (point_id when given) is reported available."`
+}
+
+// WatchTrips is the trip count a region watch holds on.
+type WatchTrips struct {
+	Observed   int       `json:"observed" doc:"Distinct trips observed at the area's stops in the last 30 minutes."`
+	Late       int       `json:"late" doc:"Those more than delay_min minutes late at one of the area's stops."`
+	LateShare  float64   `json:"lateShare" doc:"late over observed, rounded to three decimals."`
+	ObservedAt time.Time `json:"observedAt" doc:"The newest observation counted."`
+}
+
+// WatchCell is the warn cell a weather watch reads.
+type WatchCell struct {
+	Key   string  `json:"key" doc:"The cell's id, or the DWD's name of its area when the target named one."`
+	Name  *string `json:"name" nullable:"true" doc:"The DWD's name of the cell's area, when held."`
+	Place *string `json:"place" nullable:"true" doc:"The place a name target resolved to, the first listPlaces answers."`
 }
 
 // WatchEnvelope is the enveloped answer of getWatch.
@@ -139,8 +182,8 @@ type WatchOutput struct {
 }
 
 func registerWatch(api huma.API, s *server, op huma.Operation) {
-	op.Summary = "Watch a road or a place: a repeated read of what changed"
-	op.Description = "The platform's watch as a plain read: the situations of a road (closures, restrictions and, on a motorway, jams) or around a place (closures and restrictions only) in force in the window, and with since only those changed after it. Read it again with watch_id and since; there is nothing to stop. MCP counterpart: watch situation, stop watch. Needs the scope roads."
+	op.Summary = "Watch a road, a place, a station, a region, the weather or a charger: a repeated read"
+	op.Description = "The platform's watch as a plain read: the situations of a road (closures, restrictions and, on a motorway, jams) or around a place (closures and restrictions only) in force in the window, and with since only those changed after it; a station's departures delayed or cancelled, a region's punctuality, the weather warnings at a position or a charging site's free points, with whether the condition holds now. Read it again with watch_id (and since); there is nothing to stop. MCP counterpart: watch situation, stop watch. Needs the scope roads, and for a station or region watch transit, for a weather watch weather, for a charger watch energy."
 	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, in *WatchInput) (*WatchOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
@@ -155,7 +198,18 @@ func registerWatch(api huma.API, s *server, op huma.Operation) {
 			end = *in.end
 		}
 		if end.After(now.Add(watchMaxHours * time.Hour)) {
-			return nil, huma.Error422UnprocessableEntity("until is more than 24 hours ahead", &huma.ErrorDetail{Location: "query.until", Value: in.Until})
+			return nil, errWatchUntil(in.Until)
+		}
+		raw, _ := json.Marshal(watchToken{Kind: in.Kind, Key: in.Key, Condition: in.cond})
+		id := base64.RawURLEncoding.EncodeToString(raw)
+		if in.Kind != "road" && in.Kind != "place" {
+			r, err := s.readOtherKind(ctx, in, now, end)
+			if err != nil {
+				return nil, err
+			}
+			d := r.data
+			d.WatchID, d.URI, d.Kind, d.Key, d.From, d.Until, d.Ended, d.Situations = id, "viafrei://watch/"+id, in.Kind, in.Key, now, end, !end.After(now), []RoadSituation{}
+			return &WatchOutput{CacheControl: noStore, Body: WatchEnvelope{Data: d, Meta: r.meta, Links: s.selfLink(ctx)}}, nil
 		}
 		// The events watched, as the platform infers them from the person's
 		// words when the condition names none: a jam is watched on a
@@ -224,8 +278,6 @@ func registerWatch(api huma.API, s *server, op huma.Operation) {
 			return !slices.ContainsFunc(list, func(x roads.Situation) bool { return x.Family == f.Source.Family })
 		})
 		meta := s.dataMeta(ctx, fams, at, part, partialDetail)
-		raw, _ := json.Marshal(watchToken{Kind: in.Kind, Key: in.Key, Condition: in.cond})
-		id := base64.RawURLEncoding.EncodeToString(raw)
 		return &WatchOutput{CacheControl: noStore, Body: WatchEnvelope{
 			Data: WatchData{WatchID: id, URI: "viafrei://watch/" + id, Kind: in.Kind, Key: in.Key, From: now, Until: end, Ended: !end.After(now),
 				Condition: cond, Note: note, Situations: roadSituations(list)},

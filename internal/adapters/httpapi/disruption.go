@@ -69,10 +69,14 @@ type DisruptionPunctuality struct {
 
 // DisruptionData is the data of listTransitDisruptions.
 type DisruptionData struct {
-	Alerts      []DisruptionAlert      `json:"alerts" doc:"The alerts in force: a stop's first, then a route's, then the network's, each newest first."`
-	AlertsTotal int                    `json:"alertsTotal" doc:"Alerts in force before the limit."`
-	Punctuality *DisruptionPunctuality `json:"punctuality" doc:"The area's punctuality; null without an area or when the source counted no trip in it."`
-	WindowMin   int                    `json:"windowMin" doc:"The window asked for, in minutes."`
+	Alerts      []DisruptionAlert `json:"alerts" doc:"The alerts in force: a stop's first, then a route's, then the network's, each newest first."`
+	AlertsTotal int               `json:"alertsTotal" doc:"Alerts in force before the limit, duplicates left out."`
+	// AlertsChecked and DuplicatesOmitted are the platform's checked and
+	// duplicatesOmitted.
+	AlertsChecked     bool                   `json:"alertsChecked" doc:"Whether an alert publication was alive to ask: alertsTotal 0 means none in force only when this is true, and that it could not be told when false."`
+	DuplicatesOmitted int                    `json:"duplicatesOmitted" doc:"Alerts of the secondary publication left out as duplicates of an alert of the primary publication in force."`
+	Punctuality       *DisruptionPunctuality `json:"punctuality" doc:"The area's punctuality; null without an area or when the source counted no trip in it."`
+	WindowMin         int                    `json:"windowMin" doc:"The window asked for, in minutes."`
 }
 
 // DisruptionEnvelope is the enveloped answer of listTransitDisruptions.
@@ -113,7 +117,8 @@ func registerDisruptions(api huma.API, s *server, op huma.Operation) {
 }
 
 func disruptionEnvelope(s *server, ctx context.Context, a features.DisruptionAnswer, q transit.DisruptionQuery) DisruptionEnvelope {
-	data := DisruptionData{Alerts: make([]DisruptionAlert, len(a.Alerts)), AlertsTotal: a.AlertsTotal, WindowMin: q.WindowMin}
+	data := DisruptionData{Alerts: make([]DisruptionAlert, len(a.Alerts)), AlertsTotal: a.AlertsTotal, AlertsChecked: a.AlertsChecked,
+		DuplicatesOmitted: a.AlertsDuplicates, WindowMin: q.WindowMin}
 	for i, v := range a.Alerts {
 		lines := v.Lines
 		if lines == nil {

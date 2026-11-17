@@ -17,6 +17,12 @@ func FuzzParseRoad(f *testing.F) {
 		f.Add(s)
 	}
 	f.Fuzz(func(t *testing.T, s string) {
+		// Every reference ParseRoad reads, ParseAnyRoad reads alike.
+		if r, err := roads.ParseRoad(s); err == nil {
+			if wide, err := roads.ParseAnyRoad(s); err != nil || wide != r {
+				t.Fatalf("ParseAnyRoad(%q) = %q, %v; ParseRoad read %q", s, wide, err, r)
+			}
+		}
 		r, err := roads.ParseRoad(s)
 		if err != nil {
 			if !errors.Is(err, roads.ErrRoadReference) {

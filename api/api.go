@@ -29,6 +29,10 @@ type Example struct {
 	Title string `json:"title"`
 	// Request is the request target: path and query, without the base URL.
 	Request string `json:"request"`
+	// Method is the request's method; empty is GET.
+	Method string `json:"method,omitempty"`
+	// Body is the request's JSON body, for an operation that takes one.
+	Body json.RawMessage `json:"body,omitempty"`
 	// Attribution says which sources answer and how their attribution
 	// reaches the client; for an operation without source data it says so.
 	Attribution string `json:"attribution"`
@@ -36,8 +40,16 @@ type Example struct {
 	Key *Key `json:"key,omitempty"`
 	// Status is the HTTP status of the answer.
 	Status int `json:"status"`
-	// Response is the answer's body.
+	// Response is the answer's body; null for an answer without one (204).
 	Response json.RawMessage `json:"response"`
+}
+
+// HTTPMethod is the example request's method: Method, or GET.
+func (e Example) HTTPMethod() string {
+	if e.Method == "" {
+		return "GET"
+	}
+	return e.Method
 }
 
 // Key describes the fictional key of an example: its plan. Terms are

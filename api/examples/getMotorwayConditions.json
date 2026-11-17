@@ -29,6 +29,7 @@
       },
       "lamp": "amber",
       "lampReason": "warning",
+      "coverage": null,
       "situations": [
         {
           "id": "datex:syn:ev-00001",

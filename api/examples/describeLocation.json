@@ -30,7 +30,8 @@
         "distanceM": 81800,
         "sourceFamily": "geonames"
       },
-      "mayLieOutsideGermany": true
+      "mayLieOutsideGermany": true,
+      "lowEmissionZone": null
     },
     "meta": {
       "requestId": "example-request-0001",

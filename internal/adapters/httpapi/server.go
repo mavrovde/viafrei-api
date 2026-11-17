@@ -66,6 +66,8 @@ type Deps struct {
 	// answers a matching If-None-Match before the operation runs; nil
 	// validates only after it.
 	Versions VersionReader
+	// Pressure says whether the reads are saturated; nil answers ok.
+	Pressure Pressure
 }
 
 type server struct {
@@ -82,6 +84,7 @@ type server struct {
 	metering        Meter
 	results         *resultCache
 	versions        *versionCache
+	pressure        Pressure
 }
 
 // surface names the listeners an operation is served on (#92): the public
@@ -115,9 +118,14 @@ func operations() []operation {
 		{id: "getHealth", method: http.MethodGet, path: "/healthz", surface: onPublic | onHealth, legacy: true, register: registerHealth},
 		{id: "getReadiness", method: http.MethodGet, path: "/readyz", surface: onPublic | onHealth, legacy: true, register: registerReadiness},
 		{id: "getMeta", method: http.MethodGet, path: "/v1/meta", surface: onPublic | onHealth, register: registerMeta},
+		{id: "getPressure", method: http.MethodGet, path: "/v1/pressure", surface: onPublic | onHealth, register: registerPressure},
 		{id: "getKey", method: http.MethodGet, path: "/v1/key", tag: "access", keyed: true, register: registerKey},
+		{id: "getPlacesCoverage", method: http.MethodGet, path: "/v1/places/coverage", tag: "places", keyed: true, scope: "places", register: registerPlacesCoverage},
+		{id: "listAffectedStations", method: http.MethodGet, path: "/v1/affected-stations", tag: "transit", keyed: true, scope: "transit", register: registerAffected},
+		{id: "getNationalSummary", method: http.MethodGet, path: "/v1/germany", tag: "meta", keyed: true, register: registerNational},
 		{id: "listSources", method: http.MethodGet, path: "/v1/sources", tag: "meta", keyed: true, register: registerSources},
 		{id: "listChargingOptions", method: http.MethodGet, path: "/v1/charging-options", tag: "energy", keyed: true, scope: "energy", register: registerCharging},
+		{id: "listParkingBays", method: http.MethodGet, path: "/v1/parking-bays", tag: "parking", keyed: true, scope: "parking", register: registerParkingBays},
 		{id: "listParkingOptions", method: http.MethodGet, path: "/v1/parking-options", tag: "parking", keyed: true, scope: "parking", register: registerParking},
 		{id: "listPlaces", method: http.MethodGet, path: "/v1/places", tag: "places", keyed: true, scope: "places", register: registerPlaces},
 		{id: "getPlaceOverview", method: http.MethodGet, path: "/v1/places/{placeId}/overview", tag: "places", keyed: true, scope: "places", register: registerOverview},
@@ -125,12 +133,16 @@ func operations() []operation {
 		{id: "getMotorwayConditions", method: http.MethodGet, path: "/v1/motorways/{road}/conditions", tag: "roads", keyed: true, scope: "roads", register: registerMotorwayConditions},
 		{id: "listRoadConditions", method: http.MethodGet, path: "/v1/road-conditions", tag: "roads", keyed: true, scope: "roads", register: registerRoadConditions},
 		{id: "listStateRoadConditions", method: http.MethodGet, path: "/v1/states/{state}/road-conditions", tag: "roads", keyed: true, scope: "roads", register: registerStateConditions},
+		{id: "listStateWeatherWarnings", method: http.MethodGet, path: "/v1/states/{state}/weather", tag: "weather", keyed: true, scope: "weather", register: registerStateWarnings},
+		{id: "listStateServiceAlerts", method: http.MethodGet, path: "/v1/states/{state}/service-alerts", tag: "transit", keyed: true, scope: "transit", register: registerStateAlerts},
 		{id: "listLorryRules", method: http.MethodGet, path: "/v1/lorry-rules", tag: "roads", keyed: true, scope: "roads", register: registerLorry},
 		{id: "listMotorways", method: http.MethodGet, path: "/v1/motorways", tag: "roads", keyed: true, scope: "roads", register: registerMotorways},
 		{id: "getRoadSituation", method: http.MethodGet, path: "/v1/road-situations/{situationId}", tag: "roads", keyed: true, scope: "roads", register: registerRoadSituation},
 		{id: "getWatch", method: http.MethodGet, path: "/v1/watch", tag: "roads", keyed: true, scope: "roads", register: registerWatch},
 		{id: "getWeatherRisk", method: http.MethodGet, path: "/v1/weather-risk", tag: "weather", keyed: true, scope: "weather", register: registerWeatherRisk},
 		{id: "getDrivingRules", method: http.MethodGet, path: "/v1/driving-rules", tag: "rules", keyed: true, scope: "rules", register: registerDrivingRules},
+		{id: "getFuelStation", method: http.MethodGet, path: "/v1/fuel-options/{fuelId}", tag: "energy", keyed: true, scope: "energy", register: registerFuelStation},
+		{id: "getChargingSite", method: http.MethodGet, path: "/v1/charging-options/{chargingId}", tag: "energy", keyed: true, scope: "energy", register: registerChargingSite},
 		{id: "listFuelOptions", method: http.MethodGet, path: "/v1/fuel-options", tag: "energy", keyed: true, scope: "energy", register: registerFuel},
 		{id: "listHydrogenOptions", method: http.MethodGet, path: "/v1/hydrogen-options", tag: "energy", keyed: true, scope: "energy", register: registerHydrogen},
 		{id: "listSpeedCameras", method: http.MethodGet, path: "/v1/speed-cameras", tag: "roads", keyed: true, scope: "roads", register: registerSpeed},
@@ -142,6 +154,9 @@ func operations() []operation {
 		{id: "describeLocation", method: http.MethodGet, path: "/v1/location", tag: "places", keyed: true, scope: "places", register: registerLocation},
 		{id: "listStations", method: http.MethodGet, path: "/v1/stations", tag: "transit", keyed: true, scope: "transit", register: registerStations},
 		{id: "listStationDepartures", method: http.MethodGet, path: "/v1/stations/{stationId}/departures", tag: "transit", keyed: true, scope: "transit", register: registerDepartures},
+		{id: "getTrainBoard", method: http.MethodGet, path: "/v1/train-boards/{eva}", tag: "transit", keyed: true, scope: "transit", register: registerTrainBoard},
+		{id: "requestFuelRefresh", method: http.MethodPost, path: "/v1/fuel-refresh", tag: "energy", keyed: true, scope: "energy", register: registerFuelRefresh},
+		{id: "recordTrainBoard", method: http.MethodPost, path: "/v1/train-boards", tag: "transit", keyed: true, scope: "transit", register: registerRecordTrainBoard},
 		{id: "listStationFacilities", method: http.MethodGet, path: "/v1/stations/{stationId}/facilities", tag: "transit", keyed: true, scope: "transit", register: registerFacilities},
 	}
 }
@@ -258,6 +273,7 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 		features:        d.Features,
 		keyGate:         d.Keys,
 		metering:        d.Meter,
+		pressure:        d.Pressure,
 	}
 	if s.now == nil {
 		s.now = time.Now
@@ -365,6 +381,9 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 			keyedRoutes[op.method+" "+op.path] = d.Auth != nil
 			hop.Security = []map[string][]string{{schemeBearer: {}}, {schemeHeader: {}}}
 			hop.Responses = keyedResponses(api)
+			if op.method == http.MethodGet {
+				hop.Middlewares = append(hop.Middlewares, askLanguage(api))
+			}
 		}
 		if op.legacy && surf == onPublic {
 			hop.Deprecated = true
@@ -375,6 +394,9 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 			hop.Extensions = map[string]any{scopeExtension: string(op.scope)}
 		}
 		op.register(api, s, hop)
+		if op.keyed && op.method == http.MethodGet {
+			documentLang(api.OpenAPI().Paths[op.path].Get)
+		}
 		if op.legacy && surf == onPublic {
 			documentDeprecation(api.OpenAPI().Paths[op.path].Get)
 		}

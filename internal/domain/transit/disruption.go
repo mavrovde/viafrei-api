@@ -47,8 +47,30 @@ type Disruptions struct {
 	// check credits its realtime source with "no reports" too.
 	PunctualityRead []string
 	Alerts          []Alert
-	AlertsTotal     int
-	Punctuality     *Punctuality
+	// AlertsTotal are the alerts in force before the limit, duplicates left
+	// out; AlertsDuplicates the secondary publication's rows left out as
+	// duplicates of a primary alert. AlertsChecked is whether a publication of the families
+	// was alive to ask: without one no alert is listed, and none means
+	// "could not tell", not "none". AlertFamilies are the families of every
+	// row counted, which the platform credits when it lists any.
+	AlertsTotal      int
+	AlertsDuplicates int
+	AlertsChecked    bool
+	AlertFamilies    []string
+	Punctuality      *Punctuality
+	// Trips are the area's observed trips counted against the query's
+	// LateOverMin; nil when the query asks for none or none was observed.
+	Trips *TripCount
+}
+
+// TripCount is how many distinct trips were observed at the stops of an area
+// in the last half hour, and how many of them ran more than a threshold late
+// at one of those stops: the count the platform's region watch reads.
+type TripCount struct {
+	Observed   int
+	Late       int
+	ObservedAt time.Time
+	Family     string
 }
 
 // DisruptionQuery asks for the disruptions of Area (an official region
@@ -61,6 +83,9 @@ type DisruptionQuery struct {
 	WindowMin int
 	Limit     int
 	Now       time.Time
+	// LateOverMin, when above zero, asks for the area's trips more than
+	// that many minutes late (Disruptions.Trips).
+	LateOverMin int
 }
 
 // FoldLine folds a line name as the platform compares it: upper case, no

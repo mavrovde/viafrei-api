@@ -5,6 +5,7 @@ package wire
 import (
 	"time"
 
+	"github.com/mavrovde/viafrei-api/internal/adapters/fuelrefresh"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 
@@ -69,4 +70,14 @@ func SharedBudget(cfg *config.Config) store.SharedBudget {
 		RetryInterval:    b.RetryInterval,
 		RetryAfter:       b.RetryAfter,
 	}
+}
+
+// FuelRefresher builds the forwarder of the fuel refresh asks to the
+// refresher at fuel.refresh_url, each ask bounded by fuel.refresh_deadline;
+// nil when no URL is set, so every ask is refused as not configured.
+func FuelRefresher(cfg *config.Config) features.FuelRefresher {
+	if cfg.Fuel.RefreshURL == "" {
+		return nil
+	}
+	return fuelrefresh.New(cfg.Fuel.RefreshURL, cfg.Fuel.RefreshDeadline, nil)
 }

@@ -19,7 +19,7 @@ func TestMapKind(t *testing.T) {
 			t.Errorf("MapKind(%q) = %q", raw, got)
 		}
 	}
-	if len(places.Kinds) != 7 || places.Kinds[len(places.Kinds)-1] != places.Other {
+	if len(places.Kinds) != 9 || places.Kinds[len(places.Kinds)-1] != places.Other {
 		t.Error("the enumeration changed")
 	}
 }

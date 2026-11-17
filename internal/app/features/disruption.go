@@ -32,11 +32,17 @@ func (s *Service) Disruptions(ctx context.Context, key access.Record, q transit.
 	v, meta, err := listedOwn(ctx, s, key, "transit", func(permitted []string) (transit.Disruptions, []string, error) {
 		v, err := s.repos.Disruptions.Disruptions(ctx, q, permitted)
 		contributed := slices.Clone(v.PunctualityRead)
+		if len(v.Alerts) > 0 {
+			contributed = append(contributed, v.AlertFamilies...)
+		}
 		for _, a := range v.Alerts {
 			contributed = append(contributed, a.Family)
 		}
 		if v.Punctuality != nil {
 			contributed = append(contributed, v.Punctuality.Family)
+		}
+		if v.Trips != nil {
+			contributed = append(contributed, v.Trips.Family)
 		}
 		return v, contributed, err
 	})

@@ -50,5 +50,5 @@ func (s *Service) SpeedCameras(ctx context.Context, key access.Record, q roads.S
 		// rows it lists: an answer listing none credits none.
 		meta.Families = nil
 	}
-	return SpeedAnswer{SpeedCameras: v, Meta: meta, Notice: roads.SpeedNotice(s.set.Language)}, nil
+	return SpeedAnswer{SpeedCameras: v, Meta: meta, Notice: roads.SpeedNotice(s.lang(ctx))}, nil
 }

@@ -30,6 +30,8 @@
         }
       ],
       "alertsTotal": 1,
+      "alertsChecked": true,
+      "duplicatesOmitted": 0,
       "punctuality": null,
       "windowMin": 60
     },

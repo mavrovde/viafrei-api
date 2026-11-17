@@ -3,6 +3,7 @@ package httpapi
 import (
 	"fmt"
 	"maps"
+	"net/http"
 	"slices"
 	"strconv"
 	"sync"
@@ -50,6 +51,19 @@ func curlSample(base, target string, keyed bool) string {
 	return cmd
 }
 
+// exampleSample is the curl command of an example: curlSample, with the
+// method and the JSON body of an example that sends one.
+func exampleSample(base string, e api.Example, keyed bool) string {
+	cmd := curlSample(base, e.Request, keyed)
+	if e.HTTPMethod() != "GET" {
+		cmd += ` \` + "\n  -X " + e.HTTPMethod()
+	}
+	if e.Body != nil {
+		cmd += ` \` + "\n  -H \"Content-Type: application/json\" \\\n  -d '" + string(e.Body) + "'"
+	}
+	return cmd
+}
+
 // documentExamples attaches each operation's example: the request as
 // x-codeSamples and x-example-request, the answer as the example of its
 // status, and the attribution rule as x-attribution. An operation without an
@@ -67,17 +81,23 @@ func documentExamples(oapi *huma.OpenAPI, base string) error {
 				continue
 			}
 			resp := op.Responses[strconv.Itoa(e.Status)]
-			if resp == nil || resp.Content["application/json"] == nil {
+			empty := e.Status == http.StatusNoContent
+			if resp == nil || (!empty && resp.Content["application/json"] == nil) {
 				return fmt.Errorf("examples/%s.json: status %d is not documented as application/json for %s", op.OperationID, e.Status, op.OperationID)
 			}
 			if op.Extensions == nil {
 				op.Extensions = map[string]any{}
 			}
-			op.Extensions[CodeSamplesExtension] = []CodeSample{{Lang: "Shell", Label: "curl", Source: curlSample(base, e.Request, len(op.Security) > 0)}}
+			op.Extensions[CodeSamplesExtension] = []CodeSample{{Lang: "Shell", Label: "curl", Source: exampleSample(base, e, len(op.Security) > 0)}}
 			op.Extensions[ExampleRequestExtension] = e.Request
 			op.Extensions[AttributionExtension] = e.Attribution
-			resp.Content["application/json"].Examples = map[string]*huma.Example{
-				"example": {Summary: e.Title, Value: e.Response},
+			if e.Body != nil && op.RequestBody != nil && op.RequestBody.Content["application/json"] != nil {
+				op.RequestBody.Content["application/json"].Example = e.Body
+			}
+			if !empty {
+				resp.Content["application/json"].Examples = map[string]*huma.Example{
+					"example": {Summary: e.Title, Value: e.Response},
+				}
 			}
 		}
 	}

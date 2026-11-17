@@ -1,0 +1,148 @@
+{
+  "title": "Disabled bays within 2 km",
+  "request": "/v1/parking-bays?at=48.388,7.521\u0026radius_m=2000\u0026limit=3",
+  "attribution": "On-street bays come from the source families of the parking domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "parking"
+    ],
+    "sources": [
+      "dortmund_parksensoren_bays",
+      "frankfurt_behindertenparkplaetze"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": {
+      "kind": "disabled",
+      "counts": {
+        "total": 3,
+        "sensors": 2,
+        "free": 1,
+        "occupied": 0,
+        "unknown": 1,
+        "staticSites": 1,
+        "staticSpaces": 2
+      },
+      "bays": [
+        {
+          "id": "dortmund:011",
+          "kind": "disabled",
+          "publisherKind": "Behindertenparkplatz",
+          "street": "Hauptstraße",
+          "houseNumber": "1",
+          "postcode": "10000",
+          "city": "Schömpingbach",
+          "lat": 48.388148,
+          "lon": 7.521214,
+          "distanceM": 23,
+          "sensor": true,
+          "state": "free",
+          "messageAt": "2026-03-29T23:40:00Z",
+          "spaces": null,
+          "reservedWhen": null,
+          "sourceFamily": "dortmund_parksensoren_bays"
+        },
+        {
+          "id": "dortmund:012",
+          "kind": "disabled",
+          "publisherKind": "Behindertenparkplatz",
+          "street": "Hauptstraße",
+          "houseNumber": "7",
+          "postcode": "10000",
+          "city": "Schömpingbach",
+          "lat": 48.388148,
+          "lon": 7.522214,
+          "distanceM": 91,
+          "sensor": true,
+          "state": null,
+          "messageAt": "2026-03-29T19:00:00Z",
+          "spaces": null,
+          "reservedWhen": null,
+          "sourceFamily": "dortmund_parksensoren_bays"
+        },
+        {
+          "id": "frankfurt:014",
+          "kind": "disabled",
+          "publisherKind": null,
+          "street": "Bahnhofstraße",
+          "houseNumber": null,
+          "postcode": "10000",
+          "city": "Schömpingbach",
+          "lat": 48.388148,
+          "lon": 7.524214,
+          "distanceM": 239,
+          "sensor": false,
+          "state": null,
+          "messageAt": null,
+          "spaces": 2,
+          "reservedWhen": "Mo-Fr 8-18 Uhr",
+          "sourceFamily": "frankfurt_behindertenparkplaetze"
+        }
+      ]
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": null,
+      "freshness": [
+        {
+          "family": "dortmund_parksensoren_bays",
+          "dataAsOf": "2026-03-29T23:57:30Z",
+          "ageS": 150,
+          "staleAfterS": 900,
+          "stale": false
+        },
+        {
+          "family": "frankfurt_behindertenparkplaetze",
+          "dataAsOf": null,
+          "ageS": null,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "dortmund_parksensoren_bays",
+          "domain": "parking",
+          "publisher": "Buchtwerk Datenwerk",
+          "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://alpha.example/terms/dortmund_parksensoren_bays"
+        },
+        {
+          "family": "frankfurt_behindertenparkplaetze",
+          "domain": "parking",
+          "publisher": "Behindertenparkplätze: Stadt Frankfurt am Main – Straßenverkehrsamt, www.frankfurt.de, Datenlizenz Deutschland – Namensnennung – Version 2.0, bearbeitet",
+          "text": "Behindertenparkplätze: Stadt Frankfurt am Main – Straßenverkehrsamt, www.frankfurt.de, Datenlizenz Deutschland – Namensnennung – Version 2.0, bearbeitet",
+          "licence": "dl-de/by-2-0",
+          "licenceUrl": "https://licences.example/dl-de-by-2-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://www.govdata.de/daten/-/details/wfs-parken-in-der-stadt-frankfurt-am-main"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ],
+      "page": {
+        "limit": 3,
+        "hasMore": false
+      }
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/parking-bays"
+    }
+  }
+}

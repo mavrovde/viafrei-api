@@ -1,6 +1,6 @@
 {
   "title": "The stations a typed name finds, umlauts and ß as typed",
-  "request": "/v1/stations?q=Nam%C3%BCningen\u0026limit=8",
+  "request": "/v1/stations?q=Sch%C3%B6mpingbach\u0026limit=8",
   "attribution": "Stations come from the source families of the transit domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
   "key": {
     "useClass": "commercial",
@@ -17,26 +17,34 @@
   "response": {
     "data": [
       {
-        "id": "1:de:01002:1",
-        "name": "Namüningen Mitte",
+        "id": "1:de:01002:9001",
+        "name": "Schömpingbach Hbf",
         "location": {
-          "lat": 49.167002,
-          "lon": 7.862458
+          "lat": 48.388148,
+          "lon": 7.518214
         },
-        "stopCode": "de:01002:1",
+        "stopCode": "de:01002:9001",
+        "eva": "8001001",
+        "evaNumbers": [
+          "8001001",
+          "8001002",
+          "8001003"
+        ],
         "districtCode": "01002",
         "modes": [],
         "distanceM": null,
         "sourceFamily": "delfi_static"
       },
       {
-        "id": "1:de:01002:0",
-        "name": "Namüningen Süd",
+        "id": "1:de:01002:2",
+        "name": "Schömpingbach Mitte",
         "location": {
-          "lat": 49.148162,
-          "lon": 7.785749
+          "lat": 48.366697,
+          "lon": 7.522947
         },
-        "stopCode": "de:01002:0",
+        "stopCode": "de:01002:2",
+        "eva": null,
+        "evaNumbers": [],
         "districtCode": "01002",
         "modes": [],
         "distanceM": null,
@@ -102,7 +110,7 @@
         "hasMore": false
       },
       "query": {
-        "q": "Namüningen",
+        "q": "Schömpingbach",
         "code": null,
         "at": null,
         "radiusM": null

@@ -9,6 +9,21 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [0.3.0] (unreleased)
+
+The API serves what the site and the MCP server answer today, from the read
+contract of viafrei-database 0.2.0. Every operation below is new since 0.2.
+
+### Added
+
+* **access:** `getKey` (the presenting key), `listSources` (the sources a key may read: attribution, licence, freshness), `getPressure` (whether the service is saturated now).
+* **places:** `listPlaces`, `getPlaceOverview`, `getPlacesCoverage` (with each kind's newest load), `listAddresses`, `listPois`, `listNearby`, `describeLocation` (with the low-emission zone the position lies in).
+* **roads:** `listRoadConditions`, `getRoadSituation`, `listMotorways`, `getMotorwayConditions`, `listMotorwayParking`, `listStateRoadConditions`, `listSpeedCameras` (OpenStreetMap's cameras cut by Gemeinde as the platform cuts them), `listLorryRules`, `getDrivingRules`.
+* **energy:** `listFuelOptions`, `getFuelStation`, `listChargingOptions`, `getChargingSite`, `listHydrogenOptions`, `listParkingOptions`, `listSharingOptions`.
+* **transit:** `listStations`, `listStationDepartures` (platform changes as the platform states them), `listStationFacilities`, `listTransitDisruptions`, `listAffectedStations` (read from the contract's station disruption), `listStateServiceAlerts`.
+* **weather:** `getWeatherRisk`, `listStateWeatherWarnings`.
+* **composed:** `getNationalSummary` (Germany now), `getWatch` (a repeated read of a road, a place, a station, a region, the weather or a charger).
+
 ## [0.2.1](https://github.com/mavrovde/viafrei-api/compare/v0.2.0...v0.2.1) (2026-11-08)
 
 

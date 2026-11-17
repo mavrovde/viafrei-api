@@ -41,7 +41,9 @@ type roadFake struct {
 	states   []string
 	coverage *ampel.Coverage
 	// placed are the families that placed the scope's situations in a Land.
-	placed               []string
+	placed []string
+	// covering are the families an unregistered road's read names.
+	covering             []string
 	gotSince             time.Time
 	gotRoad              roads.CorridorQuery
 	gotArea              roads.AreaQuery
@@ -106,7 +108,11 @@ func (f *roadFake) page(fams roads.Families, more bool) roads.Page {
 func (f *roadFake) SituationsOnRoad(_ context.Context, q roads.CorridorQuery, fams roads.Families, at time.Time) (roads.Page, error) {
 	f.readCalls++
 	f.gotRoad, f.gotFams, f.gotNow = q, fams, at
-	return f.page(fams, true), f.readErr
+	p := f.page(fams, true)
+	if q.Unregistered {
+		p.Covering = f.covering
+	}
+	return p, f.readErr
 }
 
 func (f *roadFake) SituationsNear(_ context.Context, q roads.AreaQuery, fams roads.Families, at time.Time) (roads.Page, error) {
@@ -153,12 +159,52 @@ func lit(t *testing.T, name string, c features.Conditions, lamp roads.Lamp, reas
 
 func TestMotorwayConditionsResolveTheRoadFirst(t *testing.T) {
 	req.Covers(t, "FR-ROAD-001")
-	f := &roadFake{roadErr: roads.ErrUnknownRoad, fake: &fake{regErr: errStore}}
-	if _, err := roadService(f).MotorwayConditions(context.Background(), key("commercial", roadsScope), roads.CorridorQuery{Road: "A999"}); !errors.Is(err, roads.ErrUnknownRoad) {
+	f := &roadFake{roadErr: errStore, fake: &fake{regErr: errStore}}
+	if _, err := roadService(f).MotorwayConditions(context.Background(), key("commercial", roadsScope), roads.CorridorQuery{Road: "A8"}); !errors.Is(err, errStore) {
 		t.Fatalf("got %v", err)
 	}
 	if f.regCalls != 0 || f.readCalls != 0 {
-		t.Errorf("an unknown road read the register (%d) or the situations (%d)", f.regCalls, f.readCalls)
+		t.Errorf("a failed road read went on to the register (%d) or the situations (%d)", f.regCalls, f.readCalls)
+	}
+}
+
+// TestAnUnregisteredRoadIsAnsweredWithWhatWasRead (G6): a road the register
+// does not hold is answered, as the platform's roadworks-ahead answer
+// answers it, from the situations that name it, with the families read that
+// hold any situation on a road of its class; a read naming none answers an
+// empty, never a nil, coverage.
+func TestAnUnregisteredRoadIsAnsweredWithWhatWasRead(t *testing.T) {
+	req.Covers(t, "FR-ROAD-001", "FR-ROAD-003")
+	ctx := context.Background()
+	for _, tc := range []struct {
+		ref      string
+		class    roads.Class
+		covering []string
+		want     []string
+	}{
+		{"L1025", roads.ClassState, []string{"r1"}, []string{"r1"}},
+		{"B6", roads.ClassFederal, nil, []string{}},
+	} {
+		f := &roadFake{roadErr: roads.ErrUnknownRoad, covering: tc.covering}
+		c, err := roadService(f).MotorwayConditions(ctx, key("commercial", roadsScope, "r1", "r2"), roads.CorridorQuery{Road: tc.ref, Limit: 5})
+		if err != nil {
+			t.Fatalf("%s: %v", tc.ref, err)
+		}
+		if !f.gotRoad.Unregistered || f.gotRoad.Class != tc.class || f.gotRoad.Road != tc.ref {
+			t.Errorf("%s: asked %+v", tc.ref, f.gotRoad)
+		}
+		if c.Road == nil || c.Road.Ref != tc.ref || c.Road.Class != tc.class || c.Road.States == nil || len(c.Road.States) != 0 {
+			t.Errorf("%s: road %+v", tc.ref, c.Road)
+		}
+		if c.Covering == nil || !slices.Equal(c.Covering, tc.want) {
+			t.Errorf("%s: covering %#v, want %#v", tc.ref, c.Covering, tc.want)
+		}
+	}
+	// A registered road names no coverage.
+	f := &roadFake{road: roads.Road{Ref: "A8", Class: roads.ClassMotorway}, covering: []string{"r1"}}
+	c, err := roadService(f).MotorwayConditions(ctx, key("commercial", roadsScope, "r1"), roads.CorridorQuery{Road: "A8", Limit: 5})
+	if err != nil || c.Covering != nil || f.gotRoad.Unregistered {
+		t.Errorf("registered road: covering %v, unregistered %v, %v", c.Covering, f.gotRoad.Unregistered, err)
 	}
 }
 

@@ -100,7 +100,7 @@ func (s *Service) Nearby(ctx context.Context, key access.Record, q NearbyQuery) 
 		return out, ErrNoPart
 	}
 	slices.Sort(families)
-	fams, err := s.repos.Register.Provenance(ctx, slices.Compact(families), s.set.Language)
+	fams, err := s.repos.Register.Provenance(ctx, slices.Compact(families), s.lang(ctx))
 	out.Meta = Answer[struct{}]{Families: fams, Partial: partial, At: s.now()}
 	return out, err
 }

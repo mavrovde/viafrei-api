@@ -126,7 +126,7 @@ func (s *Service) Overview(ctx context.Context, key access.Record, q OverviewQue
 		return out, ErrNoPart
 	}
 	slices.Sort(families)
-	fams, err := s.repos.Register.Provenance(ctx, slices.Compact(families), s.set.Language)
+	fams, err := s.repos.Register.Provenance(ctx, slices.Compact(families), s.lang(ctx))
 	// The place's family passed the gate check above, so it is never one a
 	// part withheld: only the parts' withheld families lose their conditions.
 	out.Families = withholdConditions(fams, hidden)
@@ -171,8 +171,14 @@ func (s *Service) status(err error) Status {
 	}
 }
 
-// Places answers "which place is meant by this name" for key (FR-PLACE).
+// Places answers "which place is meant by this name" for key (FR-PLACE). A
+// junction is asked by its name without the junction word in front of it,
+// and that word asks for a junction even with no kind (G5), as the
+// platform's place search reads it.
 func (s *Service) Places(ctx context.Context, key access.Record, q places.Query) (Answer[places.Place], error) {
+	if core, prefixed := places.JunctionCore(q.Text); q.Kind == places.KindJunction || (q.Kind == "" && prefixed) {
+		q.Kind, q.Text = places.KindJunction, core
+	}
 	reg, gate, err := s.gate(ctx, key)
 	if err != nil {
 		return Answer[places.Place]{}, err
@@ -188,7 +194,15 @@ func (s *Service) Places(ctx context.Context, key access.Record, q places.Query)
 	if serr != nil {
 		stops = nil
 	}
-	ps, more, err := s.repos.Places.Places(ctx, q, permitted, stops)
+	// The motorway junctions and, for a road number, the motorway itself
+	// answer too, from the roads families the key may read (G5), as the
+	// platform's place search lists them; a key that may read none lists
+	// neither.
+	roads, _, rerr := gate.Answer(access.Answering(reg, "roads"))
+	if rerr != nil {
+		roads = nil
+	}
+	ps, more, err := s.repos.Places.Places(ctx, q, permitted, stops, roads)
 	if err != nil {
 		return Answer[places.Place]{}, err
 	}

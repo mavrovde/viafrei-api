@@ -16,7 +16,16 @@ type Kind string
 const Other Kind = "other"
 
 // Kinds lists every kind an answer can carry.
-var Kinds = []Kind{"municipality", "district", "locality", "region", "state", "station_area", Other}
+var Kinds = []Kind{"municipality", "district", "locality", "region", "state", "station_area", KindMotorway, KindJunction, Other}
+
+// KindMotorway and KindJunction are the gazetteer's motorway places (G5), as
+// the platform's place search lists them: a motorway by its number, a
+// junction by its name ("AK Hilden (A3)"). A text that starts with a
+// junction word asks for a junction (JunctionCore).
+const (
+	KindMotorway Kind = "motorway"
+	KindJunction Kind = "junction"
+)
 
 // MapKind maps a stored kind code (ENV-051).
 func MapKind(raw string) Kind {
@@ -35,6 +44,9 @@ type Place struct {
 	// RegionCode is the official key of the district or Land it lies in;
 	// nil when not recorded.
 	RegionCode *string
+	// OfficialKey is the place's own official key (a Gemeinde's eight
+	// digits); nil when not recorded.
+	OfficialKey *string
 	// DistanceM is the distance from the asked position; nil without one.
 	DistanceM *int
 	Family    string

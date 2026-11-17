@@ -150,6 +150,36 @@ func ParseRoad(s string) (string, error) {
 	return Canonical(s), nil
 }
 
+// anyRoadReference is roadReference widened to the Land roads: a
+// Landesstraße (L) or Staatsstraße (S), one to four digits, as the
+// platform's roadworks-ahead answer admits them. A Kreisstraße (K) is no
+// reference: its number repeats in every Kreis.
+var anyRoadReference = regexp.MustCompile(`^[AaBbLlSs] ?[0-9]{1,4}$`)
+
+// ParseAnyRoad is ParseRoad for a road of any class the conditions answer:
+// a motorway, a federal road, a Landesstraße or a Staatsstraße.
+func ParseAnyRoad(s string) (string, error) {
+	if !anyRoadReference.MatchString(s) {
+		return "", ErrRoadReference
+	}
+	return Canonical(s), nil
+}
+
+// ClassOf is the class a canonical road reference names by its letter: A
+// a motorway, B a federal road, L and S a state road; any other letter is
+// other.
+func ClassOf(ref string) Class {
+	switch {
+	case strings.HasPrefix(ref, "A"):
+		return ClassMotorway
+	case strings.HasPrefix(ref, "B"):
+		return ClassFederal
+	case strings.HasPrefix(ref, "L"), strings.HasPrefix(ref, "S"):
+		return ClassState
+	}
+	return ClassOther
+}
+
 // Canonical writes a road reference without spaces, in upper case and
 // without leading zeros in its number (CONV-011: a08 and A 8 are A8). A
 // stored reference is shown in this form too.
@@ -474,6 +504,10 @@ type Page struct {
 	// situation or a warning of the scope starts or ends (its valid_from or
 	// valid_to), whatever the list's filters keep; nil when none does.
 	NextChange *time.Time
+	// Covering are, for an unregistered road, the roads families read that
+	// hold a situation on a road of its class, in name order (empty when
+	// none does); nil for a road the register holds.
+	Covering []string
 	// Placed are the families that placed the scope's situations in their
 	// Land (contract.traffic_event's placement_source_ref), read only for
 	// a Land's answer; the platform credits them on its Land form.
@@ -575,6 +609,13 @@ func split[T comparable](list, every []T) ([]T, bool) {
 // CorridorQuery asks for the situations on one road.
 type CorridorQuery struct {
 	Road string
+	// Unregistered asks for a road the road register does not hold (a
+	// federal or Land road, or a motorway it lacks): its situations are those
+	// whose reference names it, none placed along a line, and the page names
+	// the families read that hold a situation on a road of Class.
+	Unregistered bool
+	// Class is the class of an unregistered road (ClassOf).
+	Class Class
 	// Direction keeps the situations on this carriageway, on both, and
 	// those whose direction is unknown; DirectionBoth keeps every one.
 	Direction Direction

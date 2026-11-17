@@ -9,6 +9,8 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/geo"
+	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
@@ -37,6 +39,23 @@ type wxFake struct {
 	gotNow      time.Time
 	gotCode     string
 	readCalls   int
+	cells       map[string]weather.Cell // by cell key, "@" for any position
+	gotCells    []weather.CellQuery
+}
+
+// CellWarnings answers the cell f.cells holds under q's key ("@" for a
+// position), else weather.ErrNoCell.
+func (f *wxFake) CellWarnings(_ context.Context, q weather.CellQuery, fams []string, at time.Time) (weather.Cell, error) {
+	f.gotCells, f.gotFamilies, f.gotNow = append(f.gotCells, q), fams, at
+	k := q.Cell
+	if q.At != nil {
+		k = "@"
+	}
+	c, ok := f.cells[k]
+	if !ok {
+		return weather.Cell{Key: q.Cell}, errors.Join(f.readErr, weather.ErrNoCell)
+	}
+	return c, f.readErr
 }
 
 func (f *wxFake) WarningsAt(_ context.Context, q weather.Query, fams []string, at time.Time) (weather.Scope, error) {
@@ -69,6 +88,12 @@ func (f *wxFake) Zones(context.Context, rules.ZoneQuery, []string, time.Time) ([
 	return nil, nil
 }
 
+func (f *wxFake) ZoneEntries(context.Context, []string) ([]rules.ListEntry, error) { return nil, nil }
+
+func (f *wxFake) GemeindeAt(context.Context, geo.Point, int, []string) (*places.Place, error) {
+	return nil, nil
+}
+
 func (f *wxFake) Topic(_ context.Context, code, _ string) (rules.Topic, error) {
 	f.readCalls++
 	f.gotCode = code
@@ -79,8 +104,10 @@ func wxService(f *wxFake) *features.Service {
 	if f.fake == nil {
 		f.fake = &fake{}
 	}
-	f.reg = wxRegister
-	return features.New(features.Repositories{Register: f, Weather: f, Rules: f},
+	if f.reg == nil {
+		f.reg = wxRegister
+	}
+	return features.New(features.Repositories{Register: f, Weather: f, Rules: f, Places: f},
 		features.Settings{Language: "en", MaxWarnings: 7}, func() time.Time { return now })
 }
 

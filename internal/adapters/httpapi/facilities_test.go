@@ -13,8 +13,9 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
-func (f *fakeFeatures) Facilities(_ context.Context, key access.Record, q transit.FacilityQuery) (features.StationFacilities, error) {
+func (f *fakeFeatures) Facilities(ctx context.Context, key access.Record, q transit.FacilityQuery) (features.StationFacilities, error) {
 	f.gotKey, f.gotFacil = key, q
+	f.gotLang, _ = features.LanguageOf(ctx)
 	return f.facilities, f.err
 }
 
@@ -49,7 +50,11 @@ func TestFacilitiesAnswer(t *testing.T) {
 	if st, _ := data["station"].(map[string]any); len(st) != 1 || st["name"] == nil {
 		t.Errorf("station %v", data["station"])
 	}
-	if do(t, h, http.MethodGet, "/v1/stations/sp-1/facilities", bearer); f.gotFacil.Limit != 20 {
+	if do(t, h, http.MethodGet, "/v1/stations/sp-1/facilities?lang=en", bearer); f.gotLang != "en" {
+		t.Errorf("lang not asked: %q", f.gotLang)
+	}
+	assertProblem(t, do(t, h, http.MethodGet, "/v1/stations/sp-1/facilities?lang=fr", bearer), 400, "invalid-parameter")
+	if do(t, h, http.MethodGet, "/v1/stations/sp-1/facilities", bearer); f.gotFacil.Limit != 20 || f.gotLang != "" {
 		t.Errorf("default %+v", f.gotFacil)
 	}
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/stations/sp-1/facilities?kind=ramp", bearer), 400, "invalid-parameter")

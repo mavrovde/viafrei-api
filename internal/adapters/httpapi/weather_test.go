@@ -23,6 +23,11 @@ func (f *fakeFeatures) WeatherRisk(_ context.Context, key access.Record, q weath
 	return f.risk, f.err
 }
 
+func (f *fakeFeatures) WeatherCell(_ context.Context, key access.Record, target string, at *geo.Point, minLevel int) (features.CellAnswer, error) {
+	f.gotKey, f.gotCell = key, weather.CellQuery{Cell: target, At: at, MinLevel: minLevel}
+	return f.cell, f.cellErr
+}
+
 func (f *fakeFeatures) LowEmissionZones(context.Context, access.Record, rules.ZoneQuery) (features.ZonesAnswer, error) {
 	return features.ZonesAnswer{}, nil
 }

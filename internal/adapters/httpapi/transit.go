@@ -166,14 +166,7 @@ func registerDepartures(api huma.API, s *server, op huma.Operation) {
 			Departures: make([]Departure, len(b.Items)),
 		}
 		for i, d := range b.Items {
-			data.Departures[i] = Departure{
-				ID: d.JourneyID + "/" + strconv.Itoa(d.CallOrder), JourneyID: d.JourneyID, Line: d.Line, Mode: string(d.Mode),
-				RouteType: d.RouteType, TrainNumber: d.TrainNumber, Category: d.Category, Destination: d.Destination,
-				PlannedAt: d.PlannedAt.UTC(), PlannedAtLocal: local(d.PlannedAt), Platform: d.Platform,
-				PlannedPlatform: d.PlannedPlatform, PlatformChanged: d.PlatformChanged, Realtime: d.Live,
-				RealtimeSource: d.Source, Cancelled: d.Cancelled, DelayMin: d.DelayMin, ExpectedAt: utc(d.ExpectedAt),
-				NoForecast: d.NoForecast, SourceFamily: d.Family,
-			}
+			data.Departures[i] = departureRow(d)
 		}
 		modes := make([]string, len(in.modes))
 		for i, m := range in.modes {
@@ -252,6 +245,8 @@ type Station struct {
 	Name         string   `json:"name"`
 	Location     Position `json:"location"`
 	StopCode     *string  `json:"stopCode" nullable:"true" doc:"The national stop code (DHID); null when none is recorded."`
+	Eva          *string  `json:"eva" nullable:"true" example:"8011160" doc:"The railway's main station number (EVA, DB StaDa), as getTrainBoard and recordTrainBoard take it; null for a stop that is no DB station."`
+	EvaNumbers   []string `json:"evaNumbers" doc:"Every EVA number of the DB station, the main one first, each once; empty for a stop that is no DB station. A station of several parts (Berlin Hbf) files each part's trains under the part's own number, so a departure board of the station asks each."`
 	DistrictCode *string  `json:"districtCode" nullable:"true" doc:"The official code (AGS) of the district the station lies in; null when unknown."`
 	Modes        []string `json:"modes" doc:"The modes of transport that serve the station. Open enumeration (rail, sbahn, subway, tram, bus, ferry, other: rail is every train but the S-Bahn); treat an unknown value as other."`
 	DistanceM    *int     `json:"distanceM" nullable:"true" doc:"Distance from at, in metres; null when the question named no position."`
@@ -328,14 +323,32 @@ func registerStations(api huma.API, s *server, op huma.Operation) {
 func stations(a features.Answer[transit.Station]) []Station {
 	data := make([]Station, len(a.Items))
 	for i, v := range a.Items {
-		modes := make([]string, len(v.Modes))
-		for j, m := range v.Modes {
-			modes[j] = string(m)
-		}
-		data[i] = Station{
-			ID: v.ID, Name: v.Name, Location: position(v.Location), StopCode: v.NationalCode,
-			DistrictCode: v.RegionCode, Modes: modes, DistanceM: v.DistanceM, SourceFamily: v.Family,
-		}
+		data[i] = station(v)
 	}
 	return data
+}
+
+// station is the answer of one station.
+func station(v transit.Station) Station {
+	modes := make([]string, len(v.Modes))
+	for j, m := range v.Modes {
+		modes[j] = string(m)
+	}
+	return Station{
+		ID: v.ID, Name: v.Name, Location: position(v.Location), StopCode: v.NationalCode,
+		DistrictCode: v.RegionCode, Modes: modes, DistanceM: v.DistanceM, SourceFamily: v.Family,
+		Eva: v.EVA, EvaNumbers: append([]string{}, v.EVANumbers...),
+	}
+}
+
+// departureRow is the answer of one departure.
+func departureRow(d transit.Departure) Departure {
+	return Departure{
+		ID: d.JourneyID + "/" + strconv.Itoa(d.CallOrder), JourneyID: d.JourneyID, Line: d.Line, Mode: string(d.Mode),
+		RouteType: d.RouteType, TrainNumber: d.TrainNumber, Category: d.Category, Destination: d.Destination,
+		PlannedAt: d.PlannedAt.UTC(), PlannedAtLocal: local(d.PlannedAt), Platform: d.Platform,
+		PlannedPlatform: d.PlannedPlatform, PlatformChanged: d.PlatformChanged, Realtime: d.Live,
+		RealtimeSource: d.Source, Cancelled: d.Cancelled, DelayMin: d.DelayMin, ExpectedAt: utc(d.ExpectedAt),
+		NoForecast: d.NoForecast, SourceFamily: d.Family,
+	}
 }

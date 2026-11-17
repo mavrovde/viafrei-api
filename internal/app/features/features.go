@@ -53,6 +53,9 @@ type Places interface {
 	// Place returns the place of one of the given families, or
 	// places.ErrNotFound.
 	Place(ctx context.Context, id string, families []string) (places.Place, error)
+	// Places returns the places of the given families that answer q, best
+	// match first, and whether more answer.
+	Places(ctx context.Context, q places.Query, families []string) ([]places.Place, bool, error)
 }
 
 // Repositories are the ports a Service reads through.

@@ -32,7 +32,24 @@ type Place struct {
 	Name     string
 	Kind     Kind
 	Location geo.Point
-	Family   string
+	// RegionCode is the official key of the district or Land it lies in;
+	// nil when not recorded.
+	RegionCode *string
+	// DistanceM is the distance from the asked position; nil without one.
+	DistanceM *int
+	Family    string
+}
+
+// Query asks for the places that answer a name: Text as typed (folded as
+// the contract folds it), of one Kind (empty: any), ranked by distance
+// from At when given and kept within RadiusM of it when that is set; at
+// most Limit.
+type Query struct {
+	Text    string
+	Kind    Kind
+	At      *geo.Point
+	RadiusM int
+	Limit   int
 }
 
 // ErrNotFound means no place of a permitted family has the id.

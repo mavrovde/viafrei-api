@@ -60,6 +60,8 @@ type fakeFeatures struct {
 	gotBoard   transit.DepartureQuery
 	fuel       features.FuelStations
 	gotFuel    energy.FuelQuery
+	places     features.Answer[places.Place]
+	gotPlaces  places.Query
 	gotAccept  []string
 }
 

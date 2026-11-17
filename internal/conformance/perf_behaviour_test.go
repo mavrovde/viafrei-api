@@ -15,6 +15,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/energy"
 	"github.com/mavrovde/viafrei-api/internal/domain/parking"
+	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
@@ -225,4 +226,8 @@ func perfBehaviours() map[string]behaviour {
 
 func (f *cachedFeatures) FuelStations(context.Context, access.Record, energy.FuelQuery) (features.FuelStations, error) {
 	return features.FuelStations{}, nil
+}
+
+func (f *cachedFeatures) Places(context.Context, access.Record, places.Query) (features.Answer[places.Place], error) {
+	return features.Answer[places.Place]{}, nil
 }

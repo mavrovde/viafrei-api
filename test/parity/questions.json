@@ -293,6 +293,60 @@
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "places-name",
+      "operation": "listPlaces",
+      "counterpart": "place search",
+      "request": "/v1/places?q=Nam%C3%BCningen&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "src-alpha-places",
+          "src-eta-places"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "places-near",
+      "operation": "listPlaces",
+      "counterpart": "place search",
+      "request": "/v1/places?q=Sch%C3%B6mpingbach&at=48.4,7.5&radius_m=50000&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "src-alpha-places",
+          "src-eta-places"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "places-kind",
+      "operation": "listPlaces",
+      "counterpart": "place search",
+      "request": "/v1/places?q=Matfienland&kind=state&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "src-alpha-places",
+          "src-eta-places"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
     }
   ]
 }

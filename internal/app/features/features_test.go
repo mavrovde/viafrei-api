@@ -102,6 +102,14 @@ func (f *fake) Place(context.Context, string, []string) (places.Place, error) {
 	return f.place, f.plErr
 }
 
+func (f *fake) Places(_ context.Context, _ places.Query, fams []string) ([]places.Place, bool, error) {
+	f.gotFamilies = fams
+	if f.place.ID == "" {
+		return nil, false, f.plErr
+	}
+	return []places.Place{f.place}, true, f.plErr
+}
+
 func service(f *fake, isTimeout func(error) bool) *features.Service {
 	return features.New(features.Repositories{Register: f, Charging: f, Parking: f, Places: f},
 		features.Settings{Language: "en", PartDeadline: 50 * time.Millisecond, IsTimeout: isTimeout},

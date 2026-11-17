@@ -57,3 +57,15 @@ argument:find_fuel_station.brand	listFuelOptions?brand	fuel-brand-open	-
 argument:find_fuel_station.name	listFuelOptions?name	fuel-name-by-name	-
 argument:find_fuel_station.open_now	listFuelOptions?open_now	fuel-brand-open	-
 argument:find_fuel_station.sort	listFuelOptions?sort	fuel-cheapest-e10,fuel-name-by-name	-
+argument:find_cheapest_fuel.place	listPlaces?q,listFuelOptions?at	places-name,fuel-cheapest-e10	-
+argument:find_fuel_station.place	listPlaces?q,listFuelOptions?at	places-name,fuel-near	-
+argument:find_parking.place	listPlaces?q,listParkingOptions?at	places-name,parking-terms-pending	-
+argument:find_charging_station.place	listPlaces?q,listChargingOptions?at	places-name,charging-commercial	-
+tool:find_place	listPlaces	places-name,places-near,places-kind	-
+argument:find_place.query	listPlaces?q	places-name	-
+argument:find_place.kind	listPlaces?kind	places-kind	-
+argument:find_place.near	listPlaces?q,listPlaces?at	places-near	-
+argument:find_place.lat	listPlaces?at	places-near	-
+argument:find_place.lon	listPlaces?at	places-near	-
+argument:find_place.radius_km	listPlaces?radius_m	places-near	-
+argument:find_place.limit	listPlaces?limit	places-name	-

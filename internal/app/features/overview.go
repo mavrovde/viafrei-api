@@ -170,3 +170,31 @@ func (s *Service) status(err error) Status {
 		return StatusUnavailable
 	}
 }
+
+// Places answers "which place is meant by this name" for key (FR-PLACE).
+func (s *Service) Places(ctx context.Context, key access.Record, q places.Query) (Answer[places.Place], error) {
+	reg, gate, err := s.gate(ctx, key)
+	if err != nil {
+		return Answer[places.Place]{}, err
+	}
+	permitted, partial, err := gate.Answer(access.Answering(reg, "places"))
+	if err != nil {
+		return Answer[places.Place]{}, err
+	}
+	ps, more, err := s.repos.Places.Places(ctx, q, permitted)
+	if err != nil {
+		return Answer[places.Place]{}, err
+	}
+	var contributed []string
+	for _, p := range ps {
+		contributed = append(contributed, p.Family)
+	}
+	if err := gate.Check(contributed); err != nil {
+		return Answer[places.Place]{}, err
+	}
+	fams, err := s.provenanceOf(ctx, contributed, permitted)
+	if err != nil {
+		return Answer[places.Place]{}, err
+	}
+	return Answer[places.Place]{Items: ps, HasMore: more, Families: fams, Partial: partial, At: s.now()}, nil
+}

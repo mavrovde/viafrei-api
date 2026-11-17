@@ -15,6 +15,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/energy"
 	"github.com/mavrovde/viafrei-api/internal/domain/parking"
+	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
@@ -153,4 +154,9 @@ func fuelWindow(t *testing.T, c *config.Config) string {
 		t.Fatalf("%d %s", w.Code, w.Body)
 	}
 	return f.asked
+}
+
+func (f *askedFeatures) Places(_ context.Context, _ access.Record, q places.Query) (features.Answer[places.Place], error) {
+	f.asked = fmt.Sprintf("limit=%d", q.Limit)
+	return features.Answer[places.Place]{}, nil
 }

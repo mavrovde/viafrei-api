@@ -97,7 +97,11 @@ jobs:
       - name: go test -tags integration
         run: |
           set -o pipefail
-          go test -race -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out -json ./... | tee test-integration.json | go run ./internal/testkit/gotestsum-lite
+          go test -race -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out -json $(go list ./... | grep -v '/internal/perf$') | tee test-integration.json | go run ./internal/testkit/gotestsum-lite
+      - name: go test -tags integration (internal/perf alone, its budgets time the queries)
+        run: |
+          set -o pipefail
+          go test -race -p 1 -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-perf.out -json ./internal/perf | tee test-perf.json | go run ./internal/testkit/gotestsum-lite
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -105,6 +109,8 @@ jobs:
           path: |
             test-integration.json
             coverage-integration.out
+            test-perf.json
+            coverage-perf.out
           retention-days: 30
           if-no-files-found: error
 
@@ -168,7 +174,7 @@ jobs:
         run: |
           set -o pipefail
           go run ./internal/testkit/covergate -min 100 -exclusions test/coverage-exclusions.txt -o coverage.out \
-            coverage-unit.out coverage-integration.out coverage-boot.out | tee coverage-summary.txt
+            coverage-unit.out coverage-integration.out coverage-perf.out coverage-boot.out | tee coverage-summary.txt
       - name: Coverage table in the job summary
         if: always()
         run: |

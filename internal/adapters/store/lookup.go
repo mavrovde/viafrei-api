@@ -35,7 +35,7 @@ const (
 // a motorway page's anchor is stored as (lead ruling 2026-11-17).
 var motorwayAnchor = `select split_part(j.junction_id, ':', 3) from contract.junction j
 where j.source_ref = 'bast_lcl' and j.location is not null and ` + permitted("j") + `
-  and split_part(j.junction_id, ':', 3) ~ '^[0-9]{1,8}$'
+  and split_part(j.junction_id, ':', 3) ~ '^[0-9]{1,6}$'
   and st_dwithin(j.location::geography, st_setsrid(st_makepoint($1, $2), 4326)::geography, $3)
 order by j.location::geography <-> st_setsrid(st_makepoint($1, $2), 4326)::geography, j.junction_id
 limit 1`

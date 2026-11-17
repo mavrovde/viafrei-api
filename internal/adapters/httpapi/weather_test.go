@@ -201,6 +201,7 @@ func (f *fakeFeatures) Sources(context.Context, access.Record, string) ([]proven
 	return nil, features.Answer[struct{}]{}, f.err
 }
 
-func (f *fakeFeatures) Motorways(context.Context, access.Record, roads.CatalogueQuery) (features.MotorwaysAnswer, error) {
-	return features.MotorwaysAnswer{}, nil
+func (f *fakeFeatures) Motorways(_ context.Context, _ access.Record, q roads.CatalogueQuery) (features.MotorwaysAnswer, error) {
+	f.gotCat = q
+	return f.motorways, f.err
 }

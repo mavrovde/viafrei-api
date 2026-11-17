@@ -63,6 +63,10 @@ var point = regexp.MustCompile(`^pt:(-?[0-9]{1,3}(?:\.[0-9]+)?),(-?[0-9]{1,3}(?:
 // reads it: a position of at most four decimals.
 var anchorPoint = regexp.MustCompile(`^pt:-?[0-9]{1,2}\.[0-9]{1,4},-?[0-9]{1,3}\.[0-9]{1,4}$`)
 
+// lclCode is a BASt LCL location code as a request stores it: digits only,
+// at most six (the database's check on anchor:<code>).
+var lclCode = regexp.MustCompile(`^[0-9]{1,6}$`)
+
 // Refreshes is what the on-demand refreshes (G8) run on.
 type Refreshes struct {
 	// Sources is the registry asks are checked and keyed against.
@@ -124,7 +128,26 @@ func (s *Service) RequestRefresh(ctx context.Context, key access.Record, a refre
 	if wait == 0 {
 		wait = r.Wait
 	}
-	return r.Store.Request(ctx, refresh.New{Source: a.Source, Subject: stored, SubjectKey: subjectKey, KeyID: key.ID, RequestedBy: key.Plan.Name, At: now}, since, wait)
+	return r.Store.Request(ctx, refresh.New{Source: a.Source, Subject: stored, SubjectKey: subjectKey, KeyID: key.ID, RequestedBy: Door(key.Plan.Name), At: now}, since, wait)
+}
+
+// The own services a refresh request names as its requester (requested_by):
+// the site, the MCP server, and any other own key (a development or test
+// key) as dev. Nothing about the person is ever stored.
+const (
+	DoorSite = "site"
+	DoorMCP  = "mcp"
+	DoorDev  = "dev"
+)
+
+// Door is the own service an own key of the plan named plan asks for: the
+// plans site and mcp are those services' own; every other is dev.
+func Door(plan string) string {
+	switch plan {
+	case DoorSite, DoorMCP:
+		return plan
+	}
+	return DoorDev
 }
 
 // resolvePoints is the subject with each position (pt:lat,lon) replaced by
@@ -146,7 +169,7 @@ func (r *Refreshes) resolvePoints(ctx context.Context, subject map[string]any) (
 			if err != nil {
 				return nil, err
 			}
-			if code != "" {
+			if lclCode.MatchString(code) {
 				out[field] = "anchor:" + code
 				continue
 			}

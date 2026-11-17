@@ -38,6 +38,8 @@ import (
 // fakeFeatures answers every feature operation from fixed values and
 // records what it was asked.
 type fakeFeatures struct {
+	motorways  features.MotorwaysAnswer
+	gotCat     roads.CatalogueQuery
 	trainBoard features.TrainBoardAnswer
 	lorry      features.LorryAnswer
 	zonesErr   error
@@ -464,6 +466,7 @@ func TestFeatureRefusals(t *testing.T) {
 		"/v1/charging-options?at=52.52,13.405", "/v1/parking-options?at=52.52,13.405", "/v1/places/pl-01-0001/overview",
 		"/v1/motorways/A8/conditions", "/v1/road-conditions?at=52.52,13.405", "/v1/road-situations/ev-1",
 		"/v1/weather-risk?at=52.52,13.405", "/v1/driving-rules?topic=winter_tyres", "/v1/stations?q=koeln",
+		"/v1/motorways", "/v1/motorways/A8/parking-options",
 	}
 	cases := []struct {
 		err    error

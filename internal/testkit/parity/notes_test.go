@@ -147,3 +147,15 @@ func TestASharedNoteIsTheCreditedFamilys(t *testing.T) {
 		t.Errorf("a note no credited family owns: %v", err)
 	}
 }
+
+func TestANoteKindNoFamilyOwnsIsComparedByItsText(t *testing.T) {
+	got, err := parity.Project([]byte(`{"data":{"a":1},"meta":{"notes":{"hint":["Drive slowly."]}}}`), parity.Default, "getX", "/v1/x", owners)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(got, func(f parity.Fact) bool {
+		return strings.HasPrefix(f.Name, "meta.notes.hint") && strings.Contains(f.Value, "Drive slowly.")
+	}) {
+		t.Errorf("a note kind outside OwnedNotes: %+v", got)
+	}
+}

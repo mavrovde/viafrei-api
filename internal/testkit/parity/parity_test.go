@@ -286,3 +286,18 @@ func TestAnOperationScopedExclusionHoldsInItsOperationOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestAnAnswerWhoseEveryDataFactIsExcludedStatesEmptyData(t *testing.T) {
+	r := parity.Default
+	r.Excluded = append(slices.Clone(r.Excluded), parity.Exclusion{Pattern: "data", Operation: "op", Reason: "test"})
+	got, err := parity.Project([]byte(`{"data":[{"id":"a","n":1},{"id":"b","n":2}],"meta":{"attribution":[{"family":"s","text":"T"}]}}`), r, "op", "/v1/x", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(got, parity.Fact{Name: "data", Value: "{}"}) || slices.ContainsFunc(got, func(f parity.Fact) bool { return strings.HasPrefix(f.Name, "data[") }) {
+		t.Errorf("every data fact excluded: %+v", got)
+	}
+	if !slices.IsSortedFunc(got, func(a, b parity.Fact) int { return strings.Compare(a.Name, b.Name) }) {
+		t.Errorf("the facts are not in name order: %+v", got)
+	}
+}

@@ -79,15 +79,21 @@ func runOf(j ciJob) string {
 func measureFindings(w ciJobs) []string {
 	var out []string
 	for job, profile := range map[string]string{"test": "coverage-unit.out", "integration": "coverage-integration.out"} {
-		if r := runOf(w.Jobs[job]); !strings.Contains(r, "-coverpkg=./...") || !strings.Contains(r, "-coverprofile="+profile) {
+		if r := runOf(w.Jobs[job]); !strings.Contains(r, "-coverpkg=./... -coverprofile="+profile) {
 			out = append(out, "job "+job+" does not measure every package into "+profile)
 		}
+	}
+	// internal/perf times the queries: it runs alone (-p 1), after the
+	// other integration packages, into a profile of its own.
+	if r := runOf(w.Jobs["integration"]); !strings.Contains(r, "grep -v '/internal/perf$'") ||
+		!strings.Contains(r, "-p 1 -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-perf.out -json ./internal/perf") {
+		out = append(out, "job integration does not run internal/perf alone into coverage-perf.out")
 	}
 	gate := runOf(w.Jobs["coverage"])
 	for _, want := range []string{
 		"scripts/boot-coverage.sh coverage-boot.out",
 		"covergate -min 100 -exclusions test/coverage-exclusions.txt -o coverage.out",
-		"coverage-unit.out coverage-integration.out coverage-boot.out",
+		"coverage-unit.out coverage-integration.out coverage-perf.out coverage-boot.out",
 	} {
 		if !strings.Contains(gate, want) {
 			out = append(out, "job coverage does not run "+want)
@@ -143,14 +149,15 @@ func TestCoverageGateIsWired(t *testing.T) {
 	}
 	for want, plant := range map[string][2]string{
 		"job coverage does not run covergate -min 100": {"covergate -min 100", "covergate -min 95"},
-		"job integration does not measure every":       {"-tags integration -covermode=atomic -coverpkg=./...", "-tags integration -covermode=atomic"},
+		"job integration does not measure every":       {"-coverpkg=./... -coverprofile=coverage-integration.out", "-coverprofile=coverage-integration.out"},
+		"does not run internal/perf alone":             {"go test -race -p 1 -count=1", "go test -race -count=1"},
 		"job coverage does not run scripts/boot":       {"scripts/boot-coverage.sh coverage-boot.out", "true"},
 		"job sonar does not need coverage":             {"needs: [test, coverage, docs-portal]", "needs: [test, docs-portal]"},
 		"job sonar does not need docs-portal":          {"needs: [test, coverage, docs-portal]", "needs: [test, coverage]"},
 		"ci.yml does not parse":                        {"jobs:\n", "jobs: ["},
 		"job coverage sets continue-on-error":          {"    name: Coverage gate (100 % per package)\n", "    name: Coverage gate (100 % per package)\n    continue-on-error: true\n"},
 		"(Merge and gate) sets continue-on-error":      {"      - name: Merge and gate\n", "      - name: Merge and gate\n        continue-on-error: ${{ true }}\n"},
-		"(Merge and gate) swallows a failure":          {"coverage-unit.out coverage-integration.out coverage-boot.out", "coverage-unit.out coverage-integration.out coverage-boot.out || true"},
+		"(Merge and gate) swallows a failure":          {"coverage-unit.out coverage-integration.out coverage-perf.out coverage-boot.out", "coverage-unit.out coverage-integration.out coverage-perf.out coverage-boot.out || true"},
 		"swallows a failure with || true":              {"-coverprofile=coverage-integration.out", "-coverprofile=coverage-integration.out || :"},
 	} {
 		bad := strings.Replace(string(ci), plant[0], plant[1], 1)

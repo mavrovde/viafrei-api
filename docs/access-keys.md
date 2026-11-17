@@ -115,12 +115,17 @@ viafrei-api keys plan   -name standard -use-class commercial -tier standard -sco
                         -rate 10 -burst 20 -quota-day 50000 -quota-month 1000000 -actor ops
 viafrei-api keys issue  -plan standard -label "Example GmbH" -contact ops@example.test -actor ops
 viafrei-api keys issue  -plan site -label "ViaFrei web" -contact ops@example.test -audience own -actor ops
+viafrei-api keys issue  -plan mcp -label "ViaFrei MCP" -contact ops@example.test -audience own -actor ops
 viafrei-api keys rotate -id <keyId> -actor ops          # the old secret stays valid for auth.rotation_overlap
 viafrei-api keys revoke -id <keyId> -reason "leaked" -actor ops
 viafrei-api keys move   -id <keyId> -plan pro -actor ops
 viafrei-api keys prune  -actor ops                      # audit records past audit.retention_days, usage past metering.retention_days
 viafrei-api keys usage  -id <keyId> -hours 24           # usage per hour and operation; without -id, every key
 ```
+
+An own key's plan names the service a refresh records as its requester:
+`site` and `mcp` are those services' own plans, and any other own plan (a
+development or test key) is recorded as `dev`.
 
 A key expires after `auth.default_expiry` unless `-expires` is given (at
 most 1 095 days). A key is for the public unless `-audience own` issues it

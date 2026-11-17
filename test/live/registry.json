@@ -35,7 +35,7 @@
           },
           {
             "match": {
-              "at": "^anchor:(?<lcl>[0-9]{1,8})$"
+              "at": "^anchor:(?<lcl>[0-9]{1,6})$"
             },
             "emit": "anchor:{lcl}"
           },

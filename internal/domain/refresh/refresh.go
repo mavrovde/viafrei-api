@@ -70,9 +70,9 @@ type New struct {
 	Subject    map[string]any
 	SubjectKey string
 	KeyID      string
-	// RequestedBy is which of ViaFrei's own services asked: the own key's
-	// plan (site for the web, mcp for the MCP server), never anything about
-	// the person (the privacy ruling: "which of our own services made it").
+	// RequestedBy is which of ViaFrei's own services asked: site, mcp or
+	// dev, from the own key's plan (features.Door), never anything about the
+	// person (the privacy ruling: "which of our own services made it").
 	RequestedBy string
 	At          time.Time
 }

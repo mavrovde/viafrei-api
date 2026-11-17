@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -22,6 +23,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/mavrovde/viafrei-api/internal/adapters/accessstore"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
@@ -161,11 +163,22 @@ func (c *capture) reads(relation string) int64 {
 	return n
 }
 
-type keyAuth struct{ p auth.Principal }
+// keyAuth answers every bearer as the benchmark key, but ownBearer as the
+// own key a refresh is asked with (only ViaFrei's own audience may).
+type keyAuth struct{ p, own auth.Principal }
 
-func (k keyAuth) Authenticate(context.Context, string, string) (auth.Principal, error) {
+func (k keyAuth) Authenticate(_ context.Context, presented, _ string) (auth.Principal, error) {
+	if presented == ownBearer {
+		return k.own, nil
+	}
 	return k.p, nil
 }
+
+// ownBearer is the bearer of the own key; refreshSubjects are the subjects
+// the refresh benchmarks ask about: districts, so no lookup runs.
+const ownBearer = "own"
+
+var refreshSubjects = []string{"ags:09162000", "ags:05315000", "ags:11000000"}
 
 // rig is the service over the loaded database: the real store, use cases
 // and handler, a key allowed every source, and the SQL it sends captured.
@@ -174,6 +187,8 @@ type rig struct {
 	st      *store.Store
 	sql     *capture
 	key     auth.Principal
+	own     auth.Principal
+	refresh features.Refreshes
 	now     time.Time
 	targets map[string][]string
 }
@@ -183,7 +198,8 @@ func open(t *testing.T) *rig {
 	if loadErr != nil {
 		t.Fatalf("loading the fixtures: %v", loadErr)
 	}
-	cfg, err := config.Load(config.Options{Environ: []string{"VFAPI_DB_URL=" + db.ReaderURL}, RequireSecrets: true})
+	cfg, err := config.Load(config.Options{Environ: []string{"VFAPI_DB_URL=" + db.ReaderURL, "VFAPI_ACCESS_URL=" + db.AccessURL,
+		"VFAPI_AUTH_PEPPER=perf-run-pepper-not-a-secret-0123456789", "VFAPI_REFRESH_SOURCES_FILE=" + filepath.Join("..", "..", "test", "live", "registry.json")}, RequireSecrets: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,6 +230,12 @@ func open(t *testing.T) *rig {
 		ID: "benchmarkk", Environment: access.Live, ExpiresAt: r.now.Add(24 * time.Hour),
 		Plan: access.Plan{Name: "benchmark", UseClass: "commercial", Tier: "standard", Sources: sources,
 			Scopes: []access.Scope{"places", "energy", "parking", "roads", "weather", "rules", "transit", "accessibility"}},
+	}}
+	// The own key (ViaFrei's own audience) asks what only an own key may:
+	// a refresh, and a fuel station's page (the fuel family is own-only).
+	r.own = auth.Principal{Key: access.Record{
+		ID: "benchown00", Environment: access.Live, ExpiresAt: r.now.Add(24 * time.Hour), Audience: access.AudienceOwn,
+		Plan: access.Plan{Name: "dev", UseClass: "consumer", Tier: "standard", Sources: sources, Scopes: r.key.Key.Plan.Scopes},
 	}}
 	near := func(table, path string) {
 		pts, err := pgx.CollectRows(must(conn.Query(ctx, fmt.Sprintf(
@@ -319,7 +341,12 @@ func open(t *testing.T) *rig {
 	// catalogue serves its operation (an older schema holds no table for it).
 	serves := func(op string) bool { return slices.Contains(httpapi.OperationIDs(), op) }
 	if serves("getFuelStation") {
-		list("fuel-station", "select station_id from contract.fuel_station where withdrawn_at is null order by 1 limit 40", "/v1/fuel-options/", "")
+		energy, _, err := access.NewGate(reg, r.own.Key.Plan, r.own.Key.Audience, nil, cfg.Sources.Disabled).Answer(access.Answering(reg, "energy"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		list("fuel-station", "select station_id from contract.fuel_station where withdrawn_at is null and source_ref = any($1) "+
+			"and display_class <> 'withhold' order by 1 limit 40", "/v1/fuel-options/", "", energy)
 	}
 	if serves("getChargingSite") {
 		list("charging-site", "select site_id from contract.charging_site where withdrawn_at is null order by 1 limit 40", "/v1/charging-options/", "")
@@ -338,7 +365,58 @@ func open(t *testing.T) *rig {
 	r.targets["coverage"] = []string{"/v1/places/coverage", "/v1/places/coverage?lang=en"}
 	r.targets["pressure"] = []string{"/v1/pressure"}
 	r.targets["affected"] = []string{"/v1/affected-stations?limit=5", "/v1/affected-stations?limit=20"}
+	r.refreshes(ctx, t, conn)
 	return r
+}
+
+// refreshes wires the refresh store and the own key, and asks each subject
+// once and settles it none_due, as the live refresher would: an ask
+// measured afterwards is answered by that fresh refresh (201) and a read
+// finds it, so neither waits on a refresher the benchmark does not run.
+func (r *rig) refreshes(ctx context.Context, t *testing.T, conn *pgx.Conn) {
+	t.Helper()
+	rs, err := accessstore.Open(ctx, r.cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(rs.Close)
+	if r.refresh, err = wire.Refreshes(r.cfg, rs, r.st.Lookup); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(ctx, `insert into access.plan (plan_name, use_class, tier, scopes, sources, changed_at, rate_per_second, burst, quota_day, quota_month)
+		values ('dev', 'consumer', 'standard', '{}', '{}', $1, 1, 1, 0, 0) on conflict do nothing`, r.now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(ctx, `insert into access.api_key (key_id, environment, plan_name, label, contact, mac, issued_at, expires_at, changed_at, audience)
+		values ('benchown00', 'live', 'dev', 'perf', 'perf@example.test', decode(repeat('00', 32), 'hex'), $1, $1::timestamptz + interval '1 day', $1, 'own')
+		on conflict do nothing`, r.now); err != nil {
+		t.Fatal(err)
+	}
+	h := r.handler(t, false)
+	for _, subject := range refreshSubjects {
+		target := refreshAsk(subject)
+		code, location := send(h, target)
+		if code != http.StatusCreated && code != http.StatusAccepted {
+			t.Fatalf("%s answered %d", target, code)
+		}
+		id := location[strings.LastIndex(location, "/")+1:]
+		if _, err := conn.Exec(ctx, `update live.refresh_requests set state = 'none_due', settled_at = $2
+			where id = $1::bigint and settled_at is null`, id, r.now); err != nil {
+			t.Fatal(err)
+		}
+		r.targets["create-refresh"] = append(r.targets["create-refresh"], target)
+		self, err := url.Parse(location)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.targets["get-refresh"] = append(r.targets["get-refresh"], self.Path)
+	}
+}
+
+// refreshAsk is the target of an ask (createRefresh) of the fuel prices of
+// subject, sent with the own key's bearer.
+func refreshAsk(subject string) string {
+	return http.MethodPost + " /v1/refreshes " + `{"source":"fuel-prices-de","subject":{"at":"` + subject + `"}}`
 }
 
 func must(rows pgx.Rows, _ error) pgx.Rows { return rows }
@@ -356,8 +434,8 @@ func (r *rig) handler(t *testing.T, cached bool) http.Handler {
 	deps := httpapi.Deps{
 		Config: &cfg, Build: buildinfo.Info{Version: "bench", Commit: "bench"}, ContractVersion: dbcontract.ContractVersion, Now: now,
 		Readiness: health.NewChecker(r.st, expected, cfg.Health.ReadyTimeout),
-		Auth:      keyAuth{r.key}, Sources: r.st, Versions: r.st,
-		Features: features.New(features.Repositories{Register: r.st, Charging: r.st, Parking: r.st, Places: r.st, Roads: r.st, Weather: r.st, Rules: r.st, Transit: r.st, Fuel: r.st, Hydrogen: r.st, Speed: r.st, Sharing: r.st, Addresses: r.st, Pois: r.st, Locations: r.st, Disruptions: r.st, Nearby: r.st, Lorry: r.st, Catalogue: r.st, National: r.st, Affected: r.st, Coverage: r.st, States: r.st}, wire.FeatureSettings(&cfg), now),
+		Auth:      keyAuth{r.key, r.own}, Sources: r.st, Versions: r.st,
+		Features: features.New(features.Repositories{Register: r.st, Charging: r.st, Parking: r.st, Places: r.st, Roads: r.st, Weather: r.st, Rules: r.st, Transit: r.st, Fuel: r.st, Hydrogen: r.st, Speed: r.st, Sharing: r.st, Addresses: r.st, Pois: r.st, Locations: r.st, Disruptions: r.st, Nearby: r.st, Lorry: r.st, Catalogue: r.st, National: r.st, Affected: r.st, Coverage: r.st, States: r.st, TrainBoards: r.st, Bays: r.st}, wire.FeatureSettings(&cfg), now).WithRefreshes(r.refresh),
 	}
 	h, err := httpapi.NewHandler(deps)
 	if err != nil {
@@ -461,6 +539,10 @@ func (r *rig) targetsOf(op string) []string {
 		return r.targets["pressure"]
 	case "listAffectedStations":
 		return r.targets["affected"]
+	case "createRefresh":
+		return r.targets["create-refresh"]
+	case "getRefresh":
+		return r.targets["get-refresh"]
 	}
 	return nil
 }
@@ -470,8 +552,7 @@ func (r *rig) targetsOf(op string) []string {
 func call(h http.Handler, target, ifNoneMatch string) (int, string, time.Duration) {
 	ctx, cancel := context.WithTimeout(context.Background(), testBound)
 	defer cancel()
-	q := httptest.NewRequestWithContext(ctx, http.MethodGet, target, nil)
-	q.Header.Set("Authorization", "Bearer benchmark")
+	q := request(ctx, target)
 	q.Header.Set("Accept-Encoding", "br, gzip")
 	if ifNoneMatch != "" {
 		q.Header.Set("If-None-Match", ifNoneMatch)
@@ -480,6 +561,43 @@ func call(h http.Handler, target, ifNoneMatch string) (int, string, time.Duratio
 	start := time.Now()
 	h.ServeHTTP(w, q)
 	return w.Code, w.Header().Get("ETag"), time.Since(start)
+}
+
+// request is the request of target: a GET of the path, or an ask written
+// "POST <path> <body>". A refresh is asked and read, and a fuel station's
+// page read, with the own key; everything else with the benchmark key.
+func request(ctx context.Context, target string) *http.Request {
+	if rest, ok := strings.CutPrefix(target, http.MethodPost+" "); ok {
+		path, body, _ := strings.Cut(rest, " ")
+		q := httptest.NewRequestWithContext(ctx, http.MethodPost, path, strings.NewReader(body))
+		q.Header.Set("Authorization", "Bearer "+ownBearer)
+		q.Header.Set("Content-Type", "application/json")
+		return q
+	}
+	q := httptest.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	q.Header.Set("Authorization", "Bearer benchmark")
+	if strings.HasPrefix(target, "/v1/refreshes/") || strings.HasPrefix(target, "/v1/fuel-options/") {
+		q.Header.Set("Authorization", "Bearer "+ownBearer)
+	}
+	return q
+}
+
+// send sends one request and returns its status and Location.
+func send(h http.Handler, target string) (int, string) {
+	ctx, cancel := context.WithTimeout(context.Background(), testBound)
+	defer cancel()
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, request(ctx, target))
+	return w.Code, w.Header().Get("Location")
+}
+
+// wantOf is the status a measured request of op answers: an ask answered
+// by a refresh already settled is 201, every other read 200.
+func wantOf(op string) int {
+	if op == "createRefresh" {
+		return http.StatusCreated
+	}
+	return http.StatusOK
 }
 
 // timed sends n requests over the targets from concurrency workers and
@@ -543,8 +661,8 @@ func TestEveryOperationMeetsItsBudget(t *testing.T) {
 				return
 			}
 			class, _ := budgets.Of(op)
-			timed(t, h, targets, warmup, http.StatusOK, noValidator)
-			res := perf.Measure(op, timed(t, h, targets, *samples, http.StatusOK, noValidator))
+			timed(t, h, targets, warmup, wantOf(op), noValidator)
+			res := perf.Measure(op, timed(t, h, targets, *samples, wantOf(op), noValidator))
 			t.Logf("%s  budget %s p95=%s p99=%s", res, class.Name, class.P95, class.P99)
 			findings = append(findings, res.Check(class)...)
 		})
@@ -686,7 +804,7 @@ func TestNoSequentialScanOfTimeSeries(t *testing.T) {
 		// An operation with no benchmark request yet is named by
 		// TestEveryOperationMeetsItsBudget; it is not read here.
 		for _, target := range r.targetsOf(op)[:min(1, len(r.targetsOf(op)))] {
-			if code, _, _ := call(h, target, ""); code != http.StatusOK {
+			if code, _, _ := call(h, target, ""); code != wantOf(op) {
 				t.Fatalf("%s answered %d", target, code)
 			}
 		}

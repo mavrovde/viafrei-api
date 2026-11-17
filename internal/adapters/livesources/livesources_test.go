@@ -23,7 +23,7 @@ import (
 // commit.
 var registryFile = filepath.Join("..", "..", "..", "test", "live", "registry.json")
 
-const registrySHA256 = "15f6e205b94c65432338a804fbff23ce7b7557da98974a4a4e17c1fd91b89d97"
+const registrySHA256 = "ac18d776d698217acde3f8cb53ea81592aa30b39e223e5ae6c7707ff299cc6a9"
 
 func registry(t *testing.T) *livesources.Registry {
 	t.Helper()

@@ -63,6 +63,10 @@ func gemeinden(_ context.Context, name, value string) (string, error) {
 	switch {
 	case name == features.LookupAnchor && value == "49.2648,12.9487":
 		return "12345", nil
+	case name == features.LookupAnchor && value == "49.2600,12.9400":
+		return "a7-12.n", nil
+	case name == features.LookupAnchor && value == "49.2700,12.9400":
+		return "1234567", nil
 	case name == features.LookupAnchor && value == "2.0,2.0":
 		return "", errors.New("store down")
 	case name == features.LookupAnchor:
@@ -83,6 +87,11 @@ func TestRequestRefreshIsForOwnKeysOnAConfiguredInstance(t *testing.T) {
 	own := transitKey
 	own.Audience = access.AudienceOwn
 	own.Plan.Name = "mcp"
+	for plan, want := range map[string]string{"site": "site", "mcp": "mcp", "dev": "dev", "parity": "dev", "": "dev"} {
+		if got := features.Door(plan); got != want {
+			t.Errorf("plan %q asks as %q, want %q", plan, got, want)
+		}
+	}
 	ask := refresh.Ask{Source: "fuel-prices-de", Subject: map[string]any{"at": "ags:09162000"}}
 	if _, err := s.RequestRefresh(ctx, own, ask); !errors.Is(err, features.ErrNoRefreshes) {
 		t.Fatalf("not configured: %v", err)
@@ -182,6 +191,10 @@ func TestRequestRefreshStoresAMotorwayAnchorAsItsLCLCode(t *testing.T) {
 		{map[string]any{"at": "pt:48.137,11.575", "anchor": true}, "ags:09162000"},
 		{map[string]any{"at": "pt:49.2648,12.9487"}, ""},
 		{map[string]any{"at": "pt:49.26477,12.94870", "anchor": true}, ""},
+		// A code that is no numeric LCL code of six digits at most is never
+		// stored: the position goes to its Gemeinde, of which none answers.
+		{map[string]any{"at": "pt:49.2600,12.9400", "anchor": true}, ""},
+		{map[string]any{"at": "pt:49.2700,12.9400", "anchor": true}, ""},
 	} {
 		st.requested = 0
 		_, err := s.RequestRefresh(ctx, own, refresh.Ask{Source: "fuel-prices-de", Subject: c.subject})

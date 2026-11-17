@@ -16,3 +16,7 @@ getRoadSituation	lookup
 getWeatherRisk	near
 getDrivingRules	lookup
 listStations	near
+listFuelOptions	near
+listPlaces	lookup
+listStationDepartures	lookup
+listStationFacilities	lookup

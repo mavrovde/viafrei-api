@@ -333,7 +333,7 @@ func webCmd(args []string, stdout, stderr io.Writer) error {
 		if (ext != ".ts" && ext != ".astro") || strings.Contains(p, ".test.") {
 			return nil
 		}
-		b, err := os.ReadFile(p) // #nosec G304 -- below the directory the maintainer names
+		b, err := os.ReadFile(p) // #nosec G304 G122 -- below the directory the maintainer names, read once
 		if err != nil {
 			return err
 		}

@@ -270,7 +270,7 @@ func TestServeFailsClosed(t *testing.T) {
 	req.Covers(t, "SEC-001")
 	code := serveUntilTermWithHealth(t, nil, func(addr, health string) {
 		for _, path := range []string{"/v1/meta", "/v1/openapi.json", "/openapi.json", "/healthz", "/readyz", "/v1/charging-options", "/no/such/path"} {
-			resp, body := answer(t, "http://"+addr+path)
+			resp, body := answer(t, "http://"+addr+path) //nolint:bodyclose // answer reads and closes the body
 			if resp.StatusCode != http.StatusForbidden || body != "" {
 				t.Errorf("public %s: %d %q, want 403 and no body", path, resp.StatusCode, body)
 			}
@@ -281,7 +281,7 @@ func TestServeFailsClosed(t *testing.T) {
 			}
 		}
 		for path, want := range map[string]int{"/healthz": http.StatusOK, "/readyz": http.StatusServiceUnavailable, "/v1/meta": http.StatusOK, "/v1/openapi.json": http.StatusNotFound, "/v1/charging-options": http.StatusNotFound} {
-			if resp, body := answer(t, "http://"+health+path); resp.StatusCode != want {
+			if resp, body := answer(t, "http://"+health+path); resp.StatusCode != want { //nolint:bodyclose // answer reads and closes the body
 				t.Errorf("health %s: %d %s, want %d", path, resp.StatusCode, body, want)
 			}
 		}
@@ -297,7 +297,7 @@ func TestServeAdmitsTheAllowList(t *testing.T) {
 	req.Covers(t, "SEC-001")
 	code := serveUntilTerm(t, []string{allowLoopback}, func(addr string) {
 		for path, want := range map[string]int{"/v1/meta": http.StatusOK, "/v1/openapi.json": http.StatusOK, "/healthz": http.StatusNotFound, "/readyz": http.StatusNotFound} {
-			if resp, body := answer(t, "http://"+addr+path); resp.StatusCode != want {
+			if resp, body := answer(t, "http://"+addr+path); resp.StatusCode != want { //nolint:bodyclose // answer reads and closes the body
 				t.Errorf("public %s: %d %.120s, want %d", path, resp.StatusCode, body, want)
 			}
 		}

@@ -227,6 +227,7 @@ func principal(k *api.Key) auth.Principal {
 		Plan: access.Plan{Name: "example", Tier: "standard"}}
 	if k != nil {
 		rec.Plan.UseClass, rec.Plan.Sources = access.UseClass(k.UseClass), k.Sources
+		rec.Audience = access.Audience(k.Audience)
 		for _, s := range k.Scopes {
 			rec.Plan.Scopes = append(rec.Plan.Scopes, access.Scope(s))
 		}
@@ -246,7 +247,7 @@ func ask(t *testing.T, cfg *config.Config, st *store.Store, e api.Example) (int,
 		Config: cfg, Build: build, ContractVersion: dbcontract.ContractVersion, Now: clock,
 		Readiness: health.NewChecker(st, expected, cfg.Health.ReadyTimeout),
 		Auth:      keyAuth{principal(e.Key)}, Sources: st,
-		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st}, wire.FeatureSettings(cfg), clock),
+		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st, Transit: st, Fuel: st}, wire.FeatureSettings(cfg), clock),
 	})
 	if err != nil {
 		t.Fatal(err)

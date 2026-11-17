@@ -4668,6 +4668,108 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "Fuel stations within 25 km, cheapest E10 first",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "00000000-0000-4000-8000-000000000002",
+                          "name": "Belnan Namüningen",
+                          "brand": "Belnan",
+                          "location": {
+                            "lat": 49.169409,
+                            "lon": 7.808793
+                          },
+                          "distanceM": 110,
+                          "openingState": "open",
+                          "prices": [
+                            {
+                              "fuel": "diesel",
+                              "priceEur": 1.799,
+                              "reportedAt": "2026-03-29T22:45:59Z",
+                              "reportedAtLocal": "2026-03-30T00:45:59+02:00",
+                              "current": true
+                            },
+                            {
+                              "fuel": "e10",
+                              "priceEur": 1.633,
+                              "reportedAt": "2026-03-29T15:24:44Z",
+                              "reportedAtLocal": "2026-03-29T17:24:44+02:00",
+                              "current": true
+                            },
+                            {
+                              "fuel": "e5",
+                              "priceEur": 2.062,
+                              "reportedAt": "2026-03-29T21:50:02Z",
+                              "reportedAtLocal": "2026-03-29T23:50:02+02:00",
+                              "current": true
+                            }
+                          ],
+                          "sourceFamily": "tankerkoenig_gamma"
+                        }
+                      ],
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:57:30Z",
+                        "freshness": [
+                          {
+                            "family": "tankerkoenig_gamma",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "tankerkoenig_gamma",
+                            "domain": "energy",
+                            "publisher": "Zausklaum Datenwerk",
+                            "text": "Synthetic data from family gamma, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://gamma.example/terms/tankerkoenig_gamma"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": [
+                            "For consumer information only (synthetic)."
+                          ]
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 2,
+                          "hasMore": false
+                        },
+                        "query": {
+                          "at": {
+                            "lat": 49.17,
+                            "lon": 7.81
+                          },
+                          "radiusM": 25000,
+                          "sort": "price",
+                          "matched": 1,
+                          "droppedClosed": 0,
+                          "droppedUnknown": 0
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/fuel-options"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/FuelEnvelope"
                 }
@@ -4910,6 +5012,15 @@
         "tags": [
           "energy"
         ],
+        "x-attribution": "Fuel stations and their prices come from the source families of the energy domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/fuel-options?at=49.17,7.81\u0026radius_m=25000\u0026fuel=e10\u0026sort=price\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/fuel-options?at=49.17,7.81\u0026radius_m=25000\u0026fuel=e10\u0026sort=price\u0026limit=2",
         "x-mcp-counterpart": "filling station search",
         "x-required-scope": "energy"
       }
@@ -6213,6 +6324,75 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The places a typed name finds",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "100001",
+                          "name": "Matfienland",
+                          "kind": "state",
+                          "location": {
+                            "lat": 48.24375,
+                            "lon": 7.01625
+                          },
+                          "sourceFamily": "geonames",
+                          "districtCode": "01"
+                        }
+                      ],
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": null,
+                        "freshness": [
+                          {
+                            "family": "geonames",
+                            "dataAsOf": null,
+                            "ageS": null,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "geonames",
+                            "domain": "places",
+                            "publisher": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+                            "text": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://download.geonames.org/export/dump/"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 3,
+                          "hasMore": false
+                        },
+                        "query": {
+                          "q": "Matfienland",
+                          "kind": null,
+                          "radiusM": null
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/places"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/PlacesEnvelope"
                 }
@@ -6455,6 +6635,15 @@
         "tags": [
           "places"
         ],
+        "x-attribution": "Places come from the source families of the places domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/places?q=Matfienland\u0026limit=3\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/places?q=Matfienland\u0026limit=3",
         "x-mcp-counterpart": "place search",
         "x-required-scope": "places"
       }
@@ -7953,6 +8142,7 @@
                         },
                         "query": {
                           "q": "Düsraßbach",
+                          "code": null,
                           "at": null,
                           "radiusM": null
                         }
@@ -8307,6 +8497,83 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The next departures of a station",
+                    "value": {
+                      "data": {
+                        "station": {
+                          "id": "1:de:04002:2",
+                          "name": "Pienköckheim Nord",
+                          "location": {
+                            "lat": 47.403474,
+                            "lon": 14.561662
+                          },
+                          "stopCode": "de:04002:2"
+                        },
+                        "window": {
+                          "from": "2026-03-30T00:00:00Z",
+                          "fromLocal": "2026-03-30T02:00:00+02:00",
+                          "until": "2026-03-30T01:00:00Z",
+                          "untilLocal": "2026-03-30T03:00:00+02:00",
+                          "matched": 0,
+                          "matchedAll": 0,
+                          "dropped": []
+                        },
+                        "departures": []
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T12:00:00Z",
+                        "freshness": [
+                          {
+                            "family": "delfi_static",
+                            "dataAsOf": "2026-03-29T12:00:00Z",
+                            "ageS": 43200,
+                            "staleAfterS": 259200,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "delfi_static",
+                            "domain": "transit",
+                            "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://www.opendata-oepnv.de"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 3,
+                          "hasMore": false
+                        },
+                        "query": {
+                          "modes": [],
+                          "categories": []
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/stations/1:de:04002:2/departures"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/DeparturesEnvelope"
                 }
@@ -8549,6 +8816,15 @@
         "tags": [
           "transit"
         ],
+        "x-attribution": "The station and its departures come from the source families of the transit domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/stations/1:de:04002:2/departures?limit=3\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/stations/1:de:04002:2/departures?limit=3",
         "x-mcp-counterpart": "departure board",
         "x-required-scope": "transit"
       }
@@ -8605,6 +8881,112 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The lifts and escalators of a station, out of order first",
+                    "value": {
+                      "data": {
+                        "station": {
+                          "id": "1:de:04002:2",
+                          "name": "Pienköckheim Nord",
+                          "location": {
+                            "lat": 47.403474,
+                            "lon": 14.561662
+                          },
+                          "stopCode": "de:04002:2"
+                        },
+                        "counts": {
+                          "active": 0,
+                          "inactive": 0,
+                          "unknown": 2
+                        },
+                        "facilities": [
+                          {
+                            "id": "equipment:100003",
+                            "kind": "escalator",
+                            "position": "zu Gleis 1",
+                            "state": "unknown",
+                            "observedAt": "2026-03-29T10:57:39Z",
+                            "observedAtLocal": "2026-03-29T12:57:39+02:00",
+                            "sourceFamily": "openstation_siri_fm"
+                          },
+                          {
+                            "id": "equipment:100004",
+                            "kind": "escalator",
+                            "position": "zu Gleis 2",
+                            "state": "unknown",
+                            "observedAt": "2026-03-29T07:18:26Z",
+                            "observedAtLocal": "2026-03-29T09:18:26+02:00",
+                            "sourceFamily": "openstation_siri_fm"
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T12:00:00Z",
+                        "freshness": [
+                          {
+                            "family": "delfi_static",
+                            "dataAsOf": "2026-03-29T12:00:00Z",
+                            "ageS": 43200,
+                            "staleAfterS": 259200,
+                            "stale": false
+                          },
+                          {
+                            "family": "openstation_siri_fm",
+                            "dataAsOf": "2026-03-29T23:52:30Z",
+                            "ageS": 450,
+                            "staleAfterS": 2700,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "delfi_static",
+                            "domain": "transit",
+                            "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://www.opendata-oepnv.de"
+                          },
+                          {
+                            "family": "openstation_siri_fm",
+                            "domain": "accessibility",
+                            "publisher": "Bengdün Datenwerk",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms/openstation_siri_fm"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 3,
+                          "hasMore": false
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/stations/1:de:04002:2/facilities"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/FacilitiesEnvelope"
                 }
@@ -8847,6 +9229,15 @@
         "tags": [
           "transit"
         ],
+        "x-attribution": "The station comes from the transit domain, its lifts and escalators from the accessibility domain. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/stations/1:de:04002:2/facilities?limit=3\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/stations/1:de:04002:2/facilities?limit=3",
         "x-mcp-counterpart": "station facilities",
         "x-required-scope": "transit"
       }

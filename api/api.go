@@ -47,6 +47,8 @@ type Key struct {
 	UseClass string   `json:"useClass"`
 	Scopes   []string `json:"scopes"`
 	Sources  []string `json:"sources"`
+	// Audience is "own" for a key of ViaFrei's own callers; empty is public.
+	Audience string `json:"audience,omitempty"`
 }
 
 // ReadExamples reads every examples/*.json of fsys, keyed by operation id

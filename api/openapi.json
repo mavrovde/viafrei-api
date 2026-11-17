@@ -1051,27 +1051,6 @@
             "description": "What it is attached to: stop, route or network.",
             "type": "string"
           },
-          "cause": {
-            "description": "The published cause; null when none.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "description": {
-            "description": "The text as published; null when none.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "effect": {
-            "description": "The published effect; null when none.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "header": {
             "description": "The headline as published; null when none.",
             "type": [
@@ -1108,14 +1087,6 @@
           "sourceFamily": {
             "type": "string"
           },
-          "updatedAt": {
-            "description": "When the network last changed it; null when not known.",
-            "format": "date-time",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "url": {
             "description": "The network's page on it; null when none.",
             "type": [
@@ -1127,15 +1098,11 @@
         "required": [
           "id",
           "header",
-          "description",
-          "cause",
-          "effect",
           "url",
           "inForceFrom",
           "inForceUntil",
           "lines",
           "attachedTo",
-          "updatedAt",
           "sourceFamily"
         ],
         "type": "object"
@@ -17359,9 +17326,6 @@
                           {
                             "id": "delfi_sa_alpha:700021",
                             "header": "Bauarbeiten auf der Linie RE 1",
-                            "description": "Ersatzverkehr mit Bussen.",
-                            "cause": "CONSTRUCTION",
-                            "effect": "DETOUR",
                             "url": null,
                             "inForceFrom": "2026-03-28T00:00:00Z",
                             "inForceUntil": null,
@@ -17369,7 +17333,6 @@
                               "RE 1"
                             ],
                             "attachedTo": "route",
-                            "updatedAt": "2026-03-28T00:00:00Z",
                             "sourceFamily": "delfi_sa_alpha"
                           }
                         ],

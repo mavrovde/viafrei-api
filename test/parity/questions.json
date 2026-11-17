@@ -802,7 +802,7 @@
       "counterpart": "transit disruption check",
       "request": "/v1/transit-disruptions?area=08001",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "transit"
         ],
@@ -820,7 +820,7 @@
       "counterpart": "transit disruption check",
       "request": "/v1/transit-disruptions?area=08&limit=1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "transit"
         ],

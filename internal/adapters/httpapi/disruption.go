@@ -37,19 +37,17 @@ func (in *DisruptionInput) Resolve(huma.Context) []error {
 	return nil
 }
 
-// DisruptionAlert is a service alert in force.
+// DisruptionAlert is a service alert in force, with what the platform's
+// disruption check states of it: no text beyond the headline, no cause or
+// effect, no change time.
 type DisruptionAlert struct {
 	ID           string     `json:"id"`
 	Header       *string    `json:"header" nullable:"true" doc:"The headline as published; null when none."`
-	Description  *string    `json:"description" nullable:"true" doc:"The text as published; null when none."`
-	Cause        *string    `json:"cause" nullable:"true" doc:"The published cause; null when none."`
-	Effect       *string    `json:"effect" nullable:"true" doc:"The published effect; null when none."`
 	URL          *string    `json:"url" nullable:"true" doc:"The network's page on it; null when none."`
 	ActiveFrom   *time.Time `json:"inForceFrom" nullable:"true" doc:"Since when it applies; null when open."`
 	ActiveTo     *time.Time `json:"inForceUntil" nullable:"true" doc:"Until when it applies; null when open."`
 	Lines        []string   `json:"lines" doc:"The lines it names."`
 	PlacedBy     string     `json:"attachedTo" doc:"What it is attached to: stop, route or network."`
-	ChangedAt    *time.Time `json:"updatedAt" nullable:"true" doc:"When the network last changed it; null when not known."`
 	SourceFamily string     `json:"sourceFamily"`
 }
 
@@ -121,8 +119,8 @@ func disruptionEnvelope(s *server, ctx context.Context, a features.DisruptionAns
 		if lines == nil {
 			lines = []string{}
 		}
-		data.Alerts[i] = DisruptionAlert{ID: v.ID, Header: v.Header, Description: v.Description, Cause: v.Cause, Effect: v.Effect, URL: v.URL,
-			ActiveFrom: utc(v.ActiveFrom), ActiveTo: utc(v.ActiveTo), Lines: lines, PlacedBy: v.PlacedBy, ChangedAt: utc(v.ChangedAt), SourceFamily: v.Family}
+		data.Alerts[i] = DisruptionAlert{ID: v.ID, Header: v.Header, URL: v.URL,
+			ActiveFrom: utc(v.ActiveFrom), ActiveTo: utc(v.ActiveTo), Lines: lines, PlacedBy: v.PlacedBy, SourceFamily: v.Family}
 	}
 	if p := a.Punctuality; p != nil {
 		data.Punctuality = &DisruptionPunctuality{AreaLevel: p.AreaLevel, AreaCode: p.AreaCode, AreaName: p.AreaName, WindowMin: punctualityWindowMin,

@@ -5324,7 +5324,7 @@
       "counterpart": "transit disruption check",
       "request": "/v1/transit-disruptions?area=08001",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "transit"
         ],
@@ -5343,18 +5343,6 @@
         {
           "name": "data.alerts[delfi_sa_alpha:700021].attachedTo",
           "value": "route"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700021].cause",
-          "value": "CONSTRUCTION"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700021].description",
-          "value": "Ersatzverkehr mit Bussen."
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700021].effect",
-          "value": "DETOUR"
         },
         {
           "name": "data.alerts[delfi_sa_alpha:700021].header",
@@ -5381,10 +5369,6 @@
           "value": "delfi_sa_alpha"
         },
         {
-          "name": "data.alerts[delfi_sa_alpha:700021].updatedAt",
-          "value": "2026-03-28T00:00:00Z"
-        },
-        {
           "name": "data.alerts[delfi_sa_alpha:700021].url",
           "value": "null"
         },
@@ -5395,6 +5379,10 @@
         {
           "name": "data.windowMin",
           "value": "60"
+        },
+        {
+          "name": "meta.attribution[delfi_rt_tu].family",
+          "value": "delfi_rt_tu"
         },
         {
           "name": "meta.attribution[delfi_sa_alpha].family",
@@ -5424,7 +5412,7 @@
       "counterpart": "transit disruption check",
       "request": "/v1/transit-disruptions?area=08\u0026limit=1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "transit"
         ],
@@ -5443,18 +5431,6 @@
         {
           "name": "data.alerts[delfi_sa_alpha:700021].attachedTo",
           "value": "route"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700021].cause",
-          "value": "CONSTRUCTION"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700021].description",
-          "value": "Ersatzverkehr mit Bussen."
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700021].effect",
-          "value": "DETOUR"
         },
         {
           "name": "data.alerts[delfi_sa_alpha:700021].header",
@@ -5481,10 +5457,6 @@
           "value": "delfi_sa_alpha"
         },
         {
-          "name": "data.alerts[delfi_sa_alpha:700021].updatedAt",
-          "value": "2026-03-28T00:00:00Z"
-        },
-        {
           "name": "data.alerts[delfi_sa_alpha:700021].url",
           "value": "null"
         },
@@ -5495,6 +5467,10 @@
         {
           "name": "data.windowMin",
           "value": "60"
+        },
+        {
+          "name": "meta.attribution[delfi_rt_tu].family",
+          "value": "delfi_rt_tu"
         },
         {
           "name": "meta.attribution[delfi_sa_alpha].family",
@@ -5552,8 +5528,8 @@
           "value": "60"
         },
         {
-          "name": "meta.attribution[delfi_sa_alpha].family",
-          "value": "delfi_sa_alpha"
+          "name": "meta.attribution",
+          "value": "[]"
         },
         {
           "name": "meta.notes.condition",
@@ -5607,8 +5583,8 @@
           "value": "30"
         },
         {
-          "name": "meta.attribution[delfi_sa_alpha].family",
-          "value": "delfi_sa_alpha"
+          "name": "meta.attribution",
+          "value": "[]"
         },
         {
           "name": "meta.notes.condition",

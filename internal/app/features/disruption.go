@@ -2,6 +2,7 @@ package features
 
 import (
 	"context"
+	"slices"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
@@ -25,9 +26,12 @@ type DisruptionAnswer struct {
 // platform's disruption check answers it, at the answer's instant.
 func (s *Service) Disruptions(ctx context.Context, key access.Record, q transit.DisruptionQuery) (DisruptionAnswer, error) {
 	q.Now = s.now()
-	v, meta, err := listed(ctx, s, key, "transit", func(permitted []string) (transit.Disruptions, []string, error) {
+	// As the platform's check credits: each alert listed, and the realtime
+	// source read for the area's punctuality, "no reports" included; an
+	// answer that listed no alert and read no punctuality credits nothing.
+	v, meta, err := listedOwn(ctx, s, key, "transit", func(permitted []string) (transit.Disruptions, []string, error) {
 		v, err := s.repos.Disruptions.Disruptions(ctx, q, permitted)
-		var contributed []string
+		contributed := slices.Clone(v.PunctualityRead)
 		for _, a := range v.Alerts {
 			contributed = append(contributed, a.Family)
 		}

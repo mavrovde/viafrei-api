@@ -36,6 +36,10 @@ where p.area_code = $1 and p.source_ref = any($2) and ` + permitted("p") + `
 order by p.area_level
 limit 1`
 
+// punctualityFamily is the family contract.transit_punctuality is of (its
+// source_ref): the DELFI Trip Updates.
+const punctualityFamily = "delfi_rt_tu"
+
 // Disruptions reads the alerts and the punctuality q asks for
 // (features.Disruptions).
 func (s *Store) Disruptions(ctx context.Context, q transit.DisruptionQuery, families []string) (transit.Disruptions, error) {
@@ -54,6 +58,11 @@ func (s *Store) Disruptions(ctx context.Context, q transit.DisruptionQuery, fami
 		out.Alerts = alerts
 		if q.Area == "" {
 			return out, nil
+		}
+		for _, f := range families {
+			if f == punctualityFamily {
+				out.PunctualityRead = append(out.PunctualityRead, f)
+			}
 		}
 		rows, _ = tx.Query(ctx, areaPunctuality, q.Area, families)
 		ps, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.Punctuality, error) {

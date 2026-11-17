@@ -25,8 +25,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-
 	"github.com/mavrovde/viafrei-api/api"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
@@ -107,113 +105,33 @@ func load(t *testing.T) (*config.Config, *store.Store) {
 	return cfg, st
 }
 
+// seedFixtures seeds the fixture set and the rows the examples are answered
+// on (fixtures.ExamplePlants) through the pinned image's test seed, in one
+// seed: the read contract's relations are views, written only by the seed.
 func seedFixtures() error {
 	var buf bytes.Buffer
 	if _, err := fixtures.Generate(&buf, profile, seed, dbcontract.ContractVersion); err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	if err := fixtures.ExamplePlants(&buf, profile, seed, dbcontract.ContractVersion, now, freshReports); err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	conn, err := db.Owner(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = conn.Close(ctx) }()
-	return pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, buf.String()); err != nil {
-			return err
-		}
-		if err := plantFreshReports(ctx, tx); err != nil {
-			return err
-		}
-		return plantLampSight(ctx, tx)
-	})
+	return db.Seed(ctx, buf.String())
 }
-
-// plantFreshReports runs plantFreshSQL over freshReports and holds it to its
-// word: one row per planted report, each credited to a source (the subquery
-// found the point).
-func plantFreshReports(ctx context.Context, tx pgx.Tx) error {
-	ids, ages, states := make([]string, 0, len(freshReports)), make([]string, 0, len(freshReports)), make([]string, 0, len(freshReports))
-	for _, r := range freshReports {
-		ids, ages, states = append(ids, r.point), append(ages, r.age), append(states, r.state)
-	}
-	rows, err := tx.Query(ctx, plantFreshSQL, now, ids, ages, states)
-	if err != nil {
-		return err
-	}
-	planted, err := pgx.CollectRows(rows, pgx.RowTo[*string])
-	if err != nil {
-		return err
-	}
-	if len(planted) != len(freshReports) {
-		return fmt.Errorf("planted %d fresh report(s), want %d", len(planted), len(freshReports))
-	}
-	for i, ref := range planted {
-		if ref == nil || *ref == "" {
-			return fmt.Errorf("fresh report %d has no source: its point has no fixture report", i)
-		}
-	}
-	return nil
-}
-
-// plantLampSight gives the road lamps of the examples the sight the
-// generated set does not hold (it carries no state code, coverage or
-// confirmation): each junction is placed in the state whose boundary holds
-// it, every state with a junction is covered by the roads family
-// src-alpha-roads, and every source whose data is at most ten minutes old
-// at the examples' clock was confirmed two minutes before it, at an
-// interval of 300 s. Each statement must change rows.
-func plantLampSight(ctx context.Context, tx pgx.Tx) error {
-	for _, q := range []string{
-		`update contract.junction j set state_code = r.region_code from contract.admin_region r
-where r.region_level = 'state' and st_contains(r.boundary, j.location)`,
-		`insert into contract.message_coverage (state_code, source_ref, coverage_role)
-select distinct state_code, 'src-alpha-roads', 'own' from contract.junction where state_code is not null`,
-		`update contract.source_freshness set confirmed_at = $1::timestamptz - interval '2 minutes', confirm_interval_s = 300
-where data_as_of >= $1::timestamptz - interval '10 minutes'`,
-	} {
-		args := []any{}
-		if strings.Contains(q, "$1") {
-			args = append(args, now)
-		}
-		tag, err := tx.Exec(ctx, q, args...)
-		if err != nil {
-			return err
-		}
-		if tag.RowsAffected() == 0 {
-			return fmt.Errorf("planting the lamps' sight changed no row: %s", q)
-		}
-	}
-	return nil
-}
-
-// freshReport is one report planted by plantFreshReports: a point, how long
-// before the examples' clock it was made, and the state it reported.
-type freshReport struct{ point, age, state string }
 
 // freshReports are, on the charging sites the examples document, reports
 // made minutes before the examples' clock (now, the end of the fixture
 // window): the fixtures' own reports are spread over whole days, so at that
 // clock every one of them is older than the 30-minute status limit and the
 // examples would show only stale points. With these, each documented site
-// shows a live point beside its stale ones and a non-null availableNow. Each
-// report is credited to the source of the point's own newest fixture report.
-var freshReports = []freshReport{
-	{"cp-00012-0", "5 minutes", "available"},
-	{"cp-00012-1", "12 minutes", "occupied"},
-	{"cp-00000-0", "8 minutes", "available"},
+// shows a live point beside its stale ones and a non-null availableNow.
+var freshReports = []fixtures.Report{
+	{Point: "DE*SYN*E000010", Age: 5 * time.Minute, State: "available"},
+	{Point: "DE*SYN*E000011", Age: 12 * time.Minute, State: "occupied"},
+	{Point: "DE*SYN*E000020", Age: 8 * time.Minute, State: "available"},
 }
-
-// plantFreshSQL inserts one report per element of its three arrays ($2
-// points, $3 ages, $4 states), made at the clock $1 minus the age.
-const plantFreshSQL = `
-insert into contract.charge_point_state_observation (point_id, observed_at, availability, source_ref)
-select p.point_id, $1::timestamptz - p.age::interval, p.state,
-       (select o.source_ref from contract.charge_point_state_observation o
-         where o.point_id = p.point_id order by o.observed_at desc limit 1)
-from unnest($2::text[], $3::text[], $4::text[]) as p(point_id, age, state)
-returning source_ref`
 
 // keyAuth admits every request as the example's key.
 type keyAuth struct{ p auth.Principal }

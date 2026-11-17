@@ -96,6 +96,10 @@ type gen struct {
 	roads    []road
 	stops    map[string][]string // stop place ids by Land
 	contract string
+	// junctionLands are the Länder a junction lies in, and pointRef the
+	// source of each charge point: what ExamplePlants places its rows on.
+	junctionLands []string
+	pointRef      map[string]string
 }
 
 // Generate writes the seed rows of profile to out and returns the manifest.
@@ -117,7 +121,7 @@ func generate(out io.Writer, profile string, seed uint64, contractVersion string
 	g := &gen{
 		p: profiles[i], r: r, names: &namer{r: r}, w: newSQLWriter(out),
 		sources: map[string][]source{}, family: map[string]string{},
-		perLand: map[string]int{}, perFam: map[string]int{}, edges: map[string]int{},
+		perLand: map[string]int{}, perFam: map[string]int{}, edges: map[string]int{}, pointRef: map[string]string{},
 		places: map[string][]place{}, stops: map[string][]string{}, contract: contractVersion,
 	}
 	g.lands = lands(g.names)
@@ -521,6 +525,9 @@ func (g *gen) roadsAndEvents() {
 			at := rd.along(f)
 			g.w.row(str(fmt.Sprintf("58:1:%d", 1+i*1000+j)), str(rd.ref), str(num(j+1)), str(g.names.settlement()),
 				str(kind), point(at), str(landOf(at)))
+			if code := landOf(at); !slices.Contains(g.junctionLands, code) {
+				g.junctionLands = append(g.junctionLands, code)
+			}
 		}
 	}
 
@@ -682,6 +689,7 @@ func (g *gen) energy() {
 			}
 			g.w.row(str(evse), str(s.id), str(evse), str(kind), dec(power, 2), str(s.ref))
 			points = append(points, chargePoint{evse, s.ref})
+			g.pointRef[evse] = s.ref
 		}
 	}
 	g.w.begin("charge_point_state_observation", "point_id", "observed_at", "availability", "source_ref")

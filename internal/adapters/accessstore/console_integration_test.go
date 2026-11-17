@@ -33,7 +33,7 @@ func TestTheDirectoryReadsKeysPlansAndAudit(t *testing.T) {
 	s := open(t)
 	k := auth.NewKeys(wire.AuthSettings(cfg(t)), s, nil, nil)
 	ctx := bounded(t)
-	plan := newPlan(t, k, "consumer", "src-alpha-roads")
+	plan := newPlan(t, k, "consumer", "roads_alpha")
 	key, err := k.Issue(ctx, plan, "directory", "ops@example.test", 0, "tester")
 	if err != nil {
 		t.Fatal(err)

@@ -352,7 +352,7 @@ func registerRoadConditions(api huma.API, s *server, op huma.Operation) {
 
 // SituationInput is the input of getRoadSituation.
 type SituationInput struct {
-	SituationID string `path:"situationId" maxLength:"64" pattern:"^[A-Za-z0-9_.-]+$" example:"ev-00001" doc:"The situation's id."`
+	SituationID string `path:"situationId" maxLength:"64" pattern:"^[A-Za-z0-9_.:-]+$" example:"datex:syn:ev-00001" doc:"The situation's id."`
 }
 
 // SituationEnvelope is the enveloped answer of getRoadSituation.

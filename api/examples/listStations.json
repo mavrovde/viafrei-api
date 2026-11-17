@@ -1,6 +1,6 @@
 {
   "title": "The stations a typed name finds, umlauts and ß as typed",
-  "request": "/v1/stations?q=D%C3%BCsra%C3%9Fbach\u0026limit=8",
+  "request": "/v1/stations?q=Nam%C3%BCningen\u0026limit=8",
   "attribution": "Stations come from the source families of the transit domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
   "key": {
     "useClass": "commercial",
@@ -8,83 +8,84 @@
       "transit"
     ],
     "sources": [
-      "src-alpha-transit",
-      "src-alpha-transit-stale"
+      "delfi_static",
+      "delfi_rt_tu",
+      "mobilithek_connect_gtfs"
     ]
   },
   "status": 200,
   "response": {
     "data": [
       {
-        "id": "sp-07-0000",
-        "name": "Düsraßbach Bf",
+        "id": "1:de:01002:1",
+        "name": "Namüningen Mitte",
         "location": {
-          "lat": 50.394582,
-          "lon": 12.498428
+          "lat": 49.167002,
+          "lon": 7.862458
         },
-        "stopCode": "de:07002:0",
-        "districtCode": "07002",
-        "modes": [
-          "suburban_rail",
-          "bus"
-        ],
+        "stopCode": "de:01002:1",
+        "districtCode": "01002",
+        "modes": [],
         "distanceM": null,
-        "sourceFamily": "src-alpha-transit"
+        "sourceFamily": "delfi_static"
       },
       {
-        "id": "sp-07-0001",
-        "name": "Düsraßbach Nord",
+        "id": "1:de:01002:0",
+        "name": "Namüningen Süd",
         "location": {
-          "lat": 50.402968,
-          "lon": 12.521244
+          "lat": 49.148162,
+          "lon": 7.785749
         },
-        "stopCode": "de:07002:1",
-        "districtCode": "07002",
-        "modes": [
-          "bus"
-        ],
+        "stopCode": "de:01002:0",
+        "districtCode": "01002",
+        "modes": [],
         "distanceM": null,
-        "sourceFamily": "src-alpha-transit"
+        "sourceFamily": "delfi_static"
       }
     ],
     "meta": {
       "requestId": "example-request-0001",
       "generatedAt": "2026-03-30T00:00:00Z",
       "language": "en",
-      "asOf": "2026-03-29T23:59:30Z",
+      "asOf": "2026-03-29T12:00:00Z",
       "freshness": [
         {
-          "family": "src-alpha-transit",
-          "dataAsOf": "2026-03-29T23:59:30Z",
-          "ageS": 30,
-          "staleAfterS": 300,
+          "family": "delfi_static",
+          "dataAsOf": "2026-03-29T12:00:00Z",
+          "ageS": 43200,
+          "staleAfterS": 259200,
           "stale": false
         }
       ],
       "attribution": [
         {
-          "family": "src-alpha-transit",
+          "family": "delfi_static",
           "domain": "transit",
-          "publisher": "Nimbruß Datenwerk",
-          "text": "Synthetic data from family alpha, licence lic-alpha.",
-          "licence": "Synthetic licence alpha",
-          "licenceUrl": "https://licences.example/alpha",
+          "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+          "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms"
+          "termsUrl": "https://www.opendata-oepnv.de"
         }
       ],
       "notes": {
         "condition": [],
         "purpose": []
       },
-      "warnings": [],
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ],
       "page": {
         "limit": 8,
         "hasMore": false
       },
       "query": {
-        "q": "Düsraßbach",
+        "q": "Namüningen",
         "code": null,
         "at": null,
         "radiusM": null

@@ -80,64 +80,35 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// loadFixtures partitions every time-series relation by day across the fixture
-// window, loads the fixtures and analyses them, as a database with a long
-// history is.
+// loadFixtures seeds the fixtures through the pinned image's test seed
+// (which adds the day partitions of the platform's time series the rows fall
+// in) and analyses them, as a database with a long history is.
 func loadFixtures(ctx context.Context) error {
+	var buf bytes.Buffer
+	if _, err := fixtures.Generate(&buf, *profile, 1, dbcontract.ContractVersion); err != nil {
+		return err
+	}
+	if err := db.Seed(ctx, buf.String()); err != nil {
+		return err
+	}
 	conn, err := db.Owner(ctx)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
-	parents, err := partitioned(ctx, conn)
-	if err != nil {
-		return err
-	}
-	if len(parents) == 0 {
-		return fmt.Errorf("the contract stub has no partitioned relation")
-	}
-	for _, p := range parents {
-		for d := -2; d <= 10; d++ {
-			from := fixtures.ReferenceInstant.AddDate(0, 0, d)
-			stmt := fmt.Sprintf("create table contract.%s_%s partition of contract.%s for values from ('%s') to ('%s')",
-				p, from.Format("20060102"), p, from.Format(time.RFC3339), from.AddDate(0, 0, 1).Format(time.RFC3339))
-			if _, err := conn.Exec(ctx, stmt); err != nil {
-				return err
-			}
-		}
-	}
-	var buf bytes.Buffer
-	if _, err := fixtures.Generate(&buf, *profile, 1, dbcontract.ContractVersion); err != nil {
-		return err
-	}
-	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, buf.String())
-		return err
-	}); err != nil {
-		return err
-	}
 	_, err = conn.Exec(ctx, "analyze") //nolint:misspell // the SQL keyword
 	return err
 }
 
-// partitioned names the partitioned relations of the contract schema.
-func partitioned(ctx context.Context, conn *pgx.Conn) ([]string, error) {
-	rows, _ := conn.Query(ctx, `
-select c.relname from pg_partitioned_table p
-join pg_class c on c.oid = p.partrelid
-join pg_namespace n on n.oid = c.relnamespace
-where n.nspname = 'contract' order by 1`)
-	return pgx.CollectRows(rows, pgx.RowTo[string])
-}
-
-// partitions names every partition of a partitioned contract relation.
+// partitions names every partition of a partitioned relation the contract's
+// views read: the platform's time series, outside the system schemas.
 func partitions(ctx context.Context, conn *pgx.Conn) (map[string]bool, error) {
 	rows, _ := conn.Query(ctx, `
 select c.relname from pg_inherits i
 join pg_class c on c.oid = i.inhrelid
 join pg_class p on p.oid = i.inhparent
 join pg_namespace n on n.oid = p.relnamespace
-where n.nspname = 'contract' and p.relkind = 'p'`)
+where n.nspname not in ('pg_catalog', 'information_schema') and p.relkind = 'p'`)
 	names, err := pgx.CollectRows(rows, pgx.RowTo[string])
 	out := map[string]bool{}
 	for _, n := range names {

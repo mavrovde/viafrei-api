@@ -95,7 +95,7 @@ services:
       VFAPI_CACHE_MAX_AGE_PARKING: 1s
       VFAPI_CACHE_MAX_AGE_ENERGY: 1s
       VFAPI_CACHE_VERSIONS_TTL: 1s
-      VFAPI_CACHE_NO_STALE_FAMILIES: src-alpha-energy,src-alpha-energy-stale,src-beta-energy,src-gamma-energy
+      VFAPI_CACHE_NO_STALE_FAMILIES: afir_alpha,afir_alpha_stale,afir_beta,chargepool_gamma
     ports:
       # Loopback only, like api.
       - "${API_CACHED_PUBLISH:-[::1]:8081}:8080"

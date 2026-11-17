@@ -8,56 +8,15 @@
       "weather"
     ],
     "sources": [
-      "src-alpha-weather",
-      "src-eta-weather"
+      "dwd_alpha",
+      "dwd_eta"
     ]
   },
   "status": 200,
   "response": {
     "data": {
-      "lamp": "red",
-      "warnings": [
-        {
-          "id": "ww-00021",
-          "hazard": "ice",
-          "level": 4,
-          "levelName": "Stufe 4",
-          "issuer": "Synthetischer Wetterdienst",
-          "headline": "Warnung vor ice (Stufe 4)",
-          "textLanguage": "de",
-          "validity": {
-            "from": "2026-03-29T13:36:25Z",
-            "fromLocal": "2026-03-29T15:36:25+02:00",
-            "until": "2026-03-30T08:36:25Z",
-            "untilLocal": "2026-03-30T10:36:25+02:00"
-          },
-          "area": {
-            "name": "Stungrißhausen Kreis",
-            "geometry": null
-          },
-          "sourceFamily": "src-eta-weather"
-        },
-        {
-          "id": "ww-00020",
-          "hazard": "wind",
-          "level": 3,
-          "levelName": "Stufe 3",
-          "issuer": "Synthetischer Wetterdienst",
-          "headline": "Warnung vor wind (Stufe 3)",
-          "textLanguage": "de",
-          "validity": {
-            "from": "2026-03-29T22:22:27Z",
-            "fromLocal": "2026-03-30T00:22:27+02:00",
-            "until": "2026-03-30T22:22:27Z",
-            "untilLocal": "2026-03-31T00:22:27+02:00"
-          },
-          "area": {
-            "name": "Stungrißhausen Kreis",
-            "geometry": null
-          },
-          "sourceFamily": "src-eta-weather"
-        }
-      ],
+      "lamp": "amber",
+      "warnings": [],
       "truncated": false,
       "roadWeather": []
     },
@@ -68,24 +27,42 @@
       "asOf": "2026-03-29T23:57:30Z",
       "freshness": [
         {
-          "family": "src-eta-weather",
+          "family": "dwd_alpha",
           "dataAsOf": "2026-03-29T23:57:30Z",
           "ageS": 150,
-          "staleAfterS": 1800,
+          "staleAfterS": 900,
+          "stale": false
+        },
+        {
+          "family": "dwd_eta",
+          "dataAsOf": "2026-03-29T23:57:30Z",
+          "ageS": 150,
+          "staleAfterS": 900,
           "stale": false
         }
       ],
       "attribution": [
         {
-          "family": "src-eta-weather",
+          "family": "dwd_alpha",
           "domain": "weather",
-          "publisher": "Longkein Datenwerk",
-          "text": "Synthetic data from family eta, licence lic-eta.",
-          "licence": "Synthetic licence eta",
-          "licenceUrl": "https://licences.example/eta",
+          "publisher": "Sirfeim Datenwerk",
+          "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://eta.example/terms"
+          "termsUrl": "https://alpha.example/terms/dwd_alpha"
+        },
+        {
+          "family": "dwd_eta",
+          "domain": "weather",
+          "publisher": "Golmil Datenwerk",
+          "text": "Synthetic data from family eta, licence dl-de/by-2-0.",
+          "licence": "dl-de/by-2-0",
+          "licenceUrl": "https://licences.example/dl-de-by-2-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://eta.example/terms/dwd_eta"
         }
       ],
       "notes": {

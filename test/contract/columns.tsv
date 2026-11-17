@@ -61,6 +61,21 @@ access.usage	quota_exceeded	bigint
 access.usage	overloaded	bigint
 access.usage	deadline_exhausted	bigint
 access.usage	storage_ms	bigint
+contract.address	address_id	text
+contract.address	street	text
+contract.address	street_fold	text
+contract.address	house_number	text
+contract.address	house_number_fold	text
+contract.address	postcode	text
+contract.address	place_name	text
+contract.address	place_fold	text
+contract.address	land_name	text
+contract.address	location	geometry(Point,4326)
+contract.address	data_as_of	date
+contract.address	source_ref	text
+contract.address	recorded_at	timestamp with time zone
+contract.address	display_class	text
+contract.address	audience	text
 contract.admin_region	region_code	text
 contract.admin_region	region_level	text
 contract.admin_region	name	text
@@ -88,6 +103,14 @@ contract.charge_point	source_refs	text[]
 contract.charge_point	display_class	text
 contract.charge_point	audience	text
 contract.charge_point	confidentiality	text
+contract.charge_point	connectors	text[]
+contract.charge_point	price_per_kwh	numeric(6,3)
+contract.charge_point	price_adhoc_zero	boolean
+contract.charge_point	price_updated_at	timestamp with time zone
+contract.charge_point	opening_hours_kind	text
+contract.charge_point	payment_card	boolean
+contract.charge_point	free_of_charge	boolean
+contract.charge_point	parking_access	text
 contract.charge_point_state_observation	point_id	text
 contract.charge_point_state_observation	observed_at	timestamp with time zone
 contract.charge_point_state_observation	availability	text
@@ -169,6 +192,27 @@ contract.fuel_station	changed_at	timestamp with time zone
 contract.fuel_station	withdrawn_at	timestamp with time zone
 contract.fuel_station	display_class	text
 contract.fuel_station	audience	text
+contract.fuel_station	street	text
+contract.fuel_station	house_number	text
+contract.fuel_station	postcode	text
+contract.fuel_station	city	text
+contract.fuel_station	opening_times	jsonb
+contract.fuel_station	whole_day	boolean
+contract.hydrogen_station	station_id	text
+contract.hydrogen_station	name	text
+contract.hydrogen_station	operator_name	text
+contract.hydrogen_station	brand	text
+contract.hydrogen_station	location	geometry(Point,4326)
+contract.hydrogen_station	address	jsonb
+contract.hydrogen_station	refill	jsonb
+contract.hydrogen_station	opening	jsonb
+contract.hydrogen_station	provider_updated_at	timestamp with time zone
+contract.hydrogen_station	last_seen_at	timestamp with time zone
+contract.hydrogen_station	source_ref	text
+contract.hydrogen_station	recorded_at	timestamp with time zone
+contract.hydrogen_station	withdrawn_at	timestamp with time zone
+contract.hydrogen_station	display_class	text
+contract.hydrogen_station	audience	text
 contract.journey	journey_id	text
 contract.journey	line_id	text
 contract.journey	service_date	date
@@ -231,6 +275,9 @@ contract.parking_facility	audience	text
 contract.parking_facility	confidentiality	text
 contract.parking_facility	terms_gate	text
 contract.parking_facility	hold_reason	text
+contract.parking_facility	stored_kind	text
+contract.parking_facility	amenities	text[]
+contract.parking_facility	amenities_absent	text[]
 contract.place	place_id	text
 contract.place	place_kind	text
 contract.place	name	text
@@ -255,6 +302,26 @@ contract.place_alias	search_fold	text
 contract.place_alias	source_ref	text
 contract.place_alias	display_class	text
 contract.place_alias	audience	text
+contract.poi	poi_id	text
+contract.poi	name	text
+contract.poi	name_fold	text
+contract.poi	category	text
+contract.poi	category_value	text
+contract.poi	brand	text
+contract.poi	operator_name	text
+contract.poi	street	text
+contract.poi	house_number	text
+contract.poi	postcode	text
+contract.poi	place_name	text
+contract.poi	place_fold	text
+contract.poi	land_name	text
+contract.poi	access	text
+contract.poi	location	geometry(Point,4326)
+contract.poi	data_as_of	date
+contract.poi	source_ref	text
+contract.poi	recorded_at	timestamp with time zone
+contract.poi	display_class	text
+contract.poi	audience	text
 contract.publisher	publisher_id	text
 contract.publisher	display_name	text
 contract.publisher	website	text
@@ -302,6 +369,63 @@ contract.scheduled_call	planned_platform	text
 contract.scheduled_call	source_ref	text
 contract.scheduled_call	display_class	text
 contract.scheduled_call	audience	text
+contract.service_alert	alert_id	text
+contract.service_alert	header	text
+contract.service_alert	description	text
+contract.service_alert	cause	text
+contract.service_alert	effect	text
+contract.service_alert	url	text
+contract.service_alert	active_from	timestamp with time zone
+contract.service_alert	active_to	timestamp with time zone
+contract.service_alert	active_periods	jsonb
+contract.service_alert	route_ids	text[]
+contract.service_alert	line_names	text[]
+contract.service_alert	stop_ids	text[]
+contract.service_alert	district_codes	text[]
+contract.service_alert	state_codes	text[]
+contract.service_alert	placed_by	text
+contract.service_alert	dedupe_key	text
+contract.service_alert	source_ref	text
+contract.service_alert	recorded_at	timestamp with time zone
+contract.service_alert	changed_at	timestamp with time zone
+contract.service_alert	display_class	text
+contract.service_alert	audience	text
+contract.service_alert	confidentiality	text
+contract.sharing_station	station_id	text
+contract.sharing_station	system_id	text
+contract.sharing_station	system_name	text
+contract.sharing_station	name	text
+contract.sharing_station	capacity	integer
+contract.sharing_station	is_virtual	boolean
+contract.sharing_station	location	geometry(Point,4326)
+contract.sharing_station	status_seen_at	timestamp with time zone
+contract.sharing_station	source_ref	text
+contract.sharing_station	recorded_at	timestamp with time zone
+contract.sharing_station	display_class	text
+contract.sharing_station	audience	text
+contract.sharing_station_status	station_id	text
+contract.sharing_station_status	observed_at	timestamp with time zone
+contract.sharing_station_status	vehicles_available	smallint
+contract.sharing_station_status	electric_available	smallint
+contract.sharing_station_status	docks_available	smallint
+contract.sharing_station_status	is_renting	boolean
+contract.sharing_station_status	is_returning	boolean
+contract.sharing_station_status	reported_at	timestamp with time zone
+contract.sharing_station_status	source_ref	text
+contract.sharing_station_status	display_class	text
+contract.sharing_station_status	audience	text
+contract.sharing_vehicle	vehicle_id	text
+contract.sharing_vehicle	system_id	text
+contract.sharing_vehicle	system_name	text
+contract.sharing_vehicle	form_factor	text
+contract.sharing_vehicle	propulsion	text
+contract.sharing_vehicle	range_m	integer
+contract.sharing_vehicle	location	geometry(Point,4326)
+contract.sharing_vehicle	observed_at	timestamp with time zone
+contract.sharing_vehicle	vehicles_seen_at	timestamp with time zone
+contract.sharing_vehicle	source_ref	text
+contract.sharing_vehicle	display_class	text
+contract.sharing_vehicle	audience	text
 contract.source	source_ref	text
 contract.source	domain	text
 contract.source	publisher_id	text
@@ -331,6 +455,27 @@ contract.source_note	source_ref	text
 contract.source_note	note_kind	text
 contract.source_note	lang	text
 contract.source_note	body	text
+contract.speed_camera	camera_id	text
+contract.speed_camera	camera_kind	text
+contract.speed_camera	enforces	text
+contract.speed_camera	location	geometry(Point,4326)
+contract.speed_camera	max_speed_kmh	integer
+contract.speed_camera	max_speed_hgv_kmh	integer
+contract.speed_camera	direction	text
+contract.speed_camera	name	text
+contract.speed_camera	street	text
+contract.speed_camera	location_text	text
+contract.speed_camera	admin_code	text
+contract.speed_camera	land_name	text
+contract.speed_camera	data_as_of	date
+contract.speed_camera	valid_from	date
+contract.speed_camera	valid_to	date
+contract.speed_camera	source_ref	text
+contract.speed_camera	recorded_at	timestamp with time zone
+contract.speed_camera	last_seen_at	timestamp with time zone
+contract.speed_camera	display_class	text
+contract.speed_camera	audience	text
+contract.speed_camera	origin_restriction	text
 contract.station_facility	facility_id	text
 contract.station_facility	stop_place_id	text
 contract.station_facility	facility_kind	text
@@ -366,6 +511,24 @@ contract.stop_point	source_ref	text
 contract.stop_point	display_class	text
 contract.stop_point	audience	text
 contract.stop_point	name	text
+contract.street_bay	bay_id	text
+contract.street_bay	bay_kind	text
+contract.street_bay	publisher_kind	text
+contract.street_bay	street	text
+contract.street_bay	house_number	text
+contract.street_bay	postcode	text
+contract.street_bay	city	text
+contract.street_bay	charge_point_operator	text
+contract.street_bay	spaces	integer
+contract.street_bay	reserved_when	text
+contract.street_bay	location	geometry(Point,4326)
+contract.street_bay	state	text
+contract.street_bay	state_at	timestamp with time zone
+contract.street_bay	last_message_at	timestamp with time zone
+contract.street_bay	source_ref	text
+contract.street_bay	recorded_at	timestamp with time zone
+contract.street_bay	display_class	text
+contract.street_bay	audience	text
 contract.terms	terms_gate	text
 contract.terms	terms_id	text
 contract.terms	terms_version	text
@@ -425,6 +588,19 @@ contract.transit_line	transport_mode	text
 contract.transit_line	source_ref	text
 contract.transit_line	display_class	text
 contract.transit_line	audience	text
+contract.transit_punctuality	area_level	text
+contract.transit_punctuality	area_code	text
+contract.transit_punctuality	area_name	text
+contract.transit_punctuality	trips_observed	integer
+contract.transit_punctuality	trips_late	integer
+contract.transit_punctuality	trips_skipped_stop	integer
+contract.transit_punctuality	trips_untimed	integer
+contract.transit_punctuality	median_worst_delay_s	integer
+contract.transit_punctuality	stops_seen	integer
+contract.transit_punctuality	observed_at	timestamp with time zone
+contract.transit_punctuality	source_ref	text
+contract.transit_punctuality	display_class	text
+contract.transit_punctuality	audience	text
 contract.weather_warning	warning_id	text
 contract.weather_warning	hazard	text
 contract.weather_warning	warning_level	integer

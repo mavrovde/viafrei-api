@@ -29,7 +29,7 @@ key tool, once an access store is configured:
 
 ```sh
 viafrei-api keys plan  -name trial -use-class consumer -tier standard -scopes energy,parking,places \
-                       -sources src-alpha-energy,src-alpha-parking,src-alpha-places -rate 5 -burst 10 -actor me
+                       -sources afir_alpha,park_alpha,geonames -rate 5 -burst 10 -actor me
 viafrei-api keys issue -plan trial -label "My test app" -contact me@example.test -actor me
 ```
 

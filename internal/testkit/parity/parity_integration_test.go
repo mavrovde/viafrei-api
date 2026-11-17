@@ -136,7 +136,8 @@ func (k keyAuth) Authenticate(context.Context, string, string) (auth.Principal, 
 func principal(c parity.Case) auth.Principal {
 	k := access.Record{
 		ID: "parityharn", Environment: access.Live, ExpiresAt: c.Now.Add(time.Hour),
-		Plan: access.Plan{Name: "parity", UseClass: access.UseClass(c.Key.UseClass), Tier: "standard", Sources: c.Key.Sources},
+		Plan:     access.Plan{Name: "parity", UseClass: access.UseClass(c.Key.UseClass), Tier: "standard", Sources: c.Key.Sources},
+		Audience: access.Audience(c.Key.Audience),
 	}
 	for _, s := range c.Key.Scopes {
 		k.Plan.Scopes = append(k.Plan.Scopes, access.Scope(s))

@@ -103,3 +103,46 @@ func (g *gen) plantWeather() {
 			ts(from.Add(-30*time.Minute)), str(l.code+"001"), str(ref), ts(from), w.withdrawn)
 	}
 }
+
+// Report is one charge point report ExamplePlants writes: the point, how
+// long before the clock it was made, and the state it reported.
+type Report struct {
+	Point string
+	Age   time.Duration
+	State string
+}
+
+// ExamplePlants writes the rows the documented examples are answered on
+// beside the generated set, to be seeded in the same seed as its rows: every
+// Land a junction lies in is covered by the first fresh roads source of
+// family alpha (the generated set carries no message coverage), and each of
+// reports is a report of its point made Age before at, credited to the
+// point's own source. An unknown point is an error.
+func ExamplePlants(out io.Writer, profile string, seed uint64, contractVersion string, at time.Time, reports []Report) error {
+	g, _, err := generate(io.Discard, profile, seed, contractVersion)
+	if err != nil {
+		return err
+	}
+	g.w = newSQLWriter(out)
+	g.w.write("-- Example rows, written by fixtures.ExamplePlants (integration tests only). Fictional data, CC0 1.0.\n")
+	g.w.begin("message_coverage", "state_code", "source_ref", "coverage_role")
+	ref := g.fresh("roads", "alpha")
+	for _, code := range g.junctionLands {
+		g.w.row(str(code), str(ref), str("own"))
+	}
+	if len(reports) > 0 {
+		g.w.begin("charge_point_state_observation", "point_id", "observed_at", "availability", "source_ref")
+		for _, r := range reports {
+			src, ok := g.pointRef[r.Point]
+			if !ok {
+				return fmt.Errorf("fixtures: no charge point %q in profile %s, seed %d", r.Point, profile, seed)
+			}
+			g.w.row(str(r.Point), ts(at.Add(-r.Age)), str(r.State), str(src))
+		}
+	}
+	g.w.end()
+	if _, err := g.w.close(); err != nil {
+		return fmt.Errorf("fixtures: write: %w", err)
+	}
+	return nil
+}

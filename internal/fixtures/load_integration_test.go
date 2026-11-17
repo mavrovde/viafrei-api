@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -25,36 +24,48 @@ const testBound = 2 * time.Second
 
 var (
 	db        *pgtest.DB
+	tinyDB    *pgtest.DB
 	ciSeed    uint64 = 7
 	ciLoadErr error
 	ciCounts  map[string]int
+	tinyErr   error
+	tinyRows  map[string]int
 )
 
-// TestMain starts the database and loads the ci profile once: both are setup,
-// outside every test body's bound. The tiny profile is loaded inside a test.
+// TestMain starts two databases and seeds the ci profile into one and the
+// tiny profile into the other: a database is seeded once, through the pinned
+// image's test seed, and both are setup, outside every test body's bound.
 func TestMain(m *testing.M) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	var err error
 	db, err = pgtest.Start(ctx)
+	if err == nil {
+		tinyDB, err = pgtest.Start(ctx)
+	}
 	if err != nil {
 		cancel()
+		if db != nil {
+			db.Stop()
+		}
 		fmt.Fprintln(os.Stderr, "integration tests need a container runtime:", err)
 		os.Exit(1)
 	}
-	ciCounts, ciLoadErr = loadCommitted(ctx, "ci", ciSeed)
+	ciCounts, ciLoadErr = loadCommitted(ctx, db, "ci", ciSeed)
+	tinyRows, tinyErr = loadCommitted(ctx, tinyDB, "tiny", 1)
 	cancel()
 	code := m.Run()
 	db.Stop()
+	tinyDB.Stop()
 	os.Exit(code)
 }
 
-func loadCommitted(ctx context.Context, profile string, seed uint64) (map[string]int, error) {
+func loadCommitted(ctx context.Context, into *pgtest.DB, profile string, seed uint64) (map[string]int, error) {
 	var buf bytes.Buffer
 	m, err := fixtures.Generate(&buf, profile, seed, dbcontract.ContractVersion)
 	if err != nil {
 		return nil, err
 	}
-	return m.Rows, db.Seed(ctx, buf.String())
+	return m.Rows, into.Seed(ctx, buf.String())
 }
 
 func bounded(t *testing.T) context.Context {
@@ -73,49 +84,26 @@ func countRows(ctx context.Context, q interface {
 	return n, err
 }
 
-// TestTinyLoadsIntoTheContract loads the tiny profile into the contract stub
-// in a transaction that is rolled back, and compares every table's count with
-// the manifest.
+// TestTinyLoadsIntoTheContract: the tiny set seeded in TestMain, every
+// table holds the manifest's count.
 func TestTinyLoadsIntoTheContract(t *testing.T) {
 	req.Covers(t, "TST-014")
-	ctx := bounded(t)
-	var buf bytes.Buffer
-	m, err := fixtures.Generate(&buf, "tiny", 1, dbcontract.ContractVersion)
-	if err != nil {
-		t.Fatal(err)
+	if tinyErr != nil {
+		t.Fatalf("tiny seed 1 does not load: %v", tinyErr)
 	}
-	conn, err := db.Owner(ctx)
+	ctx := bounded(t)
+	conn, err := pgx.Connect(ctx, tinyDB.ReaderURL)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
-	tx, err := conn.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
-	// The ci set committed in TestMain uses the same identifiers, so the
-	// tables are emptied inside this transaction first; the rollback brings
-	// the ci set back for the other tests. Cascade: a contract table the
-	// generator does not fill (contract.message_coverage) references one it
-	// does, and is emptied with it.
-	names := make([]string, len(fixtures.Tables))
-	for i, table := range fixtures.Tables {
-		names[i] = "contract." + pgx.Identifier{table}.Sanitize() //nolint:misspell // the pgx method's name
-	}
-	if _, err := tx.Exec(ctx, "truncate table "+strings.Join(names, ", ")+" cascade"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := tx.Exec(ctx, buf.String()); err != nil {
-		t.Fatalf("tiny seed %d does not load: %v", m.Seed, err)
-	}
 	for _, table := range fixtures.Tables {
-		n, err := countRows(ctx, tx, table)
+		n, err := countRows(ctx, conn, table)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := n; got != m.Rows[table] {
-			t.Errorf("%s: %d rows loaded, the manifest says %d", table, got, m.Rows[table])
+		if n != tinyRows[table] {
+			t.Errorf("%s: %d rows loaded, the manifest says %d", table, n, tinyRows[table])
 		}
 	}
 }

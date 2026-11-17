@@ -1,6 +1,6 @@
 {
   "title": "Two charging sites within 20 km",
-  "request": "/v1/charging-options?at=50.82,6.0\u0026radius_m=20000\u0026limit=2",
+  "request": "/v1/charging-options?at=47.62,7.79\u0026radius_m=20000\u0026limit=2",
   "attribution": "Charging sites and the availability of their charge points come from the source families of the energy domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
   "key": {
     "useClass": "commercial",
@@ -8,41 +8,42 @@
       "energy"
     ],
     "sources": [
-      "src-alpha-energy",
-      "src-beta-energy",
-      "src-gamma-energy"
+      "afir_alpha",
+      "afir_beta",
+      "chargepool_gamma",
+      "tankerkoenig_gamma"
     ]
   },
   "status": 200,
   "response": {
     "data": [
       {
-        "id": "cs-05-0012",
-        "name": "Gielfürau Laden",
-        "operator": "Weimweing Strom",
+        "id": "afir_alpha:cs-01-0001",
+        "name": "Kansilkamp Laden",
+        "operator": "Löckbrau Strom",
         "location": {
-          "lat": 50.829574,
-          "lon": 6.034346
+          "lat": 47.612837,
+          "lon": 7.828273
         },
-        "distanceM": 2644,
+        "distanceM": 2985,
         "access": "public",
         "summary": {
-          "chargePoints": 4,
+          "chargePoints": 3,
           "availableNow": 1,
-          "maxPowerKw": 300
+          "maxPowerKw": 150
         },
         "chargePoints": [
           {
-            "id": "cp-00012-0",
+            "id": "DE*SYN*E000010",
             "current": "dc",
-            "maxPowerKw": 150,
+            "maxPowerKw": 50,
             "availability": {
               "state": "available",
               "observedAt": "2026-03-29T23:55:00Z"
             }
           },
           {
-            "id": "cp-00012-1",
+            "id": "DE*SYN*E000011",
             "current": "dc",
             "maxPowerKw": 150,
             "availability": {
@@ -51,25 +52,68 @@
             }
           },
           {
-            "id": "cp-00012-2",
-            "current": "ac",
-            "maxPowerKw": 11,
-            "availability": {
-              "state": "stale",
-              "observedAt": "2026-03-29T18:57:01Z"
-            }
-          },
-          {
-            "id": "cp-00012-3",
+            "id": "DE*SYN*E000012",
             "current": "dc",
-            "maxPowerKw": 300,
+            "maxPowerKw": 50,
             "availability": {
               "state": "stale",
-              "observedAt": "2026-03-29T06:47:06Z"
+              "observedAt": "2026-03-29T03:28:20Z"
             }
           }
         ],
-        "sourceFamily": "src-beta-energy"
+        "sourceFamily": "afir_alpha"
+      },
+      {
+        "id": "afir_alpha:cs-01-0002",
+        "name": "Kansilkamp Laden",
+        "operator": "Raungul Strom",
+        "location": {
+          "lat": 47.638705,
+          "lon": 7.750173
+        },
+        "distanceM": 3645,
+        "access": "public",
+        "summary": {
+          "chargePoints": 4,
+          "availableNow": 1,
+          "maxPowerKw": 50
+        },
+        "chargePoints": [
+          {
+            "id": "DE*SYN*E000020",
+            "current": "ac",
+            "maxPowerKw": 11,
+            "availability": {
+              "state": "available",
+              "observedAt": "2026-03-29T23:52:00Z"
+            }
+          },
+          {
+            "id": "DE*SYN*E000021",
+            "current": "ac",
+            "maxPowerKw": 22,
+            "availability": null
+          },
+          {
+            "id": "DE*SYN*E000022",
+            "current": "dc",
+            "maxPowerKw": 50,
+            "availability": {
+              "state": "stale",
+              "observedAt": "2026-03-29T18:49:58Z"
+            }
+          },
+          {
+            "id": "DE*SYN*E000023",
+            "current": "ac",
+            "maxPowerKw": 22,
+            "availability": {
+              "state": "stale",
+              "observedAt": "2026-03-29T07:19:35Z"
+            }
+          }
+        ],
+        "sourceFamily": "afir_alpha"
       }
     ],
     "meta": {
@@ -79,24 +123,24 @@
       "asOf": "2026-03-29T23:55:00Z",
       "freshness": [
         {
-          "family": "src-beta-energy",
+          "family": "afir_alpha",
           "dataAsOf": "2026-03-29T23:55:00Z",
           "ageS": 300,
-          "staleAfterS": 3600,
+          "staleAfterS": 1800,
           "stale": false
         }
       ],
       "attribution": [
         {
-          "family": "src-beta-energy",
+          "family": "afir_alpha",
           "domain": "energy",
-          "publisher": "Stönwän Datenwerk",
-          "text": "Synthetic data from family beta, licence lic-beta.",
-          "licence": "Synthetic licence beta",
-          "licenceUrl": "https://licences.example/beta",
-          "shareAlike": true,
-          "shareAlikeOffer": "https://beta.example/share-alike/energy",
-          "termsUrl": "https://beta.example/terms"
+          "publisher": "Kleber Datenwerk",
+          "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://alpha.example/terms/afir_alpha"
         }
       ],
       "notes": {
@@ -115,8 +159,8 @@
       },
       "query": {
         "at": {
-          "lat": 50.82,
-          "lon": 6
+          "lat": 47.62,
+          "lon": 7.79
         },
         "radiusM": 20000,
         "minKw": 0,

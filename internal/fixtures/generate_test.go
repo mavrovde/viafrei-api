@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
@@ -258,6 +259,43 @@ func TestPlantedRefusesWhatGenerateRefuses(t *testing.T) {
 		t.Errorf("an unknown profile: %v", err)
 	}
 	if err := fixtures.Planted(brokenWriter{}, "tiny", 1, "0.1"); err == nil || !strings.Contains(err.Error(), "disk full") {
+		t.Errorf("a broken writer: %v", err)
+	}
+}
+
+// TestExamplePlantsCoverTheJunctionLandsAndReportThePoints: the example rows
+// cover every Land a junction lies in with the fresh alpha roads source, and
+// each report is its point's, credited to the point's own source; an unknown
+// point, an unknown profile and a broken writer are errors.
+func TestExamplePlantsCoverTheJunctionLandsAndReportThePoints(t *testing.T) {
+	req.Covers(t, "TST-014")
+	at := fixtures.ReferenceInstant.AddDate(0, 0, 2)
+	var out bytes.Buffer
+	reports := []fixtures.Report{{Point: "DE*SYN*E000010", Age: 5 * time.Minute, State: "available"}}
+	if err := fixtures.ExamplePlants(&out, "tiny", 1, "0.1", at, reports); err != nil {
+		t.Fatal(err)
+	}
+	s := out.String()
+	for _, want := range []string{"insert into contract.message_coverage", "'roads_alpha', 'own'",
+		"('DE*SYN*E000010', '2026-03-29T23:55:00Z', 'available', 'afir_alpha')"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("the example rows lack %q:\n%s", want, s)
+		}
+	}
+	if strings.Contains(s, "roads_alpha_stale") {
+		t.Error("a stale source covers a Land")
+	}
+	var none bytes.Buffer
+	if err := fixtures.ExamplePlants(&none, "tiny", 1, "0.1", at, nil); err != nil || strings.Contains(none.String(), "charge_point_state_observation") {
+		t.Errorf("no reports: %v\n%s", err, none.String())
+	}
+	if err := fixtures.ExamplePlants(io.Discard, "tiny", 1, "0.1", at, []fixtures.Report{{Point: "nope"}}); err == nil || !strings.Contains(err.Error(), `no charge point "nope"`) {
+		t.Errorf("an unknown point: %v", err)
+	}
+	if err := fixtures.ExamplePlants(io.Discard, "huge", 1, "0.1", at, nil); err == nil || !strings.Contains(err.Error(), "unknown profile") {
+		t.Errorf("an unknown profile: %v", err)
+	}
+	if err := fixtures.ExamplePlants(brokenWriter{}, "tiny", 1, "0.1", at, nil); err == nil || !strings.Contains(err.Error(), "disk full") {
 		t.Errorf("a broken writer: %v", err)
 	}
 }

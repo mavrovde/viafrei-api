@@ -582,7 +582,7 @@ func registerParking(api huma.API, s *server, op huma.Operation) {
 // OverviewInput is the input of getPlaceOverview.
 type OverviewInput struct {
 	TermsAcceptance
-	PlaceID      string   `path:"placeId" maxLength:"64" pattern:"^[A-Za-z0-9_.-]+$" example:"pl-01-0001" doc:"The place's id."`
+	PlaceID      string   `path:"placeId" maxLength:"64" pattern:"^[A-Za-z0-9_.-]+$" example:"100001" doc:"The place's id."`
 	Needs        []string `query:"needs" enum:"charging,parking" doc:"The parts to compute, comma-separated. Default: every part."`
 	RadiusM      int      `query:"radius_m" minimum:"1" maximum:"50000" doc:"Radius around the place, in metres. Default: geo.default_radius_m."`
 	PerPartLimit int      `query:"per_part_limit" minimum:"1" maximum:"20" doc:"Most items per part. Default: compose.per_part_limit."`

@@ -1,6 +1,6 @@
 {
   "title": "The driving rules on one topic",
-  "request": "/v1/driving-rules?topic=winter_tyres",
+  "request": "/v1/driving-rules?topic=syn_winter_tyres",
   "attribution": "Driving rules are curated content published under every source family of the rules domain the key is entitled to, and each answer is attributed to all of them. Every answer lists each such family in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
   "key": {
     "useClass": "commercial",
@@ -8,14 +8,14 @@
       "rules"
     ],
     "sources": [
-      "src-alpha-rules"
+      "viafrei_rules"
     ]
   },
   "status": 200,
   "response": {
     "data": {
-      "topic": "winter_tyres",
-      "title": "Synthetic rule topic winter_tyres",
+      "topic": "syn_winter_tyres",
+      "title": "Synthetisches Regelthema winter_tyres",
       "rules": [
         {
           "text": "Synthetic statement 1 about winter_tyres, for tests only.",
@@ -23,11 +23,11 @@
         },
         {
           "text": "Synthetic statement 2 about winter_tyres, for tests only.",
-          "legalBasis": null
+          "legalBasis": "§ 0 synthetic"
         },
         {
           "text": "Synthetic statement 3 about winter_tyres, for tests only.",
-          "legalBasis": null
+          "legalBasis": "§ 0 synthetic"
         }
       ],
       "reviewedOn": "2026-02-01",
@@ -37,39 +37,33 @@
       "requestId": "example-request-0001",
       "generatedAt": "2026-03-30T00:00:00Z",
       "language": "en",
-      "asOf": "2026-03-15T00:00:00Z",
+      "asOf": null,
       "freshness": [
         {
-          "family": "src-alpha-rules",
-          "dataAsOf": "2026-03-15T00:00:00Z",
-          "ageS": 1296000,
-          "staleAfterS": 7776000,
+          "family": "viafrei_rules",
+          "dataAsOf": null,
+          "ageS": null,
           "stale": false
         }
       ],
       "attribution": [
         {
-          "family": "src-alpha-rules",
+          "family": "viafrei_rules",
           "domain": "rules",
-          "publisher": "Nimbruß Datenwerk",
-          "text": "Synthetic data from family alpha, licence lic-alpha.",
-          "licence": "Synthetic licence alpha",
-          "licenceUrl": "https://licences.example/alpha",
+          "publisher": "Verkehrsregeln: ViaFrei, eigene Zusammenstellung aus amtlichen Quellen (StVO, StVZO, 35. BImSchV, StVG, EmoG, AFIR); jede Aussage mit Quelle und Prüfdatum — informativ, keine Rechtsberatung / Road rules: ViaFrei, our own compilation from official sources; every statement carries its source and the date it was read — informational, not legal advice",
+          "text": "Verkehrsregeln: ViaFrei, eigene Zusammenstellung aus amtlichen Quellen (StVO, StVZO, 35. BImSchV, StVG, EmoG, AFIR); jede Aussage mit Quelle und Prüfdatum — informativ, keine Rechtsberatung / Road rules: ViaFrei, our own compilation from official sources; every statement carries its source and the date it was read — informational, not legal advice",
+          "licence": "ViaFrei editorial content (informational, not legal advice)",
+          "licenceUrl": "https://viafrei.de",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms"
+          "termsUrl": "https://viafrei.de"
         }
       ],
       "notes": {
         "condition": [],
         "purpose": []
       },
-      "warnings": [
-        {
-          "code": "partial",
-          "detail": "A source family that could answer was withheld under the key's licence terms."
-        }
-      ]
+      "warnings": []
     },
     "links": {
       "self": "https://api.viafrei.de/v1/driving-rules"

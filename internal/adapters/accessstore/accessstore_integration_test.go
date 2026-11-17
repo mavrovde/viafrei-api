@@ -148,7 +148,7 @@ func TestLifecycleAgainstTheStore(t *testing.T) {
 	s := open(t)
 	k := auth.NewKeys(wire.AuthSettings(c), s, nil, nil)
 	ctx := bounded(t)
-	plan := newPlan(t, k, "consumer", "src-alpha-roads")
+	plan := newPlan(t, k, "consumer", "roads_alpha")
 	key, err := k.Issue(ctx, plan, "label", "ops@example.test", 0, "tester")
 	if err != nil {
 		t.Fatal(err)
@@ -242,10 +242,10 @@ func TestLifecycleAgainstTheStore(t *testing.T) {
 			t.Fatalf("an audit row holds secret material: %s", r.all)
 		}
 	}
-	if want := []string{"issue", "rotate", "accept_terms", "plan_move", "revoke"}; !slices.Equal(actions, want) {
+	if want := []string{"issue", "rotate", "plan_move", "revoke"}; !slices.Equal(actions, want) {
 		t.Fatalf("audit %v, want %v", actions, want)
 	}
-	if got[3].before != plan || got[3].after != other || got[4].reason != "leaked" || got[0].actor != "tester" {
+	if got[2].before != plan || got[2].after != other || got[3].reason != "leaked" || got[0].actor != "tester" {
 		t.Fatalf("audit details %+v", got)
 	}
 }
@@ -424,14 +424,14 @@ func (s stack) issue(t *testing.T, use access.UseClass, families ...string) acce
 	return key
 }
 
-var allFamilies = []string{"src-alpha-energy", "src-beta-energy", "src-gamma-energy", "src-delta-parking", "src-epsilon-roads", "src-zeta-places", "src-eta-weather"}
+var allFamilies = []string{"afir_alpha", "afir_beta", "chargepool_gamma", "truckpark_sid_dyn", "roads_epsilon", "afir_zeta", "dwd_eta"}
 
 func TestGateRestrictedPurposeFamilyEndToEnd(t *testing.T) {
 	req.Covers(t, "SEC-030", "SEC-031")
 	s := newStack(t)
 	for use, served := range map[access.UseClass]bool{"consumer": true, "non_commercial": false, "commercial": false} {
 		got := s.families(t, s.issue(t, use, allFamilies...).Full)
-		if slices.Contains(got, "src-gamma-energy") != served {
+		if slices.Contains(got, "chargepool_gamma") != served {
 			t.Errorf("%s: %v", use, got)
 		}
 	}
@@ -444,7 +444,7 @@ func TestGateTermsFamilyIsNeverAKeysOwn(t *testing.T) {
 	req.Covers(t, "SEC-030", "SEC-034")
 	s := newStack(t)
 	key := s.issue(t, "commercial", allFamilies...)
-	if slices.Contains(s.families(t, key.Full), "src-delta-parking") {
+	if slices.Contains(s.families(t, key.Full), "truckpark_sid_dyn") {
 		t.Fatal("a family whose terms need accepting is served as the key's own")
 	}
 }
@@ -453,7 +453,7 @@ func TestGateUnreviewedFamilyEndToEnd(t *testing.T) {
 	req.Covers(t, "SEC-030")
 	s := newStack(t)
 	for _, use := range access.UseClasses {
-		if slices.Contains(s.families(t, s.issue(t, use, allFamilies...).Full), "src-epsilon-roads") {
+		if slices.Contains(s.families(t, s.issue(t, use, allFamilies...).Full), "roads_epsilon") {
 			t.Fatalf("unreviewed family served to %s", use)
 		}
 	}
@@ -461,8 +461,8 @@ func TestGateUnreviewedFamilyEndToEnd(t *testing.T) {
 
 func TestGateDisabledFamilyEndToEnd(t *testing.T) {
 	req.Covers(t, "SEC-030")
-	s := newStack(t, "VFAPI_SOURCES_DISABLED=src-zeta-places")
-	if got := s.families(t, s.issue(t, "consumer", allFamilies...).Full); slices.Contains(got, "src-zeta-places") || !slices.Contains(got, "src-alpha-energy") {
+	s := newStack(t, "VFAPI_SOURCES_DISABLED=afir_zeta")
+	if got := s.families(t, s.issue(t, "consumer", allFamilies...).Full); slices.Contains(got, "afir_zeta") || !slices.Contains(got, "afir_alpha") {
 		t.Fatalf("disabled family: %v", got)
 	}
 }
@@ -470,7 +470,7 @@ func TestGateDisabledFamilyEndToEnd(t *testing.T) {
 func TestGateFamilyOutsideThePlanEndToEnd(t *testing.T) {
 	req.Covers(t, "SEC-030")
 	s := newStack(t)
-	if got := s.families(t, s.issue(t, "consumer", "src-alpha-energy").Full); !slices.Equal(got, []string{"src-alpha-energy"}) {
+	if got := s.families(t, s.issue(t, "consumer", "afir_alpha").Full); !slices.Equal(got, []string{"afir_alpha"}) {
 		t.Fatalf("plan with one family read %v", got)
 	}
 }
@@ -478,7 +478,7 @@ func TestGateFamilyOutsideThePlanEndToEnd(t *testing.T) {
 func TestKeyRefusalsEndToEnd(t *testing.T) {
 	req.Covers(t, "SEC-001", "SEC-004", "SEC-010", "SEC-042")
 	s := newStack(t)
-	key := s.issue(t, "consumer", "src-alpha-energy")
+	key := s.issue(t, "consumer", "afir_alpha")
 	if w := s.get(t, key.Full); w.Code != http.StatusOK {
 		t.Fatalf("valid key: %d %s", w.Code, w.Body)
 	}
@@ -489,7 +489,7 @@ func TestKeyRefusalsEndToEnd(t *testing.T) {
 		t.Fatalf("revoked: %d %s", w.Code, w.Body)
 	}
 	sandbox := newStack(t, "VFAPI_AUTH_ENVIRONMENT=test")
-	live := s.issue(t, "consumer", "src-alpha-energy")
+	live := s.issue(t, "consumer", "afir_alpha")
 	if w := sandbox.get(t, live.Full); w.Code != http.StatusUnauthorized || !strings.Contains(w.Body.String(), "invalid-key") {
 		t.Fatalf("a live key on the sandbox: %d %s", w.Code, w.Body)
 	}

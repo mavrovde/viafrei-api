@@ -4022,32 +4022,32 @@
                     "value": {
                       "data": [
                         {
-                          "id": "cs-05-0012",
-                          "name": "Gielfürau Laden",
-                          "operator": "Weimweing Strom",
+                          "id": "afir_alpha:cs-01-0001",
+                          "name": "Kansilkamp Laden",
+                          "operator": "Löckbrau Strom",
                           "location": {
-                            "lat": 50.829574,
-                            "lon": 6.034346
+                            "lat": 47.612837,
+                            "lon": 7.828273
                           },
-                          "distanceM": 2644,
+                          "distanceM": 2985,
                           "access": "public",
                           "summary": {
-                            "chargePoints": 4,
+                            "chargePoints": 3,
                             "availableNow": 1,
-                            "maxPowerKw": 300
+                            "maxPowerKw": 150
                           },
                           "chargePoints": [
                             {
-                              "id": "cp-00012-0",
+                              "id": "DE*SYN*E000010",
                               "current": "dc",
-                              "maxPowerKw": 150,
+                              "maxPowerKw": 50,
                               "availability": {
                                 "state": "available",
                                 "observedAt": "2026-03-29T23:55:00Z"
                               }
                             },
                             {
-                              "id": "cp-00012-1",
+                              "id": "DE*SYN*E000011",
                               "current": "dc",
                               "maxPowerKw": 150,
                               "availability": {
@@ -4056,25 +4056,68 @@
                               }
                             },
                             {
-                              "id": "cp-00012-2",
-                              "current": "ac",
-                              "maxPowerKw": 11,
-                              "availability": {
-                                "state": "stale",
-                                "observedAt": "2026-03-29T18:57:01Z"
-                              }
-                            },
-                            {
-                              "id": "cp-00012-3",
+                              "id": "DE*SYN*E000012",
                               "current": "dc",
-                              "maxPowerKw": 300,
+                              "maxPowerKw": 50,
                               "availability": {
                                 "state": "stale",
-                                "observedAt": "2026-03-29T06:47:06Z"
+                                "observedAt": "2026-03-29T03:28:20Z"
                               }
                             }
                           ],
-                          "sourceFamily": "src-beta-energy"
+                          "sourceFamily": "afir_alpha"
+                        },
+                        {
+                          "id": "afir_alpha:cs-01-0002",
+                          "name": "Kansilkamp Laden",
+                          "operator": "Raungul Strom",
+                          "location": {
+                            "lat": 47.638705,
+                            "lon": 7.750173
+                          },
+                          "distanceM": 3645,
+                          "access": "public",
+                          "summary": {
+                            "chargePoints": 4,
+                            "availableNow": 1,
+                            "maxPowerKw": 50
+                          },
+                          "chargePoints": [
+                            {
+                              "id": "DE*SYN*E000020",
+                              "current": "ac",
+                              "maxPowerKw": 11,
+                              "availability": {
+                                "state": "available",
+                                "observedAt": "2026-03-29T23:52:00Z"
+                              }
+                            },
+                            {
+                              "id": "DE*SYN*E000021",
+                              "current": "ac",
+                              "maxPowerKw": 22,
+                              "availability": null
+                            },
+                            {
+                              "id": "DE*SYN*E000022",
+                              "current": "dc",
+                              "maxPowerKw": 50,
+                              "availability": {
+                                "state": "stale",
+                                "observedAt": "2026-03-29T18:49:58Z"
+                              }
+                            },
+                            {
+                              "id": "DE*SYN*E000023",
+                              "current": "ac",
+                              "maxPowerKw": 22,
+                              "availability": {
+                                "state": "stale",
+                                "observedAt": "2026-03-29T07:19:35Z"
+                              }
+                            }
+                          ],
+                          "sourceFamily": "afir_alpha"
                         }
                       ],
                       "meta": {
@@ -4084,24 +4127,24 @@
                         "asOf": "2026-03-29T23:55:00Z",
                         "freshness": [
                           {
-                            "family": "src-beta-energy",
+                            "family": "afir_alpha",
                             "dataAsOf": "2026-03-29T23:55:00Z",
                             "ageS": 300,
-                            "staleAfterS": 3600,
+                            "staleAfterS": 1800,
                             "stale": false
                           }
                         ],
                         "attribution": [
                           {
-                            "family": "src-beta-energy",
+                            "family": "afir_alpha",
                             "domain": "energy",
-                            "publisher": "Stönwän Datenwerk",
-                            "text": "Synthetic data from family beta, licence lic-beta.",
-                            "licence": "Synthetic licence beta",
-                            "licenceUrl": "https://licences.example/beta",
-                            "shareAlike": true,
-                            "shareAlikeOffer": "https://beta.example/share-alike/energy",
-                            "termsUrl": "https://beta.example/terms"
+                            "publisher": "Kleber Datenwerk",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms/afir_alpha"
                           }
                         ],
                         "notes": {
@@ -4120,8 +4163,8 @@
                         },
                         "query": {
                           "at": {
-                            "lat": 50.82,
-                            "lon": 6
+                            "lat": 47.62,
+                            "lon": 7.79
                           },
                           "radiusM": 20000,
                           "minKw": 0,
@@ -4381,10 +4424,10 @@
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/charging-options?at=50.82,6.0\u0026radius_m=20000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/charging-options?at=47.62,7.79\u0026radius_m=20000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/charging-options?at=50.82,6.0\u0026radius_m=20000\u0026limit=2",
+        "x-example-request": "/v1/charging-options?at=47.62,7.79\u0026radius_m=20000\u0026limit=2",
         "x-mcp-counterpart": "charging station search",
         "x-required-scope": "energy"
       }
@@ -4420,8 +4463,8 @@
                     "summary": "The driving rules on one topic",
                     "value": {
                       "data": {
-                        "topic": "winter_tyres",
-                        "title": "Synthetic rule topic winter_tyres",
+                        "topic": "syn_winter_tyres",
+                        "title": "Synthetisches Regelthema winter_tyres",
                         "rules": [
                           {
                             "text": "Synthetic statement 1 about winter_tyres, for tests only.",
@@ -4429,11 +4472,11 @@
                           },
                           {
                             "text": "Synthetic statement 2 about winter_tyres, for tests only.",
-                            "legalBasis": null
+                            "legalBasis": "§ 0 synthetic"
                           },
                           {
                             "text": "Synthetic statement 3 about winter_tyres, for tests only.",
-                            "legalBasis": null
+                            "legalBasis": "§ 0 synthetic"
                           }
                         ],
                         "reviewedOn": "2026-02-01",
@@ -4443,39 +4486,33 @@
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
-                        "asOf": "2026-03-15T00:00:00Z",
+                        "asOf": null,
                         "freshness": [
                           {
-                            "family": "src-alpha-rules",
-                            "dataAsOf": "2026-03-15T00:00:00Z",
-                            "ageS": 1296000,
-                            "staleAfterS": 7776000,
+                            "family": "viafrei_rules",
+                            "dataAsOf": null,
+                            "ageS": null,
                             "stale": false
                           }
                         ],
                         "attribution": [
                           {
-                            "family": "src-alpha-rules",
+                            "family": "viafrei_rules",
                             "domain": "rules",
-                            "publisher": "Nimbruß Datenwerk",
-                            "text": "Synthetic data from family alpha, licence lic-alpha.",
-                            "licence": "Synthetic licence alpha",
-                            "licenceUrl": "https://licences.example/alpha",
+                            "publisher": "Verkehrsregeln: ViaFrei, eigene Zusammenstellung aus amtlichen Quellen (StVO, StVZO, 35. BImSchV, StVG, EmoG, AFIR); jede Aussage mit Quelle und Prüfdatum — informativ, keine Rechtsberatung / Road rules: ViaFrei, our own compilation from official sources; every statement carries its source and the date it was read — informational, not legal advice",
+                            "text": "Verkehrsregeln: ViaFrei, eigene Zusammenstellung aus amtlichen Quellen (StVO, StVZO, 35. BImSchV, StVG, EmoG, AFIR); jede Aussage mit Quelle und Prüfdatum — informativ, keine Rechtsberatung / Road rules: ViaFrei, our own compilation from official sources; every statement carries its source and the date it was read — informational, not legal advice",
+                            "licence": "ViaFrei editorial content (informational, not legal advice)",
+                            "licenceUrl": "https://viafrei.de",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms"
+                            "termsUrl": "https://viafrei.de"
                           }
                         ],
                         "notes": {
                           "condition": [],
                           "purpose": []
                         },
-                        "warnings": [
-                          {
-                            "code": "partial",
-                            "detail": "A source family that could answer was withheld under the key's licence terms."
-                          }
-                        ]
+                        "warnings": []
                       },
                       "links": {
                         "self": "https://api.viafrei.de/v1/driving-rules"
@@ -4730,10 +4767,10 @@
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/driving-rules?topic=winter_tyres\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/driving-rules?topic=syn_winter_tyres\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/driving-rules?topic=winter_tyres",
+        "x-example-request": "/v1/driving-rules?topic=syn_winter_tyres",
         "x-required-scope": "rules"
       }
     },
@@ -5630,48 +5667,37 @@
                         "expiresAt": "2026-06-28T00:00:00Z",
                         "sources": [
                           {
-                            "family": "src-alpha-energy",
+                            "family": "afir_alpha",
                             "domain": "energy",
-                            "publisher": "Nimbruß Datenwerk",
-                            "text": "Synthetic data from family alpha, licence lic-alpha.",
-                            "licence": "Synthetic licence alpha",
-                            "licenceUrl": "https://licences.example/alpha",
+                            "publisher": "Kleber Datenwerk",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms"
+                            "termsUrl": "https://alpha.example/terms/afir_alpha"
                           },
                           {
-                            "family": "src-alpha-parking",
+                            "family": "geonames",
+                            "domain": "places",
+                            "publisher": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+                            "text": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://download.geonames.org/export/dump/"
+                          },
+                          {
+                            "family": "park_alpha",
                             "domain": "parking",
-                            "publisher": "Nimbruß Datenwerk",
-                            "text": "Synthetic data from family alpha, licence lic-alpha.",
-                            "licence": "Synthetic licence alpha",
-                            "licenceUrl": "https://licences.example/alpha",
+                            "publisher": "Fäpung Datenwerk",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms"
-                          },
-                          {
-                            "family": "src-alpha-places",
-                            "domain": "places",
-                            "publisher": "Nimbruß Datenwerk",
-                            "text": "Synthetic data from family alpha, licence lic-alpha.",
-                            "licence": "Synthetic licence alpha",
-                            "licenceUrl": "https://licences.example/alpha",
-                            "shareAlike": false,
-                            "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms"
-                          },
-                          {
-                            "family": "src-zeta-places",
-                            "domain": "places",
-                            "publisher": "Deingmeir Datenwerk",
-                            "text": "Synthetic data from family zeta, licence lic-zeta.",
-                            "licence": "Synthetic licence zeta",
-                            "licenceUrl": "https://licences.example/zeta",
-                            "shareAlike": false,
-                            "shareAlikeOffer": null,
-                            "termsUrl": "https://zeta.example/terms"
+                            "termsUrl": "https://alpha.example/terms/park_alpha"
                           }
                         ]
                       },
@@ -5823,7 +5849,7 @@
                       "data": {
                         "apiVersion": "1.0.0-example",
                         "buildSha": "0123456789ab",
-                        "contractVersion": "0.2",
+                        "contractVersion": "0.3",
                         "platformVersion": null,
                         "openapi": "https://api.viafrei.de/v1/openapi.json",
                         "languages": [
@@ -5987,91 +6013,68 @@
                           "road": "A101",
                           "roadType": "motorway",
                           "direction": "both",
-                          "states": [
-                            "05",
-                            "06",
-                            "07",
-                            "08",
-                            "10",
-                            "11",
-                            "12",
-                            "15",
-                            "16"
-                          ]
+                          "states": []
                         },
-                        "lamp": "red",
-                        "lampReason": "road_closed",
+                        "lamp": "amber",
+                        "lampReason": "warning",
                         "situations": [
                           {
-                            "id": "ev-00028",
-                            "kind": "weather",
-                            "severity": "info",
-                            "road": "A101",
-                            "roadType": "motorway",
-                            "direction": "south",
-                            "directionText": "Sackbeiheim",
-                            "location": {
-                              "lat": 50.000247,
-                              "lon": 13.554106
-                            },
-                            "validity": {
-                              "from": "2026-03-29T22:00:00Z",
-                              "fromLocal": "2026-03-30T00:00:00+02:00",
-                              "until": "2026-03-31T18:00:00Z",
-                              "untilLocal": "2026-03-31T20:00:00+02:00"
-                            },
-                            "lanes": null,
-                            "delayMin": null,
-                            "lengthM": 4959,
-                            "headline": "Weather bei Gieckpückau",
-                            "description": null,
-                            "textLanguage": "de",
-                            "updatedAt": "2026-03-29T22:01:00Z",
-                            "updatedAtLocal": "2026-03-30T00:01:00+02:00",
-                            "position": {
-                              "fromKm": 539.7,
-                              "toKm": null,
-                              "junctionFrom": null,
-                              "junctionTo": null
-                            },
-                            "sourceFamily": "src-alpha-roads"
-                          },
-                          {
-                            "id": "ev-00020",
-                            "kind": "roadworks",
-                            "severity": "lane_closed",
+                            "id": "datex:syn:ev-00020",
+                            "kind": "accident",
+                            "severity": "major",
                             "road": "A101",
                             "roadType": "motorway",
                             "direction": "unknown",
-                            "directionText": "Dirkäningen",
+                            "directionText": null,
                             "location": {
-                              "lat": 50.094131,
-                              "lon": 12.752644
+                              "lat": 50.470457,
+                              "lon": 10.95832
                             },
                             "validity": {
                               "from": "2026-03-29T00:59:59Z",
                               "fromLocal": "2026-03-29T01:59:59+01:00",
-                              "until": "2026-03-31T02:59:59Z",
-                              "untilLocal": "2026-03-31T04:59:59+02:00"
+                              "until": null,
+                              "untilLocal": null
                             },
-                            "lanes": {
-                              "closed": 1,
-                              "total": 2
-                            },
+                            "lanes": null,
                             "delayMin": null,
-                            "lengthM": 7554,
-                            "headline": "Roadworks bei Zautbrierwerder",
+                            "lengthM": null,
+                            "headline": "Accident",
                             "description": null,
                             "textLanguage": "de",
                             "updatedAt": "2026-03-29T01:00:59Z",
                             "updatedAtLocal": "2026-03-29T03:00:59+02:00",
-                            "position": {
-                              "fromKm": 619.1,
-                              "toKm": null,
-                              "junctionFrom": null,
-                              "junctionTo": null
+                            "position": null,
+                            "sourceFamily": "roads_alpha"
+                          },
+                          {
+                            "id": "datex:syn:ev-00022",
+                            "kind": "accident",
+                            "severity": "major",
+                            "road": "A101",
+                            "roadType": "motorway",
+                            "direction": "unknown",
+                            "directionText": null,
+                            "location": {
+                              "lat": 50.323326,
+                              "lon": 10.655179
                             },
-                            "sourceFamily": "src-alpha-roads"
+                            "validity": {
+                              "from": "2026-03-29T01:30:00Z",
+                              "fromLocal": "2026-03-29T03:30:00+02:00",
+                              "until": null,
+                              "untilLocal": null
+                            },
+                            "lanes": null,
+                            "delayMin": null,
+                            "lengthM": null,
+                            "headline": "Accident",
+                            "description": null,
+                            "textLanguage": "de",
+                            "updatedAt": "2026-03-29T01:31:00Z",
+                            "updatedAtLocal": "2026-03-29T03:31:00+02:00",
+                            "position": null,
+                            "sourceFamily": "roads_alpha"
                           }
                         ]
                       },
@@ -6082,42 +6085,24 @@
                         "asOf": "2026-03-29T23:57:30Z",
                         "freshness": [
                           {
-                            "family": "src-alpha-roads",
+                            "family": "roads_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
-                          },
-                          {
-                            "family": "src-eta-weather",
-                            "dataAsOf": "2026-03-29T23:57:30Z",
-                            "ageS": 150,
-                            "staleAfterS": 1800,
                             "stale": false
                           }
                         ],
                         "attribution": [
                           {
-                            "family": "src-alpha-roads",
+                            "family": "roads_alpha",
                             "domain": "roads",
                             "publisher": "Nimbruß Datenwerk",
-                            "text": "Synthetic data from family alpha, licence lic-alpha.",
-                            "licence": "Synthetic licence alpha",
-                            "licenceUrl": "https://licences.example/alpha",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms"
-                          },
-                          {
-                            "family": "src-eta-weather",
-                            "domain": "weather",
-                            "publisher": "Longkein Datenwerk",
-                            "text": "Synthetic data from family eta, licence lic-eta.",
-                            "licence": "Synthetic licence eta",
-                            "licenceUrl": "https://licences.example/eta",
-                            "shareAlike": false,
-                            "shareAlikeOffer": null,
-                            "termsUrl": "https://eta.example/terms"
+                            "termsUrl": "https://alpha.example/terms/roads_alpha"
                           }
                         ],
                         "notes": {
@@ -6485,23 +6470,23 @@
                     "value": {
                       "data": [
                         {
-                          "id": "pk-07-0012",
-                          "name": "Gienneisfeld Parken",
-                          "operator": "Firgräng Parkraum",
-                          "kind": "truck_parking",
+                          "id": "p:27",
+                          "name": "Möniltal Parken",
+                          "operator": "Biesem Parkraum",
+                          "kind": "rest_area",
                           "location": {
-                            "lat": 50.387403,
-                            "lon": 10.232051
+                            "lat": 50.111313,
+                            "lon": 10.561987
                           },
-                          "distanceM": 324,
+                          "distanceM": 39008,
                           "occupancy": {
-                            "free": 93,
-                            "total": 350,
+                            "free": 106,
+                            "total": 231,
                             "state": "free",
-                            "observedAt": "2026-03-29T22:01:21Z"
+                            "observedAt": "2026-03-29T19:53:27Z"
                           },
                           "termsRequired": false,
-                          "sourceFamily": "src-delta-parking"
+                          "sourceFamily": "park_alpha"
                         }
                       ],
                       "meta": {
@@ -6511,30 +6496,28 @@
                         "asOf": "2026-03-29T23:57:30Z",
                         "freshness": [
                           {
-                            "family": "src-delta-parking",
+                            "family": "park_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
-                            "staleAfterS": 1800,
+                            "staleAfterS": 900,
                             "stale": false
                           }
                         ],
                         "attribution": [
                           {
-                            "family": "src-delta-parking",
+                            "family": "park_alpha",
                             "domain": "parking",
-                            "publisher": "Kleber Datenwerk",
-                            "text": "Synthetic data from family delta, licence lic-delta.",
-                            "licence": "Synthetic licence delta",
-                            "licenceUrl": "https://licences.example/delta",
+                            "publisher": "Fäpung Datenwerk",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://delta.example/terms"
+                            "termsUrl": "https://alpha.example/terms/park_alpha"
                           }
                         ],
                         "notes": {
-                          "condition": [
-                            "Use only after accepting the terms (synthetic)."
-                          ],
+                          "condition": [],
                           "purpose": []
                         },
                         "warnings": [
@@ -6809,10 +6792,10 @@
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/parking-options?at=50.39,10.23\u0026radius_m=50000\u0026limit=2\u0026accept_terms=delta-terms-1\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/parking-options?at=50.39,10.23\u0026radius_m=50000\u0026limit=2\u0026accept_terms=sid-terms-1\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=50000\u0026limit=2\u0026accept_terms=delta-terms-1",
+        "x-example-request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=50000\u0026limit=2\u0026accept_terms=sid-terms-1",
         "x-mcp-counterpart": "parking search",
         "x-required-scope": "parking"
       }
@@ -7252,7 +7235,7 @@
             "schema": {
               "description": "The place's id.",
               "examples": [
-                "pl-01-0001"
+                "100001"
               ],
               "maxLength": 64,
               "pattern": "^[A-Za-z0-9_.-]+$",
@@ -7313,147 +7296,118 @@
                     "value": {
                       "data": {
                         "place": {
-                          "id": "pl-01-0003",
-                          "name": "Kofüßwerder",
+                          "id": "100003",
+                          "name": "Namüningen",
                           "kind": "municipality",
                           "location": {
-                            "lat": 48.437771,
-                            "lon": 7.687209
+                            "lat": 49.164653,
+                            "lon": 7.79903
                           },
-                          "sourceFamily": "src-zeta-places"
+                          "sourceFamily": "geonames"
                         },
                         "charging": {
-                          "sites": [
-                            {
-                              "id": "cs-01-0000",
-                              "name": "Kofüßwerder Laden",
-                              "operator": "Wickmel Strom",
-                              "location": {
-                                "lat": 48.404524,
-                                "lon": 7.659936
-                              },
-                              "distanceM": 4212,
-                              "access": "public",
-                              "summary": {
-                                "chargePoints": 3,
-                                "availableNow": 1,
-                                "maxPowerKw": 150
-                              },
-                              "chargePoints": [
-                                {
-                                  "id": "cp-00000-0",
-                                  "current": "ac",
-                                  "maxPowerKw": 22,
-                                  "availability": {
-                                    "state": "available",
-                                    "observedAt": "2026-03-29T23:52:00Z"
-                                  }
-                                },
-                                {
-                                  "id": "cp-00000-1",
-                                  "current": "ac",
-                                  "maxPowerKw": 22,
-                                  "availability": null
-                                },
-                                {
-                                  "id": "cp-00000-2",
-                                  "current": "dc",
-                                  "maxPowerKw": 150,
-                                  "availability": {
-                                    "state": "stale",
-                                    "observedAt": "2026-03-29T09:34:59Z"
-                                  }
-                                }
-                              ],
-                              "sourceFamily": "src-alpha-energy"
-                            }
-                          ]
+                          "sites": []
                         },
                         "parking": {
-                          "sites": [
-                            {
-                              "id": "pk-01-0000",
-                              "name": "Kofüßwerder Parken",
-                              "operator": "Sänür Parkraum",
-                              "kind": "garage",
-                              "location": {
-                                "lat": 48.433324,
-                                "lon": 7.681788
-                              },
-                              "distanceM": 637,
-                              "occupancy": {
-                                "free": 34,
-                                "total": 43,
-                                "state": "free",
-                                "observedAt": "2026-03-29T12:02:49Z"
-                              },
-                              "termsRequired": false,
-                              "sourceFamily": "src-alpha-parking"
-                            }
-                          ]
+                          "sites": []
                         }
                       },
                       "meta": {
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
-                        "asOf": "2026-03-29T12:00:00Z",
+                        "asOf": null,
                         "freshness": [
                           {
-                            "family": "src-alpha-energy",
+                            "family": "afir_alpha",
                             "dataAsOf": "2026-03-29T23:55:00Z",
                             "ageS": 300,
-                            "staleAfterS": 3600,
-                            "stale": false
-                          },
-                          {
-                            "family": "src-alpha-parking",
-                            "dataAsOf": "2026-03-29T23:57:30Z",
-                            "ageS": 150,
                             "staleAfterS": 1800,
                             "stale": false
                           },
                           {
-                            "family": "src-zeta-places",
-                            "dataAsOf": "2026-03-29T12:00:00Z",
-                            "ageS": 43200,
-                            "staleAfterS": 604800,
+                            "family": "afir_beta",
+                            "dataAsOf": "2026-03-29T23:55:00Z",
+                            "ageS": 300,
+                            "staleAfterS": 1800,
+                            "stale": false
+                          },
+                          {
+                            "family": "geonames",
+                            "dataAsOf": null,
+                            "ageS": null,
+                            "stale": false
+                          },
+                          {
+                            "family": "park_alpha",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          },
+                          {
+                            "family": "park_beta",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
                             "stale": false
                           }
                         ],
                         "attribution": [
                           {
-                            "family": "src-alpha-energy",
+                            "family": "afir_alpha",
                             "domain": "energy",
-                            "publisher": "Nimbruß Datenwerk",
-                            "text": "Synthetic data from family alpha, licence lic-alpha.",
-                            "licence": "Synthetic licence alpha",
-                            "licenceUrl": "https://licences.example/alpha",
+                            "publisher": "Kleber Datenwerk",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms"
+                            "termsUrl": "https://alpha.example/terms/afir_alpha"
                           },
                           {
-                            "family": "src-alpha-parking",
-                            "domain": "parking",
-                            "publisher": "Nimbruß Datenwerk",
-                            "text": "Synthetic data from family alpha, licence lic-alpha.",
-                            "licence": "Synthetic licence alpha",
-                            "licenceUrl": "https://licences.example/alpha",
-                            "shareAlike": false,
-                            "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms"
-                          },
-                          {
-                            "family": "src-zeta-places",
-                            "domain": "places",
+                            "family": "afir_beta",
+                            "domain": "energy",
                             "publisher": "Deingmeir Datenwerk",
-                            "text": "Synthetic data from family zeta, licence lic-zeta.",
-                            "licence": "Synthetic licence zeta",
-                            "licenceUrl": "https://licences.example/zeta",
+                            "text": "Synthetic data from family beta, licence CC BY-SA 4.0.",
+                            "licence": "CC BY-SA 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-sa-4-0",
+                            "shareAlike": true,
+                            "shareAlikeOffer": "https://viafrei.de/impressum",
+                            "termsUrl": "https://beta.example/terms/afir_beta"
+                          },
+                          {
+                            "family": "geonames",
+                            "domain": "places",
+                            "publisher": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+                            "text": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://zeta.example/terms"
+                            "termsUrl": "https://download.geonames.org/export/dump/"
+                          },
+                          {
+                            "family": "park_alpha",
+                            "domain": "parking",
+                            "publisher": "Fäpung Datenwerk",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms/park_alpha"
+                          },
+                          {
+                            "family": "park_beta",
+                            "domain": "parking",
+                            "publisher": "Sückkies Datenwerk",
+                            "text": "Synthetic data from family beta, licence CC BY-SA 4.0.",
+                            "licence": "CC BY-SA 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-sa-4-0",
+                            "shareAlike": true,
+                            "shareAlikeOffer": "https://viafrei.de/impressum",
+                            "termsUrl": "https://beta.example/terms/park_beta"
                           }
                         ],
                         "notes": {
@@ -7477,13 +7431,13 @@
                           }
                         ],
                         "query": {
-                          "placeId": "pl-01-0003",
+                          "placeId": "100003",
                           "radiusM": 20000,
                           "perPartLimit": 2
                         }
                       },
                       "links": {
-                        "self": "https://api.viafrei.de/v1/places/pl-01-0003/overview"
+                        "self": "https://api.viafrei.de/v1/places/100003/overview"
                       }
                     }
                   }
@@ -7735,10 +7689,10 @@
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/places/pl-01-0003/overview?needs=charging,parking\u0026radius_m=20000\u0026per_part_limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/places/100003/overview?needs=charging,parking\u0026radius_m=20000\u0026per_part_limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/places/pl-01-0003/overview?needs=charging,parking\u0026radius_m=20000\u0026per_part_limit=2",
+        "x-example-request": "/v1/places/100003/overview?needs=charging,parking\u0026radius_m=20000\u0026per_part_limit=2",
         "x-required-scope": "places"
       }
     },
@@ -7870,34 +7824,64 @@
                         "lampReason": "warning",
                         "situations": [
                           {
-                            "id": "ev-00009",
-                            "kind": "other",
-                            "severity": "lane_closed",
-                            "road": "A103",
+                            "id": "datex:syn:ev-00022",
+                            "kind": "accident",
+                            "severity": "major",
+                            "road": "A101",
                             "roadType": "motorway",
                             "direction": "unknown",
-                            "directionText": "Giellönfeld",
+                            "directionText": null,
                             "location": {
-                              "lat": 50.43293,
-                              "lon": 9.661006
+                              "lat": 50.323326,
+                              "lon": 10.655179
                             },
                             "validity": {
-                              "from": "2026-03-28T16:33:33Z",
-                              "fromLocal": "2026-03-28T17:33:33+01:00",
+                              "from": "2026-03-29T01:30:00Z",
+                              "fromLocal": "2026-03-29T03:30:00+02:00",
                               "until": null,
                               "untilLocal": null
                             },
                             "lanes": null,
                             "delayMin": null,
-                            "lengthM": 9932,
-                            "headline": "Other bei Klespelau",
+                            "lengthM": null,
+                            "headline": "Accident",
                             "description": null,
                             "textLanguage": "de",
-                            "updatedAt": "2026-03-28T16:34:33Z",
-                            "updatedAtLocal": "2026-03-28T17:34:33+01:00",
+                            "updatedAt": "2026-03-29T01:31:00Z",
+                            "updatedAtLocal": "2026-03-29T03:31:00+02:00",
                             "position": null,
-                            "distanceM": 40726,
-                            "sourceFamily": "src-alpha-roads"
+                            "distanceM": 31153,
+                            "sourceFamily": "roads_alpha"
+                          },
+                          {
+                            "id": "datex:syn:ev-00019",
+                            "kind": "restriction",
+                            "severity": "minor",
+                            "road": "A105",
+                            "roadType": "motorway",
+                            "direction": "unknown",
+                            "directionText": null,
+                            "location": {
+                              "lat": 50.046305,
+                              "lon": 10.624849
+                            },
+                            "validity": {
+                              "from": "2026-03-29T15:12:30Z",
+                              "fromLocal": "2026-03-29T17:12:30+02:00",
+                              "until": null,
+                              "untilLocal": null
+                            },
+                            "lanes": null,
+                            "delayMin": null,
+                            "lengthM": null,
+                            "headline": "SpeedManagement",
+                            "description": null,
+                            "textLanguage": "de",
+                            "updatedAt": "2026-03-29T15:13:30Z",
+                            "updatedAtLocal": "2026-03-29T17:13:30+02:00",
+                            "position": null,
+                            "distanceM": 47494,
+                            "sourceFamily": "roads_alpha"
                           }
                         ]
                       },
@@ -7908,7 +7892,7 @@
                         "asOf": "2026-03-29T23:57:30Z",
                         "freshness": [
                           {
-                            "family": "src-alpha-roads",
+                            "family": "roads_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
@@ -7917,15 +7901,15 @@
                         ],
                         "attribution": [
                           {
-                            "family": "src-alpha-roads",
+                            "family": "roads_alpha",
                             "domain": "roads",
                             "publisher": "Nimbruß Datenwerk",
-                            "text": "Synthetic data from family alpha, licence lic-alpha.",
-                            "licence": "Synthetic licence alpha",
-                            "licenceUrl": "https://licences.example/alpha",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms"
+                            "termsUrl": "https://alpha.example/terms/roads_alpha"
                           }
                         ],
                         "notes": {
@@ -8226,10 +8210,10 @@
             "schema": {
               "description": "The situation's id.",
               "examples": [
-                "ev-00001"
+                "datex:syn:ev-00001"
               ],
               "maxLength": 64,
-              "pattern": "^[A-Za-z0-9_.-]+$",
+              "pattern": "^[A-Za-z0-9_.:-]+$",
               "type": "string"
             }
           }
@@ -8243,33 +8227,33 @@
                     "summary": "One road situation",
                     "value": {
                       "data": {
-                        "id": "ev-00028",
-                        "kind": "weather",
-                        "severity": "info",
+                        "id": "datex:syn:ev-00020",
+                        "kind": "accident",
+                        "severity": "major",
                         "road": "A101",
                         "roadType": "motorway",
-                        "direction": "south",
-                        "directionText": "Sackbeiheim",
+                        "direction": "unknown",
+                        "directionText": null,
                         "location": {
-                          "lat": 50.000247,
-                          "lon": 13.554106
+                          "lat": 50.470457,
+                          "lon": 10.95832
                         },
                         "validity": {
-                          "from": "2026-03-29T22:00:00Z",
-                          "fromLocal": "2026-03-30T00:00:00+02:00",
-                          "until": "2026-03-31T18:00:00Z",
-                          "untilLocal": "2026-03-31T20:00:00+02:00"
+                          "from": "2026-03-29T00:59:59Z",
+                          "fromLocal": "2026-03-29T01:59:59+01:00",
+                          "until": null,
+                          "untilLocal": null
                         },
                         "lanes": null,
                         "delayMin": null,
-                        "lengthM": 4959,
-                        "headline": "Weather bei Gieckpückau",
+                        "lengthM": null,
+                        "headline": "Accident",
                         "description": null,
                         "textLanguage": "de",
-                        "updatedAt": "2026-03-29T22:01:00Z",
-                        "updatedAtLocal": "2026-03-30T00:01:00+02:00",
+                        "updatedAt": "2026-03-29T01:00:59Z",
+                        "updatedAtLocal": "2026-03-29T03:00:59+02:00",
                         "position": null,
-                        "sourceFamily": "src-alpha-roads"
+                        "sourceFamily": "roads_alpha"
                       },
                       "meta": {
                         "requestId": "example-request-0001",
@@ -8278,7 +8262,7 @@
                         "asOf": "2026-03-29T23:57:30Z",
                         "freshness": [
                           {
-                            "family": "src-alpha-roads",
+                            "family": "roads_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
@@ -8287,15 +8271,15 @@
                         ],
                         "attribution": [
                           {
-                            "family": "src-alpha-roads",
+                            "family": "roads_alpha",
                             "domain": "roads",
                             "publisher": "Nimbruß Datenwerk",
-                            "text": "Synthetic data from family alpha, licence lic-alpha.",
-                            "licence": "Synthetic licence alpha",
-                            "licenceUrl": "https://licences.example/alpha",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms"
+                            "termsUrl": "https://alpha.example/terms/roads_alpha"
                           }
                         ],
                         "notes": {
@@ -8305,7 +8289,7 @@
                         "warnings": []
                       },
                       "links": {
-                        "self": "https://api.viafrei.de/v1/road-situations/ev-00028"
+                        "self": "https://api.viafrei.de/v1/road-situations/datex:syn:ev-00020"
                       }
                     }
                   }
@@ -8557,10 +8541,10 @@
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/road-situations/ev-00028\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/road-situations/datex:syn:ev-00020\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/road-situations/ev-00028",
+        "x-example-request": "/v1/road-situations/datex:syn:ev-00020",
         "x-required-scope": "roads"
       }
     },
@@ -8650,75 +8634,75 @@
                     "value": {
                       "data": [
                         {
-                          "id": "sp-07-0000",
-                          "name": "Düsraßbach Bf",
+                          "id": "1:de:01002:1",
+                          "name": "Namüningen Mitte",
                           "location": {
-                            "lat": 50.394582,
-                            "lon": 12.498428
+                            "lat": 49.167002,
+                            "lon": 7.862458
                           },
-                          "stopCode": "de:07002:0",
-                          "districtCode": "07002",
-                          "modes": [
-                            "suburban_rail",
-                            "bus"
-                          ],
+                          "stopCode": "de:01002:1",
+                          "districtCode": "01002",
+                          "modes": [],
                           "distanceM": null,
-                          "sourceFamily": "src-alpha-transit"
+                          "sourceFamily": "delfi_static"
                         },
                         {
-                          "id": "sp-07-0001",
-                          "name": "Düsraßbach Nord",
+                          "id": "1:de:01002:0",
+                          "name": "Namüningen Süd",
                           "location": {
-                            "lat": 50.402968,
-                            "lon": 12.521244
+                            "lat": 49.148162,
+                            "lon": 7.785749
                           },
-                          "stopCode": "de:07002:1",
-                          "districtCode": "07002",
-                          "modes": [
-                            "bus"
-                          ],
+                          "stopCode": "de:01002:0",
+                          "districtCode": "01002",
+                          "modes": [],
                           "distanceM": null,
-                          "sourceFamily": "src-alpha-transit"
+                          "sourceFamily": "delfi_static"
                         }
                       ],
                       "meta": {
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
-                        "asOf": "2026-03-29T23:59:30Z",
+                        "asOf": "2026-03-29T12:00:00Z",
                         "freshness": [
                           {
-                            "family": "src-alpha-transit",
-                            "dataAsOf": "2026-03-29T23:59:30Z",
-                            "ageS": 30,
-                            "staleAfterS": 300,
+                            "family": "delfi_static",
+                            "dataAsOf": "2026-03-29T12:00:00Z",
+                            "ageS": 43200,
+                            "staleAfterS": 259200,
                             "stale": false
                           }
                         ],
                         "attribution": [
                           {
-                            "family": "src-alpha-transit",
+                            "family": "delfi_static",
                             "domain": "transit",
-                            "publisher": "Nimbruß Datenwerk",
-                            "text": "Synthetic data from family alpha, licence lic-alpha.",
-                            "licence": "Synthetic licence alpha",
-                            "licenceUrl": "https://licences.example/alpha",
+                            "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms"
+                            "termsUrl": "https://www.opendata-oepnv.de"
                           }
                         ],
                         "notes": {
                           "condition": [],
                           "purpose": []
                         },
-                        "warnings": [],
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
                         "page": {
                           "limit": 8,
                           "hasMore": false
                         },
                         "query": {
-                          "q": "Düsraßbach",
+                          "q": "Namüningen",
                           "code": null,
                           "at": null,
                           "radiusM": null
@@ -8977,10 +8961,10 @@
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/stations?q=D%C3%BCsra%C3%9Fbach\u0026limit=8\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/stations?q=Nam%C3%BCningen\u0026limit=8\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/stations?q=D%C3%BCsra%C3%9Fbach\u0026limit=8",
+        "x-example-request": "/v1/stations?q=Nam%C3%BCningen\u0026limit=8",
         "x-required-scope": "transit"
       }
     },
@@ -9889,49 +9873,8 @@
                     "summary": "The official weather warnings at a position, with their lamp",
                     "value": {
                       "data": {
-                        "lamp": "red",
-                        "warnings": [
-                          {
-                            "id": "ww-00021",
-                            "hazard": "ice",
-                            "level": 4,
-                            "levelName": "Stufe 4",
-                            "issuer": "Synthetischer Wetterdienst",
-                            "headline": "Warnung vor ice (Stufe 4)",
-                            "textLanguage": "de",
-                            "validity": {
-                              "from": "2026-03-29T13:36:25Z",
-                              "fromLocal": "2026-03-29T15:36:25+02:00",
-                              "until": "2026-03-30T08:36:25Z",
-                              "untilLocal": "2026-03-30T10:36:25+02:00"
-                            },
-                            "area": {
-                              "name": "Stungrißhausen Kreis",
-                              "geometry": null
-                            },
-                            "sourceFamily": "src-eta-weather"
-                          },
-                          {
-                            "id": "ww-00020",
-                            "hazard": "wind",
-                            "level": 3,
-                            "levelName": "Stufe 3",
-                            "issuer": "Synthetischer Wetterdienst",
-                            "headline": "Warnung vor wind (Stufe 3)",
-                            "textLanguage": "de",
-                            "validity": {
-                              "from": "2026-03-29T22:22:27Z",
-                              "fromLocal": "2026-03-30T00:22:27+02:00",
-                              "until": "2026-03-30T22:22:27Z",
-                              "untilLocal": "2026-03-31T00:22:27+02:00"
-                            },
-                            "area": {
-                              "name": "Stungrißhausen Kreis",
-                              "geometry": null
-                            },
-                            "sourceFamily": "src-eta-weather"
-                          }
-                        ],
+                        "lamp": "amber",
+                        "warnings": [],
                         "truncated": false,
                         "roadWeather": []
                       },
@@ -9942,24 +9885,42 @@
                         "asOf": "2026-03-29T23:57:30Z",
                         "freshness": [
                           {
-                            "family": "src-eta-weather",
+                            "family": "dwd_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
-                            "staleAfterS": 1800,
+                            "staleAfterS": 900,
+                            "stale": false
+                          },
+                          {
+                            "family": "dwd_eta",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
                             "stale": false
                           }
                         ],
                         "attribution": [
                           {
-                            "family": "src-eta-weather",
+                            "family": "dwd_alpha",
                             "domain": "weather",
-                            "publisher": "Longkein Datenwerk",
-                            "text": "Synthetic data from family eta, licence lic-eta.",
-                            "licence": "Synthetic licence eta",
-                            "licenceUrl": "https://licences.example/eta",
+                            "publisher": "Sirfeim Datenwerk",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://eta.example/terms"
+                            "termsUrl": "https://alpha.example/terms/dwd_alpha"
+                          },
+                          {
+                            "family": "dwd_eta",
+                            "domain": "weather",
+                            "publisher": "Golmil Datenwerk",
+                            "text": "Synthetic data from family eta, licence dl-de/by-2-0.",
+                            "licence": "dl-de/by-2-0",
+                            "licenceUrl": "https://licences.example/dl-de-by-2-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://eta.example/terms/dwd_eta"
                           }
                         ],
                         "notes": {

@@ -9,16 +9,17 @@
       "id": "charging-commercial",
       "operation": "listChargingOptions",
       "counterpart": "charging station search",
-      "request": "/v1/charging-options?at=50.82,6.0&radius_m=20000&access=all&limit=5",
+      "request": "/v1/charging-options?at=47.62,7.79&radius_m=20000&access=all&limit=5",
       "key": {
         "useClass": "commercial",
         "scopes": [
           "energy"
         ],
         "sources": [
-          "src-alpha-energy",
-          "src-beta-energy",
-          "src-gamma-energy"
+          "afir_alpha",
+          "afir_beta",
+          "chargepool_gamma",
+          "tankerkoenig_gamma"
         ],
         "accepted": null
       },
@@ -28,16 +29,17 @@
       "id": "charging-all-consumer-fast",
       "operation": "listChargingOptions",
       "counterpart": "charging station search",
-      "request": "/v1/charging-options?at=48.41,7.68&radius_m=25000&access=all&min_kw=50&limit=3",
+      "request": "/v1/charging-options?at=47.62,7.79&radius_m=25000&access=all&min_kw=50&limit=3",
       "key": {
         "useClass": "consumer",
         "scopes": [
           "energy"
         ],
         "sources": [
-          "src-alpha-energy",
-          "src-beta-energy",
-          "src-gamma-energy"
+          "afir_alpha",
+          "afir_beta",
+          "chargepool_gamma",
+          "tankerkoenig_gamma"
         ],
         "accepted": null
       },
@@ -47,16 +49,17 @@
       "id": "charging-status-age-limit",
       "operation": "listChargingOptions",
       "counterpart": "charging station search",
-      "request": "/v1/charging-options?at=48.41,7.68&radius_m=25000&access=all&limit=2",
+      "request": "/v1/charging-options?at=47.62,7.79&radius_m=25000&access=all&limit=2",
       "key": {
         "useClass": "consumer",
         "scopes": [
           "energy"
         ],
         "sources": [
-          "src-alpha-energy",
-          "src-beta-energy",
-          "src-gamma-energy"
+          "afir_alpha",
+          "afir_beta",
+          "chargepool_gamma",
+          "tankerkoenig_gamma"
         ],
         "accepted": null
       },
@@ -66,16 +69,17 @@
       "id": "charging-reserved",
       "operation": "listChargingOptions",
       "counterpart": "charging station search",
-      "request": "/v1/charging-options?at=48.41,7.68&radius_m=25000&access=all&limit=2",
+      "request": "/v1/charging-options?at=47.62,7.79&radius_m=25000&access=all&limit=2",
       "key": {
         "useClass": "consumer",
         "scopes": [
           "energy"
         ],
         "sources": [
-          "src-alpha-energy",
-          "src-beta-energy",
-          "src-gamma-energy"
+          "afir_alpha",
+          "afir_beta",
+          "chargepool_gamma",
+          "tankerkoenig_gamma"
         ],
         "accepted": null
       },
@@ -85,16 +89,17 @@
       "id": "parking-terms-pending",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.39,10.23&radius_m=25000&limit=5",
+      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&limit=5",
       "key": {
         "useClass": "commercial",
         "scopes": [
           "parking"
         ],
         "sources": [
-          "src-alpha-parking",
-          "src-beta-parking",
-          "src-delta-parking"
+          "park_alpha",
+          "park_beta",
+          "truckpark_sid_static",
+          "truckpark_sid_dyn"
         ],
         "accepted": null
       },
@@ -104,16 +109,17 @@
       "id": "parking-terms-accepted",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.39,10.23&radius_m=25000&limit=5",
+      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&limit=5",
       "key": {
         "useClass": "commercial",
         "scopes": [
           "parking"
         ],
         "sources": [
-          "src-alpha-parking",
-          "src-beta-parking",
-          "src-delta-parking"
+          "park_alpha",
+          "park_beta",
+          "truckpark_sid_static",
+          "truckpark_sid_dyn"
         ],
         "accepted": [
           {
@@ -135,7 +141,8 @@
           "transit"
         ],
         "sources": [
-          "src-alpha-transit"
+          "delfi_static",
+          "delfi_rt_tu"
         ],
         "accepted": null
       },
@@ -152,7 +159,8 @@
           "transit"
         ],
         "sources": [
-          "src-alpha-transit"
+          "delfi_static",
+          "delfi_rt_tu"
         ],
         "accepted": null
       },
@@ -169,7 +177,8 @@
           "transit"
         ],
         "sources": [
-          "src-alpha-transit"
+          "delfi_static",
+          "delfi_rt_tu"
         ],
         "accepted": null
       },
@@ -186,7 +195,8 @@
           "transit"
         ],
         "sources": [
-          "src-alpha-transit"
+          "delfi_static",
+          "delfi_rt_tu"
         ],
         "accepted": null
       },
@@ -203,7 +213,8 @@
           "transit"
         ],
         "sources": [
-          "src-alpha-transit"
+          "delfi_static",
+          "delfi_rt_tu"
         ],
         "accepted": null
       },
@@ -220,7 +231,8 @@
           "transit"
         ],
         "sources": [
-          "src-alpha-transit"
+          "delfi_static",
+          "delfi_rt_tu"
         ],
         "accepted": null
       },
@@ -232,13 +244,14 @@
       "counterpart": "filling station search",
       "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&limit=10",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "energy"
         ],
         "sources": [
-          "src-gamma-energy"
+          "tankerkoenig_gamma"
         ],
+        "audience": "own",
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
@@ -249,13 +262,14 @@
       "counterpart": "filling station search",
       "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&fuel=e10&sort=price&limit=5",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "energy"
         ],
         "sources": [
-          "src-gamma-energy"
+          "tankerkoenig_gamma"
         ],
+        "audience": "own",
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
@@ -266,13 +280,14 @@
       "counterpart": "filling station search",
       "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&brand=belnan&open_now=true&limit=10",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "energy"
         ],
         "sources": [
-          "src-gamma-energy"
+          "tankerkoenig_gamma"
         ],
+        "audience": "own",
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
@@ -283,13 +298,14 @@
       "counterpart": "filling station search",
       "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&name=nam&sort=name&limit=10",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "energy"
         ],
         "sources": [
-          "src-gamma-energy"
+          "tankerkoenig_gamma"
         ],
+        "audience": "own",
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
@@ -305,8 +321,8 @@
           "places"
         ],
         "sources": [
-          "src-alpha-places",
-          "src-eta-places"
+          "geonames",
+          "bkg_gvisys"
         ],
         "accepted": null
       },
@@ -323,8 +339,8 @@
           "places"
         ],
         "sources": [
-          "src-alpha-places",
-          "src-eta-places"
+          "geonames",
+          "bkg_gvisys"
         ],
         "accepted": null
       },
@@ -341,8 +357,8 @@
           "places"
         ],
         "sources": [
-          "src-alpha-places",
-          "src-eta-places"
+          "geonames",
+          "bkg_gvisys"
         ],
         "accepted": null
       },
@@ -359,8 +375,8 @@
           "weather"
         ],
         "sources": [
-          "src-alpha-weather",
-          "src-eta-weather"
+          "dwd_alpha",
+          "dwd_eta"
         ],
         "accepted": null
       },
@@ -377,8 +393,8 @@
           "weather"
         ],
         "sources": [
-          "src-alpha-weather",
-          "src-eta-weather"
+          "dwd_alpha",
+          "dwd_eta"
         ],
         "accepted": null
       },
@@ -395,8 +411,8 @@
           "roads"
         ],
         "sources": [
-          "src-alpha-roads",
-          "src-epsilon-roads"
+          "roads_alpha",
+          "roads_epsilon"
         ],
         "accepted": null
       },
@@ -413,8 +429,8 @@
           "roads"
         ],
         "sources": [
-          "src-alpha-roads",
-          "src-epsilon-roads"
+          "roads_alpha",
+          "roads_epsilon"
         ],
         "accepted": null
       },
@@ -431,8 +447,8 @@
           "roads"
         ],
         "sources": [
-          "src-alpha-roads",
-          "src-epsilon-roads"
+          "roads_alpha",
+          "roads_epsilon"
         ],
         "accepted": null
       },
@@ -449,7 +465,7 @@
           "rules"
         ],
         "sources": [
-          "src-alpha-rules"
+          "viafrei_rules"
         ],
         "accepted": null
       },
@@ -466,8 +482,9 @@
           "transit"
         ],
         "sources": [
-          "src-alpha-transit",
-          "src-alpha-accessibility"
+          "delfi_static",
+          "delfi_rt_tu",
+          "openstation_siri_fm"
         ],
         "accepted": null
       },
@@ -484,8 +501,9 @@
           "transit"
         ],
         "sources": [
-          "src-alpha-transit",
-          "src-alpha-accessibility"
+          "delfi_static",
+          "delfi_rt_tu",
+          "openstation_siri_fm"
         ],
         "accepted": null
       },
@@ -502,8 +520,8 @@
           "roads"
         ],
         "sources": [
-          "src-alpha-roads",
-          "src-epsilon-roads"
+          "roads_alpha",
+          "roads_epsilon"
         ],
         "accepted": null
       },
@@ -513,16 +531,17 @@
       "id": "parking-free-spaces",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.39,10.23&radius_m=25000&free_min=1&limit=5",
+      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&free_min=1&limit=5",
       "key": {
         "useClass": "commercial",
         "scopes": [
           "parking"
         ],
         "sources": [
-          "src-alpha-parking",
-          "src-beta-parking",
-          "src-delta-parking"
+          "park_alpha",
+          "park_beta",
+          "truckpark_sid_static",
+          "truckpark_sid_dyn"
         ],
         "accepted": [
           {

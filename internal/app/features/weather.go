@@ -26,7 +26,7 @@ type Weather interface {
 type Rules interface {
 	// Topic returns one rule topic with its rules in order, or
 	// rules.ErrUnknownTopic.
-	Topic(ctx context.Context, code string) (rules.Topic, error)
+	Topic(ctx context.Context, code, lang string) (rules.Topic, error)
 	// Zones reads the low-emission-zone rows at a point or of a city.
 	Zones(ctx context.Context, q rules.ZoneQuery, families []string, now time.Time) ([]rules.Zone, error)
 }
@@ -101,7 +101,7 @@ func (s *Service) DrivingRules(ctx context.Context, key access.Record, code stri
 	if err != nil {
 		return rules.Topic{}, Answer[rules.Rule]{}, err
 	}
-	topic, err := s.repos.Rules.Topic(ctx, code)
+	topic, err := s.repos.Rules.Topic(ctx, code, s.set.Language)
 	if err != nil {
 		return rules.Topic{}, Answer[rules.Rule]{}, err
 	}

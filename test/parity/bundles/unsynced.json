@@ -3645,75 +3645,203 @@
         },
         {
           "name": "data.reviewedOn",
-          "value": "2026-10-08"
+          "value": "2026-09-19"
         },
         {
-          "name": "data.rules[0].legalBasis",
+          "name": "data.rules[truck_ban.cars_free].id",
+          "value": "truck_ban.cars_free"
+        },
+        {
+          "name": "data.rules[truck_ban.cars_free].legalBasis",
           "value": "§ 30 Abs. 3 StVO"
         },
         {
-          "name": "data.rules[0].text",
-          "value": "Sonntags und an Feiertagen dürfen Lkw über 7,5 t sowie Lkw mit Anhänger von 0 bis 22 Uhr nicht fahren."
+          "name": "data.rules[truck_ban.cars_free].reviewedOn",
+          "value": "2026-09-19"
         },
         {
-          "name": "data.rules[1].legalBasis",
-          "value": "§ 30 Abs. 3 StVO"
+          "name": "data.rules[truck_ban.cars_free].sourceUrl",
+          "value": "https://www.gesetze-im-internet.de/stvo_2013/__30.html"
         },
         {
-          "name": "data.rules[1].text",
-          "value": "Für Pkw, Wohnmobile und Transporter unter 7,5 t gilt das Verbot nicht — der Sonntag ist für sie ein normaler Fahrtag."
+          "name": "data.rules[truck_ban.cars_free].text",
+          "value": "The ban does not apply to cars, motorhomes and vans under 7.5 t — for them Sunday is an ordinary driving day."
         },
         {
-          "name": "data.rules[2].legalBasis",
-          "value": "§ 30 Abs. 4 StVO"
+          "name": "data.rules[truck_ban.cars_free].unconfirmed",
+          "value": "null"
         },
         {
-          "name": "data.rules[2].text",
-          "value": "Als Feiertage zählen bundesweit Neujahr, Karfreitag, Ostermontag, 1. Mai, Christi Himmelfahrt, Pfingstmontag, 3. Oktober, 25. und 26. Dezember; nur in einzelnen Ländern Fronleichnam (Baden-Württemberg, Bayern, Hessen, Nordrhein-Westfalen, Rheinland-Pfalz, Saarland), der Reformationstag am 31. Oktober (Brandenburg, Bremen, Hamburg, Mecklenburg-Vorpommern, Niedersachsen, Sachsen, Sachsen-Anhalt, Schleswig-Holstein, Thüringen) und Allerheiligen am 1. November (Baden-Württemberg, Bayern, Nordrhein-Westfalen, Rheinland-Pfalz, Saarland)."
+          "name": "data.rules[truck_ban.enforcement].id",
+          "value": "truck_ban.enforcement"
         },
         {
-          "name": "data.rules[3].legalBasis",
-          "value": "§ 30 Abs. 3 und 4 StVO"
-        },
-        {
-          "name": "data.rules[3].text",
-          "value": "Ein Feiertag nur einzelner Länder ist nur dort ein Fahrverbotstag: Am 31. Oktober gilt das Lkw-Verbot von 0 bis 22 Uhr in den neun genannten Ländern; in Baden-Württemberg, Bayern, Berlin, Hessen, Nordrhein-Westfalen, Rheinland-Pfalz und im Saarland ist der Tag kein Feiertag nach § 30 Abs. 4 — außer er fällt auf einen Sonntag."
-        },
-        {
-          "name": "data.rules[4].legalBasis",
-          "value": "§ 30 Abs. 4 StVO; Art. 1 FTG (Bayern)"
-        },
-        {
-          "name": "data.rules[4].text",
-          "value": "Ein Landesfeiertag, den § 30 Abs. 4 nicht nennt, ist kein Lkw-Fahrverbotstag — etwa in Bayern Heilige Drei Könige (6. Januar), Mariä Himmelfahrt (15. August, in Gemeinden mit überwiegend katholischer Bevölkerung) und in Augsburg das Friedensfest (8. August)."
-        },
-        {
-          "name": "data.rules[5].legalBasis",
-          "value": "Ferienreiseverordnung"
-        },
-        {
-          "name": "data.rules[5].text",
-          "value": "Dazu kommt das Ferienreiseverbot: vom 1. Juli bis 31. August samstags von 7 bis 20 Uhr auf den in der Verordnung genannten Autobahn- und Bundesstraßenabschnitten."
-        },
-        {
-          "name": "data.rules[6].legalBasis",
-          "value": "§ 30 Abs. 3 StVO"
-        },
-        {
-          "name": "data.rules[6].text",
-          "value": "Ausgenommen sind unter anderem kombinierter Verkehr, frische Milch, frisches Fleisch, frisches Obst und Gemüse — und die dazugehörigen Leerfahrten."
-        },
-        {
-          "name": "data.rules[7].legalBasis",
+          "name": "data.rules[truck_ban.enforcement].legalBasis",
           "value": "Bußgeldkatalog-Verordnung (BKatV)"
         },
         {
-          "name": "data.rules[7].text",
-          "value": "Verstöße treffen Fahrer und Unternehmen getrennt; kontrolliert wird an Rastplätzen und Grenzübergängen."
+          "name": "data.rules[truck_ban.enforcement].reviewedOn",
+          "value": "2026-09-19"
+        },
+        {
+          "name": "data.rules[truck_ban.enforcement].sourceUrl",
+          "value": "https://www.gesetze-im-internet.de/bkatv_2013/"
+        },
+        {
+          "name": "data.rules[truck_ban.enforcement].text",
+          "value": "Breaches are penalised separately for driver and operator; enforcement happens at rest areas and border crossings."
+        },
+        {
+          "name": "data.rules[truck_ban.enforcement].unconfirmed",
+          "value": "the amounts for driver and operator"
+        },
+        {
+          "name": "data.rules[truck_ban.exemptions].id",
+          "value": "truck_ban.exemptions"
+        },
+        {
+          "name": "data.rules[truck_ban.exemptions].legalBasis",
+          "value": "§ 30 Abs. 3 StVO"
+        },
+        {
+          "name": "data.rules[truck_ban.exemptions].reviewedOn",
+          "value": "2026-09-19"
+        },
+        {
+          "name": "data.rules[truck_ban.exemptions].sourceUrl",
+          "value": "https://www.gesetze-im-internet.de/stvo_2013/__30.html"
+        },
+        {
+          "name": "data.rules[truck_ban.exemptions].text",
+          "value": "Exempt are, among others, combined transport, fresh milk, fresh meat, fresh fruit and vegetables — and the empty runs that belong to them."
+        },
+        {
+          "name": "data.rules[truck_ban.exemptions].unconfirmed",
+          "value": "null"
+        },
+        {
+          "name": "data.rules[truck_ban.holidays].id",
+          "value": "truck_ban.holidays"
+        },
+        {
+          "name": "data.rules[truck_ban.holidays].legalBasis",
+          "value": "§ 30 Abs. 4 StVO"
+        },
+        {
+          "name": "data.rules[truck_ban.holidays].reviewedOn",
+          "value": "2026-10-08"
+        },
+        {
+          "name": "data.rules[truck_ban.holidays].sourceUrl",
+          "value": "https://www.gesetze-im-internet.de/stvo_2013/__30.html"
+        },
+        {
+          "name": "data.rules[truck_ban.holidays].text",
+          "value": "The holidays nationwide are New Year, Good Friday, Easter Monday, 1 May, Ascension, Whit Monday, 3 October, 25 and 26 December; in some federal states only: Corpus Christi (Baden-Württemberg, Bavaria, Hesse, North Rhine-Westphalia, Rhineland-Palatinate, Saarland), Reformation Day on 31 October (Brandenburg, Bremen, Hamburg, Mecklenburg-Western Pomerania, Lower Saxony, Saxony, Saxony-Anhalt, Schleswig-Holstein, Thuringia) and All Saints' Day on 1 November (Baden-Württemberg, Bavaria, North Rhine-Westphalia, Rhineland-Palatinate, Saarland)."
+        },
+        {
+          "name": "data.rules[truck_ban.holidays].unconfirmed",
+          "value": "null"
+        },
+        {
+          "name": "data.rules[truck_ban.state_holidays].id",
+          "value": "truck_ban.state_holidays"
+        },
+        {
+          "name": "data.rules[truck_ban.state_holidays].legalBasis",
+          "value": "§ 30 Abs. 3 und 4 StVO"
+        },
+        {
+          "name": "data.rules[truck_ban.state_holidays].reviewedOn",
+          "value": "2026-10-08"
+        },
+        {
+          "name": "data.rules[truck_ban.state_holidays].sourceUrl",
+          "value": "https://www.gesetze-im-internet.de/stvo_2013/__30.html"
+        },
+        {
+          "name": "data.rules[truck_ban.state_holidays].text",
+          "value": "A holiday of some federal states only is a ban day only there: on 31 October the lorry ban from 00:00 to 22:00 applies in the nine states named; in Baden-Württemberg, Bavaria, Berlin, Hesse, North Rhine-Westphalia, Rhineland-Palatinate and Saarland the day is not a holiday under § 30(4) — unless it falls on a Sunday."
+        },
+        {
+          "name": "data.rules[truck_ban.state_holidays].unconfirmed",
+          "value": "null"
+        },
+        {
+          "name": "data.rules[truck_ban.summer].id",
+          "value": "truck_ban.summer"
+        },
+        {
+          "name": "data.rules[truck_ban.summer].legalBasis",
+          "value": "Ferienreiseverordnung"
+        },
+        {
+          "name": "data.rules[truck_ban.summer].reviewedOn",
+          "value": "2026-09-19"
+        },
+        {
+          "name": "data.rules[truck_ban.summer].sourceUrl",
+          "value": "https://www.gesetze-im-internet.de/ferienreisev/"
+        },
+        {
+          "name": "data.rules[truck_ban.summer].text",
+          "value": "On top of that comes the holiday-season ban: 1 July to 31 August, Saturdays 07:00–20:00, on the motorway and federal-road sections listed in the regulation."
+        },
+        {
+          "name": "data.rules[truck_ban.summer].unconfirmed",
+          "value": "null"
+        },
+        {
+          "name": "data.rules[truck_ban.sunday].id",
+          "value": "truck_ban.sunday"
+        },
+        {
+          "name": "data.rules[truck_ban.sunday].legalBasis",
+          "value": "§ 30 Abs. 3 StVO"
+        },
+        {
+          "name": "data.rules[truck_ban.sunday].reviewedOn",
+          "value": "2026-09-19"
+        },
+        {
+          "name": "data.rules[truck_ban.sunday].sourceUrl",
+          "value": "https://www.gesetze-im-internet.de/stvo_2013/__30.html"
+        },
+        {
+          "name": "data.rules[truck_ban.sunday].text",
+          "value": "On Sundays and public holidays, lorries over 7.5 t and lorries with trailers may not drive between 00:00 and 22:00."
+        },
+        {
+          "name": "data.rules[truck_ban.sunday].unconfirmed",
+          "value": "null"
+        },
+        {
+          "name": "data.rules[truck_ban.unlisted_holidays].id",
+          "value": "truck_ban.unlisted_holidays"
+        },
+        {
+          "name": "data.rules[truck_ban.unlisted_holidays].legalBasis",
+          "value": "§ 30 Abs. 4 StVO; Art. 1 FTG (Bayern)"
+        },
+        {
+          "name": "data.rules[truck_ban.unlisted_holidays].reviewedOn",
+          "value": "2026-10-08"
+        },
+        {
+          "name": "data.rules[truck_ban.unlisted_holidays].sourceUrl",
+          "value": "https://www.gesetze-bayern.de/Content/Document/BayFTG-1"
+        },
+        {
+          "name": "data.rules[truck_ban.unlisted_holidays].text",
+          "value": "A state holiday that § 30(4) does not name is not a lorry-ban day — in Bavaria, for example, Epiphany (6 January), Assumption Day (15 August, in municipalities with a predominantly Catholic population) and in Augsburg the Peace Festival (8 August)."
+        },
+        {
+          "name": "data.rules[truck_ban.unlisted_holidays].unconfirmed",
+          "value": "null"
         },
         {
           "name": "data.title",
-          "value": "Sonntags- und Feiertagsfahrverbot für Lkw"
+          "value": "Sunday and holiday lorry ban"
         },
         {
           "name": "data.topic",
@@ -8460,72 +8588,200 @@
           "value": "2026-09-19"
         },
         {
-          "name": "data.rules[0].legalBasis",
-          "value": "35. BImSchV"
+          "name": "data.rules[lez.diesel_bans].id",
+          "value": "lez.diesel_bans"
         },
         {
-          "name": "data.rules[0].text",
-          "value": "Viele deutsche Städte haben eine Umweltzone: hineinfahren darf nur, wer eine gültige Feinstaubplakette sichtbar an der Windschutzscheibe hat — ausländische Fahrzeuge eingeschlossen."
-        },
-        {
-          "name": "data.rules[1].legalBasis",
+          "name": "data.rules[lez.diesel_bans].legalBasis",
           "value": "Umweltbundesamt, Umweltzonen in Deutschland"
         },
         {
-          "name": "data.rules[1].text",
-          "value": "Praktisch alle ausgeschilderten Umweltzonen verlangen heute die grüne Plakette (Schadstoffgruppe 4). Das Zusatzzeichen unter dem Schild sagt verbindlich, welche Plakette gilt."
+          "name": "data.rules[lez.diesel_bans].reviewedOn",
+          "value": "2026-09-19"
         },
         {
-          "name": "data.rules[2].legalBasis",
-          "value": "§ 3 35. BImSchV"
+          "name": "data.rules[lez.diesel_bans].sourceUrl",
+          "value": "https://www.umweltbundesamt.de/themen/luft/luftschadstoffe/feinstaub/umweltzonen-in-deutschland"
         },
         {
-          "name": "data.rules[2].text",
-          "value": "Die Plakette gibt es bei Kfz-Zulassungsstellen, technischen Prüfstellen und Überwachungsorganisationen (TÜV, DEKRA, GTÜ, KÜS) und anerkannten Werkstätten. Mitbringen: die Zulassungsbescheinigung Teil I bzw. den ausländischen Fahrzeugschein. Sie gilt unbefristet und klebt fahrzeuggebunden."
+          "name": "data.rules[lez.diesel_bans].text",
+          "value": "Some cities additionally had diesel through-traffic bans that apply regardless of the plaque and have changed repeatedly — check the city's own page before you drive."
         },
         {
-          "name": "data.rules[3].legalBasis",
-          "value": "35. BImSchV, Gebühr der Ausgabestelle"
+          "name": "data.rules[lez.diesel_bans].unconfirmed",
+          "value": "which diesel bans are still in force today (Stuttgart, Munich, Hamburg among others)"
         },
         {
-          "name": "data.rules[3].text",
-          "value": "Die Gebühr liegt an der Ausgabestelle üblicherweise im niedrigen einstelligen Euro-Bereich; Online-Händler verlangen deutlich mehr."
+          "name": "data.rules[lez.foreign_stickers].id",
+          "value": "lez.foreign_stickers"
         },
         {
-          "name": "data.rules[4].legalBasis",
+          "name": "data.rules[lez.foreign_stickers].legalBasis",
+          "value": "Umweltbundesamt, Umweltzonen in Deutschland"
+        },
+        {
+          "name": "data.rules[lez.foreign_stickers].reviewedOn",
+          "value": "2026-09-19"
+        },
+        {
+          "name": "data.rules[lez.foreign_stickers].sourceUrl",
+          "value": "https://www.umweltbundesamt.de/themen/luft/luftschadstoffe/feinstaub/umweltzonen-in-deutschland"
+        },
+        {
+          "name": "data.rules[lez.foreign_stickers].text",
+          "value": "A French Crit'Air sticker or any other foreign environmental badge is not valid in Germany — only the German Feinstaubplakette counts."
+        },
+        {
+          "name": "data.rules[lez.foreign_stickers].unconfirmed",
+          "value": "null"
+        },
+        {
+          "name": "data.rules[lez.green_only].id",
+          "value": "lez.green_only"
+        },
+        {
+          "name": "data.rules[lez.green_only].legalBasis",
+          "value": "Umweltbundesamt, Umweltzonen in Deutschland"
+        },
+        {
+          "name": "data.rules[lez.green_only].reviewedOn",
+          "value": "2026-09-19"
+        },
+        {
+          "name": "data.rules[lez.green_only].sourceUrl",
+          "value": "https://www.umweltbundesamt.de/themen/luft/luftschadstoffe/feinstaub/umweltzonen-in-deutschland"
+        },
+        {
+          "name": "data.rules[lez.green_only].text",
+          "value": "In practice every signposted Umweltzone today requires the green plaque (emission group 4). The supplementary sign under the zone sign is what actually decides which plaque applies."
+        },
+        {
+          "name": "data.rules[lez.green_only].unconfirmed",
+          "value": "whether any single zone still admits yellow or red plaques — if in doubt, the supplementary sign decides"
+        },
+        {
+          "name": "data.rules[lez.penalty].id",
+          "value": "lez.penalty"
+        },
+        {
+          "name": "data.rules[lez.penalty].legalBasis",
           "value": "Bußgeldkatalog-Verordnung (BKatV)"
         },
         {
-          "name": "data.rules[4].text",
-          "value": "Ohne gültige Plakette in die Umweltzone zu fahren kostet ein Bußgeld in der Größenordnung von 100 €."
+          "name": "data.rules[lez.penalty].reviewedOn",
+          "value": "2026-09-19"
         },
         {
-          "name": "data.rules[5].legalBasis",
-          "value": "Umweltbundesamt, Umweltzonen in Deutschland"
+          "name": "data.rules[lez.penalty].sourceUrl",
+          "value": "https://www.gesetze-im-internet.de/bkatv_2013/"
         },
         {
-          "name": "data.rules[5].text",
-          "value": "Eine französische Crit'Air-Vignette oder eine andere ausländische Umweltplakette gilt in Deutschland nicht — es zählt allein die deutsche Feinstaubplakette."
+          "name": "data.rules[lez.penalty].text",
+          "value": "Entering the zone without a valid plaque costs a fine in the order of €100."
         },
         {
-          "name": "data.rules[6].legalBasis",
+          "name": "data.rules[lez.penalty].unconfirmed",
+          "value": "the exact amount in the current fines catalogue"
+        },
+        {
+          "name": "data.rules[lez.price].id",
+          "value": "lez.price"
+        },
+        {
+          "name": "data.rules[lez.price].legalBasis",
+          "value": "35. BImSchV, Gebühr der Ausgabestelle"
+        },
+        {
+          "name": "data.rules[lez.price].reviewedOn",
+          "value": "2026-09-19"
+        },
+        {
+          "name": "data.rules[lez.price].sourceUrl",
+          "value": "https://www.gesetze-im-internet.de/bimschv_35_2007/"
+        },
+        {
+          "name": "data.rules[lez.price].text",
+          "value": "At an issuing office the fee is usually a few euros; online resellers charge considerably more."
+        },
+        {
+          "name": "data.rules[lez.price].unconfirmed",
+          "value": "the exact fee charged per issuing office"
+        },
+        {
+          "name": "data.rules[lez.signage].id",
+          "value": "lez.signage"
+        },
+        {
+          "name": "data.rules[lez.signage].legalBasis",
           "value": "StVO Anlage 2, Zeichen 270.1 / 270.2"
         },
         {
-          "name": "data.rules[6].text",
-          "value": "Die Zone beginnt am Zeichen 270.1 und endet am Zeichen 270.2; das Zusatzzeichen darunter zeigt die zugelassenen Plaketten."
+          "name": "data.rules[lez.signage].reviewedOn",
+          "value": "2026-09-19"
         },
         {
-          "name": "data.rules[7].legalBasis",
-          "value": "Umweltbundesamt, Umweltzonen in Deutschland"
+          "name": "data.rules[lez.signage].sourceUrl",
+          "value": "https://www.gesetze-im-internet.de/stvo_2013/anlage_2.html"
         },
         {
-          "name": "data.rules[7].text",
-          "value": "Einzelne Städte hatten zusätzlich Diesel-Durchfahrtsverbote, die unabhängig von der Plakette gelten und sich mehrfach geändert haben — vor der Fahrt auf der Seite der Stadt prüfen."
+          "name": "data.rules[lez.signage].text",
+          "value": "The zone starts at sign 270.1 and ends at sign 270.2; the plate underneath shows which plaques are admitted."
+        },
+        {
+          "name": "data.rules[lez.signage].unconfirmed",
+          "value": "null"
+        },
+        {
+          "name": "data.rules[lez.where_to_buy].id",
+          "value": "lez.where_to_buy"
+        },
+        {
+          "name": "data.rules[lez.where_to_buy].legalBasis",
+          "value": "§ 3 35. BImSchV"
+        },
+        {
+          "name": "data.rules[lez.where_to_buy].reviewedOn",
+          "value": "2026-09-19"
+        },
+        {
+          "name": "data.rules[lez.where_to_buy].sourceUrl",
+          "value": "https://www.gesetze-im-internet.de/bimschv_35_2007/"
+        },
+        {
+          "name": "data.rules[lez.where_to_buy].text",
+          "value": "You get the plaque at vehicle registration offices, technical inspection bodies (TÜV, DEKRA, GTÜ, KÜS) and approved garages. Bring the vehicle registration document (part I) or its foreign equivalent. It does not expire and belongs to that one vehicle."
+        },
+        {
+          "name": "data.rules[lez.where_to_buy].unconfirmed",
+          "value": "null"
+        },
+        {
+          "name": "data.rules[lez.zones_exist].id",
+          "value": "lez.zones_exist"
+        },
+        {
+          "name": "data.rules[lez.zones_exist].legalBasis",
+          "value": "35. BImSchV"
+        },
+        {
+          "name": "data.rules[lez.zones_exist].reviewedOn",
+          "value": "2026-09-19"
+        },
+        {
+          "name": "data.rules[lez.zones_exist].sourceUrl",
+          "value": "https://www.gesetze-im-internet.de/bimschv_35_2007/"
+        },
+        {
+          "name": "data.rules[lez.zones_exist].text",
+          "value": "Many German cities have a low-emission zone (Umweltzone): you may only drive in with a valid Feinstaubplakette displayed on the windscreen — foreign vehicles included."
+        },
+        {
+          "name": "data.rules[lez.zones_exist].unconfirmed",
+          "value": "null"
         },
         {
           "name": "data.title",
-          "value": "Umweltzone und Feinstaubplakette"
+          "value": "Low-emission zones and the Feinstaubplakette"
         },
         {
           "name": "data.topic",
@@ -8664,72 +8920,200 @@
           "value": "2026-09-19"
         },
         {
-          "name": "data.rules[0].legalBasis",
-          "value": "35. BImSchV"
+          "name": "data.rules[lez.diesel_bans].id",
+          "value": "lez.diesel_bans"
         },
         {
-          "name": "data.rules[0].text",
-          "value": "Viele deutsche Städte haben eine Umweltzone: hineinfahren darf nur, wer eine gültige Feinstaubplakette sichtbar an der Windschutzscheibe hat — ausländische Fahrzeuge eingeschlossen."
-        },
-        {
-          "name": "data.rules[1].legalBasis",
+          "name": "data.rules[lez.diesel_bans].legalBasis",
           "value": "Umweltbundesamt, Umweltzonen in Deutschland"
         },
         {
-          "name": "data.rules[1].text",
-          "value": "Praktisch alle ausgeschilderten Umweltzonen verlangen heute die grüne Plakette (Schadstoffgruppe 4). Das Zusatzzeichen unter dem Schild sagt verbindlich, welche Plakette gilt."
+          "name": "data.rules[lez.diesel_bans].reviewedOn",
+          "value": "2026-09-19"
         },
         {
-          "name": "data.rules[2].legalBasis",
-          "value": "§ 3 35. BImSchV"
+          "name": "data.rules[lez.diesel_bans].sourceUrl",
+          "value": "https://www.umweltbundesamt.de/themen/luft/luftschadstoffe/feinstaub/umweltzonen-in-deutschland"
         },
         {
-          "name": "data.rules[2].text",
-          "value": "Die Plakette gibt es bei Kfz-Zulassungsstellen, technischen Prüfstellen und Überwachungsorganisationen (TÜV, DEKRA, GTÜ, KÜS) und anerkannten Werkstätten. Mitbringen: die Zulassungsbescheinigung Teil I bzw. den ausländischen Fahrzeugschein. Sie gilt unbefristet und klebt fahrzeuggebunden."
+          "name": "data.rules[lez.diesel_bans].text",
+          "value": "Some cities additionally had diesel through-traffic bans that apply regardless of the plaque and have changed repeatedly — check the city's own page before you drive."
         },
         {
-          "name": "data.rules[3].legalBasis",
-          "value": "35. BImSchV, Gebühr der Ausgabestelle"
+          "name": "data.rules[lez.diesel_bans].unconfirmed",
+          "value": "which diesel bans are still in force today (Stuttgart, Munich, Hamburg among others)"
         },
         {
-          "name": "data.rules[3].text",
-          "value": "Die Gebühr liegt an der Ausgabestelle üblicherweise im niedrigen einstelligen Euro-Bereich; Online-Händler verlangen deutlich mehr."
+          "name": "data.rules[lez.foreign_stickers].id",
+          "value": "lez.foreign_stickers"
         },
         {
-          "name": "data.rules[4].legalBasis",
+          "name": "data.rules[lez.foreign_stickers].legalBasis",
+          "value": "Umweltbundesamt, Umweltzonen in Deutschland"
+        },
+        {
+          "name": "data.rules[lez.foreign_stickers].reviewedOn",
+          "value": "2026-09-19"
+        },
+        {
+          "name": "data.rules[lez.foreign_stickers].sourceUrl",
+          "value": "https://www.umweltbundesamt.de/themen/luft/luftschadstoffe/feinstaub/umweltzonen-in-deutschland"
+        },
+        {
+          "name": "data.rules[lez.foreign_stickers].text",
+          "value": "A French Crit'Air sticker or any other foreign environmental badge is not valid in Germany — only the German Feinstaubplakette counts."
+        },
+        {
+          "name": "data.rules[lez.foreign_stickers].unconfirmed",
+          "value": "null"
+        },
+        {
+          "name": "data.rules[lez.green_only].id",
+          "value": "lez.green_only"
+        },
+        {
+          "name": "data.rules[lez.green_only].legalBasis",
+          "value": "Umweltbundesamt, Umweltzonen in Deutschland"
+        },
+        {
+          "name": "data.rules[lez.green_only].reviewedOn",
+          "value": "2026-09-19"
+        },
+        {
+          "name": "data.rules[lez.green_only].sourceUrl",
+          "value": "https://www.umweltbundesamt.de/themen/luft/luftschadstoffe/feinstaub/umweltzonen-in-deutschland"
+        },
+        {
+          "name": "data.rules[lez.green_only].text",
+          "value": "In practice every signposted Umweltzone today requires the green plaque (emission group 4). The supplementary sign under the zone sign is what actually decides which plaque applies."
+        },
+        {
+          "name": "data.rules[lez.green_only].unconfirmed",
+          "value": "whether any single zone still admits yellow or red plaques — if in doubt, the supplementary sign decides"
+        },
+        {
+          "name": "data.rules[lez.penalty].id",
+          "value": "lez.penalty"
+        },
+        {
+          "name": "data.rules[lez.penalty].legalBasis",
           "value": "Bußgeldkatalog-Verordnung (BKatV)"
         },
         {
-          "name": "data.rules[4].text",
-          "value": "Ohne gültige Plakette in die Umweltzone zu fahren kostet ein Bußgeld in der Größenordnung von 100 €."
+          "name": "data.rules[lez.penalty].reviewedOn",
+          "value": "2026-09-19"
         },
         {
-          "name": "data.rules[5].legalBasis",
-          "value": "Umweltbundesamt, Umweltzonen in Deutschland"
+          "name": "data.rules[lez.penalty].sourceUrl",
+          "value": "https://www.gesetze-im-internet.de/bkatv_2013/"
         },
         {
-          "name": "data.rules[5].text",
-          "value": "Eine französische Crit'Air-Vignette oder eine andere ausländische Umweltplakette gilt in Deutschland nicht — es zählt allein die deutsche Feinstaubplakette."
+          "name": "data.rules[lez.penalty].text",
+          "value": "Entering the zone without a valid plaque costs a fine in the order of €100."
         },
         {
-          "name": "data.rules[6].legalBasis",
+          "name": "data.rules[lez.penalty].unconfirmed",
+          "value": "the exact amount in the current fines catalogue"
+        },
+        {
+          "name": "data.rules[lez.price].id",
+          "value": "lez.price"
+        },
+        {
+          "name": "data.rules[lez.price].legalBasis",
+          "value": "35. BImSchV, Gebühr der Ausgabestelle"
+        },
+        {
+          "name": "data.rules[lez.price].reviewedOn",
+          "value": "2026-09-19"
+        },
+        {
+          "name": "data.rules[lez.price].sourceUrl",
+          "value": "https://www.gesetze-im-internet.de/bimschv_35_2007/"
+        },
+        {
+          "name": "data.rules[lez.price].text",
+          "value": "At an issuing office the fee is usually a few euros; online resellers charge considerably more."
+        },
+        {
+          "name": "data.rules[lez.price].unconfirmed",
+          "value": "the exact fee charged per issuing office"
+        },
+        {
+          "name": "data.rules[lez.signage].id",
+          "value": "lez.signage"
+        },
+        {
+          "name": "data.rules[lez.signage].legalBasis",
           "value": "StVO Anlage 2, Zeichen 270.1 / 270.2"
         },
         {
-          "name": "data.rules[6].text",
-          "value": "Die Zone beginnt am Zeichen 270.1 und endet am Zeichen 270.2; das Zusatzzeichen darunter zeigt die zugelassenen Plaketten."
+          "name": "data.rules[lez.signage].reviewedOn",
+          "value": "2026-09-19"
         },
         {
-          "name": "data.rules[7].legalBasis",
-          "value": "Umweltbundesamt, Umweltzonen in Deutschland"
+          "name": "data.rules[lez.signage].sourceUrl",
+          "value": "https://www.gesetze-im-internet.de/stvo_2013/anlage_2.html"
         },
         {
-          "name": "data.rules[7].text",
-          "value": "Einzelne Städte hatten zusätzlich Diesel-Durchfahrtsverbote, die unabhängig von der Plakette gelten und sich mehrfach geändert haben — vor der Fahrt auf der Seite der Stadt prüfen."
+          "name": "data.rules[lez.signage].text",
+          "value": "The zone starts at sign 270.1 and ends at sign 270.2; the plate underneath shows which plaques are admitted."
+        },
+        {
+          "name": "data.rules[lez.signage].unconfirmed",
+          "value": "null"
+        },
+        {
+          "name": "data.rules[lez.where_to_buy].id",
+          "value": "lez.where_to_buy"
+        },
+        {
+          "name": "data.rules[lez.where_to_buy].legalBasis",
+          "value": "§ 3 35. BImSchV"
+        },
+        {
+          "name": "data.rules[lez.where_to_buy].reviewedOn",
+          "value": "2026-09-19"
+        },
+        {
+          "name": "data.rules[lez.where_to_buy].sourceUrl",
+          "value": "https://www.gesetze-im-internet.de/bimschv_35_2007/"
+        },
+        {
+          "name": "data.rules[lez.where_to_buy].text",
+          "value": "You get the plaque at vehicle registration offices, technical inspection bodies (TÜV, DEKRA, GTÜ, KÜS) and approved garages. Bring the vehicle registration document (part I) or its foreign equivalent. It does not expire and belongs to that one vehicle."
+        },
+        {
+          "name": "data.rules[lez.where_to_buy].unconfirmed",
+          "value": "null"
+        },
+        {
+          "name": "data.rules[lez.zones_exist].id",
+          "value": "lez.zones_exist"
+        },
+        {
+          "name": "data.rules[lez.zones_exist].legalBasis",
+          "value": "35. BImSchV"
+        },
+        {
+          "name": "data.rules[lez.zones_exist].reviewedOn",
+          "value": "2026-09-19"
+        },
+        {
+          "name": "data.rules[lez.zones_exist].sourceUrl",
+          "value": "https://www.gesetze-im-internet.de/bimschv_35_2007/"
+        },
+        {
+          "name": "data.rules[lez.zones_exist].text",
+          "value": "Many German cities have a low-emission zone (Umweltzone): you may only drive in with a valid Feinstaubplakette displayed on the windscreen — foreign vehicles included."
+        },
+        {
+          "name": "data.rules[lez.zones_exist].unconfirmed",
+          "value": "null"
         },
         {
           "name": "data.title",
-          "value": "Umweltzone und Feinstaubplakette"
+          "value": "Low-emission zones and the Feinstaubplakette"
         },
         {
           "name": "data.topic",

@@ -1276,6 +1276,10 @@
       "DrivingRule": {
         "additionalProperties": false,
         "properties": {
+          "id": {
+            "description": "The rule's key, stable across reviews.",
+            "type": "string"
+          },
           "legalBasis": {
             "description": "The provision the rule rests on; null when none is recorded.",
             "type": [
@@ -1283,13 +1287,36 @@
               "null"
             ]
           },
+          "reviewedOn": {
+            "description": "When the rule was last read against its source.",
+            "format": "date",
+            "type": "string"
+          },
+          "sourceUrl": {
+            "description": "Where the provision is published; null when none is recorded.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "text": {
             "type": "string"
+          },
+          "unconfirmed": {
+            "description": "What of the rule is not confirmed, to check with the source; null when all is.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
+          "id",
           "text",
-          "legalBasis"
+          "legalBasis",
+          "sourceUrl",
+          "reviewedOn",
+          "unconfirmed"
         ],
         "type": "object"
       },
@@ -1304,7 +1331,7 @@
             "type": "string"
           },
           "reviewedOn": {
-            "description": "When the topic was last reviewed.",
+            "description": "The oldest review of its rules: the topic is as current as its least recently read rule.",
             "format": "date",
             "type": "string"
           },

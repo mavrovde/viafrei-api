@@ -200,6 +200,11 @@ nothing, so that family contributed nothing and neither side credits it.
   route serves one) and credits the families of the situations it reports,
   none when it reports none, as the platform's watch names the source of
   the data behind each report.
+- **Driving rules** are stated in the answer's language, each with its key,
+  its source, its own review date and what of it is not confirmed, and the
+  topic's review date is its oldest rule's, as the platform's driving rules
+  state them. The platform's disclaimer opens with that date, which the
+  API states as reviewedOn; the rest is compared.
 - **Road conditions credit the weather.** The lamp reads the DWD warnings
   of every weather family the key may read, with or without the weather
   scope (the warnings are public), and the answer credits those families

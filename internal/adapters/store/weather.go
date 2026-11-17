@@ -141,28 +141,45 @@ func (s *Store) WarningsAt(ctx context.Context, q weather.Query, families []stri
 }
 
 // Topic reads one rule topic and its rules in their order.
-func (s *Store) Topic(ctx context.Context, code string) (rules.Topic, error) {
+func (s *Store) Topic(ctx context.Context, code, lang string) (rules.Topic, error) {
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]rules.Topic, error) {
 		rows, _ := tx.Query(ctx, `
-select t.topic_code, t.title, t.reviewed_on,
-       coalesce(array_agg(s.body order by s.position, s.statement_id) filter (where s.statement_id is not null), '{}'),
-       coalesce(array_agg(s.legal_basis order by s.position, s.statement_id) filter (where s.statement_id is not null), '{}')
+select t.topic_code, case when $2 = 'en' then coalesce(t.title_en, t.title) else t.title end,
+       coalesce(min(s.reviewed_on), t.reviewed_on),
+       coalesce(jsonb_agg(jsonb_build_object(
+         'id', s.statement_id,
+         'text', case when $2 = 'en' then coalesce(s.body_en, s.body) else s.body end,
+         'basis', s.legal_basis, 'url', s.legal_basis_url, 'reviewed', s.reviewed_on,
+         'verify', nullif(btrim(case when $2 = 'en' then coalesce(s.to_verify_en, s.to_verify) else s.to_verify end), ''))
+         order by s.position, s.statement_id) filter (where s.statement_id is not null), '[]')
 from contract.rule_topic t
 left join contract.rule_statement s on s.topic_code = t.topic_code and `+permitted("s")+`
 where t.topic_code = $1 and `+permitted("t")+`
-group by t.topic_code, t.title, t.reviewed_on`, code)
+group by t.topic_code, t.title, t.title_en, t.reviewed_on`, code, lang)
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (rules.Topic, error) {
 			var (
-				v      rules.Topic
-				bodies []string
-				bases  []*string
+				v   rules.Topic
+				raw []struct {
+					ID       string  `json:"id"`
+					Text     string  `json:"text"`
+					Basis    *string `json:"basis"`
+					URL      *string `json:"url"`
+					Reviewed string  `json:"reviewed"`
+					Verify   *string `json:"verify"`
+				}
 			)
-			err := r.Scan(&v.Code, &v.Title, &v.ReviewedOn, &bodies, &bases)
-			v.Rules = make([]rules.Rule, len(bodies))
-			for i, b := range bodies {
-				v.Rules[i] = rules.Rule{Text: b, LegalBasis: bases[i]}
+			if err := r.Scan(&v.Code, &v.Title, &v.ReviewedOn, &raw); err != nil {
+				return v, err
 			}
-			return v, err
+			v.Rules = make([]rules.Rule, len(raw))
+			for i, x := range raw {
+				on, err := time.Parse(time.DateOnly, x.Reviewed)
+				if err != nil {
+					return v, err
+				}
+				v.Rules[i] = rules.Rule{ID: x.ID, Text: x.Text, LegalBasis: x.Basis, LegalBasisURL: x.URL, ReviewedOn: on, ToVerify: x.Verify}
+			}
+			return v, nil
 		})
 	})
 	if err == nil && len(out) == 0 {

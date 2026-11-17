@@ -352,10 +352,10 @@ func TestTopicReadsTheRulesInOrder(t *testing.T) {
 		n, based     int
 		reviewed     time.Time
 	)
-	owner(t, `select t.topic_code, t.reviewed_on, count(*), count(s.legal_basis), string_agg(s.body, '|' order by s.position, s.statement_id)
+	owner(t, `select t.topic_code, min(s.reviewed_on), count(*), count(s.legal_basis), string_agg(s.body, '|' order by s.position, s.statement_id)
 from contract.rule_topic t join contract.rule_statement s on s.topic_code = t.topic_code
 group by t.topic_code, t.reviewed_on order by t.topic_code limit 1`, &code, &reviewed, &n, &based, &bodies)
-	topic, err := st.Topic(bounded(t), code)
+	topic, err := st.Topic(bounded(t), code, "de")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,7 +369,7 @@ group by t.topic_code, t.reviewed_on order by t.topic_code limit 1`, &code, &rev
 	if topic.Code != code || topic.Title == "" || !topic.ReviewedOn.Equal(reviewed) || len(got) != n || strings.Join(got, "|") != bodies || withBasis != based {
 		t.Errorf("topic %s: %+v, want %d rules (%d with a basis): %s", code, topic, n, based, bodies)
 	}
-	if _, err := st.Topic(bounded(t), "no_such_topic"); !errors.Is(err, rules.ErrUnknownTopic) {
+	if _, err := st.Topic(bounded(t), "no_such_topic", "de"); !errors.Is(err, rules.ErrUnknownTopic) {
 		t.Errorf("an unknown topic: %v", err)
 	}
 }
@@ -381,7 +381,7 @@ func TestWeatherAndRulesReadsReportStorageFaults(t *testing.T) {
 	if _, err := st.WarningsAt(ctx, weather.Query{Limit: maxWarnings, MinLevel: 1}, []string{"x"}, time.Now()); err == nil {
 		t.Error("WarningsAt on an ended context succeeded")
 	}
-	if _, err := st.Topic(ctx, "winter_tyres"); err == nil || errors.Is(err, rules.ErrUnknownTopic) {
+	if _, err := st.Topic(ctx, "winter_tyres", "de"); err == nil || errors.Is(err, rules.ErrUnknownTopic) {
 		t.Errorf("Topic on an ended context: %v", err)
 	}
 }

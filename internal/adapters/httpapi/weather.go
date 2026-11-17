@@ -198,8 +198,12 @@ func zoneKey(z *rules.Zone) *string {
 
 // DrivingRule is one rule of a topic.
 type DrivingRule struct {
-	Text       string  `json:"text"`
-	LegalBasis *string `json:"legalBasis" nullable:"true" doc:"The provision the rule rests on; null when none is recorded."`
+	ID            string  `json:"id" doc:"The rule's key, stable across reviews."`
+	Text          string  `json:"text"`
+	LegalBasis    *string `json:"legalBasis" nullable:"true" doc:"The provision the rule rests on; null when none is recorded."`
+	LegalBasisURL *string `json:"sourceUrl" nullable:"true" doc:"Where the provision is published; null when none is recorded."`
+	ReviewedOn    string  `json:"reviewedOn" format:"date" doc:"When the rule was last read against its source."`
+	ToVerify      *string `json:"unconfirmed" nullable:"true" doc:"What of the rule is not confirmed, to check with the source; null when all is."`
 }
 
 // DrivingRulesData is the answer of getDrivingRules.
@@ -207,7 +211,7 @@ type DrivingRulesData struct {
 	Topic      string            `json:"topic"`
 	Title      string            `json:"title"`
 	Rules      []DrivingRule     `json:"rules" doc:"In their curated order."`
-	ReviewedOn string            `json:"reviewedOn" format:"date" doc:"When the topic was last reviewed."`
+	ReviewedOn string            `json:"reviewedOn" format:"date" doc:"The oldest review of its rules: the topic is as current as its least recently read rule."`
 	Disclaimer Disclaimer        `json:"disclaimer"`
 	Zones      []LowEmissionZone `json:"zones,omitempty" doc:"With topic lez and a position or city: the published zone rows, inside first, then by distance."`
 	Verdict    *ZoneVerdict      `json:"zoneVerdict,omitempty" doc:"With topic lez and a position: the platform's verdict."`
@@ -269,7 +273,8 @@ func registerDrivingRules(api huma.API, s *server, op huma.Operation) {
 		}
 		rs := make([]DrivingRule, len(t.Rules))
 		for i, r := range t.Rules {
-			rs[i] = DrivingRule{Text: r.Text, LegalBasis: r.LegalBasis}
+			rs[i] = DrivingRule{ID: r.ID, Text: r.Text, LegalBasis: r.LegalBasis, LegalBasisURL: r.LegalBasisURL,
+				ReviewedOn: r.ReviewedOn.Format(time.DateOnly), ToVerify: r.ToVerify}
 		}
 		return &DrivingRulesOutput{CacheControl: noStore, Body: DrivingRulesEnvelope{
 			Data: DrivingRulesData{

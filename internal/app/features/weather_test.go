@@ -90,6 +90,8 @@ func (f *wxFake) Zones(context.Context, rules.ZoneQuery, []string, time.Time) ([
 
 func (f *wxFake) ZoneEntries(context.Context, []string) ([]rules.ListEntry, error) { return nil, nil }
 
+func (f *wxFake) ZoneEntryNamed(context.Context, string) (*rules.ListEntry, error) { return nil, nil }
+
 func (f *wxFake) GemeindeAt(context.Context, geo.Point, int, []string) (*places.Place, error) {
 	return nil, nil
 }

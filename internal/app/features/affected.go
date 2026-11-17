@@ -19,7 +19,9 @@ type Affected interface {
 // AffectedStations answers which stations are most affected now for key (the
 // site's station board), from the transit families it may read and, when it
 // has the scope accessibility, the lift families; without it the lifts are
-// not counted and the answer is partial.
+// not counted and the answer is partial. It credits the lift families the
+// key may read, as the site's station board credits the station lifts
+// alone; a key that may read none is credited with what contributed.
 func (s *Service) AffectedStations(ctx context.Context, key access.Record, limit int) ([]transit.Affected, Answer[struct{}], error) {
 	reg, gate, err := s.gate(ctx, key)
 	if err != nil {
@@ -30,6 +32,7 @@ func (s *Service) AffectedStations(ctx context.Context, key access.Record, limit
 		return nil, Answer[struct{}]{}, err
 	}
 	lifts, liftsPartial, err := gate.Answer(access.Answering(reg, "accessibility"))
+	credited := lifts
 	if err != nil || !key.Plan.Has("accessibility") {
 		lifts, liftsPartial = nil, true
 	}
@@ -47,7 +50,7 @@ func (s *Service) AffectedStations(ctx context.Context, key access.Record, limit
 	if err := gate.Check(contributed); err != nil {
 		return nil, Answer[struct{}]{}, err
 	}
-	fams, err := s.provenanceOf(ctx, contributed, permitted)
+	fams, err := s.provenanceOf(ctx, credited, contributed)
 	if err != nil {
 		return nil, Answer[struct{}]{}, err
 	}

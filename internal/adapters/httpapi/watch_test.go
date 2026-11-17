@@ -52,19 +52,18 @@ func TestWatchTheOtherKinds(t *testing.T) {
 	for _, c := range []struct {
 		kind, target, cond, list string
 		n                        int
-		holds                    bool
 	}{
-		{"station", "1:de:05315:11201", "", "departures", 2, true},
-		{"station", "1:de:05315:11201", `{"delay_min":20}`, "departures", 1, true},
-		{"region", "05", "", "punctuality", -1, true},
-		{"region", "05", `{"late_share":0.5}`, "punctuality", -1, false},
-		{"region", "05", `{"min_trips":100}`, "punctuality", -1, false},
-		{"region", "05", `{"delay_min":20}`, "punctuality", -1, true},
-		{"weather", "811000000", `{"min_level":0}`, "warnings", 2, true},
-		{"weather", "Berlin", "", "warnings", 2, true},
-		{"weather", "52.52,13.405", "", "warnings", 2, true},
-		{"charger", "cs-01-0000", "", "site", -1, true},
-		{"charger", "cs-01-0000", `{"point_id":"cp-2"}`, "site", -1, false},
+		{"station", "1:de:05315:11201", "", "departures", 2},
+		{"station", "1:de:05315:11201", `{"delay_min":20}`, "departures", 1},
+		{"region", "05", "", "punctuality", -1},
+		{"region", "05", `{"late_share":0.5}`, "punctuality", -1},
+		{"region", "05", `{"min_trips":100}`, "punctuality", -1},
+		{"region", "05", `{"delay_min":20}`, "punctuality", -1},
+		{"weather", "811000000", `{"min_level":0}`, "warnings", 2},
+		{"weather", "Berlin", "", "warnings", 2},
+		{"weather", "52.52,13.405", "", "warnings", 2},
+		{"charger", "cs-01-0000", "", "site", -1},
+		{"charger", "cs-01-0000", `{"point_id":"cp-2"}`, "site", -1},
 	} {
 		q := url.Values{"kind": {c.kind}, "target": {c.target}}
 		if c.cond != "" {
@@ -74,14 +73,14 @@ func TestWatchTheOtherKinds(t *testing.T) {
 		if code != http.StatusOK {
 			t.Fatalf("%s %s: %d", c.kind, c.cond, code)
 		}
-		if d["holds"] != c.holds || d[c.list] == nil || d["kind"] != c.kind || len(d["situations"].([]any)) != 0 {
+		if d["holds"] != nil || d["cell"] != nil || d[c.list] == nil || d["kind"] != c.kind || len(d["situations"].([]any)) != 0 {
 			t.Errorf("%s %s: %v", c.kind, c.cond, d)
 		}
 		if l, ok := d[c.list].([]any); ok && len(l) != c.n {
 			t.Errorf("%s %s: %d %s, want %d", c.kind, c.cond, len(l), c.list, c.n)
 		}
 		// The id stands for the watch: read again by it, the same answer.
-		if code, again := watch(t, h, url.Values{"watch_id": {d["watchId"].(string)}}); code != http.StatusOK || again["holds"] != c.holds {
+		if code, again := watch(t, h, url.Values{"watch_id": {d["watchId"].(string)}}); code != http.StatusOK || again["kind"] != c.kind {
 			t.Errorf("%s again by id: %d %v", c.kind, code, again)
 		}
 	}
@@ -94,16 +93,23 @@ func TestWatchTheOtherKinds(t *testing.T) {
 		t.Errorf("region trips: %v %+v", d, f.gotDisrupt)
 	}
 	_, d = watch(t, h, url.Values{"kind": {"weather"}, "target": {"52.52,13.405"}})
-	if c, _ := d["cell"].(map[string]any); f.gotCell.At == nil || f.gotCell.At.Lat != 52.52 || c["key"] != "811000000" || c["name"] != "Stadt Berlin" || c["place"] != nil {
+	if f.gotCell.At == nil || f.gotCell.At.Lat != 52.52 {
 		t.Errorf("weather at a position: %v %+v", d, f.gotCell)
 	}
 	f.cell.Place = &places.Place{Name: "Berlin"}
-	if _, d = watch(t, h, url.Values{"kind": {"weather"}, "target": {"Berlin"}}); d["cell"].(map[string]any)["place"] != "Berlin" || f.gotCell.Cell != "Berlin" || f.gotCell.At != nil {
+	if _, d = watch(t, h, url.Values{"kind": {"weather"}, "target": {"Berlin"}}); f.gotCell.Cell != "Berlin" || f.gotCell.At != nil {
 		t.Errorf("weather by name: %v %+v", d, f.gotCell)
 	}
 	f.disruption.Trips = nil
-	if _, d := watch(t, h, url.Values{"kind": {"region"}, "target": {"05"}}); d["holds"] != false || d["trips"] != nil {
-		t.Errorf("no trips observed holds nothing: %v", d)
+	if _, d := watch(t, h, url.Values{"kind": {"region"}, "target": {"05"}}); d["trips"] != nil {
+		t.Errorf("no trips observed: %v", d)
+	}
+	// A region or weather watch credits no family, as the platform's watch.
+	for _, q := range []url.Values{{"kind": {"region"}, "target": {"05"}}, {"kind": {"weather"}, "target": {"Berlin"}}} {
+		w := do(t, h, http.MethodGet, "/v1/watch?"+q.Encode(), bearer)
+		if m, _ := decode(t, w)["meta"].(map[string]any); w.Code != http.StatusOK || len(m["attribution"].([]any)) != 0 {
+			t.Errorf("%s credits: %d %v", q.Get("kind"), w.Code, m["attribution"])
+		}
 	}
 }
 

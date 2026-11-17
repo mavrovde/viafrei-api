@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,6 +28,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
+	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/runtime/wire"
@@ -226,6 +228,16 @@ func noteOwners(t *testing.T) parity.Owners {
 		out[n] = []string{parity.Unowned}
 	} else {
 		t.Fatal("a fixture family owns the speed cameras' notice")
+	}
+	// So is the caveat of a city the zone list holds no entry for.
+	q, err := parity.LoadQuestions(os.DirFS(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range q.Cases {
+		if u, err := url.Parse(c.Request); err == nil && u.Query().Get("city") != "" {
+			out[rules.NoBoundaryCaveat(u.Query().Get("city"), wire.Language)] = []string{parity.Unowned}
+		}
 	}
 	return out
 }

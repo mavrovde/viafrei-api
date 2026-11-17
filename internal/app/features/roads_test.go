@@ -199,9 +199,17 @@ func TestAnUnregisteredRoadIsAnsweredWithWhatWasRead(t *testing.T) {
 		if c.Covering == nil || !slices.Equal(c.Covering, tc.want) {
 			t.Errorf("%s: covering %#v, want %#v", tc.ref, c.Covering, tc.want)
 		}
+		if len(c.Families) != 0 {
+			t.Errorf("%s: an empty answer credits %v", tc.ref, c.Families)
+		}
+	}
+	// A motorway the register lacks is unknown, as the platform refuses it.
+	f := &roadFake{roadErr: roads.ErrUnknownRoad}
+	if _, err := roadService(f).MotorwayConditions(ctx, key("commercial", roadsScope, "r1"), roads.CorridorQuery{Road: "A999", Limit: 5}); !errors.Is(err, roads.ErrUnknownRoad) || f.readCalls != 0 {
+		t.Errorf("unknown motorway: %v, %d reads", err, f.readCalls)
 	}
 	// A registered road names no coverage.
-	f := &roadFake{road: roads.Road{Ref: "A8", Class: roads.ClassMotorway}, covering: []string{"r1"}}
+	f = &roadFake{road: roads.Road{Ref: "A8", Class: roads.ClassMotorway}, covering: []string{"r1"}}
 	c, err := roadService(f).MotorwayConditions(ctx, key("commercial", roadsScope, "r1"), roads.CorridorQuery{Road: "A8", Limit: 5})
 	if err != nil || c.Covering != nil || f.gotRoad.Unregistered {
 		t.Errorf("registered road: covering %v, unregistered %v, %v", c.Covering, f.gotRoad.Unregistered, err)

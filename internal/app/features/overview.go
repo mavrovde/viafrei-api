@@ -213,7 +213,9 @@ func (s *Service) Places(ctx context.Context, key access.Record, q places.Query)
 	if err := gate.Check(contributed); err != nil {
 		return Answer[places.Place]{}, err
 	}
-	fams, err := s.provenanceOf(ctx, contributed, permitted)
+	// The platform's place search credits the registers whose rows it
+	// states: an empty answer credits none.
+	fams, err := s.creditsOf(ctx, contributed)
 	if err != nil {
 		return Answer[places.Place]{}, err
 	}

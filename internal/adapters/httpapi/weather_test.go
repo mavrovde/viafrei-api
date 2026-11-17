@@ -28,8 +28,9 @@ func (f *fakeFeatures) WeatherCell(_ context.Context, key access.Record, target 
 	return f.cell, f.cellErr
 }
 
-func (f *fakeFeatures) LowEmissionZones(context.Context, access.Record, rules.ZoneQuery) (features.ZonesAnswer, error) {
-	return features.ZonesAnswer{}, nil
+func (f *fakeFeatures) LowEmissionZones(_ context.Context, _ access.Record, q rules.ZoneQuery) (features.ZonesAnswer, error) {
+	f.gotZones = &q
+	return f.zones, nil
 }
 
 func (f *fakeFeatures) DrivingRules(_ context.Context, key access.Record, topic string) (rules.Topic, features.Answer[rules.Rule], error) {
@@ -139,6 +140,44 @@ func TestDrivingRulesAnswer(t *testing.T) {
 	}
 	if attr, _ := meta(t, body)["attribution"].([]any); len(attr) != 1 {
 		t.Errorf("attribution %v", attr)
+	}
+}
+
+func TestDrivingRulesZones(t *testing.T) {
+	req.Covers(t, "FR-RULES-001")
+	f := everyAnswer()
+	f.topic.Code = "lez"
+	z := rules.Zone{Key: "lez_alpha/z1", Role: "zone", Name: "Umweltzone", DistanceM: 420, Family: "lez_alpha"}
+	f.zones = features.ZonesAnswer{Zones: []rules.Zone{z}, Verdict: &rules.Verdict{Kind: "outside", Zone: &z}, Answer: &rules.ZoneAnswer{}}
+	h := featureHandler(t, config.Defaults(), f, nil)
+	body := decode(t, do(t, h, http.MethodGet, "/v1/driving-rules?topic=lez&at=52.52,13.405", bearer))
+	data, _ := body["data"].(map[string]any)
+	v, _ := data["zoneVerdict"].(map[string]any)
+	if v["distanceM"] != 420.0 || v["zone"] != "lez_alpha/z1" || data["zoneCity"] != nil || f.gotZones == nil || f.gotZones.City != "" {
+		t.Errorf("outside: %v, asked %+v", data, f.gotZones)
+	}
+	f.zones.Verdict.Kind = "inside"
+	data, _ = decode(t, do(t, h, http.MethodGet, "/v1/driving-rules?topic=lez&at=52.52,13.405", bearer))["data"].(map[string]any)
+	if v, _ = data["zoneVerdict"].(map[string]any); v["distanceM"] != nil {
+		t.Errorf("inside states no distance: %v", v)
+	}
+	green := "green"
+	f.zones = features.ZonesAnswer{City: &rules.ZoneCity{Name: "Matfienland", Caveat: "no zone held"}}
+	body = decode(t, do(t, h, http.MethodGet, "/v1/driving-rules?topic=lez&city=Matfienland", bearer))
+	data, _ = body["data"].(map[string]any)
+	c, _ := data["zoneCity"].(map[string]any)
+	notes, _ := meta(t, body)["notes"].(map[string]any)
+	cond, _ := notes["condition"].([]any)
+	if c["name"] != "Matfienland" || c["covered"] != false || c["zone"] != nil || data["zones"] != nil || f.gotZones.City != "Matfienland" ||
+		len(cond) != 1 || cond[0] != "no zone held" {
+		t.Errorf("a city with no entry: %v %v", data, notes)
+	}
+	f.zones = features.ZonesAnswer{City: &rules.ZoneCity{Name: "Berlin", Plakette: &green, Covered: true}}
+	body = decode(t, do(t, h, http.MethodGet, "/v1/driving-rules?topic=lez&city=Berlin", bearer))
+	c, _ = body["data"].(map[string]any)["zoneCity"].(map[string]any)
+	notes, _ = meta(t, body)["notes"].(map[string]any)
+	if cond, _ = notes["condition"].([]any); c["covered"] != true || c["plakette"] != "green" || len(cond) != 0 {
+		t.Errorf("an entry: %v %v", c, notes)
 	}
 }
 

@@ -87,6 +87,7 @@ var nullableObjects = []struct{ schema, member string }{
 	{"HydrogenData", "nearest"},
 	{"DisruptionData", "punctuality"},
 	{"SpeedCamera", "location"},
+	{"LocationZone", "plaque"},
 	{"LocationData", "address"},
 	{"LocationData", "municipality"},
 	{"LocationData", "district"},
@@ -99,6 +100,7 @@ var nullableObjects = []struct{ schema, member string }{
 	{"RoadSituation", "position"},
 	{"StationsQuery", "at"},
 	{"WarningArea", "geometry"},
+	{"ZoneVerdict", "plaque"},
 }
 
 func amendNullableObjects(api huma.API) {

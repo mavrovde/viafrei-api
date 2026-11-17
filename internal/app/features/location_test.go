@@ -43,6 +43,10 @@ func (f *locationFake) ZoneEntries(_ context.Context, codes []string) ([]rules.L
 	return f.entries, f.entryErr
 }
 
+func (f *locationFake) ZoneEntryNamed(context.Context, string) (*rules.ListEntry, error) {
+	return nil, nil
+}
+
 func (f *locationFake) GemeindeAt(context.Context, geo.Point, int, []string) (*places.Place, error) {
 	return nil, nil
 }

@@ -216,6 +216,10 @@ func TestEveryStatementFaultFailsTheRead(t *testing.T) {
 			_, err := s.WarningsAt(ctx, weather.Query{At: berlin, MinLevel: 1, Limit: 5}, every, now)
 			return err
 		},
+		"Motorways": func(ctx context.Context, s *store.Store) error {
+			_, _, err := s.Motorways(ctx, roads.CatalogueQuery{Limit: 5}, every, now)
+			return err
+		},
 		"Topic": func(ctx context.Context, s *store.Store) error { _, err := s.Topic(ctx, "lez", "de"); return err },
 		"Zones": func(ctx context.Context, s *store.Store) error {
 			_, err := s.Zones(ctx, rules.ZoneQuery{At: &berlin}, every, now)

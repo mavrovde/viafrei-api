@@ -67,3 +67,13 @@ func TestRollbackOnAnUnreachableDatabaseFails(t *testing.T) {
 		t.Fatal("the test did not fail")
 	}
 }
+
+// Stopping no database does nothing; outside the module there is no pin to
+// share a database by.
+func TestStopOfNoneAndSharedWithoutAPin(t *testing.T) {
+	(*DB)(nil).Stop()
+	t.Chdir(t.TempDir())
+	if _, err := Shared(context.Background()); err == nil {
+		t.Fatal("a database was shared without a pin")
+	}
+}

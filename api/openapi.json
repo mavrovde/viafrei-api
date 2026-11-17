@@ -1400,8 +1400,17 @@
             },
             "type": "array"
           },
+          "alertsChecked": {
+            "description": "Whether an alert publication was alive to ask: alertsTotal 0 means none in force only when this is true, and that it could not be told when false.",
+            "type": "boolean"
+          },
           "alertsTotal": {
-            "description": "Alerts in force before the limit.",
+            "description": "Alerts in force before the limit, duplicates left out.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "duplicatesOmitted": {
+            "description": "Alerts of the secondary publication left out as duplicates of an alert of the primary publication in force.",
             "format": "int64",
             "type": "integer"
           },
@@ -1498,6 +1507,8 @@
         "required": [
           "alerts",
           "alertsTotal",
+          "alertsChecked",
+          "duplicatesOmitted",
           "punctuality",
           "windowMin"
         ],
@@ -11429,16 +11440,56 @@
                     "summary": "Hydrogen stations for a car within 50 km",
                     "value": {
                       "data": {
-                        "stations": [],
+                        "stations": [
+                          {
+                            "name": "H2 Schömpingbach",
+                            "operator": "H2 Synthetic",
+                            "brand": null,
+                            "location": {
+                              "lat": 48.389598,
+                              "lon": 7.422192
+                            },
+                            "distanceM": 3125,
+                            "address": null,
+                            "refill": [
+                              {
+                                "solution": "gaseousHydrogen700barCar"
+                              }
+                            ],
+                            "opening": null,
+                            "providerUpdatedAt": null,
+                            "sourceFamily": "afir_alpha"
+                          }
+                        ],
                         "nearest": null
                       },
                       "meta": {
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
-                        "asOf": null,
-                        "freshness": [],
-                        "attribution": [],
+                        "asOf": "2026-03-29T23:55:00Z",
+                        "freshness": [
+                          {
+                            "family": "afir_alpha",
+                            "dataAsOf": "2026-03-29T23:55:00Z",
+                            "ageS": 300,
+                            "staleAfterS": 1800,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "afir_alpha",
+                            "domain": "energy",
+                            "publisher": "Kleber Datenwerk",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms/afir_alpha"
+                          }
+                        ],
                         "notes": {
                           "condition": [],
                           "purpose": []
@@ -11707,10 +11758,10 @@
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/hydrogen-options?at=47.95,6.9\u0026vehicle=car\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/hydrogen-options?at=48.39,7.38\u0026vehicle=car\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/hydrogen-options?at=47.95,6.9\u0026vehicle=car\u0026limit=2",
+        "x-example-request": "/v1/hydrogen-options?at=48.39,7.38\u0026vehicle=car\u0026limit=2",
         "x-mcp-counterpart": "hydrogen station search",
         "x-required-scope": "energy"
       }
@@ -16442,14 +16493,52 @@
                   "example": {
                     "summary": "Pharmacies in a town",
                     "value": {
-                      "data": [],
+                      "data": [
+                        {
+                          "name": "Pharmacy Pößfül",
+                          "category": "amenity",
+                          "kind": "pharmacy",
+                          "brand": null,
+                          "operator": null,
+                          "street": "Marktweg",
+                          "number": "1",
+                          "postcode": "10001",
+                          "place": "Kansilkamp",
+                          "location": {
+                            "lat": 47.609833,
+                            "lon": 7.897242
+                          },
+                          "distanceM": null,
+                          "dataAsOf": "2026-02-26",
+                          "sourceFamily": "osm"
+                        }
+                      ],
                       "meta": {
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
                         "asOf": null,
-                        "freshness": [],
-                        "attribution": [],
+                        "freshness": [
+                          {
+                            "family": "osm",
+                            "dataAsOf": null,
+                            "ageS": null,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "osm",
+                            "domain": "places",
+                            "publisher": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0",
+                            "text": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0",
+                            "licence": "ODbL 1.0",
+                            "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
+                            "shareAlike": true,
+                            "shareAlikeOffer": "https://viafrei.de/impressum",
+                            "termsUrl": "https://www.openstreetmap.org/copyright"
+                          }
+                        ],
                         "notes": {
                           "condition": [],
                           "purpose": []
@@ -16462,7 +16551,7 @@
                         ],
                         "page": {
                           "limit": 2,
-                          "total": 0,
+                          "total": 1,
                           "nextCursor": null
                         }
                       },
@@ -16719,10 +16808,10 @@
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/pois?name=pharmacy\u0026in=Z%C3%BClz%C3%BCrode\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/pois?name=pharmacy\u0026in=Kansilkamp\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/pois?name=pharmacy\u0026in=Z%C3%BClz%C3%BCrode\u0026limit=2",
+        "x-example-request": "/v1/pois?name=pharmacy\u0026in=Kansilkamp\u0026limit=2",
         "x-mcp-counterpart": "place of interest search",
         "x-required-scope": "places"
       }
@@ -18478,8 +18567,49 @@
                     "summary": "Speed check locations within 10 km",
                     "value": {
                       "data": {
-                        "official": [],
-                        "officialTotal": 0,
+                        "official": [
+                          {
+                            "id": "se:700001",
+                            "kind": "fixed",
+                            "enforces": "speed",
+                            "street": "Weg 1",
+                            "locationLabel": null,
+                            "municipality": "Schömpingbach",
+                            "direction": null,
+                            "limitKmh": 30,
+                            "lorryLimitKmh": null,
+                            "firstDay": null,
+                            "lastDay": null,
+                            "dataAsOf": "2026-01-28",
+                            "staleYear": null,
+                            "location": {
+                              "lat": 48.413347,
+                              "lon": 7.465562
+                            },
+                            "sourceFamily": "speed_alpha"
+                          },
+                          {
+                            "id": "se:700002",
+                            "kind": "section_control",
+                            "enforces": "speed",
+                            "street": "Weg 2",
+                            "locationLabel": null,
+                            "municipality": "Schömpingbach",
+                            "direction": null,
+                            "limitKmh": 40,
+                            "lorryLimitKmh": null,
+                            "firstDay": null,
+                            "lastDay": null,
+                            "dataAsOf": "2026-01-28",
+                            "staleYear": null,
+                            "location": {
+                              "lat": 48.376228,
+                              "lon": 7.502126
+                            },
+                            "sourceFamily": "speed_alpha"
+                          }
+                        ],
+                        "officialTotal": 2,
                         "osm": [],
                         "osmTotal": 0
                       },
@@ -18487,9 +18617,29 @@
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
-                        "asOf": null,
-                        "freshness": [],
-                        "attribution": [],
+                        "asOf": "2026-03-29T12:00:00Z",
+                        "freshness": [
+                          {
+                            "family": "speed_alpha",
+                            "dataAsOf": "2026-03-29T12:00:00Z",
+                            "ageS": 43200,
+                            "staleAfterS": 259200,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "speed_alpha",
+                            "domain": "roads",
+                            "publisher": "Blitzwerk Datenwerk",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms/speed_alpha"
+                          }
+                        ],
                         "notes": {
                           "condition": [
                             "Note on use (§ 23 Abs. 1c StVO): a person driving a vehicle may not, while driving, operate or use any technical device or app function that shows or disrupts traffic enforcement. This also applies to a passenger's smartphone if the driver benefits from it (OLG Karlsruhe). A violation costs €75 and one point in Flensburg. This information is meant only for planning before setting off or during a stop. The locations come from official and open sources and may be incomplete or out of date; mobile checks are possible at any time and anywhere. Always keep to the speed limit in force. Not legal advice."
@@ -18760,10 +18910,10 @@
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/speed-cameras?at=47.98,6.95\u0026radius_m=10000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/speed-cameras?at=48.39,7.48\u0026radius_m=10000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/speed-cameras?at=47.98,6.95\u0026radius_m=10000\u0026limit=2",
+        "x-example-request": "/v1/speed-cameras?at=48.39,7.48\u0026radius_m=10000\u0026limit=2",
         "x-mcp-counterpart": "speed camera search",
         "x-required-scope": "roads"
       }
@@ -19710,8 +19860,23 @@
                     "summary": "The official weather warnings in force in one Land",
                     "value": {
                       "data": {
-                        "state": "09",
-                        "events": []
+                        "state": "05",
+                        "events": [
+                          {
+                            "event": "GLÄTTE",
+                            "level": 4,
+                            "notices": 1,
+                            "cells": 1,
+                            "until": "2026-03-30T00:24:18Z"
+                          },
+                          {
+                            "event": "UV-INDEX",
+                            "level": 2,
+                            "notices": 1,
+                            "cells": 1,
+                            "until": "2026-03-30T11:04:42Z"
+                          }
+                        ]
                       },
                       "meta": {
                         "requestId": "example-request-0001",
@@ -19719,13 +19884,6 @@
                         "language": "en",
                         "asOf": "2026-03-29T23:57:30Z",
                         "freshness": [
-                          {
-                            "family": "dwd_alpha",
-                            "dataAsOf": "2026-03-29T23:57:30Z",
-                            "ageS": 150,
-                            "staleAfterS": 900,
-                            "stale": false
-                          },
                           {
                             "family": "dwd_eta",
                             "dataAsOf": "2026-03-29T23:57:30Z",
@@ -19735,17 +19893,6 @@
                           }
                         ],
                         "attribution": [
-                          {
-                            "family": "dwd_alpha",
-                            "domain": "weather",
-                            "publisher": "Sirfeim Datenwerk",
-                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
-                            "licence": "CC BY 4.0",
-                            "licenceUrl": "https://licences.example/cc-by-4-0",
-                            "shareAlike": false,
-                            "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/dwd_alpha"
-                          },
                           {
                             "family": "dwd_eta",
                             "domain": "weather",
@@ -19770,7 +19917,7 @@
                         ]
                       },
                       "links": {
-                        "self": "https://api.viafrei.de/v1/states/09/weather"
+                        "self": "https://api.viafrei.de/v1/states/05/weather"
                       }
                     }
                   }
@@ -20022,10 +20169,10 @@
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/states/09/weather\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/states/05/weather\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/states/09/weather",
+        "x-example-request": "/v1/states/05/weather",
         "x-required-scope": "weather"
       }
     },
@@ -21377,6 +21524,8 @@
                           }
                         ],
                         "alertsTotal": 1,
+                        "alertsChecked": true,
+                        "duplicatesOmitted": 0,
                         "punctuality": null,
                         "windowMin": 60
                       },
@@ -21802,10 +21951,10 @@
                     "summary": "What changed on a motorway in the last three hours",
                     "value": {
                       "data": {
-                        "watchId": "eyJrIjoicm9hZCIsImtleSI6IkExMDIiLCJjIjp7fX0",
-                        "uri": "viafrei://watch/eyJrIjoicm9hZCIsImtleSI6IkExMDIiLCJjIjp7fX0",
+                        "watchId": "eyJrIjoicm9hZCIsImtleSI6IkExMDMiLCJjIjp7fX0",
+                        "uri": "viafrei://watch/eyJrIjoicm9hZCIsImtleSI6IkExMDMiLCJjIjp7fX0",
                         "kind": "road",
-                        "key": "A102",
+                        "key": "A103",
                         "from": "2026-03-30T00:00:00Z",
                         "until": "2026-03-30T03:00:00Z",
                         "ended": false,
@@ -21813,15 +21962,65 @@
                           "event": "any"
                         },
                         "note": null,
-                        "situations": []
+                        "situations": [
+                          {
+                            "id": "datex:syn:ev-00011",
+                            "kind": "roadworks",
+                            "severity": "lane_closed",
+                            "road": "A103",
+                            "roadType": "motorway",
+                            "direction": "unknown",
+                            "directionText": null,
+                            "location": {
+                              "lat": 52.574746,
+                              "lon": 8.489175
+                            },
+                            "validity": {
+                              "from": "2026-03-29T19:33:04Z",
+                              "fromLocal": "2026-03-29T21:33:04+02:00",
+                              "until": null,
+                              "untilLocal": null
+                            },
+                            "lanes": null,
+                            "delayMin": null,
+                            "lengthM": null,
+                            "headline": "MaintenanceWorks",
+                            "description": null,
+                            "textLanguage": "de",
+                            "updatedAt": "2026-03-29T23:57:30Z",
+                            "updatedAtLocal": "2026-03-30T01:57:30+02:00",
+                            "position": null,
+                            "sourceFamily": "roads_alpha"
+                          }
+                        ]
                       },
                       "meta": {
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
-                        "asOf": null,
-                        "freshness": [],
-                        "attribution": [],
+                        "asOf": "2026-03-29T23:57:30Z",
+                        "freshness": [
+                          {
+                            "family": "roads_alpha",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "roads_alpha",
+                            "domain": "roads",
+                            "publisher": "Nimbruß Datenwerk",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms/roads_alpha"
+                          }
+                        ],
                         "notes": {
                           "condition": [],
                           "purpose": []
@@ -22086,10 +22285,10 @@
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/watch?kind=road\u0026target=A102\u0026hours=3\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/watch?kind=road\u0026target=A103\u0026hours=3\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/watch?kind=road\u0026target=A102\u0026hours=3",
+        "x-example-request": "/v1/watch?kind=road\u0026target=A103\u0026hours=3",
         "x-required-scope": "roads"
       }
     },
@@ -22163,7 +22362,28 @@
                     "summary": "The official weather warnings at a position, with their lamp",
                     "value": {
                       "data": {
-                        "warnings": [],
+                        "warnings": [
+                          {
+                            "id": "dwd:100008",
+                            "hazard": "uv",
+                            "level": 2,
+                            "levelName": "Stufe 2",
+                            "issuer": "Deutscher Wetterdienst",
+                            "headline": "Warnung vor uv (Stufe 2)",
+                            "textLanguage": "de",
+                            "validity": {
+                              "from": "2026-03-29T09:04:42Z",
+                              "fromLocal": "2026-03-29T11:04:42+02:00",
+                              "until": "2026-03-30T11:04:42Z",
+                              "untilLocal": "2026-03-30T13:04:42+02:00"
+                            },
+                            "area": {
+                              "name": "Warngebiet 05002",
+                              "geometry": null
+                            },
+                            "sourceFamily": "dwd_eta"
+                          }
+                        ],
                         "roadWeather": []
                       },
                       "meta": {
@@ -22173,13 +22393,6 @@
                         "asOf": "2026-03-29T23:57:30Z",
                         "freshness": [
                           {
-                            "family": "dwd_alpha",
-                            "dataAsOf": "2026-03-29T23:57:30Z",
-                            "ageS": 150,
-                            "staleAfterS": 900,
-                            "stale": false
-                          },
-                          {
                             "family": "dwd_eta",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
@@ -22188,17 +22401,6 @@
                           }
                         ],
                         "attribution": [
-                          {
-                            "family": "dwd_alpha",
-                            "domain": "weather",
-                            "publisher": "Sirfeim Datenwerk",
-                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
-                            "licence": "CC BY 4.0",
-                            "licenceUrl": "https://licences.example/cc-by-4-0",
-                            "shareAlike": false,
-                            "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/dwd_alpha"
-                          },
                           {
                             "family": "dwd_eta",
                             "domain": "weather",
@@ -22223,8 +22425,8 @@
                         ],
                         "query": {
                           "at": {
-                            "lat": 52.1,
-                            "lon": 12.2
+                            "lat": 49.6,
+                            "lon": 7.5
                           },
                           "minLevel": 1,
                           "hazards": []
@@ -22483,10 +22685,10 @@
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/weather-risk?at=52.1,12.2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/weather-risk?at=49.6,7.5\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/weather-risk?at=52.1,12.2",
+        "x-example-request": "/v1/weather-risk?at=49.6,7.5",
         "x-required-scope": "weather"
       }
     }

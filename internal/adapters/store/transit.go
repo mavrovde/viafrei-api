@@ -182,12 +182,14 @@ func (s *Store) Facilities(ctx context.Context, station string, families []strin
 // IFOPT); then the stations themselves.
 
 // affectedAlerts are the refs the alerts in force at $2 of the families ($1)
-// name, with the alert and its family.
-const affectedAlerts = `
+// name, with the alert and its family; only of a live publication, as the
+// platform's station card asks only the alert sources alive (alertLive).
+var affectedAlerts = `
 select distinct a.alert_id, a.source_ref, u.sid
 from contract.service_alert a, unnest(a.stop_ids) u(sid)
 where a.source_ref = any($1) and ` + "a.display_class <> 'withhold' and (a.audience = 'public' or " + ownKeyOn + ")" + `
-  and (a.active_from is null or a.active_from <= $2) and (a.active_to is null or a.active_to > $2)`
+  and (a.active_from is null or a.active_from <= $2) and (a.active_to is null or a.active_to > $2)
+  and ` + alertLive("a", "$2")
 
 // affectedLifts are the stations' lifts and escalators out of service, of
 // the families ($1).

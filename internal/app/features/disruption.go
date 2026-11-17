@@ -28,6 +28,9 @@ func (s *Service) Disruptions(ctx context.Context, key access.Record, q transit.
 	v, meta, err := listed(ctx, s, key, "transit", func(permitted []string) (transit.Disruptions, []string, error) {
 		v, err := s.repos.Disruptions.Disruptions(ctx, q, permitted)
 		var contributed []string
+		if len(v.Alerts) > 0 {
+			contributed = append(contributed, v.AlertFamilies...)
+		}
 		for _, a := range v.Alerts {
 			contributed = append(contributed, a.Family)
 		}

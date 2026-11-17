@@ -42,9 +42,18 @@ type Punctuality struct {
 // Disruptions are the service alerts in force of an area or line, at most
 // the limit with the count before it, and the area's punctuality.
 type Disruptions struct {
-	Alerts      []Alert
-	AlertsTotal int
-	Punctuality *Punctuality
+	Alerts []Alert
+	// AlertsTotal are the alerts in force before the limit, duplicates left
+	// out; AlertsDuplicates the secondary publication's rows left out as
+	// duplicates of a primary alert. AlertsChecked is whether a publication of the families
+	// was alive to ask: without one no alert is listed, and none means
+	// "could not tell", not "none". AlertFamilies are the families of every
+	// row counted, which the platform credits when it lists any.
+	AlertsTotal      int
+	AlertsDuplicates int
+	AlertsChecked    bool
+	AlertFamilies    []string
+	Punctuality      *Punctuality
 	// Trips are the area's observed trips counted against the query's
 	// LateOverMin; nil when the query asks for none or none was observed.
 	Trips *TripCount

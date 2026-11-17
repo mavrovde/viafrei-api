@@ -49,11 +49,22 @@ func TestStateWarningsCountAsTheLandPage(t *testing.T) {
 func plantMessage(t *testing.T) {
 	t.Helper()
 	n := plant(t, `insert into contract.service_alert (alert_id, header, active_periods, line_names, district_codes, state_codes, placed_by, dedupe_key,
-  source_ref, recorded_at, changed_at)
-values ('delfi_rt_sa:pm-1', 'Gleisarbeiten', '[]', '{U 3}', '{09162,08111}', '{09,08}', 'stop', 'pm-key', 'delfi_rt_sa', '2026-03-28T00:00:00Z', '2026-03-28T00:00:00Z'),
-       ('delfi_siri_sx:pm-0', 'Gleisarbeiten (SX)', '[]', '{U 6}', '{09162}', '{09}', 'stop', 'pm-key', 'delfi_siri_sx', '2026-03-28T00:00:00Z', '2026-03-28T00:00:00Z')`)
+  source_ref, recorded_at, changed_at, primary_source)
+values ('delfi_rt_sa:pm-1', 'Gleisarbeiten', '[]', '{U 3}', '{09162,08111}', '{09,08}', 'stop', 'pm-key', 'delfi_rt_sa', '2026-03-28T00:00:00Z', '2026-03-28T00:00:00Z', true),
+       ('delfi_siri_sx:pm-0', 'Gleisarbeiten (SX)', '[]', '{U 6}', '{09162}', '{09}', 'stop', 'pm-key', 'delfi_siri_sx', '2026-03-28T00:00:00Z', '2026-03-28T00:00:00Z', false)`)
 	if n != 2 {
 		t.Fatalf("planted %d of 2", n)
+	}
+	// a primary alert whose only period ends an hour into the first day
+	plant(t, `insert into contract.service_alert (alert_id, header, active_periods, district_codes, state_codes, placed_by, dedupe_key, source_ref)
+values ('delfi_rt_sa:pm-2', 'Signalstörung', '[{"start":"2026-03-28T00:00:00Z","end":"2026-03-28T13:00:00Z"}]', '{09162}', '{09}', 'stop', 'pm-key-2', 'delfi_rt_sa')`)
+	// both publications checked two days after the fixture's first day, so
+	// alive from then back three cadences and at any earlier instant
+	for _, src := range []string{"delfi_rt_sa", "delfi_siri_sx"} {
+		// the seed's platform sources have no publication of their own to check
+		plant(t, `insert into contract.publisher (publisher_id, display_name) values ('`+src+`', '`+src+`')`)
+		plant(t, `insert into contract.source_freshness (source_ref, data_as_of, confirmed_at, confirm_interval_s)
+values ('`+src+`', '2026-03-30T11:59:00Z', '2026-03-30T11:59:00Z', 300)`)
 	}
 	// the read contract takes no delete and no other test of the package
 	// reads a message, so the rows stay, as the planted departures do
@@ -80,7 +91,7 @@ func TestStateAlertsReadAsTheLandPage(t *testing.T) {
 	for _, a := range got {
 		heads = append(heads, a.Header)
 	}
-	if !slices.Equal(heads, []string{"Gleisarbeiten", "Bauarbeiten auf der Linie RE 1", "Weichenstörung"}) {
+	if !slices.Equal(heads, []string{"Gleisarbeiten", "Bauarbeiten auf der Linie RE 1", "Weichenstörung", "Signalstörung"}) {
 		t.Fatalf("messages %v", heads)
 	}
 	if m := got[0]; !slices.Equal(m.Lines, []string{"U 3", "U 6"}) || !slices.Equal(m.CarriedBy, []string{"delfi_rt_sa", "delfi_siri_sx"}) {
@@ -97,8 +108,14 @@ func TestStateAlertsReadAsTheLandPage(t *testing.T) {
 		!slices.ContainsFunc(transit.StateAlertsOf(rows, "09"), func(a transit.StateAlert) bool { return a.Header == "Gleisarbeiten (SX)" }) {
 		t.Errorf("without the primary: %+v %v", rows, err)
 	}
-	// two days later the stop alert's period is over
-	if rows, err := st.StateAlerts(bounded(t), "09", []string{"delfi_sa_alpha"}, at.Add(48*time.Hour)); err != nil || len(rows) != 1 || rows[0].Header != "Bauarbeiten auf der Linie RE 1" {
+	// two days later the period of pm-2 is over; pm-1 has none
+	if rows, err := st.StateAlerts(bounded(t), "09", []string{"delfi_rt_sa", "delfi_siri_sx"}, at.Add(48*time.Hour)); err != nil ||
+		slices.ContainsFunc(rows, func(r transit.StateAlertRow) bool { return r.Header == "Signalstörung" }) ||
+		!slices.ContainsFunc(rows, func(r transit.StateAlertRow) bool { return r.Header == "Gleisarbeiten" }) {
 		t.Errorf("later: %+v %v", rows, err)
+	}
+	// the fixture's own publication was last checked long before then
+	if rows, err := st.StateAlerts(bounded(t), "09", []string{"delfi_sa_alpha"}, at.Add(48*time.Hour)); err != nil || len(rows) != 0 {
+		t.Errorf("its publication not checked since: %+v %v", rows, err)
 	}
 }

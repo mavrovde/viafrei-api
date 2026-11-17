@@ -44,16 +44,16 @@ func (s *Store) StateWarnings(ctx context.Context, land string, families []strin
 // (the published periods, none meaning always) that name a stop, with the
 // message each belongs to and the Länder of the districts their stops lie
 // in, of the messages touching the Land $3, as the platform's Land page reads
-// them. Rows sharing a dedupe key are one message; its key is the row of the
-// primary family (the realtime alerts) where one carries it, and every family
-// carrying it is listed.
+// them, of a live publication only (alertLive). Rows sharing a dedupe key
+// are one message; its key is the row of the primary family (the realtime
+// alerts) where one carries it, and every family carrying it is listed.
 var stateAlerts = `
 with f as materialized (
   select a.alert_id, a.header, a.active_to, coalesce(a.line_names, '{}') as line_names, a.dedupe_key, a.source_ref,
          array(select distinct left(k, 2) from unnest(a.district_codes) k where k ~ '^[0-9]{5}$' order by 1) as lands
   from contract.service_alert a
   where a.source_ref = any($1) and ` + permitted("a") + `
-    and cardinality(a.district_codes) > 0
+    and cardinality(a.district_codes) > 0 and ` + alertLive("a", "$2") + `
     and (jsonb_array_length(coalesce(a.active_periods, '[]'::jsonb)) = 0
          or exists (select 1 from jsonb_array_elements(a.active_periods) p
                      where (p->>'start' is null or (p->>'start')::timestamptz <= $2::timestamptz)

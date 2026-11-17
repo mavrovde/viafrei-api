@@ -70,3 +70,7 @@ func (laterFeatures) FuelStation(context.Context, access.Record, string, time.Du
 func (laterFeatures) ChargingSite(context.Context, access.Record, string, time.Duration) (features.Answer[energy.Site], error) {
 	return features.Answer[energy.Site]{}, nil
 }
+
+func (laterFeatures) National(context.Context, access.Record, time.Duration) (features.NationalAnswer, error) {
+	return features.NationalAnswer{}, nil
+}

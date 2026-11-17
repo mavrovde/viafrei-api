@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
+	"github.com/mavrovde/viafrei-api/internal/domain/national"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 
@@ -22,6 +23,7 @@ type objectsFake struct {
 	fuelMeta features.Answer[struct{}]
 	gotID    string
 	gotAge   time.Duration
+	national features.NationalAnswer
 }
 
 func (f *fakeFeatures) FuelStation(_ context.Context, _ access.Record, id string, held time.Duration) (energy.FuelStationPage, features.Answer[struct{}], error) {
@@ -96,4 +98,50 @@ func TestPressureSaysOneWord(t *testing.T) {
 			t.Errorf("%v: %d %v %q", c.p, w.Code, data, w.Header().Get("Cache-Control"))
 		}
 	}
+}
+
+func (f *fakeFeatures) National(_ context.Context, _ access.Record, window time.Duration) (features.NationalAnswer, error) {
+	f.objects.gotAge = window
+	return f.objects.national, f.err
+}
+
+func TestNationalSummarySortsTheSections(t *testing.T) {
+	two, late := 2, 5
+	low, mid, delay := 1.599, 1.689, 240.0
+	name := "Bayern"
+	f := everyAnswer()
+	f.objects.national = features.NationalAnswer{Rows: []national.Row{
+		{Section: national.SectionSituations, Key: "closure", Family: "r", N: 3},
+		{Section: national.SectionStates, Key: "09", Family: "r", N: 1},
+		{Section: national.SectionFuel, Key: "e10", Family: "f", N: 4, Low: &low, Mid: &mid},
+		{Section: national.SectionCharging, Key: "c", Family: "c", N: 2, M: &two},
+		{Section: national.SectionParking, Key: "truck", Family: "p", N: 7},
+		{Section: national.SectionFacilities, Key: "elevator/inactive", Family: "t", N: 2, M: &two},
+		{Section: national.SectionPunctuality, Key: "state:09", Name: &name, Family: "t", N: 40, M: &late, Mid: &delay},
+		{Section: national.SectionWarnings, Key: "2", Family: "w", N: 6, M: &two},
+		{Section: "other", Key: "x", Family: "x"},
+	}, Meta: features.Answer[struct{}]{Families: []provenance.Family{fresh}, At: fixedNow}}
+	w := do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/germany", bearer)
+	if w.Code != http.StatusOK || f.objects.gotAge != config.Defaults().Fuel.PriceFresh {
+		t.Fatalf("status %d window %v: %s", w.Code, f.objects.gotAge, w.Body)
+	}
+	data, _ := decode(t, w)["data"].(map[string]any)
+	for k, n := range map[string]int{"situations": 1, "states": 1, "fuel": 1, "charging": 1, "parking": 1, "facilities": 1, "punctuality": 1, "warnings": 1} {
+		if l, _ := data[k].([]any); len(l) != n {
+			t.Errorf("%s: %v", k, data[k])
+		}
+	}
+	fac := data["facilities"].([]any)[0].(map[string]any)
+	pun := data["punctuality"].([]any)[0].(map[string]any)
+	fuel := data["fuel"].([]any)[0].(map[string]any)
+	if fac["kind"] != "elevator" || fac["state"] != "inactive" || pun["level"] != "state" || pun["code"] != "09" || pun["late"] != 5.0 || fuel["cheapestEur"] != 1.599 {
+		t.Errorf("fields: %v %v %v", fac, pun, fuel)
+	}
+	f.objects.national = features.NationalAnswer{Rows: []national.Row{{Section: national.SectionFuel, Key: "e5", Family: "f"}, {Section: national.SectionCharging, Family: "c"}}, Meta: f.objects.national.Meta}
+	w = do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/germany", bearer)
+	data, _ = decode(t, w)["data"].(map[string]any)
+	if fu := data["fuel"].([]any)[0].(map[string]any); fu["cheapestEur"] != 0.0 || data["charging"].([]any)[0].(map[string]any)["chargePoints"] != 0.0 {
+		t.Errorf("a missing figure reads 0: %v", data)
+	}
+	assertProblem(t, do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: access.ErrNonePermitted}, nil), http.MethodGet, "/v1/germany", bearer), 403, "source-not-permitted")
 }

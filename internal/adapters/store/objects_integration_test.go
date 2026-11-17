@@ -9,6 +9,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/energy"
+	"github.com/mavrovde/viafrei-api/internal/domain/national"
 )
 
 func TestFuelStationIsReadByIDWithItsHeldPrices(t *testing.T) {
@@ -70,5 +71,42 @@ group by 1, 2 order by 3 desc, 1 limit 1`, &id, &fam, &points)
 	none, _, _, err := st.ChargingNear(bounded(t), energy.Query{SiteID: "no-such-site", Access: energy.FilterAll, Limit: 1}, []string{fam}, time.Now())
 	if err != nil || len(none) != 0 {
 		t.Errorf("unknown id: %+v %v", none, err)
+	}
+}
+
+func TestNationalReadsEveryDomainsPart(t *testing.T) {
+	st := seeded(t)
+	ctx := access.WithAudience(bounded(t), access.AudienceOwn)
+	var fams []string
+	owner(t, `select array_agg(distinct source_ref order by source_ref) from contract.source`, &fams)
+	var newest time.Time
+	owner(t, `select max(observed_at) from contract.fuel_price_observation`, &newest)
+	at := newest.Add(time.Minute)
+	seen := map[string]bool{}
+	for _, d := range national.Domains {
+		rows, err := st.National(ctx, d, fams, at, 72*time.Hour)
+		if err != nil {
+			t.Fatalf("%s: %v", d, err)
+		}
+		for _, r := range rows {
+			seen[r.Section] = true
+			if r.N < 0 || r.Family == "" {
+				t.Errorf("%s: %+v", d, r)
+			}
+			if r.Section == national.SectionFuel && (r.Low == nil || r.Mid == nil || *r.Low > *r.Mid) {
+				t.Errorf("fuel: %+v", r)
+			}
+		}
+	}
+	for _, s := range []string{national.SectionFuel, national.SectionCharging, national.SectionParking} {
+		if !seen[s] {
+			t.Errorf("the fixture fills %s, the read gave none (%v)", s, seen)
+		}
+	}
+	if rows, err := st.National(ctx, "places", fams, at, time.Hour); err != nil || rows != nil {
+		t.Errorf("a domain with no part: %v %v", rows, err)
+	}
+	if rows, err := st.National(ctx, "roads", []string{"no-such-family"}, at, time.Hour); err != nil || len(rows) != 0 {
+		t.Errorf("no family: %v %v", rows, err)
 	}
 }

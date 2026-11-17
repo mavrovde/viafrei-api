@@ -53,6 +53,7 @@ type Features interface {
 	Addresses(ctx context.Context, key access.Record, q places.AddressQuery) (features.AddressAnswer, error)
 	Pois(ctx context.Context, key access.Record, q places.PoiQuery) (features.PoiAnswer, error)
 	Location(ctx context.Context, key access.Record, q places.LocationQuery) (features.LocationAnswer, error)
+	National(ctx context.Context, key access.Record, fuelWindow time.Duration) (features.NationalAnswer, error)
 }
 
 // counterpartExtension names the MCP capability an operation answers the

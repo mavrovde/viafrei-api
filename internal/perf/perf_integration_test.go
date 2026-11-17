@@ -287,7 +287,7 @@ func (r *rig) handler(t *testing.T, cached bool) http.Handler {
 		Config: &cfg, Build: buildinfo.Info{Version: "bench", Commit: "bench"}, ContractVersion: dbcontract.ContractVersion, Now: now,
 		Readiness: health.NewChecker(r.st, expected, cfg.Health.ReadyTimeout),
 		Auth:      keyAuth{r.key}, Sources: r.st, Versions: r.st,
-		Features: features.New(features.Repositories{Register: r.st, Charging: r.st, Parking: r.st, Places: r.st, Roads: r.st, Weather: r.st, Rules: r.st, Transit: r.st, Fuel: r.st, Hydrogen: r.st, Speed: r.st, Sharing: r.st, Addresses: r.st, Pois: r.st, Locations: r.st, Disruptions: r.st, Nearby: r.st, Lorry: r.st, Catalogue: r.st}, wire.FeatureSettings(&cfg), now),
+		Features: features.New(features.Repositories{Register: r.st, Charging: r.st, Parking: r.st, Places: r.st, Roads: r.st, Weather: r.st, Rules: r.st, Transit: r.st, Fuel: r.st, Hydrogen: r.st, Speed: r.st, Sharing: r.st, Addresses: r.st, Pois: r.st, Locations: r.st, Disruptions: r.st, Nearby: r.st, Lorry: r.st, Catalogue: r.st, National: r.st}, wire.FeatureSettings(&cfg), now),
 	}
 	h, err := httpapi.NewHandler(deps)
 	if err != nil {

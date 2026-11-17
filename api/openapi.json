@@ -157,6 +157,59 @@
         ],
         "type": "object"
       },
+      "AreaPunctuality": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "description": "The area's official key.",
+            "type": "string"
+          },
+          "late": {
+            "description": "Trips observed late.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "level": {
+            "description": "The area's level: state (a Land) or district (a kreisfreie Stadt or Kreis). Open enumeration.",
+            "type": "string"
+          },
+          "medianDelayS": {
+            "description": "The median of each trip's worst delay, seconds.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceFamily": {
+            "type": "string"
+          },
+          "trips": {
+            "description": "Trips observed.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "level",
+          "code",
+          "name",
+          "trips",
+          "late",
+          "medianDelayS",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
       "Attribution": {
         "additionalProperties": false,
         "properties": {
@@ -436,6 +489,28 @@
           "data",
           "meta",
           "links"
+        ],
+        "type": "object"
+      },
+      "ChargingFamilySummary": {
+        "additionalProperties": false,
+        "properties": {
+          "chargePoints": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sites": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sourceFamily": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sites",
+          "chargePoints",
+          "sourceFamily"
         ],
         "type": "object"
       },
@@ -1482,6 +1557,39 @@
         ],
         "type": "object"
       },
+      "FacilitySummary": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "kind": {
+            "description": "elevator or escalator. Open enumeration.",
+            "type": "string"
+          },
+          "sourceFamily": {
+            "type": "string"
+          },
+          "state": {
+            "description": "active, inactive or unknown. Open enumeration.",
+            "type": "string"
+          },
+          "stations": {
+            "description": "The stations they are at.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "state",
+          "count",
+          "stations",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
       "FreshnessEntry": {
         "additionalProperties": false,
         "properties": {
@@ -1543,6 +1651,39 @@
           "data",
           "meta",
           "links"
+        ],
+        "type": "object"
+      },
+      "FuelGradeSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "cheapestEur": {
+            "format": "double",
+            "type": "number"
+          },
+          "fuel": {
+            "description": "The grade: e5, e10, diesel. Open enumeration.",
+            "type": "string"
+          },
+          "medianEur": {
+            "format": "double",
+            "type": "number"
+          },
+          "sourceFamily": {
+            "type": "string"
+          },
+          "stations": {
+            "description": "Stations with a current price for it (inside fuel.price_fresh).",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "fuel",
+          "stations",
+          "cheapestEur",
+          "medianEur",
+          "sourceFamily"
         ],
         "type": "object"
       },
@@ -3138,6 +3279,98 @@
               "$ref": "#/components/schemas/MotorwayRow"
             },
             "type": "array"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DataMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "NationalData": {
+        "additionalProperties": false,
+        "properties": {
+          "charging": {
+            "description": "Charging sites and their points, per family.",
+            "items": {
+              "$ref": "#/components/schemas/ChargingFamilySummary"
+            },
+            "type": "array"
+          },
+          "facilities": {
+            "description": "Station lifts and escalators, by kind and state.",
+            "items": {
+              "$ref": "#/components/schemas/FacilitySummary"
+            },
+            "type": "array"
+          },
+          "fuel": {
+            "description": "Per grade, the stations with a current price, the cheapest and the median of those prices.",
+            "items": {
+              "$ref": "#/components/schemas/FuelGradeSummary"
+            },
+            "type": "array"
+          },
+          "parking": {
+            "description": "Parking sites, by kind.",
+            "items": {
+              "$ref": "#/components/schemas/SummaryCount"
+            },
+            "type": "array"
+          },
+          "punctuality": {
+            "description": "Regional public-transport punctuality, per Land and per district.",
+            "items": {
+              "$ref": "#/components/schemas/AreaPunctuality"
+            },
+            "type": "array"
+          },
+          "situations": {
+            "description": "Road situations in force now, by kind (closure, roadworks, jam, restriction, ...).",
+            "items": {
+              "$ref": "#/components/schemas/SummaryCount"
+            },
+            "type": "array"
+          },
+          "states": {
+            "description": "Road situations in force now, by Land (the Land of each situation's point).",
+            "items": {
+              "$ref": "#/components/schemas/SummaryCount"
+            },
+            "type": "array"
+          },
+          "warnings": {
+            "description": "Official weather warnings in force now, by level.",
+            "items": {
+              "$ref": "#/components/schemas/WarningSummary"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "situations",
+          "states",
+          "fuel",
+          "charging",
+          "parking",
+          "facilities",
+          "punctuality",
+          "warnings"
+        ],
+        "type": "object"
+      },
+      "NationalEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/NationalData"
           },
           "links": {
             "$ref": "#/components/schemas/Links"
@@ -6318,6 +6551,28 @@
         ],
         "type": "object"
       },
+      "SummaryCount": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "key": {
+            "description": "What is counted: a situation kind, a Land's two-digit key, a parking kind, a warning level.",
+            "type": "string"
+          },
+          "sourceFamily": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "count",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
       "TermsBody": {
         "additionalProperties": false,
         "properties": {
@@ -6499,6 +6754,34 @@
         "required": [
           "name",
           "geometry"
+        ],
+        "type": "object"
+      },
+      "WarningSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "areas": {
+            "description": "The warning areas they cover.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "count": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "level": {
+            "description": "The warning level, 1 to 4.",
+            "type": "string"
+          },
+          "sourceFamily": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "level",
+          "count",
+          "areas",
+          "sourceFamily"
         ],
         "type": "object"
       },
@@ -8029,7 +8312,96 @@
                 "examples": {
                   "example": {
                     "summary": "One charging site with its points",
-                    "value": {}
+                    "value": {
+                      "data": {
+                        "id": "afir_alpha:cs-01-0002",
+                        "name": "Kansilkamp Laden",
+                        "operator": "Raungul Strom",
+                        "location": {
+                          "lat": 47.638705,
+                          "lon": 7.750173
+                        },
+                        "distanceM": 0,
+                        "access": "public",
+                        "summary": {
+                          "chargePoints": 4,
+                          "availableNow": 1,
+                          "maxPowerKw": 50
+                        },
+                        "chargePoints": [
+                          {
+                            "id": "DE*SYN*E000020",
+                            "current": "ac",
+                            "maxPowerKw": 11,
+                            "availability": {
+                              "state": "available",
+                              "observedAt": "2026-03-29T23:52:00Z"
+                            }
+                          },
+                          {
+                            "id": "DE*SYN*E000021",
+                            "current": "ac",
+                            "maxPowerKw": 22,
+                            "availability": null
+                          },
+                          {
+                            "id": "DE*SYN*E000022",
+                            "current": "dc",
+                            "maxPowerKw": 50,
+                            "availability": {
+                              "state": "stale",
+                              "observedAt": "2026-03-29T18:49:58Z"
+                            }
+                          },
+                          {
+                            "id": "DE*SYN*E000023",
+                            "current": "ac",
+                            "maxPowerKw": 22,
+                            "availability": {
+                              "state": "stale",
+                              "observedAt": "2026-03-29T07:19:35Z"
+                            }
+                          }
+                        ],
+                        "sourceFamily": "afir_alpha"
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:55:00Z",
+                        "freshness": [
+                          {
+                            "family": "afir_alpha",
+                            "dataAsOf": "2026-03-29T23:55:00Z",
+                            "ageS": 300,
+                            "staleAfterS": 1800,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "afir_alpha",
+                            "domain": "energy",
+                            "publisher": "Kleber Datenwerk",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms/afir_alpha"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": []
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/charging-options/afir_alpha:cs-01-0002"
+                      }
+                    }
                   }
                 },
                 "schema": {
@@ -9182,7 +9554,87 @@
                 "examples": {
                   "example": {
                     "summary": "One filling station with its newest price per grade",
-                    "value": {}
+                    "value": {
+                      "data": {
+                        "id": "00000000-0000-4000-8000-000000000002",
+                        "name": "Belnan Namüningen",
+                        "brand": "Belnan",
+                        "address": {
+                          "street": null,
+                          "number": null,
+                          "postcode": null,
+                          "place": null
+                        },
+                        "location": {
+                          "lat": 49.169409,
+                          "lon": 7.808793
+                        },
+                        "openingState": "unknown",
+                        "aroundTheClock": false,
+                        "prices": [
+                          {
+                            "fuel": "diesel",
+                            "priceEur": 1.799,
+                            "reportedAt": "2026-03-29T22:45:59Z",
+                            "reportedAtLocal": "2026-03-30T00:45:59+02:00",
+                            "current": false
+                          },
+                          {
+                            "fuel": "e10",
+                            "priceEur": 1.633,
+                            "reportedAt": "2026-03-29T15:24:44Z",
+                            "reportedAtLocal": "2026-03-29T17:24:44+02:00",
+                            "current": false
+                          },
+                          {
+                            "fuel": "e5",
+                            "priceEur": 2.062,
+                            "reportedAt": "2026-03-29T21:50:02Z",
+                            "reportedAtLocal": "2026-03-29T23:50:02+02:00",
+                            "current": false
+                          }
+                        ],
+                        "sourceFamily": "tankerkoenig_gamma"
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:57:30Z",
+                        "freshness": [
+                          {
+                            "family": "tankerkoenig_gamma",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "tankerkoenig_gamma",
+                            "domain": "energy",
+                            "publisher": "Zausklaum Datenwerk",
+                            "text": "Synthetic data from family gamma, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://gamma.example/terms/tankerkoenig_gamma"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": [
+                            "For consumer information only (synthetic)."
+                          ]
+                        },
+                        "warnings": []
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/fuel-options/00000000-0000-4000-8000-000000000002"
+                      }
+                    }
                   }
                 },
                 "schema": {
@@ -9438,6 +9890,203 @@
         "x-example-request": "/v1/fuel-options/00000000-0000-4000-8000-000000000002",
         "x-mcp-counterpart": "filling station search",
         "x-required-scope": "energy"
+      }
+    },
+    "/v1/germany": {
+      "get": {
+        "description": "The national picture the site's home tiles, its live map and its national pages state: road situations in force by kind and by Land, current fuel prices by grade, charging sites and points, parking sites by kind, station lifts and escalators by state, regional punctuality and weather warnings by level. Each part is read from the families of its domain the key may read, for every domain the key has the scope of (roads, energy, parking, transit, weather); a domain whose families are all withheld is left out and named in meta.warnings.",
+        "operationId": "getNationalSummary",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NationalEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The operation is switched off on this instance (feature-disabled).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "Germany now: the national counts and boards",
+        "tags": [
+          "meta"
+        ]
       }
     },
     "/v1/hydrogen-options": {
@@ -14458,6 +15107,24 @@
           "200": {
             "content": {
               "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "Whether the service is saturated now",
+                    "value": {
+                      "data": {
+                        "state": "ok"
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en"
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/pressure"
+                      }
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/PressureEnvelope"
                 }
@@ -14486,7 +15153,16 @@
         "summary": "Whether the service is saturated now",
         "tags": [
           "service"
-        ]
+        ],
+        "x-attribution": "No source data: this answer carries no attribution.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/pressure\""
+          }
+        ],
+        "x-example-request": "/v1/pressure"
       }
     },
     "/v1/road-conditions": {

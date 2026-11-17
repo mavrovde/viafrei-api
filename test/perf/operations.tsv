@@ -37,3 +37,4 @@ getWatch	near
 getFuelStation	lookup
 getChargingSite	lookup
 getPressure	lookup
+getNationalSummary	composed

@@ -79,6 +79,7 @@ type Repositories struct {
 	Nearby      Nearby
 	Lorry       Lorry
 	Catalogue   Catalogue
+	National    National
 }
 
 // Settings are the tunables of the use cases.

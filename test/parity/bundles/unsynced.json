@@ -2296,16 +2296,8 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
-          "name": "data.lamp",
-          "value": "amber"
-        },
-        {
           "name": "data.roadWeather",
           "value": "[]"
-        },
-        {
-          "name": "data.truncated",
-          "value": "false"
         },
         {
           "name": "data.warnings",
@@ -2348,16 +2340,8 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
-          "name": "data.lamp",
-          "value": "amber"
-        },
-        {
           "name": "data.roadWeather",
           "value": "[]"
-        },
-        {
-          "name": "data.truncated",
-          "value": "false"
         },
         {
           "name": "data.warnings",

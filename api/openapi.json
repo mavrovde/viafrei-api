@@ -6215,25 +6215,12 @@
       "WeatherRiskData": {
         "additionalProperties": false,
         "properties": {
-          "lamp": {
-            "description": "Over every warning in force at the position, whatever min_level and hazards keep (they filter only the list), first match: red when a warning of level 3 or 4 is in force; amber for a warning of level 1 or 2, or, with no warning in force, when the sight is limited: a weather family the key may not read was left out (meta.partial), or a weather family read has no data or stale data (meta.freshness), since no warning cannot then be told from none heard; green when no warning is in force and every family is fresh.",
-            "enum": [
-              "green",
-              "amber",
-              "red"
-            ],
-            "type": "string"
-          },
           "roadWeather": {
             "description": "Road-weather observations near a corridor; present for along questions only, so always empty on a question about one position.",
             "items": {
               "$ref": "#/components/schemas/RoadWeatherObservation"
             },
             "type": "array"
-          },
-          "truncated": {
-            "description": "True when more warnings answer than weather.max_warnings and only the first are listed; the lamp reads them all.",
-            "type": "boolean"
           },
           "warnings": {
             "description": "The warnings min_level and hazards keep, ordered by level descending, then validity.from ascending, then id; at most weather.max_warnings.",
@@ -6244,9 +6231,7 @@
           }
         },
         "required": [
-          "lamp",
           "warnings",
-          "truncated",
           "roadWeather"
         ],
         "type": "object"
@@ -18137,7 +18122,7 @@
     },
     "/v1/weather-risk": {
       "get": {
-        "description": "Every official weather warning in force now whose area contains the position, with the issuer's level and wording unchanged, and the lamp over every warning in force there, whatever min_level and hazards keep. MCP counterpart: weather warnings check. Needs the scope weather.",
+        "description": "Every official weather warning in force now whose area contains the position, with the issuer's level and wording unchanged, as the platform's weather warnings check states them. MCP counterpart: weather warnings check. Needs the scope weather.",
         "operationId": "getWeatherRisk",
         "parameters": [
           {

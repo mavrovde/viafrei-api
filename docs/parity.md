@@ -168,6 +168,10 @@ nothing, so that family contributed nothing and neither side credits it.
   that list nothing credit no family; the needs credit the families they
   consulted. A need's place carries no identifier and its distance is stated
   to 0.1 km, as the platform's nearby search states them.
+- **Weather warnings** at a position state no lamp and no truncation flag:
+  the platform's weather warnings check states neither, and no digest route
+  the site reads serves a lamp for a position. A family the platform does
+  not read is not credited.
 - **Station facilities** name the station only and state no report
   instant per unit, as the platform's facilities check states them.
 

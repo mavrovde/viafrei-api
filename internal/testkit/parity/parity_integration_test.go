@@ -50,19 +50,10 @@ var db *pgtest.DB
 func TestMain(m *testing.M) {
 	flag.Parse()
 	// Starting the container is setup, outside every test body's bound.
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	var err error
-	db, err = pgtest.Start(ctx)
-	cancel()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "integration tests need a container runtime:", err)
-		os.Exit(1)
-	}
 	// Generating and loading the questions' fixture rows is setup too: it
 	// took about 1.3 s inside the first test that asked for them, which
 	// pushed that test past its bound.
 	if err := seedQuestions(); err != nil {
-		db.Stop()
 		fmt.Fprintln(os.Stderr, "seeding the parity fixture:", err)
 		os.Exit(1)
 	}
@@ -112,9 +103,16 @@ func load(fx parity.Fixture) (string, error) {
 	if _, err := fixtures.Generate(&buf, fx.Profile, fx.Seed, dbcontract.ContractVersion); err != nil {
 		return "", err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), pgtest.SetupBound)
 	defer cancel()
-	if err := db.Seed(ctx, buf.String()); err != nil {
+	// The first set is the run's shared copy of it; a later one is seeded
+	// into that copy.
+	if db == nil {
+		var err error
+		if db, err = pgtest.Seeded(ctx, buf.String()); err != nil {
+			return "", err
+		}
+	} else if err := db.Seed(ctx, buf.String()); err != nil {
 		return "", err
 	}
 	seeded[fx] = parity.Checksum(buf.Bytes())

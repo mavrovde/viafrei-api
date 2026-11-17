@@ -68,19 +68,10 @@ var db *pgtest.DB
 func TestMain(m *testing.M) {
 	flag.Parse()
 	// Starting the container is setup, outside every test body's bound.
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	var err error
-	db, err = pgtest.Start(ctx)
-	cancel()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "integration tests need a container runtime:", err)
-		os.Exit(1)
-	}
 	// Seeding the fixture set is setup too: done in the first test body
 	// it counted against that test's bound, and grew with every example.
 	if err := seedFixtures(); err != nil {
 		fmt.Fprintln(os.Stderr, "seeding the fixture set:", err)
-		db.Stop()
 		os.Exit(1)
 	}
 	code := m.Run()
@@ -116,9 +107,11 @@ func seedFixtures() error {
 	if err := fixtures.ExamplePlants(&buf, profile, seed, dbcontract.ContractVersion, now, freshReports); err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), pgtest.SetupBound)
 	defer cancel()
-	return db.Seed(ctx, buf.String())
+	var err error
+	db, err = pgtest.Seeded(ctx, buf.String())
+	return err
 }
 
 // freshReports are, on the charging sites the examples document, reports

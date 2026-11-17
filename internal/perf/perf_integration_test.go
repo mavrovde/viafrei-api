@@ -65,15 +65,13 @@ var (
 // loads the fixtures: all setup, outside every test body.
 func TestMain(m *testing.M) {
 	flag.Parse()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	var err error
-	db, err = pgtest.Start(ctx)
-	if err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), pgtest.SetupBound)
+	loadErr = loadFixtures(ctx)
+	if db == nil {
 		cancel()
-		fmt.Fprintln(os.Stderr, "integration tests need a container runtime:", err)
+		fmt.Fprintln(os.Stderr, "integration tests need a container runtime:", loadErr)
 		os.Exit(1)
 	}
-	loadErr = loadFixtures(ctx)
 	cancel()
 	code := m.Run()
 	db.Stop()
@@ -88,7 +86,8 @@ func loadFixtures(ctx context.Context) error {
 	if _, err := fixtures.Generate(&buf, *profile, 1, dbcontract.ContractVersion); err != nil {
 		return err
 	}
-	if err := db.Seed(ctx, buf.String()); err != nil {
+	var err error
+	if db, err = pgtest.Seeded(ctx, buf.String()); err != nil {
 		return err
 	}
 	conn, err := db.Owner(ctx)
@@ -250,10 +249,11 @@ func open(t *testing.T) *rig {
 		"/v1/motorways/", "/conditions")
 	list("road-conditions", "select round(st_y(location)::numeric, 3)::text || ',' || round(st_x(location)::numeric, 3)::text from contract.junction order by 1 limit 40",
 		"/v1/road-conditions?at=", "&radius_m=50000")
-	// The weather and rules reads: the warnings at a point of each warning
-	// area, and each rule topic.
+	// The weather and rules reads: the warnings at a place of a region (the
+	// platform matches a warning by its region, and its contract views state
+	// neither a region's boundary nor a warning's area), and each rule topic.
 	list("weather", "select round(st_y(p)::numeric, 3)::text || ',' || round(st_x(p)::numeric, 3)::text "+
-		"from (select st_pointonsurface(boundary) as p from contract.admin_region where region_level = 'district') d order by 1 limit 40",
+		"from (select location as p from contract.place where region_code is not null and withdrawn_at is null) d order by 1 limit 40",
 		"/v1/weather-risk?at=", "")
 	list("rules", "select topic_code from contract.rule_topic order by 1 limit 40", "/v1/driving-rules?topic=", "")
 	// A situation is answered only from a family the key may read: the

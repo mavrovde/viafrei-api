@@ -172,3 +172,43 @@ func TestRunImageReportsAnImageThatCannotRun(t *testing.T) {
 		t.Fatal("an invalid reference ran")
 	}
 }
+
+// TestSharedCopiesAreTheirOwn: two copies of one seeded set are made from
+// one template, each a database of its own that a write in a rolled-back
+// transaction leaves as it was; Stop drops a copy.
+func TestSharedCopiesAreTheirOwn(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), SetupBound)
+	defer cancel()
+	empty, err := Shared(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer empty.Stop()
+	var copies [2]*DB
+	for i := range copies {
+		if copies[i], err = Seeded(ctx, "-- no rows\n"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if copies[0].OwnerURL == copies[1].OwnerURL || copies[0].OwnerURL == empty.OwnerURL {
+		t.Fatal("two copies share a database")
+	}
+	t.Cleanup(copies[0].Stop) // after the rollback's cleanup
+	tx := copies[0].Rollback(ctx, t)
+	if _, err := tx.Exec(ctx, "create table rolled_back (id int)"); err != nil {
+		t.Fatal(err)
+	}
+	reader, err := pgx.Connect(ctx, copies[1].ReaderURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = reader.Close(context.WithoutCancel(ctx)) }()
+	var v string
+	if err := reader.QueryRow(ctx, "select contract_version from contract.contract_info").Scan(&v); err != nil || v != dbcontract.ContractVersion {
+		t.Errorf("the copy's reader reads version %q (%v)", v, err)
+	}
+	copies[1].Stop()
+	if _, err := pgx.Connect(ctx, copies[1].OwnerURL); err == nil {
+		t.Error("a stopped copy still accepts a connection")
+	}
+}

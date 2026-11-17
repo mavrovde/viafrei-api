@@ -29,18 +29,13 @@ var db *pgtest.DB
 
 func TestMain(m *testing.M) {
 	// Starting the container is setup, outside every test body's bound.
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	var err error
-	db, err = pgtest.Start(ctx)
-	if err != nil {
-		cancel()
-		fmt.Fprintln(os.Stderr, "integration tests need a container runtime:", err)
-		os.Exit(1)
+	ctx, cancel := context.WithTimeout(context.Background(), pgtest.SetupBound)
+	rows, err := seedRows()
+	if err == nil {
+		db, err = pgtest.Seeded(ctx, rows)
 	}
-	err = seed(ctx)
 	cancel()
 	if err != nil {
-		db.Stop()
 		fmt.Fprintln(os.Stderr, "loading the fixtures:", err)
 		os.Exit(1)
 	}

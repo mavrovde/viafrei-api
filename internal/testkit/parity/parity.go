@@ -200,6 +200,8 @@ var Default = Rules{
 	Excluded: []Exclusion{
 		{"data[*].access", "", "", "the MCP capability has no access concept: no charging source of the platform publishes who may use a site"},
 		{"data[*].chargePoints[*].current", "", "", "the MCP capability states no current per point"},
+		{"data.access", "", "getChargingSite", "the MCP capability has no access concept: no charging source of the platform publishes who may use a site"},
+		{"data.chargePoints[*].current", "", "getChargingSite", "the MCP capability states no current per point"},
 		{"meta.freshness", "", "", "API-only: the per-family freshness block of the read contract (ENV-003)"},
 		{"meta.warnings", "", "", "API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got"},
 		{"meta.page.hasMore", "min_kw", "", "the MCP capability states no count of the sites a power filter keeps, so it cannot say whether there are more"},

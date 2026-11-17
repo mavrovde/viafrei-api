@@ -97,7 +97,8 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
 | Fact | Why it is not compared |
 |---|---|
 | `data[*].access` | The MCP capability has no access concept: no charging source of the platform publishes who may use a site. Its questions therefore ask `access=all`, which is what the tool answers. |
-| `data[*].chargePoints[*].current` | The MCP capability states no current (AC/DC) per point. |
+| `data.access`, in `getChargingSite` only | The single site's `data[*].access`, for the same reason. |
+| `data[*].chargePoints[*].current`, and `data.chargePoints[*].current` in `getChargingSite` | The MCP capability states no current (AC/DC) per point. |
 | `meta.freshness` | API-only: the per-family freshness block of the read contract (ENV-003). |
 | `meta.warnings` | API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got (for example `partial` when a commercial key withholds a family). |
 | `meta.page.hasMore`, in a case that asks `min_kw` | The MCP capability states no count of the sites a power filter keeps, so under `min_kw` it cannot say whether there are more. Without `min_kw` it states the count of the circle, and the fact is compared. |

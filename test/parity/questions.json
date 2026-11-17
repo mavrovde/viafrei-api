@@ -26,6 +26,26 @@
       "now": "2026-03-30T00:00:00Z"
     },
     {
+      "id": "charging-site",
+      "operation": "getChargingSite",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options/afir_alpha:cs-01-0002",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "chargepool_gamma",
+          "tankerkoenig_gamma"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
       "id": "charging-all-consumer-fast",
       "operation": "listChargingOptions",
       "counterpart": "charging station search",
@@ -220,6 +240,24 @@
       "operation": "listFuelOptions",
       "counterpart": "filling station search",
       "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&limit=10",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "tankerkoenig_gamma"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "fuel-station",
+      "operation": "getFuelStation",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options/00000000-0000-4000-8000-000000000002",
       "key": {
         "useClass": "consumer",
         "scopes": [

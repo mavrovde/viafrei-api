@@ -236,6 +236,140 @@
       ]
     },
     {
+      "id": "charging-site",
+      "operation": "getChargingSite",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options/afir_alpha:cs-01-0002",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "chargepool_gamma",
+          "tankerkoenig_gamma"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.chargePoints[de*syn*e000020].availability.observedAt",
+          "value": "2026-03-29T19:36:17Z"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000020].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000020].id",
+          "value": "de*syn*e000020"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000020].maxPowerKw",
+          "value": "11"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000021].availability",
+          "value": "null"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000021].id",
+          "value": "de*syn*e000021"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000021].maxPowerKw",
+          "value": "22"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000022].availability.observedAt",
+          "value": "2026-03-29T18:49:58Z"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000022].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000022].id",
+          "value": "de*syn*e000022"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000022].maxPowerKw",
+          "value": "50"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000023].availability.observedAt",
+          "value": "2026-03-29T07:19:35Z"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000023].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000023].id",
+          "value": "de*syn*e000023"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000023].maxPowerKw",
+          "value": "22"
+        },
+        {
+          "name": "data.distanceM",
+          "value": "0"
+        },
+        {
+          "name": "data.id",
+          "value": "afir_alpha:cs-01-0002"
+        },
+        {
+          "name": "data.location.lat",
+          "value": "47.63871"
+        },
+        {
+          "name": "data.location.lon",
+          "value": "7.75017"
+        },
+        {
+          "name": "data.name",
+          "value": "Kansilkamp Laden"
+        },
+        {
+          "name": "data.operator",
+          "value": "Raungul Strom"
+        },
+        {
+          "name": "data.sourceFamily",
+          "value": "afir_alpha"
+        },
+        {
+          "name": "data.summary.availableNow",
+          "value": "null"
+        },
+        {
+          "name": "data.summary.chargePoints",
+          "value": "4"
+        },
+        {
+          "name": "data.summary.maxPowerKw",
+          "value": "50"
+        },
+        {
+          "name": "meta.attribution[afir_alpha].family",
+          "value": "afir_alpha"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
       "id": "charging-all-consumer-fast",
       "operation": "listChargingOptions",
       "counterpart": "charging station search",
@@ -1618,6 +1752,146 @@
         {
           "name": "meta.page.limit",
           "value": "10"
+        }
+      ]
+    },
+    {
+      "id": "fuel-station",
+      "operation": "getFuelStation",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options/00000000-0000-4000-8000-000000000002",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "tankerkoenig_gamma"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.address.number",
+          "value": "null"
+        },
+        {
+          "name": "data.address.place",
+          "value": "null"
+        },
+        {
+          "name": "data.address.postcode",
+          "value": "null"
+        },
+        {
+          "name": "data.address.street",
+          "value": "null"
+        },
+        {
+          "name": "data.aroundTheClock",
+          "value": "false"
+        },
+        {
+          "name": "data.brand",
+          "value": "Belnan"
+        },
+        {
+          "name": "data.id",
+          "value": "00000000-0000-4000-8000-000000000002"
+        },
+        {
+          "name": "data.location.lat",
+          "value": "49.16941"
+        },
+        {
+          "name": "data.location.lon",
+          "value": "7.80879"
+        },
+        {
+          "name": "data.name",
+          "value": "Belnan Namüningen"
+        },
+        {
+          "name": "data.openingState",
+          "value": "unknown"
+        },
+        {
+          "name": "data.prices[0].current",
+          "value": "false"
+        },
+        {
+          "name": "data.prices[0].fuel",
+          "value": "diesel"
+        },
+        {
+          "name": "data.prices[0].priceEur",
+          "value": "1.799"
+        },
+        {
+          "name": "data.prices[0].reportedAt",
+          "value": "2026-03-29T22:45:59Z"
+        },
+        {
+          "name": "data.prices[0].reportedAtLocal",
+          "value": "2026-03-29T22:45:59Z"
+        },
+        {
+          "name": "data.prices[1].current",
+          "value": "false"
+        },
+        {
+          "name": "data.prices[1].fuel",
+          "value": "e10"
+        },
+        {
+          "name": "data.prices[1].priceEur",
+          "value": "1.633"
+        },
+        {
+          "name": "data.prices[1].reportedAt",
+          "value": "2026-03-29T15:24:44Z"
+        },
+        {
+          "name": "data.prices[1].reportedAtLocal",
+          "value": "2026-03-29T15:24:44Z"
+        },
+        {
+          "name": "data.prices[2].current",
+          "value": "false"
+        },
+        {
+          "name": "data.prices[2].fuel",
+          "value": "e5"
+        },
+        {
+          "name": "data.prices[2].priceEur",
+          "value": "2.062"
+        },
+        {
+          "name": "data.prices[2].reportedAt",
+          "value": "2026-03-29T21:50:02Z"
+        },
+        {
+          "name": "data.prices[2].reportedAtLocal",
+          "value": "2026-03-29T21:50:02Z"
+        },
+        {
+          "name": "data.sourceFamily",
+          "value": "tankerkoenig_gamma"
+        },
+        {
+          "name": "meta.attribution[tankerkoenig_gamma].family",
+          "value": "tankerkoenig_gamma"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose[tankerkoenig_gamma]",
+          "value": "1"
         }
       ]
     },

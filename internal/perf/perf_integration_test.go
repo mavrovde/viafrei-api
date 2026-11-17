@@ -315,6 +315,29 @@ func open(t *testing.T) *rig {
 	}
 	list("situation", "select event_id from contract.traffic_event where source_ref = any($1) and withdrawn_at is null "+
 		"and (valid_to is null or valid_to > $2) order by 1 limit 40", "/v1/road-situations/", "", permitted, r.now)
+	// The keyed pages, summaries and boards, each built only where the
+	// catalogue serves its operation (an older schema holds no table for it).
+	serves := func(op string) bool { return slices.Contains(httpapi.OperationIDs(), op) }
+	if serves("getFuelStation") {
+		list("fuel-station", "select station_id from contract.fuel_station where withdrawn_at is null order by 1 limit 40", "/v1/fuel-options/", "")
+	}
+	if serves("getChargingSite") {
+		list("charging-site", "select site_id from contract.charging_site where withdrawn_at is null order by 1 limit 40", "/v1/charging-options/", "")
+	}
+	if serves("getTrainBoard") {
+		list("train-board", "select distinct station_eva from contract.train_board order by 1 limit 40", "/v1/train-boards/", "?lang=en")
+	}
+	if serves("listParkingBays") {
+		list("parking-bays", fmt.Sprintf(at, "junction"), "/v1/parking-bays?at=", "&radius_m=2000&limit=20")
+	}
+	if serves("listStateServiceAlerts") {
+		list("state-alerts", "select distinct region_code from contract.admin_region where region_level = 'state' order by 1 limit 40", "/v1/states/", "/service-alerts")
+		list("state-weather", "select distinct region_code from contract.admin_region where region_level = 'state' order by 1 limit 40", "/v1/states/", "/weather")
+	}
+	r.targets["summaries"] = []string{"/v1/germany", "/v1/germany?lang=en"}
+	r.targets["coverage"] = []string{"/v1/places/coverage", "/v1/places/coverage?lang=en"}
+	r.targets["pressure"] = []string{"/v1/pressure"}
+	r.targets["affected"] = []string{"/v1/affected-stations?limit=5", "/v1/affected-stations?limit=20"}
 	return r
 }
 
@@ -418,6 +441,26 @@ func (r *rig) targetsOf(op string) []string {
 		return r.targets["sources"]
 	case "getWatch":
 		return r.targets["watch"]
+	case "getFuelStation":
+		return r.targets["fuel-station"]
+	case "getChargingSite":
+		return r.targets["charging-site"]
+	case "getTrainBoard":
+		return r.targets["train-board"]
+	case "listParkingBays":
+		return r.targets["parking-bays"]
+	case "listStateServiceAlerts":
+		return r.targets["state-alerts"]
+	case "listStateWeatherWarnings":
+		return r.targets["state-weather"]
+	case "getNationalSummary":
+		return r.targets["summaries"]
+	case "getPlacesCoverage":
+		return r.targets["coverage"]
+	case "getPressure":
+		return r.targets["pressure"]
+	case "listAffectedStations":
+		return r.targets["affected"]
 	}
 	return nil
 }
@@ -565,8 +608,18 @@ func TestRepeatedRequestsAreNotModified(t *testing.T) {
 	req.Covers(t, "NFR-PERF-005")
 	r := open(t)
 	h := r.handler(t, true)
-	target := r.targetsOf("listChargingOptions")[0]
-	_, etag, _ := call(h, target, "")
+	// The first charging read that credits a family and so carries an ETag
+	// (an answer that lists nothing carries none).
+	var target, etag string
+	for _, c := range r.targetsOf("listChargingOptions") {
+		if _, e, _ := call(h, c, ""); e != "" {
+			target, etag = c, e
+			break
+		}
+	}
+	if target == "" {
+		t.Fatal("no charging read carries an ETag")
+	}
 	notModified := 0
 	const repeats = 100
 	for range repeats {

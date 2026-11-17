@@ -10529,10 +10529,6 @@
           "value": "8"
         },
         {
-          "name": "data[0].kilometres",
-          "value": "null"
-        },
-        {
           "name": "data[0].name",
           "value": "A100"
         },
@@ -10545,20 +10541,12 @@
           "value": "0"
         },
         {
-          "name": "data[0].sourceFamily",
-          "value": "autobahn"
-        },
-        {
           "name": "data[0].states",
           "value": "[\"01\",\"06\",\"08\",\"10\",\"11\"]"
         },
         {
           "name": "data[1].junctions",
           "value": "8"
-        },
-        {
-          "name": "data[1].kilometres",
-          "value": "null"
         },
         {
           "name": "data[1].name",
@@ -10573,20 +10561,12 @@
           "value": "8"
         },
         {
-          "name": "data[1].sourceFamily",
-          "value": "autobahn"
-        },
-        {
           "name": "data[1].states",
           "value": "[\"06\",\"07\",\"08\",\"10\"]"
         },
         {
           "name": "data[2].junctions",
           "value": "8"
-        },
-        {
-          "name": "data[2].kilometres",
-          "value": "null"
         },
         {
           "name": "data[2].name",
@@ -10601,20 +10581,12 @@
           "value": "2"
         },
         {
-          "name": "data[2].sourceFamily",
-          "value": "autobahn"
-        },
-        {
           "name": "data[2].states",
           "value": "[\"03\",\"04\",\"07\",\"10\",\"11\",\"14\"]"
         },
         {
           "name": "data[3].junctions",
           "value": "8"
-        },
-        {
-          "name": "data[3].kilometres",
-          "value": "null"
         },
         {
           "name": "data[3].name",
@@ -10629,20 +10601,12 @@
           "value": "2"
         },
         {
-          "name": "data[3].sourceFamily",
-          "value": "autobahn"
-        },
-        {
           "name": "data[3].states",
           "value": "[\"05\",\"07\",\"10\",\"12\",\"14\",\"15\"]"
         },
         {
           "name": "data[4].junctions",
           "value": "8"
-        },
-        {
-          "name": "data[4].kilometres",
-          "value": "null"
         },
         {
           "name": "data[4].name",
@@ -10655,10 +10619,6 @@
         {
           "name": "data[4].situations",
           "value": "2"
-        },
-        {
-          "name": "data[4].sourceFamily",
-          "value": "autobahn"
         },
         {
           "name": "data[4].states",
@@ -10950,10 +10910,6 @@
           "value": "8"
         },
         {
-          "name": "data[0].kilometres",
-          "value": "null"
-        },
-        {
           "name": "data[0].name",
           "value": "A100"
         },
@@ -10964,10 +10920,6 @@
         {
           "name": "data[0].situations",
           "value": "0"
-        },
-        {
-          "name": "data[0].sourceFamily",
-          "value": "autobahn"
         },
         {
           "name": "data[0].states",
@@ -11059,10 +11011,6 @@
           "value": "8"
         },
         {
-          "name": "data[0].kilometres",
-          "value": "null"
-        },
-        {
           "name": "data[0].name",
           "value": "A100"
         },
@@ -11073,10 +11021,6 @@
         {
           "name": "data[0].situations",
           "value": "0"
-        },
-        {
-          "name": "data[0].sourceFamily",
-          "value": "autobahn"
         },
         {
           "name": "data[0].states",
@@ -11532,28 +11476,8 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
-          "name": "data.apiVersion",
-          "value": "parity"
-        },
-        {
-          "name": "data.buildSha",
-          "value": "parity"
-        },
-        {
-          "name": "data.contractVersion",
-          "value": "0.3"
-        },
-        {
-          "name": "data.languages",
-          "value": "[\"en\"]"
-        },
-        {
-          "name": "data.openapi",
-          "value": "https://api.viafrei.de/v1/openapi.json"
-        },
-        {
-          "name": "data.platformVersion",
-          "value": "null"
+          "name": "data",
+          "value": "{}"
         }
       ]
     }

@@ -219,6 +219,14 @@ var Default = Rules{
 		{"data.lampReason", "from", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
 		{"data.corridor.states", "horizon_days", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
 		{"data.corridor.states", "from", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
+		{"data[*].kilometres", "", "listMotorways", motorwayListReason},
+		{"data[*].sourceFamily", "", "listMotorways", motorwayListReason},
+		{"data.apiVersion", "", "getMeta", serviceMetaReason},
+		{"data.buildSha", "", "getMeta", serviceMetaReason},
+		{"data.contractVersion", "", "getMeta", serviceMetaReason},
+		{"data.languages", "", "getMeta", serviceMetaReason},
+		{"data.openapi", "", "getMeta", serviceMetaReason},
+		{"data.platformVersion", "", "getMeta", serviceMetaReason},
 		{"data.watchId", "", "getWatch", watchIDReason},
 		{"data.uri", "", "getWatch", watchIDReason},
 		{"meta.attribution[*].domain", "", "", attributionReason},
@@ -263,6 +271,14 @@ func siteReason(route string) string {
 
 // zoneRowsReason is why the zone rows of a rules answer are not compared.
 const zoneRowsReason = "API-only: the MCP driving rules state the verdict at a position (zoneVerdict, compared) and a city's entry of the curated zone list, and no digest route the site reads lists the published zone rows"
+
+// motorwayListReason is why a motorway's length and register family are
+// not compared: the site's motorway list, index and pages show neither.
+const motorwayListReason = "API-only: the site's motorway list, index and pages (the digest routes /internal/motorway/list, /internal/motorway/index and /internal/motorway/:road) show no length and no register family of a motorway"
+
+// serviceMetaReason is why the members of the service description are not
+// compared: they describe the running build, which the site shows none of.
+const serviceMetaReason = "API-only: the versions and the document of the running service; the site reads only whether it is saturated (the digest route /internal/pressure), which the API states by answering at all"
 
 // watchIDReason is why a watch's id is not compared: each side mints its own.
 const watchIDReason = "each side mints the id of a watch: the platform a number of its session, the API a token of kind, key and condition; the watch it names is compared"
@@ -577,10 +593,24 @@ func Project(body []byte, r Rules, operation, request string, owners Owners) ([]
 		return nil, fmt.Errorf("%w: %q", ErrDuplicateFact, n)
 	}
 	kept := p.out[:0]
+	dataFacts, dataKept := 0, 0
 	for _, f := range p.out {
+		isData := f.Name == "data" || strings.HasPrefix(f.Name, "data.") || strings.HasPrefix(f.Name, "data[")
+		if isData {
+			dataFacts++
+		}
 		if !r.Excludes(operation, request, f.Name) {
 			kept = append(kept, f)
+			if isData {
+				dataKept++
+			}
 		}
+	}
+	// An answer whose every data fact is excluded states data = {}: it
+	// answered, and none of what it answered is compared.
+	if dataFacts > 0 && dataKept == 0 {
+		kept = append(kept, Fact{"data", "{}"})
+		sort.Slice(kept, func(i, j int) bool { return kept[i].Name < kept[j].Name })
 	}
 	return kept, nil
 }

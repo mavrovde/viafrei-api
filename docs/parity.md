@@ -79,6 +79,15 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
   exclusion may hold only in a case that asks a parameter: a parameter is
   asked when it is present and its value is not a number of 0 or less, which
   filters nothing.
+- **An answer whose every data fact is excluded** states `data = {}`: it
+  answered, and none of what it answered is compared. An answer the other
+  side refuses states `error = true` instead.
+- **Site-route questions.** An operation the site reads and no MCP tool
+  answers (`listMotorways`, `getMeta`, `getPlaceOverview`, `listSources`) is
+  compared with what the site shows: the producer asks the digest routes the
+  site reads on the same fixture rows and projects their fragments. The API
+  states what the site shows; a fact the API answers beyond it is excluded for
+  that operation, with its reason below.
 - **No named differences.** Every fact that is not excluded is compared
   as it is: a value either side states otherwise is a mismatch. There is no
   list of facts both sides may state differently.
@@ -99,6 +108,8 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
 | `data.zones`, in `getDrivingRules` only | API-only. The MCP driving rules state the verdict at a position (`data.zoneVerdict`, compared) and, for a city, the curated zone list's entry; neither they nor any digest route the site reads list the published zone rows (key, role, publisher, distance) the API lists for a client to draw. |
 | `data.lamp`, `data.lampReason`, in `listStateRoadConditions` only | The MCP motorway status of a Land lists the Land's items and counts, not a lamp. The site reads the Land's lamp (the motorway pages' one rule over the Land's Autobahn items and DWD levels) from the digest route `/internal/state/:slug`, so the API answers it; it is not compared. |
 | `data.lamp`, `data.lampReason`, `data.corridor.states`, in `getMotorwayConditions` asked with `horizon_days` or `from` | The MCP roadworks-ahead answer lists the planned sites of the window, not a lamp or the Länder the road crosses. The site reads the road's lamp and Länder beside its planned works from the digest route `/internal/motorway/:road`, so the API answers them; they are not compared. |
+| `data[*].kilometres`, `data[*].sourceFamily`, in `listMotorways` only | API-only. The site's motorway list, index and pages (digest routes `/internal/motorway/list`, `/internal/motorway/index`, `/internal/motorway/:road`) show no length and no register family of a motorway. What they show (the road, its junctions with number, kind, name, point and Land, the Länder it crosses, its count of reports, its lamp, and the credits of the index) is compared. |
+| `data.apiVersion`, `data.buildSha`, `data.contractVersion`, `data.languages`, `data.openapi`, `data.platformVersion`, in `getMeta` only | API-only: the versions and the document of the running service. The site reads only whether the service is saturated (digest route `/internal/pressure`); the API states that by answering at all. The answer is compared as `data = {}` (below). |
 | `data.watchId`, `data.uri`, in `getWatch` only | Each side mints the id of a watch: the platform a number of the session that opened it, the API a token of the kind, the key and the condition. The watch the id names (kind, key, condition, window) is compared. |
 | `meta.attribution[*].` `domain`, `licence`, `licenceUrl`, `publisher`, `shareAlike`, `shareAlikeOffer`, `termsUrl`, `text` | The fixture's families carry synthetic register texts; the platform credits its own register rows for the sources the producer stores each family as, so the texts cannot be equal on these rows. Which families are credited (`meta.attribution[*].family`) is compared. |
 | The text of a condition note (`meta.notes.condition`) and, since rules/5, of a purpose note (`meta.notes.purpose`) | The same reason, since rules/4 for conditions: the fixture's notes are synthetic and the platform states its own register's. The family of each note and how many each family has are compared (`meta.notes.<kind>[<family>]`, above). |

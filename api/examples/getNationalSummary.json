@@ -9,7 +9,8 @@
       "energy",
       "parking",
       "transit",
-      "weather"
+      "weather",
+      "accessibility"
     ],
     "sources": [
       "roads_alpha",
@@ -121,7 +122,43 @@
           "sourceFamily": "park_alpha"
         }
       ],
-      "facilities": [],
+      "facilities": [
+        {
+          "kind": "elevator",
+          "state": "active",
+          "count": 11,
+          "stations": 11,
+          "sourceFamily": "openstation_siri_fm"
+        },
+        {
+          "kind": "elevator",
+          "state": "inactive",
+          "count": 2,
+          "stations": 2,
+          "sourceFamily": "openstation_siri_fm"
+        },
+        {
+          "kind": "elevator",
+          "state": "unknown",
+          "count": 4,
+          "stations": 4,
+          "sourceFamily": "openstation_siri_fm"
+        },
+        {
+          "kind": "escalator",
+          "state": "active",
+          "count": 4,
+          "stations": 3,
+          "sourceFamily": "openstation_siri_fm"
+        },
+        {
+          "kind": "escalator",
+          "state": "unknown",
+          "count": 1,
+          "stations": 1,
+          "sourceFamily": "openstation_siri_fm"
+        }
+      ],
       "punctuality": [],
       "warnings": [
         {
@@ -148,7 +185,7 @@
       "requestId": "example-request-0001",
       "generatedAt": "2026-03-30T00:00:00Z",
       "language": "en",
-      "asOf": "2026-03-29T23:55:00Z",
+      "asOf": "2026-03-29T23:52:30Z",
       "freshness": [
         {
           "family": "afir_alpha",
@@ -162,6 +199,13 @@
           "dataAsOf": "2026-03-29T23:57:30Z",
           "ageS": 150,
           "staleAfterS": 900,
+          "stale": false
+        },
+        {
+          "family": "openstation_siri_fm",
+          "dataAsOf": "2026-03-29T23:52:30Z",
+          "ageS": 450,
+          "staleAfterS": 2700,
           "stale": false
         },
         {
@@ -208,6 +252,17 @@
           "shareAlike": false,
           "shareAlikeOffer": null,
           "termsUrl": "https://alpha.example/terms/dwd_alpha"
+        },
+        {
+          "family": "openstation_siri_fm",
+          "domain": "accessibility",
+          "publisher": "Bengdün Datenwerk",
+          "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://alpha.example/terms/openstation_siri_fm"
         },
         {
           "family": "park_alpha",

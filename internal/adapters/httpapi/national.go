@@ -63,14 +63,14 @@ type WarningSummary struct {
 
 // NationalData is the national picture.
 type NationalData struct {
-	Situations  []SummaryCount     `json:"situations" doc:"Road situations in force now, by kind (closure, roadworks, jam, restriction, ...)."`
-	States      []SummaryCount     `json:"states" doc:"Road situations in force now, by Land (the Land of each situation's point)."`
-	Fuel        []FuelGradeSummary `json:"fuel" doc:"Per grade, the stations with a current price, the cheapest and the median of those prices."`
-	Charging    []ChargingFamilySummary  `json:"charging" doc:"Charging sites and their points, per family."`
-	Parking     []SummaryCount     `json:"parking" doc:"Parking sites, by kind."`
-	Facilities  []FacilitySummary  `json:"facilities" doc:"Station lifts and escalators, by kind and state."`
-	Punctuality []AreaPunctuality  `json:"punctuality" doc:"Regional public-transport punctuality, per Land and per district."`
-	Warnings    []WarningSummary   `json:"warnings" doc:"Official weather warnings in force now, by level."`
+	Situations  []SummaryCount          `json:"situations" doc:"Road situations in force now, by kind (closure, roadworks, jam, restriction, ...)."`
+	States      []SummaryCount          `json:"states" doc:"Road situations in force now, by Land (the Land of each situation's point)."`
+	Fuel        []FuelGradeSummary      `json:"fuel" doc:"Per grade, the stations with a current price, the cheapest and the median of those prices."`
+	Charging    []ChargingFamilySummary `json:"charging" doc:"Charging sites and their points, per family."`
+	Parking     []SummaryCount          `json:"parking" doc:"Parking sites, by kind."`
+	Facilities  []FacilitySummary       `json:"facilities" doc:"Station lifts and escalators, by kind and state (needs the scope accessibility)."`
+	Punctuality []AreaPunctuality       `json:"punctuality" doc:"Regional public-transport punctuality, per Land and per district."`
+	Warnings    []WarningSummary        `json:"warnings" doc:"Official weather warnings in force now, by level."`
 }
 
 // NationalEnvelope is the enveloped answer of getNationalSummary.
@@ -88,7 +88,7 @@ type NationalOutput struct {
 
 func registerNational(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "Germany now: the national counts and boards"
-	op.Description = "The national picture the site's home tiles, its live map and its national pages state: road situations in force by kind and by Land, current fuel prices by grade, charging sites and points, parking sites by kind, station lifts and escalators by state, regional punctuality and weather warnings by level. Each part is read from the families of its domain the key may read, for every domain the key has the scope of (roads, energy, parking, transit, weather); a domain whose families are all withheld is left out and named in meta.warnings."
+	op.Description = "The national picture the site's home tiles, its live map and its national pages state: road situations in force by kind and by Land, current fuel prices by grade, charging sites and points, parking sites by kind, station lifts and escalators by state, regional punctuality and weather warnings by level. Each part is read from the families of its domain the key may read, for every domain the key has the scope of (roads, energy, parking, transit, accessibility, weather); a domain whose families are all withheld is left out and named in meta.warnings."
 	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, _ *struct{}) (*NationalOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {

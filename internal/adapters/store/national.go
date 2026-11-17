@@ -50,16 +50,17 @@ where f.withdrawn_at is null and f.source_ref = any($1) and ` + permitted("f") +
 group by 2, 4
 order by 1, 2, 4`,
 	"transit": `
+select 'punctuality', p.area_level || ':' || p.area_code, p.area_name, p.source_ref, p.trips_observed, p.trips_late,
+       null, p.median_worst_delay_s::float8
+from contract.transit_punctuality p
+where p.source_ref = any($1) and ` + permitted("p") + ` and $2::timestamptz is not null
+order by 1, 2, 4`,
+	"accessibility": `
 select 'facilities', f.facility_kind || '/' || coalesce(f.facility_status, 'unknown'), null::text, f.source_ref,
        count(*)::int, count(distinct f.stop_place_id)::int, null::float8, null::float8
 from contract.station_facility f
 where f.source_ref = any($1) and ` + permitted("f") + ` and $2::timestamptz is not null
 group by 2, 4
-union all
-select 'punctuality', p.area_level || ':' || p.area_code, p.area_name, p.source_ref, p.trips_observed, p.trips_late,
-       null, p.median_worst_delay_s::float8
-from contract.transit_punctuality p
-where p.source_ref = any($1) and ` + permitted("p") + `
 order by 1, 2, 4`,
 	"weather": `
 select 'warnings', w.warning_level::text, null::text, w.source_ref, count(*)::int, count(distinct w.region_code)::int, null::float8, null::float8

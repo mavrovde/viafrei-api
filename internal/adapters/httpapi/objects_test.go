@@ -9,6 +9,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/national"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
+	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
@@ -24,6 +25,8 @@ type objectsFake struct {
 	gotID    string
 	gotAge   time.Duration
 	national features.NationalAnswer
+	affected []transit.Affected
+	gotLimit int
 }
 
 func (f *fakeFeatures) FuelStation(_ context.Context, _ access.Record, id string, held time.Duration) (energy.FuelStationPage, features.Answer[struct{}], error) {
@@ -144,4 +147,31 @@ func TestNationalSummarySortsTheSections(t *testing.T) {
 		t.Errorf("a missing figure reads 0: %v", data)
 	}
 	assertProblem(t, do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: access.ErrNonePermitted}, nil), http.MethodGet, "/v1/germany", bearer), 403, "source-not-permitted")
+}
+
+func (f *fakeFeatures) AffectedStations(_ context.Context, _ access.Record, limit int) ([]transit.Affected, features.Answer[struct{}], error) {
+	f.objects.gotLimit = limit
+	return f.objects.affected, f.objects.fuelMeta, f.err
+}
+
+func TestAffectedStationsAreRanked(t *testing.T) {
+	f := everyAnswer()
+	f.objects.affected = []transit.Affected{{Station: transit.Station{ID: "st:1", Name: "Köln Hbf", Modes: []transit.Mode{"rail"}, Family: "t"}, Cancelled: 2, Late: 3, Alerts: 1, LiftsOut: 4}}
+	f.objects.fuelMeta = features.Answer[struct{}]{Families: []provenance.Family{fresh}, At: fixedNow}
+	h := featureHandler(t, config.Defaults(), f, nil)
+	w := do(t, h, http.MethodGet, "/v1/affected-stations", bearer)
+	if w.Code != http.StatusOK || f.objects.gotLimit != 10 {
+		t.Fatalf("status %d limit %d: %s", w.Code, f.objects.gotLimit, w.Body)
+	}
+	data, _ := decode(t, w)["data"].([]any)
+	if len(data) != 1 {
+		t.Fatalf("data %v", data)
+	}
+	if s := data[0].(map[string]any); s["id"] != "st:1" || s["cancelled"] != 2.0 || s["late"] != 3.0 || s["alerts"] != 1.0 || s["liftsOut"] != 4.0 {
+		t.Errorf("station %v", s)
+	}
+	if w := do(t, h, http.MethodGet, "/v1/affected-stations?limit=3", bearer); w.Code != http.StatusOK || f.objects.gotLimit != 3 {
+		t.Errorf("limit 3: %d %d", w.Code, f.objects.gotLimit)
+	}
+	assertProblem(t, do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: access.ErrNonePermitted}, nil), http.MethodGet, "/v1/affected-stations", bearer), 403, "source-not-permitted")
 }

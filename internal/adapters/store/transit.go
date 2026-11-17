@@ -1,8 +1,10 @@
 package store
 
 import (
+	"cmp"
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -169,4 +171,156 @@ func (s *Store) Facilities(ctx context.Context, station string, families []strin
 			return v, err
 		})
 	})
+}
+
+// The affected-stations board reads each licence boundary in a statement of
+// its own and puts the answers side by side, as the platform's board does:
+// the service alerts in force and the lifts out of service name the stations
+// (by stop place id or IFOPT); then the departures of the next hour at those
+// stations, read station by station through contract.departure; then the
+// stations themselves.
+
+// affectedAlerts are the refs the alerts in force at $2 of the families ($1)
+// name, with the alert and its family.
+const affectedAlerts = `
+select distinct a.alert_id, a.source_ref, u.sid
+from contract.service_alert a, unnest(a.stop_ids) u(sid)
+where a.source_ref = any($1) and ` + "a.display_class <> 'withhold' and (a.audience = 'public' or " + ownKeyOn + ")" + `
+  and (a.active_from is null or a.active_from <= $2) and (a.active_to is null or a.active_to > $2)`
+
+// affectedLifts are the stations' lifts and escalators out of service, of
+// the families ($1).
+const affectedLifts = `
+select f.stop_place_id, count(*)::int, array_agg(distinct f.source_ref order by f.source_ref)
+from contract.station_facility f
+where f.facility_status = 'inactive' and f.stop_place_id is not null and f.source_ref = any($1)
+  and ` + "f.display_class <> 'withhold' and (f.audience = 'public' or " + ownKeyOn + ")" + `
+group by 1`
+
+// affectedPlaces are the stations of the families ($1) with these ids or
+// IFOPTs ($2), each with the ref it was named by.
+const affectedPlaces = `
+select r.ref, s.stop_place_id, s.name, st_y(s.location), st_x(s.location), s.national_stop_code, s.region_code, coalesce(s.modes, '{}'), s.source_ref
+from unnest($2::text[]) r(ref)
+join contract.stop_place s on s.stop_place_id = r.ref or s.ifopt = r.ref
+where s.withdrawn_at is null and s.location is not null and s.source_ref = any($1)
+  and ` + "s.display_class <> 'withhold' and (s.audience = 'public' or " + ownKeyOn + ")"
+
+// affectedDepartures counts one station's ($1) boarding departures planned
+// in the hour from $3, of the families ($2): cancelled, and late by $4
+// seconds or more and not cancelled.
+const affectedDepartures = `
+select count(*) filter (where d.cancelled)::int, count(*) filter (where not d.cancelled and coalesce(d.delay_s, 0) >= $4)::int,
+       coalesce(array_agg(distinct d.source_ref order by d.source_ref), '{}')
+from contract.departure d
+where d.stop_place_id = $1 and d.planned_departure_at >= $3::timestamptz and d.planned_departure_at < $3::timestamptz + interval '60 minutes'
+  and d.boarding and d.source_ref = any($2) and ` + "d.display_class <> 'withhold' and (d.audience = 'public' or " + ownKeyOn + ")"
+
+// affectedRef is what one ref (a stop place id or an IFOPT) is named by.
+type affectedRef struct {
+	alerts map[string]bool
+	lifts  int
+	fams   []string
+}
+
+// AffectedStations ranks the stations of the families by what affects them
+// at now (features.Affected): cancelled departures of the next hour first,
+// then late ones, then alerts in force, then lifts out of service; ties by
+// name, then id. A station is listed when an alert in force or a lift out of
+// service names it.
+func (s *Store) AffectedStations(ctx context.Context, families []string, now time.Time, limit int) ([]transit.Affected, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.Affected, error) {
+		by, err := affectedRefs(ctx, tx, families, now)
+		if err != nil {
+			return nil, err
+		}
+		stations, err := affectedPlacesOf(ctx, tx, families, by)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]transit.Affected, 0, len(stations))
+		for _, a := range stations {
+			var more []string
+			if err := tx.QueryRow(ctx, affectedDepartures, a.Station.ID, families, now, transit.AffectedLateS).Scan(&a.Cancelled, &a.Late, &more); err != nil {
+				return nil, err
+			}
+			fs := append(append([]string{}, a.Families...), more...)
+			slices.Sort(fs)
+			own := a.Station.Family
+			a.Families = append([]string{own}, slices.DeleteFunc(slices.Compact(fs), func(f string) bool { return f == own })...)
+			out = append(out, *a)
+		}
+		slices.SortFunc(out, func(x, y transit.Affected) int {
+			return cmp.Or(cmp.Compare(y.Cancelled, x.Cancelled), cmp.Compare(y.Late, x.Late), cmp.Compare(y.Alerts, x.Alerts),
+				cmp.Compare(y.LiftsOut, x.LiftsOut), cmp.Compare(x.Station.Name, y.Station.Name), cmp.Compare(x.Station.ID, y.Station.ID))
+		})
+		return out[:min(limit, len(out))], nil
+	})
+}
+
+// affectedRefs reads what the alerts in force and the lifts out of service
+// name, by ref.
+func affectedRefs(ctx context.Context, tx pgx.Tx, families []string, now time.Time) (map[string]*affectedRef, error) {
+	by := map[string]*affectedRef{}
+	at := func(ref string) *affectedRef {
+		if by[ref] == nil {
+			by[ref] = &affectedRef{alerts: map[string]bool{}}
+		}
+		return by[ref]
+	}
+	var (
+		id, fam, ref string
+		lifts        int
+		fams         []string
+	)
+	rows, _ := tx.Query(ctx, affectedAlerts, families, now)
+	if _, err := pgx.ForEachRow(rows, []any{&id, &fam, &ref}, func() error {
+		n := at(ref)
+		n.alerts[fam+":"+id], n.fams = true, append(n.fams, fam)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	rows, _ = tx.Query(ctx, affectedLifts, families)
+	_, err := pgx.ForEachRow(rows, []any{&ref, &lifts, &fams}, func() error {
+		n := at(ref)
+		n.lifts, n.fams = lifts, append(n.fams, fams...)
+		return nil
+	})
+	return by, err
+}
+
+// affectedPlacesOf reads the stations the refs name, each with the alerts and
+// lifts its refs carry.
+func affectedPlacesOf(ctx context.Context, tx pgx.Tx, families []string, by map[string]*affectedRef) (map[string]*transit.Affected, error) {
+	refs := make([]string, 0, len(by))
+	for r := range by {
+		refs = append(refs, r)
+	}
+	slices.Sort(refs)
+	stations := map[string]*transit.Affected{}
+	alerts := map[string]map[string]bool{}
+	var (
+		ref   string
+		st    transit.Station
+		modes []string
+	)
+	rows, _ := tx.Query(ctx, affectedPlaces, families, refs)
+	_, err := pgx.ForEachRow(rows, []any{&ref, &st.ID, &st.Name, &st.Location.Lat, &st.Location.Lon, &st.NationalCode, &st.RegionCode, &modes, &st.Family}, func() error {
+		a := stations[st.ID]
+		if a == nil {
+			st.Modes = transit.MapModes(modes)
+			a = &transit.Affected{Station: st}
+			stations[st.ID], alerts[st.ID] = a, map[string]bool{}
+		}
+		n := by[ref]
+		a.LiftsOut += n.lifts
+		for k := range n.alerts {
+			alerts[st.ID][k] = true
+		}
+		a.Alerts = len(alerts[st.ID])
+		a.Families = append(a.Families, n.fams...)
+		return nil
+	})
+	return stations, err
 }

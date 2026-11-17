@@ -110,3 +110,35 @@ func TestNationalReadsEveryDomainsPart(t *testing.T) {
 		t.Errorf("no family: %v %v", rows, err)
 	}
 }
+
+func TestAffectedStationsAreRankedByWhatAffectsThem(t *testing.T) {
+	st := seeded(t)
+	var fams []string
+	owner(t, `select array_agg(distinct source_ref order by source_ref) from contract.source`, &fams)
+	// The departures of the stations the fixture's lifts name, read station by
+	// station (the view is built for that): the hour from the first one.
+	var at time.Time
+	owner(t, `select coalesce(min(d.planned_departure_at), now()) - interval '1 minute'
+from (select distinct stop_place_id from contract.station_facility where facility_status = 'inactive') f
+cross join lateral (select planned_departure_at from contract.departure d where d.stop_place_id = f.stop_place_id order by 1 limit 1) d`, &at)
+	ctx := access.WithAudience(bounded(t), access.AudienceOwn)
+	got, err := st.AffectedStations(ctx, fams, at, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, a := range got {
+		if a.Cancelled+a.Late+a.Alerts+a.LiftsOut == 0 || len(a.Families) == 0 || a.Families[0] != a.Station.Family {
+			t.Errorf("listed with nothing, or uncredited: %+v", a)
+		}
+		if i > 0 && got[i-1].Cancelled < a.Cancelled {
+			t.Errorf("not ranked by cancellations: %+v before %+v", got[i-1], a)
+		}
+	}
+	if len(got) == 0 {
+		t.Error("the fixture holds out-of-service lifts and cancellations; none was listed")
+	}
+	none, err := st.AffectedStations(ctx, []string{"no-such-family"}, at, 5)
+	if err != nil || len(none) != 0 {
+		t.Errorf("no family: %v %v", none, err)
+	}
+}

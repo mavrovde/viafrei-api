@@ -80,6 +80,7 @@ type Repositories struct {
 	Lorry       Lorry
 	Catalogue   Catalogue
 	National    National
+	Affected    Affected
 }
 
 // Settings are the tunables of the use cases.

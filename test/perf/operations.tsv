@@ -38,3 +38,4 @@ getFuelStation	lookup
 getChargingSite	lookup
 getPressure	lookup
 getNationalSummary	composed
+listAffectedStations	composed

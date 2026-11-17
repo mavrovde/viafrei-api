@@ -10,6 +10,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/national"
+	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 )
 
 var natRegister = []access.Terms{
@@ -90,6 +91,52 @@ func TestNationalRefusals(t *testing.T) {
 	}
 	f.fake.provErr, f.fake.regErr = nil, boom
 	if _, err := s.National(ctx, key("commercial", []access.Scope{"roads"}, "r1"), time.Hour); !errors.Is(err, boom) {
+		t.Errorf("register error: %v", err)
+	}
+}
+
+type afFake struct {
+	*fake
+	v   []transit.Affected
+	err error
+}
+
+func (f *afFake) AffectedStations(context.Context, []string, time.Time, int) ([]transit.Affected, error) {
+	return f.v, f.err
+}
+
+func TestAffectedStationsCreditEveryFigure(t *testing.T) {
+	ctx := context.Background()
+	f := &afFake{fake: &fake{reg: []access.Terms{{Family: "t1", Domain: "transit", UseClasses: all, Version: "v1"},
+		{Family: "t2", Domain: "transit", UseClasses: all, Version: "v1"}, {Family: "l1", Domain: "accessibility", UseClasses: all, Version: "v1"}}},
+		v: []transit.Affected{{Station: transit.Station{ID: "a", Family: "t1"}, Families: []string{"t1", "t2", "l1", "t1"}}}}
+	s := features.New(features.Repositories{Register: f, Affected: f}, features.Settings{Language: "en"}, func() time.Time { return now })
+	v, a, err := s.AffectedStations(ctx, key("commercial", []access.Scope{"transit", "accessibility"}, "t1", "t2", "l1"), 5)
+	if err != nil || len(v) != 1 || a.Partial || !slices.Equal(names(a.Families), []string{"l1", "t1", "t2"}) {
+		t.Fatalf("%+v %+v %v", v, a, err)
+	}
+	// A family the key may not read in the answer is a gate violation.
+	if _, _, err := s.AffectedStations(ctx, key("commercial", []access.Scope{"transit"}, "t1", "t2"), 5); !errors.Is(err, features.ErrGateViolation) {
+		t.Errorf("lifts without the scope: %v", err)
+	}
+	f.v = []transit.Affected{{Station: transit.Station{ID: "a", Family: "t1"}, Families: []string{"t1"}}}
+	if _, a, err := s.AffectedStations(ctx, key("commercial", []access.Scope{"transit"}, "t1"), 5); err != nil || !a.Partial {
+		t.Errorf("without the scope accessibility the answer is partial: %+v %v", a, err)
+	}
+	if _, _, err := s.AffectedStations(ctx, key("commercial", []access.Scope{"transit"}, "l1"), 5); !errors.Is(err, access.ErrNonePermitted) {
+		t.Errorf("no transit family: %v", err)
+	}
+	boom := errors.New("boom")
+	f.err = boom
+	if _, _, err := s.AffectedStations(ctx, key("commercial", []access.Scope{"transit"}, "t1"), 5); !errors.Is(err, boom) {
+		t.Errorf("read error: %v", err)
+	}
+	f.err, f.fake.provErr = nil, boom
+	if _, _, err := s.AffectedStations(ctx, key("commercial", []access.Scope{"transit"}, "t1"), 5); !errors.Is(err, boom) {
+		t.Errorf("provenance error: %v", err)
+	}
+	f.fake.provErr, f.fake.regErr = nil, boom
+	if _, _, err := s.AffectedStations(ctx, key("commercial", []access.Scope{"transit"}, "t1"), 5); !errors.Is(err, boom) {
 		t.Errorf("register error: %v", err)
 	}
 }

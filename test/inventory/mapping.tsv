@@ -229,9 +229,9 @@ web:/internal/charging/{}	getChargingSite,listChargingOptions?operator	charging-
 web:/internal/motorway/{}/fuel	listFuelOptions?at	fuel-near	-
 web:/internal/station/index	listStations?q	stations-text	-
 web:/internal/station/list	listStations?at	stations-near	-
-web:/internal/station/top	listStations?at	stations-near	-
-web:/internal/state/index	listPlaces?kind	places-kind	-
-web:/internal/state/list	listPlaces?kind,listStateRoadConditions?state	places-kind,state-roads-10	-
+web:/internal/station/top	listAffectedStations,listStations?at	stations-near	-
+web:/internal/state/index	getNationalSummary,listPlaces?kind	places-kind	-
+web:/internal/state/list	getNationalSummary,listPlaces?kind,listStateRoadConditions?state	places-kind,state-roads-10	-
 web:/internal/place/index	listPlaces?kind	places-kind	-
 web:/internal/motorway/index	listMotorways	motorways-all	-
 web:/internal/motorway/list	listMotorways?limit	motorways-all	-

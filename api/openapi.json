@@ -139,6 +139,111 @@
         ],
         "type": "object"
       },
+      "AffectedEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/AffectedStation"
+            },
+            "type": "array"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DataMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "AffectedStation": {
+        "additionalProperties": false,
+        "properties": {
+          "alerts": {
+            "description": "Service alerts in force that name it.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "cancelled": {
+            "description": "Its departures planned in the next 60 minutes that are cancelled.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "distanceM": {
+            "description": "Distance from at, in metres; null when the question named no position.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "districtCode": {
+            "description": "The official code (AGS) of the district the station lies in; null when unknown.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "late": {
+            "description": "Its departures planned in the next 60 minutes 5 minutes late or more, not cancelled.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "liftsOut": {
+            "description": "Its lifts and escalators out of service.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "modes": {
+            "description": "The modes of transport that serve the station. Open enumeration (rail, sbahn, subway, tram, bus, ferry, other: rail is every train but the S-Bahn); treat an unknown value as other.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sourceFamily": {
+            "description": "The source family of the item; its attribution is in meta.attribution.",
+            "type": "string"
+          },
+          "stopCode": {
+            "description": "The national stop code (DHID); null when none is recorded.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "cancelled",
+          "late",
+          "alerts",
+          "liftsOut",
+          "id",
+          "name",
+          "location",
+          "stopCode",
+          "districtCode",
+          "modes",
+          "distanceM",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
       "Area": {
         "additionalProperties": false,
         "properties": {
@@ -3305,7 +3410,7 @@
             "type": "array"
           },
           "facilities": {
-            "description": "Station lifts and escalators, by kind and state.",
+            "description": "Station lifts and escalators, by kind and state (needs the scope accessibility).",
             "items": {
               "$ref": "#/components/schemas/FacilitySummary"
             },
@@ -7717,6 +7822,385 @@
         "x-required-scope": "places"
       }
     },
+    "/v1/affected-stations": {
+      "get": {
+        "description": "The stations ranked by what affects them now (the site's station board): departures of the next 60 minutes cancelled first, then late ones, then service alerts in force, then lifts and escalators out of service; a station with none is not listed. A station is listed when a service alert in force or a lift out of service names it; its departures are then counted. Needs the scope transit.",
+        "operationId": "listAffectedStations",
+        "parameters": [
+          {
+            "description": "Most stations; default 10 (the site's board names 5, 10 on a wide screen).",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "description": "Most stations; default 10 (the site's board names 5, 10 on a wide screen).",
+              "format": "int64",
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The stations most affected now",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "1:de:12002:1",
+                          "name": "Paulstörhausen Süd",
+                          "location": {
+                            "lat": 51.601337,
+                            "lon": 14.591617
+                          },
+                          "stopCode": "de:12002:1",
+                          "districtCode": "12002",
+                          "modes": [],
+                          "distanceM": null,
+                          "sourceFamily": "delfi_static",
+                          "cancelled": 0,
+                          "late": 0,
+                          "alerts": 0,
+                          "liftsOut": 1
+                        },
+                        {
+                          "id": "1:de:15002:0",
+                          "name": "Rielpetkamp Süd",
+                          "location": {
+                            "lat": 54.58607,
+                            "lon": 11.690079
+                          },
+                          "stopCode": "de:15002:0",
+                          "districtCode": "15002",
+                          "modes": [],
+                          "distanceM": null,
+                          "sourceFamily": "delfi_static",
+                          "cancelled": 0,
+                          "late": 0,
+                          "alerts": 0,
+                          "liftsOut": 1
+                        }
+                      ],
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T12:00:00Z",
+                        "freshness": [
+                          {
+                            "family": "delfi_static",
+                            "dataAsOf": "2026-03-29T12:00:00Z",
+                            "ageS": 43200,
+                            "staleAfterS": 259200,
+                            "stale": false
+                          },
+                          {
+                            "family": "openstation_siri_fm",
+                            "dataAsOf": "2026-03-29T23:52:30Z",
+                            "ageS": 450,
+                            "staleAfterS": 2700,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "delfi_static",
+                            "domain": "transit",
+                            "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://www.opendata-oepnv.de"
+                          },
+                          {
+                            "family": "openstation_siri_fm",
+                            "domain": "accessibility",
+                            "publisher": "Bengdün Datenwerk",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms/openstation_siri_fm"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ]
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/affected-stations"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/AffectedEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The operation is switched off on this instance (feature-disabled).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "The stations most affected now",
+        "tags": [
+          "transit"
+        ],
+        "x-attribution": "Every station names its source family; the figures counted for it come from the transit families the key is entitled to, each listed in meta.attribution with its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/affected-stations?limit=5\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/affected-stations?limit=5",
+        "x-required-scope": "transit"
+      }
+    },
     "/v1/charging-options": {
       "get": {
         "description": "Charging sites within the radius of a position, nearest first, then by id, each with its points and their last reported availability. Needs the scope energy.",
@@ -9894,7 +10378,7 @@
     },
     "/v1/germany": {
       "get": {
-        "description": "The national picture the site's home tiles, its live map and its national pages state: road situations in force by kind and by Land, current fuel prices by grade, charging sites and points, parking sites by kind, station lifts and escalators by state, regional punctuality and weather warnings by level. Each part is read from the families of its domain the key may read, for every domain the key has the scope of (roads, energy, parking, transit, weather); a domain whose families are all withheld is left out and named in meta.warnings.",
+        "description": "The national picture the site's home tiles, its live map and its national pages state: road situations in force by kind and by Land, current fuel prices by grade, charging sites and points, parking sites by kind, station lifts and escalators by state, regional punctuality and weather warnings by level. Each part is read from the families of its domain the key may read, for every domain the key has the scope of (roads, energy, parking, transit, accessibility, weather); a domain whose families are all withheld is left out and named in meta.warnings.",
         "operationId": "getNationalSummary",
         "responses": {
           "200": {
@@ -10001,7 +10485,43 @@
                             "sourceFamily": "park_alpha"
                           }
                         ],
-                        "facilities": [],
+                        "facilities": [
+                          {
+                            "kind": "elevator",
+                            "state": "active",
+                            "count": 11,
+                            "stations": 11,
+                            "sourceFamily": "openstation_siri_fm"
+                          },
+                          {
+                            "kind": "elevator",
+                            "state": "inactive",
+                            "count": 2,
+                            "stations": 2,
+                            "sourceFamily": "openstation_siri_fm"
+                          },
+                          {
+                            "kind": "elevator",
+                            "state": "unknown",
+                            "count": 4,
+                            "stations": 4,
+                            "sourceFamily": "openstation_siri_fm"
+                          },
+                          {
+                            "kind": "escalator",
+                            "state": "active",
+                            "count": 4,
+                            "stations": 3,
+                            "sourceFamily": "openstation_siri_fm"
+                          },
+                          {
+                            "kind": "escalator",
+                            "state": "unknown",
+                            "count": 1,
+                            "stations": 1,
+                            "sourceFamily": "openstation_siri_fm"
+                          }
+                        ],
                         "punctuality": [],
                         "warnings": [
                           {
@@ -10028,7 +10548,7 @@
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
-                        "asOf": "2026-03-29T23:55:00Z",
+                        "asOf": "2026-03-29T23:52:30Z",
                         "freshness": [
                           {
                             "family": "afir_alpha",
@@ -10042,6 +10562,13 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
+                            "stale": false
+                          },
+                          {
+                            "family": "openstation_siri_fm",
+                            "dataAsOf": "2026-03-29T23:52:30Z",
+                            "ageS": 450,
+                            "staleAfterS": 2700,
                             "stale": false
                           },
                           {
@@ -10088,6 +10615,17 @@
                             "shareAlike": false,
                             "shareAlikeOffer": null,
                             "termsUrl": "https://alpha.example/terms/dwd_alpha"
+                          },
+                          {
+                            "family": "openstation_siri_fm",
+                            "domain": "accessibility",
+                            "publisher": "Bengdün Datenwerk",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms/openstation_siri_fm"
                           },
                           {
                             "family": "park_alpha",

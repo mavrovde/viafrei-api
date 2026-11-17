@@ -16,7 +16,7 @@ const (
 )
 
 // Domains are the domains the national picture reads, in answer order.
-var Domains = []string{"roads", "energy", "parking", "transit", "weather"}
+var Domains = []string{"roads", "energy", "parking", "transit", "accessibility", "weather"}
 
 // Row is one figure of a section, of one family.
 type Row struct {

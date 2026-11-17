@@ -64,7 +64,9 @@ func (s *Service) National(ctx context.Context, key access.Record, fuelWindow ti
 	if err != nil {
 		return NationalAnswer{}, err
 	}
-	slices.SortStableFunc(rows, func(a, b national.Row) int { return slices.Index(sections, a.Section) - slices.Index(sections, b.Section) })
+	slices.SortStableFunc(rows, func(a, b national.Row) int {
+		return slices.Index(sections, a.Section) - slices.Index(sections, b.Section)
+	})
 	return NationalAnswer{Rows: rows, Meta: Answer[struct{}]{Families: fams, Partial: partial, At: now}}, nil
 }
 

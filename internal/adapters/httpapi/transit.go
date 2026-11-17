@@ -328,14 +328,19 @@ func registerStations(api huma.API, s *server, op huma.Operation) {
 func stations(a features.Answer[transit.Station]) []Station {
 	data := make([]Station, len(a.Items))
 	for i, v := range a.Items {
-		modes := make([]string, len(v.Modes))
-		for j, m := range v.Modes {
-			modes[j] = string(m)
-		}
-		data[i] = Station{
-			ID: v.ID, Name: v.Name, Location: position(v.Location), StopCode: v.NationalCode,
-			DistrictCode: v.RegionCode, Modes: modes, DistanceM: v.DistanceM, SourceFamily: v.Family,
-		}
+		data[i] = station(v)
 	}
 	return data
+}
+
+// station is the answer of one station.
+func station(v transit.Station) Station {
+	modes := make([]string, len(v.Modes))
+	for j, m := range v.Modes {
+		modes[j] = string(m)
+	}
+	return Station{
+		ID: v.ID, Name: v.Name, Location: position(v.Location), StopCode: v.NationalCode,
+		DistrictCode: v.RegionCode, Modes: modes, DistanceM: v.DistanceM, SourceFamily: v.Family,
+	}
 }

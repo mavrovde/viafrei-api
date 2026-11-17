@@ -74,3 +74,7 @@ func (laterFeatures) ChargingSite(context.Context, access.Record, string, time.D
 func (laterFeatures) National(context.Context, access.Record, time.Duration) (features.NationalAnswer, error) {
 	return features.NationalAnswer{}, nil
 }
+
+func (laterFeatures) AffectedStations(context.Context, access.Record, int) ([]transit.Affected, features.Answer[struct{}], error) {
+	return nil, features.Answer[struct{}]{}, nil
+}

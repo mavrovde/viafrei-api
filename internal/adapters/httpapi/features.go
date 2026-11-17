@@ -54,6 +54,7 @@ type Features interface {
 	Pois(ctx context.Context, key access.Record, q places.PoiQuery) (features.PoiAnswer, error)
 	Location(ctx context.Context, key access.Record, q places.LocationQuery) (features.LocationAnswer, error)
 	National(ctx context.Context, key access.Record, fuelWindow time.Duration) (features.NationalAnswer, error)
+	AffectedStations(ctx context.Context, key access.Record, limit int) ([]transit.Affected, features.Answer[struct{}], error)
 }
 
 // counterpartExtension names the MCP capability an operation answers the

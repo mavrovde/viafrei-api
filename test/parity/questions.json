@@ -574,6 +574,28 @@
       "now": "2026-03-30T00:00:00Z"
     },
     {
+      "id": "parking-bays",
+      "operation": "listParkingBays",
+      "counterpart": "parking search, kind disabled_badge",
+      "request": "/v1/parking-bays?at=48.388,7.521&radius_m=2000&limit=3",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "parking"
+        ],
+        "sources": [
+          "dortmund_parksensoren_bays",
+          "frankfurt_behindertenparkplaetze",
+          "park_alpha",
+          "park_beta",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
       "id": "hydrogen-near",
       "operation": "listHydrogenOptions",
       "counterpart": "hydrogen station search",

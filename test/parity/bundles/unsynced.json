@@ -4258,6 +4258,266 @@
       ]
     },
     {
+      "id": "parking-bays",
+      "operation": "listParkingBays",
+      "counterpart": "parking search, kind disabled_badge",
+      "request": "/v1/parking-bays?at=48.388,7.521\u0026radius_m=2000\u0026limit=3",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "parking"
+        ],
+        "sources": [
+          "dortmund_parksensoren_bays",
+          "frankfurt_behindertenparkplaetze",
+          "park_alpha",
+          "park_beta",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.bays[dortmund:011].city",
+          "value": "Schömpingbach"
+        },
+        {
+          "name": "data.bays[dortmund:011].houseNumber",
+          "value": "1"
+        },
+        {
+          "name": "data.bays[dortmund:011].id",
+          "value": "dortmund:011"
+        },
+        {
+          "name": "data.bays[dortmund:011].kind",
+          "value": "disabled"
+        },
+        {
+          "name": "data.bays[dortmund:011].lat",
+          "value": "48.38815"
+        },
+        {
+          "name": "data.bays[dortmund:011].lon",
+          "value": "7.52121"
+        },
+        {
+          "name": "data.bays[dortmund:011].messageAt",
+          "value": "2026-03-29T23:40:00Z"
+        },
+        {
+          "name": "data.bays[dortmund:011].postcode",
+          "value": "10000"
+        },
+        {
+          "name": "data.bays[dortmund:011].publisherKind",
+          "value": "Behindertenparkplatz"
+        },
+        {
+          "name": "data.bays[dortmund:011].reservedWhen",
+          "value": "null"
+        },
+        {
+          "name": "data.bays[dortmund:011].sensor",
+          "value": "true"
+        },
+        {
+          "name": "data.bays[dortmund:011].sourceFamily",
+          "value": "dortmund_parksensoren_bays"
+        },
+        {
+          "name": "data.bays[dortmund:011].spaces",
+          "value": "null"
+        },
+        {
+          "name": "data.bays[dortmund:011].state",
+          "value": "free"
+        },
+        {
+          "name": "data.bays[dortmund:011].street",
+          "value": "Hauptstraße"
+        },
+        {
+          "name": "data.bays[dortmund:012].city",
+          "value": "Schömpingbach"
+        },
+        {
+          "name": "data.bays[dortmund:012].houseNumber",
+          "value": "7"
+        },
+        {
+          "name": "data.bays[dortmund:012].id",
+          "value": "dortmund:012"
+        },
+        {
+          "name": "data.bays[dortmund:012].kind",
+          "value": "disabled"
+        },
+        {
+          "name": "data.bays[dortmund:012].lat",
+          "value": "48.38815"
+        },
+        {
+          "name": "data.bays[dortmund:012].lon",
+          "value": "7.52221"
+        },
+        {
+          "name": "data.bays[dortmund:012].messageAt",
+          "value": "2026-03-29T19:00:00Z"
+        },
+        {
+          "name": "data.bays[dortmund:012].postcode",
+          "value": "10000"
+        },
+        {
+          "name": "data.bays[dortmund:012].publisherKind",
+          "value": "Behindertenparkplatz"
+        },
+        {
+          "name": "data.bays[dortmund:012].reservedWhen",
+          "value": "null"
+        },
+        {
+          "name": "data.bays[dortmund:012].sensor",
+          "value": "true"
+        },
+        {
+          "name": "data.bays[dortmund:012].sourceFamily",
+          "value": "dortmund_parksensoren_bays"
+        },
+        {
+          "name": "data.bays[dortmund:012].spaces",
+          "value": "null"
+        },
+        {
+          "name": "data.bays[dortmund:012].state",
+          "value": "null"
+        },
+        {
+          "name": "data.bays[dortmund:012].street",
+          "value": "Hauptstraße"
+        },
+        {
+          "name": "data.bays[frankfurt:014].city",
+          "value": "Schömpingbach"
+        },
+        {
+          "name": "data.bays[frankfurt:014].houseNumber",
+          "value": "null"
+        },
+        {
+          "name": "data.bays[frankfurt:014].id",
+          "value": "frankfurt:014"
+        },
+        {
+          "name": "data.bays[frankfurt:014].kind",
+          "value": "disabled"
+        },
+        {
+          "name": "data.bays[frankfurt:014].lat",
+          "value": "48.38815"
+        },
+        {
+          "name": "data.bays[frankfurt:014].lon",
+          "value": "7.52421"
+        },
+        {
+          "name": "data.bays[frankfurt:014].messageAt",
+          "value": "null"
+        },
+        {
+          "name": "data.bays[frankfurt:014].postcode",
+          "value": "10000"
+        },
+        {
+          "name": "data.bays[frankfurt:014].publisherKind",
+          "value": "null"
+        },
+        {
+          "name": "data.bays[frankfurt:014].reservedWhen",
+          "value": "Mo-Fr 8-18 Uhr"
+        },
+        {
+          "name": "data.bays[frankfurt:014].sensor",
+          "value": "false"
+        },
+        {
+          "name": "data.bays[frankfurt:014].sourceFamily",
+          "value": "frankfurt_behindertenparkplaetze"
+        },
+        {
+          "name": "data.bays[frankfurt:014].spaces",
+          "value": "2"
+        },
+        {
+          "name": "data.bays[frankfurt:014].state",
+          "value": "null"
+        },
+        {
+          "name": "data.bays[frankfurt:014].street",
+          "value": "Bahnhofstraße"
+        },
+        {
+          "name": "data.counts.free",
+          "value": "1"
+        },
+        {
+          "name": "data.counts.occupied",
+          "value": "0"
+        },
+        {
+          "name": "data.counts.sensors",
+          "value": "2"
+        },
+        {
+          "name": "data.counts.staticSites",
+          "value": "1"
+        },
+        {
+          "name": "data.counts.staticSpaces",
+          "value": "2"
+        },
+        {
+          "name": "data.counts.total",
+          "value": "3"
+        },
+        {
+          "name": "data.counts.unknown",
+          "value": "1"
+        },
+        {
+          "name": "data.kind",
+          "value": "disabled"
+        },
+        {
+          "name": "meta.attribution[dortmund_parksensoren_bays].family",
+          "value": "dortmund_parksensoren_bays"
+        },
+        {
+          "name": "meta.attribution[frankfurt_behindertenparkplaetze].family",
+          "value": "frankfurt_behindertenparkplaetze"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "3"
+        }
+      ]
+    },
+    {
       "id": "hydrogen-near",
       "operation": "listHydrogenOptions",
       "counterpart": "hydrogen station search",

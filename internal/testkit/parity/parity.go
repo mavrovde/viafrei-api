@@ -229,6 +229,7 @@ var Default = Rules{
 		{"data.languages", "", "getMeta", serviceMetaReason},
 		{"data.openapi", "", "getMeta", serviceMetaReason},
 		{"data.platformVersion", "", "getMeta", serviceMetaReason},
+		{"data.bays[*].distanceM", "", "listParkingBays", "the parking tool states a bay's distance in kilometres to two decimals, the API in metres, so they agree only to the tool's 10 m; the bay's point both measure from is compared"},
 		{"data.watchId", "", "getWatch", watchIDReason},
 		{"data.uri", "", "getWatch", watchIDReason},
 		{"meta.attribution[*].domain", "", "", attributionReason},

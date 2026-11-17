@@ -474,6 +474,10 @@ type Page struct {
 	// situation or a warning of the scope starts or ends (its valid_from or
 	// valid_to), whatever the list's filters keep; nil when none does.
 	NextChange *time.Time
+	// Placed are the families that placed the scope's situations in their
+	// Land (contract.traffic_event's placement_source_ref), read only for
+	// a Land's answer; the platform credits them on its Land form.
+	Placed []string
 }
 
 // ChangesAt is the earliest instant after now at which the answer read in p

@@ -38,8 +38,10 @@ type roadFake struct {
 	unconfirmed, lapsed []string
 	// states overrides the states in scope ("01" when nil); coverage the
 	// coverage of state "01" (own r1, carried r2 when nil).
-	states               []string
-	coverage             *ampel.Coverage
+	states   []string
+	coverage *ampel.Coverage
+	// placed are the families that placed the scope's situations in a Land.
+	placed               []string
 	gotSince             time.Time
 	gotRoad              roads.CorridorQuery
 	gotArea              roads.AreaQuery
@@ -62,7 +64,7 @@ func (f *roadFake) Road(_ context.Context, ref string) (roads.Road, error) {
 // families given, as the store reads them.
 func (f *roadFake) page(fams roads.Families, more bool) roads.Page {
 	p := roads.Page{Items: f.sits, HasMore: more, Messages: f.msgs, States: []string{"01"},
-		Coverage: map[string]ampel.Coverage{}, Confirmations: map[string]ampel.Confirmation{}}
+		Coverage: map[string]ampel.Coverage{}, Confirmations: map[string]ampel.Confirmation{}, Placed: f.placed}
 	if f.states != nil {
 		p.States = f.states
 	}
@@ -214,6 +216,15 @@ func TestRoadConditionsAnswerAnArea(t *testing.T) {
 		t.Errorf("answer %+v, asked %+v", c, f.gotArea)
 	}
 	lit(t, "a closure", c, roads.LampRed, roads.ReasonRoadClosed)
+}
+
+func TestALandsAnswerCreditsThePlacement(t *testing.T) {
+	req.Covers(t, "FR-ROAD-006")
+	f := &roadFake{sits: []roads.Situation{{ID: "a", Family: "r2"}}, placed: []string{"p1"}}
+	c, err := roadService(f).RoadConditions(context.Background(), key("consumer", roadsScope, "r1", "r2"), roads.AreaQuery{State: "01"})
+	if err != nil || !slices.Equal(names(c.Families), []string{"p1", "r2"}) {
+		t.Errorf("a Land's answer credits the family that placed its situations: %v %v", names(c.Families), err)
+	}
 }
 
 func TestTheLampSeesStaleFamilies(t *testing.T) {

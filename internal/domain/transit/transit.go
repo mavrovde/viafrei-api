@@ -54,6 +54,9 @@ type Station struct {
 	// question named no position.
 	DistanceM *int
 	Family    string
+	// PlacedBy is the family that places the station in its district and
+	// Land (contract.stop_place's placement_source_ref); nil when none does.
+	PlacedBy *string
 }
 
 // Query is a station search: by name (Text), near a position (At), or both.

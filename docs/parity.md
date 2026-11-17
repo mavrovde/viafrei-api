@@ -200,6 +200,12 @@ nothing, so that family contributed nothing and neither side credits it.
   A priority route is the nearest street of its stretch.
 - **Station facilities** name the station only and state no report
   instant per unit, as the platform's facilities check states them.
+- **Placement credits BKG.** A Land's road conditions credit the family
+  that placed its situations in the Land (the read contract's
+  `placement_source_ref`, BKG's municipalities), and a station name that
+  more than one station answers credits the family that places each in its
+  district and Land, as the platform credits BKG on its Land form and on
+  the town and Land each name candidate is labelled with.
 
 The MCP side has further rules, specific to its sources, that the read
 contract cannot express; they are not compared here.

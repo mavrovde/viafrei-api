@@ -52,6 +52,17 @@ func (s *Service) Stations(ctx context.Context, key access.Record, q transit.Que
 	if err := gate.Check(contributed); err != nil {
 		return Answer[transit.Station]{}, err
 	}
+	// A name that more than one station answers is told apart by the
+	// district and Land each lies in, as the platform's name search labels
+	// its candidates with their town and Land: the family that placed them
+	// is credited.
+	if q.Text != "" && len(stations) > 1 {
+		for _, st := range stations {
+			if st.PlacedBy != nil {
+				contributed = append(contributed, *st.PlacedBy)
+			}
+		}
+	}
 	fams, err := s.provenanceOf(ctx, contributed, permitted)
 	if err != nil {
 		return Answer[transit.Station]{}, err

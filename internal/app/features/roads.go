@@ -136,6 +136,9 @@ func (s *Service) conditions(ctx context.Context, key access.Record, read func(f
 		consulted = slices.Clone(permitted)
 	}
 	consulted = append(consulted, weather...)
+	// A Land's answer credits the families that placed its situations in
+	// the Land, as the platform's Land form credits BKG.
+	consulted = append(consulted, p.Placed...)
 	slices.Sort(consulted)
 	consulted = slices.Compact(consulted)
 	attributed, err := s.repos.Register.Provenance(ctx, consulted, s.set.Language)

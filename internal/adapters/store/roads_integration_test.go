@@ -304,6 +304,17 @@ where e.withdrawn_at is null and e.source_ref in (`+quoted(fams)+`) and e.locati
 	if err != nil || want < 2 || len(sits) != want || len(np.Messages) == 0 {
 		t.Fatalf("read %d of %d (at least 2 are needed to see an order): %v", len(sits), want, err)
 	}
+	if np.Placed != nil {
+		t.Errorf("an area that is no Land credits no placement: %v", np.Placed)
+	}
+	// A Land's answer credits the family that placed its situations there.
+	var land string
+	owner(t, `select state_code from contract.traffic_event e where e.withdrawn_at is null and e.state_code is not null
+  and e.source_ref in (`+quoted(fams)+`) order by state_code limit 1`, &land)
+	if lp, err := st.SituationsNear(bounded(t), roads.AreaQuery{State: land, Filter: q.Filter, Limit: 100}, onRoads(fams), now); err != nil ||
+		!slices.Equal(lp.Placed, []string{"bkg_gvisys"}) {
+		t.Errorf("Land %s placed by %v: %v", land, lp.Placed, err)
+	}
 	found := false
 	for i, s := range sits {
 		if s.DistanceM == nil || *s.DistanceM > wide || s.AtKm != nil || s.Location == nil {

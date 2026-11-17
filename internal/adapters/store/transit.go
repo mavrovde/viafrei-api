@@ -54,7 +54,8 @@ with here as (
               else st_setsrid(st_makepoint($3::float8, $2::float8), 4326)::geography end g)
 select s.stop_place_id, s.name, st_y(s.location), st_x(s.location), s.national_stop_code, s.region_code,
        coalesce(s.modes, '{}'), s.source_ref,
-       case when here.g is null then null else round(st_distance(s.location::geography, here.g))::int end dist
+       case when here.g is null then null else round(st_distance(s.location::geography, here.g))::int end dist,
+       s.placement_source_ref
 from contract.stop_place s, here
 where s.withdrawn_at is null
   and s.location is not null
@@ -82,7 +83,7 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 				modes []string
 			)
 			err := r.Scan(&v.ID, &v.Name, &v.Location.Lat, &v.Location.Lon, &v.NationalCode, &v.RegionCode,
-				&modes, &v.Family, &v.DistanceM)
+				&modes, &v.Family, &v.DistanceM, &v.PlacedBy)
 			v.Modes = transit.MapModes(modes)
 			return v, err
 		})

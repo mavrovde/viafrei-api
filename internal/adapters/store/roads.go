@@ -207,6 +207,9 @@ type scope struct {
 	// states selects the codes of the states in scope, over stateArgs.
 	states    string
 	stateArgs []any
+	// placed selects the families that placed the scope's situations in a
+	// Land, over args; empty when the scope is no Land.
+	placed string
 }
 
 func scanSituation(r pgx.CollectableRow) (roads.Situation, error) {
@@ -316,6 +319,12 @@ order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, s
 				return err
 			},
 			func() error { return tx.QueryRow(ctx, sc.states, sc.stateArgs...).Scan(&out.States) },
+			func() error {
+				if sc.placed == "" {
+					return nil
+				}
+				return tx.QueryRow(ctx, sc.placed, sc.args...).Scan(&out.Placed)
+			},
 			func() (err error) {
 				res, _ := tx.Query(ctx, coverageSelect, out.States, fams.Roads)
 				out.Coverage, err = coverageOf(res)
@@ -485,6 +494,12 @@ limit $12`, args, q.Limit, fams, now, scope{
 		warningArgs: []any{q.State},
 		states:      `select case when $1 = 'de' then (select coalesce(array_agg(r.region_code order by r.region_code), '{}') from contract.admin_region r where r.region_level = 'state') else array[$1::text] end`,
 		stateArgs:   []any{q.State},
+		// The Land form places every situation of the scope by its nearest
+		// municipality: the families that placed them are credited.
+		placed: `select coalesce(array_agg(distinct e.placement_source_ref order by e.placement_source_ref) filter (where e.placement_source_ref is not null), '{}')
+from contract.traffic_event e
+where $3 <> 'de' and e.state_code = $3 and e.withdrawn_at is null and e.source_ref = any($1)
+  and ` + eventPermitted + ` and (e.valid_to is null or e.valid_to > $2)`,
 	})
 }
 

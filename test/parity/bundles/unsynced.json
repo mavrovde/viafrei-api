@@ -1176,6 +1176,10 @@
           "value": "de:01002:1"
         },
         {
+          "name": "meta.attribution[bkg_gvisys].family",
+          "value": "bkg_gvisys"
+        },
+        {
           "name": "meta.attribution[delfi_static].family",
           "value": "delfi_static"
         },
@@ -8546,6 +8550,10 @@
           "value": "10"
         },
         {
+          "name": "meta.attribution[bkg_gvisys].family",
+          "value": "bkg_gvisys"
+        },
+        {
           "name": "meta.attribution[roads_alpha].family",
           "value": "roads_alpha"
         },
@@ -8680,6 +8688,10 @@
         {
           "name": "data.state",
           "value": "10"
+        },
+        {
+          "name": "meta.attribution[bkg_gvisys].family",
+          "value": "bkg_gvisys"
         },
         {
           "name": "meta.attribution[roads_alpha].family",

@@ -378,8 +378,6 @@ func startConsole(ctx context.Context, cfg *config.Config, addr string, as *acce
 	return func() { _ = srv.Close() }, nil
 }
 
-// reportUsage logs a usage flush that failed or dropped counts; a clean
-// flush is silent.
 // reportRetention logs a failed prune of the refresh requests, and the
 // count of a round that removed any.
 func reportRetention(log *slog.Logger) func(int64, error) {
@@ -393,6 +391,8 @@ func reportRetention(log *slog.Logger) func(int64, error) {
 	}
 }
 
+// reportUsage logs a usage flush that failed or dropped counts; a clean
+// flush is silent.
 func reportUsage(log *slog.Logger) func(metering.Report) {
 	return func(r metering.Report) {
 		if r.Err != nil {

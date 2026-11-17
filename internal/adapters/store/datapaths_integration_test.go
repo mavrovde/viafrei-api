@@ -280,15 +280,29 @@ func TestAffectedStationsCountAnAlertOnTheirStops(t *testing.T) {
 // schema holds but a copy has lost, fails the read rather than answering a
 // topic with a blank title or a rule reviewed on no date.
 func TestTopicRefusesARuleWithNoReviewDateOrNoTitle(t *testing.T) {
-	var code string
-	owner(t, `select topic_code from public.driving_rule_facts order by fact_key limit 1`, &code)
+	var code, topics, facts string
+	owner(t, `select topic_code from contract.rule_statement order by topic_code limit 1`, &code)
+	owner(t, baseOf("contract.rule_topic", "title_de"), &topics)
+	owner(t, baseOf("contract.rule_statement", "reviewed_on"), &facts)
 	for col, plant := range map[string]string{
-		"title":    `alter table public.driving_rule_topics alter column title_de drop not null; update public.driving_rule_topics set title_de = null where topic_code = '` + code + `'`,
-		"reviewed": `alter table public.driving_rule_facts alter column reviewed_on drop not null; update public.driving_rule_facts set reviewed_on = null where topic_code = '` + code + `'`,
+		"title":    `alter table ` + topics + ` alter column title_de drop not null; update ` + topics + ` set title_de = null where topic_code = '` + code + `'`,
+		"reviewed": `alter table ` + facts + ` alter column reviewed_on drop not null; update ` + facts + ` set reviewed_on = null where topic_code = '` + code + `'`,
 	} {
 		st, _ := private(t, plant)
 		if _, err := st.Topic(bounded(t), code, "de"); err == nil {
 			t.Errorf("a topic with no %s was read", col)
 		}
 	}
+}
+
+// baseOf is the query of the table under the contract view that holds
+// column, found from the view's own dependencies, so a test plants a fault
+// in the platform's schema without naming one of its tables.
+func baseOf(view, column string) string {
+	return `select format('%I.%I', n.nspname, c.relname) from pg_rewrite r
+		join pg_depend d on d.objid = r.oid and d.classid = 'pg_rewrite'::regclass
+		join pg_class c on c.oid = d.refobjid and c.relkind in ('r', 'p')
+		join pg_namespace n on n.oid = c.relnamespace
+		join pg_attribute a on a.attrelid = c.oid and a.attname = '` + column + `'
+		where r.ev_class = '` + view + `'::regclass limit 1`
 }

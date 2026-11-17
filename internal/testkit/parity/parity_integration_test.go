@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -250,6 +251,9 @@ func (a asker) ask(t *testing.T, c parity.Case) []byte {
 func refresh(t *testing.T, h http.Handler, c parity.Case) func() {
 	t.Helper()
 	tables := script.Sources[c.Refresh.Source].Partitions
+	if view, ok := tickViews[c.Refresh.Source]; ok {
+		tables = append(slices.Clone(tables), ownerText(t, baseTable, view))
+	}
 	for _, tb := range tables {
 		if n := ownerCount(t, `select count(*) from `+pgx.Identifier(strings.Split(tb, ".")).Sanitize()+` where observed_at = $1`, c.Now); n != 0 {
 			t.Fatalf("%s: %s holds %d fixture row(s) at %s; a refresh question is asked at a clock no fixture row is dated", c.ID, tb, n, c.Now.Format(time.RFC3339))
@@ -301,6 +305,37 @@ func refresh(t *testing.T, h http.Handler, c parity.Case) func() {
 			}
 		}
 	}
+}
+
+// tickViews are the contract views over the tables a source's ticks write
+// when the script finds its table itself rather than naming it in
+// partitions (no platform table is named in the tree): the undo removes the
+// rows of the partitioned table under the view.
+var tickViews = map[string]string{"fuel-prices-de": "contract.fuel_price_observation"}
+
+// baseTable is the partitioned table under the view $1, as schema.table,
+// found from the view's own dependencies.
+const baseTable = `select n.nspname || '.' || c.relname from pg_rewrite r
+	join pg_depend d on d.objid = r.oid and d.classid = 'pg_rewrite'::regclass
+	join pg_class c on c.oid = d.refobjid and c.relkind = 'p'
+	join pg_namespace n on n.oid = c.relnamespace
+	where r.ev_class = $1::regclass order by 1 limit 1`
+
+// ownerText answers a text as the database owner.
+func ownerText(t *testing.T, q string, args ...any) string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), testBound)
+	defer cancel()
+	conn, err := db.Owner(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(ctx) }()
+	var v string
+	if err := conn.QueryRow(ctx, q, args...).Scan(&v); err != nil {
+		t.Fatal(err)
+	}
+	return v
 }
 
 // ownerCount answers a count as the database owner.

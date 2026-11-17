@@ -159,3 +159,20 @@ func TestSettlesCloseWithoutAWait(t *testing.T) {
 	h.close()
 	h.remove("1", make(chan struct{}))
 }
+
+// TestCapWait: a wait stops the reserve short of the ask's deadline, and
+// an ask with no deadline waits as long as it was given.
+func TestCapWait(t *testing.T) {
+	const second, reserve = time.Second, time.Second / 4
+	if got := capWait(context.Background(), second, reserve); got != second {
+		t.Errorf("no deadline: %v", got)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), second)
+	defer cancel()
+	if got := capWait(ctx, 5*second, reserve); got > second-reserve || got <= 0 {
+		t.Errorf("a 1 s deadline: %v", got)
+	}
+	if got := capWait(ctx, second/100, reserve); got != second/100 {
+		t.Errorf("a wait inside the deadline: %v", got)
+	}
+}

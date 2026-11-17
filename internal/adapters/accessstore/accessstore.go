@@ -29,6 +29,9 @@ type Store struct {
 	pool *pgxpool.Pool
 	// settles is the one connection refresh asks wait on.
 	settles *settles
+	// reserve is refresh.answer_reserve: a wait stops this far short of
+	// the ask's deadline.
+	reserve time.Duration
 }
 
 // PoolConfig translates the configuration into a pool configuration.
@@ -58,7 +61,7 @@ func Open(ctx context.Context, cfg *config.Config) (*Store, error) {
 	return &Store{pool: invariant.Must(pgxpool.NewWithConfig(ctx, pc)), settles: newSettles(func(ctx context.Context) (listenConn, error) {
 		c, err := pgx.ConnectConfig(ctx, listen)
 		return c, err // the listener reads c only when err is nil
-	}, cfg.DB.ConnectTimeout)}, nil
+	}, cfg.DB.ConnectTimeout), reserve: cfg.Refresh.AnswerReserve}, nil
 }
 
 // Close closes the pool and the settle listener.

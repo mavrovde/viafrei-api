@@ -128,6 +128,7 @@ func read(ctx context.Context, q interface {
 // The wait is registered before the first read, so a settle between the
 // read and the wait is not missed.
 func (s *Store) waitSettled(ctx context.Context, id string, wait time.Duration) (refresh.Request, error) {
+	wait = capWait(ctx, wait, s.reserve)
 	if wait <= 0 {
 		return read(ctx, s.pool, id)
 	}
@@ -152,6 +153,20 @@ func (s *Store) waitSettled(ctx context.Context, id string, wait time.Duration) 
 			return read(ctx, s.pool, id) // the wait is over: answer it as it stands
 		}
 	}
+}
+
+// AnswerReserve is the part of an ask's deadline kept for reading the
+// request once more and answering it (refresh.answer_reserve).
+func (s *Store) AnswerReserve() time.Duration { return s.reserve }
+
+// capWait is wait, cut to what ctx's deadline leaves past reserve: a wait
+// never runs into the reserve, so an ask whose deadline comes before its
+// wait ends answers pending, not an error.
+func capWait(ctx context.Context, wait, reserve time.Duration) time.Duration {
+	if dl, ok := ctx.Deadline(); ok {
+		return min(wait, time.Until(dl)-reserve)
+	}
+	return wait
 }
 
 // requestID is the shape of a request's id: a positive bigint.

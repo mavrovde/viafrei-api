@@ -103,7 +103,7 @@ func TestARefreshSettlesByTheFakeAndAnswersItsAskers(t *testing.T) {
 	// The fake wrote the source's ticks: the fixture's newest prices again,
 	// dated at the settle.
 	var ticks int
-	if err := owner(t).QueryRow(ctx, `select count(*) from public.fuel_prices where observed_at = $1`, refreshAt).Scan(&ticks); err != nil || ticks == 0 {
+	if err := owner(t).QueryRow(ctx, `select count(*) from contract.fuel_price_observation where observed_at = $1`, refreshAt).Scan(&ticks); err != nil || ticks == 0 {
 		t.Fatalf("no ticks written: %d %v", ticks, err)
 	}
 	// Each request names the own service that asked, the key's plan
@@ -173,10 +173,18 @@ func TestAnOpenRefreshAnswersPendingAtTheDeadline(t *testing.T) {
 	if _, err := s.Request(cctx, ask(fuel, "ags:05315000", ids[0]), time.Time{}, time.Second); err == nil {
 		t.Fatal("a cancelled ask answered")
 	}
-	dctx, stop := context.WithTimeout(ctx, 300*time.Millisecond)
-	defer stop()
-	if _, err := s.Request(dctx, ask(fuel, "ags:05315000", ids[0]), time.Time{}, 5*time.Second); !errors.Is(err, context.DeadlineExceeded) {
+	wctx, drop := context.WithCancel(ctx)
+	time.AfterFunc(300*time.Millisecond, drop)
+	if _, err := s.Request(wctx, ask(fuel, "ags:05315000", ids[0]), time.Time{}, 5*time.Second); !errors.Is(err, context.Canceled) {
 		t.Fatalf("an ask cancelled in its wait: %v", err)
+	}
+	// An ask whose deadline comes before its wait ends answers pending in
+	// time: the wait stops short of the deadline by the answer's reserve.
+	dctx, stop := context.WithTimeout(ctx, 600*time.Millisecond)
+	defer stop()
+	r, err = s.Request(dctx, ask(fuel, "ags:05315000", ids[0]), time.Time{}, 5*time.Second)
+	if err != nil || r.State != refresh.Pending || dctx.Err() != nil {
+		t.Fatalf("an ask past its deadline's budget: %+v %v %v", r, err, dctx.Err())
 	}
 	// An asker of no key is refused by the store, and so is a subject that
 	// is no public id (the database's privacy checks): a position, a
@@ -238,7 +246,10 @@ func TestConcurrentAsksShareOneRefresh(t *testing.T) {
 	f := fake(t)
 	const n = 12
 	ids := askers(t, s, n)
-	ctx := bounded(t)
+	// The asks' deadline is past their wait: a wait is cut to its deadline
+	// less the answer's reserve, which the test's 2 s bound would cut short.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	answers := make([]refresh.Request, n)
 	errs := make([]error, n)
 	var wg sync.WaitGroup

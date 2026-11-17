@@ -547,22 +547,39 @@ func TestAnEndedSituationChangesWhenItLeavesTheRetention(t *testing.T) {
 }
 
 type catFake struct {
-	*fake
-	ms []roads.Motorway
+	*roadFake
+	ms      []roads.Motorway
+	counted []string
+	gotQ    roads.CatalogueQuery
+	// after runs once the catalogue is read: the register may change before
+	// the lamps' read of it.
+	after func()
 }
 
-func (f *catFake) Motorways(context.Context, roads.CatalogueQuery, []string, time.Time) ([]roads.Motorway, error) {
-	return f.ms, nil
+func (f *catFake) Motorways(_ context.Context, q roads.CatalogueQuery, _ []string, _ time.Time) ([]roads.Motorway, []string, error) {
+	f.gotQ = q
+	if f.after != nil {
+		f.after()
+	}
+	return slices.Clone(f.ms), f.counted, nil
 }
 
-func TestMotorwayCatalogueCreditsOnlyTheFamiliesItsRoadsState(t *testing.T) {
+func catService(f *catFake) *features.Service {
+	return features.New(features.Repositories{Register: f, Roads: f, Catalogue: f}, features.Settings{Language: "en"}, func() time.Time { return now })
+}
+
+// TestMotorwayCatalogueCredits: an answer credits what the site's motorway
+// index credits, the families its counts state on any motorway and the
+// register of the motorways it lists when the key may read it; with no
+// situation anywhere, the families consulted, carrying no condition.
+func TestMotorwayCatalogueCredits(t *testing.T) {
 	req.Covers(t, "SEC-030")
 	cond := []provenance.Note{{Kind: provenance.Condition, Text: "c"}, {Kind: provenance.Purpose, Text: "p"}}
-	f := &catFake{fake: &fake{reg: roadRegister, notes: map[string][]provenance.Note{"r1": cond}}, ms: []roads.Motorway{
-		{Road: "A1", Family: "ref", Sources: []string{"r1"}},
+	f := &catFake{roadFake: &roadFake{fake: &fake{reg: roadRegister, notes: map[string][]provenance.Note{"r1": cond}}}, ms: []roads.Motorway{
+		{Road: "A1", Family: "ref", Registers: []string{"r2"}, Sources: []string{"r1"}},
 		{Road: "A2", Family: "ref"},
-	}}
-	s := features.New(features.Repositories{Register: f, Catalogue: f}, features.Settings{Language: "en"}, func() time.Time { return now })
+	}, counted: []string{"r1"}}
+	s := catService(f)
 	a, err := s.Motorways(context.Background(), key("commercial", []access.Scope{"roads"}, "r1", "r2"), roads.CatalogueQuery{Limit: 3})
 	if err != nil {
 		t.Fatal(err)
@@ -570,11 +587,64 @@ func TestMotorwayCatalogueCreditsOnlyTheFamiliesItsRoadsState(t *testing.T) {
 	if len(a.Motorways) != 2 || !slices.Equal(names(a.Meta.Families), []string{"r1"}) || len(a.Meta.Families[0].Notes) != 2 {
 		t.Errorf("answer %+v", a.Meta)
 	}
-	f.ms = nil
+	a, err = s.Motorways(context.Background(), key("consumer", []access.Scope{"roads"}, "r1", "r2"), roads.CatalogueQuery{Limit: 3})
+	if err != nil || !slices.Equal(names(a.Meta.Families), []string{"r1", "r2"}) {
+		t.Errorf("a register the key may read is credited: %+v %v", a.Meta, err)
+	}
+	f.ms, f.counted, f.readCalls = nil, nil, 0
 	if a, err = s.Motorways(context.Background(), key("commercial", []access.Scope{"roads"}, "r1"), roads.CatalogueQuery{Limit: 3}); err != nil || !slices.Equal(names(a.Meta.Families), []string{"r1"}) {
 		t.Errorf("a catalogue with no situation names the families consulted: %+v %v", a.Meta, err)
 	}
 	if n := a.Meta.Families[0].Notes; len(n) != 1 || n[0].Kind != provenance.Purpose {
 		t.Errorf("a catalogue with no situation carries no condition: %+v", n)
+	}
+	if f.roadFake.readCalls != 0 {
+		t.Errorf("an empty catalogue read %d lamps", f.roadFake.readCalls)
+	}
+}
+
+// TestMotorwayCatalogueLamps: each motorway carries the lamp its own
+// conditions answer states, read over the whole road in both directions
+// with the roads and weather families the key may read.
+func TestMotorwayCatalogueLamps(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004")
+	f := &catFake{roadFake: &roadFake{fake: &fake{reg: roadRegister}}, ms: []roads.Motorway{{Road: "A1"}, {Road: "A2"}}}
+	s := catService(f)
+	k := key("consumer", []access.Scope{"roads"}, "r1", "r2", "w1", "w2")
+	a, err := s.Motorways(context.Background(), k, roads.CatalogueQuery{Limit: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := roadService(&roadFake{fake: &fake{}}).MotorwayConditions(context.Background(), k, roads.CorridorQuery{Road: "A2", Direction: roads.DirectionBoth, Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range a.Motorways {
+		if m.Lamp != c.Lamp || m.Lamp == "" {
+			t.Errorf("%s: lamp %q, its conditions state %q", m.Road, m.Lamp, c.Lamp)
+		}
+	}
+	if f.readCalls != 2 || f.gotRoad.Road != "A2" || f.gotRoad.Direction != roads.DirectionBoth || f.gotRoad.MinSeverity != roads.SeverityInfo ||
+		!slices.Equal(f.gotFams.Roads, []string{"r1", "r2"}) || !slices.Equal(f.gotFams.Weather, []string{"w1", "w2"}) {
+		t.Errorf("lamps read %d times, last %+v with %+v", f.readCalls, f.gotRoad, f.gotFams)
+	}
+	f.readErr = errors.New("down")
+	f.ms = []roads.Motorway{{Road: "A1"}}
+	if _, err := s.Motorways(context.Background(), k, roads.CatalogueQuery{Limit: 3}); err == nil {
+		t.Error("a failed read answered")
+	}
+	f.readErr = nil
+	f.after = func() { f.regErr = errors.New("register down") }
+	if _, err := s.Motorways(context.Background(), k, roads.CatalogueQuery{Limit: 3}); err == nil {
+		t.Error("a lamp read without its register answered")
+	}
+	f.regErr = nil
+	f.after = func() { f.reg = roadRegister[2:] }
+	if _, err := s.Motorways(context.Background(), k, roads.CatalogueQuery{Limit: 3}); err == nil {
+		t.Error("a lamp read with no roads family answered")
+	}
+	f.reg = nil
+	if _, err := s.Motorways(context.Background(), key("consumer", []access.Scope{"roads"}, "e1"), roads.CatalogueQuery{Limit: 3}); err == nil {
+		t.Error("a key that may read no roads family answered")
 	}
 }

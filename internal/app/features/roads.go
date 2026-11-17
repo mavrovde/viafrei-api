@@ -111,24 +111,11 @@ func (s *Service) conditions(ctx context.Context, key access.Record, ahead, lamp
 	if err != nil {
 		return Conditions{}, err
 	}
-	permitted, partial, err := gate.Answer(access.Answering(reg, "roads"))
+	fams, partial, weatherRead, err := roadFamilies(reg, gate, ahead, lampless, s.set.PlannedWorks)
 	if err != nil {
 		return Conditions{}, err
 	}
-	if ahead {
-		permitted = slices.DeleteFunc(permitted, func(f string) bool { return !slices.Contains(s.set.PlannedWorks, f) })
-	}
-	// The weather warnings are public: the lamp reads every weather family
-	// the key may read, whether or not its plan holds the weather scope, as
-	// the platform's road status reads the DWD warnings for every asker. A
-	// key that may read no weather family reads no warning: the weather group
-	// is then missing, never an error of the roads question.
-	w, wpartial, werr := gate.Answer(access.Answering(reg, "weather"))
-	weather, weatherRead := w, werr == nil && !wpartial
-	if ahead || lampless {
-		weather, weatherRead = nil, false
-	}
-	fams := roads.Families{Roads: permitted, Weather: weather}
+	permitted, weather := fams.Roads, fams.Weather
 	now := s.now()
 	p, err := read(fams, now)
 	if err != nil {
@@ -162,16 +149,46 @@ func (s *Service) conditions(ctx context.Context, key access.Record, ahead, lamp
 	if err != nil {
 		return Conditions{}, err
 	}
-	levels := make([]int, len(p.Warnings))
-	for i, w := range p.Warnings {
-		levels[i] = w.Level
-	}
-	lamp, reason := roads.LampOf(p.Messages, levels, sights(p, fams, partial, weatherRead, now))
+	lamp, reason := roads.LampOf(p.Messages, warningLevels(p), sights(p, fams, partial, weatherRead, now))
 	return Conditions{
 		Answer: Answer[roads.Situation]{Items: p.Items, HasMore: p.HasMore, Families: attributed, Partial: partial, At: now,
 			ChangesAt: p.ChangesAt(now)},
 		Lamp: lamp, Reason: reason, Read: fams, Covering: p.Covering,
 	}, nil
+}
+
+// roadFamilies are the families a roads answer reads for key's gate: the
+// roads families it may read (only those of planned works, ahead) and
+// whether some were left out (partial), and the weather families its lamp
+// reads. The weather warnings are public: the lamp reads every weather family
+// the key may read, whether or not its plan holds the weather scope, as the
+// platform's road status reads the DWD warnings for every asker. A key that
+// may read no weather family reads no warning: the weather group is then
+// missing, never an error of the roads question. An answer over a window
+// ahead, or with no lamp, reads none.
+func roadFamilies(reg []access.Terms, gate access.Gate, ahead, lampless bool, planned []string) (fams roads.Families, partial, weatherRead bool, err error) {
+	permitted, partial, err := gate.Answer(access.Answering(reg, "roads"))
+	if err != nil {
+		return roads.Families{}, false, false, err
+	}
+	if ahead {
+		permitted = slices.DeleteFunc(permitted, func(f string) bool { return !slices.Contains(planned, f) })
+	}
+	w, wpartial, werr := gate.Answer(access.Answering(reg, "weather"))
+	weather, weatherRead := w, werr == nil && !wpartial
+	if ahead || lampless {
+		weather, weatherRead = nil, false
+	}
+	return roads.Families{Roads: permitted, Weather: weather}, partial, weatherRead, nil
+}
+
+// warningLevels are the levels of the page's weather warnings.
+func warningLevels(p roads.Page) []int {
+	levels := make([]int, len(p.Warnings))
+	for i, w := range p.Warnings {
+		levels[i] = w.Level
+	}
+	return levels
 }
 
 // MotorwayConditions answers "what is happening on this road" for key

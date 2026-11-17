@@ -50,6 +50,7 @@ type MotorwayRow struct {
 	Situations   int                `json:"situations" doc:"Its situations in force now (closures, roadworks, jams, ...)."`
 	Exits        []MotorwayJunction `json:"exits,omitempty" doc:"With road: its junctions in number order."`
 	SourceFamily string             `json:"sourceFamily"`
+	Lamp         string             `json:"lamp" enum:"green,amber,red" doc:"Its motorway Ampel now, as getMotorwayConditions states it for the whole road."`
 }
 
 // MotorwaysEnvelope is the enveloped answer of listMotorways.
@@ -67,7 +68,7 @@ type MotorwaysOutput struct {
 
 func registerMotorways(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "The motorways: length, Länder, junctions, situations now"
-	op.Description = "The motorway catalogue (the site's motorway index, list, top list and exits): each motorway with its length, the Länder it runs through, its junction count and the count of its situations in force now; with road, its junctions in number order. By road number. MCP counterpart: motorway traffic. Needs the scope roads."
+	op.Description = "The motorway catalogue (the site's motorway index, list, top list and exits): each motorway with its length, the Länder it runs through, its junction count, the count of its situations in force now and its lamp; with road, its junctions in number order. By road number. MCP counterpart: motorway traffic. Needs the scope roads."
 	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, in *MotorwaysInput) (*MotorwaysOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
@@ -84,7 +85,7 @@ func registerMotorways(api huma.API, s *server, op huma.Operation) {
 		out := make([]MotorwayRow, len(a.Motorways))
 		for i, m := range a.Motorways {
 			out[i] = MotorwayRow{Road: m.Road, Name: m.Name, LengthKm: m.LengthKm, States: append([]string{}, m.States...),
-				Junctions: m.Junctions, Situations: m.Situations, SourceFamily: m.Family}
+				Junctions: m.Junctions, Situations: m.Situations, SourceFamily: m.Family, Lamp: string(m.Lamp)}
 			for _, j := range m.Exits {
 				out[i].Exits = append(out[i].Exits, MotorwayJunction{ID: j.ID, Number: j.Number, Name: j.Name, Kind: j.Kind, State: j.State, Lat: j.Lat, Lon: j.Lon})
 			}

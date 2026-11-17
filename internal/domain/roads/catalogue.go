@@ -18,11 +18,17 @@ type Motorway struct {
 	// Situations counts its situations in force now, not withdrawn.
 	Situations int
 	Family     string
+	// Registers are the families of the junctions its junction count and
+	// Länder are read from (the motorway location table).
+	Registers []string
 	// Sources are the families of the situations it counts, the families
 	// an answer listing it credits.
 	Sources []string
 	// Exits are its junctions in number order, when one road was asked for.
 	Exits []Junction
+	// Lamp is its motorway Ampel now, as its own conditions answer states
+	// it (LampOf over every situation on it and the warnings it crosses).
+	Lamp Lamp
 }
 
 // Junction is one numbered junction of a motorway.

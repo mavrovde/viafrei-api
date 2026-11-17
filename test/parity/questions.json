@@ -347,6 +347,113 @@
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "weather-near",
+      "operation": "getWeatherRisk",
+      "counterpart": "weather warnings",
+      "request": "/v1/weather-risk?at=49.16,7.8",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "weather"
+        ],
+        "sources": [
+          "src-alpha-weather",
+          "src-eta-weather"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "weather-min-level",
+      "operation": "getWeatherRisk",
+      "counterpart": "weather warnings",
+      "request": "/v1/weather-risk?at=49.16,7.8&min_level=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "weather"
+        ],
+        "sources": [
+          "src-alpha-weather",
+          "src-eta-weather"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "roads-near",
+      "operation": "listRoadConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/road-conditions?at=52.2,9.15&radius_m=50000&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "src-alpha-roads",
+          "src-epsilon-roads"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "roads-near-kinds",
+      "operation": "listRoadConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/road-conditions?at=52.2,9.15&radius_m=50000&kinds=roadworks,closure&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "src-alpha-roads",
+          "src-epsilon-roads"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "motorway-a101",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/A101/conditions?limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "src-alpha-roads",
+          "src-epsilon-roads"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "rules-topic",
+      "operation": "getDrivingRules",
+      "counterpart": "driving rules",
+      "request": "/v1/driving-rules?topic=syn_holiday_ban",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "rules"
+        ],
+        "sources": [
+          "src-alpha-rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
     }
   ]
 }

@@ -12,21 +12,15 @@ import (
 )
 
 type boards struct {
-	board    *transit.TrainBoard
-	err      error
-	gotEVA   string
-	gotFams  []string
-	appended []transit.TrainBoard
+	board   *transit.TrainBoard
+	err     error
+	gotEVA  string
+	gotFams []string
 }
 
 func (b *boards) TrainBoard(_ context.Context, eva string, fams []string) (*transit.TrainBoard, error) {
 	b.gotEVA, b.gotFams = eva, fams
 	return b.board, b.err
-}
-
-func (b *boards) AppendTrainBoard(_ context.Context, tb transit.TrainBoard) error {
-	b.appended = append(b.appended, tb)
-	return b.err
 }
 
 func boardService(f *fake, b *boards) *features.Service {
@@ -61,28 +55,5 @@ func TestTrainBoardIsServedOnlyWhileFresh(t *testing.T) {
 	// a key whose plan does not hold the family gets no board
 	if _, err = s.TrainBoard(ctx, key("commercial", []access.Scope{"transit"}, "st"), "8000105"); err == nil {
 		t.Fatal("family not permitted, yet answered")
-	}
-}
-
-func TestRecordTrainBoardIsForOwnKeysAndValidBoards(t *testing.T) {
-	f, b := &fake{}, &boards{}
-	s := boardService(f, b)
-	ctx := context.Background()
-	at := now.Add(-time.Minute).In(time.FixedZone("CET", 3600))
-	board := transit.TrainBoard{EVA: "8000105", FetchedAt: at, Departures: []transit.TrainDeparture{{PlannedAt: now.Add(10 * time.Minute)}}}
-	own := transitKey
-	own.Audience = access.AudienceOwn
-	if err := s.RecordTrainBoard(ctx, own, board); !errors.Is(err, features.ErrNoWriter) {
-		t.Fatalf("no writer: %v", err)
-	}
-	s.WithTrainBoardWriter(b)
-	if err := s.RecordTrainBoard(ctx, transitKey, board); !errors.Is(err, features.ErrOwnKeyOnly) || len(b.appended) != 0 {
-		t.Fatalf("public key: %v", err)
-	}
-	if err := s.RecordTrainBoard(ctx, own, transit.TrainBoard{EVA: "1"}); !errors.Is(err, transit.ErrBoardInvalid) {
-		t.Fatalf("invalid: %v", err)
-	}
-	if err := s.RecordTrainBoard(ctx, own, board); err != nil || len(b.appended) != 1 || b.appended[0].FetchedAt.Location() != time.UTC {
-		t.Fatalf("own: %v %+v", err, b.appended)
 	}
 }

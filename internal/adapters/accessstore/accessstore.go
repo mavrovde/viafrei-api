@@ -27,6 +27,8 @@ var ErrNotFound = errors.New("accessstore: no such key or plan")
 // Store is the access store.
 type Store struct {
 	pool *pgxpool.Pool
+	// settles is the one connection refresh asks wait on.
+	settles *settles
 }
 
 // PoolConfig translates the configuration into a pool configuration.
@@ -50,12 +52,20 @@ func Open(ctx context.Context, cfg *config.Config) (*Store, error) {
 		return nil, err
 	}
 	// NewWithConfig does not connect; it fails only on bounds PoolConfig
-	// never builds.
-	return &Store{pool: invariant.Must(pgxpool.NewWithConfig(ctx, pc))}, nil
+	// never builds. The settle listener connects at the first wait, and
+	// after a lost connection again once db.connect_timeout has passed.
+	listen := pc.ConnConfig.Copy()
+	return &Store{pool: invariant.Must(pgxpool.NewWithConfig(ctx, pc)), settles: newSettles(func(ctx context.Context) (listenConn, error) {
+		c, err := pgx.ConnectConfig(ctx, listen)
+		return c, err // the listener reads c only when err is nil
+	}, cfg.DB.ConnectTimeout)}, nil
 }
 
-// Close closes the pool.
-func (s *Store) Close() { s.pool.Close() }
+// Close closes the pool and the settle listener.
+func (s *Store) Close() {
+	s.settles.close()
+	s.pool.Close()
+}
 
 // ErrSchema is a store whose schema is not the version this build expects.
 var ErrSchema = errors.New("accessstore: the access store is not at the expected schema version")

@@ -41,6 +41,7 @@ type Config struct {
 	Pagination Pagination `koanf:"pagination"`
 	Charging   Charging   `koanf:"charging"`
 	Fuel       Fuel       `koanf:"fuel"`
+	Refresh    Refresh    `koanf:"refresh"`
 	Compose    Compose    `koanf:"compose"`
 	Roads      Roads      `koanf:"roads"`
 	Weather    Weather    `koanf:"weather"`
@@ -204,11 +205,17 @@ type Charging struct {
 
 // Fuel holds the settings of the filling-station answers.
 type Fuel struct {
-	PriceCurrent    time.Duration `koanf:"price_current" default:"24h" validate:"min=5m,max=72h" desc:"How long a reported fuel price is ranked: a price this young is ranked by price, an older one is the last known price, listed after them and never ranked. The default is the MCP capability's own limit, 24 hours."`
-	PriceHeld       time.Duration `koanf:"price_held" default:"72h" validate:"min=1h,max=168h" desc:"How far back a filling station read by its id (getFuelStation) looks for each grade's newest price: the platform's held window (FUEL_PRICE_HELD_S), 72 hours by default. A grade with no price in it is left out."`
-	PriceFresh      time.Duration `koanf:"price_fresh" default:"30m" validate:"min=5m,max=6h" desc:"How long a reported fuel price is stated current (a price's current): the platform's price cache window (fuel.cache_fresh_s), 30 minutes by default. An older price is still listed and, inside price_current, ranked."`
-	RefreshURL      string        `koanf:"refresh_url" validate:"omitempty,url" desc:"URL the fuel refresh asks (requestFuelRefresh) are posted to: the refresher that holds the provider key, its guards and its write path. Empty: every ask is refused with the reason refresh not configured."`
-	RefreshDeadline time.Duration `koanf:"refresh_deadline" default:"1200ms" validate:"min=100ms,max=10s" desc:"How long a fuel refresh ask waits for the refresher: the platform's 1.2 seconds by default. An ask not answered by then is pending."`
+	PriceCurrent time.Duration `koanf:"price_current" default:"24h" validate:"min=5m,max=72h" desc:"How long a reported fuel price is ranked: a price this young is ranked by price, an older one is the last known price, listed after them and never ranked. The default is the MCP capability's own limit, 24 hours."`
+	PriceHeld    time.Duration `koanf:"price_held" default:"72h" validate:"min=1h,max=168h" desc:"How far back a filling station read by its id (getFuelStation) looks for each grade's newest price: the platform's held window (FUEL_PRICE_HELD_S), 72 hours by default. A grade with no price in it is left out."`
+	PriceFresh   time.Duration `koanf:"price_fresh" default:"30m" validate:"min=5m,max=6h" desc:"How long a reported fuel price is stated current (a price's current): the platform's price cache window (fuel.cache_fresh_s), 30 minutes by default. An older price is still listed and, inside price_current, ranked."`
+}
+
+// Refresh holds the settings of the on-demand refreshes of live sources
+// (createRefresh).
+type Refresh struct {
+	SourcesFile string        `koanf:"sources_file" validate:"omitempty,max=4096" desc:"Path of the registry of the live sources a refresh may name, each with the JSON Schema of its subject, its key rules and its freshness window (docs: the registry layout). Read once at start; a registry that does not parse stops the start. Empty: sources_json, else no source, and every ask is a 400 naming body.source."`
+	SourcesJSON string        `koanf:"sources_json" validate:"omitempty,max=65536" desc:"The registry as JSON text, read when sources_file is empty."`
+	Wait        time.Duration `koanf:"wait" default:"1200ms" validate:"min=0s,max=10s" desc:"How long a refresh ask waits for its refresh to settle: the platform's 1.2 seconds by default. A refresh still open then is answered 202 pending."`
 }
 
 // Compose holds the settings of composed answers.

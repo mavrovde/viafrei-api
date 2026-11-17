@@ -18,6 +18,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/parking"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
+	"github.com/mavrovde/viafrei-api/internal/domain/refresh"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
@@ -41,8 +42,8 @@ type Features interface {
 	Stations(ctx context.Context, key access.Record, q transit.Query) (features.Answer[transit.Station], error)
 	Departures(ctx context.Context, key access.Record, q transit.DepartureQuery) (features.Board, error)
 	Facilities(ctx context.Context, key access.Record, q transit.FacilityQuery) (features.StationFacilities, error)
-	RecordTrainBoard(ctx context.Context, key access.Record, b transit.TrainBoard) error
-	FuelRefresh(ctx context.Context, key access.Record, a energy.RefreshAsk) (energy.RefreshAnswer, error)
+	RequestRefresh(ctx context.Context, key access.Record, a refresh.Ask) (refresh.Request, error)
+	Refresh(ctx context.Context, key access.Record, id string) (refresh.Request, error)
 	ParkingBays(ctx context.Context, key access.Record, q parking.BayQuery) (features.BaysAnswer, error)
 	TrainBoard(ctx context.Context, key access.Record, eva string) (features.TrainBoardAnswer, error)
 	Places(ctx context.Context, key access.Record, q places.Query) (features.Answer[places.Place], error)
@@ -82,7 +83,7 @@ const schemaPrefix = "#/components/schemas/"
 
 var nullableObjects = []struct{ schema, member string }{
 	{"ChargePoint", "availability"},
-	{"FuelRefreshData", "queue"},
+	{"RefreshData", "queue"},
 	{"HydrogenData", "nearest"},
 	{"DisruptionData", "punctuality"},
 	{"SpeedCamera", "location"},

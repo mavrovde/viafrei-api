@@ -1,6 +1,7 @@
 package wire_test
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -68,13 +69,18 @@ func TestConsoleSettings(t *testing.T) {
 	}
 }
 
-func TestFuelRefresherIsBuiltOnlyWithAURL(t *testing.T) {
+func TestRefreshesReadTheConfiguredRegistry(t *testing.T) {
 	cfg := config.Defaults()
-	if wire.FuelRefresher(cfg) != nil {
-		t.Fatal("a refresher with no URL")
+	r, err := wire.Refreshes(cfg, nil, nil)
+	if err != nil || r.Wait != 1200*time.Millisecond || r.Sources.FreshFor("fuel") != 0 {
+		t.Fatalf("defaults: %+v %v", r, err)
 	}
-	cfg.Fuel.RefreshURL = "http://refresher.invalid/refresh"
-	if wire.FuelRefresher(cfg) == nil {
-		t.Fatal("no refresher with a URL")
+	cfg.Refresh.SourcesFile = filepath.Join("..", "..", "..", "test", "live", "sources.json")
+	if r, err = wire.Refreshes(cfg, nil, nil); err != nil || r.Sources.FreshFor("fuel") != 5*time.Minute {
+		t.Fatalf("file: %+v %v", r, err)
+	}
+	cfg.Refresh.SourcesFile, cfg.Refresh.SourcesJSON = "", "{"
+	if _, err = wire.Refreshes(cfg, nil, nil); err == nil {
+		t.Fatal("a registry that does not parse")
 	}
 }

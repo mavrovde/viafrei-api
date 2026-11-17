@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
+	"github.com/mavrovde/viafrei-api/internal/adapters/livesources"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
@@ -243,35 +243,22 @@ func fuelHeld(t *testing.T, c *config.Config) string {
 	return body.Data.Name
 }
 
-// fuelRefreshURL: with no refresher an ask is refused as not configured;
-// with one, it is forwarded (here to a host that does not resolve).
-func fuelRefreshURL(t *testing.T, c *config.Config) string {
+// refreshWait: how long a refresh ask waits for its refresh to settle.
+func refreshWait(t *testing.T, c *config.Config) string {
 	t.Helper()
-	r := wire.FuelRefresher(c)
-	if r == nil {
-		return "not configured"
-	}
-	_, err := r.Refresh(context.Background(), energy.RefreshAsk{At: "ags:09162000"})
-	return fmt.Sprint(err != nil)
-}
-
-// fuelRefreshDeadline: a refresher answering after 300 ms is waited for
-// under the default deadline and is pending under a shorter one.
-func fuelRefreshDeadline(t *testing.T, c *config.Config) string {
-	t.Helper()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		select {
-		case <-time.After(300 * time.Millisecond):
-		case <-r.Context().Done():
-			return
-		}
-		_, _ = io.WriteString(w, `{"state":"refreshed","settledAt":null,"reused":false}`)
-	}))
-	defer srv.Close()
-	c.Fuel.RefreshURL = srv.URL
-	a, err := wire.FuelRefresher(c).Refresh(context.Background(), energy.RefreshAsk{At: "ags:09162000"})
+	r, err := wire.Refreshes(c, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return string(a.State)
+	return r.Wait.String()
+}
+
+// refreshSources: the live sources a refresh may name.
+func refreshSources(t *testing.T, c *config.Config) string {
+	t.Helper()
+	r, err := wire.Refreshes(c, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fmt.Sprint(r.Sources.(*livesources.Registry).Names())
 }

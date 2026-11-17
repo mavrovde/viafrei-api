@@ -29,9 +29,10 @@ func TestEveryExampleNamesAnOperation(t *testing.T) {
 	}
 	ids := OperationIDs()
 	for id := range examples {
+		op, _, _ := strings.Cut(id, ".") // <op>.<variant> is a named example of op
 		found := false
 		for _, known := range ids {
-			found = found || known == id
+			found = found || known == op
 		}
 		if !found {
 			t.Errorf("api/examples/%s.json names no operation", id)

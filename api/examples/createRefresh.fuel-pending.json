@@ -1,0 +1,40 @@
+{
+  "title": "Not settled within the wait: 202 pending, with its place in the queue",
+  "request": "/v1/refreshes",
+  "method": "POST",
+  "body": {
+    "source": "fuel",
+    "subject": {
+      "at": "ags:05315000"
+    }
+  },
+  "attribution": "A refresh carries no data and no attribution: the data it refreshes is served, with its source's attribution, by that source's own resources (listFuelOptions and getFuelStation for fuel, getTrainBoard for train_board).",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [],
+    "sources": [],
+    "audience": "own"
+  },
+  "status": 202,
+  "response": {
+    "data": {
+      "id": "ed5c8f44-f43f-5c72-838f-3846201e6ad5",
+      "source": "fuel",
+      "state": "pending",
+      "createdAt": "2026-03-30T00:00:00Z",
+      "settledAt": null,
+      "reason": null,
+      "queue": {
+        "position": 1
+      }
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en"
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/refreshes/ed5c8f44-f43f-5c72-838f-3846201e6ad5"
+    }
+  }
+}

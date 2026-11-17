@@ -1,0 +1,62 @@
+{
+  "sources": {
+    "fuel": {
+      "ticks": "insert into public.fuel_prices (observed_at, station_id, product, price, source) select current_setting('fakelive.at')::timestamptz, station_id, product, price, source from (select distinct on (station_id, product) station_id, product, price, source from public.fuel_prices where observed_at <= current_setting('fakelive.at')::timestamptz order by station_id, product, observed_at desc) newest on conflict do nothing",
+      "partitions": [
+        "public.fuel_prices"
+      ],
+      "default": {
+        "state": "refreshed"
+      },
+      "subjects": {
+        "ags:11000000": {
+          "state": "none_due"
+        },
+        "ags:02000000": {
+          "state": "refused",
+          "reason": "the hourly refresh cap of the area is reached"
+        },
+        "ags:14612000": {
+          "state": "failed",
+          "reason": "the provider did not answer"
+        },
+        "ags:05315000": {
+          "state": "never"
+        },
+        "ags:06412000": {
+          "state": "refreshed",
+          "after_ms": 3000
+        }
+      }
+    },
+    "train_board": {
+      "ticks": "insert into domains.train_board_departures (eva, observed_at, planned_at, platform, category, train_number, destination) values (substr(current_setting('fakelive.subject_key'), 5), current_setting('fakelive.at')::timestamptz, current_setting('fakelive.at')::timestamptz + interval '12 minutes', '4', 'ICE', '578', 'Hamburg-Altona')",
+      "partitions": [
+        "domains.train_board_departures"
+      ],
+      "default": {
+        "state": "refreshed"
+      },
+      "subjects": {
+        "eva:8000105": {
+          "state": "none_due"
+        },
+        "eva:8000261": {
+          "state": "refused",
+          "reason": "no provider key"
+        },
+        "eva:8011160": {
+          "state": "never"
+        },
+        "eva:8000207": {
+          "state": "refreshed",
+          "after_ms": 500
+        },
+        "eva:8000209": {
+          "state": "refreshed",
+          "after_ms": 500
+        }
+      }
+    }
+  }
+}

@@ -2709,11 +2709,12 @@
       "counterpart": "place search",
       "request": "/v1/places?q=Kreuz%20Fixfeld\u0026kind=junction\u0026limit=5",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "places"
         ],
         "sources": [
+          "autobahn",
           "bkg_gvisys",
           "delfi_static",
           "geonames",
@@ -2724,12 +2725,36 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
-          "name": "data",
-          "value": "[]"
+          "name": "data[900001].districtCode",
+          "value": "null"
         },
         {
-          "name": "meta.attribution",
-          "value": "[]"
+          "name": "data[900001].id",
+          "value": "900001"
+        },
+        {
+          "name": "data[900001].kind",
+          "value": "junction"
+        },
+        {
+          "name": "data[900001].location.lat",
+          "value": "49.26477"
+        },
+        {
+          "name": "data[900001].location.lon",
+          "value": "12.94870"
+        },
+        {
+          "name": "data[900001].name",
+          "value": "Kreuz Fixfeld (A100)"
+        },
+        {
+          "name": "data[900001].sourceFamily",
+          "value": "autobahn"
+        },
+        {
+          "name": "meta.attribution[autobahn].family",
+          "value": "autobahn"
         },
         {
           "name": "meta.notes.condition",
@@ -10582,6 +10607,10 @@
           "value": "8"
         },
         {
+          "name": "data[0].lamp",
+          "value": "red"
+        },
+        {
           "name": "data[0].name",
           "value": "A100"
         },
@@ -10600,6 +10629,10 @@
         {
           "name": "data[1].junctions",
           "value": "8"
+        },
+        {
+          "name": "data[1].lamp",
+          "value": "red"
         },
         {
           "name": "data[1].name",
@@ -10622,6 +10655,10 @@
           "value": "8"
         },
         {
+          "name": "data[2].lamp",
+          "value": "red"
+        },
+        {
           "name": "data[2].name",
           "value": "A102"
         },
@@ -10640,6 +10677,10 @@
         {
           "name": "data[3].junctions",
           "value": "8"
+        },
+        {
+          "name": "data[3].lamp",
+          "value": "red"
         },
         {
           "name": "data[3].name",
@@ -10662,6 +10703,10 @@
           "value": "8"
         },
         {
+          "name": "data[4].lamp",
+          "value": "amber"
+        },
+        {
           "name": "data[4].name",
           "value": "A104"
         },
@@ -10676,6 +10721,10 @@
         {
           "name": "data[4].states",
           "value": "[\"03\",\"07\",\"11\",\"12\",\"15\",\"16\"]"
+        },
+        {
+          "name": "meta.attribution[bast_lcl].family",
+          "value": "bast_lcl"
         },
         {
           "name": "meta.attribution[roads_alpha].family",
@@ -10963,6 +11012,10 @@
           "value": "8"
         },
         {
+          "name": "data[0].lamp",
+          "value": "red"
+        },
+        {
           "name": "data[0].name",
           "value": "A100"
         },
@@ -10983,28 +11036,8 @@
           "value": "bast_lcl"
         },
         {
-          "name": "meta.attribution[lez_alpha].family",
-          "value": "lez_alpha"
-        },
-        {
-          "name": "meta.attribution[lorry_bast_langlkw].family",
-          "value": "lorry_bast_langlkw"
-        },
-        {
-          "name": "meta.attribution[lorry_koeln_beschraenkungen].family",
-          "value": "lorry_koeln_beschraenkungen"
-        },
-        {
-          "name": "meta.attribution[osm_speed_cameras].family",
-          "value": "osm_speed_cameras"
-        },
-        {
           "name": "meta.attribution[roads_alpha].family",
           "value": "roads_alpha"
-        },
-        {
-          "name": "meta.attribution[speed_alpha].family",
-          "value": "speed_alpha"
         },
         {
           "name": "meta.notes.condition",
@@ -11064,6 +11097,10 @@
           "value": "8"
         },
         {
+          "name": "data[0].lamp",
+          "value": "red"
+        },
+        {
           "name": "data[0].name",
           "value": "A100"
         },
@@ -11084,28 +11121,8 @@
           "value": "bast_lcl"
         },
         {
-          "name": "meta.attribution[lez_alpha].family",
-          "value": "lez_alpha"
-        },
-        {
-          "name": "meta.attribution[lorry_bast_langlkw].family",
-          "value": "lorry_bast_langlkw"
-        },
-        {
-          "name": "meta.attribution[lorry_koeln_beschraenkungen].family",
-          "value": "lorry_koeln_beschraenkungen"
-        },
-        {
-          "name": "meta.attribution[osm_speed_cameras].family",
-          "value": "osm_speed_cameras"
-        },
-        {
           "name": "meta.attribution[roads_alpha].family",
           "value": "roads_alpha"
-        },
-        {
-          "name": "meta.attribution[speed_alpha].family",
-          "value": "speed_alpha"
         },
         {
           "name": "meta.notes.condition",

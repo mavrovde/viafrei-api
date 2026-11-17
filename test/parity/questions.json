@@ -425,11 +425,12 @@
       "counterpart": "place search",
       "request": "/v1/places?q=Kreuz%20Fixfeld&kind=junction&limit=5",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "places"
         ],
         "sources": [
+          "autobahn",
           "bkg_gvisys",
           "delfi_static",
           "geonames",

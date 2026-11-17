@@ -3632,6 +3632,15 @@
               "null"
             ]
           },
+          "lamp": {
+            "description": "Its motorway Ampel now, as getMotorwayConditions states it for the whole road.",
+            "enum": [
+              "green",
+              "amber",
+              "red"
+            ],
+            "type": "string"
+          },
           "name": {
             "type": "string"
           },
@@ -3661,7 +3670,8 @@
           "states",
           "junctions",
           "situations",
-          "sourceFamily"
+          "sourceFamily",
+          "lamp"
         ],
         "type": "object"
       },
@@ -13527,7 +13537,7 @@
     },
     "/v1/motorways": {
       "get": {
-        "description": "The motorway catalogue (the site's motorway index, list, top list and exits): each motorway with its length, the Länder it runs through, its junction count and the count of its situations in force now; with road, its junctions in number order. By road number. MCP counterpart: motorway traffic. Needs the scope roads.",
+        "description": "The motorway catalogue (the site's motorway index, list, top list and exits): each motorway with its length, the Länder it runs through, its junction count, the count of its situations in force now and its lamp; with road, its junctions in number order. By road number. MCP counterpart: motorway traffic. Needs the scope roads.",
         "operationId": "listMotorways",
         "parameters": [
           {

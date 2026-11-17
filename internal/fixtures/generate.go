@@ -17,7 +17,7 @@ import (
 
 // GeneratorVersion changes whenever the output for a given seed and profile
 // changes.
-const GeneratorVersion = "0.3.3"
+const GeneratorVersion = "0.3.4"
 
 // Profile sets the size of a generated set.
 type Profile struct {
@@ -1076,7 +1076,25 @@ var hazards = []string{"thunderstorm", "wind", "rain", "snow", "ice", "fog", "he
 // warningColumns are the columns of a weather warning row: the platform reads
 // the issuer, the language and the status from the DWD source itself.
 var warningColumns = []string{"warning_id", "hazard", "warning_level", "level_label", "message_status",
-	"headline", "valid_from", "valid_to", "published_at", "region_code", "source_ref", "recorded_at", "withdrawn_at"}
+	"headline", "valid_from", "valid_to", "published_at", "region_code", "source_ref", "recorded_at", "withdrawn_at",
+	"warn_cell_id", "area_name", "area", "seen_at"}
+
+// warnCell is the DWD warn cell of a fixture district, as the DWD keys a
+// Gemeinde cell (8, the Gemeinde key): the district's own key and 000, its
+// area the district's half of the Land's cell (west 001, east 002), as the
+// fixture places the district's places. No draw of its own.
+func warnCell(l land, district string) (id, name, area string) {
+	b := l.cell
+	mid := (b.w + b.e) / 2
+	if strings.HasSuffix(district, "001") {
+		b.e = mid
+	} else {
+		b.w = mid
+	}
+	x0, x1, y0, y1 := coord(b.w), coord(b.e), coord(b.s), coord(b.n)
+	return "8" + district + "000", "Warngebiet " + district,
+		"'SRID=4326;POLYGON((" + x0 + " " + y0 + ", " + x1 + " " + y0 + ", " + x1 + " " + y1 + ", " + x0 + " " + y1 + ", " + x0 + " " + y0 + "))'"
+}
 
 func (g *gen) weather() {
 	g.w.begin("weather_warning", warningColumns...)
@@ -1091,10 +1109,13 @@ func (g *gen) weather() {
 			level := 1 + g.r.IntN(4)
 			from := g.instant()
 			ref := g.src("weather", "alpha", "eta")
+			to := from.Add(time.Duration(3+g.r.IntN(30)) * time.Hour)
+			district := l.code + "00" + num(1+g.r.IntN(2))
+			cell, cellName, area := warnCell(l, district)
 			g.w.row(str(fmt.Sprintf("dwd:%d", 100000+n)), str(hz), num(level), str(fmt.Sprintf("Stufe %d", level)),
 				str("actual"), str(fmt.Sprintf("Warnung vor %s (Stufe %d)", hz, level)), ts(from),
-				ts(from.Add(time.Duration(3+g.r.IntN(30))*time.Hour)), ts(from.Add(-30*time.Minute)),
-				str(l.code+"00"+num(1+g.r.IntN(2))), str(ref), ts(from), null)
+				ts(to), ts(from.Add(-30*time.Minute)),
+				str(district), str(ref), ts(from), null, str(cell), str(cellName), area, ts(from))
 			g.counted(l.code, ref)
 			n++
 		}
@@ -1133,9 +1154,10 @@ func (g *gen) hydrogen() {
 		for range 2 {
 			n++
 			pl := g.randomPlace(l.code)
-			refill := `[{"solution":"700bar_car"}]`
+			// The refill codes as the AFIR publication writes them.
+			refill := `[{"solution":"gaseousHydrogen700barCar"}]`
 			if n%3 == 0 {
-				refill = `[{"solution":"700bar_car"},{"solution":"350bar_truck"}]`
+				refill = `[{"solution":"gaseousHydrogen700barCar"},{"solution":"gaseousHydrogen350barTruck"}]`
 			}
 			g.w.row(str(fmt.Sprintf("%s:%d", ref, 900000+n)), str("H2 "+pl.name), str("H2 Synthetic"), point(near(g.r, pl.at, l.cell)),
 				str(refill), str(ref), ts(g.instant()))

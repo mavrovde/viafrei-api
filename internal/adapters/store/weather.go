@@ -17,20 +17,18 @@ import (
 // The weather-risk and driving-rules repositories (anti-corruption layer).
 
 // warningPlaced is the condition of a warning the lamp reads or will read at
-// a position: a published, not cancelled warning of the given families that
-// has not ended at now and whose area contains the position. $1 families, $2
-// now, $3 latitude, $4 longitude. A warning stored with no area (a null
-// region_code) cannot be placed, so it contains no position and answers no
-// question: the inner join leaves it out, as a left join would (its null
-// boundary intersects nothing).
+// a position, as the platform's warnings at a point read them: a published,
+// not cancelled warning of the given families that has not ended at now and
+// whose warn cell's area contains the position. $1 families, $2 now, $3
+// latitude, $4 longitude. A warning stored with no area cannot be placed, so
+// it answers no position.
 const warningPlaced = `from contract.weather_warning w
-join contract.admin_region r on r.region_code = w.region_code
 where w.withdrawn_at is null and w.message_status <> 'cancelled'
   and w.source_ref = any($1)
   and w.display_class <> 'withhold' and (w.audience = 'public' or ` + ownKeyOn + `)
-  and r.display_class <> 'withhold' and (r.audience = 'public' or ` + ownKeyOn + `)
   and (w.valid_to is null or w.valid_to > $2)
-  and st_intersects(r.boundary, st_setsrid(st_makepoint($4, $3), 4326))`
+  and w.area is not null and w.area && st_setsrid(st_makepoint($4, $3), 4326)
+  and st_intersects(w.area::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography)`
 
 // warningScope is the condition of the lamp's scope: a placed warning
 // (warningPlaced) in force at now.
@@ -42,7 +40,7 @@ const warningScope = warningPlaced + `
 // whether the unmapped ones are kept, $8 every mapped hazard, $9 the limit.
 const warningsPage = `
 select w.warning_id, w.source_ref, w.hazard, w.warning_level, w.level_label, w.issuer_name, w.headline,
-       w.text_lang, w.valid_from, w.valid_to, r.name
+       w.text_lang, w.valid_from, w.valid_to, coalesce(w.area_name, '')
 ` + warningScope + `
   and w.warning_level >= $5
   and (w.hazard = any($6) or ($7 and not w.hazard = any($8)))

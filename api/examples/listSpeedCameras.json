@@ -1,6 +1,6 @@
 {
   "title": "Speed check locations within 10 km",
-  "request": "/v1/speed-cameras?at=47.98,6.95\u0026radius_m=10000\u0026limit=2",
+  "request": "/v1/speed-cameras?at=48.39,7.48\u0026radius_m=10000\u0026limit=2",
   "attribution": "Speed check locations come from the source families of the roads domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
   "key": {
     "useClass": "commercial",
@@ -15,8 +15,49 @@
   "status": 200,
   "response": {
     "data": {
-      "official": [],
-      "officialTotal": 0,
+      "official": [
+        {
+          "id": "se:700001",
+          "kind": "fixed",
+          "enforces": "speed",
+          "street": "Weg 1",
+          "locationLabel": null,
+          "municipality": "Schömpingbach",
+          "direction": null,
+          "limitKmh": 30,
+          "lorryLimitKmh": null,
+          "firstDay": null,
+          "lastDay": null,
+          "dataAsOf": "2026-01-28",
+          "staleYear": null,
+          "location": {
+            "lat": 48.413347,
+            "lon": 7.465562
+          },
+          "sourceFamily": "speed_alpha"
+        },
+        {
+          "id": "se:700002",
+          "kind": "section_control",
+          "enforces": "speed",
+          "street": "Weg 2",
+          "locationLabel": null,
+          "municipality": "Schömpingbach",
+          "direction": null,
+          "limitKmh": 40,
+          "lorryLimitKmh": null,
+          "firstDay": null,
+          "lastDay": null,
+          "dataAsOf": "2026-01-28",
+          "staleYear": null,
+          "location": {
+            "lat": 48.376228,
+            "lon": 7.502126
+          },
+          "sourceFamily": "speed_alpha"
+        }
+      ],
+      "officialTotal": 2,
       "osm": [],
       "osmTotal": 0
     },
@@ -24,9 +65,29 @@
       "requestId": "example-request-0001",
       "generatedAt": "2026-03-30T00:00:00Z",
       "language": "en",
-      "asOf": null,
-      "freshness": [],
-      "attribution": [],
+      "asOf": "2026-03-29T12:00:00Z",
+      "freshness": [
+        {
+          "family": "speed_alpha",
+          "dataAsOf": "2026-03-29T12:00:00Z",
+          "ageS": 43200,
+          "staleAfterS": 259200,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "speed_alpha",
+          "domain": "roads",
+          "publisher": "Blitzwerk Datenwerk",
+          "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://alpha.example/terms/speed_alpha"
+        }
+      ],
       "notes": {
         "condition": [
           "Note on use (§ 23 Abs. 1c StVO): a person driving a vehicle may not, while driving, operate or use any technical device or app function that shows or disrupts traffic enforcement. This also applies to a passenger's smartphone if the driver benefits from it (OLG Karlsruhe). A violation costs €75 and one point in Flensburg. This information is meant only for planning before setting off or during a stop. The locations come from official and open sources and may be incomplete or out of date; mobile checks are possible at any time and anywhere. Always keep to the speed limit in force. Not legal advice."

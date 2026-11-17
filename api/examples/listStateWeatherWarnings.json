@@ -1,6 +1,6 @@
 {
   "title": "The official weather warnings in force in one Land",
-  "request": "/v1/states/09/weather",
+  "request": "/v1/states/05/weather",
   "attribution": "The events are counted from the weather families the key is entitled to, each listed in meta.attribution with its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
   "key": {
     "useClass": "commercial",
@@ -15,8 +15,23 @@
   "status": 200,
   "response": {
     "data": {
-      "state": "09",
-      "events": []
+      "state": "05",
+      "events": [
+        {
+          "event": "GLÄTTE",
+          "level": 4,
+          "notices": 1,
+          "cells": 1,
+          "until": "2026-03-30T00:24:18Z"
+        },
+        {
+          "event": "UV-INDEX",
+          "level": 2,
+          "notices": 1,
+          "cells": 1,
+          "until": "2026-03-30T11:04:42Z"
+        }
+      ]
     },
     "meta": {
       "requestId": "example-request-0001",
@@ -24,13 +39,6 @@
       "language": "en",
       "asOf": "2026-03-29T23:57:30Z",
       "freshness": [
-        {
-          "family": "dwd_alpha",
-          "dataAsOf": "2026-03-29T23:57:30Z",
-          "ageS": 150,
-          "staleAfterS": 900,
-          "stale": false
-        },
         {
           "family": "dwd_eta",
           "dataAsOf": "2026-03-29T23:57:30Z",
@@ -40,17 +48,6 @@
         }
       ],
       "attribution": [
-        {
-          "family": "dwd_alpha",
-          "domain": "weather",
-          "publisher": "Sirfeim Datenwerk",
-          "text": "Synthetic data from family alpha, licence CC BY 4.0.",
-          "licence": "CC BY 4.0",
-          "licenceUrl": "https://licences.example/cc-by-4-0",
-          "shareAlike": false,
-          "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms/dwd_alpha"
-        },
         {
           "family": "dwd_eta",
           "domain": "weather",
@@ -75,7 +72,7 @@
       ]
     },
     "links": {
-      "self": "https://api.viafrei.de/v1/states/09/weather"
+      "self": "https://api.viafrei.de/v1/states/05/weather"
     }
   }
 }

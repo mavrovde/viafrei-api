@@ -231,3 +231,7 @@ func (f *cachedFeatures) FuelStations(context.Context, access.Record, energy.Fue
 func (f *cachedFeatures) Places(context.Context, access.Record, places.Query) (features.Answer[places.Place], error) {
 	return features.Answer[places.Place]{}, nil
 }
+
+func (f *cachedFeatures) Facilities(context.Context, access.Record, transit.FacilityQuery) (features.StationFacilities, error) {
+	return features.StationFacilities{}, nil
+}

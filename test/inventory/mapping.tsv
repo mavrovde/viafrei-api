@@ -90,3 +90,8 @@ argument:check_road_status.limit	getMotorwayConditions?limit	motorway-a101	-
 argument:check_road_status.place	listPlaces?q,listRoadConditions?at	places-name,roads-near	-
 tool:get_driving_rules	getDrivingRules	rules-topic	-
 argument:get_driving_rules.topic	getDrivingRules?topic	rules-topic	-
+tool:check_station_facilities	listStations,listStationFacilities	stations-text,facilities-all	-
+argument:check_station_facilities.station	listStations?q	stations-text	-
+argument:check_station_facilities.eva_no	listStations?code	stations-code	-
+argument:check_station_facilities.facility	listStationFacilities?kind	facilities-lifts	-
+argument:check_station_facilities.limit	listStationFacilities?limit	facilities-lifts	-

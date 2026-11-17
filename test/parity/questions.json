@@ -454,6 +454,42 @@
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "facilities-all",
+      "operation": "listStationFacilities",
+      "counterpart": "station facilities",
+      "request": "/v1/stations/1:de:03001:0/facilities",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "src-alpha-transit",
+          "src-alpha-accessibility"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "facilities-lifts",
+      "operation": "listStationFacilities",
+      "counterpart": "station facilities",
+      "request": "/v1/stations/1:de:03001:0/facilities?kind=elevator&limit=1",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "src-alpha-transit",
+          "src-alpha-accessibility"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
     }
   ]
 }

@@ -2,6 +2,7 @@ package features
 
 import (
 	"context"
+	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
@@ -23,6 +24,9 @@ type Transit interface {
 	// window, of the given families: calls a passenger can board, of trips
 	// that call outside the station after them, by planned instant.
 	Departures(ctx context.Context, q transit.DepartureQuery, families []string) ([]transit.Departure, error)
+	// Facilities returns the lifts and escalators of a station, of the
+	// given families, each with its state at now.
+	Facilities(ctx context.Context, station string, families []string, now time.Time) ([]transit.Facility, error)
 }
 
 // Stations answers "which station is this" and "which stations are near
@@ -102,5 +106,55 @@ func (s *Service) Departures(ctx context.Context, key access.Record, q transit.D
 	return Board{
 		Answer:  Answer[transit.Departure]{Items: b.Rows, HasMore: b.Matched > len(b.Rows), Families: fams, Partial: partial, At: s.now()},
 		Station: st, Matched: b.Matched, MatchedAll: b.MatchedAll, Dropped: b.Dropped,
+	}, nil
+}
+
+// StationFacilities is a station's lifts and escalators (FR-TRANSIT-003).
+type StationFacilities struct {
+	Answer[transit.Facility]
+	Station                   transit.Station
+	Active, Inactive, Unknown int
+}
+
+// Facilities answers "do the lifts work at this station" for key, as
+// transit.ListFacilities lists them. Facilities are read under the
+// accessibility domain, the station under transit.
+func (s *Service) Facilities(ctx context.Context, key access.Record, q transit.FacilityQuery) (StationFacilities, error) {
+	reg, gate, err := s.gate(ctx, key)
+	if err != nil {
+		return StationFacilities{}, err
+	}
+	stations, stPartial, err := gate.Answer(access.Answering(reg, "transit"))
+	if err != nil {
+		return StationFacilities{}, err
+	}
+	permitted, partial, err := gate.Answer(access.Answering(reg, "accessibility"))
+	if err != nil {
+		return StationFacilities{}, err
+	}
+	st, err := s.repos.Transit.Station(ctx, q.StationID, stations)
+	if err != nil {
+		return StationFacilities{}, err
+	}
+	now := s.now()
+	all, err := s.repos.Transit.Facilities(ctx, q.StationID, permitted, now)
+	if err != nil {
+		return StationFacilities{}, err
+	}
+	l := transit.ListFacilities(all, q)
+	contributed := []string{st.Family}
+	for _, f := range l.Rows {
+		contributed = append(contributed, f.Family)
+	}
+	if err := gate.Check(contributed); err != nil {
+		return StationFacilities{}, err
+	}
+	fams, err := s.provenanceOf(ctx, contributed, permitted)
+	if err != nil {
+		return StationFacilities{}, err
+	}
+	return StationFacilities{
+		Answer:  Answer[transit.Facility]{Items: l.Rows, HasMore: l.Active+l.Inactive+l.Unknown > len(l.Rows), Families: fams, Partial: partial || stPartial, At: now},
+		Station: st, Active: l.Active, Inactive: l.Inactive, Unknown: l.Unknown,
 	}, nil
 }

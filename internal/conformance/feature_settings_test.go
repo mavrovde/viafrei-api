@@ -160,3 +160,8 @@ func (f *askedFeatures) Places(_ context.Context, _ access.Record, q places.Quer
 	f.asked = fmt.Sprintf("limit=%d", q.Limit)
 	return features.Answer[places.Place]{}, nil
 }
+
+func (f *askedFeatures) Facilities(_ context.Context, _ access.Record, q transit.FacilityQuery) (features.StationFacilities, error) {
+	f.asked = fmt.Sprintf("limit=%d", q.Limit)
+	return features.StationFacilities{}, nil
+}

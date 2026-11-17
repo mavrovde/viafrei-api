@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -139,6 +140,32 @@ func (s *Store) Departures(ctx context.Context, q transit.DepartureQuery, famili
 				&v.PlatformChanged, &v.Live, &v.Source, &v.Cancelled, &v.DelayMin, &v.ExpectedAt, &v.NoForecast,
 				&v.Family, &v.Families)
 			v.Mode = transit.MapMode(mode)
+			return v, err
+		})
+	})
+}
+
+// stationFacilities reads the facilities of a station: $1 the station, $2
+// the families, $3 now. A state observed longer ago than its family's
+// stale_after_s, or never observed, is unknown.
+var stationFacilities = `
+select f.facility_id, f.facility_kind, f.position_text,
+       case when f.status_observed_at is null then 'unknown'
+            when s.stale_after_s is not null and f.status_observed_at < $3::timestamptz - make_interval(secs => s.stale_after_s) then 'unknown'
+            else f.facility_status end,
+       f.status_observed_at, f.source_ref
+from contract.station_facility f
+join contract.source s on s.source_ref = f.source_ref
+where f.stop_place_id = $1 and f.source_ref = any($2) and ` + permitted("f") + `
+order by f.facility_id`
+
+// Facilities reads the facilities of a station (features.Transit).
+func (s *Store) Facilities(ctx context.Context, station string, families []string, now time.Time) ([]transit.Facility, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.Facility, error) {
+		rows, _ := tx.Query(ctx, stationFacilities, station, families, now)
+		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.Facility, error) {
+			var v transit.Facility
+			err := r.Scan(&v.ID, &v.Kind, &v.Position, &v.State, &v.ObservedAt, &v.Family)
 			return v, err
 		})
 	})

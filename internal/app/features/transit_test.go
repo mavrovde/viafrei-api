@@ -15,6 +15,7 @@ import (
 
 // trRegister: two transit families, one consumer only.
 var trRegister = []access.Terms{
+	{Family: "a1", Domain: "accessibility", UseClasses: all, Version: "v1"},
 	{Family: "t1", Domain: "transit", UseClasses: all, Version: "v1"},
 	{Family: "t2", Domain: "transit", UseClasses: []access.UseClass{"consumer"}, Version: "v1"},
 }
@@ -31,6 +32,14 @@ type trFake struct {
 	calls       []transit.Departure
 	depErr      error
 	gotBoard    transit.DepartureQuery
+	facilities  []transit.Facility
+	facErr      error
+	gotFacFams  []string
+}
+
+func (f *trFake) Facilities(_ context.Context, _ string, fams []string, _ time.Time) ([]transit.Facility, error) {
+	f.gotFacFams = fams
+	return f.facilities, f.facErr
 }
 
 func (f *trFake) Station(_ context.Context, id string, fams []string) (transit.Station, error) {
@@ -137,6 +146,40 @@ func TestDeparturesRefusals(t *testing.T) {
 		"provenance": {&trFake{fake: &fake{provErr: errStore}, station: st}, full, errStore},
 	} {
 		if _, err := trService(c.f).Departures(context.Background(), c.k, transit.DepartureQuery{Limit: 5}); !errors.Is(err, c.want) {
+			t.Errorf("%s: %v, want %v", name, err, c.want)
+		}
+	}
+}
+
+func TestFacilitiesAreListedGatedAndAttributed(t *testing.T) {
+	req.Covers(t, "FR-TRANSIT-003", "SEC-030")
+	f := &trFake{station: transit.Station{ID: "s", Family: "t1"}, facilities: []transit.Facility{
+		{ID: "x", State: "active", Family: "a1"}, {ID: "y", State: "inactive", Family: "a1"},
+	}}
+	a, err := trService(f).Facilities(context.Background(), key("commercial", []access.Scope{"transit"}, "t1", "t2", "a1"), transit.FacilityQuery{StationID: "s", Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(f.gotFacFams, []string{"a1"}) || len(a.Items) != 1 || a.Items[0].ID != "y" || !a.HasMore || !a.Partial ||
+		a.Active != 1 || a.Inactive != 1 || !slices.Equal(names(a.Families), []string{"a1", "t1"}) {
+		t.Errorf("answer %+v", a)
+	}
+	full := key("commercial", []access.Scope{"transit"}, "t1", "a1")
+	st := transit.Station{ID: "s", Family: "t1"}
+	for name, c := range map[string]struct {
+		f    *trFake
+		k    access.Record
+		want error
+	}{
+		"register":   {&trFake{fake: &fake{regErr: errStore}}, full, errStore},
+		"no transit": {&trFake{}, key("commercial", []access.Scope{"transit"}, "a1"), access.ErrNonePermitted},
+		"no access":  {&trFake{}, key("commercial", []access.Scope{"transit"}, "t1"), access.ErrNonePermitted},
+		"station":    {&trFake{stErr: transit.ErrNotFound}, full, transit.ErrNotFound},
+		"read":       {&trFake{station: st, facErr: errStore}, full, errStore},
+		"post-check": {&trFake{station: st, facilities: []transit.Facility{{Family: "t2"}}}, full, features.ErrGateViolation},
+		"provenance": {&trFake{fake: &fake{provErr: errStore}, station: st}, full, errStore},
+	} {
+		if _, err := trService(c.f).Facilities(context.Background(), c.k, transit.FacilityQuery{Limit: 5}); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)
 		}
 	}

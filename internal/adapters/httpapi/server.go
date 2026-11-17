@@ -124,6 +124,7 @@ func operations() []operation {
 		{id: "listFuelOptions", method: http.MethodGet, path: "/v1/fuel-options", tag: "energy", keyed: true, scope: "energy", register: registerFuel},
 		{id: "listStations", method: http.MethodGet, path: "/v1/stations", tag: "transit", keyed: true, scope: "transit", register: registerStations},
 		{id: "listStationDepartures", method: http.MethodGet, path: "/v1/stations/{stationId}/departures", tag: "transit", keyed: true, scope: "transit", register: registerDepartures},
+		{id: "listStationFacilities", method: http.MethodGet, path: "/v1/stations/{stationId}/facilities", tag: "transit", keyed: true, scope: "transit", register: registerFacilities},
 	}
 }
 

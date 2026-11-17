@@ -62,6 +62,8 @@ type fakeFeatures struct {
 	gotFuel    energy.FuelQuery
 	places     features.Answer[places.Place]
 	gotPlaces  places.Query
+	facilities features.StationFacilities
+	gotFacil   transit.FacilityQuery
 	gotAccept  []string
 }
 

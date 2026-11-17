@@ -120,6 +120,7 @@ func operations() []operation {
 		{id: "getRoadSituation", method: http.MethodGet, path: "/v1/road-situations/{situationId}", tag: "roads", keyed: true, scope: "roads", register: registerRoadSituation},
 		{id: "getWeatherRisk", method: http.MethodGet, path: "/v1/weather-risk", tag: "weather", keyed: true, scope: "weather", register: registerWeatherRisk},
 		{id: "getDrivingRules", method: http.MethodGet, path: "/v1/driving-rules", tag: "rules", keyed: true, scope: "rules", register: registerDrivingRules},
+		{id: "listFuelOptions", method: http.MethodGet, path: "/v1/fuel-options", tag: "energy", keyed: true, scope: "energy", register: registerFuel},
 		{id: "listStations", method: http.MethodGet, path: "/v1/stations", tag: "transit", keyed: true, scope: "transit", register: registerStations},
 		{id: "listStationDepartures", method: http.MethodGet, path: "/v1/stations/{stationId}/departures", tag: "transit", keyed: true, scope: "transit", register: registerDepartures},
 	}

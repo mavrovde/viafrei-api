@@ -40,6 +40,7 @@ type Config struct {
 	Geo        Geo        `koanf:"geo"`
 	Pagination Pagination `koanf:"pagination"`
 	Charging   Charging   `koanf:"charging"`
+	Fuel       Fuel       `koanf:"fuel"`
 	Compose    Compose    `koanf:"compose"`
 	Roads      Roads      `koanf:"roads"`
 	Weather    Weather    `koanf:"weather"`
@@ -198,6 +199,11 @@ type Weather struct {
 // Charging holds the settings of charging answers.
 type Charging struct {
 	StatusMaxAge time.Duration `koanf:"status_max_age" default:"30m" validate:"min=1m,max=24h" desc:"How old a charge point's reported state may be and still count; an older one, or one older than its family's freshness threshold, is answered as stale and not counted as available. The default is the MCP capability's own limit, 30 minutes. The parity harness runs on its own defaults, and its question charging-status-age-limit is asked 38 minutes after a report, so it fails only when the default is raised above 38 minutes."`
+}
+
+// Fuel holds the settings of the filling-station answers.
+type Fuel struct {
+	PriceCurrent time.Duration `koanf:"price_current" default:"24h" validate:"min=5m,max=72h" desc:"How long a reported fuel price is current: a current price is ranked by price, an older one is the last known price, listed after them and never ranked. The default is the MCP capability's own window, 24 hours."`
 }
 
 // Compose holds the settings of composed answers.

@@ -133,3 +133,24 @@ func chargingState(t *testing.T, c *config.Config) string {
 	}
 	return body.Data[0].ChargePoints[0].Availability.State
 }
+
+func (f *askedFeatures) FuelStations(_ context.Context, _ access.Record, q energy.FuelQuery) (features.FuelStations, error) {
+	f.asked = q.Window.String()
+	return features.FuelStations{}, nil
+}
+
+// fuelWindow is the price window a fuel search is asked under.
+func fuelWindow(t *testing.T, c *config.Config) string {
+	t.Helper()
+	f := &askedFeatures{}
+	h, err := httpapi.NewHandler(httpapi.Deps{Config: c, ContractVersion: "0.1", Auth: everyScope{}, Features: f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/fuel-options?at=1,2", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("%d %s", w.Code, w.Body)
+	}
+	return f.asked
+}

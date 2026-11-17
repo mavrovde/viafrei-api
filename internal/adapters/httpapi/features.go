@@ -36,6 +36,7 @@ type Features interface {
 	DrivingRules(ctx context.Context, key access.Record, topic string) (rules.Topic, features.Answer[rules.Rule], error)
 	Stations(ctx context.Context, key access.Record, q transit.Query) (features.Answer[transit.Station], error)
 	Departures(ctx context.Context, key access.Record, q transit.DepartureQuery) (features.Board, error)
+	FuelStations(ctx context.Context, key access.Record, q energy.FuelQuery) (features.FuelStations, error)
 }
 
 // counterpartExtension names the MCP capability an operation answers the

@@ -222,3 +222,7 @@ func perfBehaviours() map[string]behaviour {
 	}
 	return out
 }
+
+func (f *cachedFeatures) FuelStations(context.Context, access.Record, energy.FuelQuery) (features.FuelStations, error) {
+	return features.FuelStations{}, nil
+}

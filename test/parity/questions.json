@@ -225,6 +225,74 @@
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "fuel-near",
+      "operation": "listFuelOptions",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "src-gamma-energy"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "fuel-cheapest-e10",
+      "operation": "listFuelOptions",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&fuel=e10&sort=price&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "src-gamma-energy"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "fuel-brand-open",
+      "operation": "listFuelOptions",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&brand=belnan&open_now=true&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "src-gamma-energy"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "fuel-name-by-name",
+      "operation": "listFuelOptions",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&name=nam&sort=name&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "src-gamma-energy"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
     }
   ]
 }

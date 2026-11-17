@@ -18,3 +18,8 @@ vocabulary	internal/fixtures/generate.go	datex	the id the read contract itself g
 column	api/openapi.json	stationId	path parameter of the departure board, the station id listStations answers (FR-TRANSIT-002); the resource vocabulary, not a storage name
 column	api/openapi.json	journeyId	member name of a departure, the trip and its service day as the departure board names it (FR-TRANSIT-002); the resource vocabulary, not a storage name
 column	api/openapi.json	plannedPlatform	member name of a departure beside platform, as the departure board shows a platform change (FR-TRANSIT-002); the resource vocabulary, not a storage name
+column	api/openapi.json	noForecast	member name of a departure (FR-TRANSIT-002), the departure board vocabulary, not a storage name
+column	api/openapi.json	platformChanged	member name of a departure (FR-TRANSIT-002), the departure board vocabulary, not a storage name
+column	api/openapi.json	realtimeSource	member name of a departure (FR-TRANSIT-002), the departure board vocabulary, not a storage name
+column	api/openapi.json	routeType	member name of a departure (FR-TRANSIT-002), the departure board vocabulary, not a storage name
+column	api/openapi.json	trainNumber	member name of a departure (FR-TRANSIT-002), the departure board vocabulary, not a storage name

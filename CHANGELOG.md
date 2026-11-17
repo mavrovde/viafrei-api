@@ -12,18 +12,34 @@ See [docs/RELEASING.md](docs/RELEASING.md).
 ## [0.3.0] (unreleased)
 
 The API serves what the site and the MCP server answer today, from the read
-contract of viafrei-database 0.2.0. Every operation below is new since 0.2.
+contract of viafrei-database 0.3.0 (schema head 315). Every operation below
+is new since 0.2; the parity harness compares each one with the platform's
+own answers (bundle 2.6.22).
 
 ### Added
 
 * **access:** `getKey` (the presenting key), `listSources` (the sources a key may read: attribution, licence, freshness), `getPressure` (whether the service is saturated now).
 * **places:** `listPlaces`, `getPlaceOverview`, `getPlacesCoverage` (with each kind's newest load), `listAddresses`, `listPois`, `listNearby`, `describeLocation` (with the low-emission zone the position lies in).
 * **roads:** `listRoadConditions`, `getRoadSituation`, `listMotorways`, `getMotorwayConditions`, `listMotorwayParking`, `listStateRoadConditions`, `listSpeedCameras` (OpenStreetMap's cameras cut by Gemeinde as the platform cuts them), `listLorryRules`, `getDrivingRules`.
-* **energy:** `listFuelOptions`, `getFuelStation`, `listChargingOptions`, `getChargingSite`, `listHydrogenOptions`, `listParkingOptions`, `listSharingOptions`.
+* **energy:** `listFuelOptions`, `getFuelStation`, `listChargingOptions`, `getChargingSite`, `listHydrogenOptions`, `listParkingOptions`, `listParkingBays` (reserved and sensor bays near a position), `listSharingOptions`.
 * **transit:** `listStations`, `listStationDepartures` (platform changes as the platform states them), `listStationFacilities`, `listTransitDisruptions`, `listAffectedStations` (read from the contract's station disruption), `listStateServiceAlerts`.
 * **weather:** `getWeatherRisk`, `listStateWeatherWarnings`.
 * **composed:** `getNationalSummary` (Germany now), `getWatch` (a repeated read of a road, a place, a station, a region, the weather or a charger).
 * **live:** `createRefresh` and `getRefresh`, for keys of ViaFrei's own audience: a person's view asks for a refresh of one subject of a live source (`fuel-prices-de` by Gemeinde or point, `train-board-de` by EVA number or station name), keyed by the live source registry's key rules (`refresh.sources_file`); a request stores only the public id its key names: a point is resolved to its Gemeinde's AGS in memory, and one no Gemeinde answers is refused with 400 and nothing recorded; requests are kept 30 days after they were asked, in any state, pruned hourly; ids are decimal and an answer states `reused`; concurrent asks about one subject share one request, a request settled inside the source's freshness window answers at once, and the answer waits up to `refresh.wait` (1.2 s) on one listening connection per instance: 201 settled (`refreshed`, `none_due`, `refused`, `failed`) or 202 `pending` with its place in the queue. `getTrainBoard` serves the boards the live refresher stores. `testkit/fakelive` and `cmd/fakelive` settle refreshes by a script for tests and local runs.
+* **motorways:** each motorway of `listMotorways` states its lamp, and the catalogue credits the families its index credits.
+* **refreshes:** a motorway anchor is stored as `anchor:<BASt LCL code>` (digits only, at most six); `requested_by` names the own service that asked (`site`, `mcp`, or `dev` for any other own key), never anything about the person.
+
+### Changed
+
+* **database:** tests, the local stack and CI migrate with the signed viafrei-database 0.3.0 image (`database.pin`, by digest); this repository runs no DDL.
+* **sources:** own keys see unreviewed families listed in `listSources`; other keys do not.
+* **tests:** the performance package (`internal/perf`) runs alone (`-p 1`) after the other integration packages, into its own coverage profile; its budgets are unchanged.
+
+### Fixed
+
+* **places:** the name fold builds its diacritics chain per call; one chain shared by concurrent requests panicked.
+* **roads:** a road the register does not hold answers its situations and what was read, never 404; a weather warning is on a motorway when its area holds one of the road's junctions.
+* **http:** `/healthz` and `/readyz` stay on the public listener as deprecated aliases.
 
 ## [0.2.1](https://github.com/mavrovde/viafrei-api/compare/v0.2.0...v0.2.1) (2026-11-08)
 

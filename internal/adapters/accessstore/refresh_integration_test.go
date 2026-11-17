@@ -244,7 +244,11 @@ func TestConcurrentAsksShareOneRefresh(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := range n {
 		wg.Go(func() {
-			answers[i], errs[i] = s.Request(ctx, ask(board, "8000207", ids[i]), time.Time{}, 1200*time.Millisecond)
+			// The wait is not what is tested here (TestAnOpenRefreshAnswersPendingAtTheDeadline
+			// is): 5 s keeps the sharing check off the fake's connection set-up
+			// under a loaded machine, where 500 ms of script plus two fresh
+			// connections overran 1.2 s.
+			answers[i], errs[i] = s.Request(ctx, ask(board, "8000207", ids[i]), time.Time{}, 5*time.Second)
 		})
 	}
 	wg.Wait()

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -68,7 +69,7 @@ func ask(source, key, keyID string) refresh.New {
 	if source == board {
 		field = "eva"
 	}
-	return refresh.New{Source: source, Subject: map[string]any{field: key}, SubjectKey: key, KeyID: keyID, At: refreshAt}
+	return refresh.New{Source: source, Subject: map[string]any{field: key}, SubjectKey: key, KeyID: keyID, RequestedBy: "site", At: refreshAt}
 }
 
 func TestARefreshSettlesByTheFakeAndAnswersItsAskers(t *testing.T) {
@@ -104,6 +105,12 @@ func TestARefreshSettlesByTheFakeAndAnswersItsAskers(t *testing.T) {
 	var ticks int
 	if err := owner(t).QueryRow(ctx, `select count(*) from public.fuel_prices where observed_at = $1`, refreshAt).Scan(&ticks); err != nil || ticks == 0 {
 		t.Fatalf("no ticks written: %d %v", ticks, err)
+	}
+	// Each request names the own service that asked, the key's plan
+	// (privacy ruling: which of our own services made it, nothing more).
+	var doors []string
+	if err := owner(t).QueryRow(ctx, `select array_agg(distinct coalesce(requested_by, '-')) from live.refresh_requests`).Scan(&doors); err != nil || !slices.Equal(doors, []string{"site"}) {
+		t.Fatalf("requested_by: %v %v", doors, err)
 	}
 
 	// A refresh the key did not ask for, an id of none and an id that is

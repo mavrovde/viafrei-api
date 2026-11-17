@@ -177,3 +177,26 @@ func TestLookupResolvesAPositionToItsGemeinde(t *testing.T) {
 		}
 	}
 }
+
+// The anchor lookup resolves a motorway page's anchor, "lat,lon", to the
+// BASt LCL location code of the motorway point it lies on (lead ruling 1 of
+// 2026-11-17): the nearest LCL junction within 15 m; a position farther from
+// every one, a malformed one and one out of range resolve nothing.
+func TestLookupResolvesAnAnchorToItsLCLCode(t *testing.T) {
+	st := seeded(t)
+	var id string
+	var lat, lon float64
+	owner(t, `select junction_id, st_y(location), st_x(location) from contract.junction
+		where source_ref = 'bast_lcl' and location is not null order by junction_id limit 1`, &id, &lat, &lon)
+	code := id[strings.LastIndex(id, ":")+1:]
+	at := strconv.FormatFloat(lat, 'f', 4, 64) + "," + strconv.FormatFloat(lon, 'f', 4, 64)
+	if got, err := st.Lookup(bounded(t), store.LookupAnchor, at); err != nil || got != code {
+		t.Fatalf("%s: %q %v, want %s", at, got, err, code)
+	}
+	far := strconv.FormatFloat(lat+0.001, 'f', 4, 64) + "," + strconv.FormatFloat(lon, 'f', 4, 64)
+	for _, v := range []string{far, "0,0", "48.1", "x,y", "91,10", ""} {
+		if got, err := st.Lookup(bounded(t), store.LookupAnchor, v); err != nil || got != "" {
+			t.Errorf("%q: %q %v", v, got, err)
+		}
+	}
+}

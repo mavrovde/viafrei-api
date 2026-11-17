@@ -20,7 +20,25 @@ const (
 	LookupStationEVA = "eva"
 	// LookupAGS resolves a position, "lat,lon", to the AGS of its Gemeinde.
 	LookupAGS = "ags"
+	// LookupAnchor resolves a motorway page's anchor, "lat,lon", to the BASt
+	// LCL location code of the motorway point it lies on.
+	LookupAnchor = "anchor"
+	// AnchorMatchM is how near a motorway point an anchor must lie, as the
+	// platform tests it (ANCHOR_MATCH_M): a page rounds its anchor to four
+	// decimals, under 7 m; 15 m leaves room for the view's own rounding.
+	AnchorMatchM = 15
 )
+
+// motorwayAnchor reads the BASt LCL location code (the last part of the
+// junction id, country:table:code) of the motorway point of the LCL nearest
+// the position ($1 lon, $2 lat) within $3 m, a tie broken by id: the public id
+// a motorway page's anchor is stored as (lead ruling 2026-11-17).
+var motorwayAnchor = `select split_part(j.junction_id, ':', 3) from contract.junction j
+where j.source_ref = 'bast_lcl' and j.location is not null and ` + permitted("j") + `
+  and split_part(j.junction_id, ':', 3) ~ '^[0-9]{1,8}$'
+  and st_dwithin(j.location::geography, st_setsrid(st_makepoint($1, $2), 4326)::geography, $3)
+order by j.location::geography <-> st_setsrid(st_makepoint($1, $2), 4326)::geography, j.junction_id
+limit 1`
 
 // stationEVA reads the EVA number of the railway station whose folded name
 // is $1, else the shortest whose folded name starts with it.
@@ -62,6 +80,12 @@ func (s *Store) Lookup(ctx context.Context, name, value string) (string, error) 
 			return "", nil
 		}
 		sql, args = gemeindeAGS, []any{lon, lat, places.MunicipalityReachM}
+	case LookupAnchor:
+		lat, lon, ok := position(value)
+		if !ok {
+			return "", nil
+		}
+		sql, args = motorwayAnchor, []any{lon, lat, AnchorMatchM}
 	default:
 		return "", fmt.Errorf("store: no lookup %q", name)
 	}

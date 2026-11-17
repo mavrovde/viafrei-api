@@ -50,8 +50,18 @@ var ErrNoRefreshes = errors.New("features: on-demand refreshes are not configure
 // its Gemeinde (refresh.Lookup).
 const LookupAGS = "ags"
 
+// LookupAnchor is the lookup that resolves a motorway page's anchor, "lat,lon",
+// to the BASt LCL location code of the motorway point it lies on, "" when
+// none lies near enough to be one (15 m, as the platform tests it: a page
+// rounds its anchor to four decimals, under 7 m, far below any Gemeinde).
+const LookupAnchor = "anchor"
+
 // point is a subject value naming a position.
 var point = regexp.MustCompile(`^pt:(-?[0-9]{1,3}(?:\.[0-9]+)?),(-?[0-9]{1,3}(?:\.[0-9]+)?)$`)
+
+// anchorPoint is a motorway page's anchor by its own shape, as the platform
+// reads it: a position of at most four decimals.
+var anchorPoint = regexp.MustCompile(`^pt:-?[0-9]{1,2}\.[0-9]{1,4},-?[0-9]{1,3}\.[0-9]{1,4}$`)
 
 // Refreshes is what the on-demand refreshes (G8) run on.
 type Refreshes struct {
@@ -78,10 +88,13 @@ func (s *Service) WithRefreshes(r Refreshes) *Service {
 // everyone asking about the same subject while it is open, and a refresh
 // settled inside the source's freshness window answers without a new one.
 //
-// A position in the subject is resolved in memory to the AGS of its
-// Gemeinde before the subject is keyed, and only the public id the key
-// names is stored (the data-steward's privacy ruling): a position no
-// Gemeinde answers is refused, and nothing is recorded.
+// A position in the subject is resolved in memory before the subject is
+// keyed, and only the public id the key names is stored (the data-steward's
+// privacy ruling, lead ruling 1 of 2026-11-17): a motorway page's anchor
+// (anchor true) to the BASt LCL code of the motorway point it lies on
+// (anchor:<code>), any other position, and an anchor on no motorway point, to
+// the AGS of its Gemeinde. A position no Gemeinde answers is refused, and
+// nothing is recorded.
 func (s *Service) RequestRefresh(ctx context.Context, key access.Record, a refresh.Ask) (refresh.Request, error) {
 	r, err := s.refreshesFor(key)
 	if err != nil {
@@ -111,19 +124,32 @@ func (s *Service) RequestRefresh(ctx context.Context, key access.Record, a refre
 	if wait == 0 {
 		wait = r.Wait
 	}
-	return r.Store.Request(ctx, refresh.New{Source: a.Source, Subject: stored, SubjectKey: subjectKey, KeyID: key.ID, At: now}, since, wait)
+	return r.Store.Request(ctx, refresh.New{Source: a.Source, Subject: stored, SubjectKey: subjectKey, KeyID: key.ID, RequestedBy: key.Plan.Name, At: now}, since, wait)
 }
 
 // resolvePoints is the subject with each position (pt:lat,lon) replaced by
-// the AGS of its Gemeinde (ags:<8 digits>); the position is never kept.
+// its public id: the BASt LCL code of the motorway point an anchor lies on
+// (anchor:<code>), else the AGS of its Gemeinde (ags:<8 digits>); the
+// position is never kept.
 func (r *Refreshes) resolvePoints(ctx context.Context, subject map[string]any) (map[string]any, error) {
 	out := make(map[string]any, len(subject))
+	anchor := subject["anchor"] == true
 	for field, v := range subject {
 		out[field] = v
 		str, _ := v.(string)
 		m := point.FindStringSubmatch(str)
 		if m == nil {
 			continue
+		}
+		if anchor && r.Lookup != nil && anchorPoint.MatchString(str) {
+			code, err := r.Lookup(ctx, LookupAnchor, m[1]+","+m[2])
+			if err != nil {
+				return nil, err
+			}
+			if code != "" {
+				out[field] = "anchor:" + code
+				continue
+			}
 		}
 		ags := ""
 		if r.Lookup != nil {

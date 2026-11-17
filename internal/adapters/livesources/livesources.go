@@ -32,9 +32,10 @@
 //
 // The stored subject holds public ids only (the data-steward's privacy
 // ruling): it is the one-field subject a case keys to the key itself (at
-// ags:<AGS> for fuel, eva for a train board). A key no such case gives back
-// (a cell, an anchor) is refused, and a position is resolved to its Gemeinde
-// before it is keyed (features), so it never reaches the store.
+// ags:<AGS> or anchor:<BASt LCL code> for fuel, eva for a train board). A key
+// no such case gives back (a cell) is refused, and a position is resolved to
+// its Gemeinde, or a motorway anchor to the LCL code of its point, before it
+// is keyed (features), so it never reaches the store.
 package livesources
 
 import (

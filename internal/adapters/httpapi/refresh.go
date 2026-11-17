@@ -22,7 +22,7 @@ import (
 // RefreshIn is a refresh ask.
 type RefreshIn struct {
 	Source  string         `json:"source" minLength:"1" maxLength:"64" example:"fuel-prices-de" doc:"The live source: an id of the instance's registry (refresh.sources_file, the live refresher's registry), fuel-prices-de and train-board-de on ViaFrei's own."`
-	Subject map[string]any `json:"subject" example:"{\"at\":\"ags:09162000\"}" doc:"What to refresh, as the source's registered JSON Schema admits it: fuel-prices-de takes at (ags:<8 digits> or pt:lat,lon) with snap or anchor; train-board-de takes eva or name, exactly one. Only a public id is stored: a position is resolved, in memory, to the AGS of its Gemeinde, and a station's name to its EVA number; neither the position nor the name is kept or echoed."`
+	Subject map[string]any `json:"subject" example:"{\"at\":\"ags:09162000\"}" doc:"What to refresh, as the source's registered JSON Schema admits it: fuel-prices-de takes at (ags:<8 digits> or pt:lat,lon) with snap or anchor; train-board-de takes eva or name, exactly one. Only a public id is stored: a position is resolved, in memory, to the AGS of its Gemeinde (a motorway page's anchor, with anchor true, to the BASt LCL code of the motorway point it lies on, anchor:<code>), and a station's name to its EVA number; neither the position nor the name is kept or echoed."`
 }
 
 // RefreshInput is the input of createRefresh.

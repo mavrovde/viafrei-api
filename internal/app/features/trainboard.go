@@ -17,40 +17,8 @@ type TrainBoards interface {
 	TrainBoard(ctx context.Context, eva string, families []string) (*transit.TrainBoard, error)
 }
 
-// TrainBoardWriter appends a board the MCP server fetched live.
-type TrainBoardWriter interface {
-	// AppendTrainBoard appends one row per departure of b.
-	AppendTrainBoard(ctx context.Context, b transit.TrainBoard) error
-}
-
-// ErrOwnKeyOnly refuses a write or an ask by a key that is not one of
-// ViaFrei's own.
+// ErrOwnKeyOnly refuses an ask by a key that is not one of ViaFrei's own.
 var ErrOwnKeyOnly = errors.New("features: only ViaFrei's own keys may call this operation")
-
-// ErrNoWriter is the answer when no writer is configured.
-var ErrNoWriter = errors.New("features: recording boards is not configured")
-
-// WithTrainBoardWriter sets the writer recorded boards are appended with.
-func (s *Service) WithTrainBoardWriter(w TrainBoardWriter) *Service {
-	s.boardWriter = w
-	return s
-}
-
-// RecordTrainBoard appends b, a board the MCP server fetched live from DB
-// Timetables, after checking it. Only a key of audience own may record.
-func (s *Service) RecordTrainBoard(ctx context.Context, key access.Record, b transit.TrainBoard) error {
-	if key.Audience != access.AudienceOwn {
-		return ErrOwnKeyOnly
-	}
-	if s.boardWriter == nil {
-		return ErrNoWriter
-	}
-	if err := b.Validate(s.now()); err != nil {
-		return err
-	}
-	b.FetchedAt = b.FetchedAt.UTC()
-	return s.boardWriter.AppendTrainBoard(ctx, b)
-}
 
 // TrainBoardAnswer is a station's newest board while it is fresh: Board is
 // nil when none is stored or the newest is older than
@@ -63,7 +31,7 @@ type TrainBoardAnswer struct {
 }
 
 // TrainBoard answers a station's board as the MCP server shows it, from
-// the boards it recorded: DB Timetables alone, never a share-alike family.
+// the boards the live refresher stored: DB Timetables alone, never a share-alike family.
 func (s *Service) TrainBoard(ctx context.Context, key access.Record, eva string) (TrainBoardAnswer, error) {
 	now := s.now()
 	var asOf *time.Time

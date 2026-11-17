@@ -23,6 +23,7 @@ contract of viafrei-database 0.2.0. Every operation below is new since 0.2.
 * **transit:** `listStations`, `listStationDepartures` (platform changes as the platform states them), `listStationFacilities`, `listTransitDisruptions`, `listAffectedStations` (read from the contract's station disruption), `listStateServiceAlerts`.
 * **weather:** `getWeatherRisk`, `listStateWeatherWarnings`.
 * **composed:** `getNationalSummary` (Germany now), `getWatch` (a repeated read of a road, a place, a station, a region, the weather or a charger).
+* **live:** `createRefresh` and `getRefresh`, for keys of ViaFrei's own audience: a person's view asks for a refresh of one subject of a live source (`fuel` by Gemeinde or point, `train_board` by EVA number or station name), validated against the source's registered JSON Schema (`refresh.sources_file`); concurrent asks about one subject share one request, a request settled inside the source's freshness window answers at once, and the answer waits up to `refresh.wait` (1.2 s) on one listening connection per instance: 201 settled (`refreshed`, `none_due`, `refused`, `failed`) or 202 `pending` with its place in the queue. `getTrainBoard` serves the boards the live refresher stores. `testkit/fakelive` and `cmd/fakelive` settle refreshes by a script for tests and local runs.
 
 ## [0.2.1](https://github.com/mavrovde/viafrei-api/compare/v0.2.0...v0.2.1) (2026-11-08)
 

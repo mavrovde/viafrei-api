@@ -129,12 +129,6 @@ func serve(environ []string, stderr io.Writer) int {
 		Versions:  st,
 	}
 
-	// The fuel refresh asks go to the refresher that holds the provider key.
-	if svc, ok := deps.Features.(*features.Service); ok {
-		if r := wire.FuelRefresher(cfg); r != nil {
-			svc.WithFuelRefresher(r)
-		}
-	}
 	if cfg.Access.URL.IsSet() {
 		as, err := accessstore.Open(ctx, cfg)
 		if err != nil {
@@ -145,9 +139,15 @@ func serve(environ []string, stderr io.Writer) int {
 		authn := auth.New(wire.AuthSettings(cfg), as, nil)
 		go authn.Run(ctx)
 		deps.Auth = authn
-		// The API's writer role appends the boards the MCP server fetched.
+		// The on-demand refreshes are recorded in the access store, for the
+		// live refresher to claim and settle.
 		if svc, ok := deps.Features.(*features.Service); ok {
-			svc.WithTrainBoardWriter(as)
+			r, err := wire.Refreshes(cfg, as, st.Lookup)
+			if err != nil {
+				fmt.Fprintln(stderr, err)
+				return config.ExitCode
+			}
+			svc.WithRefreshes(r)
 		}
 		deps.Keys = ratelimit.NewKeyLimiter(wire.QuotaZone(cfg), as, nil)
 		meter := metering.New(wire.MeteringSettings(cfg), as, nil)

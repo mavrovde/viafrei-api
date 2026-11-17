@@ -1,0 +1,126 @@
+{
+  "sources": {
+    "fuel": {
+      "description": "The fuel prices about an area a person is viewing, as the site's fuel card asks them: a Gemeinde's AGS or a point inside Germany; snap answers the point as its nearest Gemeinde's centroid, anchor says it is a motorway page's public anchor.",
+      "subject": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^(ags:[0-9]{8}|pt:-?[0-9]{1,2}(\\.[0-9]{1,6})?,-?[0-9]{1,3}(\\.[0-9]{1,6})?)$",
+            "description": "ags:<8 digits> or pt:lat,lon of at most six decimals."
+          },
+          "snap": {
+            "type": "boolean"
+          },
+          "anchor": {
+            "type": "boolean"
+          }
+        },
+        "not": {
+          "type": "object",
+          "required": [
+            "snap",
+            "anchor"
+          ],
+          "properties": {
+            "snap": {
+              "type": "boolean",
+              "enum": [
+                true
+              ]
+            },
+            "anchor": {
+              "type": "boolean",
+              "enum": [
+                true
+              ]
+            }
+          }
+        }
+      },
+      "key": [
+        {
+          "field": "at",
+          "match": "^(ags:[0-9]{8})$"
+        },
+        {
+          "field": "at",
+          "match": "^pt:(-?[0-9.]+),(-?[0-9.]+)$",
+          "grid": [
+            0.005,
+            0.0075
+          ],
+          "prefix": "pt:"
+        }
+      ],
+      "flags": [
+        "snap",
+        "anchor"
+      ],
+      "fresh_for": "5m"
+    },
+    "train_board": {
+      "description": "A station's DB Timetables departure board, as the MCP server asks it before it reads getTrainBoard: by the station's EVA number or by its name, exactly one.",
+      "subject": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eva": {
+            "type": "string",
+            "pattern": "^[0-9]{7}$",
+            "description": "The station's seven-digit EVA number."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 80,
+            "pattern": "^\\S(.*\\S)?$",
+            "description": "The station's name, as a person writes it."
+          }
+        },
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "eva"
+            ],
+            "properties": {
+              "eva": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "key": [
+        {
+          "field": "eva",
+          "prefix": "eva:"
+        },
+        {
+          "field": "name",
+          "lookup": "station_eva",
+          "prefix": "eva:"
+        }
+      ],
+      "fresh_for": "30s"
+    }
+  }
+}

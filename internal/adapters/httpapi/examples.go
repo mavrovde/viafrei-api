@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -99,7 +100,34 @@ func documentExamples(oapi *huma.OpenAPI, base string) error {
 					"example": {Summary: e.Title, Value: e.Response},
 				}
 			}
+			if err := documentVariants(op, examples); err != nil {
+				return err
+			}
 		}
+	}
+	return nil
+}
+
+// documentVariants attaches an operation's variant examples,
+// examples/<operationId>.<variant>.json, to the responses of their statuses
+// as examples named by the variant: one per outcome a mock should serve.
+func documentVariants(op *huma.Operation, examples map[string]api.Example) error {
+	prefix := op.OperationID + "."
+	for _, id := range slices.Sorted(maps.Keys(examples)) {
+		variant, ok := strings.CutPrefix(id, prefix)
+		if !ok {
+			continue
+		}
+		e := examples[id]
+		resp := op.Responses[strconv.Itoa(e.Status)]
+		if resp == nil || resp.Content["application/json"] == nil {
+			return fmt.Errorf("examples/%s.json: status %d is not documented as application/json for %s", id, e.Status, op.OperationID)
+		}
+		mt := resp.Content["application/json"]
+		if mt.Examples == nil {
+			mt.Examples = map[string]*huma.Example{}
+		}
+		mt.Examples[variant] = &huma.Example{Summary: e.Title, Value: e.Response}
 	}
 	return nil
 }

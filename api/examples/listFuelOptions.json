@@ -29,9 +29,9 @@
           {
             "fuel": "e10",
             "priceEur": 1.633,
-            "reportedAt": "2026-03-29T15:24:44Z",
-            "reportedAtLocal": "2026-03-29T17:24:44+02:00",
-            "current": false
+            "reportedAt": "2026-03-30T00:00:00Z",
+            "reportedAtLocal": "2026-03-30T02:00:00+02:00",
+            "current": true
           }
         ],
         "sourceFamily": "tankerkoenig_gamma"

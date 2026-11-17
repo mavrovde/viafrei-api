@@ -181,7 +181,7 @@
             ]
           },
           "eva": {
-            "description": "The railway's main station number (EVA, DB StaDa), as getTrainBoard and recordTrainBoard take it; null for a stop that is no DB station.",
+            "description": "The railway's main station number (EVA, DB StaDa), as getTrainBoard and the train_board live refresh take it; null for a stop that is no DB station.",
             "examples": [
               "8011160"
             ],
@@ -2071,152 +2071,6 @@
           "droppedClosed",
           "droppedUnknown",
           "droppedNotWholeDay"
-        ],
-        "type": "object"
-      },
-      "FuelRefreshData": {
-        "additionalProperties": false,
-        "properties": {
-          "queue": {
-            "additionalProperties": false,
-            "description": "On pending, where the ask stands in the queue of person asks; null otherwise or when the refresher did not say.",
-            "properties": {
-              "etaSeconds": {
-                "description": "About how long until it starts, in whole seconds (rounded up).",
-                "format": "int64",
-                "minimum": 0,
-                "type": "integer"
-              },
-              "position": {
-                "description": "1 is next; 0 while it runs.",
-                "format": "int64",
-                "minimum": 0,
-                "type": "integer"
-              }
-            },
-            "required": [
-              "position",
-              "etaSeconds"
-            ],
-            "type": [
-              "object",
-              "null"
-            ]
-          },
-          "reason": {
-            "description": "Why a refusal was made, when known: refresh not configured on an instance with no refresher.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "reused": {
-            "description": "The answer is the area's remembered outcome: no request or read was made.",
-            "type": "boolean"
-          },
-          "settledAt": {
-            "description": "When the ask settled; null while it has not.",
-            "format": "date-time",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "state": {
-            "description": "refreshed: the prices were refreshed (settledAt says when; read the fuel answer again). pending: queued or running, its rows stored when it settles (queue, when given, says where; ask again later). failed: the provider did not answer. paused: refreshing is paused. none_due: every price of the area is inside its cache window. refused: no refresh is made (reason, when given, says why).",
-            "enum": [
-              "refreshed",
-              "pending",
-              "failed",
-              "paused",
-              "none_due",
-              "refused"
-            ],
-            "type": "string"
-          }
-        },
-        "required": [
-          "state",
-          "settledAt",
-          "reused",
-          "queue",
-          "reason"
-        ],
-        "type": "object"
-      },
-      "FuelRefreshEnvelope": {
-        "additionalProperties": false,
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/FuelRefreshData"
-          },
-          "links": {
-            "$ref": "#/components/schemas/Links"
-          },
-          "meta": {
-            "$ref": "#/components/schemas/FuelRefreshMeta"
-          }
-        },
-        "required": [
-          "data",
-          "meta",
-          "links"
-        ],
-        "type": "object"
-      },
-      "FuelRefreshIn": {
-        "additionalProperties": false,
-        "properties": {
-          "anchor": {
-            "description": "The point is a motorway page's public anchor, refreshed about as it is; default false. Not with snap.",
-            "examples": [
-              false
-            ],
-            "type": "boolean"
-          },
-          "at": {
-            "description": "The area: a Gemeinde's eight-digit AGS (ags:09162000) or a point inside Germany of at most six decimals (pt:48.137,11.575).",
-            "examples": [
-              "ags:09162000"
-            ],
-            "maxLength": 40,
-            "pattern": "^(ags:[0-9]{8}|pt:-?[0-9]{1,2}(\\.[0-9]{1,6})?,-?[0-9]{1,3}(\\.[0-9]{1,6})?)$",
-            "type": "string"
-          },
-          "snap": {
-            "description": "Answer the point as its nearest Gemeinde's centroid, as a place card is built; default false. Not with anchor.",
-            "examples": [
-              false
-            ],
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "at"
-        ],
-        "type": "object"
-      },
-      "FuelRefreshMeta": {
-        "additionalProperties": false,
-        "properties": {
-          "generatedAt": {
-            "description": "When the service produced this body.",
-            "format": "date-time",
-            "type": "string"
-          },
-          "language": {
-            "description": "The language of the texts in data (BCP 47).",
-            "type": "string"
-          },
-          "requestId": {
-            "description": "The request id, equal to the X-Request-Id header.",
-            "type": "string"
-          }
-        },
-        "required": [
-          "requestId",
-          "generatedAt",
-          "language"
         ],
         "type": "object"
       },
@@ -5696,6 +5550,128 @@
         ],
         "type": "object"
       },
+      "RefreshData": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "description": "When the first asker asked.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "The refresh's id: GET /v1/refreshes/{id} reads it again.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "queue": {
+            "additionalProperties": false,
+            "description": "While pending, where it stands; null once settled.",
+            "properties": {
+              "position": {
+                "description": "1 is next; 0 while it runs.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "position"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "reason": {
+            "description": "Why it was refused or failed, when known.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "settledAt": {
+            "description": "When it settled; null while pending.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "type": "string"
+          },
+          "state": {
+            "description": "pending: queued or running (queue says where; read it again). refreshed: the subject was refreshed, and its data is served fresh under the source's resources. none_due: its stored data was inside its cache window, so none was needed. refused: no refresh was made (reason, when known, says why). failed: the provider did not answer.",
+            "enum": [
+              "pending",
+              "refreshed",
+              "none_due",
+              "refused",
+              "failed"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "state",
+          "createdAt",
+          "settledAt",
+          "reason",
+          "queue"
+        ],
+        "type": "object"
+      },
+      "RefreshEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RefreshData"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "RefreshIn": {
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "description": "The live source: a name of the instance's registry (refresh.sources_file), fuel and train_board on ViaFrei's own.",
+            "examples": [
+              "fuel"
+            ],
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          },
+          "subject": {
+            "additionalProperties": {},
+            "description": "What to refresh, as the source's registered JSON Schema admits it: fuel takes at (ags:\u003c8 digits\u003e or pt:lat,lon) with snap or anchor; train_board takes eva or name, exactly one.",
+            "examples": [
+              {
+                "at": "ags:09162000"
+              }
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "source",
+          "subject"
+        ],
+        "type": "object"
+      },
       "ResponseMeta": {
         "additionalProperties": false,
         "properties": {
@@ -7110,7 +7086,7 @@
             ]
           },
           "eva": {
-            "description": "The railway's main station number (EVA, DB StaDa), as getTrainBoard and recordTrainBoard take it; null for a stop that is no DB station.",
+            "description": "The railway's main station number (EVA, DB StaDa), as getTrainBoard and the train_board live refresh take it; null for a stop that is no DB station.",
             "examples": [
               "8011160"
             ],
@@ -7651,92 +7627,6 @@
         ],
         "type": "object"
       },
-      "TrainBoardDepartureIn": {
-        "additionalProperties": false,
-        "properties": {
-          "cancelled": {
-            "description": "Whether the board stated the departure cancelled; default false.",
-            "examples": [
-              false
-            ],
-            "type": "boolean"
-          },
-          "category": {
-            "description": "The train category (ICE, RE, S).",
-            "examples": [
-              "ICE"
-            ],
-            "maxLength": 16,
-            "minLength": 1,
-            "type": "string"
-          },
-          "changedAt": {
-            "description": "The changed departure time the board stated; absent when none.",
-            "examples": [
-              "2026-11-17T15:47:00Z"
-            ],
-            "format": "date-time",
-            "type": "string"
-          },
-          "changedPlatform": {
-            "description": "The changed platform the board stated; absent when none.",
-            "examples": [
-              "7"
-            ],
-            "maxLength": 16,
-            "minLength": 1,
-            "type": "string"
-          },
-          "destination": {
-            "description": "The final destination as the board names it.",
-            "examples": [
-              "München Hbf"
-            ],
-            "maxLength": 120,
-            "minLength": 1,
-            "type": "string"
-          },
-          "line": {
-            "description": "The line, when the board names one.",
-            "examples": [
-              "ICE 571"
-            ],
-            "maxLength": 32,
-            "minLength": 1,
-            "type": "string"
-          },
-          "number": {
-            "description": "The train number.",
-            "examples": [
-              "571"
-            ],
-            "maxLength": 16,
-            "minLength": 1,
-            "type": "string"
-          },
-          "plannedAt": {
-            "description": "The planned departure time (RFC 3339).",
-            "examples": [
-              "2026-11-17T15:42:00Z"
-            ],
-            "format": "date-time",
-            "type": "string"
-          },
-          "platform": {
-            "description": "The planned platform.",
-            "examples": [
-              "5"
-            ],
-            "maxLength": 16,
-            "minLength": 1,
-            "type": "string"
-          }
-        },
-        "required": [
-          "plannedAt"
-        ],
-        "type": "object"
-      },
       "TrainBoardEnvelope": {
         "additionalProperties": false,
         "properties": {
@@ -7754,41 +7644,6 @@
           "data",
           "meta",
           "links"
-        ],
-        "type": "object"
-      },
-      "TrainBoardIn": {
-        "additionalProperties": false,
-        "properties": {
-          "departures": {
-            "description": "The board's departures, at most 120; empty when the board listed none.",
-            "items": {
-              "$ref": "#/components/schemas/TrainBoardDepartureIn"
-            },
-            "maxItems": 120,
-            "type": "array"
-          },
-          "eva": {
-            "description": "The station's EVA number the board was fetched for.",
-            "examples": [
-              "8000105"
-            ],
-            "pattern": "^[0-9]{7}$",
-            "type": "string"
-          },
-          "fetchedAt": {
-            "description": "When the board was fetched from DB Timetables (RFC 3339); within the last day, not in the future.",
-            "examples": [
-              "2026-11-17T15:30:12Z"
-            ],
-            "format": "date-time",
-            "type": "string"
-          }
-        },
-        "required": [
-          "eva",
-          "fetchedAt",
-          "departures"
         ],
         "type": "object"
       },
@@ -10896,9 +10751,9 @@
                             {
                               "fuel": "e10",
                               "priceEur": 1.633,
-                              "reportedAt": "2026-03-29T15:24:44Z",
-                              "reportedAtLocal": "2026-03-29T17:24:44+02:00",
-                              "current": false
+                              "reportedAt": "2026-03-30T00:00:00Z",
+                              "reportedAtLocal": "2026-03-30T02:00:00+02:00",
+                              "current": true
                             }
                           ],
                           "sourceFamily": "tankerkoenig_gamma"
@@ -11283,23 +11138,23 @@
                           {
                             "fuel": "diesel",
                             "priceEur": 1.799,
-                            "reportedAt": "2026-03-29T22:45:59Z",
-                            "reportedAtLocal": "2026-03-30T00:45:59+02:00",
-                            "current": false
+                            "reportedAt": "2026-03-30T00:00:00Z",
+                            "reportedAtLocal": "2026-03-30T02:00:00+02:00",
+                            "current": true
                           },
                           {
                             "fuel": "e10",
                             "priceEur": 1.633,
-                            "reportedAt": "2026-03-29T15:24:44Z",
-                            "reportedAtLocal": "2026-03-29T17:24:44+02:00",
-                            "current": false
+                            "reportedAt": "2026-03-30T00:00:00Z",
+                            "reportedAtLocal": "2026-03-30T02:00:00+02:00",
+                            "current": true
                           },
                           {
                             "fuel": "e5",
                             "priceEur": 2.062,
-                            "reportedAt": "2026-03-29T21:50:02Z",
-                            "reportedAtLocal": "2026-03-29T23:50:02+02:00",
-                            "current": false
+                            "reportedAt": "2026-03-30T00:00:00Z",
+                            "reportedAtLocal": "2026-03-30T02:00:00+02:00",
+                            "current": true
                           }
                         ],
                         "sourceFamily": "tankerkoenig_gamma"
@@ -11600,248 +11455,6 @@
         "x-required-scope": "energy"
       }
     },
-    "/v1/fuel-refresh": {
-      "post": {
-        "description": "Forwards one person's view of a fuel card to the refresher that holds the provider key, as the platform's site asks it today: the refresher refreshes the prices about the area under its own guards and stores them, and the fuel answers serve them. Only a key of ViaFrei's own audience may call it; any other key gets 403 (scope-denied). The refresher is given about 1.2 s (fuel.refresh_deadline): an ask it has not answered by then is pending. An instance with no refresher (fuel.refresh_url unset) answers refused with the reason refresh not configured. An area the refresher does not know (no such Gemeinde) is a 400 naming body.at; a refresher that cannot answer is a 503 (upstream-unavailable).",
-        "operationId": "requestFuelRefresh",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "example": {
-                "at": "ags:09162000"
-              },
-              "schema": {
-                "$ref": "#/components/schemas/FuelRefreshIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "examples": {
-                  "example": {
-                    "summary": "Refresh the fuel prices about a Gemeinde a person is viewing",
-                    "value": {
-                      "data": {
-                        "state": "refreshed",
-                        "settledAt": "2026-03-29T23:59:59Z",
-                        "reused": false,
-                        "queue": null,
-                        "reason": null
-                      },
-                      "meta": {
-                        "requestId": "example-request-0001",
-                        "generatedAt": "2026-03-30T00:00:00Z",
-                        "language": "en"
-                      },
-                      "links": {
-                        "self": "https://api.viafrei.de/v1/fuel-refresh"
-                      }
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/FuelRefreshEnvelope"
-                }
-              }
-            },
-            "description": "OK",
-            "headers": {
-              "Cache-Control": {
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "RateLimit": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "RateLimit-Policy": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "401": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "No key, or a key that is invalid, expired or revoked.",
-            "headers": {
-              "WWW-Authenticate": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "403": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
-            "headers": {
-              "RateLimit": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "RateLimit-Policy": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not used by this operation.",
-            "headers": {
-              "RateLimit": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "RateLimit-Policy": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "429": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
-            "headers": {
-              "RateLimit": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "RateLimit-Policy": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "Retry-After": {
-                "description": "Whole seconds to wait before retrying.",
-                "schema": {
-                  "type": "integer"
-                }
-              }
-            }
-          },
-          "503": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
-            "headers": {
-              "RateLimit": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "RateLimit-Policy": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "Retry-After": {
-                "schema": {
-                  "type": "integer"
-                }
-              }
-            }
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Error",
-            "headers": {
-              "RateLimit": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "RateLimit-Policy": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerKey": []
-          },
-          {
-            "headerKey": []
-          }
-        ],
-        "summary": "Refresh the fuel prices about an area on a person's view",
-        "tags": [
-          "energy"
-        ],
-        "x-attribution": "The refresh answers no data: the prices it stores are served by listFuelOptions and getFuelStation with the provider's attribution.",
-        "x-codeSamples": [
-          {
-            "lang": "Shell",
-            "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/fuel-refresh\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\" \\\n  -X POST \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"at\": \"ags:09162000\"\n  }'"
-          }
-        ],
-        "x-example-request": "/v1/fuel-refresh",
-        "x-required-scope": "energy"
-      }
-    },
     "/v1/germany": {
       "get": {
         "description": "The national picture the site's home tiles, its live map and its national pages state: road situations in force by kind and by Land, current fuel prices by grade, charging sites and points, parking sites by kind, station lifts and escalators by state, regional punctuality and weather warnings by level. Each part is read from the families of its domain the key may read, for every domain the key has the scope of (roads, energy, parking, transit, accessibility, weather); a domain whose families are all withheld is left out and named in meta.warnings.",
@@ -11912,23 +11525,37 @@
                         "fuel": [
                           {
                             "fuel": "diesel",
-                            "stations": 1,
-                            "cheapestEur": 1.68,
-                            "medianEur": 1.68,
+                            "stations": 48,
+                            "cheapestEur": 1.501,
+                            "medianEur": 1.8085,
                             "sourceFamily": "tankerkoenig_gamma"
                           },
                           {
                             "fuel": "e10",
-                            "stations": 2,
-                            "cheapestEur": 1.893,
-                            "medianEur": 2.0375,
+                            "stations": 48,
+                            "cheapestEur": 1.516,
+                            "medianEur": 1.8895,
                             "sourceFamily": "tankerkoenig_gamma"
                           },
                           {
                             "fuel": "e5",
-                            "stations": 1,
-                            "cheapestEur": 1.684,
-                            "medianEur": 1.684,
+                            "stations": 48,
+                            "cheapestEur": 1.543,
+                            "medianEur": 1.8405,
+                            "sourceFamily": "tankerkoenig_gamma"
+                          },
+                          {
+                            "fuel": "h2",
+                            "stations": 2,
+                            "cheapestEur": 13.803,
+                            "medianEur": 13.8045,
+                            "sourceFamily": "tankerkoenig_gamma"
+                          },
+                          {
+                            "fuel": "lpg",
+                            "stations": 12,
+                            "cheapestEur": 1.518,
+                            "medianEur": 1.7679999999999998,
                             "sourceFamily": "tankerkoenig_gamma"
                           }
                         ],
@@ -14447,7 +14074,7 @@
                           ]
                         },
                         "lamp": "amber",
-                        "lampReason": "warning",
+                        "lampReason": "weather_warning",
                         "coverage": null,
                         "situations": [
                           {
@@ -18538,6 +18165,778 @@
           }
         ],
         "x-example-request": "/v1/pressure"
+      }
+    },
+    "/v1/refreshes": {
+      "post": {
+        "description": "Records a refresh of one subject of a live source, as a person's view asks it (the fuel prices about an area, a station's train board): the live refresher refreshes it once for everyone asking about the same subject while it is open, under its own guards, and the source's resources then serve it. Only a key of ViaFrei's own audience may call it; any other key gets 403 (scope-denied). The answer waits about 1.2 s (refresh.wait) for the refresh to settle: settled, it is 201 with the outcome; still open, it is 202 with state pending and its place in the queue; either way Location names the refresh, which GET reads again. A refresh of the subject settled inside the source's freshness window answers at once, with no new refresh. An unknown source is a 400 naming body.source; a subject the source refuses is a 400 naming the field (body.subject.at, say). No provider data is ever in this answer.",
+        "operationId": "createRefresh",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "source": "fuel",
+                "subject": {
+                  "at": "ags:09162000"
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/RefreshIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "Refresh the fuel prices about a Gemeinde a person is viewing: refreshed",
+                    "value": {
+                      "data": {
+                        "id": "45efff05-510c-5f97-a727-c239a9efb87e",
+                        "source": "fuel",
+                        "state": "refreshed",
+                        "createdAt": "2026-03-30T00:00:00Z",
+                        "settledAt": "2026-03-30T00:00:00Z",
+                        "reason": null,
+                        "queue": null
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en"
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/refreshes/45efff05-510c-5f97-a727-c239a9efb87e"
+                      }
+                    }
+                  },
+                  "fuel-failed": {
+                    "summary": "The provider did not answer: failed",
+                    "value": {
+                      "data": {
+                        "id": "acb62300-933e-524d-ad08-a2e7ec22c71d",
+                        "source": "fuel",
+                        "state": "failed",
+                        "createdAt": "2026-03-30T00:00:00Z",
+                        "settledAt": "2026-03-30T00:00:00Z",
+                        "reason": "the provider did not answer",
+                        "queue": null
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en"
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/refreshes/acb62300-933e-524d-ad08-a2e7ec22c71d"
+                      }
+                    }
+                  },
+                  "fuel-none-due": {
+                    "summary": "Every fuel price of the area is inside its cache window: none_due",
+                    "value": {
+                      "data": {
+                        "id": "ac98580b-6326-5804-8ae5-9b7e3aaf828f",
+                        "source": "fuel",
+                        "state": "none_due",
+                        "createdAt": "2026-03-30T00:00:00Z",
+                        "settledAt": "2026-03-30T00:00:00Z",
+                        "reason": null,
+                        "queue": null
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en"
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/refreshes/ac98580b-6326-5804-8ae5-9b7e3aaf828f"
+                      }
+                    }
+                  },
+                  "fuel-point": {
+                    "summary": "Refresh the fuel prices about a point, snapped to its Gemeinde: refreshed",
+                    "value": {
+                      "data": {
+                        "id": "29dd685a-6829-59e2-b0b1-c5e8f569f91e",
+                        "source": "fuel",
+                        "state": "refreshed",
+                        "createdAt": "2026-03-30T00:00:00Z",
+                        "settledAt": "2026-03-30T00:00:00Z",
+                        "reason": null,
+                        "queue": null
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en"
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/refreshes/29dd685a-6829-59e2-b0b1-c5e8f569f91e"
+                      }
+                    }
+                  },
+                  "fuel-refused": {
+                    "summary": "The area's refresh cap is reached: refused, with the reason",
+                    "value": {
+                      "data": {
+                        "id": "ff9d3911-2951-5a1c-ac63-08e1f5e72eff",
+                        "source": "fuel",
+                        "state": "refused",
+                        "createdAt": "2026-03-30T00:00:00Z",
+                        "settledAt": "2026-03-30T00:00:00Z",
+                        "reason": "the hourly refresh cap of the area is reached",
+                        "queue": null
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en"
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/refreshes/ff9d3911-2951-5a1c-ac63-08e1f5e72eff"
+                      }
+                    }
+                  },
+                  "train-board": {
+                    "summary": "Refresh a station's train board by its EVA number: refreshed",
+                    "value": {
+                      "data": {
+                        "id": "741bb17e-d8b6-56cc-b27d-68e675c8db2a",
+                        "source": "train_board",
+                        "state": "refreshed",
+                        "createdAt": "2026-03-30T00:00:00Z",
+                        "settledAt": "2026-03-30T00:00:00Z",
+                        "reason": null,
+                        "queue": null
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en"
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/refreshes/741bb17e-d8b6-56cc-b27d-68e675c8db2a"
+                      }
+                    }
+                  },
+                  "train-board-by-name": {
+                    "summary": "Refresh a station's train board by its name, resolved to its EVA number: refreshed",
+                    "value": {
+                      "data": {
+                        "id": "741bb17e-d8b6-56cc-b27d-68e675c8db2a",
+                        "source": "train_board",
+                        "state": "refreshed",
+                        "createdAt": "2026-03-30T00:00:00Z",
+                        "settledAt": "2026-03-30T00:00:00Z",
+                        "reason": null,
+                        "queue": null
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en"
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/refreshes/741bb17e-d8b6-56cc-b27d-68e675c8db2a"
+                      }
+                    }
+                  },
+                  "train-board-none-due": {
+                    "summary": "The station's board is inside its cache window: none_due",
+                    "value": {
+                      "data": {
+                        "id": "a05be048-ad8f-50f7-a886-725338bcde93",
+                        "source": "train_board",
+                        "state": "none_due",
+                        "createdAt": "2026-03-30T00:00:00Z",
+                        "settledAt": "2026-03-30T00:00:00Z",
+                        "reason": null,
+                        "queue": null
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en"
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/refreshes/a05be048-ad8f-50f7-a886-725338bcde93"
+                      }
+                    }
+                  },
+                  "train-board-refused": {
+                    "summary": "No provider key: refused, with the reason",
+                    "value": {
+                      "data": {
+                        "id": "88d039c8-6f08-55ab-b43a-ecdfa28718de",
+                        "source": "train_board",
+                        "state": "refused",
+                        "createdAt": "2026-03-30T00:00:00Z",
+                        "settledAt": "2026-03-30T00:00:00Z",
+                        "reason": "no provider key",
+                        "queue": null
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en"
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/refreshes/88d039c8-6f08-55ab-b43a-ecdfa28718de"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshEnvelope"
+                }
+              }
+            },
+            "description": "The refresh settled: refreshed, none_due, refused or failed.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Location": {
+                "schema": {
+                  "description": "The refresh's own URL.",
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "fuel-pending": {
+                    "summary": "Not settled within the wait: 202 pending, with its place in the queue",
+                    "value": {
+                      "data": {
+                        "id": "ed5c8f44-f43f-5c72-838f-3846201e6ad5",
+                        "source": "fuel",
+                        "state": "pending",
+                        "createdAt": "2026-03-30T00:00:00Z",
+                        "settledAt": null,
+                        "reason": null,
+                        "queue": {
+                          "position": 1
+                        }
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en"
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/refreshes/ed5c8f44-f43f-5c72-838f-3846201e6ad5"
+                      }
+                    }
+                  },
+                  "train-board-pending": {
+                    "summary": "Not settled within the wait: 202 pending, behind the open ones",
+                    "value": {
+                      "data": {
+                        "id": "8134a06c-af6b-5560-ab7f-a7fd3458cf3f",
+                        "source": "train_board",
+                        "state": "pending",
+                        "createdAt": "2026-03-30T00:00:00Z",
+                        "settledAt": null,
+                        "reason": null,
+                        "queue": {
+                          "position": 1
+                        }
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en"
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/refreshes/8134a06c-af6b-5560-ab7f-a7fd3458cf3f"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshEnvelope"
+                }
+              }
+            },
+            "description": "The refresh is still open (pending): read it again at Location.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Location": {
+                "description": "The refresh's own URL.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not used by this operation.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "Ask for a refresh of a live source on a person's view",
+        "tags": [
+          "live"
+        ],
+        "x-attribution": "A refresh carries no data and no attribution: the data it refreshes is served, with its source's attribution, by that source's own resources (listFuelOptions and getFuelStation for fuel, getTrainBoard for train_board).",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/refreshes\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\" \\\n  -X POST \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"source\": \"fuel\",\n    \"subject\": {\n      \"at\": \"ags:09162000\"\n    }\n  }'"
+          }
+        ],
+        "x-example-request": "/v1/refreshes"
+      }
+    },
+    "/v1/refreshes/{id}": {
+      "get": {
+        "description": "A refresh this key asked for, as it now stands; a refresh of another key, or of no such id, is a 404. Only a key of ViaFrei's own audience may call it; any other key gets 403 (scope-denied). Refreshes are kept 30 days after they settle.",
+        "operationId": "getRefresh",
+        "parameters": [
+          {
+            "description": "The refresh's id, as createRefresh answered it.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "The refresh's id, as createRefresh answered it.",
+              "examples": [
+                "01968a3c-1f00-7000-8000-000000000001"
+              ],
+              "maxLength": 36,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "Read a refresh this key asked for again",
+                    "value": {
+                      "data": {
+                        "id": "45efff05-510c-5f97-a727-c239a9efb87e",
+                        "source": "fuel",
+                        "state": "refreshed",
+                        "createdAt": "2026-03-30T00:00:00Z",
+                        "settledAt": "2026-03-30T00:00:00Z",
+                        "reason": null,
+                        "queue": null
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en"
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/refreshes/45efff05-510c-5f97-a727-c239a9efb87e"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No refresh of this id was asked for by this key (not-found).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "Read a refresh",
+        "tags": [
+          "live"
+        ],
+        "x-attribution": "A refresh carries no data and no attribution: the data it refreshes is served, with its source's attribution, by that source's own resources (listFuelOptions and getFuelStation for fuel, getTrainBoard for train_board).",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/refreshes/45efff05-510c-5f97-a727-c239a9efb87e\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/refreshes/45efff05-510c-5f97-a727-c239a9efb87e"
       }
     },
     "/v1/road-conditions": {
@@ -23197,244 +23596,9 @@
         "x-required-scope": "transit"
       }
     },
-    "/v1/train-boards": {
-      "post": {
-        "description": "Appends one station's DB Timetables departure board as the MCP server fetched it live: one stored row per departure, kept as ticks, CC BY 4.0 with DB's attribution. Only a key of ViaFrei's own audience may call it; any other key gets 403 (scope-denied). A board breaking a rule gets 400 naming the field. Rate-limited per key like every keyed operation. Answers 204.",
-        "operationId": "recordTrainBoard",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "example": {
-                "eva": "8016001",
-                "fetchedAt": "2026-03-29T01:29:40Z",
-                "departures": [
-                  {
-                    "plannedAt": "2026-03-29T01:42:00Z",
-                    "changedAt": "2026-03-29T01:47:00Z",
-                    "platform": "5",
-                    "changedPlatform": "7",
-                    "category": "ICE",
-                    "number": "571",
-                    "line": "ICE 571",
-                    "destination": "München Hbf"
-                  },
-                  {
-                    "plannedAt": "2026-03-29T01:51:00Z",
-                    "platform": "13",
-                    "category": "RE",
-                    "number": "3311",
-                    "line": "RE 1",
-                    "destination": "Frankfurt (Oder)",
-                    "cancelled": true
-                  }
-                ]
-              },
-              "schema": {
-                "$ref": "#/components/schemas/TrainBoardIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "204": {
-            "description": "No Content",
-            "headers": {
-              "Cache-Control": {
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "RateLimit": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "RateLimit-Policy": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "401": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "No key, or a key that is invalid, expired or revoked.",
-            "headers": {
-              "WWW-Authenticate": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "403": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
-            "headers": {
-              "RateLimit": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "RateLimit-Policy": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not used by this operation.",
-            "headers": {
-              "RateLimit": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "RateLimit-Policy": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "429": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
-            "headers": {
-              "RateLimit": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "RateLimit-Policy": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "Retry-After": {
-                "description": "Whole seconds to wait before retrying.",
-                "schema": {
-                  "type": "integer"
-                }
-              }
-            }
-          },
-          "503": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
-            "headers": {
-              "RateLimit": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "RateLimit-Policy": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "Retry-After": {
-                "schema": {
-                  "type": "integer"
-                }
-              }
-            }
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Error",
-            "headers": {
-              "RateLimit": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "RateLimit-Policy": {
-                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerKey": []
-          },
-          {
-            "headerKey": []
-          }
-        ],
-        "summary": "Record a DB Timetables board the MCP server fetched",
-        "tags": [
-          "transit"
-        ],
-        "x-attribution": "The board is DB Timetables data (CC BY 4.0), stored with DB's attribution and answered by getTrainBoard with it; the request itself answers no data.",
-        "x-codeSamples": [
-          {
-            "lang": "Shell",
-            "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/train-boards\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\" \\\n  -X POST \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"eva\": \"8016001\",\n    \"fetchedAt\": \"2026-03-29T01:29:40Z\",\n    \"departures\": [\n      {\n        \"plannedAt\": \"2026-03-29T01:42:00Z\",\n        \"changedAt\": \"2026-03-29T01:47:00Z\",\n        \"platform\": \"5\",\n        \"changedPlatform\": \"7\",\n        \"category\": \"ICE\",\n        \"number\": \"571\",\n        \"line\": \"ICE 571\",\n        \"destination\": \"München Hbf\"\n      },\n      {\n        \"plannedAt\": \"2026-03-29T01:51:00Z\",\n        \"platform\": \"13\",\n        \"category\": \"RE\",\n        \"number\": \"3311\",\n        \"line\": \"RE 1\",\n        \"destination\": \"Frankfurt (Oder)\",\n        \"cancelled\": true\n      }\n    ]\n  }'"
-          }
-        ],
-        "x-example-request": "/v1/train-boards",
-        "x-required-scope": "transit"
-      }
-    },
     "/v1/train-boards/{eva}": {
       "get": {
-        "description": "The newest DB Timetables departure board the MCP server fetched for the station, while it was fetched no longer ago than the MCP server's own cache lifetime (30 s): DB Timetables alone, CC BY 4.0, never blended with a share-alike source. Without one, fresh is false and the answer states when the newest board held was fetched. Needs the scope transit.",
+        "description": "The newest DB Timetables departure board the live refresher fetched for the station, while it was fetched no longer ago than the MCP server's own cache lifetime (30 s): DB Timetables alone, CC BY 4.0, never blended with a share-alike source. Without one, fresh is false and the answer states when the newest board held was fetched. Needs the scope transit.",
         "operationId": "getTrainBoard",
         "parameters": [
           {
@@ -23476,47 +23640,19 @@
                       "data": {
                         "eva": "8001001",
                         "fresh": true,
-                        "fetchedAt": "2026-03-29T23:59:50Z",
-                        "ageSeconds": 10,
+                        "fetchedAt": "2026-03-30T00:00:00Z",
+                        "ageSeconds": 0,
                         "departures": [
                           {
                             "line": null,
                             "category": "ICE",
-                            "number": "571",
-                            "destination": "Schömpingbach",
-                            "plannedAt": "2026-03-30T00:03:50Z",
-                            "expectedAt": "2026-03-30T00:08:50Z",
-                            "delayMin": 5,
-                            "platform": "7",
-                            "plannedPlatform": "5",
-                            "platformChanged": true,
-                            "cancelled": false,
-                            "sourceFamily": "db_timetables"
-                          },
-                          {
-                            "line": "RE 1",
-                            "category": "RE",
-                            "number": "4713",
-                            "destination": "Schömpingbach",
-                            "plannedAt": "2026-03-30T00:11:50Z",
-                            "expectedAt": "2026-03-30T00:11:50Z",
+                            "number": "578",
+                            "destination": "Hamburg-Altona",
+                            "plannedAt": "2026-03-30T00:12:00Z",
+                            "expectedAt": "2026-03-30T00:12:00Z",
                             "delayMin": 0,
-                            "platform": "2",
-                            "plannedPlatform": "2",
-                            "platformChanged": false,
-                            "cancelled": true,
-                            "sourceFamily": "db_timetables"
-                          },
-                          {
-                            "line": "S 3",
-                            "category": "S",
-                            "number": null,
-                            "destination": "Schömpingbach",
-                            "plannedAt": "2026-03-30T00:19:50Z",
-                            "expectedAt": "2026-03-30T00:19:50Z",
-                            "delayMin": 0,
-                            "platform": null,
-                            "plannedPlatform": null,
+                            "platform": "4",
+                            "plannedPlatform": "4",
                             "platformChanged": false,
                             "cancelled": false,
                             "sourceFamily": "db_timetables"
@@ -23808,7 +23944,7 @@
         "tags": [
           "transit"
         ],
-        "x-attribution": "A train board is the DB Timetables board the MCP server last handed the API, of the transit domain's db_timetables source the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-attribution": "A train board is the DB Timetables board the live refresher last stored, of the transit domain's db_timetables source the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
         "x-codeSamples": [
           {
             "lang": "Shell",
@@ -25152,6 +25288,10 @@
     {
       "description": "Stations, their departures, lifts and escalators.",
       "name": "transit"
+    },
+    {
+      "description": "On-demand refreshes of live sources, for ViaFrei's own callers.",
+      "name": "live"
     }
   ]
 }

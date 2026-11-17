@@ -245,7 +245,7 @@ type Station struct {
 	Name         string   `json:"name"`
 	Location     Position `json:"location"`
 	StopCode     *string  `json:"stopCode" nullable:"true" doc:"The national stop code (DHID); null when none is recorded."`
-	Eva          *string  `json:"eva" nullable:"true" example:"8011160" doc:"The railway's main station number (EVA, DB StaDa), as getTrainBoard and recordTrainBoard take it; null for a stop that is no DB station."`
+	Eva          *string  `json:"eva" nullable:"true" example:"8011160" doc:"The railway's main station number (EVA, DB StaDa), as getTrainBoard and the train_board live refresh take it; null for a stop that is no DB station."`
 	EvaNumbers   []string `json:"evaNumbers" doc:"Every EVA number of the DB station, the main one first, each once; empty for a stop that is no DB station. A station of several parts (Berlin Hbf) files each part's trains under the part's own number, so a departure board of the station asks each."`
 	DistrictCode *string  `json:"districtCode" nullable:"true" doc:"The official code (AGS) of the district the station lies in; null when unknown."`
 	Modes        []string `json:"modes" doc:"The modes of transport that serve the station. Open enumeration (rail, sbahn, subway, tram, bus, ferry, other: rail is every train but the S-Bahn); treat an unknown value as other."`

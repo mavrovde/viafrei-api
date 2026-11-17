@@ -68,23 +68,37 @@
       "fuel": [
         {
           "fuel": "diesel",
-          "stations": 1,
-          "cheapestEur": 1.68,
-          "medianEur": 1.68,
+          "stations": 48,
+          "cheapestEur": 1.501,
+          "medianEur": 1.8085,
           "sourceFamily": "tankerkoenig_gamma"
         },
         {
           "fuel": "e10",
-          "stations": 2,
-          "cheapestEur": 1.893,
-          "medianEur": 2.0375,
+          "stations": 48,
+          "cheapestEur": 1.516,
+          "medianEur": 1.8895,
           "sourceFamily": "tankerkoenig_gamma"
         },
         {
           "fuel": "e5",
-          "stations": 1,
-          "cheapestEur": 1.684,
-          "medianEur": 1.684,
+          "stations": 48,
+          "cheapestEur": 1.543,
+          "medianEur": 1.8405,
+          "sourceFamily": "tankerkoenig_gamma"
+        },
+        {
+          "fuel": "h2",
+          "stations": 2,
+          "cheapestEur": 13.803,
+          "medianEur": 13.8045,
+          "sourceFamily": "tankerkoenig_gamma"
+        },
+        {
+          "fuel": "lpg",
+          "stations": 12,
+          "cheapestEur": 1.518,
+          "medianEur": 1.7679999999999998,
           "sourceFamily": "tankerkoenig_gamma"
         }
       ],

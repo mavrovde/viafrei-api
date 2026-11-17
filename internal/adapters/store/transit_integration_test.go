@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
@@ -124,5 +125,32 @@ func TestStationsStateTheirEVANumbers(t *testing.T) {
 		if s.ID != ss[0].ID && !strings.HasPrefix(s.ID, "1:de:09999:") && (s.EVA != nil || len(s.EVANumbers) != 0) {
 			t.Errorf("%s states numbers %v %v", s.ID, s.EVA, s.EVANumbers)
 		}
+	}
+}
+
+// The station_eva lookup a live source's key rule names resolves a
+// station's name to its EVA number: the exact folded name first, else the
+// shortest it starts; a name of none, a blank one and an unknown lookup
+// resolve nothing.
+func TestLookupResolvesAStationNameToItsEVA(t *testing.T) {
+	st := seeded(t)
+	fams := families(t, st, "transit")
+	main := fixtures.TrainBoardEVA("01")
+	ss, _, err := st.Stations(bounded(t), transit.Query{Code: main, Limit: 1}, fams)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("the board's station: %+v %v", ss, err)
+	}
+	for _, name := range []string{ss[0].Name, strings.ToUpper(ss[0].Name), ss[0].Name[:len(ss[0].Name)-1]} {
+		if eva, err := st.Lookup(bounded(t), store.LookupStationEVA, name); err != nil || eva != main {
+			t.Errorf("%q: %q %v", name, eva, err)
+		}
+	}
+	for _, name := range []string{"No such station anywhere", " ", ""} {
+		if eva, err := st.Lookup(bounded(t), store.LookupStationEVA, name); err != nil || eva != "" {
+			t.Errorf("%q: %q %v", name, eva, err)
+		}
+	}
+	if _, err := st.Lookup(bounded(t), "postcode_ags", "Berlin"); err == nil {
+		t.Error("an unknown lookup answered")
 	}
 }

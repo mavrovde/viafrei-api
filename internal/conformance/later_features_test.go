@@ -11,6 +11,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/parking"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
+	"github.com/mavrovde/viafrei-api/internal/domain/refresh"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
@@ -30,12 +31,12 @@ func (laterFeatures) Sharing(context.Context, access.Record, transit.SharingQuer
 	return features.SharingAnswer{}, nil
 }
 
-func (laterFeatures) RecordTrainBoard(context.Context, access.Record, transit.TrainBoard) error {
-	return nil
+func (laterFeatures) RequestRefresh(context.Context, access.Record, refresh.Ask) (refresh.Request, error) {
+	return refresh.Request{State: refresh.NoneDue}, nil
 }
 
-func (laterFeatures) FuelRefresh(context.Context, access.Record, energy.RefreshAsk) (energy.RefreshAnswer, error) {
-	return energy.RefreshAnswer{State: energy.RefreshNoneDue}, nil
+func (laterFeatures) Refresh(context.Context, access.Record, string) (refresh.Request, error) {
+	return refresh.Request{State: refresh.NoneDue}, nil
 }
 
 func (laterFeatures) TrainBoard(context.Context, access.Record, string) (features.TrainBoardAnswer, error) {

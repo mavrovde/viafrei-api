@@ -28,7 +28,7 @@
         ]
       },
       "lamp": "amber",
-      "lampReason": "warning",
+      "lampReason": "weather_warning",
       "coverage": null,
       "situations": [
         {

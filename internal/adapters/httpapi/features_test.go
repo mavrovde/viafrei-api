@@ -25,6 +25,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/parking"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
+	"github.com/mavrovde/viafrei-api/internal/domain/refresh"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
@@ -38,15 +39,14 @@ import (
 // records what it was asked.
 type fakeFeatures struct {
 	trainBoard features.TrainBoardAnswer
-	refresh    energy.RefreshAnswer
+	refresh    refresh.Request
 	refreshErr error
-	gotRefresh energy.RefreshAsk
-	gotTrain   transit.TrainBoard
+	gotRefresh refresh.Ask
+	gotRefID   string
 	gotEVA     string
 	gotLang    string
 	bays       features.BaysAnswer
 	gotBays    parking.BayQuery
-	boardErr   error
 	objects    objectsFake
 	states     statesFake
 	charging   features.Answer[energy.Site]
@@ -181,7 +181,7 @@ func overviewAnswer() features.Overview {
 
 func everyAnswer() *fakeFeatures {
 	return &fakeFeatures{charging: chargingAnswer(), parking: parkingAnswer(), overview: overviewAnswer(), conditions: conditionsAnswer(), situation: situationAnswer(), risk: riskAnswer(), topic: topicAnswer(), stations: stationsAnswer(),
-		refresh: energy.RefreshAnswer{State: energy.RefreshNoneDue, Reused: true}}
+		refresh: refresh.Request{ID: "01968a3c-1f00-7000-8000-000000000001", Source: "fuel", State: refresh.NoneDue}}
 }
 
 func featureScopes() auth.Principal {

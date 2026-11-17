@@ -1,0 +1,38 @@
+{
+  "title": "No provider key: refused, with the reason",
+  "request": "/v1/refreshes",
+  "method": "POST",
+  "body": {
+    "source": "train_board",
+    "subject": {
+      "eva": "8000261"
+    }
+  },
+  "attribution": "A refresh carries no data and no attribution: the data it refreshes is served, with its source's attribution, by that source's own resources (listFuelOptions and getFuelStation for fuel, getTrainBoard for train_board).",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [],
+    "sources": [],
+    "audience": "own"
+  },
+  "status": 201,
+  "response": {
+    "data": {
+      "id": "88d039c8-6f08-55ab-b43a-ecdfa28718de",
+      "source": "train_board",
+      "state": "refused",
+      "createdAt": "2026-03-30T00:00:00Z",
+      "settledAt": "2026-03-30T00:00:00Z",
+      "reason": "no provider key",
+      "queue": null
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en"
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/refreshes/88d039c8-6f08-55ab-b43a-ecdfa28718de"
+    }
+  }
+}

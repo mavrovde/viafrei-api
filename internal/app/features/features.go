@@ -109,11 +109,10 @@ type Settings struct {
 
 // Service answers the feature questions.
 type Service struct {
-	repos       Repositories
-	set         Settings
-	now         func() time.Time
-	boardWriter TrainBoardWriter
-	refresher   FuelRefresher
+	repos     Repositories
+	set       Settings
+	now       func() time.Time
+	refreshes *Refreshes
 }
 
 // New returns the service.

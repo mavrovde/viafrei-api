@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -25,9 +24,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+
 	"github.com/mavrovde/viafrei-api/api"
 	"github.com/mavrovde/viafrei-api/internal/adapters/accessstore"
-	"github.com/mavrovde/viafrei-api/internal/adapters/fuelrefresh"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
@@ -39,6 +40,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/runtime/wire"
+	"github.com/mavrovde/viafrei-api/internal/testkit/fakelive"
 	"github.com/mavrovde/viafrei-api/internal/testkit/oascheck"
 	"github.com/mavrovde/viafrei-api/internal/testkit/pgtest"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
@@ -80,7 +82,20 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, "seeding the fixture set:", err)
 		os.Exit(1)
 	}
+	fake, err := startFake()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "starting the fake live refresher:", err)
+		db.Stop()
+		os.Exit(1)
+	}
 	code := m.Run()
+	if refreshStore != nil {
+		refreshStore.Close()
+	}
+	if err := fake.Stop(); err != nil {
+		fmt.Fprintln(os.Stderr, "the fake live refresher:", err)
+		code = 1
+	}
 	db.Stop()
 	os.Exit(code)
 }
@@ -88,7 +103,8 @@ func TestMain(m *testing.M) {
 // load opens the service's store on the fixture set TestMain seeded.
 func load(t *testing.T) (*config.Config, *store.Store) {
 	t.Helper()
-	cfg, err := config.Load(config.Options{Environ: []string{"VFAPI_DB_URL=" + db.ReaderURL, "VFAPI_ACCESS_URL=" + db.AccessURL, "VFAPI_AUTH_PEPPER=" + examplePepper}, RequireSecrets: true})
+	cfg, err := config.Load(config.Options{Environ: []string{"VFAPI_DB_URL=" + db.ReaderURL, "VFAPI_ACCESS_URL=" + db.AccessURL, "VFAPI_AUTH_PEPPER=" + examplePepper,
+		"VFAPI_REFRESH_SOURCES_FILE=" + filepath.Join(root, "test", "live", "sources.json")}, RequireSecrets: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,16 +118,21 @@ func load(t *testing.T) (*config.Config, *store.Store) {
 	return cfg, st
 }
 
-// writer opens the access store the board an example records is appended
-// through: the API's writer role, as in service.
+// refreshStore is the access store the refreshes are recorded in, the
+// API's own role as in service: one pool for the whole run, closed by
+// TestMain, so the examples do not each hold connections of their own.
+var refreshStore *accessstore.Store
+
 func writer(t *testing.T, cfg *config.Config) *accessstore.Store {
 	t.Helper()
-	as, err := accessstore.Open(context.Background(), cfg)
-	if err != nil {
-		t.Fatal(err)
+	if refreshStore == nil {
+		as, err := accessstore.Open(context.Background(), cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		refreshStore = as
 	}
-	t.Cleanup(as.Close)
-	return as
+	return refreshStore
 }
 
 // seedFixtures seeds the fixture set and the rows the examples are answered
@@ -144,17 +165,39 @@ var freshReports = []fixtures.Report{
 	{Point: "DE*SYN*E000020", Age: 8 * time.Minute, State: "available"},
 }
 
-// refresher is a stand-in for the service that holds the fuel provider key:
-// it answers every ask refreshed, settled a second before the examples'
-// clock, as the platform's refresher answers it.
-func refresher(t *testing.T) string {
-	t.Helper()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprintf(w, `{"state":"refreshed","settledAt":%d,"reused":false}`, now.Add(-time.Second).UnixMilli())
-	}))
-	t.Cleanup(srv.Close)
-	return srv.URL
+// refreshIDs makes a refresh's id from its source and subject key, so an
+// example states the same id on every run: each example asks about a
+// subject of its own, and getRefresh reads the base example's refresh.
+var refreshNS = uuid.MustParse("6f1d2c3b-4a59-4e6f-8a7b-9c0d1e2f3a4b")
+
+func refreshID(source, subjectKey string) string {
+	return uuid.NewSHA1(refreshNS, []byte(source+"|"+subjectKey)).String()
+}
+
+// startFake runs the fake live refresher over the examples' database with
+// the repository's registry and script, and records the example key every
+// example asks as, so a refresh can link its asker.
+func startFake() (*fakelive.Fake, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), pgtest.SetupBound)
+	defer cancel()
+	conn, err := pgx.Connect(ctx, db.OwnerURL)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = conn.Close(ctx) }()
+	if _, err := conn.Exec(ctx, `insert into access.plan (plan_name, use_class, tier, scopes, sources, changed_at, rate_per_second, burst, quota_day, quota_month)
+		values ('example', 'commercial', 'standard', '{}', '{}', $1, 1, 1, 0, 0)`, now); err != nil {
+		return nil, err
+	}
+	if _, err := conn.Exec(ctx, `insert into access.api_key (key_id, environment, plan_name, label, contact, mac, issued_at, expires_at, changed_at, audience)
+		values ($2, 'live', 'example', 'examples', 'examples@example.test', decode(repeat('00', 32), 'hex'), $1, $1::timestamptz + interval '90 days', $1, 'own')`, now, keyID); err != nil {
+		return nil, err
+	}
+	sc, err := fakelive.Load(filepath.Join(root, "test", "live", "sources.json"), filepath.Join(root, "test", "live", "fakelive.json"))
+	if err != nil {
+		return nil, err
+	}
+	return fakelive.Start(ctx, db.OwnerURL, sc)
 }
 
 // keyAuth admits every request as the example's key.
@@ -186,8 +229,12 @@ func ask(t *testing.T, cfg *config.Config, st *store.Store, e api.Example) (int,
 		t.Fatal(err)
 	}
 	svc := features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st, Transit: st, Fuel: st, Hydrogen: st, Speed: st, Sharing: st, Addresses: st, Pois: st, Locations: st, Disruptions: st, Nearby: st, Lorry: st, Catalogue: st, National: st, Affected: st, Coverage: st, States: st, TrainBoards: st, Bays: st}, wire.FeatureSettings(cfg), clock)
-	svc.WithTrainBoardWriter(writer(t, cfg))
-	svc.WithFuelRefresher(fuelrefresh.New(refresher(t), cfg.Fuel.RefreshDeadline, nil))
+	refreshes, err := wire.Refreshes(cfg, writer(t, cfg), st.Lookup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	refreshes.NewID = refreshID
+	svc.WithRefreshes(refreshes)
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Config: cfg, Build: build, ContractVersion: dbcontract.ContractVersion, Now: clock,
 		Readiness: health.NewChecker(st, expected, cfg.Health.ReadyTimeout),

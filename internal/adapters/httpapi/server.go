@@ -155,8 +155,8 @@ func operations() []operation {
 		{id: "listStations", method: http.MethodGet, path: "/v1/stations", tag: "transit", keyed: true, scope: "transit", register: registerStations},
 		{id: "listStationDepartures", method: http.MethodGet, path: "/v1/stations/{stationId}/departures", tag: "transit", keyed: true, scope: "transit", register: registerDepartures},
 		{id: "getTrainBoard", method: http.MethodGet, path: "/v1/train-boards/{eva}", tag: "transit", keyed: true, scope: "transit", register: registerTrainBoard},
-		{id: "requestFuelRefresh", method: http.MethodPost, path: "/v1/fuel-refresh", tag: "energy", keyed: true, scope: "energy", register: registerFuelRefresh},
-		{id: "recordTrainBoard", method: http.MethodPost, path: "/v1/train-boards", tag: "transit", keyed: true, scope: "transit", register: registerRecordTrainBoard},
+		{id: "createRefresh", method: http.MethodPost, path: "/v1/refreshes", tag: "live", keyed: true, register: registerCreateRefresh},
+		{id: "getRefresh", method: http.MethodGet, path: "/v1/refreshes/{id}", tag: "live", keyed: true, register: registerGetRefresh},
 		{id: "listStationFacilities", method: http.MethodGet, path: "/v1/stations/{stationId}/facilities", tag: "transit", keyed: true, scope: "transit", register: registerFacilities},
 	}
 }
@@ -352,6 +352,7 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 				{Name: "weather", Description: "The official weather warnings."},
 				{Name: "rules", Description: "The German driving rules."},
 				{Name: "transit", Description: "Stations, their departures, lifts and escalators."},
+				{Name: "live", Description: "On-demand refreshes of live sources, for ViaFrei's own callers."},
 			},
 		},
 		Formats:       huma.DefaultFormats,

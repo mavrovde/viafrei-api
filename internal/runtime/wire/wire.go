@@ -5,12 +5,13 @@ package wire
 import (
 	"time"
 
-	"github.com/mavrovde/viafrei-api/internal/adapters/fuelrefresh"
+	"github.com/mavrovde/viafrei-api/internal/adapters/livesources"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/refresh"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
 
@@ -72,12 +73,14 @@ func SharedBudget(cfg *config.Config) store.SharedBudget {
 	}
 }
 
-// FuelRefresher builds the forwarder of the fuel refresh asks to the
-// refresher at fuel.refresh_url, each ask bounded by fuel.refresh_deadline;
-// nil when no URL is set, so every ask is refused as not configured.
-func FuelRefresher(cfg *config.Config) features.FuelRefresher {
-	if cfg.Fuel.RefreshURL == "" {
-		return nil
+// Refreshes builds the on-demand refreshes (createRefresh) over store,
+// resolving subject values through lookup: the registry of
+// refresh.sources_file, else refresh.sources_json, waited on for up to
+// refresh.wait.
+func Refreshes(cfg *config.Config, store features.RefreshStore, lookup refresh.Lookup) (features.Refreshes, error) {
+	reg, err := livesources.Load(cfg.Refresh.SourcesFile, cfg.Refresh.SourcesJSON)
+	if err != nil {
+		return features.Refreshes{}, err
 	}
-	return fuelrefresh.New(cfg.Fuel.RefreshURL, cfg.Fuel.RefreshDeadline, nil)
+	return features.Refreshes{Sources: reg, Store: store, Lookup: lookup, Wait: cfg.Refresh.Wait}, nil
 }

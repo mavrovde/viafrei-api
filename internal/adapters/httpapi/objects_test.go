@@ -8,6 +8,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/national"
+	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
@@ -27,6 +28,7 @@ type objectsFake struct {
 	national features.NationalAnswer
 	affected []transit.Affected
 	gotLimit int
+	coverage places.Coverage
 }
 
 func (f *fakeFeatures) FuelStation(_ context.Context, _ access.Record, id string, held time.Duration) (energy.FuelStationPage, features.Answer[struct{}], error) {
@@ -174,4 +176,44 @@ func TestAffectedStationsAreRanked(t *testing.T) {
 		t.Errorf("limit 3: %d %d", w.Code, f.objects.gotLimit)
 	}
 	assertProblem(t, do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: access.ErrNonePermitted}, nil), http.MethodGet, "/v1/affected-stations", bearer), 403, "source-not-permitted")
+}
+
+func (f *fakeFeatures) PlacesCoverage(context.Context, access.Record) (places.Coverage, features.Answer[struct{}], error) {
+	return f.objects.coverage, f.objects.fuelMeta, f.err
+}
+
+func TestPlacesCoverageNamesKindsLandsAndAddresses(t *testing.T) {
+	f := everyAnswer()
+	at := fixedNow.Add(-time.Hour).In(time.FixedZone("x", 3600))
+	berlin := "Berlin"
+	f.objects.coverage = places.Coverage{
+		Kinds:     []places.KindCount{{Family: "g", Kind: "city", Rows: 3, EnglishNames: 1, NewestLoad: &at}, {Family: "g", Kind: "junction", Rows: 2}},
+		Lands:     []places.Land{{Code: "05", Name: "Nordrhein-Westfalen", Family: "b"}},
+		Addresses: []places.AddressLand{{Land: &berlin, DataAsOf: &at, Family: "o"}, {Family: "o"}},
+	}
+	f.objects.fuelMeta = features.Answer[struct{}]{Families: []provenance.Family{fresh}, At: fixedNow}
+	w := do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/places/coverage", bearer)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", w.Code, w.Body)
+	}
+	data, _ := decode(t, w)["data"].(map[string]any)
+	kinds, lands, addrs := data["kinds"].([]any), data["lands"].([]any), data["addresses"].([]any)
+	if len(kinds) != 2 || len(lands) != 1 || len(addrs) != 2 || addrs[1].(map[string]any)["land"] != nil {
+		t.Fatalf("data %v", data)
+	}
+	if k := kinds[0].(map[string]any); k["englishNames"] != 1.0 || k["newestLoad"] != at.UTC().Format(time.RFC3339) || kinds[1].(map[string]any)["newestLoad"] != nil {
+		t.Errorf("kinds %v", kinds)
+	}
+	if addrs[0].(map[string]any)["land"] != "Berlin" || lands[0].(map[string]any)["code"] != "05" {
+		t.Errorf("lands %v addresses %v", lands, addrs)
+	}
+	assertProblem(t, do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: access.ErrNonePermitted}, nil), http.MethodGet, "/v1/places/coverage", bearer), 403, "source-not-permitted")
+}
+
+func TestTheObjectOperationsAreSwitchedOffWithTheFeatures(t *testing.T) {
+	off := featureHandler(t, config.Defaults(), nil, nil)
+	for _, target := range []string{"/v1/germany", "/v1/affected-stations", "/v1/places/coverage",
+		"/v1/fuel-options/00000000-0000-4000-8000-000000000002", "/v1/charging-options/afir_alpha:cs-01-0002"} {
+		assertProblem(t, do(t, off, http.MethodGet, target, bearer), 404, "feature-disabled")
+	}
 }

@@ -123,7 +123,7 @@ func serve(environ []string, stderr io.Writer) int {
 		Build:           buildinfo.Get(),
 		ContractVersion: dbcontract.ContractVersion,
 		Sources:         st,
-		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st, Transit: st, Fuel: st, Hydrogen: st, Speed: st, Sharing: st, Addresses: st, Pois: st, Locations: st, Disruptions: st, Nearby: st, Lorry: st, Catalogue: st, National: st, Affected: st},
+		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st, Transit: st, Fuel: st, Hydrogen: st, Speed: st, Sharing: st, Addresses: st, Pois: st, Locations: st, Disruptions: st, Nearby: st, Lorry: st, Catalogue: st, National: st, Affected: st, Coverage: st},
 			wire.FeatureSettings(cfg), time.Now),
 		Addresses: addresses,
 		Versions:  st,

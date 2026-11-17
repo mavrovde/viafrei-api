@@ -142,3 +142,38 @@ cross join lateral (select planned_departure_at from contract.departure d where 
 		t.Errorf("no family: %v %v", none, err)
 	}
 }
+
+func TestPlacesCoverageCountsKindsLandsAndAddresses(t *testing.T) {
+	st := seeded(t)
+	var fams []string
+	owner(t, `select array_agg(distinct source_ref order by source_ref) from contract.source`, &fams)
+	var places, lands int
+	owner(t, `select (select count(*) from contract.place where withdrawn_at is null and display_class <> 'withhold' and audience = 'public')::int,
+       (select count(*) from contract.place where place_kind = 'state' and official_key is not null and withdrawn_at is null and display_class <> 'withhold' and audience = 'public')::int`, &places, &lands)
+	c, err := st.PlacesCoverage(bounded(t), fams)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := 0
+	for _, k := range c.Kinds {
+		sum += k.Rows
+		if k.EnglishNames > k.Rows || k.Family == "" {
+			t.Errorf("kind %+v", k)
+		}
+	}
+	if sum != places || len(c.Lands) != lands {
+		t.Errorf("places %d of %d, lands %d of %d", sum, places, len(c.Lands), lands)
+	}
+	if len(c.Addresses) == 0 {
+		t.Error("the fixture holds addresses; none was covered")
+	}
+	for i, a := range c.Addresses {
+		if a.Family == "" || (i > 0 && (c.Addresses[i-1].Land == nil || (a.Land != nil && *c.Addresses[i-1].Land >= *a.Land))) {
+			t.Errorf("addresses not one per Land, by name, the unplaced last: %+v", c.Addresses)
+		}
+	}
+	none, err := st.PlacesCoverage(bounded(t), []string{"no-such-family"})
+	if err != nil || len(none.Kinds)+len(none.Lands)+len(none.Addresses) != 0 {
+		t.Errorf("no family: %+v %v", none, err)
+	}
+}

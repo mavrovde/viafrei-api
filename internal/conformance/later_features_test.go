@@ -78,3 +78,7 @@ func (laterFeatures) National(context.Context, access.Record, time.Duration) (fe
 func (laterFeatures) AffectedStations(context.Context, access.Record, int) ([]transit.Affected, features.Answer[struct{}], error) {
 	return nil, features.Answer[struct{}]{}, nil
 }
+
+func (laterFeatures) PlacesCoverage(context.Context, access.Record) (places.Coverage, features.Answer[struct{}], error) {
+	return places.Coverage{}, features.Answer[struct{}]{}, nil
+}

@@ -81,6 +81,7 @@ type Repositories struct {
 	Catalogue   Catalogue
 	National    National
 	Affected    Affected
+	Coverage    Coverage
 }
 
 // Settings are the tunables of the use cases.

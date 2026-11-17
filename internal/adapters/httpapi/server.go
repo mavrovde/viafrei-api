@@ -120,6 +120,7 @@ func operations() []operation {
 		{id: "getMeta", method: http.MethodGet, path: "/v1/meta", surface: onPublic | onHealth, register: registerMeta},
 		{id: "getPressure", method: http.MethodGet, path: "/v1/pressure", surface: onPublic | onHealth, register: registerPressure},
 		{id: "getKey", method: http.MethodGet, path: "/v1/key", tag: "access", keyed: true, register: registerKey},
+		{id: "getPlacesCoverage", method: http.MethodGet, path: "/v1/places/coverage", tag: "places", keyed: true, scope: "places", register: registerPlacesCoverage},
 		{id: "listAffectedStations", method: http.MethodGet, path: "/v1/affected-stations", tag: "transit", keyed: true, scope: "transit", register: registerAffected},
 		{id: "getNationalSummary", method: http.MethodGet, path: "/v1/germany", tag: "meta", keyed: true, register: registerNational},
 		{id: "listSources", method: http.MethodGet, path: "/v1/sources", tag: "meta", keyed: true, register: registerSources},

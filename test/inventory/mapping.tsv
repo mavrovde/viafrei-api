@@ -216,8 +216,8 @@ web:/internal/tiles/lorry	getNationalSummary,listLorryRules?at	lorry-near	-
 resource:viafrei://attribution	listSources	sources-all	-
 resource:viafrei://coverage	listSources	sources-all	-
 resource:viafrei://status/feeds	listSources	sources-all	-
-resource:viafrei://gazetteer	listSources?domain	sources-places	-
-resource:viafrei://addresses	listSources?domain,listAddresses	sources-places,address-postcode	-
+resource:viafrei://gazetteer	getPlacesCoverage,listSources?domain	sources-places	-
+resource:viafrei://addresses	getPlacesCoverage,listSources?domain,listAddresses	sources-places,address-postcode	-
 resource:viafrei://rules/driving-in-germany	getDrivingRules?topic	rules-topic	-
 resource:viafrei://rules/electric-driving	getDrivingRules?topic	rules-topic	-
 resource:viafrei://rules/low-emission-zones	getDrivingRules?topic,getDrivingRules?city	rules-lez-city	-

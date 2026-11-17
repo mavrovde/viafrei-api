@@ -69,6 +69,35 @@
         ],
         "type": "object"
       },
+      "AddressCoverage": {
+        "additionalProperties": false,
+        "properties": {
+          "dataAsOf": {
+            "description": "The extract date of its newest address; null when unknown.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "land": {
+            "description": "The Land's name as the address source writes it; null for the addresses placed in no Land.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceFamily": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "land",
+          "dataAsOf",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
       "AddressData": {
         "additionalProperties": false,
         "properties": {
@@ -916,6 +945,27 @@
           "roadType",
           "direction",
           "states"
+        ],
+        "type": "object"
+      },
+      "CoverageLand": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "description": "The Land's two-digit official key.",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sourceFamily": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "sourceFamily"
         ],
         "type": "object"
       },
@@ -4399,6 +4449,43 @@
         ],
         "type": "object"
       },
+      "PlaceKindCount": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "englishNames": {
+            "description": "How many of them carry an English name, the names a search in English finds.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "kind": {
+            "description": "The place kind (city, town, village, suburb, admin, station, junction, ...). Open enumeration.",
+            "type": "string"
+          },
+          "newestLoad": {
+            "description": "When the newest of them was recorded; null when unknown.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceFamily": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "count",
+          "englishNames",
+          "newestLoad",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
       "PlaceSummary": {
         "additionalProperties": false,
         "properties": {
@@ -4434,6 +4521,58 @@
           "kind",
           "location",
           "sourceFamily"
+        ],
+        "type": "object"
+      },
+      "PlacesCoverageData": {
+        "additionalProperties": false,
+        "properties": {
+          "addresses": {
+            "description": "The Länder the addresses cover, by name, each with its extract date; the addresses placed in no Land last.",
+            "items": {
+              "$ref": "#/components/schemas/AddressCoverage"
+            },
+            "type": "array"
+          },
+          "kinds": {
+            "description": "The places per family and kind.",
+            "items": {
+              "$ref": "#/components/schemas/PlaceKindCount"
+            },
+            "type": "array"
+          },
+          "lands": {
+            "description": "The Länder the gazetteer holds, by key.",
+            "items": {
+              "$ref": "#/components/schemas/CoverageLand"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "kinds",
+          "lands",
+          "addresses"
+        ],
+        "type": "object"
+      },
+      "PlacesCoverageEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PlacesCoverageData"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DataMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
         ],
         "type": "object"
       },
@@ -14978,6 +15117,484 @@
         ],
         "x-example-request": "/v1/places?q=Matfienland\u0026limit=3",
         "x-mcp-counterpart": "place search",
+        "x-required-scope": "places"
+      }
+    },
+    "/v1/places/coverage": {
+      "get": {
+        "description": "What place and address search can find: the places per family and kind with how many carry an English name and when the newest was recorded, the Länder the gazetteer holds, and the Länder the addresses cover with each one's extract date. Read from the places families the key may read. Needs the scope places.",
+        "operationId": "getPlacesCoverage",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "What the gazetteer and the addresses hold",
+                    "value": {
+                      "data": {
+                        "kinds": [
+                          {
+                            "kind": "locality",
+                            "count": 11,
+                            "englishNames": 2,
+                            "newestLoad": "2026-03-29T19:51:15Z",
+                            "sourceFamily": "bkg_gvisys"
+                          },
+                          {
+                            "kind": "municipality",
+                            "count": 75,
+                            "englishNames": 6,
+                            "newestLoad": "2026-11-17T12:23:08.225116Z",
+                            "sourceFamily": "bkg_gvisys"
+                          },
+                          {
+                            "kind": "state",
+                            "count": 7,
+                            "englishNames": 0,
+                            "newestLoad": "2026-03-29T19:12:55Z",
+                            "sourceFamily": "bkg_gvisys"
+                          },
+                          {
+                            "kind": "locality",
+                            "count": 10,
+                            "englishNames": 2,
+                            "newestLoad": "2026-03-29T22:35:07Z",
+                            "sourceFamily": "geonames"
+                          },
+                          {
+                            "kind": "municipality",
+                            "count": 25,
+                            "englishNames": 8,
+                            "newestLoad": "2026-03-29T18:43:47Z",
+                            "sourceFamily": "geonames"
+                          },
+                          {
+                            "kind": "state",
+                            "count": 9,
+                            "englishNames": 1,
+                            "newestLoad": "2026-03-29T19:17:24Z",
+                            "sourceFamily": "geonames"
+                          }
+                        ],
+                        "lands": [
+                          {
+                            "code": "01",
+                            "name": "Matfienland",
+                            "sourceFamily": "geonames"
+                          },
+                          {
+                            "code": "02",
+                            "name": "Püngmösland",
+                            "sourceFamily": "geonames"
+                          },
+                          {
+                            "code": "03",
+                            "name": "Rettasland",
+                            "sourceFamily": "geonames"
+                          },
+                          {
+                            "code": "04",
+                            "name": "Maungstömland",
+                            "sourceFamily": "bkg_gvisys"
+                          },
+                          {
+                            "code": "05",
+                            "name": "Zenmimland",
+                            "sourceFamily": "bkg_gvisys"
+                          },
+                          {
+                            "code": "06",
+                            "name": "Köndoßland",
+                            "sourceFamily": "geonames"
+                          },
+                          {
+                            "code": "07",
+                            "name": "Wurhutland",
+                            "sourceFamily": "geonames"
+                          },
+                          {
+                            "code": "08",
+                            "name": "Tarklelland",
+                            "sourceFamily": "geonames"
+                          },
+                          {
+                            "code": "09",
+                            "name": "Fickmüngland",
+                            "sourceFamily": "bkg_gvisys"
+                          },
+                          {
+                            "code": "10",
+                            "name": "Kurbamland",
+                            "sourceFamily": "bkg_gvisys"
+                          },
+                          {
+                            "code": "11",
+                            "name": "Grißkleiland",
+                            "sourceFamily": "bkg_gvisys"
+                          },
+                          {
+                            "code": "12",
+                            "name": "Durgroßland",
+                            "sourceFamily": "geonames"
+                          },
+                          {
+                            "code": "13",
+                            "name": "Lecknämland",
+                            "sourceFamily": "geonames"
+                          },
+                          {
+                            "code": "14",
+                            "name": "Hügüsland",
+                            "sourceFamily": "bkg_gvisys"
+                          },
+                          {
+                            "code": "15",
+                            "name": "Nolkünland",
+                            "sourceFamily": "bkg_gvisys"
+                          },
+                          {
+                            "code": "16",
+                            "name": "Zugrisland",
+                            "sourceFamily": "geonames"
+                          }
+                        ],
+                        "addresses": [
+                          {
+                            "land": null,
+                            "dataAsOf": "2026-02-26T00:00:00Z",
+                            "sourceFamily": "osm"
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": null,
+                        "freshness": [
+                          {
+                            "family": "bkg_gvisys",
+                            "dataAsOf": null,
+                            "ageS": null,
+                            "stale": false
+                          },
+                          {
+                            "family": "geonames",
+                            "dataAsOf": null,
+                            "ageS": null,
+                            "stale": false
+                          },
+                          {
+                            "family": "osm",
+                            "dataAsOf": null,
+                            "ageS": null,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "bkg_gvisys",
+                            "domain": "places",
+                            "publisher": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
+                            "text": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
+                            "licence": "dl-de/by-2-0",
+                            "licenceUrl": "https://licences.example/dl-de-by-2-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+                          },
+                          {
+                            "family": "geonames",
+                            "domain": "places",
+                            "publisher": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+                            "text": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://download.geonames.org/export/dump/"
+                          },
+                          {
+                            "family": "osm",
+                            "domain": "places",
+                            "publisher": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0",
+                            "text": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0",
+                            "licence": "ODbL 1.0",
+                            "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
+                            "shareAlike": true,
+                            "shareAlikeOffer": "https://viafrei.de/impressum",
+                            "termsUrl": "https://www.openstreetmap.org/copyright"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ]
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/places/coverage"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PlacesCoverageEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The operation is switched off on this instance (feature-disabled).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "What the gazetteer and the addresses hold",
+        "tags": [
+          "places"
+        ],
+        "x-attribution": "Every count names its source family; each family that contributed is listed in meta.attribution with its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/places/coverage\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/places/coverage",
         "x-required-scope": "places"
       }
     },

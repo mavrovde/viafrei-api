@@ -39,3 +39,4 @@ getChargingSite	lookup
 getPressure	lookup
 getNationalSummary	composed
 listAffectedStations	composed
+getPlacesCoverage	composed

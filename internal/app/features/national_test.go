@@ -10,6 +10,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/national"
+	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 )
 
@@ -138,5 +139,27 @@ func TestAffectedStationsCreditEveryFigure(t *testing.T) {
 	f.fake.provErr, f.fake.regErr = nil, boom
 	if _, _, err := s.AffectedStations(ctx, key("commercial", []access.Scope{"transit"}, "t1"), 5); !errors.Is(err, boom) {
 		t.Errorf("register error: %v", err)
+	}
+}
+
+type covFake struct {
+	*fake
+	c   places.Coverage
+	err error
+}
+
+func (f *covFake) PlacesCoverage(context.Context, []string) (places.Coverage, error) { return f.c, f.err }
+
+func TestPlacesCoverageCreditsItsFamilies(t *testing.T) {
+	f := &covFake{fake: &fake{reg: []access.Terms{{Family: "g1", Domain: "places", UseClasses: all, Version: "v1"}}},
+		c: places.Coverage{Kinds: []places.KindCount{{Family: "g1", Kind: "city", Rows: 3}}}}
+	s := features.New(features.Repositories{Register: f, Coverage: f}, features.Settings{Language: "en"}, func() time.Time { return now })
+	c, a, err := s.PlacesCoverage(context.Background(), key("commercial", []access.Scope{"places"}, "g1"))
+	if err != nil || len(c.Kinds) != 1 || !slices.Equal(names(a.Families), []string{"g1"}) {
+		t.Fatalf("%+v %+v %v", c, a, err)
+	}
+	f.err = errors.New("boom")
+	if _, _, err := s.PlacesCoverage(context.Background(), key("commercial", []access.Scope{"places"}, "g1")); err == nil {
+		t.Error("a read error must surface")
 	}
 }

@@ -1,6 +1,6 @@
 {
   "title": "Speed check locations within 10 km",
-  "request": "/v1/speed-cameras?at=48.39,7.48\u0026radius_m=10000\u0026limit=2",
+  "request": "/v1/speed-cameras?at=47.655,7.81\u0026radius_m=5000\u0026limit=2",
   "attribution": "Speed check locations come from the source families of the roads domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
   "key": {
     "useClass": "commercial",
@@ -15,51 +15,51 @@
   "status": 200,
   "response": {
     "data": {
-      "official": [
+      "official": [],
+      "officialTotal": 0,
+      "osm": [
         {
-          "id": "se:700001",
+          "id": "osm:node800005",
           "kind": "fixed",
           "enforces": "speed",
-          "street": "Weg 1",
-          "locationLabel": null,
-          "municipality": "Schömpingbach",
+          "street": null,
+          "locationLabel": "Blitzer Kansilkamp",
+          "municipality": null,
           "direction": null,
-          "limitKmh": 30,
+          "limitKmh": 50,
           "lorryLimitKmh": null,
           "firstDay": null,
           "lastDay": null,
-          "dataAsOf": "2026-01-28",
+          "dataAsOf": "2026-02-28",
           "staleYear": null,
           "location": {
-            "lat": 48.413347,
-            "lon": 7.465562
+            "lat": 47.655653,
+            "lon": 7.799556
           },
-          "sourceFamily": "speed_alpha"
+          "sourceFamily": "osm_speed_cameras"
         },
         {
-          "id": "se:700002",
-          "kind": "section_control",
+          "id": "osm:node800006",
+          "kind": "fixed",
           "enforces": "speed",
-          "street": "Weg 2",
-          "locationLabel": null,
-          "municipality": "Schömpingbach",
+          "street": null,
+          "locationLabel": "Blitzer Kansilkamp",
+          "municipality": null,
           "direction": null,
-          "limitKmh": 40,
+          "limitKmh": 50,
           "lorryLimitKmh": null,
           "firstDay": null,
           "lastDay": null,
-          "dataAsOf": "2026-01-28",
+          "dataAsOf": "2026-02-28",
           "staleYear": null,
           "location": {
-            "lat": 48.376228,
-            "lon": 7.502126
+            "lat": 47.653764,
+            "lon": 7.829412
           },
-          "sourceFamily": "speed_alpha"
+          "sourceFamily": "osm_speed_cameras"
         }
       ],
-      "officialTotal": 2,
-      "osm": [],
-      "osmTotal": 0
+      "osmTotal": 2
     },
     "meta": {
       "requestId": "example-request-0001",
@@ -68,7 +68,7 @@
       "asOf": "2026-03-29T12:00:00Z",
       "freshness": [
         {
-          "family": "speed_alpha",
+          "family": "osm_speed_cameras",
           "dataAsOf": "2026-03-29T12:00:00Z",
           "ageS": 43200,
           "staleAfterS": 259200,
@@ -77,15 +77,15 @@
       ],
       "attribution": [
         {
-          "family": "speed_alpha",
+          "family": "osm_speed_cameras",
           "domain": "roads",
-          "publisher": "Blitzwerk Datenwerk",
-          "text": "Synthetic data from family alpha, licence CC BY 4.0.",
-          "licence": "CC BY 4.0",
-          "licenceUrl": "https://licences.example/cc-by-4-0",
-          "shareAlike": false,
-          "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms/speed_alpha"
+          "publisher": "Blitzer (OpenStreetMap): © OpenStreetMap-Mitwirkende, ODbL 1.0",
+          "text": "Blitzer (OpenStreetMap): © OpenStreetMap-Mitwirkende, ODbL 1.0",
+          "licence": "ODbL 1.0",
+          "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
+          "shareAlike": true,
+          "shareAlikeOffer": "https://viafrei.de/impressum",
+          "termsUrl": "https://www.openstreetmap.org/copyright"
         }
       ],
       "notes": {

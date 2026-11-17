@@ -176,6 +176,17 @@ nothing, so that family contributed nothing and neither side credits it.
   A filling station states its E5 price and no opening state, and a station
   is a railway station of the DB station register (an EVA number), as the
   platform's nearby search lists them.
+- **Transit disruption.** An alert states its headline, lines, validity,
+  placement and link, as the platform's check does: no text beyond the
+  headline, no cause or effect, no change time. The answer credits each
+  alert it lists and, for an area, the realtime family it read the
+  punctuality of, a region with no report included; an answer that lists no
+  alert and reads no punctuality credits no family.
+- **Road conditions near a position** list what the platform's road status
+  lists there: closures, roadworks and lane restrictions, and jams, each
+  distance to 0.1 km. A hazard or an accident is not listed, and the answer
+  states no lamp and reads no weather warning: the road status states none
+  around a position, and no digest route the site reads serves one there.
 - **Weather warnings** at a position state no lamp and no truncation flag:
   the platform's weather warnings check states neither, and no digest route
   the site reads serves a lamp for a position. A family the platform does

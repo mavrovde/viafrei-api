@@ -99,10 +99,10 @@ func TestAFirstPublicationOfAFamilyTheLampReadEndsItsAnswer(t *testing.T) {
 		delete(v.vs, quietWeather)
 		delete(v.confirmed, quietWeather)
 	})
-	etag := revalidates(t, r, "/v1/road-conditions?at=48.1,11.6")
+	etag := revalidates(t, r, motorwayURL)
 	r.clock.add(2 * time.Second)
 	r.versions.change(func(v *fakeVersions) { v.vs[quietWeather] = "w1" })
-	answersAnew(t, r, "/v1/road-conditions?at=48.1,11.6", etag, "the family's first data")
+	answersAnew(t, r, motorwayURL, etag, "the family's first data")
 }
 
 func TestAConfirmationOfAFamilyTheLampReadEndsItsAnswer(t *testing.T) {

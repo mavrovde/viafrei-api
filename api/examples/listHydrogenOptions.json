@@ -1,6 +1,6 @@
 {
   "title": "Hydrogen stations for a car within 50 km",
-  "request": "/v1/hydrogen-options?at=48.39,7.38\u0026vehicle=car\u0026limit=2",
+  "request": "/v1/hydrogen-options?at=47.95,6.9\u0026radius_m=150000\u0026limit=2",
   "attribution": "Hydrogen stations come from the source families of the energy domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
   "key": {
     "useClass": "commercial",
@@ -23,11 +23,30 @@
             "lat": 48.389598,
             "lon": 7.422192
           },
-          "distanceM": 3125,
+          "distanceM": 62433,
           "address": null,
           "refill": [
             {
-              "solution": "gaseousHydrogen700barCar"
+              "solution": "700bar_car"
+            }
+          ],
+          "opening": null,
+          "providerUpdatedAt": null,
+          "sourceFamily": "afir_alpha"
+        },
+        {
+          "name": "H2 Kansilkamp",
+          "operator": "H2 Synthetic",
+          "brand": null,
+          "location": {
+            "lat": 47.60205,
+            "lon": 7.847536
+          },
+          "distanceM": 80869,
+          "address": null,
+          "refill": [
+            {
+              "solution": "700bar_car"
             }
           ],
           "opening": null,
@@ -76,7 +95,7 @@
       ],
       "page": {
         "limit": 2,
-        "hasMore": false
+        "hasMore": true
       }
     },
     "links": {

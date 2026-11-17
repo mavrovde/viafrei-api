@@ -61,12 +61,35 @@ func TestDisruptionsRefusals(t *testing.T) {
 		"none":       {&disruptionFake{}, key("commercial", []access.Scope{"transit"}, "f2"), access.ErrNonePermitted},
 		"read":       {&disruptionFake{err: errStore}, full, errStore},
 		"post-check": {&disruptionFake{v: transit.Disruptions{Punctuality: &transit.Punctuality{Family: "f2"}}}, full, features.ErrGateViolation},
-		"provenance": {&disruptionFake{fake: &fake{provErr: errStore}}, full, errStore},
+		"provenance": {&disruptionFake{fake: &fake{provErr: errStore}, v: transit.Disruptions{PunctualityRead: []string{"f1"}}}, full, errStore},
 		// the trip count is gated like the rest: a family the key may not read fails the answer
 		"trips post-check": {&disruptionFake{v: transit.Disruptions{Trips: &transit.TripCount{Observed: 1, Family: "f2"}}}, full, features.ErrGateViolation},
 	} {
 		if _, err := disruptionService(c.f).Disruptions(context.Background(), c.k, transit.DisruptionQuery{Limit: 6}); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)
+		}
+	}
+}
+
+func TestDisruptionsCreditWhatTheAnswerRead(t *testing.T) {
+	req.Covers(t, "FR-TRANSIT-003")
+	k := key("consumer", []access.Scope{"transit"}, "f1", "f2")
+	for name, c := range map[string]struct {
+		v    transit.Disruptions
+		want []string
+	}{
+		// The realtime source read for the area is credited with no trip counted, as the platform's "no reports".
+		"no reports": {transit.Disruptions{PunctualityRead: []string{"f2"}}, []string{"f2"}},
+		"alert":      {transit.Disruptions{Alerts: []transit.Alert{{ID: "a:1", Family: "f1"}}, PunctualityRead: []string{"f2"}}, []string{"f1", "f2"}},
+		// Nothing listed and no punctuality read: no family is credited.
+		"nothing": {transit.Disruptions{}, nil},
+	} {
+		a, err := disruptionService(&disruptionFake{v: c.v}).Disruptions(context.Background(), k, transit.DisruptionQuery{Line: "RE45", Limit: 6})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := names(a.Meta.Families); !slices.Equal(got, c.want) {
+			t.Errorf("%s: credits %v, want %v", name, got, c.want)
 		}
 	}
 }

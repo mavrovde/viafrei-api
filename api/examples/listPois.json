@@ -1,6 +1,6 @@
 {
   "title": "Pharmacies in a town",
-  "request": "/v1/pois?name=pharmacy\u0026in=Kansilkamp\u0026limit=2",
+  "request": "/v1/pois?name=pharmacy\u0026at=47.61,7.9\u0026radius_m=5000\u0026limit=2",
   "attribution": "Places of interest come from the source families of the places domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
   "key": {
     "useClass": "commercial",
@@ -28,7 +28,7 @@
           "lat": 47.609833,
           "lon": 7.897242
         },
-        "distanceM": null,
+        "distanceM": 208,
         "dataAsOf": "2026-02-26",
         "sourceFamily": "osm"
       }

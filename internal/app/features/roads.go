@@ -98,8 +98,10 @@ func sights(p roads.Page, fams roads.Families, partial, weatherRead bool, now ti
 //
 // An answer over a window ahead (ahead) reads only the families of planned
 // works (Settings.PlannedWorks) and no weather warning, as the platform's
-// roadworks-ahead answer reads the planning data alone.
-func (s *Service) conditions(ctx context.Context, key access.Record, ahead bool, read func(fams roads.Families, now time.Time) (roads.Page, error)) (Conditions, error) {
+// roadworks-ahead answer reads the planning data alone. An answer with no
+// lamp (lampless: the conditions near a position, whose platform road
+// status states none) reads no weather warning either.
+func (s *Service) conditions(ctx context.Context, key access.Record, ahead, lampless bool, read func(fams roads.Families, now time.Time) (roads.Page, error)) (Conditions, error) {
 	reg, gate, err := s.gate(ctx, key)
 	if err != nil {
 		return Conditions{}, err
@@ -118,7 +120,7 @@ func (s *Service) conditions(ctx context.Context, key access.Record, ahead bool,
 	// is then missing, never an error of the roads question.
 	w, wpartial, werr := gate.Answer(access.Answering(reg, "weather"))
 	weather, weatherRead := w, werr == nil && !wpartial
-	if ahead {
+	if ahead || lampless {
 		weather, weatherRead = nil, false
 	}
 	fams := roads.Families{Roads: permitted, Weather: weather}
@@ -176,7 +178,7 @@ func (s *Service) MotorwayConditions(ctx context.Context, key access.Record, q r
 		return Conditions{}, err
 	}
 	q.Road = road.Ref
-	c, err := s.conditions(ctx, key, q.Filter.Ahead, func(fams roads.Families, now time.Time) (roads.Page, error) {
+	c, err := s.conditions(ctx, key, q.Filter.Ahead, false, func(fams roads.Families, now time.Time) (roads.Page, error) {
 		return s.repos.Roads.SituationsOnRoad(ctx, q, fams, now)
 	})
 	if err != nil {
@@ -187,9 +189,11 @@ func (s *Service) MotorwayConditions(ctx context.Context, key access.Record, q r
 }
 
 // RoadConditions answers "what is happening on the roads near here" for key
-// (FR-ROAD-006).
+// (FR-ROAD-006). The conditions near a position state no lamp, as the
+// platform's road status states none there, so they read no weather
+// warning; a Land's answer (q.State) has its lamp.
 func (s *Service) RoadConditions(ctx context.Context, key access.Record, q roads.AreaQuery) (Conditions, error) {
-	return s.conditions(ctx, key, q.Filter.Ahead, func(fams roads.Families, now time.Time) (roads.Page, error) {
+	return s.conditions(ctx, key, q.Filter.Ahead, q.State == "", func(fams roads.Families, now time.Time) (roads.Page, error) {
 		return s.repos.Roads.SituationsNear(ctx, q, fams, now)
 	})
 }

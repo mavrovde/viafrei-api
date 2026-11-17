@@ -42,7 +42,11 @@ type Punctuality struct {
 // Disruptions are the service alerts in force of an area or line, at most
 // the limit with the count before it, and the area's punctuality.
 type Disruptions struct {
-	Alerts []Alert
+	// PunctualityRead are the families whose punctuality of the area was
+	// read, whether or not it counted a trip: the platform's disruption
+	// check credits its realtime source with "no reports" too.
+	PunctualityRead []string
+	Alerts          []Alert
 	// AlertsTotal are the alerts in force before the limit, duplicates left
 	// out; AlertsDuplicates the secondary publication's rows left out as
 	// duplicates of a primary alert. AlertsChecked is whether a publication of the families

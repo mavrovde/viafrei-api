@@ -19,9 +19,6 @@
         {
           "id": "delfi_sa_alpha:700021",
           "header": "Bauarbeiten auf der Linie RE 1",
-          "description": "Ersatzverkehr mit Bussen.",
-          "cause": "CONSTRUCTION",
-          "effect": "DETOUR",
           "url": null,
           "inForceFrom": "2026-03-28T00:00:00Z",
           "inForceUntil": null,
@@ -29,7 +26,6 @@
             "RE 1"
           ],
           "attachedTo": "route",
-          "updatedAt": "2026-03-28T00:00:00Z",
           "sourceFamily": "delfi_sa_alpha"
         }
       ],

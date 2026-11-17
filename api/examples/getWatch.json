@@ -3,7 +3,7 @@
   "request": "/v1/watch?kind=road\u0026target=A103\u0026hours=3",
   "attribution": "A watch reads the situations of the roads domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
   "key": {
-    "useClass": "commercial",
+    "useClass": "consumer",
     "scopes": [
       "roads"
     ],

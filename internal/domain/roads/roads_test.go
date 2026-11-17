@@ -285,6 +285,18 @@ func TestFiltersSplitTheUnmappedValue(t *testing.T) {
 	if !slices.Equal(known, []roads.Kind{roads.KindJam}) || other {
 		t.Errorf("without other: %v %v", known, other)
 	}
+	known, other = roads.Filter{Listed: roads.AreaKinds}.KnownKinds()
+	if !slices.Equal(known, []roads.Kind{roads.KindClosure, roads.KindRoadworks, roads.KindJam, roads.KindRestriction}) || other {
+		t.Errorf("listed kinds alone: %v %v", known, other)
+	}
+	known, other = roads.Filter{Kinds: []roads.Kind{roads.KindHazard, roads.KindJam, roads.KindOther}, Listed: roads.AreaKinds}.KnownKinds()
+	if !slices.Equal(known, []roads.Kind{roads.KindJam}) || other {
+		t.Errorf("asked kinds within the listed ones: %v %v", known, other)
+	}
+	known, _ = roads.Filter{Kinds: []roads.Kind{roads.KindHazard}, Listed: roads.AreaKinds}.KnownKinds()
+	if known == nil || len(known) != 0 {
+		t.Errorf("a kind not listed keeps nothing: %v", known)
+	}
 	classes, otherClass := roads.AreaQuery{Classes: []roads.Class{roads.ClassOther}}.KnownClasses()
 	if classes == nil || len(classes) != 0 || !otherClass {
 		t.Errorf("other alone keeps no mapped class: %v %v", classes, otherClass)

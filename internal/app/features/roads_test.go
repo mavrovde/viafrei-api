@@ -228,9 +228,21 @@ func TestAWindowAheadReadsThePlannedWorksAlone(t *testing.T) {
 	}
 	// A watch's window is not a question ahead: it reads every family.
 	w := &roadFake{}
-	q.Filter.Ahead = false
+	q.Filter.Ahead, q.State = false, "de"
 	if _, err := roadService(w).RoadConditions(context.Background(), key("consumer", weatherScope, "r1", "r2", "w1"), q); err != nil || !slices.Equal(w.gotFams.Roads, []string{"r1", "r2"}) || w.gotFams.Weather == nil {
 		t.Errorf("a watch window read %+v: %v", w.gotFams, err)
+	}
+}
+
+// TestTheConditionsNearAPositionReadNoWeather: the conditions near a
+// position state no lamp, as the platform's road status states none there,
+// so they read no weather warning and credit no weather family.
+func TestTheConditionsNearAPositionReadNoWeather(t *testing.T) {
+	req.Covers(t, "FR-ROAD-006")
+	f := &roadFake{sits: []roads.Situation{{ID: "a", Family: "r2"}}}
+	c, err := roadService(f).RoadConditions(context.Background(), key("consumer", weatherScope, "r1", "r2", "w1"), roads.AreaQuery{RadiusM: 900})
+	if err != nil || !slices.Equal(f.gotFams.Roads, []string{"r1", "r2"}) || f.gotFams.Weather != nil || !slices.Equal(names(c.Families), []string{"r2"}) {
+		t.Errorf("near a position read %+v, credits %v: %v", f.gotFams, names(c.Families), err)
 	}
 }
 
@@ -250,13 +262,13 @@ func TestTheLampSeesStaleFamilies(t *testing.T) {
 	// while the attribution names only the roads family that answered and
 	// the weather families the lamp read.
 	f := &roadFake{sits: []roads.Situation{{ID: "a", Family: "r2"}}, stale: []string{"r1"}}
-	c, err := roadService(f).RoadConditions(context.Background(), consumer, roads.AreaQuery{})
+	c, err := roadService(f).RoadConditions(context.Background(), consumer, roads.AreaQuery{State: "de"})
 	if err != nil || !slices.Equal(names(c.Families), []string{"r2", "w1", "w2"}) {
 		t.Errorf("a stale family: %v, %v", names(c.Families), err)
 	}
 	lit(t, "a stale roads family", c, roads.LampAmber, roads.ReasonLimitedSight)
 	f = &roadFake{}
-	if c, err = roadService(f).RoadConditions(context.Background(), consumer, roads.AreaQuery{}); err != nil {
+	if c, err = roadService(f).RoadConditions(context.Background(), consumer, roads.AreaQuery{State: "de"}); err != nil {
 		t.Fatal(err)
 	}
 	lit(t, "every family fresh and nothing reported", c, roads.LampGreen, "")
@@ -268,7 +280,7 @@ func TestTheLampSeesStaleFamilies(t *testing.T) {
 		"a weather family not confirmed": {lapsed: []string{"w2"}},
 		"a weather family without data":  {missing: []string{"w1"}},
 	} {
-		c, err = roadService(f).RoadConditions(context.Background(), consumer, roads.AreaQuery{})
+		c, err = roadService(f).RoadConditions(context.Background(), consumer, roads.AreaQuery{State: "de"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -291,7 +303,7 @@ func TestTheLampReadsTheWeatherWarnings(t *testing.T) {
 		{1, roads.LampAmber, roads.ReasonWeatherWarning},
 	} {
 		f := &roadFake{warns: []roads.Warning{{Family: "w2", Level: c.level}}}
-		got, err := roadService(f).RoadConditions(ctx, consumer, roads.AreaQuery{})
+		got, err := roadService(f).RoadConditions(ctx, consumer, roads.AreaQuery{State: "de"})
 		if err != nil || !slices.Equal(names(got.Families), []string{"w1", "w2"}) || !slices.Equal(f.gotFams.Weather, []string{"w1", "w2"}) {
 			t.Errorf("level %d: attributed %v, asked %v, %v", c.level, names(got.Families), f.gotFams, err)
 		}
@@ -300,7 +312,7 @@ func TestTheLampReadsTheWeatherWarnings(t *testing.T) {
 	// A jam of 30 minutes comes before a red warning in the platform's order.
 	delay := 30
 	f := &roadFake{warns: []roads.Warning{{Family: "w1", Level: 3}}, msgs: []roads.Message{{Kind: roads.KindJam, Headline: "Stau", DelayMin: &delay}}}
-	c, _ := roadService(f).RoadConditions(ctx, consumer, roads.AreaQuery{})
+	c, _ := roadService(f).RoadConditions(ctx, consumer, roads.AreaQuery{State: "de"})
 	lit(t, "a long jam and a red warning", c, roads.LampRed, roads.ReasonLongJam)
 
 	// A key that may read only some of the weather families, or none, does
@@ -311,7 +323,7 @@ func TestTheLampReadsTheWeatherWarnings(t *testing.T) {
 		"no weather family":          key("consumer", weatherScope, "r1", "r2"),
 	} {
 		f := &roadFake{}
-		c, err := roadService(f).RoadConditions(ctx, k, roads.AreaQuery{})
+		c, err := roadService(f).RoadConditions(ctx, k, roads.AreaQuery{State: "de"})
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
@@ -320,7 +332,7 @@ func TestTheLampReadsTheWeatherWarnings(t *testing.T) {
 	// The warnings are public: a key without the weather scope reads them
 	// too, and the answer credits the weather families read.
 	f = &roadFake{}
-	c, err := roadService(f).RoadConditions(ctx, key("consumer", roadsScope, "r1", "r2", "w1", "w2"), roads.AreaQuery{})
+	c, err := roadService(f).RoadConditions(ctx, key("consumer", roadsScope, "r1", "r2", "w1", "w2"), roads.AreaQuery{State: "de"})
 	if err != nil || !slices.Equal(f.gotFams.Weather, []string{"w1", "w2"}) || !slices.Equal(names(c.Families), []string{"r1", "r2", "w1", "w2"}) {
 		t.Errorf("a key without the weather scope asked for %v, credited %v, %v", f.gotFams.Weather, names(c.Families), err)
 	}
@@ -331,7 +343,7 @@ func TestConditionsRefusals(t *testing.T) {
 	req.Covers(t, "SEC-030", "SEC-033")
 	ctx := context.Background()
 	ask := func(f *roadFake, k access.Record) error {
-		_, err := roadService(f).RoadConditions(ctx, k, roads.AreaQuery{})
+		_, err := roadService(f).RoadConditions(ctx, k, roads.AreaQuery{State: "de"})
 		return err
 	}
 	full := key("commercial", weatherScope, "r1", "w1")
@@ -404,7 +416,7 @@ func TestTheWeatherSightIsTheConfirmation(t *testing.T) {
 		"a weather family confirmed long ago":    {&roadFake{lapsed: []string{"w1"}}, roads.LampAmber, roads.ReasonLimitedSight},
 		"a warning held, the family not current": {&roadFake{lapsed: []string{"w1", "w2"}, warns: []roads.Warning{{Family: "w1", Level: 1}}}, roads.LampAmber, roads.ReasonWeatherWarning},
 	} {
-		got, err := roadService(c.f).RoadConditions(ctx, consumer, roads.AreaQuery{})
+		got, err := roadService(c.f).RoadConditions(ctx, consumer, roads.AreaQuery{State: "de"})
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
@@ -432,7 +444,7 @@ func TestTheLampSeesEveryStateInScope(t *testing.T) {
 		"a current-only family lapsed caps the state": {&roadFake{lapsed: []string{"r1"}, coverage: cover([]string{"r1"}, []string{"r2"}, []string{"r1"})}, consumer, roads.LampAmber},
 		"the only covering family not readable":       {&roadFake{coverage: cover(nil, []string{"r2"}, nil)}, key("commercial", weatherScope, "r1", "r2", "w1"), roads.LampAmber},
 	} {
-		got, err := roadService(c.f).RoadConditions(ctx, c.key, roads.AreaQuery{})
+		got, err := roadService(c.f).RoadConditions(ctx, c.key, roads.AreaQuery{State: "de"})
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}

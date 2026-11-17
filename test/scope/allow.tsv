@@ -35,3 +35,4 @@ column	api/openapi.json	providerUpdatedAt	the public member of a hydrogen statio
 column	api/openapi.json	reportedAt	the public member of a report published before the read contract named a sharing column the same; the contract took the public name, it exposes no storage
 column	api/openapi.json	whole_day	the platform tool argument find_fuel_station.whole_day, named as the tool names it for parity (FR-ENERGY-002); a request parameter, not a storage name
 vocabulary	test/inventory/mapping.tsv	feeds	the MCP server's own resource URI as the inventory names it (mcp.tsv); a record of what a consumer asks for, not the API's vocabulary
+vocabulary	api/examples/getWatch.json	datex	a situation id exactly as the read contract gives a Land or city traffic message (the generated fixture id it was answered with); the id is the read contract's, opaque to a client; an opaque id is asked of the database lane

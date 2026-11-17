@@ -404,7 +404,7 @@
       "id": "roads-near-kinds",
       "operation": "listRoadConditions",
       "counterpart": "road conditions",
-      "request": "/v1/road-conditions?at=52.2,9.15&radius_m=25000&limit=10",
+      "request": "/v1/road-conditions?at=52.57,8.49&radius_m=25000&limit=10",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -802,7 +802,7 @@
       "counterpart": "transit disruption check",
       "request": "/v1/transit-disruptions?area=08001",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "transit"
         ],
@@ -820,7 +820,7 @@
       "counterpart": "transit disruption check",
       "request": "/v1/transit-disruptions?area=08&limit=1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "transit"
         ],

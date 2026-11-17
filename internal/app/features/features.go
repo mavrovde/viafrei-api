@@ -82,6 +82,7 @@ type Repositories struct {
 	National    National
 	Affected    Affected
 	Coverage    Coverage
+	States      States
 }
 
 // Settings are the tunables of the use cases.

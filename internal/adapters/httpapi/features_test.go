@@ -38,6 +38,7 @@ import (
 // records what it was asked.
 type fakeFeatures struct {
 	objects    objectsFake
+	states     statesFake
 	charging   features.Answer[energy.Site]
 	parking    features.Answer[parking.Site]
 	overview   features.Overview

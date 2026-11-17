@@ -201,7 +201,7 @@ web:/internal/place/cards	getPlaceOverview	place-overview	-
 web:/internal/place/{}/{}	getPlaceOverview	place-overview	-
 web:/internal/place/{}/card/{}	getPlaceOverview	place-overview	-
 argument:check_autobahn_traffic.land	listStateRoadConditions?state,listStateRoadConditions?road_class	state-roads-10	-
-web:/internal/state/{}	listStateRoadConditions?state	state-roads-10	-
+web:/internal/state/{}	listStateRoadConditions?state,listStateWeatherWarnings,listStateServiceAlerts	state-roads-10	-
 web:/internal/news/traffic	listStateRoadConditions?kinds	state-roads-10-closures	-
 web:/internal/tiles/jams	getNationalSummary,listStateRoadConditions?kinds	state-roads-10-closures	-
 web:/internal/tiles/reports	getNationalSummary,listStateRoadConditions	state-roads-10-closures	-

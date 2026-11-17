@@ -132,6 +132,8 @@ func operations() []operation {
 		{id: "getMotorwayConditions", method: http.MethodGet, path: "/v1/motorways/{road}/conditions", tag: "roads", keyed: true, scope: "roads", register: registerMotorwayConditions},
 		{id: "listRoadConditions", method: http.MethodGet, path: "/v1/road-conditions", tag: "roads", keyed: true, scope: "roads", register: registerRoadConditions},
 		{id: "listStateRoadConditions", method: http.MethodGet, path: "/v1/states/{state}/road-conditions", tag: "roads", keyed: true, scope: "roads", register: registerStateConditions},
+		{id: "listStateWeatherWarnings", method: http.MethodGet, path: "/v1/states/{state}/weather", tag: "weather", keyed: true, scope: "weather", register: registerStateWarnings},
+		{id: "listStateServiceAlerts", method: http.MethodGet, path: "/v1/states/{state}/service-alerts", tag: "transit", keyed: true, scope: "transit", register: registerStateAlerts},
 		{id: "listLorryRules", method: http.MethodGet, path: "/v1/lorry-rules", tag: "roads", keyed: true, scope: "roads", register: registerLorry},
 		{id: "listMotorways", method: http.MethodGet, path: "/v1/motorways", tag: "roads", keyed: true, scope: "roads", register: registerMotorways},
 		{id: "getRoadSituation", method: http.MethodGet, path: "/v1/road-situations/{situationId}", tag: "roads", keyed: true, scope: "roads", register: registerRoadSituation},

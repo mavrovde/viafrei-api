@@ -35,7 +35,7 @@ type AffectedOutput struct {
 
 func registerAffected(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "The stations most affected now"
-	op.Description = "The stations ranked by what affects them now (the site's station board): departures of the next 60 minutes cancelled first, then late ones, then service alerts in force, then lifts and escalators out of service; a station with none is not listed. A station is listed when a service alert in force or a lift out of service names it; its departures are then counted. Needs the scope transit."
+	op.Description = "The stations ranked by what affects them now (the site's station board): departures of the next 60 minutes cancelled first, then late ones, then service alerts in force, then lifts and escalators out of service; a station with none is not listed. Needs the scope transit."
 	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, in *AffectedInput) (*AffectedOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {

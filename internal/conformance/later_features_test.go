@@ -13,6 +13,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
+	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 )
 
 // laterFeatures answers every operation of 0.3.0's inventory mapping with an
@@ -86,4 +87,12 @@ func (laterFeatures) PlacesCoverage(context.Context, access.Record) (places.Cove
 
 func (laterFeatures) WeatherCell(context.Context, access.Record, string, *geo.Point, int) (features.CellAnswer, error) {
 	return features.CellAnswer{}, nil
+}
+
+func (laterFeatures) StateWarnings(context.Context, access.Record, string) ([]weather.StateWarning, features.Answer[struct{}], error) {
+	return nil, features.Answer[struct{}]{}, nil
+}
+
+func (laterFeatures) StateAlerts(context.Context, access.Record, string, int) (features.StateAlertsAnswer, error) {
+	return features.StateAlertsAnswer{}, nil
 }

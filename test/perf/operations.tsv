@@ -40,3 +40,5 @@ getPressure	lookup
 getNationalSummary	composed
 listAffectedStations	composed
 getPlacesCoverage	composed
+listStateWeatherWarnings	lookup
+listStateServiceAlerts	lookup

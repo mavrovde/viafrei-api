@@ -55,6 +55,8 @@ type Features interface {
 	Location(ctx context.Context, key access.Record, q places.LocationQuery) (features.LocationAnswer, error)
 	National(ctx context.Context, key access.Record, fuelWindow time.Duration) (features.NationalAnswer, error)
 	AffectedStations(ctx context.Context, key access.Record, limit int) ([]transit.Affected, features.Answer[struct{}], error)
+	StateWarnings(ctx context.Context, key access.Record, land string) ([]weather.StateWarning, features.Answer[struct{}], error)
+	StateAlerts(ctx context.Context, key access.Record, land string, limit int) (features.StateAlertsAnswer, error)
 	PlacesCoverage(ctx context.Context, key access.Record) (places.Coverage, features.Answer[struct{}], error)
 	WeatherCell(ctx context.Context, key access.Record, target string, at *geo.Point, minLevel int) (features.CellAnswer, error)
 }

@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5"
 
@@ -9,6 +10,36 @@ import (
 )
 
 // The public-transport repositories (anti-corruption layer).
+
+// stationByID reads one station: $1 the id, $2 the families. A station
+// stored with no position is placed at 0,0 nowhere: the board names it.
+var stationByID = `
+select s.stop_place_id, s.name, coalesce(st_y(s.location), 0), coalesce(st_x(s.location), 0), s.national_stop_code,
+       s.region_code, coalesce(s.modes, '{}'), s.source_ref
+from contract.stop_place s
+where s.stop_place_id = $1 and s.withdrawn_at is null and s.source_ref = any($2) and ` + permitted("s")
+
+// Station reads the station with this id (features.Transit).
+func (s *Store) Station(ctx context.Context, id string, families []string) (transit.Station, error) {
+	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (transit.Station, error) {
+		var (
+			v     transit.Station
+			modes []string
+		)
+		err := tx.QueryRow(ctx, stationByID, id, families).Scan(&v.ID, &v.Name, &v.Location.Lat, &v.Location.Lon,
+			&v.NationalCode, &v.RegionCode, &modes, &v.Family)
+		if errors.Is(err, pgx.ErrNoRows) {
+			// No such station is an answer, not a failure of storage.
+			return transit.Station{}, nil
+		}
+		v.Modes = transit.MapModes(modes)
+		return v, err
+	})
+	if err == nil && out.ID == "" {
+		err = transit.ErrNotFound
+	}
+	return out, err
+}
 
 // stationsPage reads the stations of the given families that answer a
 // search: $1 families; $2, $3 the position's latitude and longitude, both
@@ -61,4 +92,53 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 		return out[:q.Limit], true, nil
 	}
 	return out, false, nil
+}
+
+// boardCalls reads the departing calls of a station in a window: $1 the
+// station (a stop place), $2 and $3 the window's first and end instant
+// (planned departure), $4 the families. A call is one a passenger can board
+// (contract.departure.boarding) of a trip that calls somewhere outside the
+// station after it: a trip's last call at the station is an arrival. The
+// destination is the trip's headsign, else the name of its last stop.
+var boardCalls = `
+select d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transport_mode, d.route_type,
+       d.train_number, d.train_category, nullif(btrim(j.destination_label), ''),
+       coalesce(nullif(btrim(j.destination_label), ''),
+                (select lp.name from contract.scheduled_call lc
+                   join contract.stop_point lp on lp.stop_point_id = lc.stop_point_id
+                  where lc.journey_id = d.journey_id
+                  order by lc.call_order desc limit 1)),
+       d.planned_departure_at, d.platform, d.planned_platform, d.platform_changed, d.realtime, d.realtime_source,
+       d.cancelled, d.delay_min, d.expected_departure_at, d.no_forecast, d.source_ref, d.source_refs
+from contract.departure d
+left join contract.journey j on j.journey_id = d.journey_id
+where d.stop_place_id = $1
+  and d.planned_departure_at >= $2 and d.planned_departure_at < $3
+  and d.boarding
+  and d.source_ref = any($4)
+  and ` + permitted("d") + `
+  and exists (select 1 from contract.scheduled_call nx
+                join contract.stop_point np on np.stop_point_id = nx.stop_point_id
+               where nx.journey_id = d.journey_id and nx.call_order > d.call_order
+                 and np.stop_place_id <> $1)
+order by d.planned_departure_at, d.journey_id, d.call_order`
+
+// Departures reads the departing calls of q's station in q's window
+// (features.Transit); the board's rules are transit.Board's.
+func (s *Store) Departures(ctx context.Context, q transit.DepartureQuery, families []string) ([]transit.Departure, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.Departure, error) {
+		rows, _ := tx.Query(ctx, boardCalls, q.StationID, q.From, q.From.Add(q.Window), families)
+		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.Departure, error) {
+			var (
+				v    transit.Departure
+				mode string
+			)
+			err := r.Scan(&v.JourneyID, &v.StopPointID, &v.CallOrder, &v.Line, &mode, &v.RouteType, &v.TrainNumber,
+				&v.Category, &v.Headsign, &v.Destination, &v.PlannedAt, &v.Platform, &v.PlannedPlatform,
+				&v.PlatformChanged, &v.Live, &v.Source, &v.Cancelled, &v.DelayMin, &v.ExpectedAt, &v.NoForecast,
+				&v.Family, &v.Families)
+			v.Mode = transit.MapMode(mode)
+			return v, err
+		})
+	})
 }

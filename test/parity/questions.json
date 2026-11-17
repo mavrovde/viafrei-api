@@ -123,6 +123,91 @@
         ]
       },
       "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "stations-text",
+      "operation": "listStations",
+      "counterpart": "station search",
+      "request": "/v1/stations?q=Nam%C3%BCningen&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "src-alpha-transit"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "stations-near",
+      "operation": "listStations",
+      "counterpart": "station search",
+      "request": "/v1/stations?at=49.148,7.786&radius_m=20000&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "src-alpha-transit"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "departures-day",
+      "operation": "listStationDepartures",
+      "counterpart": "departure board",
+      "request": "/v1/stations/1:de:01002:0/departures?from=2026-03-30T04:00:00Z&duration_min=1440&limit=15",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "src-alpha-transit"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "departures-modes",
+      "operation": "listStationDepartures",
+      "counterpart": "departure board",
+      "request": "/v1/stations/1:de:01002:0/departures?from=2026-03-30T04:00:00Z&duration_min=1440&modes=rail,sbahn&limit=15",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "src-alpha-transit"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "departures-categories",
+      "operation": "listStationDepartures",
+      "counterpart": "departure board",
+      "request": "/v1/stations/1:de:01002:0/departures?from=2026-03-30T04:00:00Z&duration_min=1440&categories=RE&limit=15",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "src-alpha-transit"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
     }
   ]
 }

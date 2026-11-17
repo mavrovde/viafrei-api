@@ -93,6 +93,11 @@ func (f *askedFeatures) Stations(_ context.Context, _ access.Record, q transit.Q
 	return features.Answer[transit.Station]{}, nil
 }
 
+func (f *askedFeatures) Departures(_ context.Context, _ access.Record, q transit.DepartureQuery) (features.Board, error) {
+	f.asked = fmt.Sprintf("window=%s limit=%d", q.Window, q.Limit)
+	return features.Board{}, nil
+}
+
 // tenMinutesOld answers one charging site whose one point was reported
 // occupied ten minutes before the answer, by a family whose design threshold
 // is an hour: only the status age limit can make it stale.

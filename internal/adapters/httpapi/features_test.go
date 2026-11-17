@@ -56,6 +56,8 @@ type fakeFeatures struct {
 	chargeCall int
 	stations   features.Answer[transit.Station]
 	gotStation transit.Query
+	board      features.Board
+	gotBoard   transit.DepartureQuery
 	gotAccept  []string
 }
 

@@ -29,7 +29,7 @@ var transitFamily = provenance.Family{
 func stationsAnswer() features.Answer[transit.Station] {
 	return features.Answer[transit.Station]{Items: []transit.Station{
 		{ID: "sp-05-0001", Name: "Köln Hbf", Location: geo.Point{Lat: 50.9430001, Lon: 6.9589999}, NationalCode: sp("de:05315:11201"),
-			RegionCode: sp("05315"), Modes: []transit.Mode{"long_distance_rail", "bus"}, DistanceM: ip(120), Family: "src-alpha-transit"},
+			RegionCode: sp("05315"), Modes: []transit.Mode{"rail", "bus"}, DistanceM: ip(120), Family: "src-alpha-transit"},
 		{ID: "sp-05-0002", Name: "Köln Messe/Deutz", Location: geo.Point{Lat: 50.94, Lon: 6.975}, Modes: []transit.Mode{}, Family: "src-alpha-transit"},
 	}, HasMore: true, Families: []provenance.Family{transitFamily}, At: fixedNow}
 }
@@ -51,7 +51,7 @@ func TestStationsAnswer(t *testing.T) {
 	modes, _ := s0["modes"].([]any)
 	if len(data) != 2 || s0["id"] != "sp-05-0001" || s0["name"] != "Köln Hbf" || loc["lat"] != 50.943 || loc["lon"] != 6.959 ||
 		s0["stopCode"] != "de:05315:11201" || s0["districtCode"] != "05315" || s0["distanceM"] != 120.0 ||
-		s0["sourceFamily"] != "src-alpha-transit" || len(modes) != 2 || modes[0] != "long_distance_rail" {
+		s0["sourceFamily"] != "src-alpha-transit" || len(modes) != 2 || modes[0] != "rail" {
 		t.Fatalf("first station %v", s0)
 	}
 	s1, _ := data[1].(map[string]any)

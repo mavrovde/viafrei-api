@@ -15,3 +15,6 @@ column	api/openapi.json	legalBasis	member name of a driving rule fixed by Spec: 
 column	api/openapi.json	reviewedOn	member name of a rule topic fixed by Spec: Endpoints, Weather, Rules and Composed, section 2 and FR-RULES-001; the resource vocabulary, not a storage name
 vocabulary	test/inventory/mcp.tsv	feeds	the MCP server's own resource URI, exactly as its release lists it (internal/release/inventory); a record of what a consumer asks for, not the API's vocabulary
 vocabulary	internal/fixtures/generate.go	datex	the id the read contract itself gives a Land or city traffic message, written as the view writes it so the fixture plants what the platform holds; an opaque id is asked of the database lane
+column	api/openapi.json	stationId	path parameter of the departure board, the station id listStations answers (FR-TRANSIT-002); the resource vocabulary, not a storage name
+column	api/openapi.json	journeyId	member name of a departure, the trip and its service day as the departure board names it (FR-TRANSIT-002); the resource vocabulary, not a storage name
+column	api/openapi.json	plannedPlatform	member name of a departure beside platform, as the departure board shows a platform change (FR-TRANSIT-002); the resource vocabulary, not a storage name

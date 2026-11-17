@@ -81,6 +81,109 @@
         ],
         "type": "object"
       },
+      "Board": {
+        "additionalProperties": false,
+        "properties": {
+          "departures": {
+            "items": {
+              "$ref": "#/components/schemas/Departure"
+            },
+            "type": "array"
+          },
+          "station": {
+            "$ref": "#/components/schemas/BoardStation"
+          },
+          "window": {
+            "$ref": "#/components/schemas/BoardWindow"
+          }
+        },
+        "required": [
+          "station",
+          "window",
+          "departures"
+        ],
+        "type": "object"
+      },
+      "BoardStation": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "name": {
+            "type": "string"
+          },
+          "stopCode": {
+            "description": "The national stop code (DHID); null when none is recorded.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "location",
+          "stopCode"
+        ],
+        "type": "object"
+      },
+      "BoardWindow": {
+        "additionalProperties": false,
+        "properties": {
+          "dropped": {
+            "description": "Departures the mode and category filter left out, per route type; empty when it left none out.",
+            "items": {
+              "$ref": "#/components/schemas/Dropped"
+            },
+            "type": "array"
+          },
+          "from": {
+            "description": "Start of the window.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "fromLocal": {
+            "description": "from in Europe/Berlin time.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "matched": {
+            "description": "Departures of the asked modes and categories in the window; more than listed when meta.page.hasMore.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "matchedAll": {
+            "description": "Departures of every mode and category in the window.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "until": {
+            "description": "End of the window (excluded).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "untilLocal": {
+            "description": "until in Europe/Berlin time.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "fromLocal",
+          "until",
+          "untilLocal",
+          "matched",
+          "matchedAll",
+          "dropped"
+        ],
+        "type": "object"
+      },
       "ChargePoint": {
         "additionalProperties": false,
         "properties": {
@@ -511,6 +614,259 @@
         ],
         "type": "object"
       },
+      "Departure": {
+        "additionalProperties": false,
+        "properties": {
+          "cancelled": {
+            "description": "True when a live source reports the departure cancelled.",
+            "type": "boolean"
+          },
+          "category": {
+            "description": "The train category (ICE, RE, S) where a live source names it; null otherwise.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "delayMin": {
+            "description": "The live delay in whole minutes (negative: early); null without a figure.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "destination": {
+            "description": "Where the trip goes: its headsign, else its last stop; null when neither is known.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expectedAt": {
+            "description": "The expected departure; null without a figure.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "The journey and the call: one train calling twice at the station is two rows.",
+            "type": "string"
+          },
+          "journeyId": {
+            "description": "The trip and its service day.",
+            "type": "string"
+          },
+          "line": {
+            "description": "The line as signed (RE 5, S 6, 120); null when the timetable names none.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mode": {
+            "description": "The mode of transport. Open enumeration (rail, sbahn, subway, tram, bus, ferry, other); treat an unknown value as other.",
+            "type": "string"
+          },
+          "noForecast": {
+            "description": "True when a live source holds the departure but gives no figure for it.",
+            "type": "boolean"
+          },
+          "plannedAt": {
+            "description": "The planned departure.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "plannedAtLocal": {
+            "description": "plannedAt in Europe/Berlin time.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "plannedPlatform": {
+            "description": "The planned platform; null when the timetable names none.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platform": {
+            "description": "The live platform where one is reported, else the planned one; null when none is known.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platformChanged": {
+            "description": "True when a live source reports a platform other than the planned one.",
+            "type": "boolean"
+          },
+          "realtime": {
+            "description": "True when a live figure stands for this departure.",
+            "type": "boolean"
+          },
+          "realtimeSource": {
+            "description": "The live source family the figure is from; null without one.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "routeType": {
+            "description": "The timetable's route type code, basic or extended (3 bus, 2 and 100-199 rail, 109 S-Bahn).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "sourceFamily": {
+            "description": "The timetable's source family; every family a row draws on is credited in meta.attribution.",
+            "type": "string"
+          },
+          "trainNumber": {
+            "description": "The train's number; null off the railway or when not published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "journeyId",
+          "line",
+          "mode",
+          "routeType",
+          "trainNumber",
+          "category",
+          "destination",
+          "plannedAt",
+          "plannedAtLocal",
+          "platform",
+          "plannedPlatform",
+          "platformChanged",
+          "realtime",
+          "realtimeSource",
+          "cancelled",
+          "delayMin",
+          "expectedAt",
+          "noForecast",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
+      "DeparturesEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Board"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DeparturesMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "DeparturesMeta": {
+        "additionalProperties": false,
+        "properties": {
+          "asOf": {
+            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "attribution": {
+            "description": "One entry per contributing source family; clients displaying the data must show its text.",
+            "items": {
+              "$ref": "#/components/schemas/Attribution"
+            },
+            "type": "array"
+          },
+          "freshness": {
+            "description": "One entry per contributing source family.",
+            "items": {
+              "$ref": "#/components/schemas/FreshnessEntry"
+            },
+            "type": "array"
+          },
+          "generatedAt": {
+            "description": "When the service produced this body.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "language": {
+            "description": "The language of the texts in data (BCP 47).",
+            "type": "string"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/Notes"
+          },
+          "page": {
+            "$ref": "#/components/schemas/Page"
+          },
+          "query": {
+            "$ref": "#/components/schemas/DeparturesQuery"
+          },
+          "requestId": {
+            "description": "The request id, equal to the X-Request-Id header.",
+            "type": "string"
+          },
+          "warnings": {
+            "description": "Warnings about this answer; empty when there is none.",
+            "items": {
+              "$ref": "#/components/schemas/DataWarning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "page",
+          "query",
+          "asOf",
+          "freshness",
+          "attribution",
+          "notes",
+          "warnings",
+          "requestId",
+          "generatedAt",
+          "language"
+        ],
+        "type": "object"
+      },
+      "DeparturesQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "categories": {
+            "description": "The categories asked; empty for every departure.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "modes": {
+            "description": "The modes asked; empty for every mode.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "modes",
+          "categories"
+        ],
+        "type": "object"
+      },
       "DrivingRule": {
         "additionalProperties": false,
         "properties": {
@@ -586,6 +942,24 @@
           "data",
           "meta",
           "links"
+        ],
+        "type": "object"
+      },
+      "Dropped": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "description": "The route type code, as text.",
+            "type": "string"
+          },
+          "count": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "count"
         ],
         "type": "object"
       },
@@ -2179,7 +2553,7 @@
             "$ref": "#/components/schemas/Position"
           },
           "modes": {
-            "description": "The modes of transport that serve the station. Open enumeration (long_distance_rail, regional_rail, suburban_rail, subway, tram, bus, ferry, other); treat an unknown value as other.",
+            "description": "The modes of transport that serve the station. Open enumeration (rail, sbahn, subway, tram, bus, ferry, other: rail is every train but the S-Bahn); treat an unknown value as other.",
             "items": {
               "type": "string"
             },
@@ -6548,6 +6922,342 @@
           }
         ],
         "x-example-request": "/v1/stations?q=D%C3%BCsra%C3%9Fbach\u0026limit=8",
+        "x-required-scope": "transit"
+      }
+    },
+    "/v1/stations/{stationId}/departures": {
+      "get": {
+        "description": "The departures planned from the station in the window, as a departure board shows them: calls a passenger can board, of trips that go on beyond the station (a trip's last call is an arrival); one line to one destination at one instant once, whatever stop of the station published it; one destination from one platform at one instant once, whatever the line is called; earliest first, then by line. Each row carries the newest live figure the platform holds for it (delay, cancellation, platform change). Needs the scope transit.",
+        "operationId": "listStationDepartures",
+        "parameters": [
+          {
+            "description": "The station id, as listStations answers it.",
+            "in": "path",
+            "name": "stationId",
+            "required": true,
+            "schema": {
+              "description": "The station id, as listStations answers it.",
+              "examples": [
+                "1:de:05315:11201"
+              ],
+              "maxLength": 120,
+              "minLength": 3,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Start of the window (RFC 3339 with an offset); default: now. The board lists the departures planned from it.",
+            "explode": false,
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "description": "Start of the window (RFC 3339 with an offset); default: now. The board lists the departures planned from it.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Length of the window in minutes; default 60. To look further ahead, move from rather than widen the window.",
+            "explode": false,
+            "in": "query",
+            "name": "duration_min",
+            "schema": {
+              "description": "Length of the window in minutes; default 60. To look further ahead, move from rather than widen the window.",
+              "format": "int64",
+              "maximum": 1440,
+              "minimum": 5,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Keep only these modes (comma-separated): rail, sbahn, subway, tram, bus, ferry, other. Default: every mode.",
+            "explode": false,
+            "in": "query",
+            "name": "modes",
+            "schema": {
+              "description": "Keep only these modes (comma-separated): rail, sbahn, subway, tram, bus, ferry, other. Default: every mode.",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 7,
+              "type": "array"
+            }
+          },
+          {
+            "description": "Keep only trains of these categories (comma-separated, as the timetable writes them: ICE, IC, RE, RB, S). Default: every departure.",
+            "explode": false,
+            "in": "query",
+            "name": "categories",
+            "schema": {
+              "description": "Keep only trains of these categories (comma-separated, as the timetable writes them: ICE, IC, RE, RB, S). Default: every departure.",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 20,
+              "type": "array"
+            }
+          },
+          {
+            "description": "Most departures to return, earliest first; default 10.",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "description": "Most departures to return, earliest first; default 10.",
+              "format": "int64",
+              "maximum": 15,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeparturesEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No station with this id.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "A station's departure board",
+        "tags": [
+          "transit"
+        ],
+        "x-mcp-counterpart": "departure board",
         "x-required-scope": "transit"
       }
     },

@@ -35,6 +35,7 @@ type Features interface {
 	WeatherRisk(ctx context.Context, key access.Record, q weather.Query) (features.WeatherRisk, error)
 	DrivingRules(ctx context.Context, key access.Record, topic string) (rules.Topic, features.Answer[rules.Rule], error)
 	Stations(ctx context.Context, key access.Record, q transit.Query) (features.Answer[transit.Station], error)
+	Departures(ctx context.Context, key access.Record, q transit.DepartureQuery) (features.Board, error)
 }
 
 // counterpartExtension names the MCP capability an operation answers the
@@ -194,6 +195,8 @@ func (s *server) featureProblem(ctx context.Context, err error) *Problem {
 		gateViolations.Add(1)
 		s.log.ErrorContext(ctx, "licence gate post-check aborted an answer", "requestId", RequestIDFrom(ctx), "error", err)
 		return newProblem(ctx, SlugInternal, "An unexpected fault occurred; quote the request id.", 0)
+	case errors.Is(err, transit.ErrNotFound):
+		return newProblem(ctx, SlugNotFound, "No station with this id.", 0)
 	case errors.Is(err, places.ErrNotFound):
 		return newProblem(ctx, SlugNotFound, "No place with this id.", 0)
 	case errors.Is(err, roads.ErrUnknownRoad):

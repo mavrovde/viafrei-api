@@ -37,8 +37,8 @@ func TestMapModes(t *testing.T) {
 	if got := transit.MapMode("cable_car"); got != transit.Other {
 		t.Errorf("an unknown mode: %q", got)
 	}
-	got := transit.MapModes([]string{"bus", "cable_car", "regional_rail", "bus", "funicular"})
-	if want := []transit.Mode{"regional_rail", "bus", transit.Other}; !slices.Equal(got, want) {
+	got := transit.MapModes([]string{"bus", "cable_car", "rail", "bus", "funicular"})
+	if want := []transit.Mode{"rail", "bus", transit.Other}; !slices.Equal(got, want) {
 		t.Errorf("MapModes = %v, want %v", got, want)
 	}
 	if got := transit.MapModes(nil); got == nil || len(got) != 0 {

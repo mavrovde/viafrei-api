@@ -26,6 +26,21 @@ type trFake struct {
 	readErr     error
 	gotQuery    transit.Query
 	gotFamilies []string
+	station     transit.Station
+	stErr       error
+	calls       []transit.Departure
+	depErr      error
+	gotBoard    transit.DepartureQuery
+}
+
+func (f *trFake) Station(_ context.Context, id string, fams []string) (transit.Station, error) {
+	f.gotFamilies = fams
+	return f.station, f.stErr
+}
+
+func (f *trFake) Departures(_ context.Context, q transit.DepartureQuery, _ []string) ([]transit.Departure, error) {
+	f.gotBoard = q
+	return f.calls, f.depErr
 }
 
 func (f *trFake) Stations(_ context.Context, q transit.Query, fams []string) ([]transit.Station, bool, error) {
@@ -78,6 +93,50 @@ func TestStationsRefusals(t *testing.T) {
 		"provenance": {&trFake{fake: &fake{provErr: errStore}}, full, errStore},
 	} {
 		if _, err := trService(c.f).Stations(context.Background(), c.k, transit.Query{}); !errors.Is(err, c.want) {
+			t.Errorf("%s: %v, want %v", name, err, c.want)
+		}
+	}
+}
+
+func TestDeparturesAreTheBoardGatedAndAttributed(t *testing.T) {
+	req.Covers(t, "FR-TRANSIT-002", "SEC-030")
+	at := now.Add(time.Minute)
+	f := &trFake{station: transit.Station{ID: "s", Family: "t1"}, calls: []transit.Departure{
+		{JourneyID: "a", PlannedAt: at, Mode: "bus", RouteType: 3, Family: "t1", Families: []string{"t1"}},
+		{JourneyID: "b", PlannedAt: at.Add(time.Minute), Mode: "bus", RouteType: 3, Family: "t1", Families: []string{"t1"}},
+		{JourneyID: "c", StopPointID: "p2", PlannedAt: at, Mode: "tram", RouteType: 0, Family: "t1", Families: []string{"t1"}},
+	}}
+	q := transit.DepartureQuery{StationID: "s", From: now, Window: time.Hour, Modes: []transit.Mode{"bus"}, Limit: 1}
+	b, err := trService(f).Departures(context.Background(), key("commercial", []access.Scope{"transit"}, "t1", "t2"), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(f.gotFamilies, []string{"t1"}) || f.gotBoard.StationID != "s" {
+		t.Errorf("asked %+v of %v", f.gotBoard, f.gotFamilies)
+	}
+	if b.Station.ID != "s" || len(b.Items) != 1 || b.Items[0].JourneyID != "a" || !b.HasMore || !b.Partial || b.Matched != 2 ||
+		b.MatchedAll != 3 || b.Dropped[0] != 1 || !b.At.Equal(now) || !slices.Equal(names(b.Families), []string{"t1"}) {
+		t.Errorf("board %+v", b)
+	}
+}
+
+func TestDeparturesRefusals(t *testing.T) {
+	req.Covers(t, "SEC-030", "SEC-033")
+	full := key("commercial", []access.Scope{"transit"}, "t1")
+	st := transit.Station{ID: "s", Family: "t1"}
+	for name, c := range map[string]struct {
+		f    *trFake
+		k    access.Record
+		want error
+	}{
+		"register":   {&trFake{fake: &fake{regErr: errStore}}, full, errStore},
+		"none":       {&trFake{}, key("commercial", []access.Scope{"transit"}, "t2"), access.ErrNonePermitted},
+		"station":    {&trFake{stErr: transit.ErrNotFound}, full, transit.ErrNotFound},
+		"read":       {&trFake{station: st, depErr: errStore}, full, errStore},
+		"post-check": {&trFake{station: st, calls: []transit.Departure{{Families: []string{"t2"}}}}, full, features.ErrGateViolation},
+		"provenance": {&trFake{fake: &fake{provErr: errStore}, station: st}, full, errStore},
+	} {
+		if _, err := trService(c.f).Departures(context.Background(), c.k, transit.DepartureQuery{Limit: 5}); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)
 		}
 	}

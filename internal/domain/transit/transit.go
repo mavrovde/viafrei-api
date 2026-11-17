@@ -3,6 +3,7 @@
 package transit
 
 import (
+	"errors"
 	"slices"
 	"strings"
 	"unicode"
@@ -17,7 +18,7 @@ type Mode string
 const Other Mode = "other"
 
 // Modes lists every mode an answer can carry.
-var Modes = []Mode{"long_distance_rail", "regional_rail", "suburban_rail", "subway", "tram", "bus", "ferry", Other}
+var Modes = []Mode{"rail", "sbahn", "subway", "tram", "bus", "ferry", Other}
 
 // MapMode maps a stored mode code.
 func MapMode(raw string) Mode {
@@ -96,3 +97,6 @@ func strip(r rune) string {
 	}
 	return string(r)
 }
+
+// ErrNotFound is returned for a station id no permitted family holds.
+var ErrNotFound = errors.New("transit: no such station")

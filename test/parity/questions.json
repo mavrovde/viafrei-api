@@ -2190,6 +2190,55 @@
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "fuel-refreshed",
+      "operation": "listFuelOptions",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&limit=10",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "tankerkoenig_gamma"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T01:00:00Z",
+      "refresh": {
+        "source": "fuel",
+        "subject": {
+          "at": "pt:49.17,7.81",
+          "snap": true
+        }
+      }
+    },
+    {
+      "id": "train-board-refreshed",
+      "operation": "getTrainBoard",
+      "counterpart": "train departures",
+      "request": "/v1/train-boards/8001001",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "db_timetables"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T01:00:00Z",
+      "refresh": {
+        "source": "train_board",
+        "subject": {
+          "eva": "8001001"
+        }
+      }
     }
   ]
 }

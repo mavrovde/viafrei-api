@@ -75,7 +75,19 @@ type Case struct {
 	Request     string    `json:"request"`
 	Key         Key       `json:"key"`
 	Now         time.Time `json:"now"`
+	Refresh     *Refresh  `json:"refresh,omitempty"`
 	Facts       []Fact    `json:"facts"`
+}
+
+// Refresh is the on-demand refresh a question asks before its read: the
+// API is asked createRefresh (POST /v1/refreshes) with it, as the key, and
+// the read is asked once the refresh has settled; the MCP side asks its
+// tool with a refresh port that settles the same way (docs/parity.md). The
+// read's answer is compared; the refresh's own answer is not, since the MCP
+// tool states no refresh of its own.
+type Refresh struct {
+	Source  string         `json:"source"`
+	Subject map[string]any `json:"subject"`
 }
 
 // Key is the caller the question is asked as.
@@ -484,6 +496,7 @@ type Question struct {
 	Request     string    `json:"request"`
 	Key         Key       `json:"key"`
 	Now         time.Time `json:"now"`
+	Refresh     *Refresh  `json:"refresh,omitempty"`
 }
 
 // Questions are the parity questions and the fixture rows they are asked on.
@@ -518,6 +531,9 @@ func LoadQuestions(fsys fs.FS) (Questions, error) {
 		if c.ID == "" || seen[c.ID] || c.Operation == "" || c.Request == "" || c.Now.IsZero() {
 			return Questions{}, fmt.Errorf("%w: %s: question %q needs a unique id, an operation, a request and a now", ErrMalformed, QuestionsFile, c.ID)
 		}
+		if c.Refresh != nil && (c.Refresh.Source == "" || len(c.Refresh.Subject) == 0) {
+			return Questions{}, fmt.Errorf("%w: %s: question %q asks a refresh without a source or a subject", ErrMalformed, QuestionsFile, c.ID)
+		}
 		seen[c.ID] = true
 	}
 	return q, nil
@@ -525,7 +541,7 @@ func LoadQuestions(fsys fs.FS) (Questions, error) {
 
 // QuestionOf is the question a case answers.
 func QuestionOf(c Case) Question {
-	return Question{ID: c.ID, Operation: c.Operation, Counterpart: c.Counterpart, Request: c.Request, Key: c.Key, Now: c.Now}
+	return Question{ID: c.ID, Operation: c.Operation, Counterpart: c.Counterpart, Request: c.Request, Key: c.Key, Now: c.Now, Refresh: c.Refresh}
 }
 
 // Answers states every way in which b does not answer exactly q: a question

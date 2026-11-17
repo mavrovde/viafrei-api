@@ -13084,6 +13084,227 @@
           "value": "1"
         }
       ]
+    },
+    {
+      "id": "fuel-refreshed",
+      "operation": "listFuelOptions",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options?at=49.17,7.81\u0026radius_m=25000\u0026limit=10",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "tankerkoenig_gamma"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T01:00:00Z",
+      "refresh": {
+        "source": "fuel",
+        "subject": {
+          "at": "pt:49.17,7.81",
+          "snap": true
+        }
+      },
+      "facts": [
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].brand",
+          "value": "Belnan"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].distanceM",
+          "value": "100"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].id",
+          "value": "00000000-0000-4000-8000-000000000002"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].location.lat",
+          "value": "49.16941"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].location.lon",
+          "value": "7.80879"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].name",
+          "value": "Belnan Namüningen"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].openingState",
+          "value": "unknown"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].prices[0].current",
+          "value": "true"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].prices[0].fuel",
+          "value": "diesel"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].prices[0].priceEur",
+          "value": "1.799"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].prices[0].reportedAt",
+          "value": "2026-03-30T01:00:00Z"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].prices[0].reportedAtLocal",
+          "value": "2026-03-30T01:00:00Z"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].prices[1].current",
+          "value": "true"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].prices[1].fuel",
+          "value": "e10"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].prices[1].priceEur",
+          "value": "1.633"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].prices[1].reportedAt",
+          "value": "2026-03-30T01:00:00Z"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].prices[1].reportedAtLocal",
+          "value": "2026-03-30T01:00:00Z"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].prices[2].current",
+          "value": "true"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].prices[2].fuel",
+          "value": "e5"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].prices[2].priceEur",
+          "value": "2.062"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].prices[2].reportedAt",
+          "value": "2026-03-30T01:00:00Z"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].prices[2].reportedAtLocal",
+          "value": "2026-03-30T01:00:00Z"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].sourceFamily",
+          "value": "tankerkoenig_gamma"
+        },
+        {
+          "name": "meta.attribution[tankerkoenig_gamma].family",
+          "value": "tankerkoenig_gamma"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose[tankerkoenig_gamma]",
+          "value": "1"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "10"
+        }
+      ]
+    },
+    {
+      "id": "train-board-refreshed",
+      "operation": "getTrainBoard",
+      "counterpart": "train departures",
+      "request": "/v1/train-boards/8001001",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "db_timetables"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T01:00:00Z",
+      "refresh": {
+        "source": "train_board",
+        "subject": {
+          "eva": "8001001"
+        }
+      },
+      "facts": [
+        {
+          "name": "data.departures[0].cancelled",
+          "value": "false"
+        },
+        {
+          "name": "data.departures[0].category",
+          "value": "ICE"
+        },
+        {
+          "name": "data.departures[0].delayMin",
+          "value": "0"
+        },
+        {
+          "name": "data.departures[0].destination",
+          "value": "Hamburg-Altona"
+        },
+        {
+          "name": "data.departures[0].expectedAt",
+          "value": "2026-03-30T01:12:00Z"
+        },
+        {
+          "name": "data.departures[0].plannedAt",
+          "value": "2026-03-30T01:12:00Z"
+        },
+        {
+          "name": "data.departures[0].plannedPlatform",
+          "value": "4"
+        },
+        {
+          "name": "data.departures[0].platform",
+          "value": "4"
+        },
+        {
+          "name": "data.departures[0].platformChanged",
+          "value": "false"
+        },
+        {
+          "name": "data.departures[0].sourceFamily",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.eva",
+          "value": "8001001"
+        },
+        {
+          "name": "meta.attribution[db_timetables].family",
+          "value": "db_timetables"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
     }
   ]
 }

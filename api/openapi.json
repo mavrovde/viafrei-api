@@ -10257,7 +10257,7 @@
       "name": "access"
     },
     {
-      "description": "Where to charge.",
+      "description": "Where to charge and to fill up.",
       "name": "energy"
     },
     {
@@ -10279,6 +10279,10 @@
     {
       "description": "The German driving rules.",
       "name": "rules"
+    },
+    {
+      "description": "Stations, their departures, lifts and escalators.",
+      "name": "transit"
     }
   ]
 }

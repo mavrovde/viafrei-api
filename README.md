@@ -116,7 +116,7 @@ The public listener answers only the callers of `VFAPI_CALLERS_ALLOW_CIDR` and r
 
 Other subcommands: `healthcheck` (exit 0 when `/healthz` on the health listener answers, for container healthchecks), `meta-check` (compare the running service's versions with the expected platform and read-contract versions, [releasing](docs/RELEASING.md#version-sync-with-the-platform)), `config show` (effective values, secrets hidden), `config docs`, `openapi`, `keys` (the operator's key tool, [docs/access-keys.md](docs/access-keys.md)), `version`.
 
-The database the service reads is described by a versioned read contract in [`db/contract/`](db/contract): logical names only, created with a read-only role. Tests build it in a throwaway container. They never reach a live data source or production.
+The database the service reads is described by a versioned read contract that the [viafrei-database](https://github.com/mavrovde/viafrei-database) release in [`database.pin`](database.pin) builds: logical names only, read with a read-only role. Tests migrate a throwaway container with that release. They never reach a live data source or production.
 
 ## Run with Docker
 

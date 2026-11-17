@@ -33,7 +33,6 @@ func (a *AddressInput) Resolve(huma.Context) []error {
 
 // Address is an address of an answer.
 type Address struct {
-	ID           string   `json:"id"`
 	Street       *string  `json:"street" nullable:"true" doc:"The street; null when not mapped."`
 	HouseNumber  *string  `json:"number" nullable:"true" doc:"The house number; null when not mapped."`
 	Postcode     *string  `json:"postcode" nullable:"true" doc:"The postcode; null when not mapped."`
@@ -44,18 +43,11 @@ type Address struct {
 	SourceFamily string   `json:"sourceFamily"`
 }
 
-// AddressData is the data of listAddresses.
+// AddressData is the data of listAddresses: the addresses, as the
+// platform's address search states them (no identifier, no reading of the
+// typed text: docs/parity.md).
 type AddressData struct {
-	Query     AddressQuery `json:"query" doc:"How the typed address was read."`
-	Addresses []Address    `json:"addresses"`
-}
-
-// AddressQuery is how a typed address was read.
-type AddressQuery struct {
-	Street      string  `json:"street"`
-	HouseNumber string  `json:"number"`
-	Postcode    *string `json:"postcode" nullable:"true"`
-	Place       *string `json:"place" nullable:"true"`
+	Addresses []Address `json:"addresses"`
 }
 
 // AddressEnvelope is the enveloped answer of listAddresses.
@@ -101,10 +93,9 @@ func registerAddress(api huma.API, s *server, op huma.Operation) {
 }
 
 func addressEnvelope(s *server, ctx context.Context, a features.AddressAnswer, q places.AddressQuery) AddressEnvelope {
-	data := AddressData{Query: AddressQuery{Street: q.Street, HouseNumber: q.HouseNumber, Postcode: optional(q.Postcode), Place: optional(q.Place)},
-		Addresses: make([]Address, len(a.Addresses))}
+	data := AddressData{Addresses: make([]Address, len(a.Addresses))}
 	for i, v := range a.Addresses {
-		data.Addresses[i] = Address{ID: v.ID, Street: v.Street, HouseNumber: v.HouseNumber, Postcode: v.Postcode, Place: v.Place, Land: v.Land,
+		data.Addresses[i] = Address{Street: v.Street, HouseNumber: v.HouseNumber, Postcode: v.Postcode, Place: v.Place, Land: v.Land,
 			Location: position(v.Location), DataAsOf: day(v.DataAsOf), SourceFamily: v.Family}
 	}
 	return AddressEnvelope{Data: data,

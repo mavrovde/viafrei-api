@@ -27,7 +27,7 @@ type PoiAnswer struct {
 // Pois answers "where is the X in Y" for key as the platform's search for a
 // place of interest pages it: q.Limit matches from q.Offset.
 func (s *Service) Pois(ctx context.Context, key access.Record, q places.PoiQuery) (PoiAnswer, error) {
-	v, meta, err := listed(ctx, s, key, "places", func(permitted []string) (PoiAnswer, []string, error) {
+	v, meta, err := listedOwn(ctx, s, key, "places", func(permitted []string) (PoiAnswer, []string, error) {
 		all, err := s.repos.Pois.Pois(ctx, q, permitted)
 		if err != nil {
 			return PoiAnswer{}, nil, err

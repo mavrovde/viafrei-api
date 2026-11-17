@@ -4464,59 +4464,39 @@
       "now": "2026-03-28T18:00:00Z",
       "facts": [
         {
-          "name": "data.addresses[osm:node650000].dataAsOf",
+          "name": "data.addresses[0].dataAsOf",
           "value": "2026-02-26"
         },
         {
-          "name": "data.addresses[osm:node650000].id",
-          "value": "osm:node650000"
-        },
-        {
-          "name": "data.addresses[osm:node650000].land",
+          "name": "data.addresses[0].land",
           "value": "null"
         },
         {
-          "name": "data.addresses[osm:node650000].location.lat",
+          "name": "data.addresses[0].location.lat",
           "value": "47.60983"
         },
         {
-          "name": "data.addresses[osm:node650000].location.lon",
+          "name": "data.addresses[0].location.lon",
           "value": "7.89724"
         },
         {
-          "name": "data.addresses[osm:node650000].number",
+          "name": "data.addresses[0].number",
           "value": "1"
         },
         {
-          "name": "data.addresses[osm:node650000].place",
+          "name": "data.addresses[0].place",
           "value": "Kansilkamp"
         },
         {
-          "name": "data.addresses[osm:node650000].postcode",
+          "name": "data.addresses[0].postcode",
           "value": "20000"
         },
         {
-          "name": "data.addresses[osm:node650000].sourceFamily",
+          "name": "data.addresses[0].sourceFamily",
           "value": "osm"
         },
         {
-          "name": "data.addresses[osm:node650000].street",
-          "value": "Marktweg"
-        },
-        {
-          "name": "data.query.number",
-          "value": "1"
-        },
-        {
-          "name": "data.query.place",
-          "value": "null"
-        },
-        {
-          "name": "data.query.postcode",
-          "value": "20000"
-        },
-        {
-          "name": "data.query.street",
+          "name": "data.addresses[0].street",
           "value": "Marktweg"
         },
         {
@@ -4563,22 +4543,6 @@
           "value": "[]"
         },
         {
-          "name": "data.query.number",
-          "value": "2"
-        },
-        {
-          "name": "data.query.place",
-          "value": "Zülzürode"
-        },
-        {
-          "name": "data.query.postcode",
-          "value": "null"
-        },
-        {
-          "name": "data.query.street",
-          "value": "Marktweg"
-        },
-        {
           "name": "meta.attribution[osm].family",
           "value": "osm"
         },
@@ -4622,8 +4586,8 @@
           "value": "[]"
         },
         {
-          "name": "meta.attribution[osm].family",
-          "value": "osm"
+          "name": "meta.attribution",
+          "value": "[]"
         },
         {
           "name": "meta.notes.condition",
@@ -4632,10 +4596,6 @@
         {
           "name": "meta.notes.purpose",
           "value": "[]"
-        },
-        {
-          "name": "meta.page.atLeast",
-          "value": "false"
         },
         {
           "name": "meta.page.limit",
@@ -4673,8 +4633,8 @@
           "value": "[]"
         },
         {
-          "name": "meta.attribution[osm].family",
-          "value": "osm"
+          "name": "meta.attribution",
+          "value": "[]"
         },
         {
           "name": "meta.notes.condition",
@@ -4683,10 +4643,6 @@
         {
           "name": "meta.notes.purpose",
           "value": "[]"
-        },
-        {
-          "name": "meta.page.atLeast",
-          "value": "false"
         },
         {
           "name": "meta.page.limit",
@@ -4720,303 +4676,283 @@
       "now": "2026-03-28T18:00:00Z",
       "facts": [
         {
-          "name": "data[osm:node600013].brand",
+          "name": "data[0].brand",
           "value": "null"
         },
         {
-          "name": "data[osm:node600013].category",
+          "name": "data[0].category",
           "value": "amenity"
         },
         {
-          "name": "data[osm:node600013].dataAsOf",
+          "name": "data[0].dataAsOf",
           "value": "2026-02-26"
         },
         {
-          "name": "data[osm:node600013].distanceM",
+          "name": "data[0].distanceM",
           "value": "null"
         },
         {
-          "name": "data[osm:node600013].id",
-          "value": "osm:node600013"
-        },
-        {
-          "name": "data[osm:node600013].kind",
+          "name": "data[0].kind",
           "value": "pharmacy"
         },
         {
-          "name": "data[osm:node600013].location.lat",
-          "value": "47.97635"
+          "name": "data[0].location.lat",
+          "value": "55.05900"
         },
         {
-          "name": "data[osm:node600013].location.lon",
-          "value": "11.41268"
+          "name": "data[0].location.lon",
+          "value": "15.01056"
         },
         {
-          "name": "data[osm:node600013].name",
-          "value": "Pharmacy Greitwuck"
+          "name": "data[0].name",
+          "value": "Pharmacy Bragrir"
         },
         {
-          "name": "data[osm:node600013].number",
-          "value": "13"
+          "name": "data[0].number",
+          "value": "91"
         },
         {
-          "name": "data[osm:node600013].operator",
+          "name": "data[0].operator",
           "value": "null"
         },
         {
-          "name": "data[osm:node600013].place",
-          "value": "Klomdürbrück"
+          "name": "data[0].place",
+          "value": "Bomstolstedt"
         },
         {
-          "name": "data[osm:node600013].postcode",
-          "value": "10013"
+          "name": "data[0].postcode",
+          "value": "10091"
         },
         {
-          "name": "data[osm:node600013].sourceFamily",
+          "name": "data[0].sourceFamily",
           "value": "osm"
         },
         {
-          "name": "data[osm:node600013].street",
+          "name": "data[0].street",
           "value": "Marktweg"
         },
         {
-          "name": "data[osm:node600019].brand",
+          "name": "data[1].brand",
           "value": "null"
         },
         {
-          "name": "data[osm:node600019].category",
+          "name": "data[1].category",
           "value": "amenity"
         },
         {
-          "name": "data[osm:node600019].dataAsOf",
+          "name": "data[1].dataAsOf",
           "value": "2026-02-26"
         },
         {
-          "name": "data[osm:node600019].distanceM",
+          "name": "data[1].distanceM",
           "value": "null"
         },
         {
-          "name": "data[osm:node600019].id",
-          "value": "osm:node600019"
-        },
-        {
-          "name": "data[osm:node600019].kind",
+          "name": "data[1].kind",
           "value": "pharmacy"
         },
         {
-          "name": "data[osm:node600019].location.lat",
-          "value": "48.18694"
+          "name": "data[1].location.lat",
+          "value": "47.85294"
         },
         {
-          "name": "data[osm:node600019].location.lon",
-          "value": "14.94431"
+          "name": "data[1].location.lon",
+          "value": "9.08365"
         },
         {
-          "name": "data[osm:node600019].name",
-          "value": "Pharmacy Klasmiß"
+          "name": "data[1].name",
+          "value": "Pharmacy Brümmäck"
         },
         {
-          "name": "data[osm:node600019].number",
-          "value": "19"
+          "name": "data[1].number",
+          "value": "7"
         },
         {
-          "name": "data[osm:node600019].operator",
+          "name": "data[1].operator",
           "value": "null"
         },
         {
-          "name": "data[osm:node600019].place",
-          "value": "Törscheibach"
+          "name": "data[1].place",
+          "value": "Tüstoßwerder"
         },
         {
-          "name": "data[osm:node600019].postcode",
-          "value": "10019"
+          "name": "data[1].postcode",
+          "value": "10007"
         },
         {
-          "name": "data[osm:node600019].sourceFamily",
+          "name": "data[1].sourceFamily",
           "value": "osm"
         },
         {
-          "name": "data[osm:node600019].street",
+          "name": "data[1].street",
           "value": "Marktweg"
         },
         {
-          "name": "data[osm:node600025].brand",
+          "name": "data[2].brand",
           "value": "null"
         },
         {
-          "name": "data[osm:node600025].category",
+          "name": "data[2].category",
           "value": "amenity"
         },
         {
-          "name": "data[osm:node600025].dataAsOf",
+          "name": "data[2].dataAsOf",
           "value": "2026-02-26"
         },
         {
-          "name": "data[osm:node600025].distanceM",
+          "name": "data[2].distanceM",
           "value": "null"
         },
         {
-          "name": "data[osm:node600025].id",
-          "value": "osm:node600025"
-        },
-        {
-          "name": "data[osm:node600025].kind",
+          "name": "data[2].kind",
           "value": "pharmacy"
         },
         {
-          "name": "data[osm:node600025].location.lat",
+          "name": "data[2].location.lat",
           "value": "49.45394"
         },
         {
-          "name": "data[osm:node600025].location.lon",
+          "name": "data[2].location.lon",
           "value": "7.06698"
         },
         {
-          "name": "data[osm:node600025].name",
+          "name": "data[2].name",
           "value": "Pharmacy Motklül"
         },
         {
-          "name": "data[osm:node600025].number",
+          "name": "data[2].number",
           "value": "25"
         },
         {
-          "name": "data[osm:node600025].operator",
+          "name": "data[2].operator",
           "value": "null"
         },
         {
-          "name": "data[osm:node600025].place",
+          "name": "data[2].place",
           "value": "Oberunterhinterkieselbrückenwaldsiedlungsgemeinschaftsgemarkung"
         },
         {
-          "name": "data[osm:node600025].postcode",
+          "name": "data[2].postcode",
           "value": "10025"
         },
         {
-          "name": "data[osm:node600025].sourceFamily",
+          "name": "data[2].sourceFamily",
           "value": "osm"
         },
         {
-          "name": "data[osm:node600025].street",
+          "name": "data[2].street",
           "value": "Marktweg"
         },
         {
-          "name": "data[osm:node600067].brand",
+          "name": "data[3].brand",
           "value": "null"
         },
         {
-          "name": "data[osm:node600067].category",
+          "name": "data[3].category",
           "value": "amenity"
         },
         {
-          "name": "data[osm:node600067].dataAsOf",
+          "name": "data[3].dataAsOf",
           "value": "2026-02-26"
         },
         {
-          "name": "data[osm:node600067].distanceM",
+          "name": "data[3].distanceM",
           "value": "null"
         },
         {
-          "name": "data[osm:node600067].id",
-          "value": "osm:node600067"
-        },
-        {
-          "name": "data[osm:node600067].kind",
+          "name": "data[3].kind",
           "value": "pharmacy"
         },
         {
-          "name": "data[osm:node600067].location.lat",
-          "value": "51.36946"
+          "name": "data[3].location.lat",
+          "value": "53.93108"
         },
         {
-          "name": "data[osm:node600067].location.lon",
-          "value": "13.18011"
+          "name": "data[3].location.lon",
+          "value": "10.96477"
         },
         {
-          "name": "data[osm:node600067].name",
-          "value": "Pharmacy Heismeß"
+          "name": "data[3].name",
+          "value": "Pharmacy Stunmel"
         },
         {
-          "name": "data[osm:node600067].number",
-          "value": "67"
+          "name": "data[3].number",
+          "value": "85"
         },
         {
-          "name": "data[osm:node600067].operator",
+          "name": "data[3].operator",
           "value": "null"
         },
         {
-          "name": "data[osm:node600067].place",
-          "value": "Famgickrode"
+          "name": "data[3].place",
+          "value": "Schüßnockrode"
         },
         {
-          "name": "data[osm:node600067].postcode",
-          "value": "10067"
+          "name": "data[3].postcode",
+          "value": "10085"
         },
         {
-          "name": "data[osm:node600067].sourceFamily",
+          "name": "data[3].sourceFamily",
           "value": "osm"
         },
         {
-          "name": "data[osm:node600067].street",
+          "name": "data[3].street",
           "value": "Marktweg"
         },
         {
-          "name": "data[osm:node600073].brand",
+          "name": "data[4].brand",
           "value": "null"
         },
         {
-          "name": "data[osm:node600073].category",
+          "name": "data[4].category",
           "value": "amenity"
         },
         {
-          "name": "data[osm:node600073].dataAsOf",
+          "name": "data[4].dataAsOf",
           "value": "2026-02-26"
         },
         {
-          "name": "data[osm:node600073].distanceM",
+          "name": "data[4].distanceM",
           "value": "null"
         },
         {
-          "name": "data[osm:node600073].id",
-          "value": "osm:node600073"
-        },
-        {
-          "name": "data[osm:node600073].kind",
+          "name": "data[4].kind",
           "value": "pharmacy"
         },
         {
-          "name": "data[osm:node600073].location.lat",
-          "value": "54.55739"
+          "name": "data[4].location.lat",
+          "value": "52.92118"
         },
         {
-          "name": "data[osm:node600073].location.lon",
-          "value": "7.02831"
+          "name": "data[4].location.lon",
+          "value": "9.79931"
         },
         {
-          "name": "data[osm:node600073].name",
-          "value": "Pharmacy Grienlel"
+          "name": "data[4].name",
+          "value": "Pharmacy Tötpöng"
         },
         {
-          "name": "data[osm:node600073].number",
-          "value": "73"
+          "name": "data[4].number",
+          "value": "55"
         },
         {
-          "name": "data[osm:node600073].operator",
+          "name": "data[4].operator",
           "value": "null"
         },
         {
-          "name": "data[osm:node600073].place",
-          "value": "Hülgreinbach"
+          "name": "data[4].place",
+          "value": "Tämnamfeld"
         },
         {
-          "name": "data[osm:node600073].postcode",
-          "value": "10073"
+          "name": "data[4].postcode",
+          "value": "10055"
         },
         {
-          "name": "data[osm:node600073].sourceFamily",
+          "name": "data[4].sourceFamily",
           "value": "osm"
         },
         {
-          "name": "data[osm:node600073].street",
+          "name": "data[4].street",
           "value": "Marktweg"
         },
         {
@@ -5030,10 +4966,6 @@
         {
           "name": "meta.notes.purpose",
           "value": "[]"
-        },
-        {
-          "name": "meta.page.atLeast",
-          "value": "false"
         },
         {
           "name": "meta.page.limit",

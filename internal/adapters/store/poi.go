@@ -11,7 +11,8 @@ import (
 // poiMatch reads the places of interest whose name or brand holds $1 (both
 // in their search form): in the town $2, or within $5 metres of ($3, $4),
 // or anywhere; in the family $6 when set. The name spelt as asked first,
-// then one that begins with it, then the nearest (or by name), at most
+// then one that begins with it, then the nearest, then the closest in
+// trigrams and by name, as the platform ranks equal matches; at most
 // places.PoiReach+1 from the start, so the total says whether more matched;
 // $7 the families.
 var poiMatch = `select p.poi_id, p.name, p.category, p.category_value, p.brand, p.operator_name, p.street, p.house_number,
@@ -26,7 +27,7 @@ where (p.name_fold like '%' || $1 || '%' or lower(p.brand) like '%' || $1 || '%'
   and ($6::text is null or p.category = $6)
   and p.source_ref = any($7) and ` + permitted("p") + `
 order by case when p.name_fold = $1 then 0 when p.name_fold like $1 || '%' then 1 else 2 end,
-         distance_m nulls last, p.name_fold, p.poi_id
+         distance_m nulls last, similarity(p.name_fold, $1) desc, p.name, p.poi_id
 limit $8`
 
 // Pois reads the places of interest q asks for, from the first, at most

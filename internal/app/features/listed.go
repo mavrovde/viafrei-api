@@ -2,6 +2,7 @@ package features
 
 import (
 	"context"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 )
@@ -10,6 +11,19 @@ import (
 // permitted families, the post-check of the families that contributed, and
 // their provenance (or the consulted families' when none did).
 func listed[T any](ctx context.Context, s *Service, key access.Record, domain string,
+	read func(permitted []string) (T, []string, error)) (T, Answer[struct{}], error) {
+	return listedCredits(ctx, s, key, domain, false, read)
+}
+
+// listedOwn is listed for a search that credits only the families whose
+// rows it states, so an empty answer credits none (creditsOf), as the
+// platform's search of the same domain does.
+func listedOwn[T any](ctx context.Context, s *Service, key access.Record, domain string,
+	read func(permitted []string) (T, []string, error)) (T, Answer[struct{}], error) {
+	return listedCredits(ctx, s, key, domain, true, read)
+}
+
+func listedCredits[T any](ctx context.Context, s *Service, key access.Record, domain string, own bool,
 	read func(permitted []string) (T, []string, error)) (T, Answer[struct{}], error) {
 	var zero T
 	reg, gate, err := s.gate(ctx, key)
@@ -27,7 +41,12 @@ func listed[T any](ctx context.Context, s *Service, key access.Record, domain st
 	if err := gate.Check(contributed); err != nil {
 		return zero, Answer[struct{}]{}, err
 	}
-	fams, err := s.provenanceOf(ctx, contributed, permitted)
+	var fams []provenance.Family
+	if own {
+		fams, err = s.creditsOf(ctx, contributed)
+	} else {
+		fams, err = s.provenanceOf(ctx, contributed, permitted)
+	}
 	if err != nil {
 		return zero, Answer[struct{}]{}, err
 	}

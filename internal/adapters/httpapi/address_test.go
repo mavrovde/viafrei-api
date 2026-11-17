@@ -33,12 +33,16 @@ func TestAddressAnswer(t *testing.T) {
 	if f.gotAddress.Street != "Hauptstr." || f.gotAddress.Postcode != "50667" || f.gotAddress.Place != "Köln" || f.gotAddress.Limit != 3 {
 		t.Errorf("asked %+v", f.gotAddress)
 	}
-	for _, want := range []string{`"id":"osm:node1"`, `"postcode":"50667"`} {
-		if !strings.Contains(body, want) {
-			t.Errorf("answer lacks %s: %s", want, body)
+	if !strings.Contains(body, `"street":"Hauptstraße"`) {
+		t.Errorf("answer lacks the street: %s", body)
+	}
+	// The platform's address search states neither an identifier nor its reading of the typed text (docs/parity.md).
+	for _, unwanted := range []string{`"id":`, `"query":`} {
+		if strings.Contains(body, unwanted) {
+			t.Errorf("answer states %s: %s", unwanted, body)
 		}
 	}
-	if w = do(t, h, http.MethodGet, "/v1/addresses?q=Ring+1,+Fulda&limit=5", bearer); w.Code != http.StatusOK || f.gotAddress.Limit != 5 || !strings.Contains(w.Body.String(), `"postcode":null`) {
+	if w = do(t, h, http.MethodGet, "/v1/addresses?q=Ring+1,+Fulda&limit=5", bearer); w.Code != http.StatusOK || f.gotAddress.Limit != 5 || f.gotAddress.Postcode != "" || f.gotAddress.Place != "Fulda" {
 		t.Errorf("town only: %d %s", w.Code, w.Body.String())
 	}
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/addresses?q=Hauptstra%C3%9Fe+12", bearer), 400, "invalid-parameter")

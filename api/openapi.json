@@ -11,9 +11,6 @@
               "null"
             ]
           },
-          "id": {
-            "type": "string"
-          },
           "land": {
             "description": "The Land; null when not known.",
             "type": [
@@ -57,7 +54,6 @@
           }
         },
         "required": [
-          "id",
           "street",
           "number",
           "postcode",
@@ -77,14 +73,9 @@
               "$ref": "#/components/schemas/Address"
             },
             "type": "array"
-          },
-          "query": {
-            "$ref": "#/components/schemas/AddressQuery",
-            "description": "How the typed address was read."
           }
         },
         "required": [
-          "query",
           "addresses"
         ],
         "type": "object"
@@ -106,36 +97,6 @@
           "data",
           "meta",
           "links"
-        ],
-        "type": "object"
-      },
-      "AddressQuery": {
-        "additionalProperties": false,
-        "properties": {
-          "number": {
-            "type": "string"
-          },
-          "place": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "postcode": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "street": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "street",
-          "number",
-          "postcode",
-          "place"
         ],
         "type": "object"
       },
@@ -2093,9 +2054,6 @@
                 "format": "int64",
                 "type": "integer"
               },
-              "id": {
-                "type": "string"
-              },
               "land": {
                 "description": "The Land; null when not known.",
                 "type": [
@@ -2140,7 +2098,6 @@
             },
             "required": [
               "distanceM",
-              "id",
               "street",
               "number",
               "postcode",
@@ -4148,9 +4105,6 @@
               "null"
             ]
           },
-          "id": {
-            "type": "string"
-          },
           "kind": {
             "description": "The value in the family (pharmacy, hotel); null when not mapped.",
             "type": [
@@ -4208,7 +4162,6 @@
           }
         },
         "required": [
-          "id",
           "name",
           "category",
           "kind",
@@ -4316,10 +4269,6 @@
       "PoiPage": {
         "additionalProperties": false,
         "properties": {
-          "atLeast": {
-            "description": "More than 50 matched: narrow the search (a town, a category).",
-            "type": "boolean"
-          },
           "limit": {
             "format": "int64",
             "type": "integer"
@@ -4340,7 +4289,6 @@
         "required": [
           "limit",
           "total",
-          "atLeast",
           "nextCursor"
         ],
         "type": "object"

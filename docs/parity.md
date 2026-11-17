@@ -157,6 +157,13 @@ nothing, so that family contributed nothing and neither side credits it.
   `Truck`).
 - **Cheapest fuel** (`sort=price`) lists only the asked grade's price, and
   each station's reported open state.
+- **Addresses** carry no identifier and no reading of the typed text: the
+  platform's address search states neither, so an address is named by its
+  position in the answer.
+- **Places of interest** carry no identifier and no `atLeast` flag; an
+  answer that lists none credits no family. Equal matches rank by trigram
+  similarity to the asked name, then by name, as the platform's search
+  ranks them.
 
 The MCP side has further rules, specific to its sources, that the read
 contract cannot express; they are not compared here.

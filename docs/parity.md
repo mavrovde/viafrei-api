@@ -83,7 +83,7 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
   answered, and none of what it answered is compared. An answer the other
   side refuses states `error = true` instead.
 - **Site-route questions.** An operation the site reads and no MCP tool
-  answers (`listMotorways`, `getMeta`, `getPlaceOverview`, `listSources`) is
+  answers (`listMotorways`, `getMeta`, `getPlaceOverview`) is
   compared with what the site shows: the producer asks the digest routes the
   site reads on the same fixture rows and projects their fragments. The API
   states what the site shows; a fact the API answers beyond it is excluded for
@@ -116,6 +116,8 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
 | `data.fresh`, `data.fetchedAt`, `data.ageSeconds`, in `getTrainBoard` only | API-only: the age of the recorded board the API serves. The train tool asks the timetable provider at the time of the question; the producer gives it a departures port fed from the fixture's recorded boards (`contract.train_board`), so both sides answer from the same rows and no provider is called. |
 | `data.place.location`, `data.charging.sites[*].access`, `data.charging.sites[*].chargePoints`, `data.parking.sites[*].kind`, `data.parking.sites[*].operator`, `data.parking.sites[*].occupancy.total`, `.state`, `.observedAt`, in `getPlaceOverview` only | API-only. The site's form of the overview is the place page of the Gemeinde (digest route `/internal/place/cards`): it shows the place's name, and per charging site its name, operator, map point, highest power and number of charge points, per car park its name, map point and free spaces. Those are compared; the place's position, a charging site's access and charge points, and a car park's kind, operator, capacity, state and reading time are not shown. A site's id is the read contract's row at the point the row links its map to. |
 | `data.charging.sites[*].distanceM`, `data.parking.sites[*].distanceM`, in `getPlaceOverview` only | The cards state a site's distance in kilometres to one decimal with a direction, the API in metres. The site's point, which both measure from, is compared. |
+| `data[*].status`, `data[*].dataAsOf`, in `listSources` only | Live-varying. The source register's MCP form is the coverage resource (`viafrei://coverage`), generated from the feed catalogue: it states a feed's freshness from the platform's run ledger, the API a family's status and age from its newest `dataAsOf`. The fixture rows hold no runs, so the two cannot agree on these rows. Which families are listed, their `domain`, `staleAfterS` and `shareAlike` are compared. |
+| `data[*].attribution`, `data[*].licence`, `data[*].licenceUrl`, `data[*].publisher`, `data[*].termsUrl`, in `listSources` only | Prose: the register texts of a family. The fixture's families carry synthetic texts and the platform states its own register's (the reason of `meta.attribution[*]` below). |
 | `data.watchId`, `data.uri`, in `getWatch` only | Each side mints the id of a watch: the platform a number of the session that opened it, the API a token of the kind, the key and the condition. The watch the id names (kind, key, condition, window) is compared. |
 | `meta.attribution[*].` `domain`, `licence`, `licenceUrl`, `publisher`, `shareAlike`, `shareAlikeOffer`, `termsUrl`, `text` | The fixture's families carry synthetic register texts; the platform credits its own register rows for the sources the producer stores each family as, so the texts cannot be equal on these rows. Which families are credited (`meta.attribution[*].family`) is compared. |
 | The text of a condition note (`meta.notes.condition`) and, since rules/5, of a purpose note (`meta.notes.purpose`) | The same reason, since rules/4 for conditions: the fixture's notes are synthetic and the platform states its own register's. The family of each note and how many each family has are compared (`meta.notes.<kind>[<family>]`, above). |
@@ -136,6 +138,11 @@ and `access=all`.
 last report: older than the status age limit (30 minutes) and younger than
 its family's design threshold (an hour). Both sides must answer it `stale`,
 so a change of either side's limit fails here.
+
+`sources-all` is asked with a `consumer` key: the MCP coverage resource
+lists the deployment's sources for the site's and an assistant's readers,
+which is the consumer use class; a commercial key would withhold the
+consumer-only families the resource lists.
 
 `charging-reserved` is asked at the same place 7 minutes after a point
 reported `reserved`. Both sides must answer it `occupied`: a reserved point

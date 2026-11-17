@@ -643,6 +643,26 @@
         ],
         "type": "object"
       },
+      "ChargingSiteEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ChargingSite"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DataMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
       "ChargingSummary": {
         "additionalProperties": false,
         "properties": {
@@ -1734,6 +1754,84 @@
           "openingState",
           "prices",
           "sourceFamily"
+        ],
+        "type": "object"
+      },
+      "FuelStationData": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/PostalAddress"
+          },
+          "aroundTheClock": {
+            "description": "True when the provider flags the station as open around the clock.",
+            "type": "boolean"
+          },
+          "brand": {
+            "description": "The brand; null when not published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "name": {
+            "description": "The station's name; null when not published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "openingState": {
+            "description": "open, closed or unknown now, read from the published opening hours: unknown when there are none or they cannot be read. Open enumeration.",
+            "type": "string"
+          },
+          "prices": {
+            "description": "Per grade, the newest price reported in the last 72 hours (the platform's held window), by grade; a grade with no price in it is left out, and current says whether a price is inside fuel.price_fresh.",
+            "items": {
+              "$ref": "#/components/schemas/FuelPrice"
+            },
+            "type": "array"
+          },
+          "sourceFamily": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "brand",
+          "address",
+          "location",
+          "openingState",
+          "aroundTheClock",
+          "prices",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
+      "FuelStationEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FuelStationData"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DataMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
         ],
         "type": "object"
       },
@@ -4371,6 +4469,83 @@
         "required": [
           "lat",
           "lon"
+        ],
+        "type": "object"
+      },
+      "PostalAddress": {
+        "additionalProperties": false,
+        "properties": {
+          "number": {
+            "description": "The house number; null when not published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "place": {
+            "description": "The town; null when not published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "postcode": {
+            "description": "The postcode; null when not published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "street": {
+            "description": "The street; null when not published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "street",
+          "number",
+          "postcode",
+          "place"
+        ],
+        "type": "object"
+      },
+      "PressureData": {
+        "additionalProperties": false,
+        "properties": {
+          "state": {
+            "description": "saturated while every read slot is taken and a read waits for one; ok otherwise. A client that shows live data can hold back its refreshes while it reads saturated.",
+            "enum": [
+              "ok",
+              "saturated"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "type": "object"
+      },
+      "PressureEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PressureData"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
         ],
         "type": "object"
       },
@@ -7826,6 +8001,292 @@
         "x-required-scope": "energy"
       }
     },
+    "/v1/charging-options/{chargingId}": {
+      "get": {
+        "description": "One charging site by its id with its points and their last reported availability (the site's own page). distanceM is 0. A withdrawn site, or one of a source family the key may not read, is not found. Needs the scope energy.",
+        "operationId": "getChargingSite",
+        "parameters": [
+          {
+            "description": "A charging site's id, as listChargingOptions answers it.",
+            "in": "path",
+            "name": "chargingId",
+            "required": true,
+            "schema": {
+              "description": "A charging site's id, as listChargingOptions answers it.",
+              "examples": [
+                "cs-000001"
+              ],
+              "maxLength": 200,
+              "pattern": "^[A-Za-z0-9:._/-]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "One charging site with its points",
+                    "value": {}
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ChargingSiteEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No charging site with this id (not-found), or the operation is switched off on this instance (feature-disabled).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "One charging site and its points",
+        "tags": [
+          "energy"
+        ],
+        "x-attribution": "Energy objects come from the source families of the energy domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. A station or site of a family the key may not read is not found.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/charging-options/afir_alpha:cs-01-0002\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/charging-options/afir_alpha:cs-01-0002",
+        "x-mcp-counterpart": "charging station search",
+        "x-required-scope": "energy"
+      }
+    },
     "/v1/driving-rules": {
       "get": {
         "description": "The curated rules on one topic, in order, with the date of their last review and the disclaimer that they are informational, not legal advice (FR-RULES-001). MCP counterpart: driving rules. Needs the scope rules.",
@@ -8689,6 +9150,292 @@
           }
         ],
         "x-example-request": "/v1/fuel-options?at=49.17,7.81\u0026radius_m=25000\u0026fuel=e10\u0026sort=price\u0026limit=2",
+        "x-mcp-counterpart": "filling station search",
+        "x-required-scope": "energy"
+      }
+    },
+    "/v1/fuel-options/{fuelId}": {
+      "get": {
+        "description": "One filling station by its id: its name, brand, address, opening state now and, per grade, the newest price it reported in the last 72 hours (the site's station page and its price block). A withdrawn station, or one of a source family the key may not read, is not found. Needs the scope energy.",
+        "operationId": "getFuelStation",
+        "parameters": [
+          {
+            "description": "A filling station's id, as listFuelOptions answers it.",
+            "in": "path",
+            "name": "fuelId",
+            "required": true,
+            "schema": {
+              "description": "A filling station's id, as listFuelOptions answers it.",
+              "examples": [
+                "tk-000001"
+              ],
+              "maxLength": 120,
+              "pattern": "^[A-Za-z0-9:._-]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "One filling station with its newest price per grade",
+                    "value": {}
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/FuelStationEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No filling station with this id (not-found), or the operation is switched off on this instance (feature-disabled).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "One filling station and its prices",
+        "tags": [
+          "energy"
+        ],
+        "x-attribution": "Energy objects come from the source families of the energy domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. A station or site of a family the key may not read is not found.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/fuel-options/00000000-0000-4000-8000-000000000002\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/fuel-options/00000000-0000-4000-8000-000000000002",
         "x-mcp-counterpart": "filling station search",
         "x-required-scope": "energy"
       }
@@ -13701,6 +14448,45 @@
         "x-example-request": "/v1/pois?name=pharmacy\u0026in=Z%C3%BClz%C3%BCrode\u0026limit=2",
         "x-mcp-counterpart": "place of interest search",
         "x-required-scope": "places"
+      }
+    },
+    "/v1/pressure": {
+      "get": {
+        "description": "One word: saturated while every read slot is taken and a read waits for one, ok otherwise (the site's pressure word). It counts slots, never a request, an address or a key.",
+        "operationId": "getPressure",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PressureEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Whether the service is saturated now",
+        "tags": [
+          "service"
+        ]
       }
     },
     "/v1/road-conditions": {

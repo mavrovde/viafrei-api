@@ -213,6 +213,7 @@ func behaviours() map[string]behaviour {
 		"charging.status_max_age":  {"5m", chargingState},
 		"fuel.price_current":       {"1h", fuelWindow},
 		"fuel.price_fresh":         {"1h", fuelFresh},
+		"fuel.price_held":          {"24h", fuelHeld},
 		"compose.part_deadline": {"300ms", func(t *testing.T, c *config.Config) string {
 			return wire.FeatureSettings(c).PartDeadline.String()
 		}},

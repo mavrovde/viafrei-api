@@ -34,3 +34,6 @@ listLorryRules	near
 listSources	near
 listMotorways	near
 getWatch	near
+getFuelStation	lookup
+getChargingSite	lookup
+getPressure	lookup

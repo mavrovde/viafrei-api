@@ -43,6 +43,8 @@ type Features interface {
 	Facilities(ctx context.Context, key access.Record, q transit.FacilityQuery) (features.StationFacilities, error)
 	Places(ctx context.Context, key access.Record, q places.Query) (features.Answer[places.Place], error)
 	FuelStations(ctx context.Context, key access.Record, q energy.FuelQuery) (features.FuelStations, error)
+	FuelStation(ctx context.Context, key access.Record, id string, held time.Duration) (energy.FuelStationPage, features.Answer[struct{}], error)
+	ChargingSite(ctx context.Context, key access.Record, id string, statusMaxAge time.Duration) (features.Answer[energy.Site], error)
 	HydrogenStations(ctx context.Context, key access.Record, q energy.HydrogenQuery) (features.HydrogenStations, error)
 	SpeedCameras(ctx context.Context, key access.Record, q roads.SpeedQuery) (features.SpeedAnswer, error)
 	Disruptions(ctx context.Context, key access.Record, q transit.DisruptionQuery) (features.DisruptionAnswer, error)
@@ -220,6 +222,8 @@ func (s *server) featureProblem(ctx context.Context, err error) *Problem {
 		return newProblem(ctx, SlugInternal, "An unexpected fault occurred; quote the request id.", 0)
 	case errors.Is(err, transit.ErrNotFound):
 		return newProblem(ctx, SlugNotFound, "No station with this id.", 0)
+	case errors.Is(err, energy.ErrNotFound):
+		return newProblem(ctx, SlugNotFound, "No filling station or charging site with this id.", 0)
 	case errors.Is(err, places.ErrNotFound):
 		return newProblem(ctx, SlugNotFound, "No place with this id.", 0)
 	case errors.Is(err, roads.ErrUnknownRoad):

@@ -223,9 +223,9 @@ resource:viafrei://rules/electric-driving	getDrivingRules?topic	rules-topic	-
 resource:viafrei://rules/low-emission-zones	getDrivingRules?topic,getDrivingRules?city	rules-lez-city	-
 resource:viafrei://emergency	getDrivingRules?topic	rules-topic	-
 web:/internal/fuel/refresh	listFuelOptions?at	fuel-near	-
-web:/internal/fuel/{}	listFuelOptions?name	fuel-name-by-name	-
-web:/internal/fuel/{}/prices	listFuelOptions?fuel	fuel-cheapest-e10	-
-web:/internal/charging/{}	listChargingOptions?operator	charging-operator	-
+web:/internal/fuel/{}	getFuelStation,listFuelOptions?name	fuel-name-by-name	-
+web:/internal/fuel/{}/prices	getFuelStation,listFuelOptions?fuel	fuel-cheapest-e10	-
+web:/internal/charging/{}	getChargingSite,listChargingOptions?operator	charging-operator	-
 web:/internal/motorway/{}/fuel	listFuelOptions?at	fuel-near	-
 web:/internal/station/index	listStations?q	stations-text	-
 web:/internal/station/list	listStations?at	stations-near	-
@@ -251,4 +251,4 @@ argument:stop_watch.uri	getWatch?watch_id	watch-by-id	-
 argument:stop_watch.kind	getWatch?kind	watch-road	-
 argument:stop_watch.key	getWatch?target	watch-road	-
 resource:viafrei://watches	getWatch?watch_id,getWatch?since	watch-by-id,watch-road-since	-
-web:/internal/pressure	getMeta	service-meta	-
+web:/internal/pressure	getPressure,getMeta	service-meta	-

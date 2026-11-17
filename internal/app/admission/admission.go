@@ -370,3 +370,14 @@ func (c *Controller) Snapshot() Snapshot {
 	}
 	return s
 }
+
+// Saturated reports whether every slot is taken and a read waits for one:
+// the pressure word the site's shell reads (the platform's pressure route).
+func (c *Controller) Saturated() bool {
+	s := c.Snapshot()
+	waiting := 0
+	for _, n := range s.Waiting {
+		waiting += n
+	}
+	return s.Free == 0 && waiting > 0
+}

@@ -211,3 +211,32 @@ func fuelFresh(t *testing.T, c *config.Config) string {
 	}
 	return fmt.Sprint(body.Data[0].Prices[0].Current)
 }
+
+// heldFeatures answers a filling station read by its id with the held
+// window it was asked with, as the station's name.
+type heldFeatures struct{ askedFeatures }
+
+func (*heldFeatures) FuelStation(_ context.Context, _ access.Record, id string, held time.Duration) (energy.FuelStationPage, features.Answer[struct{}], error) {
+	name := held.String()
+	return energy.FuelStationPage{FuelStation: energy.FuelStation{ID: id, Name: &name, Family: "f"}}, features.Answer[struct{}]{}, nil
+}
+
+// fuelHeld is the held window a filling station read by its id is asked with.
+func fuelHeld(t *testing.T, c *config.Config) string {
+	t.Helper()
+	h, err := httpapi.NewHandler(httpapi.Deps{Config: c, ContractVersion: "0.1", Auth: everyScope{}, Features: &heldFeatures{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/fuel-options/x1", nil))
+	var body struct {
+		Data struct {
+			Name string `json:"name"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil || w.Code != http.StatusOK {
+		t.Fatalf("%d %v %s", w.Code, err, w.Body)
+	}
+	return body.Data.Name
+}

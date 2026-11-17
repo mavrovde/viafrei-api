@@ -2,9 +2,11 @@ package conformance_test
 
 import (
 	"context"
+	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/energy"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
@@ -59,4 +61,12 @@ func (laterFeatures) Sources(context.Context, access.Record, string) ([]provenan
 
 func (laterFeatures) Motorways(context.Context, access.Record, roads.CatalogueQuery) (features.MotorwaysAnswer, error) {
 	return features.MotorwaysAnswer{}, nil
+}
+
+func (laterFeatures) FuelStation(context.Context, access.Record, string, time.Duration) (energy.FuelStationPage, features.Answer[struct{}], error) {
+	return energy.FuelStationPage{}, features.Answer[struct{}]{}, nil
+}
+
+func (laterFeatures) ChargingSite(context.Context, access.Record, string, time.Duration) (features.Answer[energy.Site], error) {
+	return features.Answer[energy.Site]{}, nil
 }

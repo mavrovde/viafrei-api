@@ -66,6 +66,8 @@ type Deps struct {
 	// answers a matching If-None-Match before the operation runs; nil
 	// validates only after it.
 	Versions VersionReader
+	// Pressure says whether the reads are saturated; nil answers ok.
+	Pressure Pressure
 }
 
 type server struct {
@@ -82,6 +84,7 @@ type server struct {
 	metering        Meter
 	results         *resultCache
 	versions        *versionCache
+	pressure        Pressure
 }
 
 // surface names the listeners an operation is served on (#92): the public
@@ -115,6 +118,7 @@ func operations() []operation {
 		{id: "getHealth", method: http.MethodGet, path: "/healthz", surface: onPublic | onHealth, legacy: true, register: registerHealth},
 		{id: "getReadiness", method: http.MethodGet, path: "/readyz", surface: onPublic | onHealth, legacy: true, register: registerReadiness},
 		{id: "getMeta", method: http.MethodGet, path: "/v1/meta", surface: onPublic | onHealth, register: registerMeta},
+		{id: "getPressure", method: http.MethodGet, path: "/v1/pressure", surface: onPublic | onHealth, register: registerPressure},
 		{id: "getKey", method: http.MethodGet, path: "/v1/key", tag: "access", keyed: true, register: registerKey},
 		{id: "listSources", method: http.MethodGet, path: "/v1/sources", tag: "meta", keyed: true, register: registerSources},
 		{id: "listChargingOptions", method: http.MethodGet, path: "/v1/charging-options", tag: "energy", keyed: true, scope: "energy", register: registerCharging},
@@ -131,6 +135,8 @@ func operations() []operation {
 		{id: "getWatch", method: http.MethodGet, path: "/v1/watch", tag: "roads", keyed: true, scope: "roads", register: registerWatch},
 		{id: "getWeatherRisk", method: http.MethodGet, path: "/v1/weather-risk", tag: "weather", keyed: true, scope: "weather", register: registerWeatherRisk},
 		{id: "getDrivingRules", method: http.MethodGet, path: "/v1/driving-rules", tag: "rules", keyed: true, scope: "rules", register: registerDrivingRules},
+		{id: "getFuelStation", method: http.MethodGet, path: "/v1/fuel-options/{fuelId}", tag: "energy", keyed: true, scope: "energy", register: registerFuelStation},
+		{id: "getChargingSite", method: http.MethodGet, path: "/v1/charging-options/{chargingId}", tag: "energy", keyed: true, scope: "energy", register: registerChargingSite},
 		{id: "listFuelOptions", method: http.MethodGet, path: "/v1/fuel-options", tag: "energy", keyed: true, scope: "energy", register: registerFuel},
 		{id: "listHydrogenOptions", method: http.MethodGet, path: "/v1/hydrogen-options", tag: "energy", keyed: true, scope: "energy", register: registerHydrogen},
 		{id: "listSpeedCameras", method: http.MethodGet, path: "/v1/speed-cameras", tag: "roads", keyed: true, scope: "roads", register: registerSpeed},
@@ -258,6 +264,7 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 		features:        d.Features,
 		keyGate:         d.Keys,
 		metering:        d.Meter,
+		pressure:        d.Pressure,
 	}
 	if s.now == nil {
 		s.now = time.Now

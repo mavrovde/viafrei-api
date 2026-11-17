@@ -37,6 +37,7 @@ import (
 // fakeFeatures answers every feature operation from fixed values and
 // records what it was asked.
 type fakeFeatures struct {
+	objects    objectsFake
 	charging   features.Answer[energy.Site]
 	parking    features.Answer[parking.Site]
 	overview   features.Overview

@@ -56,3 +56,37 @@ func TestAPermitGrantedAsTheWaitEndsIsKept(t *testing.T) {
 		}
 	}
 }
+
+func TestSaturatedOnlyWhileAReadWaits(t *testing.T) {
+	ts := TierSettings{QueueLen: 1, MaxWait: time.Second, MaxInflight: 1}
+	c := New(Settings{Permits: 1, Tiers: [tierCount]TierSettings{ts, ts, ts}, PerKey: 1, AgingAfter: time.Hour, Alpha: 1}, nil)
+	if c.Saturated() {
+		t.Fatal("an idle controller is saturated")
+	}
+	release, err := c.Acquire(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Saturated() {
+		t.Fatal("every slot taken and nobody waiting is not saturated")
+	}
+	got := make(chan func(), 1)
+	go func() {
+		r, _ := c.Acquire(WithCaller(context.Background(), Caller{Tier: Standard, Key: "k"}))
+		got <- r
+	}()
+	deadline := time.Now().Add(time.Second)
+	for !c.Saturated() {
+		if time.Now().After(deadline) {
+			t.Fatal("never saturated with a read waiting")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	release()
+	if r := <-got; r != nil {
+		r()
+	}
+	if c.Saturated() {
+		t.Fatal("still saturated once the waiter was served")
+	}
+}

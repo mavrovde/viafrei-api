@@ -95,3 +95,15 @@ argument:check_station_facilities.station	listStations?q	stations-text	-
 argument:check_station_facilities.eva_no	listStations?code	stations-code	-
 argument:check_station_facilities.facility	listStationFacilities?kind	facilities-lifts	-
 argument:check_station_facilities.limit	listStationFacilities?limit	facilities-lifts	-
+web:/internal/search	listPlaces?q,listStations?q	places-name,stations-text	-
+web:/internal/place/suggest	listPlaces?q	places-name	-
+tool:find_roadworks_ahead	getMotorwayConditions	motorway-a101-roadworks	-
+argument:find_roadworks_ahead.road	getMotorwayConditions?road	motorway-a101-roadworks	-
+argument:find_roadworks_ahead.limit	getMotorwayConditions?limit	motorway-a101-roadworks	-
+argument:find_roadworks_ahead.place	listPlaces?q,listRoadConditions?at	places-name,roads-near-kinds	-
+argument:find_parking.only_with_free_spaces	listParkingOptions?free_min	parking-free-spaces	-
+tool:describe_station	listStations,listStationDepartures,listStationFacilities	stations-text,departures-day,facilities-all	-
+argument:describe_station.station	listStations?q	stations-text	-
+argument:describe_station.eva_no	listStations?code	stations-code	-
+argument:describe_station.departures	listStationDepartures?limit	departures-day	-
+web:/internal/station/{}/live	listStationDepartures,listStationFacilities	departures-day,facilities-all	-

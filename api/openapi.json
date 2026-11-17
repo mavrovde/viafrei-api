@@ -11977,7 +11977,7 @@
                             "address": null,
                             "refill": [
                               {
-                                "solution": "700bar_car"
+                                "solution": "gaseousHydrogen700barCar"
                               }
                             ],
                             "opening": null,
@@ -11996,7 +11996,7 @@
                             "address": null,
                             "refill": [
                               {
-                                "solution": "700bar_car"
+                                "solution": "gaseousHydrogen700barCar"
                               }
                             ],
                             "opening": null,
@@ -12576,7 +12576,8 @@
                           "distanceM": 81800,
                           "sourceFamily": "geonames"
                         },
-                        "mayLieOutsideGermany": true
+                        "mayLieOutsideGermany": true,
+                        "lowEmissionZone": null
                       },
                       "meta": {
                         "requestId": "example-request-0001",
@@ -15346,7 +15347,138 @@
                 "examples": {
                   "example": {
                     "summary": "Disabled bays within 2 km",
-                    "value": null
+                    "value": {
+                      "data": {
+                        "kind": "disabled",
+                        "counts": {
+                          "total": 3,
+                          "sensors": 2,
+                          "free": 1,
+                          "occupied": 0,
+                          "unknown": 1,
+                          "staticSites": 1,
+                          "staticSpaces": 2
+                        },
+                        "bays": [
+                          {
+                            "id": "dortmund:011",
+                            "kind": "disabled",
+                            "publisherKind": "Behindertenparkplatz",
+                            "street": "Hauptstraße",
+                            "houseNumber": "1",
+                            "postcode": "10000",
+                            "city": "Schömpingbach",
+                            "lat": 48.388148,
+                            "lon": 7.521214,
+                            "distanceM": 23,
+                            "sensor": true,
+                            "state": "free",
+                            "messageAt": "2026-03-29T23:40:00Z",
+                            "spaces": null,
+                            "reservedWhen": null,
+                            "sourceFamily": "dortmund_parksensoren_bays"
+                          },
+                          {
+                            "id": "dortmund:012",
+                            "kind": "disabled",
+                            "publisherKind": "Behindertenparkplatz",
+                            "street": "Hauptstraße",
+                            "houseNumber": "7",
+                            "postcode": "10000",
+                            "city": "Schömpingbach",
+                            "lat": 48.388148,
+                            "lon": 7.522214,
+                            "distanceM": 91,
+                            "sensor": true,
+                            "state": null,
+                            "messageAt": "2026-03-29T19:00:00Z",
+                            "spaces": null,
+                            "reservedWhen": null,
+                            "sourceFamily": "dortmund_parksensoren_bays"
+                          },
+                          {
+                            "id": "frankfurt:014",
+                            "kind": "disabled",
+                            "publisherKind": null,
+                            "street": "Bahnhofstraße",
+                            "houseNumber": null,
+                            "postcode": "10000",
+                            "city": "Schömpingbach",
+                            "lat": 48.388148,
+                            "lon": 7.524214,
+                            "distanceM": 239,
+                            "sensor": false,
+                            "state": null,
+                            "messageAt": null,
+                            "spaces": 2,
+                            "reservedWhen": "Mo-Fr 8-18 Uhr",
+                            "sourceFamily": "frankfurt_behindertenparkplaetze"
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": null,
+                        "freshness": [
+                          {
+                            "family": "dortmund_parksensoren_bays",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          },
+                          {
+                            "family": "frankfurt_behindertenparkplaetze",
+                            "dataAsOf": null,
+                            "ageS": null,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "dortmund_parksensoren_bays",
+                            "domain": "parking",
+                            "publisher": "Buchtwerk Datenwerk",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms/dortmund_parksensoren_bays"
+                          },
+                          {
+                            "family": "frankfurt_behindertenparkplaetze",
+                            "domain": "parking",
+                            "publisher": "Behindertenparkplätze: Stadt Frankfurt am Main – Straßenverkehrsamt, www.frankfurt.de, Datenlizenz Deutschland – Namensnennung – Version 2.0, bearbeitet",
+                            "text": "Behindertenparkplätze: Stadt Frankfurt am Main – Straßenverkehrsamt, www.frankfurt.de, Datenlizenz Deutschland – Namensnennung – Version 2.0, bearbeitet",
+                            "licence": "dl-de/by-2-0",
+                            "licenceUrl": "https://licences.example/dl-de-by-2-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://www.govdata.de/daten/-/details/wfs-parken-in-der-stadt-frankfurt-am-main"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 3,
+                          "hasMore": false
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/parking-bays"
+                      }
+                    }
                   }
                 },
                 "schema": {
@@ -16100,19 +16232,21 @@
             }
           },
           {
-            "description": "Only places of this kind. Default: every kind.",
+            "description": "Only places of this kind. Default: every kind. motorway and junction are the gazetteer's motorway places; a q that starts with a junction word (AK, AD, AS, Kreuz, Dreieck, Anschlussstelle, interchange, junction, exit ...) asks for a junction by the name after it.",
             "explode": false,
             "in": "query",
             "name": "kind",
             "schema": {
-              "description": "Only places of this kind. Default: every kind.",
+              "description": "Only places of this kind. Default: every kind. motorway and junction are the gazetteer's motorway places; a q that starts with a junction word (AK, AD, AS, Kreuz, Dreieck, Anschlussstelle, interchange, junction, exit ...) asks for a junction by the name after it.",
               "enum": [
                 "municipality",
                 "district",
                 "locality",
                 "region",
                 "state",
-                "station_area"
+                "station_area",
+                "motorway",
+                "junction"
               ],
               "type": "string"
             }
@@ -22861,7 +22995,98 @@
                 "examples": {
                   "example": {
                     "summary": "The newest board of a station, fresh",
-                    "value": null
+                    "value": {
+                      "data": {
+                        "eva": "8001001",
+                        "fresh": true,
+                        "fetchedAt": "2026-03-29T23:59:50Z",
+                        "ageSeconds": 10,
+                        "departures": [
+                          {
+                            "line": null,
+                            "category": "ICE",
+                            "number": "571",
+                            "destination": "Schömpingbach",
+                            "plannedAt": "2026-03-30T00:03:50Z",
+                            "expectedAt": "2026-03-30T00:08:50Z",
+                            "delayMin": 5,
+                            "platform": "7",
+                            "plannedPlatform": "5",
+                            "platformChanged": true,
+                            "cancelled": false,
+                            "sourceFamily": "db_timetables"
+                          },
+                          {
+                            "line": "RE 1",
+                            "category": "RE",
+                            "number": "4713",
+                            "destination": "Schömpingbach",
+                            "plannedAt": "2026-03-30T00:11:50Z",
+                            "expectedAt": "2026-03-30T00:11:50Z",
+                            "delayMin": 0,
+                            "platform": "2",
+                            "plannedPlatform": "2",
+                            "platformChanged": false,
+                            "cancelled": true,
+                            "sourceFamily": "db_timetables"
+                          },
+                          {
+                            "line": "S 3",
+                            "category": "S",
+                            "number": null,
+                            "destination": "Schömpingbach",
+                            "plannedAt": "2026-03-30T00:19:50Z",
+                            "expectedAt": "2026-03-30T00:19:50Z",
+                            "delayMin": 0,
+                            "platform": null,
+                            "plannedPlatform": null,
+                            "platformChanged": false,
+                            "cancelled": false,
+                            "sourceFamily": "db_timetables"
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": null,
+                        "freshness": [
+                          {
+                            "family": "db_timetables",
+                            "dataAsOf": null,
+                            "ageS": null,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "db_timetables",
+                            "domain": "transit",
+                            "publisher": "Fahrplandaten: Deutsche Bahn AG, DB API Marketplace, CC BY 4.0, bearbeitet",
+                            "text": "Fahrplandaten: Deutsche Bahn AG, DB API Marketplace, CC BY 4.0, bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://developers.deutschebahn.com"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ]
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/train-boards/8001001"
+                      }
+                    }
                   }
                 },
                 "schema": {

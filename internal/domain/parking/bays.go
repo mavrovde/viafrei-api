@@ -15,11 +15,11 @@ import (
 // BayKinds are the bay kinds a read may ask for.
 var BayKinds = []string{"disabled", "ev_charging"}
 
-// BayStateFresh is how long a bay sensor's state counts after the
+// BayStateFreshS is how long, in seconds, a bay sensor's state counts after the
 // publisher's newest message: a sensor reports on a change and otherwise
 // only as a heartbeat, so three hours is a sensor still reporting; an older
 // state is no reading, never the last one (the platform's BAY_STATE_FRESH_S).
-const BayStateFresh = 3 * time.Hour
+const BayStateFreshS = 3 * 60 * 60
 
 // BayQuery asks for the bays of a kind within RadiusM of At, at most Limit,
 // only the ones reported free when OnlyFree.

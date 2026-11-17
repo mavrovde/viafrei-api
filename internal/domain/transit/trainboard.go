@@ -12,10 +12,19 @@ import (
 // CC BY 4.0. No share-alike family is ever blended into a board.
 const TrainBoardFamily = "db_timetables"
 
-// TrainBoardFreshFor is how old a stored board may be and still be served:
+// TrainBoardFreshS is how old, in seconds, a stored board may be and still be served:
 // the MCP server's own cache lifetime of the DB Timetables changes it read
 // the board's changed times and platforms from (CHANGES_TTL_MS, 30 s).
-const TrainBoardFreshFor = 30 * time.Second
+const TrainBoardFreshS = 30
+
+// TrainBoardFreshFor is TrainBoardFreshS as a duration.
+const TrainBoardFreshFor = TrainBoardFreshS * time.Second
+
+// boardDayS is the day, in seconds, a recorded time may lie from the time it
+// is checked against.
+const boardDayS = 24 * 60 * 60
+
+const boardDay = boardDayS * time.Second
 
 // The bounds of a recorded board: a DB Timetables board lists at most 120
 // departures, and each text is as short as the table holds it.
@@ -97,7 +106,7 @@ func (b TrainBoard) Validate(now time.Time) error {
 	if !ValidEVA(b.EVA) {
 		return &BoardFieldError{"eva", "must be a seven-digit EVA number"}
 	}
-	if b.FetchedAt.IsZero() || b.FetchedAt.After(now.Add(time.Minute)) || b.FetchedAt.Before(now.Add(-24*time.Hour)) {
+	if b.FetchedAt.IsZero() || b.FetchedAt.After(now.Add(time.Minute)) || b.FetchedAt.Before(now.Add(-boardDay)) {
 		return &BoardFieldError{"fetchedAt", "must lie within the last day and not in the future"}
 	}
 	if len(b.Departures) > MaxBoardDepartures {
@@ -105,10 +114,10 @@ func (b TrainBoard) Validate(now time.Time) error {
 	}
 	for i, d := range b.Departures {
 		at := fmt.Sprintf("departures[%d].", i)
-		if d.PlannedAt.Before(b.FetchedAt.Add(-24*time.Hour)) || d.PlannedAt.After(b.FetchedAt.Add(24*time.Hour)) {
+		if d.PlannedAt.Before(b.FetchedAt.Add(-boardDay)) || d.PlannedAt.After(b.FetchedAt.Add(boardDay)) {
 			return &BoardFieldError{at + "plannedAt", "must lie within a day of fetchedAt"}
 		}
-		if d.ChangedAt != nil && (d.ChangedAt.Before(d.PlannedAt.Add(-24*time.Hour)) || d.ChangedAt.After(d.PlannedAt.Add(24*time.Hour))) {
+		if d.ChangedAt != nil && (d.ChangedAt.Before(d.PlannedAt.Add(-boardDay)) || d.ChangedAt.After(d.PlannedAt.Add(boardDay))) {
 			return &BoardFieldError{at + "changedAt", "must lie within a day of plannedAt"}
 		}
 		for _, f := range []struct {

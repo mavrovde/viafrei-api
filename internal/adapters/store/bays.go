@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -40,7 +39,7 @@ select m.bay_id, m.bay_kind, m.publisher_kind, m.street, m.house_number, m.postc
 func (s *Store) Bays(ctx context.Context, q parking.BayQuery, families []string) (parking.Bays, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (parking.Bays, error) {
 		var out parking.Bays
-		rows, _ := tx.Query(ctx, baysNear, q.At.Lon, q.At.Lat, q.RadiusM, q.Kind, q.Now, int(parking.BayStateFresh/time.Second), q.Limit, families, q.OnlyFree)
+		rows, _ := tx.Query(ctx, baysNear, q.At.Lon, q.At.Lat, q.RadiusM, q.Kind, q.Now, parking.BayStateFreshS, q.Limit, families, q.OnlyFree)
 		items, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (parking.Bay, error) {
 			var b parking.Bay
 			c := &out.Counts

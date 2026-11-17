@@ -565,8 +565,18 @@ func TestRepeatedRequestsAreNotModified(t *testing.T) {
 	req.Covers(t, "NFR-PERF-005")
 	r := open(t)
 	h := r.handler(t, true)
-	target := r.targetsOf("listChargingOptions")[0]
-	_, etag, _ := call(h, target, "")
+	// A charging answer withholding a family the key may not read is
+	// partial and carries no ETag; the scenario repeats one that carries one.
+	var target, etag string
+	for _, c := range r.targetsOf("listChargingOptions") {
+		if _, e, _ := call(h, c, ""); e != "" {
+			target, etag = c, e
+			break
+		}
+	}
+	if etag == "" {
+		t.Fatal("no charging answer carries an ETag")
+	}
 	notModified := 0
 	const repeats = 100
 	for range repeats {
@@ -630,7 +640,9 @@ func TestNoSequentialScanOfTimeSeries(t *testing.T) {
 	r := open(t)
 	h := r.handler(t, false)
 	for _, op := range httpapi.OperationIDs() {
-		for _, target := range r.targetsOf(op)[:1] {
+		// An operation with no benchmark request yet is named by
+		// TestEveryOperationMeetsItsBudget; it is not read here.
+		for _, target := range r.targetsOf(op)[:min(1, len(r.targetsOf(op)))] {
 			if code, _, _ := call(h, target, ""); code != http.StatusOK {
 				t.Fatalf("%s answered %d", target, code)
 			}

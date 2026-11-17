@@ -45,3 +45,4 @@ listStateServiceAlerts	lookup
 getTrainBoard	lookup
 recordTrainBoard	lookup
 listParkingBays	near
+requestFuelRefresh	lookup

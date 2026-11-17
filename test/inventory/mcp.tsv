@@ -1,4 +1,4 @@
-# source mcp 2.6.18 566552fb65c8c5b3ec7e3019e559387f2baf249b
+# source mcp 2.6.21 d64764560cbbc9a022267a933eb855f3daf04783
 # kind	entry	detail
 tool	check_autobahn_traffic	schema sha256:7aaa37d27c0d6f1356b0297d5c6524628dccf7c25371a50d47ac626d274587c5
 argument	check_autobahn_traffic.roads	string[] optional

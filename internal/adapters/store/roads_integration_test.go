@@ -761,3 +761,43 @@ func TestSituationsOnRoadOverAWindowAndAPage(t *testing.T) {
 		t.Errorf("near over the window: %d, %v", len(a.Items), err)
 	}
 }
+
+// TestAMotorwayReadsTheWarningsWhoseAreaHoldsItsJunctions plants, far after
+// the fixture's window, two warnings of one weather family in force: one whose
+// own area holds a junction point of road "A101", one whose area holds none of
+// them though its district is the first junction's. The corridor reads the
+// first only, as the platform places a DWD warning on the road's
+// location-code points.
+func TestAMotorwayReadsTheWarningsWhoseAreaHoldsItsJunctions(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004", "FR-ROAD-006")
+	st := seeded(t)
+	var region, family string
+	var lat, lon float64
+	owner(t, `select w.region_code, w.source_ref, st_y(j.location), st_x(j.location)
+from contract.weather_warning w, contract.junction j
+where w.warning_id = 'dwd:900001' and j.road_ref = 'A101' order by j.junction_id limit 1`, &region, &family, &lat, &lon)
+	var n int
+	owner(t, `with ins as (
+  insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
+    valid_from, valid_to, published_at, region_code, source_ref, recorded_at, withdrawn_at, area)
+  select v.id, 'fog', v.level, 'Stufe', 'actual', 'Deutscher Wetterdienst', 'Nebel', 'de',
+    '2104-01-01T00:00:00Z', '2104-01-02T00:00:00Z', null, '`+region+`', '`+family+`', '2104-01-01T00:00:00Z', null,
+    st_buffer(st_setsrid(st_makepoint(`+fmt.Sprint(lon)+` + v.shift, `+fmt.Sprint(lat)+`), 4326), 0.01)
+  from (values ('dwd:990001', 3, 0.0), ('dwd:990002', 4, 0.5)) v(id, level, shift)
+  returning 1)
+select count(*) from ins`, &n)
+	t.Cleanup(func() {
+		change(t, `delete from contract.weather_warning where warning_id in ('dwd:990001', 'dwd:990002')`)
+	})
+	if n != 2 {
+		t.Fatalf("%d warnings planted", n)
+	}
+	q := roads.CorridorQuery{Road: "A101", Direction: roads.DirectionBoth, Filter: roads.Filter{MinSeverity: roads.SeverityInfo}, Limit: 1}
+	p, err := st.SituationsOnRoad(bounded(t), q, roads.Families{Roads: families(t, st, "roads"), Weather: []string{family}}, time.Date(2104, 1, 1, 12, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []roads.Warning{{Family: family, Level: 3}}; !slices.Equal(p.Warnings, want) {
+		t.Errorf("warnings %v, want %v (the one whose area holds a junction)", p.Warnings, want)
+	}
+}

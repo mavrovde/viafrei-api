@@ -8464,78 +8464,6 @@
           "value": "lez_alpha/z1"
         },
         {
-          "name": "data.zones[0].city",
-          "value": "Matfienland"
-        },
-        {
-          "name": "data.zones[0].distanceM",
-          "value": "0"
-        },
-        {
-          "name": "data.zones[0].inside",
-          "value": "true"
-        },
-        {
-          "name": "data.zones[0].key",
-          "value": "lez_alpha/z1"
-        },
-        {
-          "name": "data.zones[0].name",
-          "value": "Umweltzone Matfienland"
-        },
-        {
-          "name": "data.zones[0].publisher",
-          "value": "Zonenwerk"
-        },
-        {
-          "name": "data.zones[0].role",
-          "value": "zone"
-        },
-        {
-          "name": "data.zones[0].sameZone",
-          "value": "[]"
-        },
-        {
-          "name": "data.zones[0].sourceFamily",
-          "value": "lez_alpha"
-        },
-        {
-          "name": "data.zones[1].city",
-          "value": "Matfienland"
-        },
-        {
-          "name": "data.zones[1].distanceM",
-          "value": "1489"
-        },
-        {
-          "name": "data.zones[1].inside",
-          "value": "false"
-        },
-        {
-          "name": "data.zones[1].key",
-          "value": "lez_alpha/t1"
-        },
-        {
-          "name": "data.zones[1].name",
-          "value": "Freigabe Matfienland"
-        },
-        {
-          "name": "data.zones[1].publisher",
-          "value": "Zonenwerk"
-        },
-        {
-          "name": "data.zones[1].role",
-          "value": "transfer"
-        },
-        {
-          "name": "data.zones[1].sameZone",
-          "value": "[]"
-        },
-        {
-          "name": "data.zones[1].sourceFamily",
-          "value": "lez_alpha"
-        },
-        {
           "name": "meta.attribution[lez_alpha].family",
           "value": "lez_alpha"
         },
@@ -8778,42 +8706,6 @@
         {
           "name": "data.topic",
           "value": "lez"
-        },
-        {
-          "name": "data.zones[0].city",
-          "value": "Matfienland"
-        },
-        {
-          "name": "data.zones[0].distanceM",
-          "value": "0"
-        },
-        {
-          "name": "data.zones[0].inside",
-          "value": "false"
-        },
-        {
-          "name": "data.zones[0].key",
-          "value": "lez_alpha/z1"
-        },
-        {
-          "name": "data.zones[0].name",
-          "value": "Umweltzone Matfienland"
-        },
-        {
-          "name": "data.zones[0].publisher",
-          "value": "Zonenwerk"
-        },
-        {
-          "name": "data.zones[0].role",
-          "value": "zone"
-        },
-        {
-          "name": "data.zones[0].sameZone",
-          "value": "[]"
-        },
-        {
-          "name": "data.zones[0].sourceFamily",
-          "value": "lez_alpha"
         },
         {
           "name": "meta.attribution[lez_alpha].family",

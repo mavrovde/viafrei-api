@@ -413,8 +413,13 @@ limit $11 offset $14`, args, q.Limit, fams, now, scope{
   and ` + fmt.Sprintf(canonicalRef, "e.road_ref") + ` = $3
   and ($4::text = 'both' or e.direction = $4::text or not e.direction = any($5))`,
 		args: []any{fams.Roads, now, q.Road, string(q.Direction), codes(roads.Compass())},
-		warnings: `st_intersects(r.boundary, (select g.geometry from contract.road g
-                                  where ` + fmt.Sprintf(canonicalRef, "g.road_ref") + ` = $3 and ` + permitted("g") + ` order by g.road_ref limit 1))`,
+		// A warning is on the road when its own area holds one of the
+		// road's junction points, as the platform's motorway page and its
+		// motorway status place a DWD warning on the location-code points
+		// of the road, not on the districts the road crosses.
+		warnings: `exists (select 1 from contract.junction j
+               where ` + fmt.Sprintf(canonicalRef, "j.road_ref") + ` = $3 and ` + permitted("j") + `
+                 and st_intersects(w.area, j.location))`,
 		warningArgs: []any{q.Road},
 		states: statesOf(`select j.state_code from contract.junction j
 where ` + fmt.Sprintf(canonicalRef, "j.road_ref") + ` = $1 and ` + permitted("j")),

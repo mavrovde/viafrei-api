@@ -29,6 +29,7 @@ var register = []access.Terms{
 	{Family: "p1", Domain: "parking", UseClasses: all, Version: "v1"},
 	{Family: "p2", Domain: "parking", UseClasses: all, AcceptanceRequired: true, Version: "p2-terms-1"},
 	{Family: "pl", Domain: "places", UseClasses: all, Version: "v1"},
+	{Family: "st", Domain: "transit", UseClasses: all, Version: "v1"},
 }
 
 var errStore = errors.New("store down")
@@ -41,6 +42,7 @@ type fake struct {
 	parks                                []parking.Site
 	place                                places.Place
 	gotFamilies, gotListed, gotOccupancy []string
+	gotStops                             []string
 	gotNow                               time.Time
 	gotLang                              string
 	gotProv                              [][]string
@@ -102,8 +104,8 @@ func (f *fake) Place(context.Context, string, []string) (places.Place, error) {
 	return f.place, f.plErr
 }
 
-func (f *fake) Places(_ context.Context, _ places.Query, fams []string) ([]places.Place, bool, error) {
-	f.gotFamilies = fams
+func (f *fake) Places(_ context.Context, _ places.Query, fams, stops []string) ([]places.Place, bool, error) {
+	f.gotFamilies, f.gotStops = fams, stops
 	if f.place.ID == "" {
 		return nil, false, f.plErr
 	}

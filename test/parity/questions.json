@@ -298,8 +298,9 @@
           "places"
         ],
         "sources": [
-          "geonames",
-          "bkg_gvisys"
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames"
         ],
         "accepted": null
       },
@@ -316,8 +317,9 @@
           "places"
         ],
         "sources": [
-          "geonames",
-          "bkg_gvisys"
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames"
         ],
         "accepted": null
       },
@@ -334,8 +336,9 @@
           "places"
         ],
         "sources": [
-          "geonames",
-          "bkg_gvisys"
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames"
         ],
         "accepted": null
       },

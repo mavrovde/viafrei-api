@@ -12123,7 +12123,7 @@
     },
     "/v1/places": {
       "get": {
-        "description": "The places one of whose names answers the text, best match first: a whole name before the start of one, the start before a part, then the more prominent place, then the nearer to at. The id is what getPlaceOverview takes, and the location is what every position operation asks. Needs the scope places.",
+        "description": "The places one of whose names answers the text, and the timetable stops whose name does (kind station_area, from the stop families the key may read), best match first: a whole name before the start of one, the start before a part, then the more prominent place, then the nearer to at. The id is what getPlaceOverview takes, and the location is what every position operation asks. Needs the scope places.",
         "operationId": "listPlaces",
         "parameters": [
           {

@@ -1900,8 +1900,9 @@
           "places"
         ],
         "sources": [
-          "geonames",
-          "bkg_gvisys"
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames"
         ],
         "accepted": null
       },
@@ -1936,6 +1937,66 @@
           "value": "geonames"
         },
         {
+          "name": "data[1:de:01002:0].districtCode",
+          "value": "01002"
+        },
+        {
+          "name": "data[1:de:01002:0].id",
+          "value": "1:de:01002:0"
+        },
+        {
+          "name": "data[1:de:01002:0].kind",
+          "value": "station_area"
+        },
+        {
+          "name": "data[1:de:01002:0].location.lat",
+          "value": "49.14816"
+        },
+        {
+          "name": "data[1:de:01002:0].location.lon",
+          "value": "7.78575"
+        },
+        {
+          "name": "data[1:de:01002:0].name",
+          "value": "Namüningen Süd"
+        },
+        {
+          "name": "data[1:de:01002:0].sourceFamily",
+          "value": "delfi_static"
+        },
+        {
+          "name": "data[1:de:01002:1].districtCode",
+          "value": "01002"
+        },
+        {
+          "name": "data[1:de:01002:1].id",
+          "value": "1:de:01002:1"
+        },
+        {
+          "name": "data[1:de:01002:1].kind",
+          "value": "station_area"
+        },
+        {
+          "name": "data[1:de:01002:1].location.lat",
+          "value": "49.16700"
+        },
+        {
+          "name": "data[1:de:01002:1].location.lon",
+          "value": "7.86246"
+        },
+        {
+          "name": "data[1:de:01002:1].name",
+          "value": "Namüningen Mitte"
+        },
+        {
+          "name": "data[1:de:01002:1].sourceFamily",
+          "value": "delfi_static"
+        },
+        {
+          "name": "meta.attribution[delfi_static].family",
+          "value": "delfi_static"
+        },
+        {
           "name": "meta.attribution[geonames].family",
           "value": "geonames"
         },
@@ -1968,8 +2029,9 @@
           "places"
         ],
         "sources": [
-          "geonames",
-          "bkg_gvisys"
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames"
         ],
         "accepted": null
       },
@@ -1977,7 +2039,7 @@
       "facts": [
         {
           "name": "data[100002].distanceM",
-          "value": "1994"
+          "value": "1991"
         },
         {
           "name": "data[100002].districtCode",
@@ -2006,6 +2068,42 @@
         {
           "name": "data[100002].sourceFamily",
           "value": "geonames"
+        },
+        {
+          "name": "data[1:de:01002:2].distanceM",
+          "value": "4072"
+        },
+        {
+          "name": "data[1:de:01002:2].districtCode",
+          "value": "01002"
+        },
+        {
+          "name": "data[1:de:01002:2].id",
+          "value": "1:de:01002:2"
+        },
+        {
+          "name": "data[1:de:01002:2].kind",
+          "value": "station_area"
+        },
+        {
+          "name": "data[1:de:01002:2].location.lat",
+          "value": "48.36670"
+        },
+        {
+          "name": "data[1:de:01002:2].location.lon",
+          "value": "7.52295"
+        },
+        {
+          "name": "data[1:de:01002:2].name",
+          "value": "Schömpingbach Mitte"
+        },
+        {
+          "name": "data[1:de:01002:2].sourceFamily",
+          "value": "delfi_static"
+        },
+        {
+          "name": "meta.attribution[delfi_static].family",
+          "value": "delfi_static"
         },
         {
           "name": "meta.attribution[geonames].family",
@@ -2040,8 +2138,9 @@
           "places"
         ],
         "sources": [
-          "geonames",
-          "bkg_gvisys"
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames"
         ],
         "accepted": null
       },

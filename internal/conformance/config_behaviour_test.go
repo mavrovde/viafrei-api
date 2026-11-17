@@ -219,6 +219,9 @@ func behaviours() map[string]behaviour {
 		"roads.ended_retention_h": {"6", func(t *testing.T, c *config.Config) string {
 			return wire.FeatureSettings(c).EndedRetention.String()
 		}},
+		"roads.planned_families": {"alpha", func(t *testing.T, c *config.Config) string {
+			return fmt.Sprint(wire.FeatureSettings(c).PlannedWorks)
+		}},
 		"weather.max_warnings": {"7", func(t *testing.T, c *config.Config) string {
 			return fmt.Sprint(wire.FeatureSettings(c).MaxWarnings)
 		}},

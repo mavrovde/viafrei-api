@@ -206,13 +206,18 @@ nothing, so that family contributed nothing and neither side credits it.
   the families of planned works (`roads.planned_families`, BASt's planning
   data and its twins) and no weather warning, as the platform's
   roadworks-ahead answer reads the planning data alone; a site changed at
-  its feed's last check.
+  its source's last check.
 - **Placement credits BKG.** A Land's road conditions credit the family
   that placed its situations in the Land (the read contract's
   `placement_source_ref`, BKG's municipalities), and a station name that
   more than one station answers credits the family that places each in its
   district and Land, as the platform credits BKG on its Land form and on
   the town and Land each name candidate is labelled with.
+- **A place search lists stops.** A name answers the timetable's stops too
+  (kind `station_area`, the stop families the key may read), and a
+  distance is measured on the sphere, as the platform's place search lists
+  the stop register's stops and measures great-circle metres. A place
+  carries no id on the MCP side: the producer reads it by name and point.
 
 The MCP side has further rules, specific to its sources, that the read
 contract cannot express; they are not compared here.

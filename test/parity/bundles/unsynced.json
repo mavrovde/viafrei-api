@@ -10149,7 +10149,7 @@
       "counterpart": "attribution",
       "request": "/v1/sources",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "roads",
           "energy",
@@ -10193,32 +10193,12 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
-          "name": "data[afir_alpha].attribution",
-          "value": "Synthetic data from family alpha, licence CC BY 4.0."
-        },
-        {
-          "name": "data[afir_alpha].dataAsOf",
-          "value": "2026-03-29T23:55:00Z"
-        },
-        {
           "name": "data[afir_alpha].domain",
           "value": "energy"
         },
         {
           "name": "data[afir_alpha].family",
           "value": "afir_alpha"
-        },
-        {
-          "name": "data[afir_alpha].licence",
-          "value": "CC BY 4.0"
-        },
-        {
-          "name": "data[afir_alpha].licenceUrl",
-          "value": "https://licences.example/cc-by-4-0"
-        },
-        {
-          "name": "data[afir_alpha].publisher",
-          "value": "Kleber Datenwerk"
         },
         {
           "name": "data[afir_alpha].shareAlike",
@@ -10229,40 +10209,12 @@
           "value": "1800"
         },
         {
-          "name": "data[afir_alpha].status",
-          "value": "green"
-        },
-        {
-          "name": "data[afir_alpha].termsUrl",
-          "value": "https://alpha.example/terms/afir_alpha"
-        },
-        {
-          "name": "data[afir_beta].attribution",
-          "value": "Synthetic data from family beta, licence CC BY-SA 4.0."
-        },
-        {
-          "name": "data[afir_beta].dataAsOf",
-          "value": "2026-03-29T23:55:00Z"
-        },
-        {
           "name": "data[afir_beta].domain",
           "value": "energy"
         },
         {
           "name": "data[afir_beta].family",
           "value": "afir_beta"
-        },
-        {
-          "name": "data[afir_beta].licence",
-          "value": "CC BY-SA 4.0"
-        },
-        {
-          "name": "data[afir_beta].licenceUrl",
-          "value": "https://licences.example/cc-by-sa-4-0"
-        },
-        {
-          "name": "data[afir_beta].publisher",
-          "value": "Deingmeir Datenwerk"
         },
         {
           "name": "data[afir_beta].shareAlike",
@@ -10273,22 +10225,6 @@
           "value": "1800"
         },
         {
-          "name": "data[afir_beta].status",
-          "value": "green"
-        },
-        {
-          "name": "data[afir_beta].termsUrl",
-          "value": "https://beta.example/terms/afir_beta"
-        },
-        {
-          "name": "data[bast_lcl].attribution",
-          "value": "TMC Location Code List (LCL 22.0): Bundesanstalt für Straßenwesen (BASt), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), bearbeitet"
-        },
-        {
-          "name": "data[bast_lcl].dataAsOf",
-          "value": "null"
-        },
-        {
           "name": "data[bast_lcl].domain",
           "value": "roads"
         },
@@ -10297,36 +10233,8 @@
           "value": "bast_lcl"
         },
         {
-          "name": "data[bast_lcl].licence",
-          "value": "CC BY 4.0"
-        },
-        {
-          "name": "data[bast_lcl].licenceUrl",
-          "value": "https://licences.example/cc-by-4-0"
-        },
-        {
-          "name": "data[bast_lcl].publisher",
-          "value": "TMC Location Code List (LCL 22.0): Bundesanstalt für Straßenwesen (BASt), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), bearbeitet"
-        },
-        {
           "name": "data[bast_lcl].shareAlike",
           "value": "false"
-        },
-        {
-          "name": "data[bast_lcl].status",
-          "value": "grey"
-        },
-        {
-          "name": "data[bast_lcl].termsUrl",
-          "value": "https://www.bast.de/DE/Themen/Digitales/HF_1/Massnahmen/LCL/location-code-list.html"
-        },
-        {
-          "name": "data[bkg_gvisys].attribution",
-          "value": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)"
-        },
-        {
-          "name": "data[bkg_gvisys].dataAsOf",
-          "value": "null"
         },
         {
           "name": "data[bkg_gvisys].domain",
@@ -10337,36 +10245,40 @@
           "value": "bkg_gvisys"
         },
         {
-          "name": "data[bkg_gvisys].licence",
-          "value": "dl-de/by-2-0"
-        },
-        {
-          "name": "data[bkg_gvisys].licenceUrl",
-          "value": "https://licences.example/dl-de-by-2-0"
-        },
-        {
-          "name": "data[bkg_gvisys].publisher",
-          "value": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)"
-        },
-        {
           "name": "data[bkg_gvisys].shareAlike",
           "value": "false"
         },
         {
-          "name": "data[bkg_gvisys].status",
-          "value": "grey"
+          "name": "data[chargepool_gamma].domain",
+          "value": "energy"
         },
         {
-          "name": "data[bkg_gvisys].termsUrl",
-          "value": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+          "name": "data[chargepool_gamma].family",
+          "value": "chargepool_gamma"
         },
         {
-          "name": "data[delfi_sa_alpha].attribution",
-          "value": "Synthetic data from family alpha, licence CC BY 4.0."
+          "name": "data[chargepool_gamma].shareAlike",
+          "value": "false"
         },
         {
-          "name": "data[delfi_sa_alpha].dataAsOf",
-          "value": "2026-03-29T23:57:30Z"
+          "name": "data[chargepool_gamma].staleAfterS",
+          "value": "1800"
+        },
+        {
+          "name": "data[delfi_rt_tu].domain",
+          "value": "transit"
+        },
+        {
+          "name": "data[delfi_rt_tu].family",
+          "value": "delfi_rt_tu"
+        },
+        {
+          "name": "data[delfi_rt_tu].shareAlike",
+          "value": "true"
+        },
+        {
+          "name": "data[delfi_rt_tu].staleAfterS",
+          "value": "180"
         },
         {
           "name": "data[delfi_sa_alpha].domain",
@@ -10377,40 +10289,12 @@
           "value": "delfi_sa_alpha"
         },
         {
-          "name": "data[delfi_sa_alpha].licence",
-          "value": "CC BY 4.0"
-        },
-        {
-          "name": "data[delfi_sa_alpha].licenceUrl",
-          "value": "https://licences.example/cc-by-4-0"
-        },
-        {
-          "name": "data[delfi_sa_alpha].publisher",
-          "value": "StÃ¶rwerk Datenwerk"
-        },
-        {
           "name": "data[delfi_sa_alpha].shareAlike",
           "value": "false"
         },
         {
           "name": "data[delfi_sa_alpha].staleAfterS",
           "value": "900"
-        },
-        {
-          "name": "data[delfi_sa_alpha].status",
-          "value": "green"
-        },
-        {
-          "name": "data[delfi_sa_alpha].termsUrl",
-          "value": "https://alpha.example/terms/delfi_sa_alpha"
-        },
-        {
-          "name": "data[delfi_static].attribution",
-          "value": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet"
-        },
-        {
-          "name": "data[delfi_static].dataAsOf",
-          "value": "2026-03-29T12:00:00Z"
         },
         {
           "name": "data[delfi_static].domain",
@@ -10421,40 +10305,12 @@
           "value": "delfi_static"
         },
         {
-          "name": "data[delfi_static].licence",
-          "value": "CC BY 4.0"
-        },
-        {
-          "name": "data[delfi_static].licenceUrl",
-          "value": "https://licences.example/cc-by-4-0"
-        },
-        {
-          "name": "data[delfi_static].publisher",
-          "value": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet"
-        },
-        {
           "name": "data[delfi_static].shareAlike",
           "value": "false"
         },
         {
           "name": "data[delfi_static].staleAfterS",
           "value": "259200"
-        },
-        {
-          "name": "data[delfi_static].status",
-          "value": "green"
-        },
-        {
-          "name": "data[delfi_static].termsUrl",
-          "value": "https://www.opendata-oepnv.de"
-        },
-        {
-          "name": "data[dwd_alpha].attribution",
-          "value": "Synthetic data from family alpha, licence CC BY 4.0."
-        },
-        {
-          "name": "data[dwd_alpha].dataAsOf",
-          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data[dwd_alpha].domain",
@@ -10465,40 +10321,12 @@
           "value": "dwd_alpha"
         },
         {
-          "name": "data[dwd_alpha].licence",
-          "value": "CC BY 4.0"
-        },
-        {
-          "name": "data[dwd_alpha].licenceUrl",
-          "value": "https://licences.example/cc-by-4-0"
-        },
-        {
-          "name": "data[dwd_alpha].publisher",
-          "value": "Sirfeim Datenwerk"
-        },
-        {
           "name": "data[dwd_alpha].shareAlike",
           "value": "false"
         },
         {
           "name": "data[dwd_alpha].staleAfterS",
           "value": "900"
-        },
-        {
-          "name": "data[dwd_alpha].status",
-          "value": "green"
-        },
-        {
-          "name": "data[dwd_alpha].termsUrl",
-          "value": "https://alpha.example/terms/dwd_alpha"
-        },
-        {
-          "name": "data[dwd_eta].attribution",
-          "value": "Synthetic data from family eta, licence dl-de/by-2-0."
-        },
-        {
-          "name": "data[dwd_eta].dataAsOf",
-          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data[dwd_eta].domain",
@@ -10509,40 +10337,12 @@
           "value": "dwd_eta"
         },
         {
-          "name": "data[dwd_eta].licence",
-          "value": "dl-de/by-2-0"
-        },
-        {
-          "name": "data[dwd_eta].licenceUrl",
-          "value": "https://licences.example/dl-de-by-2-0"
-        },
-        {
-          "name": "data[dwd_eta].publisher",
-          "value": "Golmil Datenwerk"
-        },
-        {
           "name": "data[dwd_eta].shareAlike",
           "value": "false"
         },
         {
           "name": "data[dwd_eta].staleAfterS",
           "value": "900"
-        },
-        {
-          "name": "data[dwd_eta].status",
-          "value": "green"
-        },
-        {
-          "name": "data[dwd_eta].termsUrl",
-          "value": "https://eta.example/terms/dwd_eta"
-        },
-        {
-          "name": "data[gbfs_nextbike].attribution",
-          "value": "Bikesharing: nextbike GmbH (GBFS), CC0 1.0"
-        },
-        {
-          "name": "data[gbfs_nextbike].dataAsOf",
-          "value": "2026-03-29T23:59:30Z"
         },
         {
           "name": "data[gbfs_nextbike].domain",
@@ -10553,40 +10353,12 @@
           "value": "gbfs_nextbike"
         },
         {
-          "name": "data[gbfs_nextbike].licence",
-          "value": "CC0 1.0"
-        },
-        {
-          "name": "data[gbfs_nextbike].licenceUrl",
-          "value": "https://licences.example/cc0-1-0"
-        },
-        {
-          "name": "data[gbfs_nextbike].publisher",
-          "value": "Bikesharing: nextbike GmbH (GBFS), CC0 1.0"
-        },
-        {
           "name": "data[gbfs_nextbike].shareAlike",
           "value": "false"
         },
         {
           "name": "data[gbfs_nextbike].staleAfterS",
           "value": "180"
-        },
-        {
-          "name": "data[gbfs_nextbike].status",
-          "value": "green"
-        },
-        {
-          "name": "data[gbfs_nextbike].termsUrl",
-          "value": "https://www.nextbike.de"
-        },
-        {
-          "name": "data[geonames].attribution",
-          "value": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet"
-        },
-        {
-          "name": "data[geonames].dataAsOf",
-          "value": "null"
         },
         {
           "name": "data[geonames].domain",
@@ -10597,36 +10369,8 @@
           "value": "geonames"
         },
         {
-          "name": "data[geonames].licence",
-          "value": "CC BY 4.0"
-        },
-        {
-          "name": "data[geonames].licenceUrl",
-          "value": "https://licences.example/cc-by-4-0"
-        },
-        {
-          "name": "data[geonames].publisher",
-          "value": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet"
-        },
-        {
           "name": "data[geonames].shareAlike",
           "value": "false"
-        },
-        {
-          "name": "data[geonames].status",
-          "value": "grey"
-        },
-        {
-          "name": "data[geonames].termsUrl",
-          "value": "https://download.geonames.org/export/dump/"
-        },
-        {
-          "name": "data[lez_alpha].attribution",
-          "value": "Synthetic data from family alpha, licence CC BY 4.0."
-        },
-        {
-          "name": "data[lez_alpha].dataAsOf",
-          "value": "2026-03-29T12:00:00Z"
         },
         {
           "name": "data[lez_alpha].domain",
@@ -10637,40 +10381,12 @@
           "value": "lez_alpha"
         },
         {
-          "name": "data[lez_alpha].licence",
-          "value": "CC BY 4.0"
-        },
-        {
-          "name": "data[lez_alpha].licenceUrl",
-          "value": "https://licences.example/cc-by-4-0"
-        },
-        {
-          "name": "data[lez_alpha].publisher",
-          "value": "Zonenwerk Datenwerk"
-        },
-        {
           "name": "data[lez_alpha].shareAlike",
           "value": "false"
         },
         {
           "name": "data[lez_alpha].staleAfterS",
           "value": "259200"
-        },
-        {
-          "name": "data[lez_alpha].status",
-          "value": "green"
-        },
-        {
-          "name": "data[lez_alpha].termsUrl",
-          "value": "https://alpha.example/terms/lez_alpha"
-        },
-        {
-          "name": "data[lorry_bast_langlkw].attribution",
-          "value": "Lang-Lkw-Netz: Bundesanstalt für Straßen- und Verkehrswesen (BASt), Positivnetz Lang-LKW (Auszug Bundesfernstraßen), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), bearbeitet"
-        },
-        {
-          "name": "data[lorry_bast_langlkw].dataAsOf",
-          "value": "null"
         },
         {
           "name": "data[lorry_bast_langlkw].domain",
@@ -10681,36 +10397,8 @@
           "value": "lorry_bast_langlkw"
         },
         {
-          "name": "data[lorry_bast_langlkw].licence",
-          "value": "CC BY 4.0"
-        },
-        {
-          "name": "data[lorry_bast_langlkw].licenceUrl",
-          "value": "https://licences.example/cc-by-4-0"
-        },
-        {
-          "name": "data[lorry_bast_langlkw].publisher",
-          "value": "Lang-Lkw-Netz: Bundesanstalt für Straßen- und Verkehrswesen (BASt), Positivnetz Lang-LKW (Auszug Bundesfernstraßen), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), bearbeitet"
-        },
-        {
           "name": "data[lorry_bast_langlkw].shareAlike",
           "value": "false"
-        },
-        {
-          "name": "data[lorry_bast_langlkw].status",
-          "value": "grey"
-        },
-        {
-          "name": "data[lorry_bast_langlkw].termsUrl",
-          "value": "https://www.bast.de/DE/Publikationen/Daten/Verkehrstechnik/Lang-Lkw.html"
-        },
-        {
-          "name": "data[lorry_koeln_beschraenkungen].attribution",
-          "value": "Straßenbeschränkungen Köln: Stadt Köln, Datenlizenz Deutschland – Zero – Version 2.0"
-        },
-        {
-          "name": "data[lorry_koeln_beschraenkungen].dataAsOf",
-          "value": "null"
         },
         {
           "name": "data[lorry_koeln_beschraenkungen].domain",
@@ -10721,36 +10409,8 @@
           "value": "lorry_koeln_beschraenkungen"
         },
         {
-          "name": "data[lorry_koeln_beschraenkungen].licence",
-          "value": "dl-de/zero-2-0"
-        },
-        {
-          "name": "data[lorry_koeln_beschraenkungen].licenceUrl",
-          "value": "https://www.govdata.de/dl-de/zero-2-0"
-        },
-        {
-          "name": "data[lorry_koeln_beschraenkungen].publisher",
-          "value": "Straßenbeschränkungen Köln: Stadt Köln, Datenlizenz Deutschland – Zero – Version 2.0"
-        },
-        {
           "name": "data[lorry_koeln_beschraenkungen].shareAlike",
           "value": "false"
-        },
-        {
-          "name": "data[lorry_koeln_beschraenkungen].status",
-          "value": "grey"
-        },
-        {
-          "name": "data[lorry_koeln_beschraenkungen].termsUrl",
-          "value": "https://www.offenedaten-koeln.de/dataset/strassenbeschraenkungen-koeln"
-        },
-        {
-          "name": "data[openstation_siri_fm].attribution",
-          "value": "Synthetic data from family alpha, licence CC BY 4.0."
-        },
-        {
-          "name": "data[openstation_siri_fm].dataAsOf",
-          "value": "2026-03-29T23:52:30Z"
         },
         {
           "name": "data[openstation_siri_fm].domain",
@@ -10761,40 +10421,12 @@
           "value": "openstation_siri_fm"
         },
         {
-          "name": "data[openstation_siri_fm].licence",
-          "value": "CC BY 4.0"
-        },
-        {
-          "name": "data[openstation_siri_fm].licenceUrl",
-          "value": "https://licences.example/cc-by-4-0"
-        },
-        {
-          "name": "data[openstation_siri_fm].publisher",
-          "value": "Bengdün Datenwerk"
-        },
-        {
           "name": "data[openstation_siri_fm].shareAlike",
           "value": "false"
         },
         {
           "name": "data[openstation_siri_fm].staleAfterS",
           "value": "2700"
-        },
-        {
-          "name": "data[openstation_siri_fm].status",
-          "value": "green"
-        },
-        {
-          "name": "data[openstation_siri_fm].termsUrl",
-          "value": "https://alpha.example/terms/openstation_siri_fm"
-        },
-        {
-          "name": "data[osm].attribution",
-          "value": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0"
-        },
-        {
-          "name": "data[osm].dataAsOf",
-          "value": "null"
         },
         {
           "name": "data[osm].domain",
@@ -10805,36 +10437,8 @@
           "value": "osm"
         },
         {
-          "name": "data[osm].licence",
-          "value": "ODbL 1.0"
-        },
-        {
-          "name": "data[osm].licenceUrl",
-          "value": "https://opendatacommons.org/licenses/odbl/1-0/"
-        },
-        {
-          "name": "data[osm].publisher",
-          "value": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0"
-        },
-        {
           "name": "data[osm].shareAlike",
           "value": "true"
-        },
-        {
-          "name": "data[osm].status",
-          "value": "grey"
-        },
-        {
-          "name": "data[osm].termsUrl",
-          "value": "https://www.openstreetmap.org/copyright"
-        },
-        {
-          "name": "data[osm_speed_cameras].attribution",
-          "value": "Blitzer (OpenStreetMap): © OpenStreetMap-Mitwirkende, ODbL 1.0"
-        },
-        {
-          "name": "data[osm_speed_cameras].dataAsOf",
-          "value": "2026-03-29T12:00:00Z"
         },
         {
           "name": "data[osm_speed_cameras].domain",
@@ -10845,40 +10449,12 @@
           "value": "osm_speed_cameras"
         },
         {
-          "name": "data[osm_speed_cameras].licence",
-          "value": "ODbL 1.0"
-        },
-        {
-          "name": "data[osm_speed_cameras].licenceUrl",
-          "value": "https://opendatacommons.org/licenses/odbl/1-0/"
-        },
-        {
-          "name": "data[osm_speed_cameras].publisher",
-          "value": "Blitzer (OpenStreetMap): © OpenStreetMap-Mitwirkende, ODbL 1.0"
-        },
-        {
           "name": "data[osm_speed_cameras].shareAlike",
           "value": "true"
         },
         {
           "name": "data[osm_speed_cameras].staleAfterS",
           "value": "259200"
-        },
-        {
-          "name": "data[osm_speed_cameras].status",
-          "value": "green"
-        },
-        {
-          "name": "data[osm_speed_cameras].termsUrl",
-          "value": "https://www.openstreetmap.org/copyright"
-        },
-        {
-          "name": "data[park_alpha].attribution",
-          "value": "Synthetic data from family alpha, licence CC BY 4.0."
-        },
-        {
-          "name": "data[park_alpha].dataAsOf",
-          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data[park_alpha].domain",
@@ -10889,40 +10465,12 @@
           "value": "park_alpha"
         },
         {
-          "name": "data[park_alpha].licence",
-          "value": "CC BY 4.0"
-        },
-        {
-          "name": "data[park_alpha].licenceUrl",
-          "value": "https://licences.example/cc-by-4-0"
-        },
-        {
-          "name": "data[park_alpha].publisher",
-          "value": "Fäpung Datenwerk"
-        },
-        {
           "name": "data[park_alpha].shareAlike",
           "value": "false"
         },
         {
           "name": "data[park_alpha].staleAfterS",
           "value": "900"
-        },
-        {
-          "name": "data[park_alpha].status",
-          "value": "green"
-        },
-        {
-          "name": "data[park_alpha].termsUrl",
-          "value": "https://alpha.example/terms/park_alpha"
-        },
-        {
-          "name": "data[park_beta].attribution",
-          "value": "Synthetic data from family beta, licence CC BY-SA 4.0."
-        },
-        {
-          "name": "data[park_beta].dataAsOf",
-          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data[park_beta].domain",
@@ -10933,40 +10481,12 @@
           "value": "park_beta"
         },
         {
-          "name": "data[park_beta].licence",
-          "value": "CC BY-SA 4.0"
-        },
-        {
-          "name": "data[park_beta].licenceUrl",
-          "value": "https://licences.example/cc-by-sa-4-0"
-        },
-        {
-          "name": "data[park_beta].publisher",
-          "value": "Sückkies Datenwerk"
-        },
-        {
           "name": "data[park_beta].shareAlike",
           "value": "true"
         },
         {
           "name": "data[park_beta].staleAfterS",
           "value": "900"
-        },
-        {
-          "name": "data[park_beta].status",
-          "value": "green"
-        },
-        {
-          "name": "data[park_beta].termsUrl",
-          "value": "https://beta.example/terms/park_beta"
-        },
-        {
-          "name": "data[roads_alpha].attribution",
-          "value": "Synthetic data from family alpha, licence CC BY 4.0."
-        },
-        {
-          "name": "data[roads_alpha].dataAsOf",
-          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data[roads_alpha].domain",
@@ -10977,40 +10497,12 @@
           "value": "roads_alpha"
         },
         {
-          "name": "data[roads_alpha].licence",
-          "value": "CC BY 4.0"
-        },
-        {
-          "name": "data[roads_alpha].licenceUrl",
-          "value": "https://licences.example/cc-by-4-0"
-        },
-        {
-          "name": "data[roads_alpha].publisher",
-          "value": "Nimbruß Datenwerk"
-        },
-        {
           "name": "data[roads_alpha].shareAlike",
           "value": "false"
         },
         {
           "name": "data[roads_alpha].staleAfterS",
           "value": "900"
-        },
-        {
-          "name": "data[roads_alpha].status",
-          "value": "green"
-        },
-        {
-          "name": "data[roads_alpha].termsUrl",
-          "value": "https://alpha.example/terms/roads_alpha"
-        },
-        {
-          "name": "data[speed_alpha].attribution",
-          "value": "Synthetic data from family alpha, licence CC BY 4.0."
-        },
-        {
-          "name": "data[speed_alpha].dataAsOf",
-          "value": "2026-03-29T12:00:00Z"
         },
         {
           "name": "data[speed_alpha].domain",
@@ -11021,40 +10513,12 @@
           "value": "speed_alpha"
         },
         {
-          "name": "data[speed_alpha].licence",
-          "value": "CC BY 4.0"
-        },
-        {
-          "name": "data[speed_alpha].licenceUrl",
-          "value": "https://licences.example/cc-by-4-0"
-        },
-        {
-          "name": "data[speed_alpha].publisher",
-          "value": "Blitzwerk Datenwerk"
-        },
-        {
           "name": "data[speed_alpha].shareAlike",
           "value": "false"
         },
         {
           "name": "data[speed_alpha].staleAfterS",
           "value": "259200"
-        },
-        {
-          "name": "data[speed_alpha].status",
-          "value": "green"
-        },
-        {
-          "name": "data[speed_alpha].termsUrl",
-          "value": "https://alpha.example/terms/speed_alpha"
-        },
-        {
-          "name": "data[viafrei_rules].attribution",
-          "value": "Verkehrsregeln: ViaFrei, eigene Zusammenstellung aus amtlichen Quellen (StVO, StVZO, 35. BImSchV, StVG, EmoG, AFIR); jede Aussage mit Quelle und Prüfdatum — informativ, keine Rechtsberatung / Road rules: ViaFrei, our own compilation from official sources; every statement carries its source and the date it was read — informational, not legal advice"
-        },
-        {
-          "name": "data[viafrei_rules].dataAsOf",
-          "value": "null"
         },
         {
           "name": "data[viafrei_rules].domain",
@@ -11065,28 +10529,8 @@
           "value": "viafrei_rules"
         },
         {
-          "name": "data[viafrei_rules].licence",
-          "value": "ViaFrei editorial content (informational, not legal advice)"
-        },
-        {
-          "name": "data[viafrei_rules].licenceUrl",
-          "value": "https://viafrei.de"
-        },
-        {
-          "name": "data[viafrei_rules].publisher",
-          "value": "Verkehrsregeln: ViaFrei, eigene Zusammenstellung aus amtlichen Quellen (StVO, StVZO, 35. BImSchV, StVG, EmoG, AFIR); jede Aussage mit Quelle und Prüfdatum — informativ, keine Rechtsberatung / Road rules: ViaFrei, our own compilation from official sources; every statement carries its source and the date it was read — informational, not legal advice"
-        },
-        {
           "name": "data[viafrei_rules].shareAlike",
           "value": "false"
-        },
-        {
-          "name": "data[viafrei_rules].status",
-          "value": "grey"
-        },
-        {
-          "name": "data[viafrei_rules].termsUrl",
-          "value": "https://viafrei.de"
         },
         {
           "name": "meta.attribution[afir_alpha].family",
@@ -11103,6 +10547,14 @@
         {
           "name": "meta.attribution[bkg_gvisys].family",
           "value": "bkg_gvisys"
+        },
+        {
+          "name": "meta.attribution[chargepool_gamma].family",
+          "value": "chargepool_gamma"
+        },
+        {
+          "name": "meta.attribution[delfi_rt_tu].family",
+          "value": "delfi_rt_tu"
         },
         {
           "name": "meta.attribution[delfi_sa_alpha].family",
@@ -11177,8 +10629,8 @@
           "value": "1"
         },
         {
-          "name": "meta.notes.purpose",
-          "value": "[]"
+          "name": "meta.notes.purpose[chargepool_gamma]",
+          "value": "1"
         }
       ]
     },
@@ -11226,14 +10678,6 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
-          "name": "data[bkg_gvisys].attribution",
-          "value": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)"
-        },
-        {
-          "name": "data[bkg_gvisys].dataAsOf",
-          "value": "null"
-        },
-        {
           "name": "data[bkg_gvisys].domain",
           "value": "places"
         },
@@ -11242,36 +10686,8 @@
           "value": "bkg_gvisys"
         },
         {
-          "name": "data[bkg_gvisys].licence",
-          "value": "dl-de/by-2-0"
-        },
-        {
-          "name": "data[bkg_gvisys].licenceUrl",
-          "value": "https://licences.example/dl-de-by-2-0"
-        },
-        {
-          "name": "data[bkg_gvisys].publisher",
-          "value": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)"
-        },
-        {
           "name": "data[bkg_gvisys].shareAlike",
           "value": "false"
-        },
-        {
-          "name": "data[bkg_gvisys].status",
-          "value": "grey"
-        },
-        {
-          "name": "data[bkg_gvisys].termsUrl",
-          "value": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
-        },
-        {
-          "name": "data[geonames].attribution",
-          "value": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet"
-        },
-        {
-          "name": "data[geonames].dataAsOf",
-          "value": "null"
         },
         {
           "name": "data[geonames].domain",
@@ -11282,36 +10698,8 @@
           "value": "geonames"
         },
         {
-          "name": "data[geonames].licence",
-          "value": "CC BY 4.0"
-        },
-        {
-          "name": "data[geonames].licenceUrl",
-          "value": "https://licences.example/cc-by-4-0"
-        },
-        {
-          "name": "data[geonames].publisher",
-          "value": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet"
-        },
-        {
           "name": "data[geonames].shareAlike",
           "value": "false"
-        },
-        {
-          "name": "data[geonames].status",
-          "value": "grey"
-        },
-        {
-          "name": "data[geonames].termsUrl",
-          "value": "https://download.geonames.org/export/dump/"
-        },
-        {
-          "name": "data[osm].attribution",
-          "value": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0"
-        },
-        {
-          "name": "data[osm].dataAsOf",
-          "value": "null"
         },
         {
           "name": "data[osm].domain",
@@ -11322,28 +10710,8 @@
           "value": "osm"
         },
         {
-          "name": "data[osm].licence",
-          "value": "ODbL 1.0"
-        },
-        {
-          "name": "data[osm].licenceUrl",
-          "value": "https://opendatacommons.org/licenses/odbl/1-0/"
-        },
-        {
-          "name": "data[osm].publisher",
-          "value": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0"
-        },
-        {
           "name": "data[osm].shareAlike",
           "value": "true"
-        },
-        {
-          "name": "data[osm].status",
-          "value": "grey"
-        },
-        {
-          "name": "data[osm].termsUrl",
-          "value": "https://www.openstreetmap.org/copyright"
         },
         {
           "name": "meta.attribution[bkg_gvisys].family",
@@ -12851,6 +12219,869 @@
         {
           "name": "meta.notes.purpose",
           "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "places-coverage",
+      "operation": "getPlacesCoverage",
+      "counterpart": "coverage",
+      "request": "/v1/places/coverage",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.addresses[0].dataAsOf",
+          "value": "2026-02-26T00:00:00Z"
+        },
+        {
+          "name": "data.addresses[0].land",
+          "value": "null"
+        },
+        {
+          "name": "data.addresses[0].sourceFamily",
+          "value": "osm"
+        },
+        {
+          "name": "data.kinds[0].count",
+          "value": "11"
+        },
+        {
+          "name": "data.kinds[0].englishNames",
+          "value": "2"
+        },
+        {
+          "name": "data.kinds[0].kind",
+          "value": "locality"
+        },
+        {
+          "name": "data.kinds[0].newestLoad",
+          "value": "2026-03-29T19:51:15Z"
+        },
+        {
+          "name": "data.kinds[0].sourceFamily",
+          "value": "bkg_gvisys"
+        },
+        {
+          "name": "data.kinds[1].count",
+          "value": "75"
+        },
+        {
+          "name": "data.kinds[1].englishNames",
+          "value": "6"
+        },
+        {
+          "name": "data.kinds[1].kind",
+          "value": "municipality"
+        },
+        {
+          "name": "data.kinds[1].newestLoad",
+          "value": "2026-03-29T22:15:32Z"
+        },
+        {
+          "name": "data.kinds[1].sourceFamily",
+          "value": "bkg_gvisys"
+        },
+        {
+          "name": "data.kinds[2].count",
+          "value": "7"
+        },
+        {
+          "name": "data.kinds[2].englishNames",
+          "value": "0"
+        },
+        {
+          "name": "data.kinds[2].kind",
+          "value": "state"
+        },
+        {
+          "name": "data.kinds[2].newestLoad",
+          "value": "2026-03-29T19:12:55Z"
+        },
+        {
+          "name": "data.kinds[2].sourceFamily",
+          "value": "bkg_gvisys"
+        },
+        {
+          "name": "data.kinds[3].count",
+          "value": "10"
+        },
+        {
+          "name": "data.kinds[3].englishNames",
+          "value": "2"
+        },
+        {
+          "name": "data.kinds[3].kind",
+          "value": "locality"
+        },
+        {
+          "name": "data.kinds[3].newestLoad",
+          "value": "2026-03-29T22:35:07Z"
+        },
+        {
+          "name": "data.kinds[3].sourceFamily",
+          "value": "geonames"
+        },
+        {
+          "name": "data.kinds[4].count",
+          "value": "25"
+        },
+        {
+          "name": "data.kinds[4].englishNames",
+          "value": "8"
+        },
+        {
+          "name": "data.kinds[4].kind",
+          "value": "municipality"
+        },
+        {
+          "name": "data.kinds[4].newestLoad",
+          "value": "2026-03-29T18:43:47Z"
+        },
+        {
+          "name": "data.kinds[4].sourceFamily",
+          "value": "geonames"
+        },
+        {
+          "name": "data.kinds[5].count",
+          "value": "9"
+        },
+        {
+          "name": "data.kinds[5].englishNames",
+          "value": "1"
+        },
+        {
+          "name": "data.kinds[5].kind",
+          "value": "state"
+        },
+        {
+          "name": "data.kinds[5].newestLoad",
+          "value": "2026-03-29T19:17:24Z"
+        },
+        {
+          "name": "data.kinds[5].sourceFamily",
+          "value": "geonames"
+        },
+        {
+          "name": "data.lands[01].code",
+          "value": "01"
+        },
+        {
+          "name": "data.lands[01].name",
+          "value": "Matfienland"
+        },
+        {
+          "name": "data.lands[01].sourceFamily",
+          "value": "geonames"
+        },
+        {
+          "name": "data.lands[02].code",
+          "value": "02"
+        },
+        {
+          "name": "data.lands[02].name",
+          "value": "Püngmösland"
+        },
+        {
+          "name": "data.lands[02].sourceFamily",
+          "value": "geonames"
+        },
+        {
+          "name": "data.lands[03].code",
+          "value": "03"
+        },
+        {
+          "name": "data.lands[03].name",
+          "value": "Rettasland"
+        },
+        {
+          "name": "data.lands[03].sourceFamily",
+          "value": "geonames"
+        },
+        {
+          "name": "data.lands[04].code",
+          "value": "04"
+        },
+        {
+          "name": "data.lands[04].name",
+          "value": "Maungstömland"
+        },
+        {
+          "name": "data.lands[04].sourceFamily",
+          "value": "bkg_gvisys"
+        },
+        {
+          "name": "data.lands[05].code",
+          "value": "05"
+        },
+        {
+          "name": "data.lands[05].name",
+          "value": "Zenmimland"
+        },
+        {
+          "name": "data.lands[05].sourceFamily",
+          "value": "bkg_gvisys"
+        },
+        {
+          "name": "data.lands[06].code",
+          "value": "06"
+        },
+        {
+          "name": "data.lands[06].name",
+          "value": "Köndoßland"
+        },
+        {
+          "name": "data.lands[06].sourceFamily",
+          "value": "geonames"
+        },
+        {
+          "name": "data.lands[07].code",
+          "value": "07"
+        },
+        {
+          "name": "data.lands[07].name",
+          "value": "Wurhutland"
+        },
+        {
+          "name": "data.lands[07].sourceFamily",
+          "value": "geonames"
+        },
+        {
+          "name": "data.lands[08].code",
+          "value": "08"
+        },
+        {
+          "name": "data.lands[08].name",
+          "value": "Tarklelland"
+        },
+        {
+          "name": "data.lands[08].sourceFamily",
+          "value": "geonames"
+        },
+        {
+          "name": "data.lands[09].code",
+          "value": "09"
+        },
+        {
+          "name": "data.lands[09].name",
+          "value": "Fickmüngland"
+        },
+        {
+          "name": "data.lands[09].sourceFamily",
+          "value": "bkg_gvisys"
+        },
+        {
+          "name": "data.lands[10].code",
+          "value": "10"
+        },
+        {
+          "name": "data.lands[10].name",
+          "value": "Kurbamland"
+        },
+        {
+          "name": "data.lands[10].sourceFamily",
+          "value": "bkg_gvisys"
+        },
+        {
+          "name": "data.lands[11].code",
+          "value": "11"
+        },
+        {
+          "name": "data.lands[11].name",
+          "value": "Grißkleiland"
+        },
+        {
+          "name": "data.lands[11].sourceFamily",
+          "value": "bkg_gvisys"
+        },
+        {
+          "name": "data.lands[12].code",
+          "value": "12"
+        },
+        {
+          "name": "data.lands[12].name",
+          "value": "Durgroßland"
+        },
+        {
+          "name": "data.lands[12].sourceFamily",
+          "value": "geonames"
+        },
+        {
+          "name": "data.lands[13].code",
+          "value": "13"
+        },
+        {
+          "name": "data.lands[13].name",
+          "value": "Lecknämland"
+        },
+        {
+          "name": "data.lands[13].sourceFamily",
+          "value": "geonames"
+        },
+        {
+          "name": "data.lands[14].code",
+          "value": "14"
+        },
+        {
+          "name": "data.lands[14].name",
+          "value": "Hügüsland"
+        },
+        {
+          "name": "data.lands[14].sourceFamily",
+          "value": "bkg_gvisys"
+        },
+        {
+          "name": "data.lands[15].code",
+          "value": "15"
+        },
+        {
+          "name": "data.lands[15].name",
+          "value": "Nolkünland"
+        },
+        {
+          "name": "data.lands[15].sourceFamily",
+          "value": "bkg_gvisys"
+        },
+        {
+          "name": "data.lands[16].code",
+          "value": "16"
+        },
+        {
+          "name": "data.lands[16].name",
+          "value": "Zugrisland"
+        },
+        {
+          "name": "data.lands[16].sourceFamily",
+          "value": "geonames"
+        },
+        {
+          "name": "meta.attribution[bkg_gvisys].family",
+          "value": "bkg_gvisys"
+        },
+        {
+          "name": "meta.attribution[geonames].family",
+          "value": "geonames"
+        },
+        {
+          "name": "meta.attribution[osm].family",
+          "value": "osm"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "national-summary",
+      "operation": "getNationalSummary",
+      "counterpart": "home",
+      "request": "/v1/germany",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "roads",
+          "energy",
+          "parking",
+          "transit",
+          "weather",
+          "accessibility"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.charging[0].chargePoints",
+          "value": "36"
+        },
+        {
+          "name": "data.charging[0].sites",
+          "value": "14"
+        },
+        {
+          "name": "data.charging[0].sourceFamily",
+          "value": "afir_alpha"
+        },
+        {
+          "name": "data.charging[1].chargePoints",
+          "value": "16"
+        },
+        {
+          "name": "data.charging[1].sites",
+          "value": "8"
+        },
+        {
+          "name": "data.charging[1].sourceFamily",
+          "value": "afir_beta"
+        },
+        {
+          "name": "data.charging[2].chargePoints",
+          "value": "38"
+        },
+        {
+          "name": "data.charging[2].sites",
+          "value": "14"
+        },
+        {
+          "name": "data.charging[2].sourceFamily",
+          "value": "chargepool_gamma"
+        },
+        {
+          "name": "data.facilities[0].count",
+          "value": "11"
+        },
+        {
+          "name": "data.facilities[0].kind",
+          "value": "elevator"
+        },
+        {
+          "name": "data.facilities[0].sourceFamily",
+          "value": "openstation_siri_fm"
+        },
+        {
+          "name": "data.facilities[0].state",
+          "value": "active"
+        },
+        {
+          "name": "data.facilities[0].stations",
+          "value": "11"
+        },
+        {
+          "name": "data.facilities[1].count",
+          "value": "2"
+        },
+        {
+          "name": "data.facilities[1].kind",
+          "value": "elevator"
+        },
+        {
+          "name": "data.facilities[1].sourceFamily",
+          "value": "openstation_siri_fm"
+        },
+        {
+          "name": "data.facilities[1].state",
+          "value": "inactive"
+        },
+        {
+          "name": "data.facilities[1].stations",
+          "value": "2"
+        },
+        {
+          "name": "data.facilities[2].count",
+          "value": "4"
+        },
+        {
+          "name": "data.facilities[2].kind",
+          "value": "elevator"
+        },
+        {
+          "name": "data.facilities[2].sourceFamily",
+          "value": "openstation_siri_fm"
+        },
+        {
+          "name": "data.facilities[2].state",
+          "value": "unknown"
+        },
+        {
+          "name": "data.facilities[2].stations",
+          "value": "4"
+        },
+        {
+          "name": "data.facilities[3].count",
+          "value": "4"
+        },
+        {
+          "name": "data.facilities[3].kind",
+          "value": "escalator"
+        },
+        {
+          "name": "data.facilities[3].sourceFamily",
+          "value": "openstation_siri_fm"
+        },
+        {
+          "name": "data.facilities[3].state",
+          "value": "active"
+        },
+        {
+          "name": "data.facilities[3].stations",
+          "value": "3"
+        },
+        {
+          "name": "data.facilities[4].count",
+          "value": "1"
+        },
+        {
+          "name": "data.facilities[4].kind",
+          "value": "escalator"
+        },
+        {
+          "name": "data.facilities[4].sourceFamily",
+          "value": "openstation_siri_fm"
+        },
+        {
+          "name": "data.facilities[4].state",
+          "value": "unknown"
+        },
+        {
+          "name": "data.facilities[4].stations",
+          "value": "1"
+        },
+        {
+          "name": "data.fuel",
+          "value": "[]"
+        },
+        {
+          "name": "data.parking[0].count",
+          "value": "6"
+        },
+        {
+          "name": "data.parking[0].key",
+          "value": "other"
+        },
+        {
+          "name": "data.parking[0].sourceFamily",
+          "value": "park_alpha"
+        },
+        {
+          "name": "data.parking[1].count",
+          "value": "7"
+        },
+        {
+          "name": "data.parking[1].key",
+          "value": "other"
+        },
+        {
+          "name": "data.parking[1].sourceFamily",
+          "value": "park_beta"
+        },
+        {
+          "name": "data.parking[2].count",
+          "value": "4"
+        },
+        {
+          "name": "data.parking[2].key",
+          "value": "park_and_ride"
+        },
+        {
+          "name": "data.parking[2].sourceFamily",
+          "value": "park_alpha"
+        },
+        {
+          "name": "data.parking[3].count",
+          "value": "3"
+        },
+        {
+          "name": "data.parking[3].key",
+          "value": "park_and_ride"
+        },
+        {
+          "name": "data.parking[3].sourceFamily",
+          "value": "park_beta"
+        },
+        {
+          "name": "data.parking[4].count",
+          "value": "3"
+        },
+        {
+          "name": "data.parking[4].key",
+          "value": "rest_area"
+        },
+        {
+          "name": "data.parking[4].sourceFamily",
+          "value": "park_alpha"
+        },
+        {
+          "name": "data.parking[5].count",
+          "value": "4"
+        },
+        {
+          "name": "data.parking[5].key",
+          "value": "rest_area"
+        },
+        {
+          "name": "data.parking[5].sourceFamily",
+          "value": "park_beta"
+        },
+        {
+          "name": "data.punctuality",
+          "value": "[]"
+        },
+        {
+          "name": "data.situations[0].count",
+          "value": "14"
+        },
+        {
+          "name": "data.situations[0].key",
+          "value": "hazard"
+        },
+        {
+          "name": "data.situations[0].sourceFamily",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "data.situations[1].count",
+          "value": "2"
+        },
+        {
+          "name": "data.situations[1].key",
+          "value": "roadworks"
+        },
+        {
+          "name": "data.situations[1].sourceFamily",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "data.states[0].count",
+          "value": "1"
+        },
+        {
+          "name": "data.states[0].key",
+          "value": "03"
+        },
+        {
+          "name": "data.states[0].sourceFamily",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "data.states[1].count",
+          "value": "1"
+        },
+        {
+          "name": "data.states[1].key",
+          "value": "06"
+        },
+        {
+          "name": "data.states[1].sourceFamily",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "data.states[2].count",
+          "value": "1"
+        },
+        {
+          "name": "data.states[2].key",
+          "value": "07"
+        },
+        {
+          "name": "data.states[2].sourceFamily",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "data.states[3].count",
+          "value": "3"
+        },
+        {
+          "name": "data.states[3].key",
+          "value": "10"
+        },
+        {
+          "name": "data.states[3].sourceFamily",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "data.states[4].count",
+          "value": "1"
+        },
+        {
+          "name": "data.states[4].key",
+          "value": "14"
+        },
+        {
+          "name": "data.states[4].sourceFamily",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "data.warnings[0].areas",
+          "value": "1"
+        },
+        {
+          "name": "data.warnings[0].count",
+          "value": "1"
+        },
+        {
+          "name": "data.warnings[0].level",
+          "value": "2"
+        },
+        {
+          "name": "data.warnings[0].sourceFamily",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "data.warnings[1].areas",
+          "value": "5"
+        },
+        {
+          "name": "data.warnings[1].count",
+          "value": "5"
+        },
+        {
+          "name": "data.warnings[1].level",
+          "value": "2"
+        },
+        {
+          "name": "data.warnings[1].sourceFamily",
+          "value": "dwd_eta"
+        },
+        {
+          "name": "data.warnings[2].areas",
+          "value": "1"
+        },
+        {
+          "name": "data.warnings[2].count",
+          "value": "1"
+        },
+        {
+          "name": "data.warnings[2].level",
+          "value": "3"
+        },
+        {
+          "name": "data.warnings[2].sourceFamily",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "data.warnings[3].areas",
+          "value": "1"
+        },
+        {
+          "name": "data.warnings[3].count",
+          "value": "1"
+        },
+        {
+          "name": "data.warnings[3].level",
+          "value": "4"
+        },
+        {
+          "name": "data.warnings[3].sourceFamily",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "data.warnings[4].areas",
+          "value": "2"
+        },
+        {
+          "name": "data.warnings[4].count",
+          "value": "2"
+        },
+        {
+          "name": "data.warnings[4].level",
+          "value": "4"
+        },
+        {
+          "name": "data.warnings[4].sourceFamily",
+          "value": "dwd_eta"
+        },
+        {
+          "name": "meta.attribution[afir_alpha].family",
+          "value": "afir_alpha"
+        },
+        {
+          "name": "meta.attribution[afir_beta].family",
+          "value": "afir_beta"
+        },
+        {
+          "name": "meta.attribution[chargepool_gamma].family",
+          "value": "chargepool_gamma"
+        },
+        {
+          "name": "meta.attribution[dwd_alpha].family",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "meta.attribution[dwd_eta].family",
+          "value": "dwd_eta"
+        },
+        {
+          "name": "meta.attribution[openstation_siri_fm].family",
+          "value": "openstation_siri_fm"
+        },
+        {
+          "name": "meta.attribution[park_alpha].family",
+          "value": "park_alpha"
+        },
+        {
+          "name": "meta.attribution[park_beta].family",
+          "value": "park_beta"
+        },
+        {
+          "name": "meta.attribution[roads_alpha].family",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose[chargepool_gamma]",
+          "value": "1"
         }
       ]
     }

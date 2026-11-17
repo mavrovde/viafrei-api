@@ -245,6 +245,13 @@ var Default = Rules{
 		{"data.parking.sites[*].occupancy.total", "", "getPlaceOverview", overviewReason},
 		{"data.parking.sites[*].occupancy.state", "", "getPlaceOverview", overviewReason},
 		{"data.parking.sites[*].occupancy.observedAt", "", "getPlaceOverview", overviewReason},
+		{"data[*].status", "", "listSources", sourcesLiveReason},
+		{"data[*].dataAsOf", "", "listSources", sourcesLiveReason},
+		{"data[*].attribution", "", "listSources", sourcesTextReason},
+		{"data[*].licence", "", "listSources", sourcesTextReason},
+		{"data[*].licenceUrl", "", "listSources", sourcesTextReason},
+		{"data[*].publisher", "", "listSources", sourcesTextReason},
+		{"data[*].termsUrl", "", "listSources", sourcesTextReason},
 		{"data.watchId", "", "getWatch", watchIDReason},
 		{"data.uri", "", "getWatch", watchIDReason},
 		{"meta.attribution[*].domain", "", "", attributionReason},
@@ -314,6 +321,15 @@ const overviewReason = "API-only: the place page's cards (the digest route /inte
 const overviewDistanceReason = "the place page's cards state a site's distance in kilometres to one decimal with a direction, the API in metres; the site's point, which both measure from, is compared"
 
 // watchIDReason is why a watch's id is not compared: each side mints its own.
+// sourcesLiveReason: a source's status and data age vary with when it last
+// arrived; the MCP coverage resource reads them from the run ledger, the API
+// from the family's newest dataAsOf (docs/parity.md).
+const sourcesLiveReason = "live-varying: the API states a family's status and data age from its newest dataAsOf, the MCP coverage resource from the platform's run ledger, which the fixture rows hold none of"
+
+// sourcesTextReason: the register texts of a source family, prose the
+// fixture states synthetically (attributionReason).
+const sourcesTextReason = "prose: the fixture's families carry synthetic register texts and the platform states its own register's; which families are listed, their domain, stale threshold and share-alike flag are compared"
+
 const watchIDReason = "each side mints the id of a watch: the platform a number of its session, the API a token of kind, key and condition; the watch it names is compared"
 
 // attributionReason is why only the credited family of an attribution entry

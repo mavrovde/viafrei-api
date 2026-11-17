@@ -23,7 +23,7 @@ import (
 // commit.
 var registryFile = filepath.Join("..", "..", "..", "test", "live", "registry.json")
 
-const registrySHA256 = "93e195a12799af567672ce690d3cde5620f2d6fbd8f9a5423e34bed45c3bf176"
+const registrySHA256 = "15f6e205b94c65432338a804fbff23ce7b7557da98974a4a4e17c1fd91b89d97"
 
 func registry(t *testing.T) *livesources.Registry {
 	t.Helper()
@@ -113,8 +113,10 @@ func TestKey(t *testing.T) {
 	}{
 		{fuel, map[string]any{"at": "ags:09162000"}, "ags:09162000"},
 		{fuel, map[string]any{"at": "ags:09162000", "snap": true}, "ags:09162000"},
+		// A motorway anchor as the API resolves it: its BASt LCL code.
+		{fuel, map[string]any{"at": "anchor:12345", "anchor": true}, "anchor:12345"},
 		// The registry's own cases for a position: never stored (Stored).
-		{fuel, map[string]any{"at": "pt:48.1371,11.5754", "anchor": true}, "anchor:48.1371,11.5754"},
+		{fuel, map[string]any{"at": "pt:48.1371,11.5754", "anchor": true}, "cell:48.135,11.5725:false"},
 		{fuel, map[string]any{"at": "pt:48.1371,11.5754"}, "cell:48.135,11.5725:false"},
 		{fuel, map[string]any{"at": "pt:-0.001,0.001", "snap": true}, "cell:0,0:true"},
 		{board, map[string]any{"eva": "8000207"}, "8000207"},
@@ -158,6 +160,7 @@ func TestStoredHoldsPublicIdsOnly(t *testing.T) {
 	}{
 		{fuel, "ags:09162000", "at=ags:09162000"},
 		{board, "8000207", "eva=8000207"},
+		{fuel, "anchor:12345", "at=anchor:12345"},
 		{fuel, "anchor:48.1371,11.5754", ""},
 		{fuel, "cell:48.135,11.5725:false", ""},
 		{fuel, "pt:48.1371,11.5754", ""},

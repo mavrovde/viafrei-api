@@ -61,6 +61,12 @@ func (r *refreshStore) Refresh(_ context.Context, id, keyID string) (refresh.Req
 // other.
 func gemeinden(_ context.Context, name, value string) (string, error) {
 	switch {
+	case name == features.LookupAnchor && value == "49.2648,12.9487":
+		return "12345", nil
+	case name == features.LookupAnchor && value == "2.0,2.0":
+		return "", errors.New("store down")
+	case name == features.LookupAnchor:
+		return "", nil
 	case name != features.LookupAGS:
 		return "", errors.New("unknown lookup " + name)
 	case value == "48.137,11.575":
@@ -76,6 +82,7 @@ func TestRequestRefreshIsForOwnKeysOnAConfiguredInstance(t *testing.T) {
 	s := features.New(features.Repositories{}, features.Settings{}, func() time.Time { return now })
 	own := transitKey
 	own.Audience = access.AudienceOwn
+	own.Plan.Name = "mcp"
 	ask := refresh.Ask{Source: "fuel-prices-de", Subject: map[string]any{"at": "ags:09162000"}}
 	if _, err := s.RequestRefresh(ctx, own, ask); !errors.Is(err, features.ErrNoRefreshes) {
 		t.Fatalf("not configured: %v", err)
@@ -96,7 +103,7 @@ func TestRequestRefreshIsForOwnKeysOnAConfiguredInstance(t *testing.T) {
 	st.answer = refresh.Request{ID: "1", State: refresh.Pending}
 	got, err := s.RequestRefresh(ctx, own, ask)
 	if err != nil || got.ID != "1" || st.got.Source != "fuel-prices-de" || st.got.SubjectKey != "ags:09162000" || st.got.KeyID != own.ID ||
-		!st.got.At.Equal(now) || !st.gotSince.IsZero() || st.gotWait != 1200*time.Millisecond || src.gotLookup == nil {
+		st.got.RequestedBy != "mcp" || !st.got.At.Equal(now) || !st.gotSince.IsZero() || st.gotWait != 1200*time.Millisecond || src.gotLookup == nil {
 		t.Fatalf("ask: %+v %v %+v", got, err, st)
 	}
 	src.fresh, src.deadline = 5*time.Minute, 300*time.Millisecond
@@ -152,5 +159,44 @@ func TestRequestRefreshStoresAPositionAsItsGemeinde(t *testing.T) {
 	s.WithRefreshes(features.Refreshes{Sources: src, Store: st})
 	if _, err := s.RequestRefresh(ctx, own, refresh.Ask{Source: "fuel-prices-de", Subject: map[string]any{"at": "pt:48.137,11.575"}}); !errors.As(err, &se) || se.Location != "subject.at" {
 		t.Fatalf("no lookup: %v", err)
+	}
+}
+
+// TestRequestRefreshStoresAMotorwayAnchorAsItsLCLCode: lead ruling 1 of
+// 2026-11-17. A motorway page's anchor (anchor true, four decimals at most)
+// on a motorway point of the BASt LCL is keyed and stored as that point's
+// code, anchor:<code>; an anchor on none, an anchor of more decimals and a
+// position not marked anchor are stored as the AGS of their Gemeinde.
+func TestRequestRefreshStoresAMotorwayAnchorAsItsLCLCode(t *testing.T) {
+	ctx := context.Background()
+	own := transitKey
+	own.Audience = access.AudienceOwn
+	src, st := &sources{}, &refreshStore{}
+	s := features.New(features.Repositories{}, features.Settings{}, func() time.Time { return now }).
+		WithRefreshes(features.Refreshes{Sources: src, Store: st, Lookup: gemeinden})
+	for _, c := range []struct {
+		subject map[string]any
+		want    string
+	}{
+		{map[string]any{"at": "pt:49.2648,12.9487", "anchor": true}, "anchor:12345"},
+		{map[string]any{"at": "pt:48.137,11.575", "anchor": true}, "ags:09162000"},
+		{map[string]any{"at": "pt:49.2648,12.9487"}, ""},
+		{map[string]any{"at": "pt:49.26477,12.94870", "anchor": true}, ""},
+	} {
+		st.requested = 0
+		_, err := s.RequestRefresh(ctx, own, refresh.Ask{Source: "fuel-prices-de", Subject: c.subject})
+		if c.want == "" {
+			var se *refresh.SubjectError
+			if !errors.As(err, &se) || st.requested != 0 {
+				t.Errorf("%v: %v, %d recorded; want it resolved to a Gemeinde, of which none answers", c.subject, err, st.requested)
+			}
+			continue
+		}
+		if err != nil || src.gotSubject["at"] != c.want || st.got.SubjectKey != c.want || len(st.got.Subject) != 1 || st.got.Subject["at"] != c.want {
+			t.Errorf("%v: keyed %v, stored %+v, %v; want %s", c.subject, src.gotSubject, st.got, err, c.want)
+		}
+	}
+	if _, err := s.RequestRefresh(ctx, own, refresh.Ask{Source: "fuel-prices-de", Subject: map[string]any{"at": "pt:2.0,2.0", "anchor": true}}); err == nil || errors.As(err, new(*refresh.SubjectError)) {
+		t.Error("a failed anchor lookup answered")
 	}
 }

@@ -28,7 +28,8 @@
         ],
         "junctions": 8,
         "situations": 0,
-        "sourceFamily": "autobahn"
+        "sourceFamily": "autobahn",
+        "lamp": "amber"
       },
       {
         "road": "A101",
@@ -42,7 +43,8 @@
         ],
         "junctions": 8,
         "situations": 8,
-        "sourceFamily": "autobahn"
+        "sourceFamily": "autobahn",
+        "lamp": "amber"
       },
       {
         "road": "A102",
@@ -58,7 +60,8 @@
         ],
         "junctions": 8,
         "situations": 2,
-        "sourceFamily": "autobahn"
+        "sourceFamily": "autobahn",
+        "lamp": "amber"
       }
     ],
     "meta": {

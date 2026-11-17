@@ -70,7 +70,11 @@ type New struct {
 	Subject    map[string]any
 	SubjectKey string
 	KeyID      string
-	At         time.Time
+	// RequestedBy is which of ViaFrei's own services asked: the own key's
+	// plan (site for the web, mcp for the MCP server), never anything about
+	// the person (the privacy ruling: "which of our own services made it").
+	RequestedBy string
+	At          time.Time
 }
 
 // ErrSource is the error of an ask naming no registered source.

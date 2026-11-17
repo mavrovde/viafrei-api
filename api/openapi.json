@@ -5717,7 +5717,7 @@
           },
           "subject": {
             "additionalProperties": {},
-            "description": "What to refresh, as the source's registered JSON Schema admits it: fuel-prices-de takes at (ags:\u003c8 digits\u003e or pt:lat,lon) with snap or anchor; train-board-de takes eva or name, exactly one. Only a public id is stored: a position is resolved, in memory, to the AGS of its Gemeinde, and a station's name to its EVA number; neither the position nor the name is kept or echoed.",
+            "description": "What to refresh, as the source's registered JSON Schema admits it: fuel-prices-de takes at (ags:\u003c8 digits\u003e or pt:lat,lon) with snap or anchor; train-board-de takes eva or name, exactly one. Only a public id is stored: a position is resolved, in memory, to the AGS of its Gemeinde (a motorway page's anchor, with anchor true, to the BASt LCL code of the motorway point it lies on, anchor:\u003ccode\u003e), and a station's name to its EVA number; neither the position nor the name is kept or echoed.",
             "examples": [
               {
                 "at": "ags:09162000"

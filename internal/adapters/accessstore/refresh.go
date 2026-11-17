@@ -94,9 +94,9 @@ func join(ctx context.Context, conn *pgxpool.Pool, n refresh.New, freshSince tim
 				return id, true, err
 			}
 		}
-		err := conn.QueryRow(ctx, `insert into live.refresh_requests (source, subject, subject_key, created_at)
-			values ($1, $2, $3, $4) on conflict do nothing returning id::text`,
-			n.Source, subject(n.Subject), n.SubjectKey, n.At).Scan(&id)
+		err := conn.QueryRow(ctx, `insert into live.refresh_requests (source, subject, subject_key, created_at, requested_by)
+			values ($1, $2, $3, $4, $5) on conflict do nothing returning id::text`,
+			n.Source, subject(n.Subject), n.SubjectKey, n.At, n.RequestedBy).Scan(&id)
 		if err == nil || !errors.Is(err, pgx.ErrNoRows) {
 			return id, false, err
 		}

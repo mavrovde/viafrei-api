@@ -218,3 +218,13 @@ func TestStrictQueryRefusesARepeatedDeclaredParameter(t *testing.T) {
 		}
 	}
 }
+
+// TestTenthKm: a filling station's distance is stated as the platform's
+// filling-station search states it, kilometres to one decimal, halves up.
+func TestTenthKm(t *testing.T) {
+	for m, want := range map[int]int{0: 0, 49: 0, 50: 100, 110: 100, 149: 100, 150: 200, 62433: 62400} {
+		if got := tenthKm(m); got != want {
+			t.Errorf("tenthKm(%d) = %d, want %d", m, got, want)
+		}
+	}
+}

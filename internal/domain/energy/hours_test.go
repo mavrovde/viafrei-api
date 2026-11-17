@@ -95,7 +95,7 @@ func TestResolveOpenAt(t *testing.T) {
 		"06:15":            time.Date(2026, 3, 31, 6, 15, 0, 0, berlin),
 		"2026-09-30 06:15": time.Date(2026, 9, 30, 6, 15, 0, 0, berlin),
 		"2026-10-25T02:30": time.Date(2026, 10, 25, 1, 30, 0, 0, time.UTC), // the fold: the later 02:30, CET
-		"2026-03-29 02:30": time.Date(2026, 3, 29, 1, 30, 0, 0, time.UTC), // the gap: moved forward, 03:30 CEST
+		"2026-03-29 02:30": time.Date(2026, 3, 29, 1, 30, 0, 0, time.UTC),  // the gap: moved forward, 03:30 CEST
 	} {
 		if got, ok := energy.ResolveOpenAt(text, now); !ok || !got.Equal(want) {
 			t.Errorf("%q: %v, %v; want %v", text, got, ok, want)

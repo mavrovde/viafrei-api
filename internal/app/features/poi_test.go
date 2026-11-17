@@ -19,7 +19,9 @@ type poiFake struct {
 	err error
 }
 
-func (f *poiFake) Pois(context.Context, places.PoiQuery, []string) ([]places.Poi, error) { return f.v, f.err }
+func (f *poiFake) Pois(context.Context, places.PoiQuery, []string) ([]places.Poi, error) {
+	return f.v, f.err
+}
 
 func poiService(f *poiFake) *features.Service {
 	if f.fake == nil {

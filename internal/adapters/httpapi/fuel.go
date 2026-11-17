@@ -67,7 +67,7 @@ type FuelStation struct {
 	Name         *string     `json:"name" nullable:"true" doc:"The station's name; null when not published."`
 	Brand        *string     `json:"brand" nullable:"true" doc:"The brand; null when not published."`
 	Location     Position    `json:"location"`
-	DistanceM    int         `json:"distanceM" doc:"Distance from the asked position in metres."`
+	DistanceM    int         `json:"distanceM" doc:"Distance from the asked position in metres, to the nearest 100 m: the platform's filling-station search states it in kilometres to one decimal (0.1 km). The order is by the exact distance."`
 	OpenState    string      `json:"openingState" doc:"open, closed or unknown at the answer's instant (open_at's, when asked), read from the published opening hours: unknown when there are none or they cannot be read. Open enumeration."`
 	Prices       []FuelPrice `json:"prices" doc:"The newest price per grade the station reported, by grade; empty when it reported none."`
 	SourceFamily string      `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
@@ -156,9 +156,16 @@ func fuelStations(a features.FuelStations, window time.Duration) []FuelStation {
 				ReportedAtLocal: local(p.ObservedAt), Current: p.Current(a.At, window)}
 		}
 		data[i] = FuelStation{ID: st.ID, Name: st.Name, Brand: st.Brand, Location: position(st.Location),
-			DistanceM: st.DistanceM, OpenState: st.OpenStateAt(openStateInstant(a)), Prices: prices, SourceFamily: st.Family}
+			DistanceM: tenthKm(st.DistanceM), OpenState: st.OpenStateAt(openStateInstant(a)), Prices: prices, SourceFamily: st.Family}
 	}
 	return data
+}
+
+// tenthKm states a distance as the platform's filling-station search states
+// it: kilometres to one decimal (Math.round(km*10)/10, halves up), here in
+// metres, so 110 m is 100 and 150 m is 200.
+func tenthKm(m int) int {
+	return (m + 50) / 100 * 100
 }
 
 // openStateInstant is the instant a fuel answer's opening states are read at.

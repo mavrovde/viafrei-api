@@ -1378,7 +1378,7 @@
       "id": "departures-modes",
       "operation": "listStationDepartures",
       "counterpart": "departure board",
-      "request": "/v1/stations/1:de:01002:0/departures?from=2026-03-30T04:00:00Z\u0026duration_min=1440\u0026modes=rail,sbahn\u0026limit=15",
+      "request": "/v1/stations/1:de:01002:0/departures?from=2026-03-30T04:00:00Z\u0026duration_min=1440\u0026modes=rail,subway\u0026limit=15",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -1470,7 +1470,7 @@
       "id": "departures-categories",
       "operation": "listStationDepartures",
       "counterpart": "departure board",
-      "request": "/v1/stations/1:de:01002:0/departures?from=2026-03-30T04:00:00Z\u0026duration_min=1440\u0026categories=RE\u0026limit=15",
+      "request": "/v1/stations/1:de:01002:0/departures?from=2026-03-29T10:00:00Z\u0026duration_min=120\u0026categories=RE\u0026limit=15",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -1482,7 +1482,7 @@
         ],
         "accepted": null
       },
-      "now": "2026-03-30T00:00:00Z",
+      "now": "2026-03-29T09:30:00Z",
       "facts": [
         {
           "name": "data.departures",
@@ -1509,16 +1509,28 @@
           "value": "de:01002:0"
         },
         {
-          "name": "data.window.dropped",
-          "value": "[]"
+          "name": "data.window.dropped[1].code",
+          "value": "1"
+        },
+        {
+          "name": "data.window.dropped[1].count",
+          "value": "1"
+        },
+        {
+          "name": "data.window.dropped[2].code",
+          "value": "2"
+        },
+        {
+          "name": "data.window.dropped[2].count",
+          "value": "1"
         },
         {
           "name": "data.window.from",
-          "value": "2026-03-30T04:00:00Z"
+          "value": "2026-03-29T10:00:00Z"
         },
         {
           "name": "data.window.fromLocal",
-          "value": "2026-03-30T04:00:00Z"
+          "value": "2026-03-29T10:00:00Z"
         },
         {
           "name": "data.window.matched",
@@ -1526,15 +1538,15 @@
         },
         {
           "name": "data.window.matchedAll",
-          "value": "0"
+          "value": "2"
         },
         {
           "name": "data.window.until",
-          "value": "2026-03-31T04:00:00Z"
+          "value": "2026-03-29T12:00:00Z"
         },
         {
           "name": "data.window.untilLocal",
-          "value": "2026-03-31T04:00:00Z"
+          "value": "2026-03-29T12:00:00Z"
         },
         {
           "name": "meta.attribution[delfi_static].family",
@@ -1658,7 +1670,7 @@
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].distanceM",
-          "value": "110"
+          "value": "100"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].id",
@@ -1790,7 +1802,7 @@
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].distanceM",
-          "value": "110"
+          "value": "100"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].id",
@@ -1966,7 +1978,7 @@
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].distanceM",
-          "value": "110"
+          "value": "100"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].id",
@@ -2390,7 +2402,7 @@
       "id": "roads-near",
       "operation": "listRoadConditions",
       "counterpart": "road conditions",
-      "request": "/v1/road-conditions?at=52.2,9.15\u0026radius_m=50000\u0026limit=10",
+      "request": "/v1/road-conditions?at=52.2,9.15\u0026radius_m=25000\u0026limit=10",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -2414,7 +2426,7 @@
         },
         {
           "name": "data.area.radiusM",
-          "value": "50000"
+          "value": "25000"
         },
         {
           "name": "data.lamp",
@@ -2642,7 +2654,7 @@
       "id": "roads-near-kinds",
       "operation": "listRoadConditions",
       "counterpart": "road conditions",
-      "request": "/v1/road-conditions?at=52.2,9.15\u0026radius_m=50000\u0026kinds=roadworks,closure\u0026limit=10",
+      "request": "/v1/road-conditions?at=52.2,9.15\u0026radius_m=25000\u0026kinds=roadworks,closure\u0026limit=10",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -2666,7 +2678,7 @@
         },
         {
           "name": "data.area.radiusM",
-          "value": "50000"
+          "value": "25000"
         },
         {
           "name": "data.lamp",
@@ -3142,7 +3154,7 @@
       "id": "rules-topic",
       "operation": "getDrivingRules",
       "counterpart": "driving rules",
-      "request": "/v1/driving-rules?topic=syn_holiday_ban",
+      "request": "/v1/driving-rules?topic=truck_ban",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -3161,39 +3173,79 @@
         },
         {
           "name": "data.reviewedOn",
-          "value": "2026-02-01"
+          "value": "2026-10-08"
         },
         {
           "name": "data.rules[0].legalBasis",
-          "value": "§ 0 synthetic"
+          "value": "§ 30 Abs. 3 StVO"
         },
         {
           "name": "data.rules[0].text",
-          "value": "Synthetic statement 1 about holiday_ban, for tests only."
+          "value": "Sonntags und an Feiertagen dürfen Lkw über 7,5 t sowie Lkw mit Anhänger von 0 bis 22 Uhr nicht fahren."
         },
         {
           "name": "data.rules[1].legalBasis",
-          "value": "§ 0 synthetic"
+          "value": "§ 30 Abs. 3 StVO"
         },
         {
           "name": "data.rules[1].text",
-          "value": "Synthetic statement 2 about holiday_ban, for tests only."
+          "value": "Für Pkw, Wohnmobile und Transporter unter 7,5 t gilt das Verbot nicht — der Sonntag ist für sie ein normaler Fahrtag."
         },
         {
           "name": "data.rules[2].legalBasis",
-          "value": "§ 0 synthetic"
+          "value": "§ 30 Abs. 4 StVO"
         },
         {
           "name": "data.rules[2].text",
-          "value": "Synthetic statement 3 about holiday_ban, for tests only."
+          "value": "Als Feiertage zählen bundesweit Neujahr, Karfreitag, Ostermontag, 1. Mai, Christi Himmelfahrt, Pfingstmontag, 3. Oktober, 25. und 26. Dezember; nur in einzelnen Ländern Fronleichnam (Baden-Württemberg, Bayern, Hessen, Nordrhein-Westfalen, Rheinland-Pfalz, Saarland), der Reformationstag am 31. Oktober (Brandenburg, Bremen, Hamburg, Mecklenburg-Vorpommern, Niedersachsen, Sachsen, Sachsen-Anhalt, Schleswig-Holstein, Thüringen) und Allerheiligen am 1. November (Baden-Württemberg, Bayern, Nordrhein-Westfalen, Rheinland-Pfalz, Saarland)."
+        },
+        {
+          "name": "data.rules[3].legalBasis",
+          "value": "§ 30 Abs. 3 und 4 StVO"
+        },
+        {
+          "name": "data.rules[3].text",
+          "value": "Ein Feiertag nur einzelner Länder ist nur dort ein Fahrverbotstag: Am 31. Oktober gilt das Lkw-Verbot von 0 bis 22 Uhr in den neun genannten Ländern; in Baden-Württemberg, Bayern, Berlin, Hessen, Nordrhein-Westfalen, Rheinland-Pfalz und im Saarland ist der Tag kein Feiertag nach § 30 Abs. 4 — außer er fällt auf einen Sonntag."
+        },
+        {
+          "name": "data.rules[4].legalBasis",
+          "value": "§ 30 Abs. 4 StVO; Art. 1 FTG (Bayern)"
+        },
+        {
+          "name": "data.rules[4].text",
+          "value": "Ein Landesfeiertag, den § 30 Abs. 4 nicht nennt, ist kein Lkw-Fahrverbotstag — etwa in Bayern Heilige Drei Könige (6. Januar), Mariä Himmelfahrt (15. August, in Gemeinden mit überwiegend katholischer Bevölkerung) und in Augsburg das Friedensfest (8. August)."
+        },
+        {
+          "name": "data.rules[5].legalBasis",
+          "value": "Ferienreiseverordnung"
+        },
+        {
+          "name": "data.rules[5].text",
+          "value": "Dazu kommt das Ferienreiseverbot: vom 1. Juli bis 31. August samstags von 7 bis 20 Uhr auf den in der Verordnung genannten Autobahn- und Bundesstraßenabschnitten."
+        },
+        {
+          "name": "data.rules[6].legalBasis",
+          "value": "§ 30 Abs. 3 StVO"
+        },
+        {
+          "name": "data.rules[6].text",
+          "value": "Ausgenommen sind unter anderem kombinierter Verkehr, frische Milch, frisches Fleisch, frisches Obst und Gemüse — und die dazugehörigen Leerfahrten."
+        },
+        {
+          "name": "data.rules[7].legalBasis",
+          "value": "Bußgeldkatalog-Verordnung (BKatV)"
+        },
+        {
+          "name": "data.rules[7].text",
+          "value": "Verstöße treffen Fahrer und Unternehmen getrennt; kontrolliert wird an Rastplätzen und Grenzübergängen."
         },
         {
           "name": "data.title",
-          "value": "Synthetisches Regelthema holiday_ban"
+          "value": "Sonntags- und Feiertagsfahrverbot für Lkw"
         },
         {
           "name": "data.topic",
-          "value": "syn_holiday_ban"
+          "value": "truck_ban"
         },
         {
           "name": "meta.attribution[viafrei_rules].family",
@@ -6772,7 +6824,7 @@
       "id": "parking-facilities-toilet",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.25,10.43\u0026radius_m=50000\u0026facilities=toilet\u0026limit=5",
+      "request": "/v1/parking-options?at=50.25,10.43\u0026radius_m=25000\u0026facilities=toilet\u0026limit=5",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -8165,7 +8217,7 @@
       "id": "state-roads-de-closures",
       "operation": "listStateRoadConditions",
       "counterpart": "traffic announcements",
-      "request": "/v1/states/de/road-conditions?kinds=closure,jam\u0026limit=10",
+      "request": "/v1/states/de/road-conditions?kinds=closure,roadworks\u0026limit=10",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -8188,96 +8240,96 @@
           "value": "jam"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].delayMin",
+          "name": "data.situations[datex:syn:ev-00011].delayMin",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].description",
+          "name": "data.situations[datex:syn:ev-00011].description",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].direction",
+          "name": "data.situations[datex:syn:ev-00011].direction",
           "value": "unknown"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].directionText",
+          "name": "data.situations[datex:syn:ev-00011].directionText",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].headline",
-          "value": "AbnormalTraffic"
+          "name": "data.situations[datex:syn:ev-00011].headline",
+          "value": "MaintenanceWorks"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].id",
-          "value": "datex:syn:ev-00007"
+          "name": "data.situations[datex:syn:ev-00011].id",
+          "value": "datex:syn:ev-00011"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].kind",
-          "value": "jam"
+          "name": "data.situations[datex:syn:ev-00011].kind",
+          "value": "roadworks"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].lanes",
+          "name": "data.situations[datex:syn:ev-00011].lanes",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].lengthM",
+          "name": "data.situations[datex:syn:ev-00011].lengthM",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].location.lat",
-          "value": "52.06978"
+          "name": "data.situations[datex:syn:ev-00011].location.lat",
+          "value": "52.57475"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].location.lon",
-          "value": "10.34101"
+          "name": "data.situations[datex:syn:ev-00011].location.lon",
+          "value": "8.48918"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].position",
+          "name": "data.situations[datex:syn:ev-00011].position",
           "value": "null"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].road",
-          "value": "A102"
+          "name": "data.situations[datex:syn:ev-00011].road",
+          "value": "A103"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].roadType",
+          "name": "data.situations[datex:syn:ev-00011].roadType",
           "value": "motorway"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].severity",
-          "value": "minor"
+          "name": "data.situations[datex:syn:ev-00011].severity",
+          "value": "lane_closed"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].sourceFamily",
+          "name": "data.situations[datex:syn:ev-00011].sourceFamily",
           "value": "roads_alpha"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].textLanguage",
+          "name": "data.situations[datex:syn:ev-00011].textLanguage",
           "value": "de"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].updatedAt",
-          "value": "2026-03-29T01:09:37Z"
+          "name": "data.situations[datex:syn:ev-00011].updatedAt",
+          "value": "2026-03-29T19:34:04Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].updatedAtLocal",
-          "value": "2026-03-29T01:09:37Z"
+          "name": "data.situations[datex:syn:ev-00011].updatedAtLocal",
+          "value": "2026-03-29T19:34:04Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].validity.from",
-          "value": "2026-03-29T01:08:37Z"
+          "name": "data.situations[datex:syn:ev-00011].validity.from",
+          "value": "2026-03-29T19:33:04Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].validity.fromLocal",
-          "value": "2026-03-29T01:08:37Z"
+          "name": "data.situations[datex:syn:ev-00011].validity.fromLocal",
+          "value": "2026-03-29T19:33:04Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].validity.until",
-          "value": "2026-03-31T06:08:37Z"
+          "name": "data.situations[datex:syn:ev-00011].validity.until",
+          "value": "2026-03-30T05:33:04Z"
         },
         {
-          "name": "data.situations[datex:syn:ev-00007].validity.untilLocal",
-          "value": "2026-03-31T06:08:37Z"
+          "name": "data.situations[datex:syn:ev-00011].validity.untilLocal",
+          "value": "2026-03-30T05:33:04Z"
         },
         {
           "name": "data.state",

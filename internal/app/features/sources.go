@@ -10,7 +10,7 @@ import (
 
 // Sources answers which sources the key may read, of one domain or of every
 // domain: each with its attribution, licence and freshness (the platform's
-// attribution, coverage and feed-status resources).
+// attribution, coverage and source-status resources).
 func (s *Service) Sources(ctx context.Context, key access.Record, domain string) ([]provenance.Family, Answer[struct{}], error) {
 	reg, gate, err := s.gate(ctx, key)
 	if err != nil {

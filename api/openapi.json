@@ -1692,7 +1692,7 @@
             ]
           },
           "distanceM": {
-            "description": "Distance from the asked position in metres.",
+            "description": "Distance from the asked position in metres, to the nearest 100 m: the platform's filling-station search states it in kilometres to one decimal (0.1 km). The order is by the exact distance.",
             "format": "int64",
             "type": "integer"
           },
@@ -8348,7 +8348,7 @@
                             "lat": 49.169409,
                             "lon": 7.808793
                           },
-                          "distanceM": 110,
+                          "distanceM": 100,
                           "openingState": "unknown",
                           "prices": [
                             {

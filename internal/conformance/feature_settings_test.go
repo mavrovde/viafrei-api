@@ -173,3 +173,41 @@ func (f *askedFeatures) HydrogenStations(_ context.Context, _ access.Record, q e
 	f.asked = fmt.Sprintf("limit=%d", q.Limit)
 	return features.HydrogenStations{}, nil
 }
+
+// pricedFeatures answers a fuel search with one station whose one price was
+// reported 45 minutes before the answer's instant.
+type pricedFeatures struct{ askedFeatures }
+
+func (*pricedFeatures) FuelStations(context.Context, access.Record, energy.FuelQuery) (features.FuelStations, error) {
+	at := time.Date(2026, 3, 30, 12, 0, 0, 0, time.UTC)
+	st := energy.FuelStation{ID: "s", Prices: []energy.FuelPrice{{Product: "e10", Price: 1.7, ObservedAt: at.Add(-45 * time.Minute)}}}
+	a := features.FuelStations{At: at}
+	a.Items = []energy.FuelStation{st}
+	return a, nil
+}
+
+// fuelFresh says whether a price reported 45 minutes ago is stated current:
+// not inside the default 30-minute window, current inside an hour's.
+func fuelFresh(t *testing.T, c *config.Config) string {
+	t.Helper()
+	h, err := httpapi.NewHandler(httpapi.Deps{Config: c, ContractVersion: "0.1", Auth: everyScope{}, Features: &pricedFeatures{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/fuel-options?at=1,2", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("%d %s", w.Code, w.Body)
+	}
+	var body struct {
+		Data []struct {
+			Prices []struct {
+				Current bool `json:"current"`
+			} `json:"prices"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil || len(body.Data) != 1 || len(body.Data[0].Prices) != 1 {
+		t.Fatalf("%v %s", err, w.Body)
+	}
+	return fmt.Sprint(body.Data[0].Prices[0].Current)
+}

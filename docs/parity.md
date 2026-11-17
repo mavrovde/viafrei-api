@@ -79,6 +79,15 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
   exclusion may hold only in a case that asks a parameter: a parameter is
   asked when it is present and its value is not a number of 0 or less, which
   filters nothing.
+- **An answer whose every data fact is excluded** states `data = {}`: it
+  answered, and none of what it answered is compared. An answer the other
+  side refuses states `error = true` instead.
+- **Site-route questions.** An operation the site reads and no MCP tool
+  answers (`listMotorways`, `getMeta`, `getPlaceOverview`, `listSources`) is
+  compared with what the site shows: the producer asks the digest routes the
+  site reads on the same fixture rows and projects their fragments. The API
+  states what the site shows; a fact the API answers beyond it is excluded for
+  that operation, with its reason below.
 - **No named differences.** Every fact that is not excluded is compared
   as it is: a value either side states otherwise is a mismatch. There is no
   list of facts both sides may state differently.
@@ -88,7 +97,8 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
 | Fact | Why it is not compared |
 |---|---|
 | `data[*].access` | The MCP capability has no access concept: no charging source of the platform publishes who may use a site. Its questions therefore ask `access=all`, which is what the tool answers. |
-| `data[*].chargePoints[*].current` | The MCP capability states no current (AC/DC) per point. |
+| `data.access`, in `getChargingSite` only | The single site's `data[*].access`, for the same reason. |
+| `data[*].chargePoints[*].current`, and `data.chargePoints[*].current` in `getChargingSite` | The MCP capability states no current (AC/DC) per point. |
 | `meta.freshness` | API-only: the per-family freshness block of the read contract (ENV-003). |
 | `meta.warnings` | API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got (for example `partial` when a commercial key withholds a family). |
 | `meta.page.hasMore`, in a case that asks `min_kw` | The MCP capability states no count of the sites a power filter keeps, so under `min_kw` it cannot say whether there are more. Without `min_kw` it states the count of the circle, and the fact is compared. |
@@ -99,9 +109,21 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
 | `data.zones`, in `getDrivingRules` only | API-only. The MCP driving rules state the verdict at a position (`data.zoneVerdict`, compared) and, for a city, the curated zone list's entry; neither they nor any digest route the site reads list the published zone rows (key, role, publisher, distance) the API lists for a client to draw. |
 | `data.lamp`, `data.lampReason`, in `listStateRoadConditions` only | The MCP motorway status of a Land lists the Land's items and counts, not a lamp. The site reads the Land's lamp (the motorway pages' one rule over the Land's Autobahn items and DWD levels) from the digest route `/internal/state/:slug`, so the API answers it; it is not compared. |
 | `data.lamp`, `data.lampReason`, `data.corridor.states`, in `getMotorwayConditions` asked with `horizon_days` or `from` | The MCP roadworks-ahead answer lists the planned sites of the window, not a lamp or the Länder the road crosses. The site reads the road's lamp and Länder beside its planned works from the digest route `/internal/motorway/:road`, so the API answers them; they are not compared. |
+| `data[*].kilometres`, `data[*].sourceFamily`, in `listMotorways` only | API-only. The site's motorway list, index and pages (digest routes `/internal/motorway/list`, `/internal/motorway/index`, `/internal/motorway/:road`) show no length and no register family of a motorway. What they show (the road, its junctions with number, kind, name, point and Land, the Länder it crosses, its count of reports, its lamp, and the credits of the index) is compared. |
+| `data.apiVersion`, `data.buildSha`, `data.contractVersion`, `data.languages`, `data.openapi`, `data.platformVersion`, in `getMeta` only | API-only: the versions and the document of the running service. The site reads only whether the service is saturated (digest route `/internal/pressure`); the API states that by answering at all. The answer is compared as `data = {}` (below). |
+| `data.bays[*].distanceM`, in `listParkingBays` only | The parking tool states a bay's distance in kilometres to two decimals, the API in metres, so the two agree only to the tool's 10 m. The bay's point, which both measure from, is compared. |
+| `data.departures[*].line`, `data.departures[*].number`, in `getTrainBoard` only | The train tool states one label per departure, what a person reads on the board (`ICE 571`, `RE 1`); the API states the board's line and train number apart. A label of a category and a number cannot be split back into the two. Category, destination, times, delay, platforms and cancellation are compared. |
+| `data.fresh`, `data.fetchedAt`, `data.ageSeconds`, in `getTrainBoard` only | API-only: the age of the recorded board the API serves. The train tool asks the timetable provider at the time of the question; the producer gives it a departures port fed from the fixture's recorded boards (`contract.train_board`), so both sides answer from the same rows and no provider is called. |
+| `data.place.location`, `data.charging.sites[*].access`, `data.charging.sites[*].chargePoints`, `data.parking.sites[*].kind`, `data.parking.sites[*].operator`, `data.parking.sites[*].occupancy.total`, `.state`, `.observedAt`, in `getPlaceOverview` only | API-only. The site's form of the overview is the place page of the Gemeinde (digest route `/internal/place/cards`): it shows the place's name, and per charging site its name, operator, map point, highest power and number of charge points, per car park its name, map point and free spaces. Those are compared; the place's position, a charging site's access and charge points, and a car park's kind, operator, capacity, state and reading time are not shown. A site's id is the read contract's row at the point the row links its map to. |
+| `data.charging.sites[*].distanceM`, `data.parking.sites[*].distanceM`, in `getPlaceOverview` only | The cards state a site's distance in kilometres to one decimal with a direction, the API in metres. The site's point, which both measure from, is compared. |
 | `data.watchId`, `data.uri`, in `getWatch` only | Each side mints the id of a watch: the platform a number of the session that opened it, the API a token of the kind, the key and the condition. The watch the id names (kind, key, condition, window) is compared. |
 | `meta.attribution[*].` `domain`, `licence`, `licenceUrl`, `publisher`, `shareAlike`, `shareAlikeOffer`, `termsUrl`, `text` | The fixture's families carry synthetic register texts; the platform credits its own register rows for the sources the producer stores each family as, so the texts cannot be equal on these rows. Which families are credited (`meta.attribution[*].family`) is compared. |
 | The text of a condition note (`meta.notes.condition`) and, since rules/5, of a purpose note (`meta.notes.purpose`) | The same reason, since rules/4 for conditions: the fixture's notes are synthetic and the platform states its own register's. The family of each note and how many each family has are compared (`meta.notes.<kind>[<family>]`, above). |
+
+A question the API refuses as unknown (`404`, a problem document) is
+compared as one fact, `error = true`, as the MCP side states a tool's
+`not_found`; the wording of either refusal is not compared. Any other
+status fails the run.
 
 ## The questions
 

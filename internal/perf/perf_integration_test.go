@@ -357,7 +357,7 @@ func (r *rig) handler(t *testing.T, cached bool) http.Handler {
 		Config: &cfg, Build: buildinfo.Info{Version: "bench", Commit: "bench"}, ContractVersion: dbcontract.ContractVersion, Now: now,
 		Readiness: health.NewChecker(r.st, expected, cfg.Health.ReadyTimeout),
 		Auth:      keyAuth{r.key}, Sources: r.st, Versions: r.st,
-		Features: features.New(features.Repositories{Register: r.st, Charging: r.st, Parking: r.st, Places: r.st, Roads: r.st, Weather: r.st, Rules: r.st, Transit: r.st, Fuel: r.st, Hydrogen: r.st, Speed: r.st, Sharing: r.st, Addresses: r.st, Pois: r.st, Locations: r.st, Disruptions: r.st, Nearby: r.st, Lorry: r.st, Catalogue: r.st, National: r.st, Affected: r.st, Coverage: r.st, States: r.st, TrainBoards: r.st, Bays: r.st}, wire.FeatureSettings(&cfg), now),
+		Features: features.New(features.Repositories{Register: r.st, Charging: r.st, Parking: r.st, Places: r.st, Roads: r.st, Weather: r.st, Rules: r.st, Transit: r.st, Fuel: r.st, Hydrogen: r.st, Speed: r.st, Sharing: r.st, Addresses: r.st, Pois: r.st, Locations: r.st, Disruptions: r.st, Nearby: r.st, Lorry: r.st, Catalogue: r.st, National: r.st, Affected: r.st, Coverage: r.st, States: r.st}, wire.FeatureSettings(&cfg), now),
 	}
 	h, err := httpapi.NewHandler(deps)
 	if err != nil {
@@ -608,8 +608,8 @@ func TestRepeatedRequestsAreNotModified(t *testing.T) {
 	req.Covers(t, "NFR-PERF-005")
 	r := open(t)
 	h := r.handler(t, true)
-	// The first charging read that credits a family and so carries an ETag
-	// (an answer that lists nothing carries none).
+	// A charging answer withholding a family the key may not read is
+	// partial and carries no ETag; the scenario repeats one that carries one.
 	var target, etag string
 	for _, c := range r.targetsOf("listChargingOptions") {
 		if _, e, _ := call(h, c, ""); e != "" {
@@ -617,8 +617,8 @@ func TestRepeatedRequestsAreNotModified(t *testing.T) {
 			break
 		}
 	}
-	if target == "" {
-		t.Fatal("no charging read carries an ETag")
+	if etag == "" {
+		t.Fatal("no charging answer carries an ETag")
 	}
 	notModified := 0
 	const repeats = 100
@@ -683,7 +683,9 @@ func TestNoSequentialScanOfTimeSeries(t *testing.T) {
 	r := open(t)
 	h := r.handler(t, false)
 	for _, op := range httpapi.OperationIDs() {
-		for _, target := range r.targetsOf(op)[:1] {
+		// An operation with no benchmark request yet is named by
+		// TestEveryOperationMeetsItsBudget; it is not read here.
+		for _, target := range r.targetsOf(op)[:min(1, len(r.targetsOf(op)))] {
 			if code, _, _ := call(h, target, ""); code != http.StatusOK {
 				t.Fatalf("%s answered %d", target, code)
 			}

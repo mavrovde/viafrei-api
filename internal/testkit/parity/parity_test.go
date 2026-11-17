@@ -149,6 +149,19 @@ func TestProjectAppliesTheRules(t *testing.T) {
 	}
 }
 
+func TestProjectStatesARefusalAsOneFact(t *testing.T) {
+	problem := `{"type":"https://api.viafrei.de/problems/not-found","title":"Not found","status":404,"detail":"no such road"}`
+	got, err := parity.Project([]byte(problem), parity.Default, "getX", "/v1/x", nil)
+	if err != nil || len(got) != 1 || got[0] != (parity.Fact{Name: "error", Value: "true"}) {
+		t.Fatalf("a refusal: %+v, %v", got, err)
+	}
+	// A status member inside an answer with data is the answer's own.
+	got, err = parity.Project([]byte(`{"status":404,"data":{"a":1},"meta":{}}`), parity.Default, "getX", "/v1/x", nil)
+	if err != nil || slices.ContainsFunc(got, func(f parity.Fact) bool { return f.Name == "error" }) {
+		t.Fatalf("an answer with data: %+v, %v", got, err)
+	}
+}
+
 func TestProjectRefusesTwoValuesUnderOneName(t *testing.T) {
 	// Two elements with one key, after normalisation: either value kept
 	// alone would hide a difference in the other.

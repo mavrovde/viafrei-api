@@ -6,7 +6,7 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "3bf54615fc128fee62f72603d5a80c280e699f0a3d2e7699d738173f0e25e117"
+    "sha256": "6b146cee258538b77b3eb7f018e5335c7a8c606041afee7c08a08210a2e04dea"
   },
   "cases": [
     {
@@ -232,6 +232,140 @@
         {
           "name": "meta.page.limit",
           "value": "5"
+        }
+      ]
+    },
+    {
+      "id": "charging-site",
+      "operation": "getChargingSite",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options/afir_alpha:cs-01-0002",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "chargepool_gamma",
+          "tankerkoenig_gamma"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.chargePoints[de*syn*e000020].availability.observedAt",
+          "value": "2026-03-29T19:36:17Z"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000020].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000020].id",
+          "value": "de*syn*e000020"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000020].maxPowerKw",
+          "value": "11"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000021].availability",
+          "value": "null"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000021].id",
+          "value": "de*syn*e000021"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000021].maxPowerKw",
+          "value": "22"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000022].availability.observedAt",
+          "value": "2026-03-29T18:49:58Z"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000022].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000022].id",
+          "value": "de*syn*e000022"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000022].maxPowerKw",
+          "value": "50"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000023].availability.observedAt",
+          "value": "2026-03-29T07:19:35Z"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000023].availability.state",
+          "value": "stale"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000023].id",
+          "value": "de*syn*e000023"
+        },
+        {
+          "name": "data.chargePoints[de*syn*e000023].maxPowerKw",
+          "value": "22"
+        },
+        {
+          "name": "data.distanceM",
+          "value": "0"
+        },
+        {
+          "name": "data.id",
+          "value": "afir_alpha:cs-01-0002"
+        },
+        {
+          "name": "data.location.lat",
+          "value": "47.63871"
+        },
+        {
+          "name": "data.location.lon",
+          "value": "7.75017"
+        },
+        {
+          "name": "data.name",
+          "value": "Kansilkamp Laden"
+        },
+        {
+          "name": "data.operator",
+          "value": "Raungul Strom"
+        },
+        {
+          "name": "data.sourceFamily",
+          "value": "afir_alpha"
+        },
+        {
+          "name": "data.summary.availableNow",
+          "value": "null"
+        },
+        {
+          "name": "data.summary.chargePoints",
+          "value": "4"
+        },
+        {
+          "name": "data.summary.maxPowerKw",
+          "value": "50"
+        },
+        {
+          "name": "meta.attribution[afir_alpha].family",
+          "value": "afir_alpha"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
         }
       ]
     },
@@ -1430,6 +1564,161 @@
       ]
     },
     {
+      "id": "train-board",
+      "operation": "getTrainBoard",
+      "counterpart": "train departures",
+      "request": "/v1/train-boards/8001001",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "db_timetables"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.departures[0].cancelled",
+          "value": "false"
+        },
+        {
+          "name": "data.departures[0].category",
+          "value": "ICE"
+        },
+        {
+          "name": "data.departures[0].delayMin",
+          "value": "5"
+        },
+        {
+          "name": "data.departures[0].destination",
+          "value": "Schömpingbach"
+        },
+        {
+          "name": "data.departures[0].expectedAt",
+          "value": "2026-03-30T00:08:50Z"
+        },
+        {
+          "name": "data.departures[0].plannedAt",
+          "value": "2026-03-30T00:03:50Z"
+        },
+        {
+          "name": "data.departures[0].plannedPlatform",
+          "value": "5"
+        },
+        {
+          "name": "data.departures[0].platform",
+          "value": "7"
+        },
+        {
+          "name": "data.departures[0].platformChanged",
+          "value": "true"
+        },
+        {
+          "name": "data.departures[0].sourceFamily",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.departures[1].cancelled",
+          "value": "true"
+        },
+        {
+          "name": "data.departures[1].category",
+          "value": "RE"
+        },
+        {
+          "name": "data.departures[1].delayMin",
+          "value": "0"
+        },
+        {
+          "name": "data.departures[1].destination",
+          "value": "Schömpingbach"
+        },
+        {
+          "name": "data.departures[1].expectedAt",
+          "value": "2026-03-30T00:11:50Z"
+        },
+        {
+          "name": "data.departures[1].plannedAt",
+          "value": "2026-03-30T00:11:50Z"
+        },
+        {
+          "name": "data.departures[1].plannedPlatform",
+          "value": "2"
+        },
+        {
+          "name": "data.departures[1].platform",
+          "value": "2"
+        },
+        {
+          "name": "data.departures[1].platformChanged",
+          "value": "false"
+        },
+        {
+          "name": "data.departures[1].sourceFamily",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.departures[2].cancelled",
+          "value": "false"
+        },
+        {
+          "name": "data.departures[2].category",
+          "value": "S"
+        },
+        {
+          "name": "data.departures[2].delayMin",
+          "value": "0"
+        },
+        {
+          "name": "data.departures[2].destination",
+          "value": "Schömpingbach"
+        },
+        {
+          "name": "data.departures[2].expectedAt",
+          "value": "2026-03-30T00:19:50Z"
+        },
+        {
+          "name": "data.departures[2].plannedAt",
+          "value": "2026-03-30T00:19:50Z"
+        },
+        {
+          "name": "data.departures[2].plannedPlatform",
+          "value": "null"
+        },
+        {
+          "name": "data.departures[2].platform",
+          "value": "null"
+        },
+        {
+          "name": "data.departures[2].platformChanged",
+          "value": "false"
+        },
+        {
+          "name": "data.departures[2].sourceFamily",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.eva",
+          "value": "8001001"
+        },
+        {
+          "name": "meta.attribution[db_timetables].family",
+          "value": "db_timetables"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
       "id": "stations-code",
       "operation": "listStations",
       "counterpart": "station search",
@@ -1618,6 +1907,146 @@
         {
           "name": "meta.page.limit",
           "value": "10"
+        }
+      ]
+    },
+    {
+      "id": "fuel-station",
+      "operation": "getFuelStation",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options/00000000-0000-4000-8000-000000000002",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "tankerkoenig_gamma"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.address.number",
+          "value": "null"
+        },
+        {
+          "name": "data.address.place",
+          "value": "null"
+        },
+        {
+          "name": "data.address.postcode",
+          "value": "null"
+        },
+        {
+          "name": "data.address.street",
+          "value": "null"
+        },
+        {
+          "name": "data.aroundTheClock",
+          "value": "false"
+        },
+        {
+          "name": "data.brand",
+          "value": "Belnan"
+        },
+        {
+          "name": "data.id",
+          "value": "00000000-0000-4000-8000-000000000002"
+        },
+        {
+          "name": "data.location.lat",
+          "value": "49.16941"
+        },
+        {
+          "name": "data.location.lon",
+          "value": "7.80879"
+        },
+        {
+          "name": "data.name",
+          "value": "Belnan Namüningen"
+        },
+        {
+          "name": "data.openingState",
+          "value": "unknown"
+        },
+        {
+          "name": "data.prices[0].current",
+          "value": "false"
+        },
+        {
+          "name": "data.prices[0].fuel",
+          "value": "diesel"
+        },
+        {
+          "name": "data.prices[0].priceEur",
+          "value": "1.799"
+        },
+        {
+          "name": "data.prices[0].reportedAt",
+          "value": "2026-03-29T22:45:59Z"
+        },
+        {
+          "name": "data.prices[0].reportedAtLocal",
+          "value": "2026-03-29T22:45:59Z"
+        },
+        {
+          "name": "data.prices[1].current",
+          "value": "false"
+        },
+        {
+          "name": "data.prices[1].fuel",
+          "value": "e10"
+        },
+        {
+          "name": "data.prices[1].priceEur",
+          "value": "1.633"
+        },
+        {
+          "name": "data.prices[1].reportedAt",
+          "value": "2026-03-29T15:24:44Z"
+        },
+        {
+          "name": "data.prices[1].reportedAtLocal",
+          "value": "2026-03-29T15:24:44Z"
+        },
+        {
+          "name": "data.prices[2].current",
+          "value": "false"
+        },
+        {
+          "name": "data.prices[2].fuel",
+          "value": "e5"
+        },
+        {
+          "name": "data.prices[2].priceEur",
+          "value": "2.062"
+        },
+        {
+          "name": "data.prices[2].reportedAt",
+          "value": "2026-03-29T21:50:02Z"
+        },
+        {
+          "name": "data.prices[2].reportedAtLocal",
+          "value": "2026-03-29T21:50:02Z"
+        },
+        {
+          "name": "data.sourceFamily",
+          "value": "tankerkoenig_gamma"
+        },
+        {
+          "name": "meta.attribution[tankerkoenig_gamma].family",
+          "value": "tankerkoenig_gamma"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose[tankerkoenig_gamma]",
+          "value": "1"
         }
       ]
     },
@@ -2102,6 +2531,38 @@
           "value": "delfi_static"
         },
         {
+          "name": "data[1:de:01002:9001].distanceM",
+          "value": "1883"
+        },
+        {
+          "name": "data[1:de:01002:9001].districtCode",
+          "value": "01002"
+        },
+        {
+          "name": "data[1:de:01002:9001].id",
+          "value": "1:de:01002:9001"
+        },
+        {
+          "name": "data[1:de:01002:9001].kind",
+          "value": "station_area"
+        },
+        {
+          "name": "data[1:de:01002:9001].location.lat",
+          "value": "48.38815"
+        },
+        {
+          "name": "data[1:de:01002:9001].location.lon",
+          "value": "7.51821"
+        },
+        {
+          "name": "data[1:de:01002:9001].name",
+          "value": "Schömpingbach Hbf"
+        },
+        {
+          "name": "data[1:de:01002:9001].sourceFamily",
+          "value": "delfi_static"
+        },
+        {
           "name": "meta.attribution[delfi_static].family",
           "value": "delfi_static"
         },
@@ -2173,6 +2634,106 @@
         {
           "name": "data[100001].sourceFamily",
           "value": "geonames"
+        },
+        {
+          "name": "meta.attribution[geonames].family",
+          "value": "geonames"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "5"
+        }
+      ]
+    },
+    {
+      "id": "places-motorway",
+      "operation": "listPlaces",
+      "counterpart": "place search",
+      "request": "/v1/places?q=A100\u0026kind=motorway\u0026limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames",
+          "roads_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data",
+          "value": "[]"
+        },
+        {
+          "name": "meta.attribution[bkg_gvisys].family",
+          "value": "bkg_gvisys"
+        },
+        {
+          "name": "meta.attribution[geonames].family",
+          "value": "geonames"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "5"
+        }
+      ]
+    },
+    {
+      "id": "places-junction",
+      "operation": "listPlaces",
+      "counterpart": "place search",
+      "request": "/v1/places?q=Kreuz%20Fixfeld\u0026kind=junction\u0026limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames",
+          "roads_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data",
+          "value": "[]"
+        },
+        {
+          "name": "meta.attribution[bkg_gvisys].family",
+          "value": "bkg_gvisys"
         },
         {
           "name": "meta.attribution[geonames].family",
@@ -2529,12 +3090,16 @@
           "value": "[\"06\",\"07\",\"08\",\"10\"]"
         },
         {
+          "name": "data.coverage",
+          "value": "null"
+        },
+        {
           "name": "data.lamp",
-          "value": "amber"
+          "value": "red"
         },
         {
           "name": "data.lampReason",
-          "value": "warning"
+          "value": "weather_warning"
         },
         {
           "name": "data.situations[datex:syn:ev-00001].delayMin",
@@ -3764,12 +4329,16 @@
           "value": "[\"06\",\"07\",\"08\",\"10\"]"
         },
         {
+          "name": "data.coverage",
+          "value": "null"
+        },
+        {
           "name": "data.lamp",
-          "value": "amber"
+          "value": "red"
         },
         {
           "name": "data.lampReason",
-          "value": "warning"
+          "value": "weather_warning"
         },
         {
           "name": "data.situations[datex:syn:ev-00028].delayMin",
@@ -3944,6 +4513,266 @@
       ]
     },
     {
+      "id": "parking-bays",
+      "operation": "listParkingBays",
+      "counterpart": "parking search, kind disabled_badge",
+      "request": "/v1/parking-bays?at=48.388,7.521\u0026radius_m=2000\u0026limit=3",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "parking"
+        ],
+        "sources": [
+          "dortmund_parksensoren_bays",
+          "frankfurt_behindertenparkplaetze",
+          "park_alpha",
+          "park_beta",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.bays[dortmund:011].city",
+          "value": "Schömpingbach"
+        },
+        {
+          "name": "data.bays[dortmund:011].houseNumber",
+          "value": "1"
+        },
+        {
+          "name": "data.bays[dortmund:011].id",
+          "value": "dortmund:011"
+        },
+        {
+          "name": "data.bays[dortmund:011].kind",
+          "value": "disabled"
+        },
+        {
+          "name": "data.bays[dortmund:011].lat",
+          "value": "48.38815"
+        },
+        {
+          "name": "data.bays[dortmund:011].lon",
+          "value": "7.52121"
+        },
+        {
+          "name": "data.bays[dortmund:011].messageAt",
+          "value": "2026-03-29T23:40:00Z"
+        },
+        {
+          "name": "data.bays[dortmund:011].postcode",
+          "value": "10000"
+        },
+        {
+          "name": "data.bays[dortmund:011].publisherKind",
+          "value": "Behindertenparkplatz"
+        },
+        {
+          "name": "data.bays[dortmund:011].reservedWhen",
+          "value": "null"
+        },
+        {
+          "name": "data.bays[dortmund:011].sensor",
+          "value": "true"
+        },
+        {
+          "name": "data.bays[dortmund:011].sourceFamily",
+          "value": "dortmund_parksensoren_bays"
+        },
+        {
+          "name": "data.bays[dortmund:011].spaces",
+          "value": "null"
+        },
+        {
+          "name": "data.bays[dortmund:011].state",
+          "value": "free"
+        },
+        {
+          "name": "data.bays[dortmund:011].street",
+          "value": "Hauptstraße"
+        },
+        {
+          "name": "data.bays[dortmund:012].city",
+          "value": "Schömpingbach"
+        },
+        {
+          "name": "data.bays[dortmund:012].houseNumber",
+          "value": "7"
+        },
+        {
+          "name": "data.bays[dortmund:012].id",
+          "value": "dortmund:012"
+        },
+        {
+          "name": "data.bays[dortmund:012].kind",
+          "value": "disabled"
+        },
+        {
+          "name": "data.bays[dortmund:012].lat",
+          "value": "48.38815"
+        },
+        {
+          "name": "data.bays[dortmund:012].lon",
+          "value": "7.52221"
+        },
+        {
+          "name": "data.bays[dortmund:012].messageAt",
+          "value": "2026-03-29T19:00:00Z"
+        },
+        {
+          "name": "data.bays[dortmund:012].postcode",
+          "value": "10000"
+        },
+        {
+          "name": "data.bays[dortmund:012].publisherKind",
+          "value": "Behindertenparkplatz"
+        },
+        {
+          "name": "data.bays[dortmund:012].reservedWhen",
+          "value": "null"
+        },
+        {
+          "name": "data.bays[dortmund:012].sensor",
+          "value": "true"
+        },
+        {
+          "name": "data.bays[dortmund:012].sourceFamily",
+          "value": "dortmund_parksensoren_bays"
+        },
+        {
+          "name": "data.bays[dortmund:012].spaces",
+          "value": "null"
+        },
+        {
+          "name": "data.bays[dortmund:012].state",
+          "value": "null"
+        },
+        {
+          "name": "data.bays[dortmund:012].street",
+          "value": "Hauptstraße"
+        },
+        {
+          "name": "data.bays[frankfurt:014].city",
+          "value": "Schömpingbach"
+        },
+        {
+          "name": "data.bays[frankfurt:014].houseNumber",
+          "value": "null"
+        },
+        {
+          "name": "data.bays[frankfurt:014].id",
+          "value": "frankfurt:014"
+        },
+        {
+          "name": "data.bays[frankfurt:014].kind",
+          "value": "disabled"
+        },
+        {
+          "name": "data.bays[frankfurt:014].lat",
+          "value": "48.38815"
+        },
+        {
+          "name": "data.bays[frankfurt:014].lon",
+          "value": "7.52421"
+        },
+        {
+          "name": "data.bays[frankfurt:014].messageAt",
+          "value": "null"
+        },
+        {
+          "name": "data.bays[frankfurt:014].postcode",
+          "value": "10000"
+        },
+        {
+          "name": "data.bays[frankfurt:014].publisherKind",
+          "value": "null"
+        },
+        {
+          "name": "data.bays[frankfurt:014].reservedWhen",
+          "value": "Mo-Fr 8-18 Uhr"
+        },
+        {
+          "name": "data.bays[frankfurt:014].sensor",
+          "value": "false"
+        },
+        {
+          "name": "data.bays[frankfurt:014].sourceFamily",
+          "value": "frankfurt_behindertenparkplaetze"
+        },
+        {
+          "name": "data.bays[frankfurt:014].spaces",
+          "value": "2"
+        },
+        {
+          "name": "data.bays[frankfurt:014].state",
+          "value": "null"
+        },
+        {
+          "name": "data.bays[frankfurt:014].street",
+          "value": "Bahnhofstraße"
+        },
+        {
+          "name": "data.counts.free",
+          "value": "1"
+        },
+        {
+          "name": "data.counts.occupied",
+          "value": "0"
+        },
+        {
+          "name": "data.counts.sensors",
+          "value": "2"
+        },
+        {
+          "name": "data.counts.staticSites",
+          "value": "1"
+        },
+        {
+          "name": "data.counts.staticSpaces",
+          "value": "2"
+        },
+        {
+          "name": "data.counts.total",
+          "value": "3"
+        },
+        {
+          "name": "data.counts.unknown",
+          "value": "1"
+        },
+        {
+          "name": "data.kind",
+          "value": "disabled"
+        },
+        {
+          "name": "meta.attribution[dortmund_parksensoren_bays].family",
+          "value": "dortmund_parksensoren_bays"
+        },
+        {
+          "name": "meta.attribution[frankfurt_behindertenparkplaetze].family",
+          "value": "frankfurt_behindertenparkplaetze"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "3"
+        }
+      ]
+    },
+    {
       "id": "hydrogen-near",
       "operation": "listHydrogenOptions",
       "counterpart": "hydrogen station search",
@@ -4002,7 +4831,7 @@
         },
         {
           "name": "data.stations[0].refill[0].solution",
-          "value": "700bar_car"
+          "value": "gaseousHydrogen700barCar"
         },
         {
           "name": "data.stations[0].sourceFamily",
@@ -4046,7 +4875,7 @@
         },
         {
           "name": "data.stations[1].refill[0].solution",
-          "value": "700bar_car"
+          "value": "gaseousHydrogen700barCar"
         },
         {
           "name": "data.stations[1].sourceFamily",
@@ -4090,7 +4919,7 @@
         },
         {
           "name": "data.stations[2].refill[0].solution",
-          "value": "700bar_car"
+          "value": "gaseousHydrogen700barCar"
         },
         {
           "name": "data.stations[2].sourceFamily",
@@ -4134,11 +4963,11 @@
         },
         {
           "name": "data.stations[3].refill[0].solution",
-          "value": "700bar_car"
+          "value": "gaseousHydrogen700barCar"
         },
         {
           "name": "data.stations[3].refill[1].solution",
-          "value": "350bar_truck"
+          "value": "gaseousHydrogen350barTruck"
         },
         {
           "name": "data.stations[3].sourceFamily",
@@ -4188,12 +5017,56 @@
           "value": "null"
         },
         {
-          "name": "data.stations",
-          "value": "[]"
+          "name": "data.stations[0].address",
+          "value": "null"
         },
         {
-          "name": "meta.attribution",
-          "value": "[]"
+          "name": "data.stations[0].brand",
+          "value": "null"
+        },
+        {
+          "name": "data.stations[0].distanceM",
+          "value": "143591"
+        },
+        {
+          "name": "data.stations[0].location.lat",
+          "value": "47.41901"
+        },
+        {
+          "name": "data.stations[0].location.lon",
+          "value": "8.64346"
+        },
+        {
+          "name": "data.stations[0].name",
+          "value": "H2 Gickpängingen"
+        },
+        {
+          "name": "data.stations[0].opening",
+          "value": "null"
+        },
+        {
+          "name": "data.stations[0].operator",
+          "value": "H2 Synthetic"
+        },
+        {
+          "name": "data.stations[0].providerUpdatedAt",
+          "value": "null"
+        },
+        {
+          "name": "data.stations[0].refill[0].solution",
+          "value": "gaseousHydrogen700barCar"
+        },
+        {
+          "name": "data.stations[0].refill[1].solution",
+          "value": "gaseousHydrogen350barTruck"
+        },
+        {
+          "name": "data.stations[0].sourceFamily",
+          "value": "afir_alpha"
+        },
+        {
+          "name": "meta.attribution[afir_alpha].family",
+          "value": "afir_alpha"
         },
         {
           "name": "meta.notes.condition",
@@ -4268,7 +5141,7 @@
         },
         {
           "name": "data.nearest.refill[0].solution",
-          "value": "700bar_car"
+          "value": "gaseousHydrogen700barCar"
         },
         {
           "name": "data.nearest.sourceFamily",
@@ -5164,6 +6037,10 @@
           "value": "null"
         },
         {
+          "name": "data.lowEmissionZone",
+          "value": "null"
+        },
+        {
           "name": "data.mayLieOutsideGermany",
           "value": "true"
         },
@@ -5242,6 +6119,10 @@
         },
         {
           "name": "data.district",
+          "value": "null"
+        },
+        {
+          "name": "data.lowEmissionZone",
           "value": "null"
         },
         {
@@ -5337,6 +6218,10 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
+          "name": "data.alertsChecked",
+          "value": "true"
+        },
+        {
           "name": "data.alertsTotal",
           "value": "1"
         },
@@ -5371,6 +6256,10 @@
         {
           "name": "data.alerts[delfi_sa_alpha:700021].url",
           "value": "null"
+        },
+        {
+          "name": "data.duplicatesOmitted",
+          "value": "0"
         },
         {
           "name": "data.punctuality",
@@ -5425,6 +6314,10 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
+          "name": "data.alertsChecked",
+          "value": "true"
+        },
+        {
           "name": "data.alertsTotal",
           "value": "2"
         },
@@ -5459,6 +6352,10 @@
         {
           "name": "data.alerts[delfi_sa_alpha:700021].url",
           "value": "null"
+        },
+        {
+          "name": "data.duplicatesOmitted",
+          "value": "0"
         },
         {
           "name": "data.punctuality",
@@ -5516,7 +6413,15 @@
           "value": "[]"
         },
         {
+          "name": "data.alertsChecked",
+          "value": "true"
+        },
+        {
           "name": "data.alertsTotal",
+          "value": "0"
+        },
+        {
+          "name": "data.duplicatesOmitted",
           "value": "0"
         },
         {
@@ -5571,7 +6476,15 @@
           "value": "[]"
         },
         {
+          "name": "data.alertsChecked",
+          "value": "true"
+        },
+        {
           "name": "data.alertsTotal",
+          "value": "0"
+        },
+        {
+          "name": "data.duplicatesOmitted",
           "value": "0"
         },
         {
@@ -6676,6 +7589,10 @@
           "value": "motorway"
         },
         {
+          "name": "data.coverage",
+          "value": "null"
+        },
+        {
           "name": "data.situations[datex:syn:bast-0001].delayMin",
           "value": "null"
         },
@@ -7009,6 +7926,10 @@
         {
           "name": "data.corridor.roadType",
           "value": "motorway"
+        },
+        {
+          "name": "data.coverage",
+          "value": "null"
         },
         {
           "name": "data.situations[datex:syn:bast-0001].delayMin",
@@ -7441,12 +8362,16 @@
           "value": "[\"06\",\"07\",\"08\",\"10\"]"
         },
         {
+          "name": "data.coverage",
+          "value": "null"
+        },
+        {
           "name": "data.lamp",
-          "value": "amber"
+          "value": "red"
         },
         {
           "name": "data.lampReason",
-          "value": "warning"
+          "value": "weather_warning"
         },
         {
           "name": "data.situations[datex:syn:ev-00020].delayMin",
@@ -7670,7 +8595,7 @@
       "id": "place-overview",
       "operation": "getPlaceOverview",
       "counterpart": "place cards",
-      "request": "/v1/places/100003/overview",
+      "request": "/v1/places/100079/overview?radius_m=5000",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -7684,6 +8609,7 @@
         "sources": [
           "afir_alpha",
           "afir_beta",
+          "afir_zeta",
           "bast_lcl",
           "bkg_gvisys",
           "chargepool_gamma",
@@ -7712,40 +8638,136 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
-          "name": "data.charging.sites",
-          "value": "[]"
+          "name": "data.charging.sites[afir_alpha:cs-16-0047].id",
+          "value": "afir_alpha:cs-16-0047"
         },
         {
-          "name": "data.parking.sites",
-          "value": "[]"
+          "name": "data.charging.sites[afir_alpha:cs-16-0047].location.lat",
+          "value": "53.19974"
+        },
+        {
+          "name": "data.charging.sites[afir_alpha:cs-16-0047].location.lon",
+          "value": "13.36477"
+        },
+        {
+          "name": "data.charging.sites[afir_alpha:cs-16-0047].name",
+          "value": "Hölkönrode Laden"
+        },
+        {
+          "name": "data.charging.sites[afir_alpha:cs-16-0047].operator",
+          "value": "Zisgom Strom"
+        },
+        {
+          "name": "data.charging.sites[afir_alpha:cs-16-0047].sourceFamily",
+          "value": "afir_alpha"
+        },
+        {
+          "name": "data.charging.sites[afir_alpha:cs-16-0047].summary.availableNow",
+          "value": "null"
+        },
+        {
+          "name": "data.charging.sites[afir_alpha:cs-16-0047].summary.chargePoints",
+          "value": "1"
+        },
+        {
+          "name": "data.charging.sites[afir_alpha:cs-16-0047].summary.maxPowerKw",
+          "value": "11"
+        },
+        {
+          "name": "data.charging.sites[afir_zeta:cs-16-0046].id",
+          "value": "afir_zeta:cs-16-0046"
+        },
+        {
+          "name": "data.charging.sites[afir_zeta:cs-16-0046].location.lat",
+          "value": "53.21094"
+        },
+        {
+          "name": "data.charging.sites[afir_zeta:cs-16-0046].location.lon",
+          "value": "13.40736"
+        },
+        {
+          "name": "data.charging.sites[afir_zeta:cs-16-0046].name",
+          "value": "Hölkönrode Laden"
+        },
+        {
+          "name": "data.charging.sites[afir_zeta:cs-16-0046].operator",
+          "value": "Stößgrir Strom"
+        },
+        {
+          "name": "data.charging.sites[afir_zeta:cs-16-0046].sourceFamily",
+          "value": "afir_zeta"
+        },
+        {
+          "name": "data.charging.sites[afir_zeta:cs-16-0046].summary.availableNow",
+          "value": "null"
+        },
+        {
+          "name": "data.charging.sites[afir_zeta:cs-16-0046].summary.chargePoints",
+          "value": "1"
+        },
+        {
+          "name": "data.charging.sites[afir_zeta:cs-16-0046].summary.maxPowerKw",
+          "value": "22"
+        },
+        {
+          "name": "data.parking.sites[p:31].id",
+          "value": "p:31"
+        },
+        {
+          "name": "data.parking.sites[p:31].location.lat",
+          "value": "53.25867"
+        },
+        {
+          "name": "data.parking.sites[p:31].location.lon",
+          "value": "13.38451"
+        },
+        {
+          "name": "data.parking.sites[p:31].name",
+          "value": "Hölkönrode Parken"
+        },
+        {
+          "name": "data.parking.sites[p:31].occupancy.free",
+          "value": "87"
+        },
+        {
+          "name": "data.parking.sites[p:31].sourceFamily",
+          "value": "park_beta"
+        },
+        {
+          "name": "data.parking.sites[p:31].termsRequired",
+          "value": "false"
         },
         {
           "name": "data.place.id",
-          "value": "100003"
+          "value": "100079"
         },
         {
           "name": "data.place.kind",
           "value": "municipality"
         },
         {
-          "name": "data.place.location.lat",
-          "value": "49.16465"
-        },
-        {
-          "name": "data.place.location.lon",
-          "value": "7.79903"
-        },
-        {
           "name": "data.place.name",
-          "value": "Namüningen"
+          "value": "Hölkönrode"
         },
         {
           "name": "data.place.sourceFamily",
-          "value": "geonames"
+          "value": "bkg_gvisys"
         },
         {
-          "name": "meta.attribution[geonames].family",
-          "value": "geonames"
+          "name": "meta.attribution[afir_alpha].family",
+          "value": "afir_alpha"
+        },
+        {
+          "name": "meta.attribution[afir_zeta].family",
+          "value": "afir_zeta"
+        },
+        {
+          "name": "meta.attribution[bkg_gvisys].family",
+          "value": "bkg_gvisys"
+        },
+        {
+          "name": "meta.attribution[park_beta].family",
+          "value": "park_beta"
         },
         {
           "name": "meta.notes.condition",
@@ -8448,12 +9470,40 @@
           "value": "lez"
         },
         {
+          "name": "data.zoneVerdict.boundaryReadAt",
+          "value": "2026-03-27T00:00:00Z"
+        },
+        {
+          "name": "data.zoneVerdict.dataDate",
+          "value": "2026-02-26"
+        },
+        {
           "name": "data.zoneVerdict.exemptRoad",
           "value": "null"
         },
         {
           "name": "data.zoneVerdict.kind",
           "value": "inside"
+        },
+        {
+          "name": "data.zoneVerdict.liftedOn",
+          "value": "null"
+        },
+        {
+          "name": "data.zoneVerdict.plaque.covered",
+          "value": "null"
+        },
+        {
+          "name": "data.zoneVerdict.plaque.entry",
+          "value": "null"
+        },
+        {
+          "name": "data.zoneVerdict.plaque.from",
+          "value": "national_fact"
+        },
+        {
+          "name": "data.zoneVerdict.plaque.plakette",
+          "value": "green"
         },
         {
           "name": "data.zoneVerdict.transfer",
@@ -10365,10 +11415,6 @@
           "value": "8"
         },
         {
-          "name": "data[0].kilometres",
-          "value": "null"
-        },
-        {
           "name": "data[0].name",
           "value": "A100"
         },
@@ -10381,20 +11427,12 @@
           "value": "0"
         },
         {
-          "name": "data[0].sourceFamily",
-          "value": "autobahn"
-        },
-        {
           "name": "data[0].states",
           "value": "[\"01\",\"06\",\"08\",\"10\",\"11\"]"
         },
         {
           "name": "data[1].junctions",
           "value": "8"
-        },
-        {
-          "name": "data[1].kilometres",
-          "value": "null"
         },
         {
           "name": "data[1].name",
@@ -10409,20 +11447,12 @@
           "value": "8"
         },
         {
-          "name": "data[1].sourceFamily",
-          "value": "autobahn"
-        },
-        {
           "name": "data[1].states",
           "value": "[\"06\",\"07\",\"08\",\"10\"]"
         },
         {
           "name": "data[2].junctions",
           "value": "8"
-        },
-        {
-          "name": "data[2].kilometres",
-          "value": "null"
         },
         {
           "name": "data[2].name",
@@ -10437,20 +11467,12 @@
           "value": "2"
         },
         {
-          "name": "data[2].sourceFamily",
-          "value": "autobahn"
-        },
-        {
           "name": "data[2].states",
           "value": "[\"03\",\"04\",\"07\",\"10\",\"11\",\"14\"]"
         },
         {
           "name": "data[3].junctions",
           "value": "8"
-        },
-        {
-          "name": "data[3].kilometres",
-          "value": "null"
         },
         {
           "name": "data[3].name",
@@ -10465,20 +11487,12 @@
           "value": "2"
         },
         {
-          "name": "data[3].sourceFamily",
-          "value": "autobahn"
-        },
-        {
           "name": "data[3].states",
           "value": "[\"05\",\"07\",\"10\",\"12\",\"14\",\"15\"]"
         },
         {
           "name": "data[4].junctions",
           "value": "8"
-        },
-        {
-          "name": "data[4].kilometres",
-          "value": "null"
         },
         {
           "name": "data[4].name",
@@ -10491,10 +11505,6 @@
         {
           "name": "data[4].situations",
           "value": "2"
-        },
-        {
-          "name": "data[4].sourceFamily",
-          "value": "autobahn"
         },
         {
           "name": "data[4].states",
@@ -10786,10 +11796,6 @@
           "value": "8"
         },
         {
-          "name": "data[0].kilometres",
-          "value": "null"
-        },
-        {
           "name": "data[0].name",
           "value": "A100"
         },
@@ -10800,10 +11806,6 @@
         {
           "name": "data[0].situations",
           "value": "0"
-        },
-        {
-          "name": "data[0].sourceFamily",
-          "value": "autobahn"
         },
         {
           "name": "data[0].states",
@@ -10895,10 +11897,6 @@
           "value": "8"
         },
         {
-          "name": "data[0].kilometres",
-          "value": "null"
-        },
-        {
           "name": "data[0].name",
           "value": "A100"
         },
@@ -10909,10 +11907,6 @@
         {
           "name": "data[0].situations",
           "value": "0"
-        },
-        {
-          "name": "data[0].sourceFamily",
-          "value": "autobahn"
         },
         {
           "name": "data[0].states",
@@ -11368,28 +12362,495 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
-          "name": "data.apiVersion",
-          "value": "parity"
+          "name": "data",
+          "value": "{}"
+        }
+      ]
+    },
+    {
+      "id": "watch-region",
+      "operation": "getWatch",
+      "counterpart": "watch situation",
+      "request": "/v1/watch?kind=region\u0026target=08001\u0026hours=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places",
+          "roads",
+          "transit",
+          "weather"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.condition.delay_min",
+          "value": "5"
         },
         {
-          "name": "data.buildSha",
-          "value": "parity"
+          "name": "data.condition.late_share",
+          "value": "0.25"
         },
         {
-          "name": "data.contractVersion",
-          "value": "0.3"
+          "name": "data.condition.min_trips",
+          "value": "10"
         },
         {
-          "name": "data.languages",
-          "value": "[\"en\"]"
+          "name": "data.ended",
+          "value": "false"
         },
         {
-          "name": "data.openapi",
-          "value": "https://api.viafrei.de/v1/openapi.json"
+          "name": "data.from",
+          "value": "2026-03-30T00:00:00Z"
         },
         {
-          "name": "data.platformVersion",
+          "name": "data.holds",
+          "value": "false"
+        },
+        {
+          "name": "data.key",
+          "value": "08001"
+        },
+        {
+          "name": "data.kind",
+          "value": "region"
+        },
+        {
+          "name": "data.note",
           "value": "null"
+        },
+        {
+          "name": "data.situations",
+          "value": "[]"
+        },
+        {
+          "name": "data.until",
+          "value": "2026-03-30T03:00:00Z"
+        },
+        {
+          "name": "meta.attribution[delfi_sa_alpha].family",
+          "value": "delfi_sa_alpha"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "watch-weather",
+      "operation": "getWatch",
+      "counterpart": "watch situation",
+      "request": "/v1/watch?kind=weather\u0026target=49.16,7.8\u0026hours=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places",
+          "roads",
+          "transit",
+          "weather"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.cell.key",
+          "value": "801002000"
+        },
+        {
+          "name": "data.cell.name",
+          "value": "Warngebiet 01002"
+        },
+        {
+          "name": "data.cell.place",
+          "value": "null"
+        },
+        {
+          "name": "data.condition.min_level",
+          "value": "2"
+        },
+        {
+          "name": "data.ended",
+          "value": "false"
+        },
+        {
+          "name": "data.from",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.holds",
+          "value": "false"
+        },
+        {
+          "name": "data.key",
+          "value": "49.16,7.8"
+        },
+        {
+          "name": "data.kind",
+          "value": "weather"
+        },
+        {
+          "name": "data.note",
+          "value": "null"
+        },
+        {
+          "name": "data.situations",
+          "value": "[]"
+        },
+        {
+          "name": "data.until",
+          "value": "2026-03-30T03:00:00Z"
+        },
+        {
+          "name": "meta.attribution[dwd_alpha].family",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "meta.attribution[dwd_eta].family",
+          "value": "dwd_eta"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "motorway-unknown-roadworks",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/A999/conditions?kinds=roadworks\u0026from=2026-03-30\u0026to=2026-04-06\u0026limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta",
+          "roads_alpha",
+          "roads_epsilon",
+          "roadworks_bast"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.corridor.direction",
+          "value": "both"
+        },
+        {
+          "name": "data.corridor.road",
+          "value": "A999"
+        },
+        {
+          "name": "data.corridor.roadType",
+          "value": "motorway"
+        },
+        {
+          "name": "data.coverage.families",
+          "value": "[\"roadworks_bast\"]"
+        },
+        {
+          "name": "data.coverage.registered",
+          "value": "false"
+        },
+        {
+          "name": "data.coverage.roadType",
+          "value": "motorway"
+        },
+        {
+          "name": "data.situations",
+          "value": "[]"
+        },
+        {
+          "name": "meta.attribution[roadworks_bast].family",
+          "value": "roadworks_bast"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "10"
+        },
+        {
+          "name": "meta.page.nextCursor",
+          "value": "null"
+        }
+      ]
+    },
+    {
+      "id": "service-pressure",
+      "operation": "getPressure",
+      "counterpart": "pressure",
+      "request": "/v1/pressure",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.state",
+          "value": "ok"
+        }
+      ]
+    },
+    {
+      "id": "road-b-no-sites",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/B999/conditions?kinds=roadworks\u0026from=2026-03-30\u0026to=2026-04-06\u0026limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta",
+          "roads_alpha",
+          "roads_epsilon",
+          "roadworks_bast"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.corridor.direction",
+          "value": "both"
+        },
+        {
+          "name": "data.corridor.road",
+          "value": "B999"
+        },
+        {
+          "name": "data.corridor.roadType",
+          "value": "federal"
+        },
+        {
+          "name": "data.coverage.families",
+          "value": "[]"
+        },
+        {
+          "name": "data.coverage.registered",
+          "value": "false"
+        },
+        {
+          "name": "data.coverage.roadType",
+          "value": "federal"
+        },
+        {
+          "name": "data.situations",
+          "value": "[]"
+        },
+        {
+          "name": "meta.attribution[roadworks_bast].family",
+          "value": "roadworks_bast"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "10"
+        },
+        {
+          "name": "meta.page.nextCursor",
+          "value": "null"
+        }
+      ]
+    },
+    {
+      "id": "affected-stations",
+      "operation": "listAffectedStations",
+      "counterpart": "station board",
+      "request": "/v1/affected-stations?limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places",
+          "energy",
+          "parking",
+          "roads",
+          "weather",
+          "transit"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "afir_zeta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data",
+          "value": "[]"
+        },
+        {
+          "name": "meta.attribution[delfi_sa_alpha].family",
+          "value": "delfi_sa_alpha"
+        },
+        {
+          "name": "meta.attribution[delfi_static].family",
+          "value": "delfi_static"
+        },
+        {
+          "name": "meta.attribution[gbfs_nextbike].family",
+          "value": "gbfs_nextbike"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
         }
       ]
     }

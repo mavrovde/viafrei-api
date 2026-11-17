@@ -2,7 +2,7 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "3bf54615fc128fee62f72603d5a80c280e699f0a3d2e7699d738173f0e25e117"
+    "sha256": "6b146cee258538b77b3eb7f018e5335c7a8c606041afee7c08a08210a2e04dea"
   },
   "cases": [
     {
@@ -10,6 +10,26 @@
       "operation": "listChargingOptions",
       "counterpart": "charging station search",
       "request": "/v1/charging-options?at=47.62,7.79&radius_m=20000&access=all&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "chargepool_gamma",
+          "tankerkoenig_gamma"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "charging-site",
+      "operation": "getChargingSite",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options/afir_alpha:cs-01-0002",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -198,6 +218,23 @@
       "now": "2026-03-30T00:00:00Z"
     },
     {
+      "id": "train-board",
+      "operation": "getTrainBoard",
+      "counterpart": "train departures",
+      "request": "/v1/train-boards/8001001",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "db_timetables"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
       "id": "stations-code",
       "operation": "listStations",
       "counterpart": "station search",
@@ -220,6 +257,24 @@
       "operation": "listFuelOptions",
       "counterpart": "filling station search",
       "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&limit=10",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "tankerkoenig_gamma"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "fuel-station",
+      "operation": "getFuelStation",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options/00000000-0000-4000-8000-000000000002",
       "key": {
         "useClass": "consumer",
         "scopes": [
@@ -339,6 +394,46 @@
           "bkg_gvisys",
           "delfi_static",
           "geonames"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "places-motorway",
+      "operation": "listPlaces",
+      "counterpart": "place search",
+      "request": "/v1/places?q=A100&kind=motorway&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames",
+          "roads_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "places-junction",
+      "operation": "listPlaces",
+      "counterpart": "place search",
+      "request": "/v1/places?q=Kreuz%20Fixfeld&kind=junction&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames",
+          "roads_alpha"
         ],
         "accepted": null
       },
@@ -530,6 +625,28 @@
           "park_beta",
           "truckpark_sid_static",
           "truckpark_sid_dyn"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "parking-bays",
+      "operation": "listParkingBays",
+      "counterpart": "parking search, kind disabled_badge",
+      "request": "/v1/parking-bays?at=48.388,7.521&radius_m=2000&limit=3",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "parking"
+        ],
+        "sources": [
+          "dortmund_parksensoren_bays",
+          "frankfurt_behindertenparkplaetze",
+          "park_alpha",
+          "park_beta",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static"
         ],
         "accepted": null
       },
@@ -1174,7 +1291,7 @@
       "id": "place-overview",
       "operation": "getPlaceOverview",
       "counterpart": "place cards",
-      "request": "/v1/places/100003/overview",
+      "request": "/v1/places/100079/overview?radius_m=5000",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -1188,6 +1305,7 @@
         "sources": [
           "afir_alpha",
           "afir_beta",
+          "afir_zeta",
           "bast_lcl",
           "bkg_gvisys",
           "chargepool_gamma",
@@ -1742,6 +1860,229 @@
           "lez_alpha",
           "lorry_bast_langlkw",
           "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "watch-region",
+      "operation": "getWatch",
+      "counterpart": "watch situation",
+      "request": "/v1/watch?kind=region&target=08001&hours=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places",
+          "roads",
+          "transit",
+          "weather"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "watch-weather",
+      "operation": "getWatch",
+      "counterpart": "watch situation",
+      "request": "/v1/watch?kind=weather&target=49.16,7.8&hours=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places",
+          "roads",
+          "transit",
+          "weather"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "motorway-unknown-roadworks",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/A999/conditions?kinds=roadworks&from=2026-03-30&to=2026-04-06&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta",
+          "roads_alpha",
+          "roads_epsilon",
+          "roadworks_bast"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "service-pressure",
+      "operation": "getPressure",
+      "counterpart": "pressure",
+      "request": "/v1/pressure",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "road-b-no-sites",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/B999/conditions?kinds=roadworks&from=2026-03-30&to=2026-04-06&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta",
+          "roads_alpha",
+          "roads_epsilon",
+          "roadworks_bast"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "affected-stations",
+      "operation": "listAffectedStations",
+      "counterpart": "station board",
+      "request": "/v1/affected-stations?limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places",
+          "energy",
+          "parking",
+          "roads",
+          "weather",
+          "transit"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "afir_zeta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
           "openstation_siri_fm",
           "osm",
           "osm_speed_cameras",

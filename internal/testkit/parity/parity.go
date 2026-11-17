@@ -200,6 +200,8 @@ var Default = Rules{
 	Excluded: []Exclusion{
 		{"data[*].access", "", "", "the MCP capability has no access concept: no charging source of the platform publishes who may use a site"},
 		{"data[*].chargePoints[*].current", "", "", "the MCP capability states no current per point"},
+		{"data.access", "", "getChargingSite", "the MCP capability has no access concept: no charging source of the platform publishes who may use a site"},
+		{"data.chargePoints[*].current", "", "getChargingSite", "the MCP capability states no current per point"},
 		{"meta.freshness", "", "", "API-only: the per-family freshness block of the read contract (ENV-003)"},
 		{"meta.warnings", "", "", "API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got"},
 		{"meta.page.hasMore", "min_kw", "", "the MCP capability states no count of the sites a power filter keeps, so it cannot say whether there are more"},
@@ -219,6 +221,30 @@ var Default = Rules{
 		{"data.lampReason", "from", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
 		{"data.corridor.states", "horizon_days", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
 		{"data.corridor.states", "from", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
+		{"data[*].kilometres", "", "listMotorways", motorwayListReason},
+		{"data[*].sourceFamily", "", "listMotorways", motorwayListReason},
+		{"data.apiVersion", "", "getMeta", serviceMetaReason},
+		{"data.buildSha", "", "getMeta", serviceMetaReason},
+		{"data.contractVersion", "", "getMeta", serviceMetaReason},
+		{"data.languages", "", "getMeta", serviceMetaReason},
+		{"data.openapi", "", "getMeta", serviceMetaReason},
+		{"data.platformVersion", "", "getMeta", serviceMetaReason},
+		{"data.bays[*].distanceM", "", "listParkingBays", "the parking tool states a bay's distance in kilometres to two decimals, the API in metres, so they agree only to the tool's 10 m; the bay's point both measure from is compared"},
+		{"data.departures[*].line", "", "getTrainBoard", trainLabelReason},
+		{"data.departures[*].number", "", "getTrainBoard", trainLabelReason},
+		{"data.fresh", "", "getTrainBoard", trainAgeReason},
+		{"data.fetchedAt", "", "getTrainBoard", trainAgeReason},
+		{"data.ageSeconds", "", "getTrainBoard", trainAgeReason},
+		{"data.place.location", "", "getPlaceOverview", overviewReason},
+		{"data.charging.sites[*].access", "", "getPlaceOverview", overviewReason},
+		{"data.charging.sites[*].chargePoints", "", "getPlaceOverview", overviewReason},
+		{"data.charging.sites[*].distanceM", "", "getPlaceOverview", overviewDistanceReason},
+		{"data.parking.sites[*].distanceM", "", "getPlaceOverview", overviewDistanceReason},
+		{"data.parking.sites[*].kind", "", "getPlaceOverview", overviewReason},
+		{"data.parking.sites[*].operator", "", "getPlaceOverview", overviewReason},
+		{"data.parking.sites[*].occupancy.total", "", "getPlaceOverview", overviewReason},
+		{"data.parking.sites[*].occupancy.state", "", "getPlaceOverview", overviewReason},
+		{"data.parking.sites[*].occupancy.observedAt", "", "getPlaceOverview", overviewReason},
 		{"data.watchId", "", "getWatch", watchIDReason},
 		{"data.uri", "", "getWatch", watchIDReason},
 		{"meta.attribution[*].domain", "", "", attributionReason},
@@ -263,6 +289,29 @@ func siteReason(route string) string {
 
 // zoneRowsReason is why the zone rows of a rules answer are not compared.
 const zoneRowsReason = "API-only: the MCP driving rules state the verdict at a position (zoneVerdict, compared) and a city's entry of the curated zone list, and no digest route the site reads lists the published zone rows"
+
+// motorwayListReason is why a motorway's length and register family are
+// not compared: the site's motorway list, index and pages show neither.
+const motorwayListReason = "API-only: the site's motorway list, index and pages (the digest routes /internal/motorway/list, /internal/motorway/index and /internal/motorway/:road) show no length and no register family of a motorway"
+
+// serviceMetaReason is why the members of the service description are not
+// compared: they describe the running build, which the site shows none of.
+const serviceMetaReason = "API-only: the versions and the document of the running service; the site reads only whether it is saturated (the digest route /internal/pressure), which the API states by answering at all"
+
+// trainLabelReason is why a departure's line and train number are not
+// compared: the train tool states one label, which cannot be split back.
+const trainLabelReason = "the train tool states one label, what a person reads on the board (ICE 571, RE 1), the API the board's line and train number apart; a label of a category and a number cannot be split back into the two"
+
+// trainAgeReason is why the age of a train board is not compared.
+const trainAgeReason = "API-only: the age of the recorded board the API serves (fresh, fetchedAt, ageSeconds); the train tool asks the timetable provider at the time of the question"
+
+// overviewReason is why a member of the place overview is not compared:
+// the place page's cards, the site's form of the overview, do not show it.
+const overviewReason = "API-only: the place page's cards (the digest route /internal/place/cards) show no position of the place, no access or charge points of a charging site, and no kind, operator, capacity, state or reading time of a car park"
+
+// overviewDistanceReason is why a site's distance in the overview is not
+// compared: the cards round it.
+const overviewDistanceReason = "the place page's cards state a site's distance in kilometres to one decimal with a direction, the API in metres; the site's point, which both measure from, is compared"
 
 // watchIDReason is why a watch's id is not compared: each side mints its own.
 const watchIDReason = "each side mints the id of a watch: the platform a number of its session, the API a token of kind, key and condition; the watch it names is compared"
@@ -556,6 +605,13 @@ func Project(body []byte, r Rules, operation, request string, owners Owners) ([]
 	if err := dec.Decode(&doc); err != nil {
 		return nil, err
 	}
+	// A refusal (a problem document, RFC 9457) is one fact, as the MCP side
+	// states a tool error: what was refused is compared, not its wording.
+	if st, ok := doc["status"].(json.Number); ok && doc["data"] == nil {
+		if n, err := st.Int64(); err == nil && n >= 400 {
+			return []Fact{{Name: "error", Value: "true"}}, nil
+		}
+	}
 	p := projector{r: r}
 	p.walk("data", "data", doc["data"])
 	meta, _ := doc["meta"].(map[string]any)
@@ -577,10 +633,24 @@ func Project(body []byte, r Rules, operation, request string, owners Owners) ([]
 		return nil, fmt.Errorf("%w: %q", ErrDuplicateFact, n)
 	}
 	kept := p.out[:0]
+	dataFacts, dataKept := 0, 0
 	for _, f := range p.out {
+		isData := f.Name == "data" || strings.HasPrefix(f.Name, "data.") || strings.HasPrefix(f.Name, "data[")
+		if isData {
+			dataFacts++
+		}
 		if !r.Excludes(operation, request, f.Name) {
 			kept = append(kept, f)
+			if isData {
+				dataKept++
+			}
 		}
+	}
+	// An answer whose every data fact is excluded states data = {}: it
+	// answered, and none of what it answered is compared.
+	if dataFacts > 0 && dataKept == 0 {
+		kept = append(kept, Fact{"data", "{}"})
+		sort.Slice(kept, func(i, j int) bool { return kept[i].Name < kept[j].Name })
 	}
 	return kept, nil
 }

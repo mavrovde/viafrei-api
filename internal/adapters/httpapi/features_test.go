@@ -303,11 +303,11 @@ func TestChargingOptionsWarnsOfStaleAndWithheldData(t *testing.T) {
 func TestParkingOptionsAnswer(t *testing.T) {
 	req.Covers(t, "FR-PARK-002", "FR-PARK-003", "SEC-030", "ENV-003")
 	f := everyAnswer()
-	w := do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/parking-options?at=52.52,13.405&free_min=2&limit=5", bearer)
+	w := do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/parking-options?at=52.52,13.405&free_min=2&limit=5&kind=truck&facilities=shower,toilet", bearer)
 	if w.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", w.Code, w.Body)
 	}
-	if f.gotPark != (parking.Query{At: geo.Point{Lat: 52.52, Lon: 13.405}, RadiusM: 2000, FreeMin: 2, Limit: 5}) {
+	if !reflect.DeepEqual(f.gotPark, parking.Query{At: geo.Point{Lat: 52.52, Lon: 13.405}, RadiusM: 2000, FreeMin: 2, Kind: "truck", Amenities: []string{"shower", "toilet"}, Limit: 5}) {
 		t.Errorf("asked %+v", f.gotPark)
 	}
 	body := decode(t, w)
@@ -332,7 +332,7 @@ func TestParkingOptionsAnswer(t *testing.T) {
 		t.Errorf("condition notes %v", notes)
 	}
 	q, _ := m["query"].(map[string]any)
-	if q["freeMin"] != 2.0 {
+	if fs, _ := q["facilities"].([]any); q["freeMin"] != 2.0 || q["kind"] != "truck" || len(fs) != 2 {
 		t.Errorf("query %v", q)
 	}
 
@@ -699,4 +699,33 @@ func TestChargingFilters(t *testing.T) {
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&min_kw=150&max_kw=50", bearer), 400, "invalid-parameter")
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&operator=GmbH", bearer), 400, "invalid-parameter")
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&conditions=cheap", bearer), 400, "invalid-parameter")
+}
+
+func TestMotorwayParkingAnswer(t *testing.T) {
+	req.Covers(t, "FR-PARK-002", "SEC-030")
+	f := everyAnswer()
+	h := featureHandler(t, config.Defaults(), f, nil)
+	w := do(t, h, http.MethodGet, "/v1/motorways/a%207/parking-options?kind=rest_area&facilities=shower&limit=3", bearer)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", w.Code, w.Body)
+	}
+	if !reflect.DeepEqual(f.gotPark, parking.Query{Road: "A7", Kind: "rest_area", Amenities: []string{"shower"}, Limit: 3}) {
+		t.Errorf("asked %+v", f.gotPark)
+	}
+	body := decode(t, w)
+	m := meta(t, body)
+	q, _ := m["query"].(map[string]any)
+	if q["road"] != "A7" || q["kind"] != "rest_area" || q["freeMin"] != 0.0 {
+		t.Errorf("query %v", q)
+	}
+	if data, _ := body["data"].([]any); len(data) != 2 {
+		t.Errorf("data %v", data)
+	}
+	if w := do(t, h, http.MethodGet, "/v1/motorways/B7/parking-options", bearer); w.Code != http.StatusBadRequest {
+		t.Errorf("a federal road: %d", w.Code)
+	}
+	f.err = errors.New("down")
+	if w := do(t, h, http.MethodGet, "/v1/motorways/A7/parking-options", bearer); w.Code < 500 {
+		t.Errorf("a failed read: %d", w.Code)
+	}
 }

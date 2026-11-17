@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	_ "time/tzdata" // the Europe/Berlin rendering never depends on the host
@@ -144,6 +145,25 @@ type SituationFilters struct {
 	MinSeverity string   `query:"min_severity" enum:"info,minor,lane_closed,major,road_closed" default:"info" doc:"Only situations at or above this severity; info also keeps those that cannot be graded."`
 }
 
+// SituationWindow asks for the situations whose validity overlaps a window
+// instead of those in force now.
+type SituationWindow struct {
+	HorizonDays int    `query:"horizon_days" minimum:"0" maximum:"14" doc:"Also the situations that start within this many days from now: the window is now to now plus the days, and a situation is kept when its validity overlaps it (the platform's road status horizon). 0, the default, keeps those in force now. Not with from or to."`
+	From        string `query:"from" format:"date" doc:"The first day of a window of German calendar days (Europe/Berlin), YYYY-MM-DD: a situation is kept when its validity overlaps the window (the platform's roadworks window). Default: today, when to is given."`
+	To          string `query:"to" format:"date" doc:"The last day of the window, inclusive, YYYY-MM-DD. Default: 7 days after from. The window spans at most 92 days."`
+}
+
+// check refuses a window that cannot be read.
+func (w SituationWindow) check() []error {
+	if _, _, err := roads.DayWindow(time.Now(), w.HorizonDays, w.From, w.To); err != nil {
+		return []error{&huma.ErrorDetail{Location: "query.from", Message: err.Error(), Value: w.From + ".." + w.To}}
+	}
+	return nil
+}
+
+// asked reports whether a window was asked for.
+func (w SituationWindow) asked() bool { return w.HorizonDays > 0 || w.From != "" || w.To != "" }
+
 func (f SituationFilters) filter() roads.Filter {
 	out := roads.Filter{MinSeverity: roads.Severity(f.MinSeverity)}
 	for _, k := range f.Kinds {
@@ -152,14 +172,32 @@ func (f SituationFilters) filter() roads.Filter {
 	return out
 }
 
+// windowed is the filter with the window at now: an answer over a window
+// moves with the clock, so it changes at its read.
+func (s *server) windowed(ctx context.Context, f roads.Filter, w SituationWindow) roads.Filter {
+	if !w.asked() {
+		return f
+	}
+	now := s.now()
+	f.From, f.Until, _ = roads.DayWindow(now, w.HorizonDays, w.From, w.To)
+	noteChangesAt(ctx, now)
+	return f
+}
+
 // FilterQuery is the filter part of meta.query of a conditions answer.
 type FilterQuery struct {
-	Kinds       []string `json:"kinds" doc:"The kinds asked for; empty for every kind."`
-	MinSeverity string   `json:"minSeverity"`
+	Kinds       []string   `json:"kinds" doc:"The kinds asked for; empty for every kind."`
+	MinSeverity string     `json:"minSeverity"`
+	WindowFrom  *time.Time `json:"windowFrom,omitempty" doc:"The start of the window asked for (horizon_days, or from and to); absent for the situations in force now."`
+	WindowUntil *time.Time `json:"windowUntil,omitempty" doc:"The end of the window asked for; absent for the situations in force now."`
 }
 
 func filterQuery(f roads.Filter) FilterQuery {
 	out := FilterQuery{Kinds: []string{}, MinSeverity: string(f.MinSeverity)}
+	if !f.Until.IsZero() {
+		from, until := f.From.UTC(), f.Until.UTC()
+		out.WindowFrom, out.WindowUntil = &from, &until
+	}
 	for _, k := range f.Kinds {
 		out.Kinds = append(out.Kinds, string(k))
 	}
@@ -173,8 +211,11 @@ type MotorwayInput struct {
 	Road      string `path:"road" maxLength:"6" pattern:"^[AaBb] ?[0-9]{1,4}$" example:"A8" doc:"The road reference, case-insensitive, with an optional space (A8, a 8)."`
 	Direction string `query:"direction" enum:"north,east,south,west,both" default:"both" doc:"The carriageway; both keeps every situation. A direction keeps that carriageway's situations, those on both and those whose direction is unknown."`
 	SituationFilters
-	Limit int `query:"limit" minimum:"1" maximum:"100" doc:"Most situations to return. Default: pagination.default_limit."`
-	road  string
+	SituationWindow
+	Limit  int    `query:"limit" minimum:"1" maximum:"100" doc:"Most situations to return. Default: pagination.default_limit."`
+	Cursor string `query:"cursor" pattern:"^[0-9]{1,4}$" doc:"The meta.page.nextCursor of the page before; omit for the first page."`
+	road   string
+	offset int
 }
 
 // Resolve reads the road reference into its canonical form (CONV-011; huma
@@ -185,7 +226,8 @@ func (in *MotorwayInput) Resolve(huma.Context) []error {
 		return []error{&huma.ErrorDetail{Location: "path.road", Message: err.Error(), Value: in.Road}}
 	}
 	in.road = road
-	return nil
+	in.offset, _ = strconv.Atoi(in.Cursor)
+	return in.check()
 }
 
 // Corridor is the road a conditions answer is about.
@@ -211,10 +253,25 @@ type MotorwayQuery struct {
 	FilterQuery
 }
 
+// CursorPage is a page that a cursor continues.
+type CursorPage struct {
+	Page
+	NextCursor *string `json:"nextCursor" nullable:"true" doc:"The cursor of the next page; null on the last."`
+}
+
+func cursorPage(q roads.CorridorQuery, more bool, n int) CursorPage {
+	out := CursorPage{Page: Page{Limit: q.Limit, HasMore: more}}
+	if more {
+		next := strconv.Itoa(q.Offset + n)
+		out.NextCursor = &next
+	}
+	return out
+}
+
 // MotorwayMeta is the meta member of getMotorwayConditions.
 type MotorwayMeta struct {
 	DataMeta
-	Page  Page          `json:"page"`
+	Page  CursorPage    `json:"page"`
 	Query MotorwayQuery `json:"query"`
 }
 
@@ -239,7 +296,7 @@ func registerMotorwayConditions(api huma.API, s *server, op huma.Operation) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
-		q := roads.CorridorQuery{Road: in.road, Direction: roads.Direction(in.Direction), Filter: in.filter(), Limit: s.limit(in.Limit)}
+		q := roads.CorridorQuery{Road: in.road, Direction: roads.Direction(in.Direction), Filter: s.windowed(ctx, in.filter(), in.SituationWindow), Limit: s.limit(in.Limit), Offset: in.offset}
 		c, err := s.features.MotorwayConditions(ctx, principalFrom(ctx).Key, q)
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
@@ -254,7 +311,7 @@ func registerMotorwayConditions(api huma.API, s *server, op huma.Operation) {
 			},
 			Meta: MotorwayMeta{
 				DataMeta: s.dataMeta(ctx, c.Families, c.At, c.Partial, partialDetail),
-				Page:     Page{Limit: q.Limit, HasMore: c.HasMore},
+				Page:     cursorPage(q, c.HasMore, len(c.Items)),
 				Query:    MotorwayQuery{Road: c.Road.Ref, Direction: string(q.Direction), FilterQuery: filterQuery(q.Filter)},
 			},
 			Links: s.selfLink(ctx),
@@ -268,7 +325,13 @@ func registerMotorwayConditions(api huma.API, s *server, op huma.Operation) {
 type RoadConditionsInput struct {
 	Near
 	SituationFilters
+	SituationWindow
 	RoadClass []string `query:"road_class" enum:"motorway,federal,state,urban,other" doc:"Only situations on roads of these classes, comma-separated; other keeps the classes that cannot be mapped. Default: every class held."`
+}
+
+// Resolve reads the position and refuses a window that cannot be read.
+func (in *RoadConditionsInput) Resolve(ctx huma.Context) []error {
+	return append(in.AtPosition.Resolve(ctx), in.check()...)
 }
 
 // Area is the area a conditions answer is about.
@@ -320,7 +383,7 @@ func registerRoadConditions(api huma.API, s *server, op huma.Operation) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
-		q := roads.AreaQuery{At: in.point, RadiusM: s.radius(in.RadiusM), Filter: in.filter(), Limit: s.limit(in.Limit)}
+		q := roads.AreaQuery{At: in.point, RadiusM: s.radius(in.RadiusM), Filter: s.windowed(ctx, in.filter(), in.SituationWindow), Limit: s.limit(in.Limit)}
 		types := []string{}
 		for _, c := range in.RoadClass {
 			q.Classes = append(q.Classes, roads.Class(c))

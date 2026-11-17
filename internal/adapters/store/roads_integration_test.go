@@ -707,3 +707,34 @@ select count(*) from ins`, &n)
 	})
 	t.Run("a warning in scope starts", func(t *testing.T) { dbAsk(t, noBoundary) })
 }
+
+func TestSituationsOnRoadOverAWindowAndAPage(t *testing.T) {
+	req.Covers(t, "FR-ROAD-001", "FR-ROAD-002")
+	st := seeded(t)
+	now, count := busiest(t)
+	fams := roads.Families{Roads: families(t, st, "roads")}
+	q := roads.CorridorQuery{Road: "A101", Direction: roads.DirectionBoth, Filter: roads.Filter{MinSeverity: roads.SeverityInfo}, Limit: 100}
+	wide := q
+	wide.From, wide.Until = now.AddDate(-1, 0, 0), now.AddDate(1, 0, 0)
+	all, err := st.SituationsOnRoad(bounded(t), wide, fams, now)
+	if err != nil || len(all.Items) <= count {
+		t.Fatalf("a two-year window read %d situations, %d in force: %v", len(all.Items), count, err)
+	}
+	paged := wide
+	paged.Limit, paged.Offset = 1, 1
+	p, err := st.SituationsOnRoad(bounded(t), paged, fams, now)
+	if err != nil || len(p.Items) != 1 || p.Items[0].ID != all.Items[1].ID || !p.HasMore {
+		t.Errorf("the second page of one: %+v, %v", p.Items, err)
+	}
+	var near roads.AreaQuery
+	for _, v := range all.Items {
+		if v.Location != nil {
+			near.At = *v.Location
+		}
+	}
+	near.RadiusM, near.Limit, near.MinSeverity = 2_000_000, 100, roads.SeverityInfo
+	near.From, near.Until = wide.From, wide.Until
+	if a, err := st.SituationsNear(bounded(t), near, fams, now); err != nil || len(a.Items) == 0 {
+		t.Errorf("near over the window: %d, %v", len(a.Items), err)
+	}
+}

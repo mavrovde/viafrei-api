@@ -92,12 +92,41 @@ func (s Site) Withheld() Site {
 	return s
 }
 
-// Query asks for parking sites near a position.
+// Query asks for parking sites near a position, or along a motorway.
 type Query struct {
 	At      geo.Point
 	RadiusM int
+	// Road, when set, asks for the sites along that motorway instead of
+	// near At: the platform's corridor (CorridorM of the road's points, or
+	// filed under the road by their source), in name order, with no distance.
+	Road string
+	// Kind keeps only the sites whose source stores this kind (the
+	// platform's car_park, park_and_ride or truck); empty keeps every kind.
+	Kind string
+	// Amenities keeps only the sites whose own publisher states all of them.
+	Amenities []string
 	// FreeMin keeps only sites whose live report has at least this many free
 	// spaces; zero keeps every site.
 	FreeMin int
 	Limit   int
 }
+
+// CorridorM is how far from one of a motorway's location-code points a
+// facility is still on the motorway, in metres: the platform's corridor.
+const CorridorM = 1500
+
+// FilterKinds are the kinds a query can keep, as the platform's parking
+// search names them; rest_area is accepted and answered unfiltered, because
+// no source classifies a rest area.
+var FilterKinds = []string{"car_park", "park_and_ride", "truck", "rest_area"}
+
+// FilterKind is the stored kind a requested kind keeps; empty keeps every kind.
+func FilterKind(asked string) string {
+	if asked == "rest_area" {
+		return ""
+	}
+	return asked
+}
+
+// Amenities is the amenity vocabulary of the platform's parking search.
+var Amenities = []string{"toilet", "shower", "restaurant", "snack", "cafe", "shop", "fuel", "charging", "drinking_water", "picnic", "playground", "wifi", "security", "accessible_toilet"}

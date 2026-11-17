@@ -2,7 +2,7 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "5a243015fd5eff6c40f10efb8a9e2aa2c0df2ced16108acaf80fd7b1c1f74374"
+    "sha256": "04faf0216734ccd42622ae7466159575a0c40727077cb0f79d3e1c430e51d520"
   },
   "cases": [
     {
@@ -1059,6 +1059,135 @@
           "tankerkoenig_gamma"
         ],
         "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "parking-kind-truck",
+      "operation": "listParkingOptions",
+      "counterpart": "parking search",
+      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&kind=truck&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "parking"
+        ],
+        "sources": [
+          "park_alpha",
+          "park_beta",
+          "truckpark_sid_static",
+          "truckpark_sid_dyn"
+        ],
+        "accepted": [
+          {
+            "source": "src-delta-parking",
+            "version": "2026-03-01"
+          }
+        ]
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "parking-facilities-toilet",
+      "operation": "listParkingOptions",
+      "counterpart": "parking search",
+      "request": "/v1/parking-options?at=50.25,10.43&radius_m=50000&facilities=toilet&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "parking"
+        ],
+        "sources": [
+          "park_alpha",
+          "park_beta",
+          "truckpark_sid_static",
+          "truckpark_sid_dyn"
+        ],
+        "accepted": [
+          {
+            "source": "src-delta-parking",
+            "version": "2026-03-01"
+          }
+        ]
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "parking-road-a101",
+      "operation": "listMotorwayParking",
+      "counterpart": "parking search",
+      "request": "/v1/motorways/A101/parking-options?limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "parking"
+        ],
+        "sources": [
+          "park_alpha",
+          "park_beta",
+          "truckpark_sid_static",
+          "truckpark_sid_dyn"
+        ],
+        "accepted": [
+          {
+            "source": "src-delta-parking",
+            "version": "2026-03-01"
+          }
+        ]
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "motorway-a101-horizon",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/A101/conditions?horizon_days=14&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "roads_alpha",
+          "roads_epsilon"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "motorway-a101-roadworks-window",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/A101/conditions?kinds=roadworks&from=2026-03-30&to=2026-04-30&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "roads_alpha",
+          "roads_epsilon"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "motorway-a101-cursor",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/A101/conditions?limit=2&cursor=2",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "roads_alpha",
+          "roads_epsilon"
+        ],
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"

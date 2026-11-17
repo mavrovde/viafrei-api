@@ -751,6 +751,21 @@ func (g *gen) otherFamily(domain, ref string) string {
 // car park it reads as other.
 var parkingKinds = []string{"other", "other", "park_and_ride", "other", "rest_area", "truck_parking"}
 
+// parkingAmenities is what the publisher of the n-th site states, without
+// a draw of its own: a toilet and a shower, a toilet alone, or nothing;
+// nothing for a site of the SID, whose rows the platform keeps no amenities on.
+func parkingAmenities(n int, sid bool) string {
+	switch {
+	case sid:
+		return null
+	case n%3 == 0:
+		return array("shower", "toilet")
+	case n%3 == 1:
+		return array("toilet")
+	}
+	return null
+}
+
 func (g *gen) parking() {
 	type facility struct {
 		id, ref string // ref: the source of its occupancy
@@ -758,7 +773,7 @@ func (g *gen) parking() {
 	}
 	var fs []facility
 	g.w.begin("parking_facility", "facility_id", "name", "parking_kind", "operator_name", "road_ref", "location",
-		"acceptance_required", "source_ref", "origin_key", "recorded_at", "changed_at", "withdrawn_at")
+		"acceptance_required", "source_ref", "origin_key", "recorded_at", "changed_at", "withdrawn_at", "amenities")
 	for _, l := range g.lands {
 		for range 2 * g.p.Scale {
 			n := 1 + len(fs)
@@ -781,7 +796,7 @@ func (g *gen) parking() {
 			rec := g.instant()
 			total := 20 + g.r.IntN(400)
 			g.w.row(str(id), optStr(pl.name+" Parken"), str(kind), operator, roadRef, point(at),
-				boolean(accept), str(ref), str(fmt.Sprint(n)), ts(rec), ts(rec), null)
+				boolean(accept), str(ref), str(fmt.Sprint(n)), ts(rec), ts(rec), null, parkingAmenities(n, accept))
 			g.counted(landOf(at), ref)
 			occ := ref
 			if accept {

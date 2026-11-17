@@ -124,7 +124,8 @@
       ],
       "page": {
         "limit": 2,
-        "hasMore": true
+        "hasMore": true,
+        "nextCursor": "2"
       },
       "query": {
         "road": "A101",

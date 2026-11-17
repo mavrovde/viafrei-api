@@ -509,6 +509,22 @@ type Filter struct {
 	Kinds []Kind
 	// MinSeverity keeps the situations at or above it (see Severity.Floor).
 	MinSeverity Severity
+	// From and Until bound the window a situation's validity must overlap;
+	// a zero bound is the instant of the read, so a zero window keeps the
+	// situations in force then.
+	From, Until time.Time
+}
+
+// Window is the window of the filter at now: its bounds, a zero one now.
+func (f Filter) Window(now time.Time) (start, end time.Time) {
+	start, end = f.From, f.Until
+	if start.IsZero() {
+		start = now
+	}
+	if end.IsZero() {
+		end = now
+	}
+	return start, end
 }
 
 // KnownKinds returns the mapped kinds a filter keeps, and whether it keeps
@@ -540,6 +556,8 @@ type CorridorQuery struct {
 	Direction Direction
 	Filter
 	Limit int
+	// Offset skips this many situations of the order: the page a cursor names.
+	Offset int
 }
 
 // AreaQuery asks for the situations near a position.

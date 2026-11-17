@@ -719,6 +719,33 @@
         ],
         "type": "object"
       },
+      "CursorPage": {
+        "additionalProperties": false,
+        "properties": {
+          "hasMore": {
+            "description": "True when more items lie within the radius than were returned.",
+            "type": "boolean"
+          },
+          "limit": {
+            "description": "The limit applied.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "nextCursor": {
+            "description": "The cursor of the next page; null on the last.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "nextCursor",
+          "limit",
+          "hasMore"
+        ],
+        "type": "object"
+      },
       "DataMeta": {
         "additionalProperties": false,
         "properties": {
@@ -2464,7 +2491,7 @@
             "$ref": "#/components/schemas/Notes"
           },
           "page": {
-            "$ref": "#/components/schemas/Page"
+            "$ref": "#/components/schemas/CursorPage"
           },
           "query": {
             "$ref": "#/components/schemas/MotorwayQuery"
@@ -2495,6 +2522,134 @@
         ],
         "type": "object"
       },
+      "MotorwayParkingEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ParkingSite"
+            },
+            "type": "array"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/MotorwayParkingMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "MotorwayParkingMeta": {
+        "additionalProperties": false,
+        "properties": {
+          "asOf": {
+            "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "attribution": {
+            "description": "One entry per contributing source family; clients displaying the data must show its text.",
+            "items": {
+              "$ref": "#/components/schemas/Attribution"
+            },
+            "type": "array"
+          },
+          "freshness": {
+            "description": "One entry per contributing source family.",
+            "items": {
+              "$ref": "#/components/schemas/FreshnessEntry"
+            },
+            "type": "array"
+          },
+          "generatedAt": {
+            "description": "When the service produced this body.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "language": {
+            "description": "The language of the texts in data (BCP 47).",
+            "type": "string"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/Notes"
+          },
+          "page": {
+            "$ref": "#/components/schemas/Page"
+          },
+          "query": {
+            "$ref": "#/components/schemas/MotorwayParkingQuery"
+          },
+          "requestId": {
+            "description": "The request id, equal to the X-Request-Id header.",
+            "type": "string"
+          },
+          "terms": {
+            "description": "The terms of the sites marked termsRequired, with their text: show it to the end user, and pass accept_terms only once the user accepts.",
+            "items": {
+              "$ref": "#/components/schemas/TermsOffer"
+            },
+            "type": "array"
+          },
+          "warnings": {
+            "description": "Warnings about this answer; empty when there is none.",
+            "items": {
+              "$ref": "#/components/schemas/DataWarning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "page",
+          "query",
+          "asOf",
+          "freshness",
+          "attribution",
+          "notes",
+          "warnings",
+          "requestId",
+          "generatedAt",
+          "language"
+        ],
+        "type": "object"
+      },
+      "MotorwayParkingQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "facilities": {
+            "description": "The amenities asked for; absent for none.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "freeMin": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "kind": {
+            "description": "The kind asked for; absent for every kind.",
+            "type": "string"
+          },
+          "road": {
+            "description": "The motorway without spaces.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "road",
+          "freeMin"
+        ],
+        "type": "object"
+      },
       "MotorwayQuery": {
         "additionalProperties": false,
         "properties": {
@@ -2512,6 +2667,16 @@
             "type": "string"
           },
           "road": {
+            "type": "string"
+          },
+          "windowFrom": {
+            "description": "The start of the window asked for (horizon_days, or from and to); absent for the situations in force now.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "windowUntil": {
+            "description": "The end of the window asked for; absent for the situations in force now.",
+            "format": "date-time",
             "type": "string"
           }
         },
@@ -3210,9 +3375,20 @@
           "at": {
             "$ref": "#/components/schemas/Position"
           },
+          "facilities": {
+            "description": "The amenities asked for; absent for none.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "freeMin": {
             "format": "int64",
             "type": "integer"
+          },
+          "kind": {
+            "description": "The kind asked for; absent for every kind.",
+            "type": "string"
           },
           "radiusM": {
             "description": "The radius applied, in metres.",
@@ -3221,9 +3397,9 @@
           }
         },
         "required": [
-          "freeMin",
           "at",
-          "radiusM"
+          "radiusM",
+          "freeMin"
         ],
         "type": "object"
       },
@@ -4110,6 +4286,16 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "windowFrom": {
+            "description": "The start of the window asked for (horizon_days, or from and to); absent for the situations in force now.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "windowUntil": {
+            "description": "The end of the window asked for; absent for the situations in force now.",
+            "format": "date-time",
+            "type": "string"
           }
         },
         "required": [
@@ -6613,6 +6799,7 @@
                           },
                           "radiusM": 20000,
                           "minKw": 0,
+                          "onlyAvailable": false,
                           "access": "public"
                         }
                       },
@@ -7450,7 +7637,8 @@
                           "sort": "price",
                           "matched": 1,
                           "droppedClosed": 0,
-                          "droppedUnknown": 0
+                          "droppedUnknown": 0,
+                          "droppedNotWholeDay": 0
                         }
                       },
                       "links": {
@@ -8824,6 +9012,41 @@
             }
           },
           {
+            "description": "Also the situations that start within this many days from now: the window is now to now plus the days, and a situation is kept when its validity overlaps it (the platform's road status horizon). 0, the default, keeps those in force now. Not with from or to.",
+            "explode": false,
+            "in": "query",
+            "name": "horizon_days",
+            "schema": {
+              "description": "Also the situations that start within this many days from now: the window is now to now plus the days, and a situation is kept when its validity overlaps it (the platform's road status horizon). 0, the default, keeps those in force now. Not with from or to.",
+              "format": "int64",
+              "maximum": 14,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The first day of a window of German calendar days (Europe/Berlin), YYYY-MM-DD: a situation is kept when its validity overlaps the window (the platform's roadworks window). Default: today, when to is given.",
+            "explode": false,
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "description": "The first day of a window of German calendar days (Europe/Berlin), YYYY-MM-DD: a situation is kept when its validity overlaps the window (the platform's roadworks window). Default: today, when to is given.",
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The last day of the window, inclusive, YYYY-MM-DD. Default: 7 days after from. The window spans at most 92 days.",
+            "explode": false,
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "description": "The last day of the window, inclusive, YYYY-MM-DD. Default: 7 days after from. The window spans at most 92 days.",
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
             "description": "Most situations to return. Default: pagination.default_limit.",
             "explode": false,
             "in": "query",
@@ -8834,6 +9057,17 @@
               "maximum": 100,
               "minimum": 1,
               "type": "integer"
+            }
+          },
+          {
+            "description": "The meta.page.nextCursor of the page before; omit for the first page.",
+            "explode": false,
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "description": "The meta.page.nextCursor of the page before; omit for the first page.",
+              "pattern": "^[0-9]{1,4}$",
+              "type": "string"
             }
           }
         ],
@@ -8954,7 +9188,8 @@
                         ],
                         "page": {
                           "limit": 2,
-                          "hasMore": true
+                          "hasMore": true,
+                          "nextCursor": "2"
                         },
                         "query": {
                           "road": "A101",
@@ -9221,6 +9456,454 @@
         ],
         "x-example-request": "/v1/motorways/A101/conditions?limit=2",
         "x-required-scope": "roads"
+      }
+    },
+    "/v1/motorways/{road}/parking-options": {
+      "get": {
+        "description": "Parking sites along a motorway, in name order (unnamed last), then by id, each with its last reported occupancy: the sites within 1 500 m of one of the motorway's location-code points, and those their source files under the motorway. distanceM is 0: no point was asked. A site whose terms need accepting first is listed without its occupancy and marked termsRequired. Needs the scope parking.",
+        "operationId": "listMotorwayParking",
+        "parameters": [
+          {
+            "description": "The motorway, case-insensitive, with an optional space (A7, a 7).",
+            "in": "path",
+            "name": "road",
+            "required": true,
+            "schema": {
+              "description": "The motorway, case-insensitive, with an optional space (A7, a 7).",
+              "examples": [
+                "A7"
+              ],
+              "maxLength": 5,
+              "pattern": "^[Aa] ?[0-9]{1,3}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The terms the end user has accepted, comma-separated, each as meta.terms names it (accept). Pass it only after showing the user the terms' text (meta.terms) and the user accepting them, as the MCP server asks by elicitation; never on the user's behalf. Without it, the data the terms gate is withheld and meta.terms carries their text. Terms that are not current are refused (terms-not-accepted) with the current text. Nothing is stored with the key: every request states its own acceptance.",
+            "explode": false,
+            "in": "query",
+            "name": "accept_terms",
+            "schema": {
+              "description": "The terms the end user has accepted, comma-separated, each as meta.terms names it (accept). Pass it only after showing the user the terms' text (meta.terms) and the user accepting them, as the MCP server asks by elicitation; never on the user's behalf. Without it, the data the terms gate is withheld and meta.terms carries their text. Terms that are not current are refused (terms-not-accepted) with the current text. Nothing is stored with the key: every request states its own acceptance.",
+              "examples": [
+                "sid-terms-1"
+              ],
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only sites whose live report has at least this many free spaces. Default 0, every site.",
+            "explode": false,
+            "in": "query",
+            "name": "free_min",
+            "schema": {
+              "description": "Only sites whose live report has at least this many free spaces. Default 0, every site.",
+              "format": "int64",
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Only sites of this kind as their source stores it: car_park, park_and_ride or truck. rest_area is accepted and answered with every kind, because no source classifies a rest area. Default: every kind.",
+            "explode": false,
+            "in": "query",
+            "name": "kind",
+            "schema": {
+              "description": "Only sites of this kind as their source stores it: car_park, park_and_ride or truck. rest_area is accepted and answered with every kind, because no source classifies a rest area. Default: every kind.",
+              "enum": [
+                "car_park",
+                "park_and_ride",
+                "truck",
+                "rest_area"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only sites whose own publisher states every one of these amenities, comma-separated. An amenity nobody stated is unknown, and such a site is left out.",
+            "explode": false,
+            "in": "query",
+            "name": "facilities",
+            "schema": {
+              "description": "Only sites whose own publisher states every one of these amenities, comma-separated. An amenity nobody stated is unknown, and such a site is left out.",
+              "items": {
+                "enum": [
+                  "toilet",
+                  "accessible_toilet",
+                  "shower",
+                  "restaurant",
+                  "snack",
+                  "cafe",
+                  "shop",
+                  "fuel",
+                  "charging",
+                  "drinking_water",
+                  "picnic",
+                  "playground",
+                  "wifi",
+                  "security"
+                ],
+                "type": "string"
+              },
+              "maxItems": 5,
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "Most items to return. Default: pagination.default_limit.",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "description": "Most items to return. Default: pagination.default_limit.",
+              "format": "int64",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The rest areas along a motorway that state a toilet, with terms accepted",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "p:9",
+                          "name": "Stunsaltal Parken",
+                          "operator": "Maunklur Parkraum",
+                          "kind": "rest_area",
+                          "location": {
+                            "lat": 52.194239,
+                            "lon": 9.165894
+                          },
+                          "distanceM": 0,
+                          "occupancy": {
+                            "free": 32,
+                            "total": 229,
+                            "state": "free",
+                            "observedAt": "2026-03-29T15:37:54Z"
+                          },
+                          "termsRequired": false,
+                          "sourceFamily": "park_alpha"
+                        }
+                      ],
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T23:57:30Z",
+                        "freshness": [
+                          {
+                            "family": "park_alpha",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "park_alpha",
+                            "domain": "parking",
+                            "publisher": "Fäpung Datenwerk",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms/park_alpha"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 2,
+                          "hasMore": false
+                        },
+                        "query": {
+                          "road": "A101",
+                          "freeMin": 0,
+                          "kind": "rest_area",
+                          "facilities": [
+                            "toilet"
+                          ]
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/motorways/A101/parking-options"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/MotorwayParkingEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The operation is switched off on this instance (feature-disabled).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "Where to park along a motorway",
+        "tags": [
+          "parking"
+        ],
+        "x-attribution": "Parking sites and their occupancy come from the source families of the parking domain the key is entitled to; a family whose terms need accepting answers only to a request that accepts them (accept_terms), which the caller passes after its end user has accepted their text. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/motorways/A101/parking-options?kind=rest_area\u0026facilities=toilet\u0026limit=2\u0026accept_terms=sid-terms-1\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/motorways/A101/parking-options?kind=rest_area\u0026facilities=toilet\u0026limit=2\u0026accept_terms=sid-terms-1",
+        "x-mcp-counterpart": "parking search",
+        "x-required-scope": "parking"
       }
     },
     "/v1/nearby": {
@@ -9705,6 +10388,53 @@
               "maximum": 10000,
               "minimum": 0,
               "type": "integer"
+            }
+          },
+          {
+            "description": "Only sites of this kind as their source stores it: car_park, park_and_ride or truck. rest_area is accepted and answered with every kind, because no source classifies a rest area. Default: every kind.",
+            "explode": false,
+            "in": "query",
+            "name": "kind",
+            "schema": {
+              "description": "Only sites of this kind as their source stores it: car_park, park_and_ride or truck. rest_area is accepted and answered with every kind, because no source classifies a rest area. Default: every kind.",
+              "enum": [
+                "car_park",
+                "park_and_ride",
+                "truck",
+                "rest_area"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only sites whose own publisher states every one of these amenities, comma-separated. An amenity nobody stated is unknown, and such a site is left out.",
+            "explode": false,
+            "in": "query",
+            "name": "facilities",
+            "schema": {
+              "description": "Only sites whose own publisher states every one of these amenities, comma-separated. An amenity nobody stated is unknown, and such a site is left out.",
+              "items": {
+                "enum": [
+                  "toilet",
+                  "accessible_toilet",
+                  "shower",
+                  "restaurant",
+                  "snack",
+                  "cafe",
+                  "shop",
+                  "fuel",
+                  "charging",
+                  "drinking_water",
+                  "picnic",
+                  "playground",
+                  "wifi",
+                  "security"
+                ],
+                "type": "string"
+              },
+              "maxItems": 5,
+              "type": "array",
+              "uniqueItems": true
             }
           }
         ],
@@ -11447,6 +12177,41 @@
                 "major",
                 "road_closed"
               ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Also the situations that start within this many days from now: the window is now to now plus the days, and a situation is kept when its validity overlaps it (the platform's road status horizon). 0, the default, keeps those in force now. Not with from or to.",
+            "explode": false,
+            "in": "query",
+            "name": "horizon_days",
+            "schema": {
+              "description": "Also the situations that start within this many days from now: the window is now to now plus the days, and a situation is kept when its validity overlaps it (the platform's road status horizon). 0, the default, keeps those in force now. Not with from or to.",
+              "format": "int64",
+              "maximum": 14,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The first day of a window of German calendar days (Europe/Berlin), YYYY-MM-DD: a situation is kept when its validity overlaps the window (the platform's roadworks window). Default: today, when to is given.",
+            "explode": false,
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "description": "The first day of a window of German calendar days (Europe/Berlin), YYYY-MM-DD: a situation is kept when its validity overlaps the window (the platform's roadworks window). Default: today, when to is given.",
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The last day of the window, inclusive, YYYY-MM-DD. Default: 7 days after from. The window spans at most 92 days.",
+            "explode": false,
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "description": "The last day of the window, inclusive, YYYY-MM-DD. Default: 7 days after from. The window spans at most 92 days.",
+              "format": "date",
               "type": "string"
             }
           },

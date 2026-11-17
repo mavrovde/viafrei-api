@@ -63,22 +63,20 @@ const situationColumns = `e.event_id, e.source_ref, e.event_kind, e.severity, e.
        e.lanes_closed, e.lanes_total, e.delay_min, e.affected_length_m, e.headline, e.description,
        e.text_lang, e.changed_at`
 
-// scopeFilter is the condition of the lamp's scope: an active, published
-// situation of the given families. $1 families, $2 now. The lamp reads every
-// situation in the scope (the road and direction, or the radius), whatever
-// the list's filters keep.
-const scopeFilter = `e.withdrawn_at is null
+// situationFilter is the condition every list read applies: an active,
+// published situation of the given families whose validity overlaps the
+// asked window, then the asked kinds and the severity floor. $1 families,
+// $3 kinds kept, $4 whether unmapped kinds are kept, $5 every mapped kind,
+// $6 the ordered severities, $7 the floor; $w and $w+1 the window's start
+// and end (both now for the situations in force now).
+func situationFilter(w int) string {
+	return fmt.Sprintf(`e.withdrawn_at is null
   and e.source_ref = any($1)
-  and ` + eventPermitted + `
-  and e.valid_from <= $2 and (e.valid_to is null or e.valid_to > $2)`
-
-// situationFilter is the condition every list read applies: the scope's,
-// then the asked kinds and the severity floor. $3 kinds kept, $4 whether
-// unmapped kinds are kept, $5 every mapped kind, $6 the ordered severities,
-// $7 the floor.
-const situationFilter = scopeFilter + `
+  and `+eventPermitted+`
+  and e.valid_from <= greatest($2::timestamptz, $%[2]d) and (e.valid_to is null or e.valid_to > $%[1]d)
   and (e.event_kind = any($3) or ($4 and not e.event_kind = any($5)))
-  and coalesce(array_position($6::text[], e.severity), 0) >= $7`
+  and coalesce(array_position($6::text[], e.severity), 0) >= $7`, w, w+1)
+}
 
 // eventPermitted is rowRule over the traffic events aliased e.
 const eventPermitted = `e.display_class <> 'withhold' and (e.audience = 'public' or ` + ownKeyOn + `)`
@@ -356,7 +354,8 @@ order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, s
 // A situation's road reference is compared in its canonical form, as the
 // road's is: A1 and A 1 are one road.
 func (s *Store) SituationsOnRoad(ctx context.Context, q roads.CorridorQuery, fams roads.Families, now time.Time) (roads.Page, error) {
-	args := append(filterArgs(q.Filter, fams.Roads, now), q.Road, string(q.Direction), codes(roads.Compass()), q.Limit+1)
+	start, end := q.Window(now)
+	args := append(filterArgs(q.Filter, fams.Roads, now), q.Road, string(q.Direction), codes(roads.Compass()), q.Limit+1, start, end, q.Offset)
 	return s.read(ctx, `
 with road as (
   select k.road_ref from contract.road k
@@ -381,7 +380,7 @@ travel as (
 answering as (
   select e.*, line.km road_km, line.total road_total
   from contract.traffic_event e left join line on true
-  where `+situationFilter+`
+  where `+situationFilter(12)+`
     and exists (select 1 from road)
     and `+fmt.Sprintf(canonicalRef, "e.road_ref")+` = $8
     and ($9::text = 'both' or e.direction = $9::text or not e.direction = any($10))),
@@ -402,7 +401,7 @@ select `+situationColumns+`,
 from placed e
 order by case when coalesce((select falling from travel), false) then -1 else 1 end * e.share nulls last,
          coalesce(array_position($6::text[], e.severity), 0) desc, e.event_id
-limit $11`, args, q.Limit, fams, now, scope{
+limit $11 offset $14`, args, q.Limit, fams, now, scope{
 		messages: messagesSelect + `
   and ` + fmt.Sprintf(canonicalRef, "e.road_ref") + ` = $3
   and ($4::text = 'both' or e.direction = $4::text or not e.direction = any($5))`,
@@ -425,12 +424,14 @@ func (s *Store) SituationsNear(ctx context.Context, q roads.AreaQuery, fams road
 	classes, other := q.KnownClasses()
 	args := append(filterArgs(q.Filter, fams.Roads, now), q.At.Lat, q.At.Lon, q.RadiusM,
 		codes(classes), other, codes(roads.Classes[:len(roads.Classes)-1]), q.Limit+1)
+	start, end := q.Window(now)
+	args = append(args, start, end)
 	return s.read(ctx, `
 with here as (select st_setsrid(st_makepoint($9, $8), 4326)::geography g),
 answering as (
   select e.*, round(st_distance(e.location::geography, here.g))::int dist
   from contract.traffic_event e, here
-  where `+situationFilter+`
+  where `+situationFilter(15)+`
     and e.location is not null
     and st_dwithin(e.location::geography, here.g, $10)
     and (e.road_class = any($11) or ($12 and not e.road_class = any($13))))

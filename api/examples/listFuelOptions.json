@@ -103,7 +103,8 @@
         "sort": "price",
         "matched": 1,
         "droppedClosed": 0,
-        "droppedUnknown": 0
+        "droppedUnknown": 0,
+        "droppedNotWholeDay": 0
       }
     },
     "links": {

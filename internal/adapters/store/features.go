@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -195,6 +196,57 @@ func earliest(a, b *time.Time) *time.Time {
 	return a
 }
 
+// parkingHere is the asked position, $1 lat and $2 lon.
+const parkingHere = `with here as (select st_setsrid(st_makepoint($2, $1), 4326)::geography g)`
+
+// parkingWhere is the where of a parking read past its gates, and its order:
+// $5 the radius, $7 the stored kind or null, $8 the amenities or null, $9
+// the road or empty. A road read keeps the platform's corridor (CorridorM of
+// one of the road's location-code points, which only the platform's own
+// parking family is matched by, or filed under the road by its source) and
+// is in name order, unnamed last; a position read keeps the radius and is
+// nearest first. Both then go by id.
+func parkingWhere(q parking.Query) (where, order string) {
+	filters := `($7::text is null or f.stored_kind = $7) and ($8::text[] is null or f.amenities @> $8)`
+	if q.Road == "" {
+		return `$9 = '' and st_dwithin(f.location::geography, here.g, $5) and ` + filters, `8, f.facility_id`
+	}
+	return `$5::int >= 0 and f.facility_id like 'p:%' and (f.road_ref = $9 or exists (
+    select 1 from contract.road r, st_dumppoints(r.geometry) d
+    where r.road_ref = $9 and st_dwithin(f.location::geography, d.geom::geography, ` + strconv.Itoa(parking.CorridorM) + `))) and ` + filters, `f.name nulls last, f.facility_id`
+}
+
+// shiftParams moves the where's $7..$9 to $8..$10, the positions the list
+// read gives them after its own $7.
+func shiftParams(where string) string {
+	return strings.NewReplacer("$7", "$8", "$8", "$9", "$9", "$10").Replace(where)
+}
+
+// parkingDistance is the distance column: the metres from the asked
+// position, or 0 along a road, where no point was asked.
+func parkingDistance(q parking.Query) string {
+	if q.Road != "" {
+		return `0`
+	}
+	return `round(st_distance(f.location::geography, here.g))::int`
+}
+
+// parkingKind is the stored kind a query keeps, or nil for every kind.
+func parkingKind(q parking.Query) *string {
+	if k := parking.FilterKind(q.Kind); k != "" {
+		return &k
+	}
+	return nil
+}
+
+// parkingAmenities is the amenities a query asks for, or nil for none.
+func parkingAmenities(q parking.Query) []string {
+	if len(q.Amenities) == 0 {
+		return nil
+	}
+	return q.Amenities
+}
+
 // ParkingNear reads the parking sites of the listed families within the
 // radius, nearest first, then by id, each with its last occupancy report
 // from the occupancy families. next is the earliest occupancy report dated
@@ -211,8 +263,8 @@ func (s *Store) ParkingNear(ctx context.Context, q parking.Query, listed, occupa
 		// leaves out may qualify once a later report takes effect. A failure
 		// aborts the transaction, so the next statement fails too and both
 		// surface together.
-		nextErr := tx.QueryRow(ctx, `
-with here as (select st_setsrid(st_makepoint($2, $1), 4326)::geography g)
+		where, order := parkingWhere(q)
+		nextErr := tx.QueryRow(ctx, parkingHere+`
 select min(nx.next_at)
 from contract.parking_facility f
 cross join here
@@ -223,12 +275,11 @@ cross join lateral (
 where f.withdrawn_at is null
   and f.source_ref = any($3)
   and `+held("f")+`
-  and st_dwithin(f.location::geography, here.g, $5)`, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, now).Scan(&a.next)
-		rows, _ := tx.Query(ctx, `
-with here as (select st_setsrid(st_makepoint($2, $1), 4326)::geography g)
+  and `+where, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, now, parkingKind(q), parkingAmenities(q), q.Road).Scan(&a.next)
+		rows, _ := tx.Query(ctx, parkingHere+`
 select f.facility_id, f.source_ref, f.name, f.operator_name, f.parking_kind,
        st_y(f.location), st_x(f.location),
-       round(st_distance(f.location::geography, here.g))::int,
+       `+parkingDistance(q)+`,
        o.free_spaces, o.total_spaces, o.occupancy_status, o.observed_at, o.source_ref
 from contract.parking_facility f
 cross join here
@@ -241,12 +292,12 @@ left join lateral (
 where f.withdrawn_at is null
   and f.source_ref = any($3)
   and `+held("f")+`
-  and st_dwithin(f.location::geography, here.g, $5)
+  and `+shiftParams(where)+`
   and ($6::int <= 0 or (o.free_spaces >= $6 and (
         select s.stale_after_s is null or o.observed_at >= $7::timestamptz - make_interval(secs => s.stale_after_s)
         from contract.source s where s.source_ref = o.source_ref)))
-order by 8, f.facility_id
-limit $8`, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, q.FreeMin, now, q.Limit+1)
+order by `+order+`
+limit $11`, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, q.FreeMin, now, parkingKind(q), parkingAmenities(q), q.Road, q.Limit+1)
 		var err error
 		a.sites, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (parking.Site, error) {
 			var (

@@ -14,7 +14,7 @@ argument:find_charging_station.lon	listChargingOptions?at	charging-commercial	-
 argument:find_charging_station.radius_km	listChargingOptions?radius_m	charging-commercial	-
 argument:find_charging_station.min_power_kw	listChargingOptions?min_kw	charging-all-consumer-fast	-
 argument:find_charging_station.limit	listChargingOptions?limit	charging-commercial	-
-tool:find_parking	listParkingOptions	parking-terms-pending,parking-terms-accepted	-
+tool:find_parking	listParkingOptions,listMotorwayParking	parking-terms-pending,parking-terms-accepted,parking-road-a101	-
 argument:find_parking.lat	listParkingOptions?at	parking-terms-pending	-
 argument:find_parking.lon	listParkingOptions?at	parking-terms-pending	-
 argument:find_parking.radius_km	listParkingOptions?radius_m	parking-terms-pending	-
@@ -162,3 +162,10 @@ argument:find_charging_station.conditions	listChargingOptions?conditions	chargin
 argument:find_charging_station.only_available	listChargingOptions?only_available	charging-only-available	-
 argument:find_fuel_station.open_at	listFuelOptions?open_at	fuel-open-at	-
 argument:find_fuel_station.whole_day	listFuelOptions?whole_day	fuel-whole-day	-
+argument:find_parking.kind	listParkingOptions?kind	parking-kind-truck	-
+argument:find_parking.facilities	listParkingOptions?facilities	parking-facilities-toilet	-
+argument:find_parking.road	listMotorwayParking?road	parking-road-a101	-
+argument:check_road_status.horizon_days	getMotorwayConditions?horizon_days	motorway-a101-horizon	-
+argument:find_roadworks_ahead.from	getMotorwayConditions?from	motorway-a101-roadworks-window	-
+argument:find_roadworks_ahead.to	getMotorwayConditions?to	motorway-a101-roadworks-window	-
+argument:check_autobahn_traffic.cursor	getMotorwayConditions?cursor	motorway-a101-cursor	-

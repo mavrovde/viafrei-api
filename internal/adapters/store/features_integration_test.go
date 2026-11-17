@@ -537,3 +537,58 @@ func TestFeatureReadsReportStorageFaults(t *testing.T) {
 		t.Error("IsDeadline")
 	}
 }
+
+func TestParkingFiltersAndRoadReadTheStoredKindAmenitiesAndCorridor(t *testing.T) {
+	req.Covers(t, "FR-PARK-002")
+	st := seeded(t)
+	listed := families(t, st, "parking")
+	var at geo.Point
+	owner(t, `select st_y(location), st_x(location) from contract.parking_facility order by facility_id limit 1`, &at.Lat, &at.Lon)
+	ids := func(q parking.Query) []string {
+		t.Helper()
+		sites, _, _, err := st.ParkingNear(bounded(t), q, listed, listed, time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, s := range sites {
+			out = append(out, s.ID)
+		}
+		return out
+	}
+	in := "'" + strings.Join(listed, "','") + "'"
+	want := func(where string) []string {
+		t.Helper()
+		var out []string
+		owner(t, `select coalesce(array_agg(facility_id order by facility_id), '{}') from contract.parking_facility
+where withdrawn_at is null and source_ref in (`+in+`) and `+where, &out)
+		return out
+	}
+	near := parking.Query{At: at, RadiusM: 2_000_000, Limit: 100}
+	kind := near
+	kind.Kind = "truck"
+	if got, w := ids(kind), want(`stored_kind = 'truck'`); len(got) != len(w) {
+		t.Errorf("kind truck: %v, want %v", got, w)
+	}
+	rest := near
+	rest.Kind = "rest_area"
+	if got, all := ids(rest), ids(near); !slices.Equal(got, all) {
+		t.Errorf("rest_area is not answered unfiltered: %v, %v", got, all)
+	}
+	amen := near
+	amen.Amenities = []string{"toilet"}
+	if got, w := ids(amen), want(`amenities @> '{toilet}'`); len(got) != len(w) {
+		t.Errorf("amenity toilet: %v, want %v", got, w)
+	}
+	var road string
+	owner(t, `select coalesce(min(road_ref), 'A1') from contract.parking_facility where road_ref is not null and facility_id like 'p:%'`, &road)
+	sites, _, _, err := st.ParkingNear(bounded(t), parking.Query{Road: road, Limit: 100}, listed, listed, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, s := range sites {
+		if !strings.HasPrefix(s.ID, "p:") || s.DistanceM != 0 || i > 0 && s.Name != nil && sites[i-1].Name != nil && *s.Name < *sites[i-1].Name {
+			t.Errorf("along %s: %+v", road, s)
+		}
+	}
+}

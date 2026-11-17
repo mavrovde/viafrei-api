@@ -9,6 +9,7 @@ getMeta	lookup
 getKey	lookup
 listChargingOptions	near
 listParkingOptions	near
+listMotorwayParking	along
 getPlaceOverview	composed
 getMotorwayConditions	along
 listRoadConditions	near

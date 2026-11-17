@@ -497,11 +497,25 @@ func registerCharging(api huma.API, s *server, op huma.Operation) {
 
 // ------------------------------------------------------------------ parking
 
+// ParkingFilters are the filters a parking search takes, near a position
+// or along a motorway.
+type ParkingFilters struct {
+	FreeMin    int      `query:"free_min" minimum:"0" maximum:"10000" doc:"Only sites whose live report has at least this many free spaces. Default 0, every site."`
+	Kind       string   `query:"kind" enum:"car_park,park_and_ride,truck,rest_area" doc:"Only sites of this kind as their source stores it: car_park, park_and_ride or truck. rest_area is accepted and answered with every kind, because no source classifies a rest area. Default: every kind."`
+	Facilities []string `query:"facilities" maxItems:"5" uniqueItems:"true" enum:"toilet,accessible_toilet,shower,restaurant,snack,cafe,shop,fuel,charging,drinking_water,picnic,playground,wifi,security" doc:"Only sites whose own publisher states every one of these amenities, comma-separated. An amenity nobody stated is unknown, and such a site is left out."`
+}
+
+// query is the parking query of the filters.
+func (f ParkingFilters) query(q parking.Query) parking.Query {
+	q.FreeMin, q.Kind, q.Amenities = f.FreeMin, f.Kind, f.Facilities
+	return q
+}
+
 // ParkingInput is the input of listParkingOptions.
 type ParkingInput struct {
 	Near
 	TermsAcceptance
-	FreeMin int `query:"free_min" minimum:"0" maximum:"10000" doc:"Only sites whose live report has at least this many free spaces. Default 0, every site."`
+	ParkingFilters
 }
 
 // Resolve reads the position and the accepted terms: both embedded inputs
@@ -534,7 +548,18 @@ type ParkingSite struct {
 // ParkingQuery is meta.query of listParkingOptions.
 type ParkingQuery struct {
 	NearQuery
-	FreeMin int `json:"freeMin"`
+	ParkingFilterQuery
+}
+
+// ParkingFilterQuery is the part of meta.query the parking filters fill.
+type ParkingFilterQuery struct {
+	FreeMin    int      `json:"freeMin"`
+	Kind       string   `json:"kind,omitempty" doc:"The kind asked for; absent for every kind."`
+	Facilities []string `json:"facilities,omitempty" doc:"The amenities asked for; absent for none."`
+}
+
+func parkingFilterQuery(q parking.Query) ParkingFilterQuery {
+	return ParkingFilterQuery{FreeMin: q.FreeMin, Kind: q.Kind, Facilities: q.Amenities}
 }
 
 // ParkingMeta is the meta member of listParkingOptions.
@@ -615,26 +640,96 @@ func registerParking(api huma.API, s *server, op huma.Operation) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
-		q := parking.Query{At: in.point, RadiusM: s.radius(in.RadiusM), FreeMin: in.FreeMin, Limit: s.limit(in.Limit)}
-		a, err := s.features.Parking(in.with(ctx), principalFrom(ctx).Key, q)
+		q := in.query(parking.Query{At: in.point, RadiusM: s.radius(in.RadiusM), Limit: s.limit(in.Limit)})
+		a, meta, err := s.parkingAnswer(in.with(ctx), q)
 		if err != nil {
-			return nil, s.featureProblem(ctx, err)
+			return nil, err
 		}
-		data, withheld := parkingSites(a)
-		noteNextReport(ctx, a.NextReport)
-		noteFreeMin(ctx, a, q.FreeMin)
-		detail := partialDetail
-		if withheld {
-			detail += " " + termsDetail
+		meta.Query = ParkingQuery{NearQuery: NearQuery{At: position(q.At), RadiusM: q.RadiusM}, ParkingFilterQuery: parkingFilterQuery(q)}
+		return &ParkingOutput{CacheControl: noStore, Body: ParkingEnvelope{Data: a, Meta: meta, Links: s.selfLink(ctx)}}, nil
+	})
+}
+
+// parkingAnswer asks the parking search and builds its data and meta, but
+// for meta.query.
+func (s *server) parkingAnswer(ctx context.Context, q parking.Query) ([]ParkingSite, ParkingMeta, error) {
+	a, err := s.features.Parking(ctx, principalFrom(ctx).Key, q)
+	if err != nil {
+		return nil, ParkingMeta{}, s.featureProblem(ctx, err)
+	}
+	data, withheld := parkingSites(a)
+	noteNextReport(ctx, a.NextReport)
+	noteFreeMin(ctx, a, q.FreeMin)
+	detail := partialDetail
+	if withheld {
+		detail += " " + termsDetail
+	}
+	return data, ParkingMeta{
+		DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, detail),
+		Page:     Page{Limit: q.Limit, HasMore: a.HasMore},
+		Terms:    termsOffers(a.Terms),
+	}, nil
+}
+
+// MotorwayParkingInput is the input of listMotorwayParking.
+type MotorwayParkingInput struct {
+	Road string `path:"road" maxLength:"5" pattern:"^[Aa] ?[0-9]{1,3}$" example:"A7" doc:"The motorway, case-insensitive, with an optional space (A7, a 7)."`
+	TermsAcceptance
+	ParkingFilters
+	Limit int `query:"limit" minimum:"1" maximum:"100" doc:"Most items to return. Default: pagination.default_limit."`
+	road  string
+}
+
+// Resolve reads the road into its canonical form and the accepted terms.
+func (in *MotorwayParkingInput) Resolve(ctx huma.Context) []error {
+	in.road = roads.Canonical(in.Road)
+	return in.TermsAcceptance.Resolve(ctx)
+}
+
+// MotorwayParkingQuery is meta.query of listMotorwayParking.
+type MotorwayParkingQuery struct {
+	Road string `json:"road" doc:"The motorway without spaces."`
+	ParkingFilterQuery
+}
+
+// MotorwayParkingMeta is the meta member of listMotorwayParking.
+type MotorwayParkingMeta struct {
+	DataMeta
+	Page  Page                 `json:"page"`
+	Query MotorwayParkingQuery `json:"query"`
+	Terms []TermsOffer         `json:"terms,omitempty" doc:"The terms of the sites marked termsRequired, with their text: show it to the end user, and pass accept_terms only once the user accepts."`
+}
+
+// MotorwayParkingEnvelope is the enveloped answer of listMotorwayParking.
+type MotorwayParkingEnvelope struct {
+	Data  []ParkingSite       `json:"data"`
+	Meta  MotorwayParkingMeta `json:"meta"`
+	Links Links               `json:"links"`
+}
+
+// MotorwayParkingOutput is the response of listMotorwayParking.
+type MotorwayParkingOutput struct {
+	CacheControl string `header:"Cache-Control"`
+	Body         MotorwayParkingEnvelope
+}
+
+func registerMotorwayParking(api huma.API, s *server, op huma.Operation) {
+	op.Summary = "Where to park along a motorway"
+	op.Description = "Parking sites along a motorway, in name order (unnamed last), then by id, each with its last reported occupancy: the sites within 1 500 m of one of the motorway's location-code points, and those their source files under the motorway. distanceM is 0: no point was asked. A site whose terms need accepting first is listed without its occupancy and marked termsRequired. Needs the scope parking."
+	op.Extensions[counterpartExtension] = "parking search"
+	featureResponses(api, &op, featureOffDoc)
+	huma.Register(api, op, func(ctx context.Context, in *MotorwayParkingInput) (*MotorwayParkingOutput, error) {
+		if err := s.featuresOff(ctx); err != nil {
+			return nil, err
 		}
-		return &ParkingOutput{CacheControl: noStore, Body: ParkingEnvelope{
-			Data: data,
-			Meta: ParkingMeta{
-				DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, detail),
-				Page:     Page{Limit: q.Limit, HasMore: a.HasMore},
-				Query:    ParkingQuery{NearQuery: NearQuery{At: position(q.At), RadiusM: q.RadiusM}, FreeMin: q.FreeMin},
-				Terms:    termsOffers(a.Terms),
-			},
+		q := in.query(parking.Query{Road: in.road, Limit: s.limit(in.Limit)})
+		a, meta, err := s.parkingAnswer(in.with(ctx), q)
+		if err != nil {
+			return nil, err
+		}
+		return &MotorwayParkingOutput{CacheControl: noStore, Body: MotorwayParkingEnvelope{
+			Data:  a,
+			Meta:  MotorwayParkingMeta{DataMeta: meta.DataMeta, Page: meta.Page, Terms: meta.Terms, Query: MotorwayParkingQuery{Road: q.Road, ParkingFilterQuery: parkingFilterQuery(q)}},
 			Links: s.selfLink(ctx),
 		}}, nil
 	})

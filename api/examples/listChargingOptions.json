@@ -164,6 +164,7 @@
         },
         "radiusM": 20000,
         "minKw": 0,
+        "onlyAvailable": false,
         "access": "public"
       }
     },

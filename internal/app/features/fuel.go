@@ -87,7 +87,7 @@ func (s *Service) FuelStation(ctx context.Context, key access.Record, id string,
 	if err := gate.Check([]string{st.Family}); err != nil {
 		return energy.FuelStationPage{}, Answer[struct{}]{}, err
 	}
-	fams, err := s.repos.Register.Provenance(ctx, []string{st.Family}, s.set.Language)
+	fams, err := s.repos.Register.Provenance(ctx, []string{st.Family}, s.lang(ctx))
 	if err != nil {
 		return energy.FuelStationPage{}, Answer[struct{}]{}, err
 	}

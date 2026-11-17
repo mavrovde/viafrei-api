@@ -41,6 +41,9 @@ type Features interface {
 	Stations(ctx context.Context, key access.Record, q transit.Query) (features.Answer[transit.Station], error)
 	Departures(ctx context.Context, key access.Record, q transit.DepartureQuery) (features.Board, error)
 	Facilities(ctx context.Context, key access.Record, q transit.FacilityQuery) (features.StationFacilities, error)
+	RecordTrainBoard(ctx context.Context, key access.Record, b transit.TrainBoard) error
+	ParkingBays(ctx context.Context, key access.Record, q parking.BayQuery) (features.BaysAnswer, error)
+	TrainBoard(ctx context.Context, key access.Record, eva string) (features.TrainBoardAnswer, error)
 	Places(ctx context.Context, key access.Record, q places.Query) (features.Answer[places.Place], error)
 	FuelStations(ctx context.Context, key access.Record, q energy.FuelQuery) (features.FuelStations, error)
 	FuelStation(ctx context.Context, key access.Record, id string, held time.Duration) (energy.FuelStationPage, features.Answer[struct{}], error)

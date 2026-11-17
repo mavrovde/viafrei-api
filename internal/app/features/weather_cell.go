@@ -81,7 +81,7 @@ func (s *Service) placeOf(ctx context.Context, key access.Record, name string) (
 	if err != nil || !key.Plan.Has("places") {
 		return nil, nil, nil
 	}
-	ps, _, err := s.repos.Places.Places(ctx, places.Query{Text: name, Limit: 1}, permitted, nil)
+	ps, _, err := s.repos.Places.Places(ctx, places.Query{Text: name, Limit: 1}, permitted, nil, nil)
 	if err != nil || len(ps) == 0 {
 		return nil, nil, err
 	}

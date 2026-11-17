@@ -75,7 +75,7 @@ func (s *Service) Location(ctx context.Context, key access.Record, q places.Loca
 	}
 	fams = append(fams, zoneFams...)
 	slices.Sort(fams)
-	prov, err := s.repos.Register.Provenance(ctx, slices.Compact(fams), s.set.Language)
+	prov, err := s.repos.Register.Provenance(ctx, slices.Compact(fams), s.lang(ctx))
 	if err != nil {
 		return LocationAnswer{}, err
 	}

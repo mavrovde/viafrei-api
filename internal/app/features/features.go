@@ -54,8 +54,9 @@ type Places interface {
 	// places.ErrNotFound.
 	Place(ctx context.Context, id string, families []string) (places.Place, error)
 	// Places returns the places of the given families and the stops of the
-	// stop families that answer q, best match first, and whether more answer.
-	Places(ctx context.Context, q places.Query, families, stops []string) ([]places.Place, bool, error)
+	// stop families and the motorway places of the roads families that answer
+	// q, best match first, and whether more answer.
+	Places(ctx context.Context, q places.Query, families, stops, roads []string) ([]places.Place, bool, error)
 }
 
 // Repositories are the ports a Service reads through.
@@ -83,6 +84,8 @@ type Repositories struct {
 	Affected    Affected
 	Coverage    Coverage
 	States      States
+	TrainBoards TrainBoards
+	Bays        Bays
 }
 
 // Settings are the tunables of the use cases.
@@ -106,9 +109,10 @@ type Settings struct {
 
 // Service answers the feature questions.
 type Service struct {
-	repos Repositories
-	set   Settings
-	now   func() time.Time
+	repos       Repositories
+	set         Settings
+	now         func() time.Time
+	boardWriter TrainBoardWriter
 }
 
 // New returns the service.
@@ -178,7 +182,7 @@ func (s *Service) provenanceOf(ctx context.Context, contributed, consulted []str
 	}
 	fams = slices.Clone(fams)
 	slices.Sort(fams)
-	return s.repos.Register.Provenance(ctx, slices.Compact(fams), s.set.Language)
+	return s.repos.Register.Provenance(ctx, slices.Compact(fams), s.lang(ctx))
 }
 
 // creditsOf reads the provenance of the families that contributed, and of
@@ -201,7 +205,7 @@ func (s *Service) sight(ctx context.Context, permitted, contributed []string, no
 	consulted := slices.Clone(permitted)
 	slices.Sort(consulted)
 	consulted = slices.Compact(consulted)
-	all, err := s.repos.Register.Provenance(ctx, consulted, s.set.Language)
+	all, err := s.repos.Register.Provenance(ctx, consulted, s.lang(ctx))
 	if err != nil {
 		return nil, false, nil, err
 	}
@@ -474,7 +478,7 @@ func (s *Service) parking(ctx context.Context, reg []access.Terms, gate access.G
 		// found: the platform credits their register on every road search.
 		credited = append(slices.Clone(credited), CorridorFamily)
 	}
-	fams, err := s.repos.Register.Provenance(ctx, slices.Compact(slices.Sorted(slices.Values(credited))), s.set.Language)
+	fams, err := s.repos.Register.Provenance(ctx, slices.Compact(slices.Sorted(slices.Values(credited))), s.lang(ctx))
 	if err != nil {
 		return Answer[parking.Site]{}, err
 	}

@@ -153,7 +153,7 @@ func (s *Service) conditions(ctx context.Context, key access.Record, ahead, lamp
 	consulted = append(consulted, p.Placed...)
 	slices.Sort(consulted)
 	consulted = slices.Compact(consulted)
-	attributed, err := s.repos.Register.Provenance(ctx, consulted, s.set.Language)
+	attributed, err := s.repos.Register.Provenance(ctx, consulted, s.lang(ctx))
 	if err != nil {
 		return Conditions{}, err
 	}
@@ -220,7 +220,7 @@ func (s *Service) RoadSituation(ctx context.Context, key access.Record, id strin
 	if err := gate.Check([]string{sit.Family}); err != nil {
 		return Answer[roads.Situation]{}, err
 	}
-	fams, err := s.repos.Register.Provenance(ctx, []string{sit.Family}, s.set.Language)
+	fams, err := s.repos.Register.Provenance(ctx, []string{sit.Family}, s.lang(ctx))
 	if err != nil {
 		return Answer[roads.Situation]{}, err
 	}

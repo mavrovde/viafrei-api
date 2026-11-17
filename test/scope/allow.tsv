@@ -35,4 +35,16 @@ column	api/openapi.json	providerUpdatedAt	the public member of a hydrogen statio
 column	api/openapi.json	reportedAt	the public member of a report published before the read contract named a sharing column the same; the contract took the public name, it exposes no storage
 column	api/openapi.json	whole_day	the platform tool argument find_fuel_station.whole_day, named as the tool names it for parity (FR-ENERGY-002); a request parameter, not a storage name
 vocabulary	test/inventory/mapping.tsv	feeds	the MCP server's own resource URI as the inventory names it (mcp.tsv); a record of what a consumer asks for, not the API's vocabulary
-vocabulary	api/examples/getWatch.json	datex	a situation id exactly as the read contract gives a Land or city traffic message (the generated fixture id it was answered with); the id is the read contract's, opaque to a client; an opaque id is asked of the database lane
+column	api/openapi.json	changedAt	member name of a recorded train departure, the board's changed departure time (recordTrainBoard, T2); the resource vocabulary, not a storage name
+column	api/openapi.json	changedPlatform	member name of a recorded train departure, the board's changed platform (recordTrainBoard, T2); the resource vocabulary, not a storage name
+column	api/openapi.json	fetchedAt	member name of a train board, when the board was fetched (recordTrainBoard, getTrainBoard, T2); the resource vocabulary, not a storage name
+column	api/openapi.json	houseNumber	member name of an on-street bay's address, as listAddresses names an address part (listParkingBays, G4); the resource vocabulary, not a storage name
+column	api/openapi.json	publisherKind	member name of an on-street bay, the publisher's own word for it (listParkingBays, G4); the resource vocabulary, not a storage name
+column	api/openapi.json	reservedWhen	member name of a sensor-less bay site, when its spaces are reserved (listParkingBays, G4); the resource vocabulary, not a storage name
+column	api/openapi.json	liftedOn	member name of a zone plaque rule, the day a zone was lifted (describeLocation, getDrivingRules); the resource vocabulary, not a storage name
+column	api/openapi.json	lowEmissionZone	member name of a location, the zone the position lies in (describeLocation); the resource vocabulary, not a storage name
+column	api/openapi.json	zoneKey	member name of a location's zone, the key getDrivingRules lists it by (describeLocation); the resource vocabulary, not a storage name
+column	api/openapi.json	networkState	member name of a lorry rule, the network state its publisher states (listLorryRules); the resource vocabulary, not a storage name
+column	api/openapi.json	publishedText	member name of a lorry rule, the publisher's own words (listLorryRules); the resource vocabulary, not a storage name
+column	api/openapi.json	versionDate	member name of a lorry rule, the date of the publisher's file (listLorryRules); the resource vocabulary, not a storage name
+column	api/openapi.json	sourceUrl	member name of a driving rule's legal basis, where the provision is published (getDrivingRules); the resource vocabulary, not a storage name

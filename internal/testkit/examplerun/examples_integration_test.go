@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -26,6 +25,7 @@ import (
 	"time"
 
 	"github.com/mavrovde/viafrei-api/api"
+	"github.com/mavrovde/viafrei-api/internal/adapters/accessstore"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
@@ -56,6 +56,10 @@ const (
 	seed      = 1
 	requestID = "example-request-0001"
 	keyID     = "examplekey"
+	// examplePepper is the access store's pepper in the example run: a fixed
+	// test value; no key is ever MACed with it (the examples authenticate by
+	// keyAuth).
+	examplePepper = "example-run-pepper-not-a-secret-0123456789"
 )
 
 var (
@@ -91,7 +95,7 @@ func TestMain(m *testing.M) {
 // load opens the service's store on the fixture set TestMain seeded.
 func load(t *testing.T) (*config.Config, *store.Store) {
 	t.Helper()
-	cfg, err := config.Load(config.Options{Environ: []string{"VFAPI_DB_URL=" + db.ReaderURL}, RequireSecrets: true})
+	cfg, err := config.Load(config.Options{Environ: []string{"VFAPI_DB_URL=" + db.ReaderURL, "VFAPI_ACCESS_URL=" + db.AccessURL, "VFAPI_AUTH_PEPPER=" + examplePepper}, RequireSecrets: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,6 +107,18 @@ func load(t *testing.T) (*config.Config, *store.Store) {
 	}
 	t.Cleanup(st.Close)
 	return cfg, st
+}
+
+// writer opens the access store the board an example records is appended
+// through: the API's writer role, as in service.
+func writer(t *testing.T, cfg *config.Config) *accessstore.Store {
+	t.Helper()
+	as, err := accessstore.Open(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(as.Close)
+	return as
 }
 
 // seedFixtures seeds the fixture set and the rows the examples are answered
@@ -161,18 +177,27 @@ func ask(t *testing.T, cfg *config.Config, st *store.Store, e api.Example) (int,
 	if err != nil {
 		t.Fatal(err)
 	}
+	svc := features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st, Transit: st, Fuel: st, Hydrogen: st, Speed: st, Sharing: st, Addresses: st, Pois: st, Locations: st, Disruptions: st, Nearby: st, Lorry: st, Catalogue: st, National: st, Affected: st, Coverage: st, States: st, TrainBoards: st, Bays: st}, wire.FeatureSettings(cfg), clock)
+	svc.WithTrainBoardWriter(writer(t, cfg))
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Config: cfg, Build: build, ContractVersion: dbcontract.ContractVersion, Now: clock,
 		Readiness: health.NewChecker(st, expected, cfg.Health.ReadyTimeout),
 		Auth:      keyAuth{principal(e.Key)}, Sources: st,
-		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st, Transit: st, Fuel: st, Hydrogen: st, Speed: st, Sharing: st, Addresses: st, Pois: st, Locations: st, Disruptions: st, Nearby: st, Lorry: st, Catalogue: st, National: st, Affected: st, Coverage: st, States: st}, wire.FeatureSettings(cfg), clock),
+		Features: svc,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), testBound)
 	defer cancel()
-	r := httptest.NewRequestWithContext(ctx, http.MethodGet, e.Request, nil)
+	var sent io.Reader
+	if e.Body != nil {
+		sent = bytes.NewReader(e.Body)
+	}
+	r := httptest.NewRequestWithContext(ctx, e.HTTPMethod(), e.Request, sent)
+	if e.Body != nil {
+		r.Header.Set("Content-Type", "application/json")
+	}
 	r.Header.Set(httpapi.RequestIDHeader, requestID)
 	if e.Key != nil {
 		r.Header.Set("Authorization", "Bearer example")
@@ -180,8 +205,11 @@ func ask(t *testing.T, cfg *config.Config, st *store.Store, e api.Example) (int,
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	body, _ := io.ReadAll(w.Body)
-	if err := contractDoc(t).Check(http.MethodGet, e.Request, w.Code, w.Header(), body); err != nil {
+	if err := contractDoc(t).Check(e.HTTPMethod(), e.Request, w.Code, w.Header(), body); err != nil {
 		t.Errorf("the answer to %s breaks the document: %v", e.Request, err)
+	}
+	if len(body) == 0 {
+		body = []byte("null") // an answer without a body (204), as its example states it
 	}
 	return w.Code, body
 }

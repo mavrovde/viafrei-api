@@ -37,6 +37,13 @@ import (
 // fakeFeatures answers every feature operation from fixed values and
 // records what it was asked.
 type fakeFeatures struct {
+	trainBoard features.TrainBoardAnswer
+	gotTrain   transit.TrainBoard
+	gotEVA     string
+	gotLang    string
+	bays       features.BaysAnswer
+	gotBays    parking.BayQuery
+	boardErr   error
 	objects    objectsFake
 	states     statesFake
 	charging   features.Answer[energy.Site]

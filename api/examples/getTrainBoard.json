@@ -1,0 +1,16 @@
+{
+  "title": "The newest board of a station, fresh",
+  "request": "/v1/train-boards/8001001?lang=en",
+  "attribution": "A train board is the DB Timetables board the MCP server last handed the API, of the transit domain's db_timetables source the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "transit"
+    ],
+    "sources": [
+      "db_timetables"
+    ]
+  },
+  "status": 200,
+  "response": null
+}

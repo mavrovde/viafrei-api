@@ -106,7 +106,7 @@ func (s *Service) DrivingRules(ctx context.Context, key access.Record, code stri
 	if err != nil {
 		return rules.Topic{}, Answer[rules.Rule]{}, err
 	}
-	topic, err := s.repos.Rules.Topic(ctx, code, s.set.Language)
+	topic, err := s.repos.Rules.Topic(ctx, code, s.lang(ctx))
 	if err != nil {
 		return rules.Topic{}, Answer[rules.Rule]{}, err
 	}

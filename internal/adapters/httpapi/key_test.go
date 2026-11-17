@@ -358,7 +358,7 @@ func TestEveryDataOperationRefusesWithoutAValidKey(t *testing.T) {
 			if e.Key == nil {
 				continue
 			}
-			w := do(t, h, http.MethodGet, e.Request, nil)
+			w := do(t, h, e.HTTPMethod(), e.Request, nil)
 			if w.Code != c.status || !strings.Contains(w.Body.String(), "/problems/"+c.slug) {
 				t.Errorf("%s with %s: %d %s", id, c.slug, w.Code, w.Body)
 			}

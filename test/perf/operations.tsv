@@ -42,3 +42,6 @@ listAffectedStations	composed
 getPlacesCoverage	composed
 listStateWeatherWarnings	lookup
 listStateServiceAlerts	lookup
+getTrainBoard	lookup
+recordTrainBoard	lookup
+listParkingBays	near

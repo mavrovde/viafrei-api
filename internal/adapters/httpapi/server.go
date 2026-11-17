@@ -125,6 +125,7 @@ func operations() []operation {
 		{id: "getNationalSummary", method: http.MethodGet, path: "/v1/germany", tag: "meta", keyed: true, register: registerNational},
 		{id: "listSources", method: http.MethodGet, path: "/v1/sources", tag: "meta", keyed: true, register: registerSources},
 		{id: "listChargingOptions", method: http.MethodGet, path: "/v1/charging-options", tag: "energy", keyed: true, scope: "energy", register: registerCharging},
+		{id: "listParkingBays", method: http.MethodGet, path: "/v1/parking-bays", tag: "parking", keyed: true, scope: "parking", register: registerParkingBays},
 		{id: "listParkingOptions", method: http.MethodGet, path: "/v1/parking-options", tag: "parking", keyed: true, scope: "parking", register: registerParking},
 		{id: "listPlaces", method: http.MethodGet, path: "/v1/places", tag: "places", keyed: true, scope: "places", register: registerPlaces},
 		{id: "getPlaceOverview", method: http.MethodGet, path: "/v1/places/{placeId}/overview", tag: "places", keyed: true, scope: "places", register: registerOverview},
@@ -153,6 +154,8 @@ func operations() []operation {
 		{id: "describeLocation", method: http.MethodGet, path: "/v1/location", tag: "places", keyed: true, scope: "places", register: registerLocation},
 		{id: "listStations", method: http.MethodGet, path: "/v1/stations", tag: "transit", keyed: true, scope: "transit", register: registerStations},
 		{id: "listStationDepartures", method: http.MethodGet, path: "/v1/stations/{stationId}/departures", tag: "transit", keyed: true, scope: "transit", register: registerDepartures},
+		{id: "getTrainBoard", method: http.MethodGet, path: "/v1/train-boards/{eva}", tag: "transit", keyed: true, scope: "transit", register: registerTrainBoard},
+		{id: "recordTrainBoard", method: http.MethodPost, path: "/v1/train-boards", tag: "transit", keyed: true, scope: "transit", register: registerRecordTrainBoard},
 		{id: "listStationFacilities", method: http.MethodGet, path: "/v1/stations/{stationId}/facilities", tag: "transit", keyed: true, scope: "transit", register: registerFacilities},
 	}
 }
@@ -377,6 +380,9 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 			keyedRoutes[op.method+" "+op.path] = d.Auth != nil
 			hop.Security = []map[string][]string{{schemeBearer: {}}, {schemeHeader: {}}}
 			hop.Responses = keyedResponses(api)
+			if op.method == http.MethodGet {
+				hop.Middlewares = append(hop.Middlewares, askLanguage(api))
+			}
 		}
 		if op.legacy && surf == onPublic {
 			hop.Deprecated = true
@@ -387,6 +393,9 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 			hop.Extensions = map[string]any{scopeExtension: string(op.scope)}
 		}
 		op.register(api, s, hop)
+		if op.keyed && op.method == http.MethodGet {
+			documentLang(api.OpenAPI().Paths[op.path].Get)
+		}
 		if op.legacy && surf == onPublic {
 			documentDeprecation(api.OpenAPI().Paths[op.path].Get)
 		}

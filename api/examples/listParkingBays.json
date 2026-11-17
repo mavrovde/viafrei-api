@@ -1,0 +1,17 @@
+{
+  "title": "Disabled bays within 2 km",
+  "request": "/v1/parking-bays?at=48.388,7.521&radius_m=2000&limit=3",
+  "attribution": "On-street bays come from the source families of the parking domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "parking"
+    ],
+    "sources": [
+      "dortmund_parksensoren_bays",
+      "frankfurt_behindertenparkplaetze"
+    ]
+  },
+  "status": 200,
+  "response": null
+}

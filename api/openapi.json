@@ -4292,6 +4292,207 @@
         ],
         "type": "object"
       },
+      "ParkingBay": {
+        "additionalProperties": false,
+        "properties": {
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "distanceM": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "houseNumber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "description": "disabled or ev_charging.",
+            "type": "string"
+          },
+          "lat": {
+            "format": "double",
+            "type": "number"
+          },
+          "lon": {
+            "format": "double",
+            "type": "number"
+          },
+          "messageAt": {
+            "description": "When the sensor last reported its state, fresh or not; null at a sensor-less site.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "postcode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publisherKind": {
+            "description": "The publisher's own word for the bay, verbatim.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reservedWhen": {
+            "description": "A sensor-less site's words for when the spaces are reserved, verbatim in German.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sensor": {
+            "description": "Whether a sensor reports the bay; false at a sensor-less site, which states spaces instead.",
+            "type": "boolean"
+          },
+          "sourceFamily": {
+            "type": "string"
+          },
+          "spaces": {
+            "description": "A sensor-less site's count of reserved spaces; null on a sensor bay.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "state": {
+            "description": "free or occupied while the newest message is under three hours old; null otherwise (no current reading) and at a sensor-less site.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "street": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "publisherKind",
+          "street",
+          "houseNumber",
+          "postcode",
+          "city",
+          "lat",
+          "lon",
+          "distanceM",
+          "sensor",
+          "state",
+          "messageAt",
+          "spaces",
+          "reservedWhen",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
+      "ParkingBayCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "free": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "occupied": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sensors": {
+            "description": "Bays a sensor reports.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "staticSites": {
+            "description": "Sensor-less sites.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "staticSpaces": {
+            "description": "The reserved spaces the sensor-less sites stand for.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "unknown": {
+            "description": "Bays a sensor reports with no current reading.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "sensors",
+          "free",
+          "occupied",
+          "unknown",
+          "staticSites",
+          "staticSpaces"
+        ],
+        "type": "object"
+      },
+      "ParkingBaysData": {
+        "additionalProperties": false,
+        "properties": {
+          "bays": {
+            "items": {
+              "$ref": "#/components/schemas/ParkingBay"
+            },
+            "type": "array"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ParkingBayCounts"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "counts",
+          "bays"
+        ],
+        "type": "object"
+      },
+      "ParkingBaysEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ParkingBaysData"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PagedMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
       "ParkingEnvelope": {
         "additionalProperties": false,
         "properties": {
@@ -7100,6 +7301,275 @@
         ],
         "type": "object"
       },
+      "TrainBoardData": {
+        "additionalProperties": false,
+        "properties": {
+          "ageSeconds": {
+            "description": "How long ago that was, in seconds; null when none is held.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "departures": {
+            "description": "The fresh board's departures by planned time; empty without a fresh board.",
+            "items": {
+              "$ref": "#/components/schemas/TrainBoardDeparture"
+            },
+            "type": "array"
+          },
+          "eva": {
+            "type": "string"
+          },
+          "fetchedAt": {
+            "description": "When the newest board held was fetched, fresh or not; null when none is held.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fresh": {
+            "description": "Whether a board fetched no longer ago than the MCP server's cache lifetime (30 s) is held: false is no fresh board.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "eva",
+          "fresh",
+          "fetchedAt",
+          "ageSeconds",
+          "departures"
+        ],
+        "type": "object"
+      },
+      "TrainBoardDeparture": {
+        "additionalProperties": false,
+        "properties": {
+          "cancelled": {
+            "type": "boolean"
+          },
+          "category": {
+            "description": "The train category.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "delayMin": {
+            "description": "expectedAt less plannedAt, in whole minutes.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "destination": {
+            "description": "The final destination; null when the board names none.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expectedAt": {
+            "description": "The changed time where the board stated one, else the planned time.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "line": {
+            "description": "The line, when the board names one.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "number": {
+            "description": "The train number.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plannedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "plannedPlatform": {
+            "description": "The planned platform.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platform": {
+            "description": "The platform it leaves from: the changed one where the board stated one.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platformChanged": {
+            "type": "boolean"
+          },
+          "sourceFamily": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "line",
+          "category",
+          "number",
+          "destination",
+          "plannedAt",
+          "expectedAt",
+          "delayMin",
+          "platform",
+          "plannedPlatform",
+          "platformChanged",
+          "cancelled",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
+      "TrainBoardDepartureIn": {
+        "additionalProperties": false,
+        "properties": {
+          "cancelled": {
+            "description": "Whether the board stated the departure cancelled; default false.",
+            "examples": [
+              false
+            ],
+            "type": "boolean"
+          },
+          "category": {
+            "description": "The train category (ICE, RE, S).",
+            "examples": [
+              "ICE"
+            ],
+            "maxLength": 16,
+            "minLength": 1,
+            "type": "string"
+          },
+          "changedAt": {
+            "description": "The changed departure time the board stated; absent when none.",
+            "examples": [
+              "2026-11-17T15:47:00Z"
+            ],
+            "format": "date-time",
+            "type": "string"
+          },
+          "changedPlatform": {
+            "description": "The changed platform the board stated; absent when none.",
+            "examples": [
+              "7"
+            ],
+            "maxLength": 16,
+            "minLength": 1,
+            "type": "string"
+          },
+          "destination": {
+            "description": "The final destination as the board names it.",
+            "examples": [
+              "München Hbf"
+            ],
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "line": {
+            "description": "The line, when the board names one.",
+            "examples": [
+              "ICE 571"
+            ],
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          },
+          "number": {
+            "description": "The train number.",
+            "examples": [
+              "571"
+            ],
+            "maxLength": 16,
+            "minLength": 1,
+            "type": "string"
+          },
+          "plannedAt": {
+            "description": "The planned departure time (RFC 3339).",
+            "examples": [
+              "2026-11-17T15:42:00Z"
+            ],
+            "format": "date-time",
+            "type": "string"
+          },
+          "platform": {
+            "description": "The planned platform.",
+            "examples": [
+              "5"
+            ],
+            "maxLength": 16,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "plannedAt"
+        ],
+        "type": "object"
+      },
+      "TrainBoardEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TrainBoardData"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DataMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "TrainBoardIn": {
+        "additionalProperties": false,
+        "properties": {
+          "departures": {
+            "description": "The board's departures, at most 120; empty when the board listed none.",
+            "items": {
+              "$ref": "#/components/schemas/TrainBoardDepartureIn"
+            },
+            "maxItems": 120,
+            "type": "array"
+          },
+          "eva": {
+            "description": "The station's EVA number the board was fetched for.",
+            "examples": [
+              "8000105"
+            ],
+            "pattern": "^[0-9]{7}$",
+            "type": "string"
+          },
+          "fetchedAt": {
+            "description": "When the board was fetched from DB Timetables (RFC 3339); within the last day, not in the future.",
+            "examples": [
+              "2026-11-17T15:30:12Z"
+            ],
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "eva",
+          "fetchedAt",
+          "departures"
+        ],
+        "type": "object"
+      },
       "Warning": {
         "additionalProperties": false,
         "properties": {
@@ -7932,6 +8402,19 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -8277,6 +8760,19 @@
               "maximum": 50,
               "minimum": 1,
               "type": "integer"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -8784,6 +9280,19 @@
               ],
               "type": "string"
             }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -9226,6 +9735,19 @@
               "pattern": "^[A-Za-z0-9:._/-]+$",
               "type": "string"
             }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -9629,6 +10151,19 @@
               ],
               "maxLength": 60,
               "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
               "type": "string"
             }
           }
@@ -10097,6 +10632,19 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -10466,6 +11014,19 @@
               "pattern": "^[A-Za-z0-9:._-]+$",
               "type": "string"
             }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -10817,6 +11378,21 @@
       "get": {
         "description": "The national picture the site's home tiles, its live map and its national pages state: road situations in force by kind and by Land, current fuel prices by grade, charging sites and points, parking sites by kind, station lifts and escalators by state, regional punctuality and weather warnings by level. Each part is read from the families of its domain the key may read, for every domain the key has the scope of (roads, energy, parking, transit, accessibility, weather); a domain whose families are all withheld is left out and named in meta.warnings.",
         "operationId": "getNationalSummary",
+        "parameters": [
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -11364,6 +11940,19 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -11724,6 +12313,21 @@
       "get": {
         "description": "The key's id, plan, expiry and the source families the licence gate lets it receive, with their attribution. Needs a key, no scope.",
         "operationId": "getKey",
+        "parameters": [
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -11932,6 +12536,19 @@
                 "52.52,13.405"
               ],
               "pattern": "^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
               "type": "string"
             }
           }
@@ -12352,6 +12969,19 @@
               "maximum": 100,
               "minimum": 1,
               "type": "integer"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -12806,6 +13436,19 @@
               "maximum": 200,
               "minimum": 1,
               "type": "integer"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -13297,6 +13940,19 @@
             "schema": {
               "description": "The meta.page.nextCursor of the page before; omit for the first page.",
               "pattern": "^[0-9]{1,4}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
               "type": "string"
             }
           }
@@ -13817,6 +14473,19 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -14220,6 +14889,19 @@
               },
               "type": "array"
             }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -14569,6 +15251,359 @@
         "x-required-scope": "places"
       }
     },
+    "/v1/parking-bays": {
+      "get": {
+        "description": "The on-street bays a municipality publishes as open data, reserved for a disabled parking permit (kind=disabled) or for charging, nearest first: a sensor's free or occupied while its newest message is under three hours old, else no current reading; a sensor-less site with the publisher's count of reserved spaces, never free. The counts cover every bay of the kind in the radius. A bay is not a car park: listParkingOptions never lists one. Needs the scope parking.",
+        "operationId": "listParkingBays",
+        "parameters": [
+          {
+            "description": "The position: lat,lon in decimal degrees (WGS 84).",
+            "explode": false,
+            "in": "query",
+            "name": "at",
+            "required": true,
+            "schema": {
+              "description": "The position: lat,lon in decimal degrees (WGS 84).",
+              "examples": [
+                "52.52,13.405"
+              ],
+              "pattern": "^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Which bays: disabled = reserved for a disabled parking permit, ev_charging = reserved for charging. Default: disabled.",
+            "explode": false,
+            "in": "query",
+            "name": "kind",
+            "schema": {
+              "description": "Which bays: disabled = reserved for a disabled parking permit, ev_charging = reserved for charging. Default: disabled.",
+              "enum": [
+                "disabled",
+                "ev_charging"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Search radius in metres (1000 to 25000); default 10000.",
+            "explode": false,
+            "in": "query",
+            "name": "radius_m",
+            "schema": {
+              "description": "Search radius in metres (1000 to 25000); default 10000.",
+              "format": "int64",
+              "maximum": 25000,
+              "minimum": 1000,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Most bays to list, nearest first; default 5. The counts cover every bay in the radius.",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "description": "Most bays to list, nearest first; default 5. The counts cover every bay in the radius.",
+              "format": "int64",
+              "maximum": 20,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "List only the bays a sensor reports free now; default false. A sensor-less site is never free.",
+            "explode": false,
+            "in": "query",
+            "name": "only_free",
+            "schema": {
+              "description": "List only the bays a sensor reports free now; default false. A sensor-less site is never free.",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "Disabled bays within 2 km",
+                    "value": null
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ParkingBaysEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not used by this operation.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "On-street bays near a position",
+        "tags": [
+          "parking"
+        ],
+        "x-attribution": "On-street bays come from the source families of the parking domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/parking-bays?at=48.388,7.521\u0026radius_m=2000\u0026limit=3\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/parking-bays?at=48.388,7.521\u0026radius_m=2000\u0026limit=3",
+        "x-mcp-counterpart": "parking search, kind disabled_badge",
+        "x-required-scope": "parking"
+      }
+    },
     "/v1/parking-options": {
       "get": {
         "description": "Parking sites within the radius of a position, nearest first, then by id, each with its last reported occupancy. A site whose terms are not accepted (accept_terms) is not listed; meta.terms offers its terms. Needs the scope parking.",
@@ -14687,6 +15722,19 @@
               "maxItems": 5,
               "type": "array",
               "uniqueItems": true
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -15108,6 +16156,19 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -15442,6 +16503,21 @@
       "get": {
         "description": "What place and address search can find: the places per family and kind with how many carry an English name (each family's last load is in meta.freshness), the Länder the gazetteer holds, and the Länder the addresses cover with each one's extract date. Read from the places families the key may read. Needs the scope places.",
         "operationId": "getPlacesCoverage",
+        "parameters": [
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -15992,6 +17068,19 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -16434,6 +17523,19 @@
             "schema": {
               "description": "The meta.page.nextCursor of the page before; omit for the first page.",
               "pattern": "^[0-9]{1,2}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
               "type": "string"
             }
           }
@@ -16976,6 +18078,19 @@
               },
               "type": "array"
             }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -17356,6 +18471,19 @@
               ],
               "maxLength": 64,
               "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
               "type": "string"
             }
           }
@@ -17749,6 +18877,19 @@
               ],
               "type": "string"
             }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -18089,6 +19230,19 @@
               ],
               "maxLength": 32,
               "pattern": "^[a-z_]+$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
               "type": "string"
             }
           }
@@ -18458,6 +19612,19 @@
               "maximum": 50,
               "minimum": 1,
               "type": "integer"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -18948,6 +20115,19 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -19410,6 +20590,19 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -19750,6 +20943,19 @@
                 "09"
               ],
               "pattern": "^[0-9]{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
               "type": "string"
             }
           }
@@ -20152,6 +21358,19 @@
               "maximum": 60,
               "minimum": 1,
               "type": "integer"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -20600,6 +21819,19 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -20984,6 +22216,19 @@
               "minimum": 1,
               "type": "integer"
             }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -21341,6 +22586,539 @@
         "x-required-scope": "transit"
       }
     },
+    "/v1/train-boards": {
+      "post": {
+        "description": "Appends one station's DB Timetables departure board as the MCP server fetched it live: one stored row per departure, kept as ticks, CC BY 4.0 with DB's attribution. Only a key of ViaFrei's own audience may call it; any other key gets 403 (scope-denied). A board breaking a rule gets 400 naming the field. Rate-limited per key like every keyed operation. Answers 204.",
+        "operationId": "recordTrainBoard",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "eva": "8016001",
+                "fetchedAt": "2026-03-29T01:29:40Z",
+                "departures": [
+                  {
+                    "plannedAt": "2026-03-29T01:42:00Z",
+                    "changedAt": "2026-03-29T01:47:00Z",
+                    "platform": "5",
+                    "changedPlatform": "7",
+                    "category": "ICE",
+                    "number": "571",
+                    "line": "ICE 571",
+                    "destination": "München Hbf"
+                  },
+                  {
+                    "plannedAt": "2026-03-29T01:51:00Z",
+                    "platform": "13",
+                    "category": "RE",
+                    "number": "3311",
+                    "line": "RE 1",
+                    "destination": "Frankfurt (Oder)",
+                    "cancelled": true
+                  }
+                ]
+              },
+              "schema": {
+                "$ref": "#/components/schemas/TrainBoardIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not used by this operation.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "Record a DB Timetables board the MCP server fetched",
+        "tags": [
+          "transit"
+        ],
+        "x-attribution": "The board is DB Timetables data (CC BY 4.0), stored with DB's attribution and answered by getTrainBoard with it; the request itself answers no data.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/train-boards\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\" \\\n  -X POST \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"eva\": \"8016001\",\n    \"fetchedAt\": \"2026-03-29T01:29:40Z\",\n    \"departures\": [\n      {\n        \"plannedAt\": \"2026-03-29T01:42:00Z\",\n        \"changedAt\": \"2026-03-29T01:47:00Z\",\n        \"platform\": \"5\",\n        \"changedPlatform\": \"7\",\n        \"category\": \"ICE\",\n        \"number\": \"571\",\n        \"line\": \"ICE 571\",\n        \"destination\": \"München Hbf\"\n      },\n      {\n        \"plannedAt\": \"2026-03-29T01:51:00Z\",\n        \"platform\": \"13\",\n        \"category\": \"RE\",\n        \"number\": \"3311\",\n        \"line\": \"RE 1\",\n        \"destination\": \"Frankfurt (Oder)\",\n        \"cancelled\": true\n      }\n    ]\n  }'"
+          }
+        ],
+        "x-example-request": "/v1/train-boards",
+        "x-required-scope": "transit"
+      }
+    },
+    "/v1/train-boards/{eva}": {
+      "get": {
+        "description": "The newest DB Timetables departure board the MCP server fetched for the station, while it was fetched no longer ago than the MCP server's own cache lifetime (30 s): DB Timetables alone, CC BY 4.0, never blended with a share-alike source. Without one, fresh is false and the answer states when the newest board held was fetched. Needs the scope transit.",
+        "operationId": "getTrainBoard",
+        "parameters": [
+          {
+            "description": "The station's EVA number.",
+            "in": "path",
+            "name": "eva",
+            "required": true,
+            "schema": {
+              "description": "The station's EVA number.",
+              "examples": [
+                "8000105"
+              ],
+              "pattern": "^[0-9]{7}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The newest board of a station, fresh",
+                    "value": null
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/TrainBoardEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "description": "Sent when the body was read for an earlier request: the whole seconds since that read. The body is the one read then, so its ageS, dataAsOf and generatedAt are as of that read: add Age to ageS for the data's age now. max-age counts from the read. A 304 carries no Age; its max-age counts from the 304.",
+                "schema": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Sent on a data answer built from source families: the ETag changes with the asked input, what the key may read and the version of every family read; Cache-Control is private, with the smallest max-age of the families' domains.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not used by this operation.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Sent on every keyed answer but a 401, success or error, in the syntax of draft-ietf-httpapi-ratelimit-headers-09: a burst policy, and a day and a month policy for a plan with those quotas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "A station's DB Timetables board, while fresh",
+        "tags": [
+          "transit"
+        ],
+        "x-attribution": "A train board is the DB Timetables board the MCP server last handed the API, of the transit domain's db_timetables source the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/train-boards/8001001?lang=en\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/train-boards/8001001?lang=en",
+        "x-mcp-counterpart": "train departures",
+        "x-required-scope": "transit"
+      }
+    },
     "/v1/transit-disruptions": {
       "get": {
         "description": "The service alerts in force in the area (a Land or a Kreis) or for the line, and the area's punctuality: the trips late at least once. Needs the scope transit.",
@@ -21396,6 +23174,19 @@
               "maximum": 20,
               "minimum": 1,
               "type": "integer"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -21839,6 +23630,19 @@
               "format": "date-time",
               "type": "string"
             }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -22249,6 +24053,19 @@
                 "type": "string"
               },
               "type": "array"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
             }
           }
         ],

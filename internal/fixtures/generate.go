@@ -17,7 +17,10 @@ import (
 
 // GeneratorVersion changes whenever the output for a given seed and profile
 // changes.
-const GeneratorVersion = "0.3.4"
+const GeneratorVersion = "0.3.6"
+
+// TrainBoardRef is the one source of the train boards.
+const TrainBoardRef = "db_timetables"
 
 // Profile sets the size of a generated set.
 type Profile struct {
@@ -52,7 +55,7 @@ var Tables = []string{
 	"stop_place", "stop_point", "transit_line", "journey", "scheduled_call", "call_observation",
 	"station_facility", "weather_warning", "rule_topic", "rule_statement",
 	"hydrogen_station", "speed_camera", "sharing_station", "sharing_station_status", "sharing_vehicle", "poi", "address", "service_alert",
-	"low_emission_zone", "lorry_rule",
+	"low_emission_zone", "lorry_rule", "street_bay", "train_board",
 }
 
 // ReferenceInstant is the start of the first generated day: the Saturday
@@ -147,6 +150,9 @@ func generate(out io.Writer, profile string, seed uint64, contractVersion string
 	g.zones()
 	g.lorry()
 	g.plannedWorks()
+	g.streetBays()
+	g.trainBoards()
+	g.motorwayPlaces()
 	g.w.end()
 	sum, err := g.w.close()
 	if err != nil {
@@ -297,6 +303,17 @@ var sourceList = []source{
 	// register keeps BASt's (roadworks_bast: CC BY 4.0, every use class,
 	// reviewed): the family a window ahead reads.
 	{ref: PlannedWorksFamily, family: "alpha", domain: "roads", target: 300, publisher: "Baustellwerk Datenwerk"},
+	// The on-street bays: the bay tables take only their own two sources.
+	// The sensors' inventory is registered with the set; the sensor-less
+	// sites' source is in the platform's register.
+	{ref: "dortmund_parksensoren_bays", family: "alpha", domain: "parking", target: 300, publisher: "Buchtwerk Datenwerk"},
+	{ref: "frankfurt_behindertenparkplaetze", family: "alpha", domain: "parking", platform: true},
+	// The train boards the API is handed: the platform's register holds the
+	// timetable source the tick table takes alone.
+	{ref: TrainBoardRef, family: "alpha", domain: "transit", platform: true},
+	// The gazetteer's motorway places: the place table takes the Autobahn
+	// GmbH source alone for them.
+	{ref: MotorwayPlaceRef, family: "alpha", domain: "roads", platform: true},
 }
 
 // useClasses are the register's use classes of each family; nil writes no

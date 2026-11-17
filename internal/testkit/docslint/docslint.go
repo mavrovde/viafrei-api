@@ -98,6 +98,9 @@ func check(name string, op operation) []string {
 		add("no attribution of its sources (%s)", attribution)
 	}
 	answers := successExamples(op)
+	if len(answers) == 0 && bodiless(op) {
+		return out // its answer is a status alone (204): nothing to show
+	}
 	if len(answers) == 0 {
 		add("no example answer on a 2xx response")
 		return out
@@ -110,6 +113,20 @@ func check(name string, op operation) []string {
 		}
 	}
 	return out
+}
+
+// bodiless is an operation whose every success is 204, which has no body.
+func bodiless(op operation) bool {
+	n := 0
+	for status := range op.Responses {
+		if strings.HasPrefix(status, "2") {
+			if status != "204" {
+				return false
+			}
+			n++
+		}
+	}
+	return n > 0
 }
 
 // successExamples are the example values of every 2xx response.

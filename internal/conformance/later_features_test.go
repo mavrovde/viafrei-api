@@ -8,6 +8,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/energy"
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
+	"github.com/mavrovde/viafrei-api/internal/domain/parking"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
@@ -27,6 +28,18 @@ func (laterFeatures) SpeedCameras(context.Context, access.Record, roads.SpeedQue
 
 func (laterFeatures) Sharing(context.Context, access.Record, transit.SharingQuery) (features.SharingAnswer, error) {
 	return features.SharingAnswer{}, nil
+}
+
+func (laterFeatures) RecordTrainBoard(context.Context, access.Record, transit.TrainBoard) error {
+	return nil
+}
+
+func (laterFeatures) TrainBoard(context.Context, access.Record, string) (features.TrainBoardAnswer, error) {
+	return features.TrainBoardAnswer{}, nil
+}
+
+func (laterFeatures) ParkingBays(context.Context, access.Record, parking.BayQuery) (features.BaysAnswer, error) {
+	return features.BaysAnswer{}, nil
 }
 
 func (laterFeatures) Addresses(context.Context, access.Record, places.AddressQuery) (features.AddressAnswer, error) {

@@ -42,9 +42,11 @@ func (in *LorryInput) Resolve(huma.Context) []error {
 	return nil
 }
 
-// LorryRule is one published lorry row.
+// LorryRule is one published lorry row. It states what the platform's road
+// status states of its layer (docs/parity.md): no identifier, a publisher's
+// file date only for a priority route or the long-lorry network, and no
+// direction for the long-lorry network.
 type LorryRule struct {
-	ID            string   `json:"id"`
 	Layer         string   `json:"layer" doc:"long_lorry (the positive network), restriction, priority_route or zone; open enumeration."`
 	Kind          *string  `json:"kind" nullable:"true" doc:"What is restricted (height, weight, width, ban, ...), as published."`
 	Sign          *string  `json:"sign" nullable:"true"`
@@ -54,13 +56,13 @@ type LorryRule struct {
 	Road          *string  `json:"road" nullable:"true"`
 	Street        *string  `json:"street" nullable:"true"`
 	Municipality  *string  `json:"municipality" nullable:"true"`
-	Direction     *string  `json:"direction" nullable:"true"`
+	Direction     *string  `json:"direction" nullable:"true" doc:"The direction a restriction or a priority route applies in, the publisher's words; null for the long-lorry network."`
 	Exceptions    []string `json:"exceptions"`
 	Times         *string  `json:"times" nullable:"true"`
 	Days          *string  `json:"days" nullable:"true"`
 	Category      *string  `json:"category" nullable:"true"`
 	NetworkState  *string  `json:"networkState" nullable:"true"`
-	VersionDate   *string  `json:"versionDate" nullable:"true" doc:"The date of the publisher's file (YYYY-MM-DD)."`
+	VersionDate   *string  `json:"versionDate" nullable:"true" doc:"The date of the publisher's file (YYYY-MM-DD), for a priority route and the long-lorry network; null for a restriction or a zone."`
 	DistanceM     *int     `json:"distanceM" nullable:"true" doc:"From the position; null without one."`
 	SourceFamily  string   `json:"sourceFamily"`
 }
@@ -80,7 +82,7 @@ type LorryOutput struct {
 
 func registerLorry(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "Where a lorry or a long lorry may go"
-	op.Description = "The long-lorry positive network (BASt's extract of the ordinance's annex, which binds; not complete and not fit for navigation) on a road or around a position, or the lorry restrictions and priority routes the publishers hold around a position (NRW, Frankfurt RheinMain, Bremen and the cities' own files); outside their regions none is held, which is no all-clear. By distance, then id. MCP counterpart: road status (vehicle form). Needs the scope roads."
+	op.Description = "The long-lorry positive network (BASt's extract of the ordinance's annex, which binds; not complete and not fit for navigation) on a road or around a position, or the lorry restrictions and priority routes the publishers hold around a position (NRW, Frankfurt RheinMain, Bremen and the cities' own files); outside their regions none is held, which is no all-clear. By distance, then the publisher's row. MCP counterpart: road status (vehicle form). Needs the scope roads."
 	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, in *LorryInput) (*LorryOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
@@ -106,10 +108,16 @@ func registerLorry(api huma.API, s *server, op huma.Operation) {
 		}
 		out := make([]LorryRule, len(rs))
 		for i, r := range rs {
-			out[i] = LorryRule{ID: r.ID, Layer: r.Layer, Kind: r.Kind, Sign: r.Sign, Value: r.Value, Unit: r.Unit, PublishedText: r.PublishedText,
+			out[i] = LorryRule{Layer: r.Layer, Kind: r.Kind, Sign: r.Sign, Value: r.Value, Unit: r.Unit, PublishedText: r.PublishedText,
 				Road: r.Road, Street: r.Street, Municipality: r.Municipality, Direction: r.Direction, Exceptions: append([]string{}, r.Exceptions...),
 				Times: r.Times, Days: r.Days, Category: r.Category, NetworkState: r.NetworkState, VersionDate: day(r.VersionDate),
 				DistanceM: r.DistanceM, SourceFamily: r.Family}
+			if r.Layer != "priority_route" && r.Layer != "long_lorry" {
+				out[i].VersionDate = nil
+			}
+			if r.Layer == "long_lorry" {
+				out[i].Direction = nil
+			}
 		}
 		return &LorryOutput{CacheControl: noStore, Body: LorryEnvelope{Data: out,
 			Meta:  PagedMeta{DataMeta: s.dataMeta(ctx, a.Meta.Families, a.Meta.At, a.Meta.Partial, partialDetail), Page: Page{Limit: q.Limit, HasMore: more}},

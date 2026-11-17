@@ -2327,6 +2327,7 @@
             ]
           },
           "direction": {
+            "description": "The direction a restriction or a priority route applies in, the publisher's words; null for the long-lorry network.",
             "type": [
               "string",
               "null"
@@ -2345,9 +2346,6 @@
               "type": "string"
             },
             "type": "array"
-          },
-          "id": {
-            "type": "string"
           },
           "kind": {
             "description": "What is restricted (height, weight, width, ban, ...), as published.",
@@ -2421,7 +2419,7 @@
             ]
           },
           "versionDate": {
-            "description": "The date of the publisher's file (YYYY-MM-DD).",
+            "description": "The date of the publisher's file (YYYY-MM-DD), for a priority route and the long-lorry network; null for a restriction or a zone.",
             "type": [
               "string",
               "null"
@@ -2429,7 +2427,6 @@
           }
         },
         "required": [
-          "id",
           "layer",
           "kind",
           "sign",
@@ -6714,15 +6711,8 @@
                     "summary": "An address with its postcode",
                     "value": {
                       "data": {
-                        "query": {
-                          "street": "Marktweg",
-                          "number": "1",
-                          "postcode": "20000",
-                          "place": null
-                        },
                         "addresses": [
                           {
-                            "id": "osm:node650000",
                             "street": "Marktweg",
                             "number": "1",
                             "postcode": "20000",
@@ -8129,27 +8119,13 @@
                             "lon": 7.808793
                           },
                           "distanceM": 100,
-                          "openingState": "unknown",
+                          "openingState": "open",
                           "prices": [
-                            {
-                              "fuel": "diesel",
-                              "priceEur": 1.799,
-                              "reportedAt": "2026-03-29T22:45:59Z",
-                              "reportedAtLocal": "2026-03-30T00:45:59+02:00",
-                              "current": false
-                            },
                             {
                               "fuel": "e10",
                               "priceEur": 1.633,
                               "reportedAt": "2026-03-29T15:24:44Z",
                               "reportedAtLocal": "2026-03-29T17:24:44+02:00",
-                              "current": false
-                            },
-                            {
-                              "fuel": "e5",
-                              "priceEur": 2.062,
-                              "reportedAt": "2026-03-29T21:50:02Z",
-                              "reportedAtLocal": "2026-03-29T23:50:02+02:00",
                               "current": false
                             }
                           ],
@@ -8544,54 +8520,15 @@
                     "value": {
                       "data": {
                         "stations": [],
-                        "nearest": {
-                          "id": "afir_alpha:900001",
-                          "name": "H2 Schömpingbach",
-                          "operator": "H2 Synthetic",
-                          "brand": null,
-                          "location": {
-                            "lat": 48.389598,
-                            "lon": 7.422192
-                          },
-                          "distanceM": 62433,
-                          "address": null,
-                          "refill": [
-                            {
-                              "solution": "700bar_car"
-                            }
-                          ],
-                          "opening": null,
-                          "providerUpdatedAt": null,
-                          "sourceFamily": "afir_alpha"
-                        }
+                        "nearest": null
                       },
                       "meta": {
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
-                        "asOf": "2026-03-29T23:55:00Z",
-                        "freshness": [
-                          {
-                            "family": "afir_alpha",
-                            "dataAsOf": "2026-03-29T23:55:00Z",
-                            "ageS": 300,
-                            "staleAfterS": 1800,
-                            "stale": false
-                          }
-                        ],
-                        "attribution": [
-                          {
-                            "family": "afir_alpha",
-                            "domain": "energy",
-                            "publisher": "Kleber Datenwerk",
-                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
-                            "licence": "CC BY 4.0",
-                            "licenceUrl": "https://licences.example/cc-by-4-0",
-                            "shareAlike": false,
-                            "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/afir_alpha"
-                          }
-                        ],
+                        "asOf": null,
+                        "freshness": [],
+                        "attribution": [],
                         "notes": {
                           "condition": [],
                           "purpose": []
@@ -9432,7 +9369,7 @@
     },
     "/v1/lorry-rules": {
       "get": {
-        "description": "The long-lorry positive network (BASt's extract of the ordinance's annex, which binds; not complete and not fit for navigation) on a road or around a position, or the lorry restrictions and priority routes the publishers hold around a position (NRW, Frankfurt RheinMain, Bremen and the cities' own files); outside their regions none is held, which is no all-clear. By distance, then id. MCP counterpart: road status (vehicle form). Needs the scope roads.",
+        "description": "The long-lorry positive network (BASt's extract of the ordinance's annex, which binds; not complete and not fit for navigation) on a road or around a position, or the lorry restrictions and priority routes the publishers hold around a position (NRW, Frankfurt RheinMain, Bremen and the cities' own files); outside their regions none is held, which is no all-clear. By distance, then the publisher's row. MCP counterpart: road status (vehicle form). Needs the scope roads.",
         "operationId": "listLorryRules",
         "parameters": [
           {
@@ -9519,7 +9456,6 @@
                     "value": {
                       "data": [
                         {
-                          "id": "long:1",
                           "layer": "long_lorry",
                           "kind": null,
                           "sign": null,
@@ -9529,7 +9465,7 @@
                           "road": "A100",
                           "street": null,
                           "municipality": null,
-                          "direction": "both",
+                          "direction": null,
                           "exceptions": [],
                           "times": null,
                           "days": null,
@@ -10974,7 +10910,7 @@
                             "lat": 52.194239,
                             "lon": 9.165894
                           },
-                          "distanceM": 0,
+                          "distanceM": null,
                           "occupancy": {
                             "free": 32,
                             "total": 229,
@@ -11381,7 +11317,6 @@
                             "widened": true,
                             "places": [
                               {
-                                "id": "osm:node600001",
                                 "name": "Pharmacy Pößfül",
                                 "kind": "amenity=pharmacy",
                                 "street": "Marktweg",
@@ -11390,7 +11325,7 @@
                                   "lat": 47.609833,
                                   "lon": 7.897242
                                 },
-                                "distanceM": 5,
+                                "distanceM": 0,
                                 "sourceFamily": "osm"
                               }
                             ]
@@ -12687,63 +12622,13 @@
                         "asOf": null,
                         "freshness": [
                           {
-                            "family": "afir_alpha",
-                            "dataAsOf": "2026-03-29T23:55:00Z",
-                            "ageS": 300,
-                            "staleAfterS": 1800,
-                            "stale": false
-                          },
-                          {
-                            "family": "afir_beta",
-                            "dataAsOf": "2026-03-29T23:55:00Z",
-                            "ageS": 300,
-                            "staleAfterS": 1800,
-                            "stale": false
-                          },
-                          {
                             "family": "geonames",
                             "dataAsOf": null,
                             "ageS": null,
                             "stale": false
-                          },
-                          {
-                            "family": "park_alpha",
-                            "dataAsOf": "2026-03-29T23:57:30Z",
-                            "ageS": 150,
-                            "staleAfterS": 900,
-                            "stale": false
-                          },
-                          {
-                            "family": "park_beta",
-                            "dataAsOf": "2026-03-29T23:57:30Z",
-                            "ageS": 150,
-                            "staleAfterS": 900,
-                            "stale": false
                           }
                         ],
                         "attribution": [
-                          {
-                            "family": "afir_alpha",
-                            "domain": "energy",
-                            "publisher": "Kleber Datenwerk",
-                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
-                            "licence": "CC BY 4.0",
-                            "licenceUrl": "https://licences.example/cc-by-4-0",
-                            "shareAlike": false,
-                            "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/afir_alpha"
-                          },
-                          {
-                            "family": "afir_beta",
-                            "domain": "energy",
-                            "publisher": "Deingmeir Datenwerk",
-                            "text": "Synthetic data from family beta, licence CC BY-SA 4.0.",
-                            "licence": "CC BY-SA 4.0",
-                            "licenceUrl": "https://licences.example/cc-by-sa-4-0",
-                            "shareAlike": true,
-                            "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://beta.example/terms/afir_beta"
-                          },
                           {
                             "family": "geonames",
                             "domain": "places",
@@ -12754,28 +12639,6 @@
                             "shareAlike": false,
                             "shareAlikeOffer": null,
                             "termsUrl": "https://download.geonames.org/export/dump/"
-                          },
-                          {
-                            "family": "park_alpha",
-                            "domain": "parking",
-                            "publisher": "Fäpung Datenwerk",
-                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
-                            "licence": "CC BY 4.0",
-                            "licenceUrl": "https://licences.example/cc-by-4-0",
-                            "shareAlike": false,
-                            "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/park_alpha"
-                          },
-                          {
-                            "family": "park_beta",
-                            "domain": "parking",
-                            "publisher": "Sückkies Datenwerk",
-                            "text": "Synthetic data from family beta, licence CC BY-SA 4.0.",
-                            "licence": "CC BY-SA 4.0",
-                            "licenceUrl": "https://licences.example/cc-by-sa-4-0",
-                            "shareAlike": true,
-                            "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://beta.example/terms/park_beta"
                           }
                         ],
                         "notes": {
@@ -13184,27 +13047,8 @@
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
                         "asOf": null,
-                        "freshness": [
-                          {
-                            "family": "osm",
-                            "dataAsOf": null,
-                            "ageS": null,
-                            "stale": false
-                          }
-                        ],
-                        "attribution": [
-                          {
-                            "family": "osm",
-                            "domain": "places",
-                            "publisher": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0",
-                            "text": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0",
-                            "licence": "ODbL 1.0",
-                            "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
-                            "shareAlike": true,
-                            "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://www.openstreetmap.org/copyright"
-                          }
-                        ],
+                        "freshness": [],
+                        "attribution": [],
                         "notes": {
                           "condition": [],
                           "purpose": []
@@ -13218,7 +13062,6 @@
                         "page": {
                           "limit": 2,
                           "total": 0,
-                          "atLeast": false,
                           "nextCursor": null
                         }
                       },
@@ -14447,29 +14290,6 @@
                           "electric": 0,
                           "atLeast": false,
                           "nearest": []
-                        },
-                        "nearest": {
-                          "id": "nextbike_syn:023",
-                          "system": "nextbike_syn",
-                          "systemLabel": "nextbike Synthetic",
-                          "name": "Station 6",
-                          "capacity": 10,
-                          "virtual": false,
-                          "location": {
-                            "lat": 48.211289,
-                            "lon": 8.356669
-                          },
-                          "distanceM": 82235,
-                          "current": false,
-                          "available": false,
-                          "bikes": null,
-                          "electricBikes": null,
-                          "freeDocks": null,
-                          "renting": null,
-                          "takesReturns": null,
-                          "countedAt": null,
-                          "reportedAt": null,
-                          "sourceFamily": "gbfs_nextbike"
                         }
                       },
                       "meta": {
@@ -15182,49 +15002,13 @@
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
-                        "asOf": "2026-03-29T12:00:00Z",
-                        "freshness": [
-                          {
-                            "family": "osm_speed_cameras",
-                            "dataAsOf": "2026-03-29T12:00:00Z",
-                            "ageS": 43200,
-                            "staleAfterS": 259200,
-                            "stale": false
-                          },
-                          {
-                            "family": "speed_alpha",
-                            "dataAsOf": "2026-03-29T12:00:00Z",
-                            "ageS": 43200,
-                            "staleAfterS": 259200,
-                            "stale": false
-                          }
-                        ],
-                        "attribution": [
-                          {
-                            "family": "osm_speed_cameras",
-                            "domain": "roads",
-                            "publisher": "Blitzer (OpenStreetMap): © OpenStreetMap-Mitwirkende, ODbL 1.0",
-                            "text": "Blitzer (OpenStreetMap): © OpenStreetMap-Mitwirkende, ODbL 1.0",
-                            "licence": "ODbL 1.0",
-                            "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
-                            "shareAlike": true,
-                            "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://www.openstreetmap.org/copyright"
-                          },
-                          {
-                            "family": "speed_alpha",
-                            "domain": "roads",
-                            "publisher": "Blitzwerk Datenwerk",
-                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
-                            "licence": "CC BY 4.0",
-                            "licenceUrl": "https://licences.example/cc-by-4-0",
-                            "shareAlike": false,
-                            "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/speed_alpha"
-                          }
-                        ],
+                        "asOf": null,
+                        "freshness": [],
+                        "attribution": [],
                         "notes": {
-                          "condition": [],
+                          "condition": [
+                            "Note on use (§ 23 Abs. 1c StVO): a person driving a vehicle may not, while driving, operate or use any technical device or app function that shows or disrupts traffic enforcement. This also applies to a passenger's smartphone if the driver benefits from it (OLG Karlsruhe). A violation costs €75 and one point in Flensburg. This information is meant only for planning before setting off or during a stop. The locations come from official and open sources and may be incomplete or out of date; mobile checks are possible at any time and anywhere. Always keep to the speed limit in force. Not legal advice."
+                          ],
                           "purpose": []
                         },
                         "warnings": [
@@ -16911,13 +16695,7 @@
                     "value": {
                       "data": {
                         "station": {
-                          "id": "1:de:04002:2",
-                          "name": "Pienköckheim Nord",
-                          "location": {
-                            "lat": 47.403474,
-                            "lon": 14.561662
-                          },
-                          "stopCode": "de:04002:2"
+                          "name": "Pienköckheim Nord"
                         },
                         "counts": {
                           "active": 0,
@@ -16930,8 +16708,6 @@
                             "kind": "escalator",
                             "position": "zu Gleis 1",
                             "state": "unknown",
-                            "observedAt": "2026-03-29T10:57:39Z",
-                            "observedAtLocal": "2026-03-29T12:57:39+02:00",
                             "sourceFamily": "openstation_siri_fm"
                           },
                           {
@@ -16939,8 +16715,6 @@
                             "kind": "escalator",
                             "position": "zu Gleis 2",
                             "state": "unknown",
-                            "observedAt": "2026-03-29T07:18:26Z",
-                            "observedAtLocal": "2026-03-29T09:18:26+02:00",
                             "sourceFamily": "openstation_siri_fm"
                           }
                         ]
@@ -18190,9 +17964,7 @@
                     "summary": "The official weather warnings at a position, with their lamp",
                     "value": {
                       "data": {
-                        "lamp": "amber",
                         "warnings": [],
-                        "truncated": false,
                         "roadWeather": []
                       },
                       "meta": {

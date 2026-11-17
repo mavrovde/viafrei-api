@@ -8084,79 +8084,75 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
-          "name": "data[long:1].category",
+          "name": "data[0].category",
           "value": "null"
         },
         {
-          "name": "data[long:1].days",
+          "name": "data[0].days",
           "value": "null"
         },
         {
-          "name": "data[long:1].direction",
-          "value": "both"
-        },
-        {
-          "name": "data[long:1].distanceM",
+          "name": "data[0].direction",
           "value": "null"
         },
         {
-          "name": "data[long:1].exceptions",
+          "name": "data[0].distanceM",
+          "value": "null"
+        },
+        {
+          "name": "data[0].exceptions",
           "value": "[]"
         },
         {
-          "name": "data[long:1].id",
-          "value": "long:1"
-        },
-        {
-          "name": "data[long:1].kind",
+          "name": "data[0].kind",
           "value": "null"
         },
         {
-          "name": "data[long:1].layer",
+          "name": "data[0].layer",
           "value": "long_lorry"
         },
         {
-          "name": "data[long:1].municipality",
+          "name": "data[0].municipality",
           "value": "null"
         },
         {
-          "name": "data[long:1].networkState",
+          "name": "data[0].networkState",
           "value": "positive network"
         },
         {
-          "name": "data[long:1].publishedText",
+          "name": "data[0].publishedText",
           "value": "null"
         },
         {
-          "name": "data[long:1].road",
+          "name": "data[0].road",
           "value": "A100"
         },
         {
-          "name": "data[long:1].sign",
+          "name": "data[0].sign",
           "value": "null"
         },
         {
-          "name": "data[long:1].sourceFamily",
+          "name": "data[0].sourceFamily",
           "value": "lorry_bast_langlkw"
         },
         {
-          "name": "data[long:1].street",
+          "name": "data[0].street",
           "value": "null"
         },
         {
-          "name": "data[long:1].times",
+          "name": "data[0].times",
           "value": "null"
         },
         {
-          "name": "data[long:1].unit",
+          "name": "data[0].unit",
           "value": "null"
         },
         {
-          "name": "data[long:1].value",
+          "name": "data[0].value",
           "value": "null"
         },
         {
-          "name": "data[long:1].versionDate",
+          "name": "data[0].versionDate",
           "value": "2026-01-27"
         },
         {
@@ -8200,232 +8196,220 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
-          "name": "data[city:1].category",
-          "value": "null"
-        },
-        {
-          "name": "data[city:1].days",
-          "value": "null"
-        },
-        {
-          "name": "data[city:1].direction",
-          "value": "null"
-        },
-        {
-          "name": "data[city:1].distanceM",
-          "value": "149"
-        },
-        {
-          "name": "data[city:1].exceptions",
-          "value": "[]"
-        },
-        {
-          "name": "data[city:1].id",
-          "value": "city:1"
-        },
-        {
-          "name": "data[city:1].kind",
-          "value": "height"
-        },
-        {
-          "name": "data[city:1].layer",
-          "value": "restriction"
-        },
-        {
-          "name": "data[city:1].municipality",
-          "value": "null"
-        },
-        {
-          "name": "data[city:1].networkState",
-          "value": "null"
-        },
-        {
-          "name": "data[city:1].publishedText",
-          "value": "3,80 m"
-        },
-        {
-          "name": "data[city:1].road",
-          "value": "null"
-        },
-        {
-          "name": "data[city:1].sign",
-          "value": "265"
-        },
-        {
-          "name": "data[city:1].sourceFamily",
-          "value": "lorry_koeln_beschraenkungen"
-        },
-        {
-          "name": "data[city:1].street",
-          "value": "Brückenweg"
-        },
-        {
-          "name": "data[city:1].times",
-          "value": "null"
-        },
-        {
-          "name": "data[city:1].unit",
-          "value": "m"
-        },
-        {
-          "name": "data[city:1].value",
-          "value": "3.8"
-        },
-        {
-          "name": "data[city:1].versionDate",
-          "value": "2026-01-27"
-        },
-        {
-          "name": "data[city:2].category",
-          "value": "null"
-        },
-        {
-          "name": "data[city:2].days",
-          "value": "null"
-        },
-        {
-          "name": "data[city:2].direction",
-          "value": "null"
-        },
-        {
-          "name": "data[city:2].distanceM",
-          "value": "743"
-        },
-        {
-          "name": "data[city:2].exceptions",
-          "value": "[]"
-        },
-        {
-          "name": "data[city:2].id",
-          "value": "city:2"
-        },
-        {
-          "name": "data[city:2].kind",
-          "value": "weight"
-        },
-        {
-          "name": "data[city:2].layer",
-          "value": "restriction"
-        },
-        {
-          "name": "data[city:2].municipality",
-          "value": "null"
-        },
-        {
-          "name": "data[city:2].networkState",
-          "value": "null"
-        },
-        {
-          "name": "data[city:2].publishedText",
-          "value": "7,5 t"
-        },
-        {
-          "name": "data[city:2].road",
-          "value": "null"
-        },
-        {
-          "name": "data[city:2].sign",
-          "value": "262"
-        },
-        {
-          "name": "data[city:2].sourceFamily",
-          "value": "lorry_koeln_beschraenkungen"
-        },
-        {
-          "name": "data[city:2].street",
-          "value": "Hafenstraße"
-        },
-        {
-          "name": "data[city:2].times",
-          "value": "null"
-        },
-        {
-          "name": "data[city:2].unit",
-          "value": "t"
-        },
-        {
-          "name": "data[city:2].value",
-          "value": "7.5"
-        },
-        {
-          "name": "data[city:2].versionDate",
-          "value": "2026-01-27"
-        },
-        {
-          "name": "data[city:3].category",
+          "name": "data[0].category",
           "value": "lorry_priority_route"
         },
         {
-          "name": "data[city:3].days",
+          "name": "data[0].days",
           "value": "null"
         },
         {
-          "name": "data[city:3].direction",
+          "name": "data[0].direction",
           "value": "null"
         },
         {
-          "name": "data[city:3].distanceM",
+          "name": "data[0].distanceM",
           "value": "0"
         },
         {
-          "name": "data[city:3].exceptions",
+          "name": "data[0].exceptions",
           "value": "[]"
         },
         {
-          "name": "data[city:3].id",
-          "value": "city:3"
-        },
-        {
-          "name": "data[city:3].kind",
+          "name": "data[0].kind",
           "value": "null"
         },
         {
-          "name": "data[city:3].layer",
+          "name": "data[0].layer",
           "value": "priority_route"
         },
         {
-          "name": "data[city:3].municipality",
+          "name": "data[0].municipality",
           "value": "null"
         },
         {
-          "name": "data[city:3].networkState",
+          "name": "data[0].networkState",
           "value": "null"
         },
         {
-          "name": "data[city:3].publishedText",
+          "name": "data[0].publishedText",
           "value": "null"
         },
         {
-          "name": "data[city:3].road",
+          "name": "data[0].road",
           "value": "null"
         },
         {
-          "name": "data[city:3].sign",
+          "name": "data[0].sign",
           "value": "null"
         },
         {
-          "name": "data[city:3].sourceFamily",
+          "name": "data[0].sourceFamily",
           "value": "lorry_koeln_beschraenkungen"
         },
         {
-          "name": "data[city:3].street",
+          "name": "data[0].street",
           "value": "Lkw-Route Nord"
         },
         {
-          "name": "data[city:3].times",
+          "name": "data[0].times",
           "value": "null"
         },
         {
-          "name": "data[city:3].unit",
+          "name": "data[0].unit",
           "value": "null"
         },
         {
-          "name": "data[city:3].value",
+          "name": "data[0].value",
           "value": "null"
         },
         {
-          "name": "data[city:3].versionDate",
+          "name": "data[0].versionDate",
           "value": "2026-01-27"
+        },
+        {
+          "name": "data[1].category",
+          "value": "null"
+        },
+        {
+          "name": "data[1].days",
+          "value": "null"
+        },
+        {
+          "name": "data[1].direction",
+          "value": "null"
+        },
+        {
+          "name": "data[1].distanceM",
+          "value": "149"
+        },
+        {
+          "name": "data[1].exceptions",
+          "value": "[]"
+        },
+        {
+          "name": "data[1].kind",
+          "value": "height"
+        },
+        {
+          "name": "data[1].layer",
+          "value": "restriction"
+        },
+        {
+          "name": "data[1].municipality",
+          "value": "null"
+        },
+        {
+          "name": "data[1].networkState",
+          "value": "null"
+        },
+        {
+          "name": "data[1].publishedText",
+          "value": "3,80 m"
+        },
+        {
+          "name": "data[1].road",
+          "value": "null"
+        },
+        {
+          "name": "data[1].sign",
+          "value": "265"
+        },
+        {
+          "name": "data[1].sourceFamily",
+          "value": "lorry_koeln_beschraenkungen"
+        },
+        {
+          "name": "data[1].street",
+          "value": "Brückenweg"
+        },
+        {
+          "name": "data[1].times",
+          "value": "null"
+        },
+        {
+          "name": "data[1].unit",
+          "value": "m"
+        },
+        {
+          "name": "data[1].value",
+          "value": "3.8"
+        },
+        {
+          "name": "data[1].versionDate",
+          "value": "null"
+        },
+        {
+          "name": "data[2].category",
+          "value": "null"
+        },
+        {
+          "name": "data[2].days",
+          "value": "null"
+        },
+        {
+          "name": "data[2].direction",
+          "value": "null"
+        },
+        {
+          "name": "data[2].distanceM",
+          "value": "743"
+        },
+        {
+          "name": "data[2].exceptions",
+          "value": "[]"
+        },
+        {
+          "name": "data[2].kind",
+          "value": "weight"
+        },
+        {
+          "name": "data[2].layer",
+          "value": "restriction"
+        },
+        {
+          "name": "data[2].municipality",
+          "value": "null"
+        },
+        {
+          "name": "data[2].networkState",
+          "value": "null"
+        },
+        {
+          "name": "data[2].publishedText",
+          "value": "7,5 t"
+        },
+        {
+          "name": "data[2].road",
+          "value": "null"
+        },
+        {
+          "name": "data[2].sign",
+          "value": "262"
+        },
+        {
+          "name": "data[2].sourceFamily",
+          "value": "lorry_koeln_beschraenkungen"
+        },
+        {
+          "name": "data[2].street",
+          "value": "Hafenstraße"
+        },
+        {
+          "name": "data[2].times",
+          "value": "null"
+        },
+        {
+          "name": "data[2].unit",
+          "value": "t"
+        },
+        {
+          "name": "data[2].value",
+          "value": "7.5"
+        },
+        {
+          "name": "data[2].versionDate",
+          "value": "null"
         },
         {
           "name": "meta.attribution[lorry_koeln_beschraenkungen].family",

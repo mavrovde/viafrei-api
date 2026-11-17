@@ -176,6 +176,11 @@ nothing, so that family contributed nothing and neither side credits it.
 - **Departure boards** state the station by the read contract's id, its
   name and its national stop code, and the window asked. A day the
   timetable holds no trip on is inside the window and answers no departure.
+- **Lorry rules** carry no identifier, so a row is named by its place in
+  the answer (by distance, none last). A publisher's file date is stated
+  for a priority route and the long-lorry network only, and the long-lorry
+  network states no direction: the platform's road status states neither.
+  A priority route is the nearest street of its stretch.
 - **Station facilities** name the station only and state no report
   instant per unit, as the platform's facilities check states them.
 

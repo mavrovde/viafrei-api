@@ -16,7 +16,6 @@
   "response": {
     "data": [
       {
-        "id": "long:1",
         "layer": "long_lorry",
         "kind": null,
         "sign": null,
@@ -26,7 +25,7 @@
         "road": "A100",
         "street": null,
         "municipality": null,
-        "direction": "both",
+        "direction": null,
         "exceptions": [],
         "times": null,
         "days": null,

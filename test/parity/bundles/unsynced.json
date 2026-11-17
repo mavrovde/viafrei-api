@@ -1140,24 +1140,8 @@
           "value": "null"
         },
         {
-          "name": "data[1:de:01002:0].districtCode",
-          "value": "01002"
-        },
-        {
           "name": "data[1:de:01002:0].id",
           "value": "1:de:01002:0"
-        },
-        {
-          "name": "data[1:de:01002:0].location.lat",
-          "value": "49.14816"
-        },
-        {
-          "name": "data[1:de:01002:0].location.lon",
-          "value": "7.78575"
-        },
-        {
-          "name": "data[1:de:01002:0].modes",
-          "value": "[]"
         },
         {
           "name": "data[1:de:01002:0].name",
@@ -1176,24 +1160,8 @@
           "value": "null"
         },
         {
-          "name": "data[1:de:01002:1].districtCode",
-          "value": "01002"
-        },
-        {
           "name": "data[1:de:01002:1].id",
           "value": "1:de:01002:1"
-        },
-        {
-          "name": "data[1:de:01002:1].location.lat",
-          "value": "49.16700"
-        },
-        {
-          "name": "data[1:de:01002:1].location.lon",
-          "value": "7.86246"
-        },
-        {
-          "name": "data[1:de:01002:1].modes",
-          "value": "[]"
         },
         {
           "name": "data[1:de:01002:1].name",
@@ -1252,24 +1220,8 @@
           "value": "26"
         },
         {
-          "name": "data[1:de:01002:0].districtCode",
-          "value": "01002"
-        },
-        {
           "name": "data[1:de:01002:0].id",
           "value": "1:de:01002:0"
-        },
-        {
-          "name": "data[1:de:01002:0].location.lat",
-          "value": "49.14816"
-        },
-        {
-          "name": "data[1:de:01002:0].location.lon",
-          "value": "7.78575"
-        },
-        {
-          "name": "data[1:de:01002:0].modes",
-          "value": "[]"
         },
         {
           "name": "data[1:de:01002:0].name",
@@ -1592,24 +1544,8 @@
           "value": "null"
         },
         {
-          "name": "data[1:de:01002:0].districtCode",
-          "value": "01002"
-        },
-        {
           "name": "data[1:de:01002:0].id",
           "value": "1:de:01002:0"
-        },
-        {
-          "name": "data[1:de:01002:0].location.lat",
-          "value": "49.14816"
-        },
-        {
-          "name": "data[1:de:01002:0].location.lon",
-          "value": "7.78575"
-        },
-        {
-          "name": "data[1:de:01002:0].modes",
-          "value": "[]"
         },
         {
           "name": "data[1:de:01002:0].name",

@@ -253,7 +253,7 @@ func compare(t *testing.T, name string) (parity.Bundle, asker) {
 	compared := map[string][]string{}
 	facts, differ := 0, 0
 	for _, c := range b.Cases {
-		got, err := parity.Project(a.ask(t, c), parity.Default, c.Request, a.owners)
+		got, err := parity.Project(a.ask(t, c), parity.Default, c.Operation, c.Request, a.owners)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -289,11 +289,11 @@ func TestParity(t *testing.T) {
 	planted := parity.Default
 	planted.PositionDecimals = 4
 	answer := a.ask(t, b.Cases[0])
-	got, err := parity.Project(answer, planted, b.Cases[0].Request, a.owners)
+	got, err := parity.Project(answer, planted, b.Cases[0].Operation, b.Cases[0].Request, a.owners)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, err := parity.Project(answer, parity.Default, b.Cases[0].Request, a.owners)
+	want, err := parity.Project(answer, parity.Default, b.Cases[0].Operation, b.Cases[0].Request, a.owners)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,7 +358,7 @@ func recordBundle(t *testing.T) {
 	a := open(t)
 	for _, qq := range q.Cases {
 		c := parity.Case{ID: qq.ID, Operation: qq.Operation, Counterpart: qq.Counterpart, Request: qq.Request, Key: qq.Key, Now: qq.Now}
-		facts, err := parity.Project(a.ask(t, c), parity.Default, c.Request, a.owners)
+		facts, err := parity.Project(a.ask(t, c), parity.Default, c.Operation, c.Request, a.owners)
 		if err != nil {
 			t.Fatal(err)
 		}

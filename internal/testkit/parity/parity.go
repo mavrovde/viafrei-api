@@ -147,18 +147,22 @@ const Unowned = "unowned"
 // Exclusion is one fact, or family of facts, left out of the comparison.
 // Pattern is a fact name in which [*] stands for any element key; it covers
 // the name itself and every fact under it. When Asked names a request
-// parameter, the exclusion holds only in a case that asks it (Asks).
+// parameter, the exclusion holds only in a case that asks it (Asks). When
+// Operation names an operation, it holds only in a case of that operation:
+// a station's position is left out of a station answer, a charging site's
+// is compared.
 type Exclusion struct {
-	Pattern string
-	Asked   string
-	Reason  string
+	Pattern   string
+	Asked     string
+	Operation string
+	Reason    string
 }
 
 // Excludes reports whether the fact name falls under one of r's exclusions
-// in a case asking request.
-func (r Rules) Excludes(request, name string) bool {
+// in a case of operation asking request.
+func (r Rules) Excludes(operation, request, name string) bool {
 	for _, e := range r.Excluded {
-		if exclusionPattern(e.Pattern).MatchString(name) && (e.Asked == "" || Asks(request, e.Asked)) {
+		if exclusionPattern(e.Pattern).MatchString(name) && (e.Asked == "" || Asks(request, e.Asked)) && (e.Operation == "" || e.Operation == operation) {
 			return true
 		}
 	}
@@ -194,21 +198,24 @@ var Default = Rules{
 	Identifiers:      []string{"sourceFamily"},
 	Meta:             []string{"asOf", "attribution", "freshness", "notes", "page", "warnings"},
 	Excluded: []Exclusion{
-		{"data[*].access", "", "the MCP capability has no access concept: no charging source of the platform publishes who may use a site"},
-		{"data[*].chargePoints[*].current", "", "the MCP capability states no current per point"},
-		{"meta.freshness", "", "API-only: the per-family freshness block of the read contract (ENV-003)"},
-		{"meta.warnings", "", "API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got"},
-		{"meta.page.hasMore", "min_kw", "the MCP capability states no count of the sites a power filter keeps, so it cannot say whether there are more"},
-		{"meta.asOf", "", "each side defines it differently: the API the oldest family dataAsOf (ENV-004), MCP the newest current status or its clock"},
-		{"data.station.location", "", siteReason("/internal/station/:slug")},
-		{"meta.attribution[*].domain", "", attributionReason},
-		{"meta.attribution[*].licence", "", attributionReason},
-		{"meta.attribution[*].licenceUrl", "", attributionReason},
-		{"meta.attribution[*].publisher", "", attributionReason},
-		{"meta.attribution[*].shareAlike", "", attributionReason},
-		{"meta.attribution[*].shareAlikeOffer", "", attributionReason},
-		{"meta.attribution[*].termsUrl", "", attributionReason},
-		{"meta.attribution[*].text", "", attributionReason},
+		{"data[*].access", "", "", "the MCP capability has no access concept: no charging source of the platform publishes who may use a site"},
+		{"data[*].chargePoints[*].current", "", "", "the MCP capability states no current per point"},
+		{"meta.freshness", "", "", "API-only: the per-family freshness block of the read contract (ENV-003)"},
+		{"meta.warnings", "", "", "API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got"},
+		{"meta.page.hasMore", "min_kw", "", "the MCP capability states no count of the sites a power filter keeps, so it cannot say whether there are more"},
+		{"meta.asOf", "", "", "each side defines it differently: the API the oldest family dataAsOf (ENV-004), MCP the newest current status or its clock"},
+		{"data.station.location", "", "listStationDepartures", siteReason("/internal/station/:slug")},
+		{"data[*].location", "", "listStations", siteReason("/internal/station/:slug")},
+		{"data[*].districtCode", "", "listStations", siteReason("/internal/station/:slug")},
+		{"data[*].modes", "", "listStations", siteReason("/internal/station/:slug")},
+		{"meta.attribution[*].domain", "", "", attributionReason},
+		{"meta.attribution[*].licence", "", "", attributionReason},
+		{"meta.attribution[*].licenceUrl", "", "", attributionReason},
+		{"meta.attribution[*].publisher", "", "", attributionReason},
+		{"meta.attribution[*].shareAlike", "", "", attributionReason},
+		{"meta.attribution[*].shareAlikeOffer", "", "", attributionReason},
+		{"meta.attribution[*].termsUrl", "", "", attributionReason},
+		{"meta.attribution[*].text", "", "", attributionReason},
 	},
 	// The fixture's condition and purpose notes are synthetic register texts
 	// and the platform states its own register's (attributionReason): which
@@ -336,7 +343,7 @@ func Parse(raw []byte, platform string) (Bundle, error) {
 			return Bundle{}, fmt.Errorf("%w: case %q names the fact %q more than once", ErrMalformed, c.ID, n)
 		}
 		for _, f := range c.Facts {
-			if Default.Excludes(c.Request, f.Name) {
+			if Default.Excludes(c.Operation, c.Request, f.Name) {
 				return Bundle{}, fmt.Errorf("%w: case %q states %q, which %s excludes from the comparison", ErrMalformed, c.ID, f.Name, Default.ID)
 			}
 			if !Default.ownedNoteFact(f) {
@@ -518,12 +525,12 @@ func Inventory(doc []byte, b Bundle) ([]string, error) {
 // so one of them could not be compared.
 var ErrDuplicateFact = errors.New("parity: two values project onto one fact name")
 
-// Project turns the response body of a case asking request into its facts
+// Project turns the response body of a case of operation asking request into its facts
 // under r, sorted by name. Two values under one name are an error: a
 // comparison keeping either would hide a difference in the other. A note of
 // a kind in r.OwnedNotes is stated by the families owners names for its text;
 // a note owners names no family for is an error (ErrUnownedNote).
-func Project(body []byte, r Rules, request string, owners Owners) ([]Fact, error) {
+func Project(body []byte, r Rules, operation, request string, owners Owners) ([]Fact, error) {
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.UseNumber()
 	var doc map[string]any
@@ -552,7 +559,7 @@ func Project(body []byte, r Rules, request string, owners Owners) ([]Fact, error
 	}
 	kept := p.out[:0]
 	for _, f := range p.out {
-		if !r.Excludes(request, f.Name) {
+		if !r.Excludes(operation, request, f.Name) {
 			kept = append(kept, f)
 		}
 	}

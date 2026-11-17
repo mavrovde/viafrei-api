@@ -14,7 +14,7 @@ var owners = parity.Owners{"Use only after accepting.": {" SRC-A "}}
 
 func notes(t *testing.T, notes string, o parity.Owners) []parity.Fact {
 	t.Helper()
-	got, err := parity.Project([]byte(`{"meta":{"notes":`+notes+`}}`), parity.Default, "/v1/x", o)
+	got, err := parity.Project([]byte(`{"meta":{"notes":`+notes+`}}`), parity.Default, "op", "/v1/x", o)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,12 +67,12 @@ func TestNoteTextIsNotComparedButFamilyAndCountAre(t *testing.T) {
 }
 
 func TestProjectRefusesANoteNoFamilyOwns(t *testing.T) {
-	_, err := parity.Project([]byte(`{"meta":{"notes":{"condition":["secret text"]}}}`), parity.Default, "/v1/x", parity.Owners{"other": {"f"}})
+	_, err := parity.Project([]byte(`{"meta":{"notes":{"condition":["secret text"]}}}`), parity.Default, "op", "/v1/x", parity.Owners{"other": {"f"}})
 	if !errors.Is(err, parity.ErrUnownedNote) || strings.Contains(err.Error(), "secret") {
 		t.Errorf("an unowned note: %v", err)
 	}
 	for _, v := range []string{`"text"`, `null`, `[1]`} {
-		if _, err := parity.Project([]byte(`{"meta":{"notes":{"condition":`+v+`}}}`), parity.Default, "/v1/x", nil); !errors.Is(err, parity.ErrMalformed) {
+		if _, err := parity.Project([]byte(`{"meta":{"notes":{"condition":`+v+`}}}`), parity.Default, "op", "/v1/x", nil); !errors.Is(err, parity.ErrMalformed) {
 			t.Errorf("condition notes %s: %v", v, err)
 		}
 	}
@@ -135,7 +135,7 @@ func TestARules4BundleIsReadOnlyWithoutAPurposeNote(t *testing.T) {
 func TestASharedNoteIsTheCreditedFamilys(t *testing.T) {
 	o := parity.Owners{"shared": {"fam-a", "fam-b"}}
 	body := `{"meta":{"attribution":[{"family":"fam-a"}],"notes":{"purpose":["shared"],"condition":[]}}}`
-	got, err := parity.Project([]byte(body), parity.Default, "/v1/x", o)
+	got, err := parity.Project([]byte(body), parity.Default, "op", "/v1/x", o)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestASharedNoteIsTheCreditedFamilys(t *testing.T) {
 	if d := parity.Diff(want, got); len(d) > 0 {
 		t.Errorf("a shared note: %q", d)
 	}
-	if _, err := parity.Project([]byte(`{"meta":{"attribution":[{"family":"fam-c"}],"notes":{"purpose":["shared"]}}}`), parity.Default, "/v1/x", o); !errors.Is(err, parity.ErrUnownedNote) {
+	if _, err := parity.Project([]byte(`{"meta":{"attribution":[{"family":"fam-c"}],"notes":{"purpose":["shared"]}}}`), parity.Default, "op", "/v1/x", o); !errors.Is(err, parity.ErrUnownedNote) {
 		t.Errorf("a note no credited family owns: %v", err)
 	}
 }

@@ -121,7 +121,7 @@ const body = `{"data":[
 "meta":{"requestId":"r","attribution":[{"family":"src-a","text":"T"}],"warnings":[{"code":"partial"}],"notes":{"condition":["Use only after accepting."]},"huge":1}}`
 
 func TestProjectAppliesTheRules(t *testing.T) {
-	got, err := parity.Project([]byte(body), parity.Default, "/v1/x", owners)
+	got, err := parity.Project([]byte(body), parity.Default, "op", "/v1/x", owners)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestProjectAppliesTheRules(t *testing.T) {
 func TestProjectRefusesTwoValuesUnderOneName(t *testing.T) {
 	// Two elements with one key, after normalisation: either value kept
 	// alone would hide a difference in the other.
-	_, err := parity.Project([]byte(`{"data":[{"id":"a","n":1},{"id":" A ","n":2}]}`), parity.Default, "/v1/x", nil)
+	_, err := parity.Project([]byte(`{"data":[{"id":"a","n":1},{"id":" A ","n":2}]}`), parity.Default, "op", "/v1/x", nil)
 	if !errors.Is(err, parity.ErrDuplicateFact) || !strings.Contains(err.Error(), "data[a].id") {
 		t.Errorf("duplicate names projected: %v", err)
 	}
@@ -160,27 +160,27 @@ func TestProjectRefusesTwoValuesUnderOneName(t *testing.T) {
 
 func TestProjectStatesAListAsAJSONArray(t *testing.T) {
 	// A value holding the old separator stays one value.
-	got, err := parity.Project([]byte(`{"data":{"tags":["b | c","a"]}}`), parity.Default, "/v1/x", nil)
+	got, err := parity.Project([]byte(`{"data":{"tags":["b | c","a"]}}`), parity.Default, "op", "/v1/x", nil)
 	if err != nil || len(got) != 1 || got[0].Value != `["a","b | c"]` {
 		t.Errorf("%v, %v", got, err)
 	}
 }
 
 func TestProjectKeepsAnOutOfRangeNumberVerbatim(t *testing.T) {
-	got, err := parity.Project([]byte(`{"data":{"n":1e999}}`), parity.Default, "/v1/x", nil)
+	got, err := parity.Project([]byte(`{"data":{"n":1e999}}`), parity.Default, "op", "/v1/x", nil)
 	if err != nil || len(got) != 1 || got[0].Value != "1e999" {
 		t.Errorf("%v, %v", got, err)
 	}
-	if _, err := parity.Project([]byte(`[`), parity.Default, "/v1/x", nil); err == nil {
+	if _, err := parity.Project([]byte(`[`), parity.Default, "op", "/v1/x", nil); err == nil {
 		t.Error("an unreadable body was projected")
 	}
 }
 
 func TestAPlantedRuleChangeNamesTheFact(t *testing.T) {
-	want, _ := parity.Project([]byte(body), parity.Default, "/v1/x", owners)
+	want, _ := parity.Project([]byte(body), parity.Default, "op", "/v1/x", owners)
 	planted := parity.Default
 	planted.PositionDecimals = 4
-	got, _ := parity.Project([]byte(body), planted, "/v1/x", owners)
+	got, _ := parity.Project([]byte(body), planted, "op", "/v1/x", owners)
 	d := parity.Diff(want, got)
 	if !slices.Equal(d, []string{`changed data[cs-1].location.lat: want "48.40452", got "48.4045"`, `changed data[cs-1].location.lon: want "7.65994", got "7.6599"`}) {
 		t.Errorf("diff %q", d)
@@ -206,7 +206,7 @@ func TestExclusionsCoverANameAndWhatIsUnderItOnly(t *testing.T) {
 		"meta.asOf", "meta.freshness", "meta.freshness[src-a].ageS", "meta.warnings[partial].code",
 		"data[cs-1].access", "data[cs-1].chargePoints[cp-1].current", "meta.attribution[src-a].text", "meta.attribution[src-a].shareAlikeOffer",
 	} {
-		if !r.Excludes(plain, name) {
+		if !r.Excludes("listChargingOptions", plain, name) {
 			t.Errorf("%s is compared", name)
 		}
 	}
@@ -214,7 +214,7 @@ func TestExclusionsCoverANameAndWhatIsUnderItOnly(t *testing.T) {
 		"meta.asOfX", "meta.page.limit", "meta.page.hasMore", "data[cs-1].accessible", "data[cs-1].chargePoints[cp-1].currentKw",
 		"data[cs-1].chargePoints[cp-1].availability.state", "meta.attribution[src-a].family", "meta.notes.condition", "data.access",
 	} {
-		if r.Excludes(plain, name) {
+		if r.Excludes("listChargingOptions", plain, name) {
 			t.Errorf("%s is excluded", name)
 		}
 	}
@@ -223,7 +223,7 @@ func TestExclusionsCoverANameAndWhatIsUnderItOnly(t *testing.T) {
 			t.Errorf("an exclusion without its pattern or reason: %+v", e)
 		}
 	}
-	if (parity.Rules{}).Excludes(plain, "meta.asOf") {
+	if (parity.Rules{}).Excludes("listChargingOptions", plain, "meta.asOf") {
 		t.Error("a rule set with no exclusion excluded a fact")
 	}
 }
@@ -238,7 +238,7 @@ func TestHasMoreIsExcludedOnlyWhereAPowerIsAsked(t *testing.T) {
 		"/v1/charging-options?at=1,2":            false,
 		"%zz":                                    false, // an unreadable request asks nothing
 	} {
-		if got := r.Excludes(request, "meta.page.hasMore"); got != excluded {
+		if got := r.Excludes("listChargingOptions", request, "meta.page.hasMore"); got != excluded {
 			t.Errorf("%s: hasMore excluded %v", request, got)
 		}
 	}
@@ -252,5 +252,24 @@ func TestAChargePointStateIsComparedLikeAnyOtherFact(t *testing.T) {
 	d := parity.Diff(want, []parity.Fact{{state, "reserved"}, {"data[cs-1].id", "cs-1"}})
 	if len(d) != 1 || d[0] != `changed `+state+`: want "occupied", got "reserved"` {
 		t.Errorf("reserved against occupied: %q", d)
+	}
+}
+
+func TestAnOperationScopedExclusionHoldsInItsOperationOnly(t *testing.T) {
+	r := parity.Default
+	for _, c := range []struct {
+		operation, name string
+		excluded        bool
+	}{
+		{"listStations", "data[1:de:01002:0].location.lat", true},
+		{"listStations", "data[1:de:01002:0].name", false},
+		{"listStationDepartures", "data.station.location.lon", true},
+		{"listChargingOptions", "data[cs-1].location.lat", false},
+		{"listParkingOptions", "data[p-1].location.lon", false},
+		{"listChargingOptions", "data.station.location.lat", false},
+	} {
+		if got := r.Excludes(c.operation, "/v1/x", c.name); got != c.excluded {
+			t.Errorf("%s %s: excluded %v", c.operation, c.name, got)
+		}
 	}
 }

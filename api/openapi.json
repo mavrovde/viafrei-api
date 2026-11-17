@@ -1606,6 +1606,10 @@
       "DrivingRule": {
         "additionalProperties": false,
         "properties": {
+          "id": {
+            "description": "The rule's key, stable across reviews.",
+            "type": "string"
+          },
           "legalBasis": {
             "description": "The provision the rule rests on; null when none is recorded.",
             "type": [
@@ -1613,13 +1617,36 @@
               "null"
             ]
           },
+          "reviewedOn": {
+            "description": "When the rule was last read against its source.",
+            "format": "date",
+            "type": "string"
+          },
+          "sourceUrl": {
+            "description": "Where the provision is published; null when none is recorded.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "text": {
             "type": "string"
+          },
+          "unconfirmed": {
+            "description": "What of the rule is not confirmed, to check with the source; null when all is.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
+          "id",
           "text",
-          "legalBasis"
+          "legalBasis",
+          "sourceUrl",
+          "reviewedOn",
+          "unconfirmed"
         ],
         "type": "object"
       },
@@ -1634,7 +1661,7 @@
             "type": "string"
           },
           "reviewedOn": {
-            "description": "When the topic was last reviewed.",
+            "description": "The oldest review of its rules: the topic is as current as its least recently read rule.",
             "format": "date",
             "type": "string"
           },
@@ -2610,7 +2637,7 @@
                 ]
               },
               "distanceM": {
-                "description": "Distance from the asked position in metres; null for the Land.",
+                "description": "Distance from the asked position in metres, to 100 m (under 50 m to the metre); null for the Land of a district.",
                 "format": "int64",
                 "type": [
                   "integer",
@@ -2739,19 +2766,16 @@
               "null"
             ]
           },
+          "mayLieOutsideGermany": {
+            "description": "True when the position may lie outside Germany, off the coast or near the border: no address within 1.5 km, and at least half of the circle of 15 km around it, in neighbouring eighths, holds none. The facts are then the nearest in Germany and may not describe the position itself.",
+            "type": "boolean"
+          },
           "municipality": {
             "additionalProperties": false,
             "description": "The nearest municipality within 50 km; null when none.",
             "properties": {
-              "code": {
-                "description": "The official region code; null when none.",
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
               "distanceM": {
-                "description": "Distance from the asked position in metres; null for the Land.",
+                "description": "Distance from the asked position in metres, to 100 m (under 50 m to the metre).",
                 "format": "int64",
                 "type": [
                   "integer",
@@ -2774,7 +2798,6 @@
             "required": [
               "id",
               "name",
-              "code",
               "location",
               "distanceM",
               "sourceFamily"
@@ -2786,7 +2809,7 @@
           },
           "state": {
             "additionalProperties": false,
-            "description": "The Land of the district; null when no district.",
+            "description": "The Land of the district; with no district, the nearest Land within 250 km; null when none.",
             "properties": {
               "code": {
                 "description": "The official region code; null when none.",
@@ -2796,7 +2819,7 @@
                 ]
               },
               "distanceM": {
-                "description": "Distance from the asked position in metres; null for the Land.",
+                "description": "Distance from the asked position in metres, to 100 m (under 50 m to the metre); null for the Land of a district.",
                 "format": "int64",
                 "type": [
                   "integer",
@@ -2835,6 +2858,7 @@
           "municipality",
           "district",
           "state",
+          "mayLieOutsideGermany",
           "lowEmissionZone"
         ],
         "type": "object"
@@ -3687,9 +3711,9 @@
             "type": "array"
           },
           "fuel": {
-            "description": "The cheapest current E5 prices first, three at most.",
+            "description": "The cheapest current E5 prices first, three at most, each with its E5 price only.",
             "items": {
-              "$ref": "#/components/schemas/FuelStation"
+              "$ref": "#/components/schemas/NearbyFuelStation"
             },
             "type": "array"
           },
@@ -3741,6 +3765,56 @@
           "data",
           "meta",
           "links"
+        ],
+        "type": "object"
+      },
+      "NearbyFuelStation": {
+        "additionalProperties": false,
+        "properties": {
+          "brand": {
+            "description": "The brand; null when not published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "distanceM": {
+            "description": "Distance in metres, to 0.1 km as the platform's nearby search states it.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "name": {
+            "description": "The station's name; null when not published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prices": {
+            "description": "The station's E5 price.",
+            "items": {
+              "$ref": "#/components/schemas/FuelPrice"
+            },
+            "type": "array"
+          },
+          "sourceFamily": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "brand",
+          "location",
+          "distanceM",
+          "prices",
+          "sourceFamily"
         ],
         "type": "object"
       },
@@ -7235,12 +7309,6 @@
           "kind": {
             "type": "string"
           },
-          "lamp": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "note": {
             "description": "Set when the request asked for something the watch does not report (a jam off a motorway, or around a place).",
             "type": [
@@ -7298,7 +7366,6 @@
           "ended",
           "condition",
           "note",
-          "lamp",
           "situations"
         ],
         "type": "object"
@@ -9630,22 +9697,34 @@
                     "value": {
                       "data": {
                         "topic": "syn_winter_tyres",
-                        "title": "Synthetisches Regelthema winter_tyres",
+                        "title": "Synthetic rule topic winter_tyres",
                         "rules": [
                           {
+                            "id": "syn_winter_tyres.1",
                             "text": "Synthetic statement 1 about winter_tyres, for tests only.",
-                            "legalBasis": "§ 0 synthetic"
+                            "legalBasis": "§ 0 synthetic",
+                            "sourceUrl": "https://law.example/winter_tyres",
+                            "reviewedOn": "2026-11-17",
+                            "unconfirmed": null
                           },
                           {
+                            "id": "syn_winter_tyres.2",
                             "text": "Synthetic statement 2 about winter_tyres, for tests only.",
-                            "legalBasis": "§ 0 synthetic"
+                            "legalBasis": "§ 0 synthetic",
+                            "sourceUrl": "https://law.example/winter_tyres",
+                            "reviewedOn": "2026-11-17",
+                            "unconfirmed": null
                           },
                           {
+                            "id": "syn_winter_tyres.3",
                             "text": "Synthetic statement 3 about winter_tyres, for tests only.",
-                            "legalBasis": "§ 0 synthetic"
+                            "legalBasis": "§ 0 synthetic",
+                            "sourceUrl": "https://law.example/winter_tyres",
+                            "reviewedOn": "2026-11-17",
+                            "unconfirmed": null
                           }
                         ],
-                        "reviewedOn": "2026-02-01",
+                        "reviewedOn": "2026-11-17",
                         "disclaimer": "Informational, not legal advice."
                       },
                       "meta": {
@@ -11833,7 +11912,7 @@
     },
     "/v1/location": {
       "get": {
-        "description": "A coordinate as a person understands it: the nearest address, municipality and district, the district's Land and the low-emission zone it lies in; each fact on its own, null when none is within its reach. Needs the scope places.",
+        "description": "A coordinate as a person understands it: the nearest address, municipality and district, and the district's Land (with no district, the nearest Land); each fact on its own, null when none is within its reach; the low-emission zone it lies in; and whether the position may lie outside Germany. Needs the scope places.",
         "operationId": "describeLocation",
         "parameters": [
           {
@@ -11864,7 +11943,18 @@
                         "address": null,
                         "municipality": null,
                         "district": null,
-                        "state": null,
+                        "state": {
+                          "id": "100001",
+                          "name": "Matfienland",
+                          "code": "01",
+                          "location": {
+                            "lat": 48.24375,
+                            "lon": 7.01625
+                          },
+                          "distanceM": 81800,
+                          "sourceFamily": "geonames"
+                        },
+                        "mayLieOutsideGermany": true,
                         "lowEmissionZone": null
                       },
                       "meta": {
@@ -11873,12 +11963,6 @@
                         "language": "en",
                         "asOf": null,
                         "freshness": [
-                          {
-                            "family": "bkg_gvisys",
-                            "dataAsOf": null,
-                            "ageS": null,
-                            "stale": false
-                          },
                           {
                             "family": "geonames",
                             "dataAsOf": null,
@@ -11893,17 +11977,6 @@
                           }
                         ],
                         "attribution": [
-                          {
-                            "family": "bkg_gvisys",
-                            "domain": "places",
-                            "publisher": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
-                            "text": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
-                            "licence": "dl-de/by-2-0",
-                            "licenceUrl": "https://licences.example/dl-de-by-2-0",
-                            "shareAlike": false,
-                            "shareAlikeOffer": null,
-                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
-                          },
                           {
                             "family": "geonames",
                             "domain": "places",
@@ -14955,7 +15028,7 @@
     },
     "/v1/places": {
       "get": {
-        "description": "The places one of whose names answers the text, best match first: a whole name before the start of one, the start before a part, then the more prominent place, then the nearer to at. The id is what getPlaceOverview takes, and the location is what every position operation asks. Needs the scope places.",
+        "description": "The places one of whose names answers the text, and the timetable stops whose name does (kind station_area, from the stop families the key may read), best match first: a whole name before the start of one, the start before a part, then the more prominent place, then the nearer to at. The id is what getPlaceOverview takes, and the location is what every position operation asks. Needs the scope places.",
         "operationId": "listPlaces",
         "parameters": [
           {
@@ -21737,40 +21810,18 @@
                         "until": "2026-03-30T03:00:00Z",
                         "ended": false,
                         "condition": {
-                          "event": "any",
-                          "events": null
+                          "event": "any"
                         },
                         "note": null,
-                        "lamp": "amber",
                         "situations": []
                       },
                       "meta": {
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
-                        "asOf": "2026-03-29T23:57:30Z",
-                        "freshness": [
-                          {
-                            "family": "roads_alpha",
-                            "dataAsOf": "2026-03-29T23:57:30Z",
-                            "ageS": 150,
-                            "staleAfterS": 900,
-                            "stale": false
-                          }
-                        ],
-                        "attribution": [
-                          {
-                            "family": "roads_alpha",
-                            "domain": "roads",
-                            "publisher": "Nimbruß Datenwerk",
-                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
-                            "licence": "CC BY 4.0",
-                            "licenceUrl": "https://licences.example/cc-by-4-0",
-                            "shareAlike": false,
-                            "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/roads_alpha"
-                          }
-                        ],
+                        "asOf": null,
+                        "freshness": [],
+                        "attribution": [],
                         "notes": {
                           "condition": [],
                           "purpose": []

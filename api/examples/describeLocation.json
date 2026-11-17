@@ -19,7 +19,18 @@
       "address": null,
       "municipality": null,
       "district": null,
-      "state": null,
+      "state": {
+        "id": "100001",
+        "name": "Matfienland",
+        "code": "01",
+        "location": {
+          "lat": 48.24375,
+          "lon": 7.01625
+        },
+        "distanceM": 81800,
+        "sourceFamily": "geonames"
+      },
+      "mayLieOutsideGermany": true,
       "lowEmissionZone": null
     },
     "meta": {
@@ -28,12 +39,6 @@
       "language": "en",
       "asOf": null,
       "freshness": [
-        {
-          "family": "bkg_gvisys",
-          "dataAsOf": null,
-          "ageS": null,
-          "stale": false
-        },
         {
           "family": "geonames",
           "dataAsOf": null,
@@ -48,17 +53,6 @@
         }
       ],
       "attribution": [
-        {
-          "family": "bkg_gvisys",
-          "domain": "places",
-          "publisher": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
-          "text": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
-          "licence": "dl-de/by-2-0",
-          "licenceUrl": "https://licences.example/dl-de-by-2-0",
-          "shareAlike": false,
-          "shareAlikeOffer": null,
-          "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
-        },
         {
           "family": "geonames",
           "domain": "places",

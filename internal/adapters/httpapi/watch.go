@@ -142,7 +142,6 @@ type WatchData struct {
 	Ended      bool            `json:"ended"`
 	Condition  map[string]any  `json:"condition" doc:"The condition applied, defaults filled in."`
 	Note       *string         `json:"note" nullable:"true" doc:"Set when the request asked for something the watch does not report (a jam off a motorway, or around a place)."`
-	Lamp       *string         `json:"lamp" nullable:"true"`
 	Situations []RoadSituation `json:"situations" doc:"road, place: the situations in the window, changed after since when given; empty for the other kinds."`
 	// Holds and the lists below answer the other kinds.
 	Holds       *bool                  `json:"holds,omitempty" doc:"station, region, weather, charger: whether the condition holds now (the platform's watch would report it)."`
@@ -212,8 +211,22 @@ func registerWatch(api huma.API, s *server, op huma.Operation) {
 			d.WatchID, d.URI, d.Kind, d.Key, d.From, d.Until, d.Ended, d.Situations = id, "viafrei://watch/"+id, in.Kind, in.Key, now, end, !end.After(now), []RoadSituation{}
 			return &WatchOutput{CacheControl: noStore, Body: WatchEnvelope{Data: d, Meta: r.meta, Links: s.selfLink(ctx)}}, nil
 		}
-		jams := in.Kind == "road" && strings.HasPrefix(in.Key, "A") && (slices.Contains(in.cond.Events, "jams") || len(in.cond.Events) == 0 && strings.Contains(strings.ToLower(in.Request), "stau"))
-		restrictions := len(in.cond.Events) == 0 || slices.Contains(in.cond.Events, "restrictions")
+		// The events watched, as the platform infers them from the person's
+		// words when the condition names none: a jam is watched on a
+		// motorway only.
+		events := in.cond.Events
+		if in.Kind == "road" {
+			events = roads.WatchEvents(in.cond.Events, roads.AskOf(true, in.Request, in.Key))
+		}
+		motorway := in.Kind == "road" && strings.HasPrefix(in.Key, "A")
+		var note *string
+		if !motorway && (slices.Contains(events, "jams") || in.Kind == "place" && roads.AskOf(false, in.Request, "") != roads.AskPlain) {
+			n := "A jam is watched on a motorway only; this watch reports closures and restrictions."
+			note = &n
+			events = slices.DeleteFunc(slices.Clone(events), func(e string) bool { return e == "jams" })
+		}
+		jams := motorway && slices.Contains(events, "jams")
+		restrictions := len(events) == 0 || slices.Contains(events, "restrictions")
 		var kinds []roads.Kind
 		if restrictions {
 			kinds = append(kinds, roads.KindClosure, roads.KindRoadworks, roads.KindRestriction)
@@ -221,28 +234,28 @@ func registerWatch(api huma.API, s *server, op huma.Operation) {
 		if jams {
 			kinds = append(kinds, roads.KindJam)
 		}
-		var note *string
-		if !jams && (slices.Contains(in.cond.Events, "jams") || strings.Contains(strings.ToLower(in.Request), "stau") || strings.Contains(strings.ToLower(in.Request), "jam")) {
-			n := "A jam is watched on a motorway only; this watch reports closures and restrictions."
-			note = &n
-		}
 		event := in.cond.Event
 		if event == "" {
 			event = "any"
 		}
 		filter := roads.Filter{Kinds: kinds, Until: end}
 		cond := map[string]any{}
-		var list []roads.Situation
-		var lamp *string
-		var meta DataMeta
+		var (
+			list []roads.Situation
+			fams []provenance.Family
+			at   time.Time
+			part bool
+		)
 		if in.Kind == "road" {
-			cond["event"], cond["events"] = event, in.cond.Events
+			cond["event"] = event
+			if events != nil {
+				cond["events"] = events
+			}
 			c, err := s.features.MotorwayConditions(ctx, principalFrom(ctx).Key, roads.CorridorQuery{Road: in.Key, Direction: roads.DirectionBoth, Filter: filter, Limit: 100})
 			if err != nil {
 				return nil, s.featureProblem(ctx, err)
 			}
-			l := string(c.Lamp)
-			list, lamp, meta = c.Items, &l, s.dataMeta(ctx, c.Families, c.At, c.Partial, partialDetail)
+			list, fams, at, part = c.Items, c.Families, c.At, c.Partial
 		} else {
 			r := in.cond.RadiusKm
 			if r == 0 {
@@ -253,21 +266,21 @@ func registerWatch(api huma.API, s *server, op huma.Operation) {
 			if err != nil {
 				return nil, s.featureProblem(ctx, err)
 			}
-			l := string(c.Lamp)
-			fams := c.Families
-			if len(c.Items) == 0 {
-				// An answer that states no situation carries no register's
-				// condition, as the platform's watch answers it.
-				fams = provenance.Unconditioned(fams)
-			}
-			list, lamp, meta = c.Items, &l, s.dataMeta(ctx, fams, c.At, c.Partial, partialDetail)
+			list, fams, at, part = c.Items, c.Families, c.At, c.Partial
 		}
 		if in.since != nil {
 			list = slices.DeleteFunc(slices.Clone(list), func(x roads.Situation) bool { return !x.UpdatedAt.After(*in.since) })
 		}
+		// The watch credits the families of the situations it reports, as the
+		// platform's watch credits the data behind each report: a watch that
+		// reports none credits none.
+		fams = slices.DeleteFunc(slices.Clone(fams), func(f provenance.Family) bool {
+			return !slices.ContainsFunc(list, func(x roads.Situation) bool { return x.Family == f.Source.Family })
+		})
+		meta := s.dataMeta(ctx, fams, at, part, partialDetail)
 		return &WatchOutput{CacheControl: noStore, Body: WatchEnvelope{
 			Data: WatchData{WatchID: id, URI: "viafrei://watch/" + id, Kind: in.Kind, Key: in.Key, From: now, Until: end, Ended: !end.After(now),
-				Condition: cond, Note: note, Lamp: lamp, Situations: roadSituations(list)},
+				Condition: cond, Note: note, Situations: roadSituations(list)},
 			Meta: meta, Links: s.selfLink(ctx)}}, nil
 	})
 }

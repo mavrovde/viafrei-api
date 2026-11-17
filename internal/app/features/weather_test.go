@@ -94,7 +94,7 @@ func (f *wxFake) GemeindeAt(context.Context, geo.Point, int, []string) (*places.
 	return nil, nil
 }
 
-func (f *wxFake) Topic(_ context.Context, code string) (rules.Topic, error) {
+func (f *wxFake) Topic(_ context.Context, code, _ string) (rules.Topic, error) {
 	f.readCalls++
 	f.gotCode = code
 	return f.topic, f.readErr

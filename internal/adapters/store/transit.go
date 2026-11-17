@@ -66,6 +66,7 @@ where s.withdrawn_at is null
   and ($4::text = '' or s.search_fold like '%' || $4::text || '%')
   and (here.g is null or st_dwithin(s.location::geography, here.g, $5))
   and ($7::text = '' or s.eva_no = $7::text or s.national_stop_code = $7::text)
+  and (not $8::bool or s.eva_no is not null)
 order by case when here.g is null and not s.search_fold like $4::text || '%' then 1 else 0 end,
          dist, s.name, s.stop_place_id
 limit $6`
@@ -78,7 +79,7 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 		lat, lon = &q.At.Lat, &q.At.Lon
 	}
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.Station, error) {
-		rows, _ := tx.Query(ctx, stationsPage, families, lat, lon, transit.Fold(q.Text), q.RadiusM, q.Limit+1, q.Code)
+		rows, _ := tx.Query(ctx, stationsPage, families, lat, lon, transit.Fold(q.Text), q.RadiusM, q.Limit+1, q.Code, q.Railway)
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.Station, error) {
 			var (
 				v     transit.Station

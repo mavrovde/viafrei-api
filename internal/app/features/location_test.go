@@ -34,7 +34,9 @@ func (f *locationFake) Zones(_ context.Context, q rules.ZoneQuery, _ []string, _
 	return f.zones, f.zoneErr
 }
 
-func (f *locationFake) Topic(context.Context, string) (rules.Topic, error) { return rules.Topic{}, nil }
+func (f *locationFake) Topic(context.Context, string, string) (rules.Topic, error) {
+	return rules.Topic{}, nil
+}
 
 func (f *locationFake) ZoneEntries(_ context.Context, codes []string) ([]rules.ListEntry, error) {
 	f.gotCodes = codes
@@ -72,6 +74,12 @@ func TestLocation(t *testing.T) {
 	// nothing found: the places families consulted are named
 	if a, err := locationService(&locationFake{}).Location(context.Background(), full, places.LocationQuery{}); err != nil || !slices.Equal(names(a.Meta.Families), []string{"f1"}) {
 		t.Errorf("empty answer %+v %v", a, err)
+	}
+	// A position that may lie abroad credits the addresses it was judged by.
+	abroad := places.Location{State: &places.Place{Family: "f1"}, MayLieAbroad: true, AbroadFamily: "f2"}
+	a, err = locationService(&locationFake{v: abroad}).Location(context.Background(), key("consumer", []access.Scope{"places"}, "f1", "f2"), places.LocationQuery{})
+	if err != nil || len(a.Meta.Families) != 2 {
+		t.Errorf("abroad %+v %v", a.Meta.Families, err)
 	}
 	for name, c := range map[string]struct {
 		f    *locationFake

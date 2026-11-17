@@ -33,6 +33,26 @@ type NearbyJunction struct {
 	SourceFamily string   `json:"sourceFamily"`
 }
 
+// NearbyFuelStation is a filling station near the position, as the
+// platform's nearby search states it: its E5 price and no opening state.
+type NearbyFuelStation struct {
+	ID           string      `json:"id"`
+	Name         *string     `json:"name" nullable:"true" doc:"The station's name; null when not published."`
+	Brand        *string     `json:"brand" nullable:"true" doc:"The brand; null when not published."`
+	Location     Position    `json:"location"`
+	DistanceM    int         `json:"distanceM" doc:"Distance in metres, to 0.1 km as the platform's nearby search states it."`
+	Prices       []FuelPrice `json:"prices" doc:"The station's E5 price."`
+	SourceFamily string      `json:"sourceFamily"`
+}
+
+func nearbyFuel(in []FuelStation) []NearbyFuelStation {
+	out := make([]NearbyFuelStation, len(in))
+	for i, f := range in {
+		out[i] = NearbyFuelStation{ID: f.ID, Name: f.Name, Brand: f.Brand, Location: f.Location, DistanceM: f.DistanceM, Prices: f.Prices, SourceFamily: f.SourceFamily}
+	}
+	return out
+}
+
 // NeedPlace is a place of interest answering an everyday need.
 type NeedPlace struct {
 	Name         string   `json:"name"`
@@ -54,12 +74,12 @@ type NeedBlock struct {
 
 // NearbyData is the data of listNearby: each asked category that is ok.
 type NearbyData struct {
-	Fuel      *[]FuelStation    `json:"fuel,omitempty" doc:"The cheapest current E5 prices first, three at most."`
-	Charging  *[]ChargingSite   `json:"charging,omitempty" doc:"Public charging sites, nearest first, three at most."`
-	Parking   *[]ParkingSite    `json:"parking,omitempty" doc:"Parking sites, nearest first, three at most."`
-	Stations  *[]Station        `json:"stations,omitempty" doc:"Stations, nearest first, three at most."`
-	Junctions *[]NearbyJunction `json:"junctions,omitempty" doc:"Motorway junctions, nearest first, three at most; services areas and car parks are none."`
-	Needs     *[]NeedBlock      `json:"needs,omitempty" doc:"The asked everyday needs, in the order asked."`
+	Fuel      *[]NearbyFuelStation `json:"fuel,omitempty" doc:"The cheapest current E5 prices first, three at most, each with its E5 price only."`
+	Charging  *[]ChargingSite      `json:"charging,omitempty" doc:"Public charging sites, nearest first, three at most."`
+	Parking   *[]ParkingSite       `json:"parking,omitempty" doc:"Parking sites, nearest first, three at most."`
+	Stations  *[]Station           `json:"stations,omitempty" doc:"Stations, nearest first, three at most."`
+	Junctions *[]NearbyJunction    `json:"junctions,omitempty" doc:"Motorway junctions, nearest first, three at most; services areas and car parks are none."`
+	Needs     *[]NeedBlock         `json:"needs,omitempty" doc:"The asked everyday needs, in the order asked."`
 }
 
 // NearbyPartStatus is the outcome of one category.
@@ -133,7 +153,7 @@ func registerNearby(api huma.API, s *server, op huma.Operation) {
 func nearbyEnvelope(s *server, ctx context.Context, a features.NearbyAnswer, q features.NearbyQuery) NearbyEnvelope {
 	var data NearbyData
 	if a.Fuel != nil {
-		v := fuelStations(*a.Fuel, q.FuelWindow)
+		v := nearbyFuel(cheapest(*a.Fuel, fuelStations(*a.Fuel, q.FuelWindow), "e5"))
 		data.Fuel = &v
 	}
 	if a.Charging != nil {

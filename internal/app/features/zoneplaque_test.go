@@ -36,7 +36,9 @@ func (f *plaqueFake) Register(ctx context.Context) ([]access.Terms, error) {
 	return f.fake.Register(ctx)
 }
 
-func (f *plaqueFake) Topic(context.Context, string) (rules.Topic, error) { return rules.Topic{}, nil }
+func (f *plaqueFake) Topic(context.Context, string, string) (rules.Topic, error) {
+	return rules.Topic{}, nil
+}
 
 func (f *plaqueFake) Zones(context.Context, rules.ZoneQuery, []string, time.Time) ([]rules.Zone, error) {
 	return slices.Clone(f.zones), f.zoneErr

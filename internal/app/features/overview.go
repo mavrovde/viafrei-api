@@ -181,7 +181,14 @@ func (s *Service) Places(ctx context.Context, key access.Record, q places.Query)
 	if err != nil {
 		return Answer[places.Place]{}, err
 	}
-	ps, more, err := s.repos.Places.Places(ctx, q, permitted)
+	// The timetable's stops answer a name too, as the platform's place
+	// search lists them: the stop families the key may read, whether or not
+	// its plan holds the transit scope; a key that may read none lists no stop.
+	stops, _, serr := gate.Answer(access.Answering(reg, "transit"))
+	if serr != nil {
+		stops = nil
+	}
+	ps, more, err := s.repos.Places.Places(ctx, q, permitted, stops)
 	if err != nil {
 		return Answer[places.Place]{}, err
 	}

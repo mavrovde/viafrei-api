@@ -298,8 +298,9 @@
           "places"
         ],
         "sources": [
-          "geonames",
-          "bkg_gvisys"
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames"
         ],
         "accepted": null
       },
@@ -316,8 +317,9 @@
           "places"
         ],
         "sources": [
-          "geonames",
-          "bkg_gvisys"
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames"
         ],
         "accepted": null
       },
@@ -334,8 +336,9 @@
           "places"
         ],
         "sources": [
-          "geonames",
-          "bkg_gvisys"
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames"
         ],
         "accepted": null
       },
@@ -885,6 +888,7 @@
           "bast_lcl",
           "osm"
         ],
+        "audience": "own",
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"

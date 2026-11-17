@@ -34,10 +34,16 @@ func TestLocationAnswer(t *testing.T) {
 	if w.Code != http.StatusOK || f.gotLoc.At.Lat != 50.94 {
 		t.Fatalf("status %d: %s", w.Code, body)
 	}
-	for _, want := range []string{`"distanceM":40`, `"municipality":null`, `"name":"Kreis"`, `"state":null`, `"lowEmissionZone":null`} {
+	for _, want := range []string{`"distanceM":40`, `"municipality":null`, `"name":"Kreis"`, `"state":null`, `"mayLieOutsideGermany":false`, `"lowEmissionZone":null`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("answer lacks %s: %s", want, body)
 		}
+	}
+	// A settlement is named by its name and point, without a code; a
+	// position that may lie abroad says so.
+	f.location = features.LocationAnswer{Location: places.Location{Municipality: &places.Place{ID: "m1", Name: "Ort", RegionCode: sp("01002"), DistanceM: ip(37900)}, MayLieAbroad: true}, Meta: features.Answer[struct{}]{At: fixedNow}}
+	if body = do(t, h, http.MethodGet, "/v1/location?at=50.94,6.96", bearer).Body.String(); !strings.Contains(body, `"municipality":{"id":"m1","name":"Ort","location":`) || strings.Contains(body, "01002") || !strings.Contains(body, `"mayLieOutsideGermany":true`) {
+		t.Errorf("settlement: %s", body)
 	}
 	f.location = features.LocationAnswer{Location: places.Location{Address: &places.Address{ID: "osm:node2"}}, Meta: features.Answer[struct{}]{At: fixedNow}}
 	if w = do(t, h, http.MethodGet, "/v1/location?at=50.94,6.96", bearer); !strings.Contains(w.Body.String(), `"distanceM":0`) {

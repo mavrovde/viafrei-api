@@ -19,8 +19,13 @@ func TestPlacesAreGatedAndAttributed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(f.gotFamilies, []string{"pl"}) || len(a.Items) != 1 || !a.HasMore || !a.At.Equal(now) || !slices.Equal(names(a.Families), []string{"pl"}) {
+	if !slices.Equal(f.gotFamilies, []string{"pl"}) || f.gotStops != nil || len(a.Items) != 1 || !a.HasMore || !a.At.Equal(now) || !slices.Equal(names(a.Families), []string{"pl"}) {
 		t.Errorf("answer %+v", a)
+	}
+	// The stops a key may read answer a name too, without the transit scope.
+	f = &fake{place: places.Place{ID: "x", Family: "st"}}
+	if _, err := service(f, nil).Places(context.Background(), key("commercial", []access.Scope{"places"}, "pl", "st"), places.Query{Text: "nn", Limit: 1}); err != nil || !slices.Equal(f.gotStops, []string{"st"}) {
+		t.Errorf("stops %v, %v", f.gotStops, err)
 	}
 	full := key("commercial", []access.Scope{"places"}, "pl")
 	for name, c := range map[string]struct {

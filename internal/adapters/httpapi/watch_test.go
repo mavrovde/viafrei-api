@@ -173,7 +173,7 @@ func TestWatchARoadOrAPlace(t *testing.T) {
 		{"kind": {"place"}, "target": {"52.52,13.405"}, "condition": {`{"radius_km":10}`}, "until": {fixedNow.Add(time.Hour).Format(time.RFC3339)}},
 		{"kind": {"place"}, "target": {"52.52,13.405"}},
 	} {
-		if code, d := watch(t, h, q); code != http.StatusOK || d["lamp"] == nil || d["holds"] != nil {
+		if code, d := watch(t, h, q); code != http.StatusOK || d["lamp"] != nil || d["holds"] != nil {
 			t.Errorf("%v: %d %v", q, code, d)
 		}
 	}

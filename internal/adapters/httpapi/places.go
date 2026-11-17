@@ -74,7 +74,7 @@ type PlacesOutput struct {
 
 func registerPlaces(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "The places a name means"
-	op.Description = "The places one of whose names answers the text, best match first: a whole name before the start of one, the start before a part, then the more prominent place, then the nearer to at. The id is what getPlaceOverview takes, and the location is what every position operation asks. Needs the scope places."
+	op.Description = "The places one of whose names answers the text, and the timetable stops whose name does (kind station_area, from the stop families the key may read), best match first: a whole name before the start of one, the start before a part, then the more prominent place, then the nearer to at. The id is what getPlaceOverview takes, and the location is what every position operation asks. Needs the scope places."
 	featureResponses(api, &op, "Not used by this operation.")
 	op.Extensions[counterpartExtension] = "place search"
 	huma.Register(api, op, func(ctx context.Context, in *PlacesInput) (*PlacesOutput, error) {

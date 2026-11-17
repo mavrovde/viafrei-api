@@ -8,15 +8,36 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 )
 
+// statedM is a distance from ($1, $2) on the sphere, as the platform
+// measures and states it: metres under 50 m, else to 100 m.
+func statedM(col string) string {
+	d := `st_distance(` + col + `::geography, st_setsrid(st_makepoint($1, $2), 4326)::geography, false)::numeric`
+	return `(case when ` + d + ` < 50 then round(` + d + `) else round(` + d + ` / 100) * 100 end)::int`
+}
+
 // nearestPlace reads the nearest place of the kind $3 within $4 metres of
 // ($1, $2), of the families $5.
 var nearestPlace = `select p.place_id, p.name, p.place_kind, st_y(p.location), st_x(p.location), p.region_code, p.source_ref,
-       round(st_distance(p.location::geography, st_setsrid(st_makepoint($1, $2), 4326)::geography))::int, p.official_key
+       ` + statedM("p.location") + `, p.official_key
 from contract.place p
 where p.place_kind = $3 and p.withdrawn_at is null and p.location is not null
   and st_dwithin(p.location::geography, st_setsrid(st_makepoint($1, $2), 4326)::geography, $4)
   and p.source_ref = any($5) and ` + permitted("p") + `
 order by p.location::geography <-> st_setsrid(st_makepoint($1, $2), 4326)::geography, p.place_id
+limit 1`
+
+// addressSectors reads, for each wedge of $1 (WKT), whether it holds an
+// address of the families $2.
+var addressSectors = `select w.i::int, exists (select 1 from contract.address a
+  where a.source_ref = any($2) and ` + permitted("a") + ` and st_intersects(a.location::geography, st_geogfromtext(w.wkt)))
+from unnest($1::text[]) with ordinality as w(wkt, i)
+order by w.i`
+
+// nearestAddressFamily reads the family of the nearest address of the
+// families $3 to ($1, $2), however far.
+var nearestAddressFamily = `select a.source_ref from contract.address a
+where a.source_ref = any($3) and ` + permitted("a") + `
+order by a.location <-> st_setsrid(st_makepoint($1, $2), 4326), a.address_id
 limit 1`
 
 // stateOf reads the Land whose region code begins the code $1.
@@ -53,8 +74,9 @@ func first[T any](v []T) *T {
 }
 
 // Location reads what lies at q.At (features.Location): the nearest
-// address, municipality and district within the platform's reaches, and the
-// Land of the district.
+// address, municipality and district within the platform's reaches, the
+// Land of the district (with none, the nearest Land), and whether the
+// position may lie outside Germany.
 func (s *Store) Location(ctx context.Context, q places.LocationQuery, families []string) (places.Location, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (places.Location, error) {
 		var out places.Location
@@ -82,12 +104,35 @@ func (s *Store) Location(ctx context.Context, q places.LocationQuery, families [
 		}
 		if out.District != nil && out.District.RegionCode != nil {
 			rows, _ = tx.Query(ctx, stateOf, *out.District.RegionCode, families)
-			ps, err := pgx.CollectRows(rows, scanPlace)
-			if err != nil {
-				return out, err
-			}
-			out.State = first(ps)
+		} else {
+			rows, _ = tx.Query(ctx, nearestPlace, q.At.Lon, q.At.Lat, "state", places.StateReachM, families)
 		}
-		return out, nil
+		ps, err := pgx.CollectRows(rows, scanPlace)
+		if err != nil {
+			return out, err
+		}
+		out.State = first(ps)
+		if out.Address != nil && *out.Address.DistanceM <= places.AbroadNearestM {
+			return out, nil
+		}
+		rows, _ = tx.Query(ctx, addressSectors, places.SectorWedges(q.At, places.AbroadScanM, places.AbroadSectors), families)
+		hits, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (bool, error) {
+			var (
+				i   int
+				hit bool
+			)
+			err := r.Scan(&i, &hit)
+			return hit, err
+		})
+		if err != nil || places.LongestEmptyRun(hits) < places.AbroadEmptyRun {
+			return out, err
+		}
+		out.MayLieAbroad = true
+		rows, _ = tx.Query(ctx, nearestAddressFamily, q.At.Lon, q.At.Lat, families)
+		fam, err := pgx.CollectRows(rows, pgx.RowTo[string])
+		if v := first(fam); v != nil {
+			out.AbroadFamily = *v
+		}
+		return out, err
 	})
 }

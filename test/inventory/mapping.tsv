@@ -40,3 +40,4 @@ argument:get_train_departures.limit	listStationDepartures?limit	departures-day	-
 argument:get_train_departures.categories	listStationDepartures?categories	departures-categories	-
 web:/internal/station-suggest	listStations?q	stations-text	-
 web:/internal/station/near	listStations?at	stations-near	-
+argument:get_train_departures.eva_no	listStations?code	stations-code	-

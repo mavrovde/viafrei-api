@@ -60,6 +60,9 @@ type Station struct {
 type Query struct {
 	// Text is what the client typed; empty for none.
 	Text string
+	// Code is a station code (EVA number or national stop code) the
+	// station must carry; empty for none.
+	Code string
 	// At is the position; nil for none.
 	At      *geo.Point
 	RadiusM int

@@ -208,6 +208,23 @@
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "stations-code",
+      "operation": "listStations",
+      "counterpart": "station search",
+      "request": "/v1/stations?code=de:01002:0&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "src-alpha-transit"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
     }
   ]
 }

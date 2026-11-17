@@ -221,6 +221,7 @@ func utc(t *time.Time) *time.Time {
 // StationsInput is the input of listStations.
 type StationsInput struct {
 	Q       string `query:"q" minLength:"2" maxLength:"60" example:"Köln Hbf" doc:"A station name, or part of it, as typed: case, umlauts written out (koeln for Köln), accents and punctuation do not matter."`
+	Code    string `query:"code" minLength:"3" maxLength:"40" example:"8000207" doc:"A station code: the railway's EVA number or the national stop code (DHID); the station that carries it. At least one of q, code and at."`
 	At      string `query:"at" pattern:"^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$" example:"50.943,6.959" doc:"A position: lat,lon in decimal degrees (WGS 84). With q, the name search within radius_m of it. At least one of q and at."`
 	RadiusM int    `query:"radius_m" minimum:"1" maximum:"50000" doc:"Search radius around at, in metres. Default: geo.default_radius_m. Ignored without at."`
 	Limit   int    `query:"limit" minimum:"1" maximum:"60" doc:"Most stations to return. Default: pagination.default_limit."`
@@ -231,8 +232,8 @@ type StationsInput struct {
 // schema checks).
 func (in *StationsInput) Resolve(huma.Context) []error {
 	if in.At == "" {
-		if in.Q == "" {
-			return []error{&huma.ErrorDetail{Location: "query.q", Message: "q or at is required"}}
+		if in.Q == "" && in.Code == "" {
+			return []error{&huma.ErrorDetail{Location: "query.q", Message: "q, code or at is required"}}
 		}
 		return nil
 	}
@@ -259,6 +260,7 @@ type Station struct {
 // StationsQuery is meta.query of listStations: the input actually answered.
 type StationsQuery struct {
 	Q       *string   `json:"q" nullable:"true" doc:"The text searched for; null for none."`
+	Code    *string   `json:"code" nullable:"true" doc:"The station code asked; null for none."`
 	At      *Position `json:"at" doc:"The position searched around; null for none."`
 	RadiusM *int      `json:"radiusM" nullable:"true" doc:"The radius around at; null without at."`
 }
@@ -291,10 +293,13 @@ func registerStations(api huma.API, s *server, op huma.Operation) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
-		q := transit.Query{Text: in.Q, At: in.point, Limit: s.limit(in.Limit)}
+		q := transit.Query{Text: in.Q, Code: in.Code, At: in.point, Limit: s.limit(in.Limit)}
 		query := StationsQuery{}
 		if in.Q != "" {
 			query.Q = &in.Q
+		}
+		if in.Code != "" {
+			query.Code = &in.Code
 		}
 		if in.point != nil {
 			q.RadiusM = s.radius(in.RadiusM)

@@ -84,6 +84,13 @@ func TestStationsAnswer(t *testing.T) {
 	if g := f.gotStation; g.Text != "" || g.At == nil || g.RadiusM != config.Defaults().Geo.DefaultRadiusM || q["q"] != nil {
 		t.Errorf("a position alone: asked %+v, query %v", g, q)
 	}
+	// A station code alone.
+	f = everyAnswer()
+	body = decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/stations?code=8000207", bearer))
+	q, _ = meta(t, body)["query"].(map[string]any)
+	if g := f.gotStation; g.Code != "8000207" || g.At != nil || q["code"] != "8000207" {
+		t.Errorf("a code alone: asked %+v, query %v", g, q)
+	}
 	if !slices.Contains(featureScopes().Key.Plan.Scopes, "transit") {
 		t.Fatal("the rig's key has no transit scope")
 	}

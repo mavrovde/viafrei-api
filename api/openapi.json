@@ -2709,6 +2709,13 @@
               "null"
             ]
           },
+          "code": {
+            "description": "The station code asked; null for none.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "q": {
             "description": "The text searched for; null for none.",
             "type": [
@@ -2727,6 +2734,7 @@
         },
         "required": [
           "q",
+          "code",
           "at",
           "radiusM"
         ],
@@ -6538,6 +6546,21 @@
               ],
               "maxLength": 60,
               "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "description": "A station code: the railway's EVA number or the national stop code (DHID); the station that carries it. At least one of q, code and at.",
+            "explode": false,
+            "in": "query",
+            "name": "code",
+            "schema": {
+              "description": "A station code: the railway's EVA number or the national stop code (DHID); the station that carries it. At least one of q, code and at.",
+              "examples": [
+                "8000207"
+              ],
+              "maxLength": 40,
+              "minLength": 3,
               "type": "string"
             }
           },

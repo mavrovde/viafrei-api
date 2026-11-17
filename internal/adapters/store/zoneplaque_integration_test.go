@@ -42,6 +42,23 @@ values ('testdorf', 'Testdorf', array['99000101', '99000102'], null, false, '202
 	}
 }
 
+func TestZoneEntryNamedReadsTheCuratedListByNameOrAlias(t *testing.T) {
+	req.Covers(t, "FR-RULES-001")
+	st := seeded(t)
+	// Expected from the platform's curated list: München's aliases name it.
+	for _, name := range []string{"muenchen", "munich", "monacodibaviera"} {
+		if e, err := st.ZoneEntryNamed(bounded(t), name); err != nil || e == nil || e.Name != "München" || !e.Covered {
+			t.Errorf("%s: %+v %v", name, e, err)
+		}
+	}
+	if e, err := st.ZoneEntryNamed(bounded(t), "matfienland"); err != nil || e != nil {
+		t.Errorf("no entry: %+v %v", e, err)
+	}
+	if zs, err := st.Zones(bounded(t), rules.ZoneQuery{City: "München"}, []string{"lez_alpha"}, time.Now()); err != nil || zs != nil {
+		t.Errorf("no zone row is read for a city: %+v %v", zs, err)
+	}
+}
+
 // The Gemeinde that finds a list entry is the nearest municipality of the
 // families asked within the reach, none beyond it.
 func TestGemeindeAtReadsTheNearestMunicipalityWithinReach(t *testing.T) {

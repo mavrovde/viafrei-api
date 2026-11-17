@@ -15,6 +15,9 @@ import (
 type ZonePlaques interface {
 	// ZoneEntries reads the list entries that speak for any of codes.
 	ZoneEntries(ctx context.Context, codes []string) ([]rules.ListEntry, error)
+	// ZoneEntryNamed reads the list entry whose key or an alias is the
+	// normalised city name (rules.NormaliseCity), nil when none.
+	ZoneEntryNamed(ctx context.Context, name string) (*rules.ListEntry, error)
 	// GemeindeAt reads the nearest municipality of the families within
 	// reachM metres of at, nil when none.
 	GemeindeAt(ctx context.Context, at geo.Point, reachM int, families []string) (*places.Place, error)

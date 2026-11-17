@@ -127,12 +127,27 @@ type ZonesAnswer struct {
 	Verdict *rules.Verdict
 	Answer  *rules.ZoneAnswer
 	Meta    Answer[struct{}]
+	// City is the curated list's entry for the asked city, which no zone
+	// row is read for; nil when none was asked.
+	City *rules.ZoneCity
 }
 
 // LowEmissionZones answers "am I in a low-emission zone" for a point, or
 // "which zone does this city publish", from the zone sources the key may read
 // (domain roads) that are alive now.
 func (s *Service) LowEmissionZones(ctx context.Context, key access.Record, q rules.ZoneQuery) (ZonesAnswer, error) {
+	var city *rules.ZoneCity
+	if q.City != "" {
+		e, err := s.repos.Rules.ZoneEntryNamed(ctx, rules.NormaliseCity(q.City))
+		if err != nil {
+			return ZonesAnswer{}, err
+		}
+		c := rules.CityOf(q.City, e, s.lang(ctx))
+		city = &c
+	}
+	if q.At == nil {
+		return ZonesAnswer{City: city}, nil
+	}
 	v, meta, err := listed(ctx, s, key, "roads", func(permitted []string) ([]rules.Zone, []string, error) {
 		zs, err := s.repos.Rules.Zones(ctx, q, permitted, s.now())
 		var fams []string
@@ -141,8 +156,8 @@ func (s *Service) LowEmissionZones(ctx context.Context, key access.Record, q rul
 		}
 		return zs, fams, err
 	})
-	out := ZonesAnswer{Zones: v, Meta: meta}
-	if q.At == nil || err != nil {
+	out := ZonesAnswer{Zones: v, Meta: meta, City: city}
+	if err != nil {
 		return out, err
 	}
 	vd := rules.VerdictOf(v)

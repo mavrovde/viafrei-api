@@ -180,6 +180,7 @@ type ZoneVerdict struct {
 	Zone       *string `json:"zone" nullable:"true" doc:"The key of the zone it is inside, or of the nearest."`
 	Transfer   *string `json:"transfer" nullable:"true" doc:"The key of the released area it is in."`
 	ExemptRoad *string `json:"exemptRoad" nullable:"true" doc:"The key of an exempt road within 60 m."`
+	DistanceM  *int    `json:"distanceM" nullable:"true" doc:"Outside: the distance to the nearest zone in metres; null otherwise."`
 	ZoneFacts
 }
 
@@ -207,8 +208,17 @@ type DrivingRulesData struct {
 	Rules      []DrivingRule     `json:"rules" doc:"In their curated order."`
 	ReviewedOn string            `json:"reviewedOn" format:"date" doc:"The oldest review of its rules: the topic is as current as its least recently read rule."`
 	Disclaimer Disclaimer        `json:"disclaimer"`
-	Zones      []LowEmissionZone `json:"zones,omitempty" doc:"With topic lez and a position or city: the published zone rows, inside first, then by distance."`
+	Zones      []LowEmissionZone `json:"zones,omitempty" doc:"With topic lez and a position: the published zone rows, inside first, then by distance."`
 	Verdict    *ZoneVerdict      `json:"zoneVerdict,omitempty" doc:"With topic lez and a position: the platform's verdict."`
+	ZoneCity   *ZoneCity         `json:"zoneCity,omitempty" doc:"With topic lez and a city: the curated list's entry for it, or the city uncovered (no entry is not that the city has no zone; the condition note says so)."`
+}
+
+// ZoneCity is the curated zone list's entry for an asked city.
+type ZoneCity struct {
+	Name     string  `json:"name" doc:"The entry's name, or the asked city when the list holds none."`
+	Zone     *string `json:"zone" nullable:"true" doc:"The entry's description of its zone; null while the list carries none."`
+	Plakette *string `json:"plakette" nullable:"true" doc:"The plaque the zone takes (green); null when none is stated."`
+	Covered  bool    `json:"covered" doc:"Whether the list holds an entry whose zone it states."`
 }
 
 // Disclaimer is the sentence every rules answer carries. Its schema is an
@@ -250,18 +260,29 @@ func registerDrivingRules(api huma.API, s *server, op huma.Operation) {
 		noteRules(ctx)
 		var zones []LowEmissionZone
 		var verdict *ZoneVerdict
+		var city *ZoneCity
+		var caveat string
 		if t.Code == "lez" && (in.point != nil || in.City != "") {
 			z, err := s.features.LowEmissionZones(ctx, principalFrom(ctx).Key, rules.ZoneQuery{At: in.point, City: in.City})
 			if err != nil {
 				return nil, s.featureProblem(ctx, err)
 			}
-			zones = []LowEmissionZone{}
+			if c := z.City; c != nil {
+				city, caveat = &ZoneCity{Name: c.Name, Zone: c.Zone, Plakette: c.Plakette, Covered: c.Covered}, c.Caveat
+			}
+			if in.point != nil {
+				zones = []LowEmissionZone{}
+			}
 			for _, r := range z.Zones {
 				zones = append(zones, LowEmissionZone{Key: r.Key, Role: r.Role, Name: r.Name, City: r.City, Publisher: r.Publisher,
 					Inside: r.Inside, DistanceM: r.DistanceM, SameZone: append([]string{}, r.SameZone...), SourceFamily: r.Family})
 			}
 			if v := z.Verdict; v != nil {
 				verdict = &ZoneVerdict{Kind: v.Kind, Zone: zoneKey(v.Zone), Transfer: zoneKey(v.Transfer), ExemptRoad: zoneKey(v.ExemptRoad), ZoneFacts: zoneFacts(z.Answer)}
+				if v.Kind == "outside" && v.Zone != nil {
+					d := v.Zone.DistanceM
+					verdict.DistanceM = &d
+				}
 			}
 			a.Families = append(a.Families, z.Meta.Families...)
 		}
@@ -273,12 +294,21 @@ func registerDrivingRules(api huma.API, s *server, op huma.Operation) {
 		return &DrivingRulesOutput{CacheControl: noStore, Body: DrivingRulesEnvelope{
 			Data: DrivingRulesData{
 				Topic: t.Code, Title: t.Title, Rules: rs,
-				ReviewedOn: t.ReviewedOn.Format(time.DateOnly), Disclaimer: rules.Disclaimer, Zones: zones, Verdict: verdict,
+				ReviewedOn: t.ReviewedOn.Format(time.DateOnly), Disclaimer: rules.Disclaimer, Zones: zones, Verdict: verdict, ZoneCity: city,
 			},
-			Meta:  s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
+			Meta:  rulesMeta(s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail), caveat),
 			Links: s.selfLink(ctx),
 		}}, nil
 	})
+}
+
+// rulesMeta states the caveat of a city the zone list holds no entry for
+// as a condition: no entry is not that there is no zone.
+func rulesMeta(m DataMeta, caveat string) DataMeta {
+	if caveat != "" {
+		m.Notes.Condition = append(m.Notes.Condition, caveat)
+	}
+	return m
 }
 
 // weatherWarnings are the answers of the warnings.

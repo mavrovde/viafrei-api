@@ -148,7 +148,8 @@ type watchRead struct {
 }
 
 // readOtherKind reads a station, region, weather or charger watch at now
-// until end, and says whether its condition holds.
+// until end. A region or weather watch credits no family, as the platform's
+// watch states its condition's figures and credits none.
 func (s *server) readOtherKind(ctx context.Context, in *WatchInput, now, end time.Time) (watchRead, error) {
 	key := principalFrom(ctx).Key
 	c := in.cond
@@ -156,7 +157,6 @@ func (s *server) readOtherKind(ctx context.Context, in *WatchInput, now, end tim
 	if scope := watchScopes[in.Kind]; !key.Plan.Has(scope) {
 		return r, newProblem(ctx, SlugScopeDenied, "A "+in.Kind+" watch needs the scope "+string(scope)+".", 0)
 	}
-	holds := false
 	switch in.Kind {
 	case "station":
 		b, err := s.features.Departures(ctx, key, transit.DepartureQuery{StationID: in.Key, From: now, Window: end.Sub(now), Limit: watchMaxDepartures})
@@ -170,7 +170,6 @@ func (s *server) readOtherKind(ctx context.Context, in *WatchInput, now, end tim
 				r.data.Departures = append(r.data.Departures, departureRow(d))
 			}
 		}
-		holds = len(r.data.Departures) > 0
 		r.meta = s.dataMeta(ctx, b.Families, b.At, b.Partial, partialDetail)
 	case "region":
 		q := transit.DisruptionQuery{Area: in.Key, WindowMin: disruptionDefaultWindowMin, Limit: disruptionDefaultLimit, LateOverMin: c.DelayMin}
@@ -183,22 +182,17 @@ func (s *server) readOtherKind(ctx context.Context, in *WatchInput, now, end tim
 		r.data.Punctuality = env.Data.Punctuality
 		if t := a.Trips; t != nil {
 			r.data.Trips = &WatchTrips{Observed: t.Observed, Late: t.Late, LateShare: math.Round(float64(t.Late)/float64(t.Observed)*1000) / 1000, ObservedAt: t.ObservedAt}
-			holds = t.Observed >= c.MinTrips && float64(t.Late) >= c.LateShare*float64(t.Observed)
 		}
 		r.meta = env.Meta.DataMeta
+		r.meta.Attribution = []Attribution{}
 	case "weather":
 		a, err := s.features.WeatherCell(ctx, key, in.Key, in.at, *c.MinLevel)
 		if err != nil {
 			return r, s.featureProblem(ctx, err)
 		}
 		r.data.Condition = map[string]any{"min_level": *c.MinLevel}
-		r.data.Cell = &WatchCell{Key: a.Key, Name: a.Name}
-		if a.Place != nil {
-			r.data.Cell.Place = &a.Place.Name
-		}
 		r.data.Warnings = weatherWarnings(a.Warnings)
-		holds = len(a.Warnings) > 0
-		r.meta = s.dataMeta(ctx, a.Meta.Families, a.Meta.At, a.Meta.Partial, partialDetail)
+		r.meta = s.dataMeta(ctx, nil, a.Meta.At, a.Meta.Partial, partialDetail)
 	case "charger":
 		a, err := s.features.ChargingSite(ctx, key, in.Key, s.cfg.Charging.StatusMaxAge)
 		if err != nil {
@@ -210,15 +204,9 @@ func (s *server) readOtherKind(ctx context.Context, in *WatchInput, now, end tim
 		if c.PointID != "" {
 			r.data.Condition["point_id"] = c.PointID
 		}
-		for _, p := range site.ChargePoints {
-			if (c.PointID == "" || p.ID == c.PointID) && p.Availability != nil && p.Availability.State == "available" {
-				holds = true
-			}
-		}
 		r.data.Site = &site
 		r.meta = s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail)
 	}
-	r.data.Holds = &holds
 	return r, nil
 }
 

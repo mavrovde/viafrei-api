@@ -25,6 +25,8 @@ type plaqueFake struct {
 	gemErr                error
 	gotCodes, gotGemFams  []string
 	gemCalls, entryCalls  int
+	named                 *rules.ListEntry
+	gotName               string
 	regErrOnCall, regRead int
 }
 
@@ -48,6 +50,11 @@ func (f *plaqueFake) ZoneEntries(_ context.Context, codes []string) ([]rules.Lis
 	f.entryCalls++
 	f.gotCodes = codes
 	return f.entries, f.entryErr
+}
+
+func (f *plaqueFake) ZoneEntryNamed(_ context.Context, name string) (*rules.ListEntry, error) {
+	f.gotName = name
+	return f.named, f.entryErr
 }
 
 func (f *plaqueFake) GemeindeAt(_ context.Context, _ geo.Point, reach int, fams []string) (*places.Place, error) {
@@ -115,10 +122,21 @@ func TestLowEmissionZonesStatesThePlaqueAsThePlatform(t *testing.T) {
 		t.Errorf("unknown: %+v %v", a, err)
 	}
 
-	// A city asked by name gets its rows and no verdict.
-	f = &plaqueFake{zones: []rules.Zone{m}}
-	if a, err := plaqueService(f, "places").LowEmissionZones(context.Background(), k, rules.ZoneQuery{City: "München"}); err != nil || a.Verdict != nil || a.Answer != nil || len(a.Zones) != 1 {
+	// A city asked by name gets the list's entry, and no zone row or verdict.
+	f = &plaqueFake{zones: []rules.Zone{m}, named: &rules.ListEntry{Name: "München", Covered: true}}
+	if a, err := plaqueService(f, "places").LowEmissionZones(context.Background(), k, rules.ZoneQuery{City: "Monaco di Baviera"}); err != nil || a.Verdict != nil || a.Answer != nil ||
+		len(a.Zones) != 0 || a.City == nil || a.City.Name != "München" || !a.City.Covered || f.gotName != "monacodibaviera" || len(a.Meta.Families) != 0 {
 		t.Errorf("city: %+v %v", a, err)
+	}
+	// With a position too, the position's zones and the city's entry.
+	f = &plaqueFake{zones: []rules.Zone{m}}
+	if a, err := plaqueService(f, "places").LowEmissionZones(context.Background(), k, rules.ZoneQuery{At: &at, City: "Matfienland"}); err != nil || a.Verdict == nil || len(a.Zones) != 1 ||
+		a.City == nil || a.City.Covered || a.City.Caveat == "" {
+		t.Errorf("city and position: %+v %v", a, err)
+	}
+	f = &plaqueFake{entryErr: errStore}
+	if _, err := plaqueService(f, "places").LowEmissionZones(context.Background(), k, rules.ZoneQuery{City: "Köln"}); !errors.Is(err, errStore) {
+		t.Errorf("city entry: %v", err)
 	}
 
 	for name, f := range map[string]*plaqueFake{

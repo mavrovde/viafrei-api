@@ -143,12 +143,10 @@ type WatchData struct {
 	Condition  map[string]any  `json:"condition" doc:"The condition applied, defaults filled in."`
 	Note       *string         `json:"note" nullable:"true" doc:"Set when the request asked for something the watch does not report (a jam off a motorway, or around a place)."`
 	Situations []RoadSituation `json:"situations" doc:"road, place: the situations in the window, changed after since when given; empty for the other kinds."`
-	// Holds and the lists below answer the other kinds.
-	Holds       *bool                  `json:"holds,omitempty" doc:"station, region, weather, charger: whether the condition holds now (the platform's watch would report it)."`
+	// The lists below answer the other kinds.
 	Departures  []Departure            `json:"departures,omitempty" doc:"station: the departures of the window cancelled or at least delay_min late."`
 	Punctuality *DisruptionPunctuality `json:"punctuality,omitempty" doc:"region: the area's punctuality, as listDisruptions reports it."`
 	Trips       *WatchTrips            `json:"trips,omitempty" doc:"region: the distinct trips observed at the area's stops in the last half hour and those more than delay_min late at one of them; the condition holds when at least min_trips were observed and at least late_share of them were late. Absent when none was observed."`
-	Cell        *WatchCell             `json:"cell,omitempty" doc:"weather: the DWD warn cell the target resolved to."`
 	Warnings    []WeatherWarning       `json:"warnings,omitempty" doc:"weather: the official warnings in force of the warn cell of at least min_level."`
 	Site        *ChargingSite          `json:"site,omitempty" doc:"charger: the site and its points; the condition holds when a point (point_id when given) is reported available."`
 }
@@ -159,13 +157,6 @@ type WatchTrips struct {
 	Late       int       `json:"late" doc:"Those more than delay_min minutes late at one of the area's stops."`
 	LateShare  float64   `json:"lateShare" doc:"late over observed, rounded to three decimals."`
 	ObservedAt time.Time `json:"observedAt" doc:"The newest observation counted."`
-}
-
-// WatchCell is the warn cell a weather watch reads.
-type WatchCell struct {
-	Key   string  `json:"key" doc:"The cell's id, or the DWD's name of its area when the target named one."`
-	Name  *string `json:"name" nullable:"true" doc:"The DWD's name of the cell's area, when held."`
-	Place *string `json:"place" nullable:"true" doc:"The place a name target resolved to, the first listPlaces answers."`
 }
 
 // WatchEnvelope is the enveloped answer of getWatch.

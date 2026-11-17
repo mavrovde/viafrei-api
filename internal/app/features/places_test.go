@@ -22,6 +22,10 @@ func TestPlacesAreGatedAndAttributed(t *testing.T) {
 	if !slices.Equal(f.gotFamilies, []string{"pl"}) || f.gotStops != nil || len(a.Items) != 1 || !a.HasMore || !a.At.Equal(now) || !slices.Equal(names(a.Families), []string{"pl"}) {
 		t.Errorf("answer %+v", a)
 	}
+	// An empty answer credits none, as the platform's place search.
+	if a, err := service(&fake{}, nil).Places(context.Background(), key("commercial", []access.Scope{"places"}, "pl"), places.Query{Text: "nn", Limit: 1}); err != nil || len(a.Families) != 0 {
+		t.Errorf("empty: %+v %v", a.Families, err)
+	}
 	// The stops a key may read answer a name too, without the transit scope.
 	f = &fake{place: places.Place{ID: "x", Family: "st"}}
 	if _, err := service(f, nil).Places(context.Background(), key("commercial", []access.Scope{"places"}, "pl", "st"), places.Query{Text: "nn", Limit: 1}); err != nil || !slices.Equal(f.gotStops, []string{"st"}) {
@@ -37,7 +41,7 @@ func TestPlacesAreGatedAndAttributed(t *testing.T) {
 		"none":       {&fake{}, key("commercial", []access.Scope{"places"}, "e1"), access.ErrNonePermitted},
 		"read":       {&fake{plErr: errStore}, full, errStore},
 		"post-check": {&fake{place: places.Place{ID: "y", Family: "e1"}}, full, features.ErrGateViolation},
-		"provenance": {&fake{provErr: errStore}, full, errStore},
+		"provenance": {&fake{place: places.Place{ID: "x", Family: "pl"}, provErr: errStore}, full, errStore},
 	} {
 		if _, err := service(c.f, nil).Places(context.Background(), c.k, places.Query{Limit: 5}); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)

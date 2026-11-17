@@ -1675,12 +1675,16 @@
           "topic": {
             "type": "string"
           },
+          "zoneCity": {
+            "$ref": "#/components/schemas/ZoneCity",
+            "description": "With topic lez and a city: the curated list's entry for it, or the city uncovered (no entry is not that the city has no zone; the condition note says so)."
+          },
           "zoneVerdict": {
             "$ref": "#/components/schemas/ZoneVerdict",
             "description": "With topic lez and a position: the platform's verdict."
           },
           "zones": {
-            "description": "With topic lez and a position or city: the published zone rows, inside first, then by distance.",
+            "description": "With topic lez and a position: the published zone rows, inside first, then by distance.",
             "items": {
               "$ref": "#/components/schemas/LowEmissionZone"
             },
@@ -2711,8 +2715,49 @@
                 ]
               },
               "plaque": {
-                "$ref": "#/components/schemas/ZonePlaque",
-                "description": "Stated only of a zone the position is in and not released from; else null."
+                "additionalProperties": false,
+                "description": "Stated only of a zone the position is in and not released from; else null.",
+                "properties": {
+                  "covered": {
+                    "description": "false where the zone's data is under a closed licence we may not pass on; null for the national fact.",
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "entry": {
+                    "description": "The list entry's name; null for the national fact.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "from": {
+                    "description": "curated_entry: the curated zone list's entry for the zone's Gemeinde; national_fact: no entry speaks for it, and every signposted zone today asks for the green plaque.",
+                    "enum": [
+                      "curated_entry",
+                      "national_fact"
+                    ],
+                    "type": "string"
+                  },
+                  "plakette": {
+                    "description": "green; null where the entry deliberately states no plaque (a lifted zone, a zone whose data we may not carry).",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "from",
+                  "entry",
+                  "plakette",
+                  "covered"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
               },
               "releasedArea": {
                 "description": "The name of the released area at the zone's edge the position is in.",
@@ -7737,42 +7782,9 @@
         ],
         "type": "object"
       },
-      "WatchCell": {
-        "additionalProperties": false,
-        "properties": {
-          "key": {
-            "description": "The cell's id, or the DWD's name of its area when the target named one.",
-            "type": "string"
-          },
-          "name": {
-            "description": "The DWD's name of the cell's area, when held.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "place": {
-            "description": "The place a name target resolved to, the first listPlaces answers.",
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "key",
-          "name",
-          "place"
-        ],
-        "type": "object"
-      },
       "WatchData": {
         "additionalProperties": false,
         "properties": {
-          "cell": {
-            "$ref": "#/components/schemas/WatchCell",
-            "description": "weather: the DWD warn cell the target resolved to."
-          },
           "condition": {
             "additionalProperties": {},
             "description": "The condition applied, defaults filled in.",
@@ -7791,10 +7803,6 @@
           "from": {
             "format": "date-time",
             "type": "string"
-          },
-          "holds": {
-            "description": "station, region, weather, charger: whether the condition holds now (the platform's watch would report it).",
-            "type": "boolean"
           },
           "key": {
             "type": "string"
@@ -8120,33 +8128,26 @@
         ],
         "type": "object"
       },
-      "ZonePlaque": {
+      "ZoneCity": {
         "additionalProperties": false,
         "properties": {
           "covered": {
-            "description": "false where the zone's data is under a closed licence we may not pass on; null for the national fact.",
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "description": "Whether the list holds an entry whose zone it states.",
+            "type": "boolean"
           },
-          "entry": {
-            "description": "The list entry's name; null for the national fact.",
+          "name": {
+            "description": "The entry's name, or the asked city when the list holds none.",
+            "type": "string"
+          },
+          "plakette": {
+            "description": "The plaque the zone takes (green); null when none is stated.",
             "type": [
               "string",
               "null"
             ]
           },
-          "from": {
-            "description": "curated_entry: the curated zone list's entry for the zone's Gemeinde; national_fact: no entry speaks for it, and every signposted zone today asks for the green plaque.",
-            "enum": [
-              "curated_entry",
-              "national_fact"
-            ],
-            "type": "string"
-          },
-          "plakette": {
-            "description": "green; null where the entry deliberately states no plaque (a lifted zone, a zone whose data we may not carry).",
+          "zone": {
+            "description": "The entry's description of its zone; null while the list carries none.",
             "type": [
               "string",
               "null"
@@ -8154,8 +8155,8 @@
           }
         },
         "required": [
-          "from",
-          "entry",
+          "name",
+          "zone",
           "plakette",
           "covered"
         ],
@@ -8177,6 +8178,14 @@
             "format": "date",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "distanceM": {
+            "description": "Outside: the distance to the nearest zone in metres; null otherwise.",
+            "format": "int64",
+            "type": [
+              "integer",
               "null"
             ]
           },
@@ -8206,8 +8215,49 @@
             ]
           },
           "plaque": {
-            "$ref": "#/components/schemas/ZonePlaque",
-            "description": "Stated only of a zone the position is in and not released from; else null."
+            "additionalProperties": false,
+            "description": "Stated only of a zone the position is in and not released from; else null.",
+            "properties": {
+              "covered": {
+                "description": "false where the zone's data is under a closed licence we may not pass on; null for the national fact.",
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "entry": {
+                "description": "The list entry's name; null for the national fact.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "from": {
+                "description": "curated_entry: the curated zone list's entry for the zone's Gemeinde; national_fact: no entry speaks for it, and every signposted zone today asks for the green plaque.",
+                "enum": [
+                  "curated_entry",
+                  "national_fact"
+                ],
+                "type": "string"
+              },
+              "plakette": {
+                "description": "green; null where the entry deliberately states no plaque (a lifted zone, a zone whose data we may not carry).",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "from",
+              "entry",
+              "plakette",
+              "covered"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
           },
           "transfer": {
             "description": "The key of the released area it is in.",
@@ -8229,6 +8279,7 @@
           "zone",
           "transfer",
           "exemptRoad",
+          "distanceM",
           "plaque",
           "liftedOn",
           "dataDate",
@@ -8905,15 +8956,8 @@
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
-                        "asOf": "2026-03-29T12:00:00Z",
+                        "asOf": "2026-03-29T23:52:30Z",
                         "freshness": [
-                          {
-                            "family": "delfi_static",
-                            "dataAsOf": "2026-03-29T12:00:00Z",
-                            "ageS": 43200,
-                            "staleAfterS": 259200,
-                            "stale": false
-                          },
                           {
                             "family": "openstation_siri_fm",
                             "dataAsOf": "2026-03-29T23:52:30Z",
@@ -8923,17 +8967,6 @@
                           }
                         ],
                         "attribution": [
-                          {
-                            "family": "delfi_static",
-                            "domain": "transit",
-                            "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
-                            "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
-                            "licence": "CC BY 4.0",
-                            "licenceUrl": "https://licences.example/cc-by-4-0",
-                            "shareAlike": false,
-                            "shareAlikeOffer": null,
-                            "termsUrl": "https://www.opendata-oepnv.de"
-                          },
                           {
                             "family": "openstation_siri_fm",
                             "domain": "accessibility",

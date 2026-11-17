@@ -197,14 +197,16 @@ group by t.topic_code, t.title, t.title_en, t.reviewed_on`, code, lang)
 const zoneAlive = `(z.checked_at > $3::timestamptz - make_interval(secs => 3 * coalesce(z.cadence_s, 2592000))
     or (z.paused and z.checked_at is not null))`
 
-// Zones reads the low-emission-zone rows at a point (within the platform's
-// reach, inside first, then by distance) or of a city (by name), of the
-// given families whose source is alive at now.
+// Zones reads the low-emission-zone rows at q's point (within the
+// platform's reach, inside first, then by distance), of the given families
+// whose source is alive at now; none without a point (a city is answered
+// from the curated list, ZoneEntryNamed).
 func (s *Store) Zones(ctx context.Context, q rules.ZoneQuery, families []string, now time.Time) ([]rules.Zone, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]rules.Zone, error) {
-		var res pgx.Rows
-		if q.At != nil {
-			res, _ = tx.Query(ctx, `
+		if q.At == nil {
+			return nil, nil
+		}
+		res, _ := tx.Query(ctx, `
 with p as (select st_transform(st_setsrid(st_makepoint($4::float8, $5::float8), 4326), 25832) m, st_setsrid(st_makepoint($4::float8, $5::float8), 4326) g),
 r as (
   select z.*, (z.zone_role <> 'exempt_road' and st_covers(z.geometry, p.g)) inside,
@@ -218,17 +220,6 @@ select r.zone_key, r.zone_id, r.zone_role, r.name, r.city, r.publisher_name, r.i
        r.source_ref, r.changed_at, r.recorded_at, r.source_scope, r.source_place_code, r.source_city
 from r
 order by r.inside desc, r.dist, r.source_ref, r.zone_id`, families, float64(rules.ZoneReachM), now, q.At.Lon, q.At.Lat, float64(rules.ExemptRoadReachM))
-		} else {
-			res, _ = tx.Query(ctx, `
-select z.zone_key, z.zone_id, z.zone_role, z.name, z.city, z.publisher_name, false, 0,
-       array(select k from unnest(z.same_zone_keys) k
-              where k in (select o.zone_key from contract.low_emission_zone o where lower(o.city) = lower($2) and o.source_ref = any($1))),
-       z.source_ref, z.changed_at, z.recorded_at, z.source_scope, z.source_place_code, z.source_city
-from contract.low_emission_zone z
-where z.source_ref = any($1) and `+permitted("z")+` and `+zoneAlive+`
-  and z.zone_role = 'zone' and lower(z.city) = lower($2)
-order by z.source_ref, z.zone_id`, families, q.City, now)
-		}
 		return pgx.CollectRows(res, func(r pgx.CollectableRow) (rules.Zone, error) {
 			var z rules.Zone
 			err := r.Scan(&z.Key, &z.ZoneID, &z.Role, &z.Name, &z.City, &z.Publisher, &z.Inside, &z.DistanceM, &z.SameZone, &z.Family,
@@ -252,6 +243,25 @@ order by e.entry_key`, codes)
 			err := r.Scan(&e.Key, &e.Name, &e.PlaceCodes, &e.Plaque, &e.Covered, &e.LiftedOn)
 			return e, err
 		})
+	})
+}
+
+// ZoneEntryNamed reads the entry of the curated zone list whose key or an
+// alias is name, a city name normalised as the list keys them; nil when the
+// list holds none.
+func (s *Store) ZoneEntryNamed(ctx context.Context, name string) (*rules.ListEntry, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (*rules.ListEntry, error) {
+		res, _ := tx.Query(ctx, `
+select e.entry_key, e.name, e.place_codes, e.plaque, e.covered, e.lifted_on
+from contract.low_emission_zone_entry e
+where (e.entry_key = $1 or $1 = any(e.aliases)) and `+permitted("e")+`
+order by e.entry_key limit 1`, name)
+		es, err := pgx.CollectRows(res, func(r pgx.CollectableRow) (rules.ListEntry, error) {
+			var e rules.ListEntry
+			err := r.Scan(&e.Key, &e.Name, &e.PlaceCodes, &e.Plaque, &e.Covered, &e.LiftedOn)
+			return e, err
+		})
+		return first(es), err
 	})
 }
 

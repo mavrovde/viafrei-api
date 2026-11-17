@@ -106,14 +106,17 @@ func (f *afFake) AffectedStations(context.Context, []string, time.Time, int) ([]
 	return f.v, f.err
 }
 
-func TestAffectedStationsCreditEveryFigure(t *testing.T) {
+// TestAffectedStationsCreditTheLifts: the board credits the lift families
+// the key may read, as the site's station board credits the station lifts
+// alone, and what contributed when it may read none.
+func TestAffectedStationsCreditTheLifts(t *testing.T) {
 	ctx := context.Background()
 	f := &afFake{fake: &fake{reg: []access.Terms{{Family: "t1", Domain: "transit", UseClasses: all, Version: "v1"},
 		{Family: "t2", Domain: "transit", UseClasses: all, Version: "v1"}, {Family: "l1", Domain: "accessibility", UseClasses: all, Version: "v1"}}},
 		v: []transit.Affected{{Station: transit.Station{ID: "a", Family: "t1"}, Families: []string{"t1", "t2", "l1", "t1"}}}}
 	s := features.New(features.Repositories{Register: f, Affected: f}, features.Settings{Language: "en"}, func() time.Time { return now })
 	v, a, err := s.AffectedStations(ctx, key("commercial", []access.Scope{"transit", "accessibility"}, "t1", "t2", "l1"), 5)
-	if err != nil || len(v) != 1 || a.Partial || !slices.Equal(names(a.Families), []string{"l1", "t1", "t2"}) {
+	if err != nil || len(v) != 1 || a.Partial || !slices.Equal(names(a.Families), []string{"l1"}) {
 		t.Fatalf("%+v %+v %v", v, a, err)
 	}
 	// A family the key may not read in the answer is a gate violation.
@@ -121,9 +124,15 @@ func TestAffectedStationsCreditEveryFigure(t *testing.T) {
 		t.Errorf("lifts without the scope: %v", err)
 	}
 	f.v = []transit.Affected{{Station: transit.Station{ID: "a", Family: "t1"}, Families: []string{"t1"}}}
-	if _, a, err := s.AffectedStations(ctx, key("commercial", []access.Scope{"transit"}, "t1"), 5); err != nil || !a.Partial {
+	if _, a, err := s.AffectedStations(ctx, key("commercial", []access.Scope{"transit"}, "t1"), 5); err != nil || !a.Partial || !slices.Equal(names(a.Families), []string{"t1"}) {
 		t.Errorf("without the scope accessibility the answer is partial: %+v %v", a, err)
 	}
+	// A key that may read a lift family is credited with it, scope or none.
+	f.v = nil
+	if _, a, err := s.AffectedStations(ctx, key("commercial", []access.Scope{"transit"}, "t1", "l1"), 5); err != nil || !slices.Equal(names(a.Families), []string{"l1"}) {
+		t.Errorf("an empty board: %+v %v", a, err)
+	}
+	f.v = []transit.Affected{{Station: transit.Station{ID: "a", Family: "t1"}, Families: []string{"t1"}}}
 	if _, _, err := s.AffectedStations(ctx, key("commercial", []access.Scope{"transit"}, "l1"), 5); !errors.Is(err, access.ErrNonePermitted) {
 		t.Errorf("no transit family: %v", err)
 	}

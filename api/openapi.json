@@ -7724,22 +7724,34 @@
                     "value": {
                       "data": {
                         "topic": "syn_winter_tyres",
-                        "title": "Synthetisches Regelthema winter_tyres",
+                        "title": "Synthetic rule topic winter_tyres",
                         "rules": [
                           {
+                            "id": "syn_winter_tyres.1",
                             "text": "Synthetic statement 1 about winter_tyres, for tests only.",
-                            "legalBasis": "§ 0 synthetic"
+                            "legalBasis": "§ 0 synthetic",
+                            "sourceUrl": "https://law.example/winter_tyres",
+                            "reviewedOn": "2026-11-17",
+                            "unconfirmed": null
                           },
                           {
+                            "id": "syn_winter_tyres.2",
                             "text": "Synthetic statement 2 about winter_tyres, for tests only.",
-                            "legalBasis": "§ 0 synthetic"
+                            "legalBasis": "§ 0 synthetic",
+                            "sourceUrl": "https://law.example/winter_tyres",
+                            "reviewedOn": "2026-11-17",
+                            "unconfirmed": null
                           },
                           {
+                            "id": "syn_winter_tyres.3",
                             "text": "Synthetic statement 3 about winter_tyres, for tests only.",
-                            "legalBasis": "§ 0 synthetic"
+                            "legalBasis": "§ 0 synthetic",
+                            "sourceUrl": "https://law.example/winter_tyres",
+                            "reviewedOn": "2026-11-17",
+                            "unconfirmed": null
                           }
                         ],
-                        "reviewedOn": "2026-02-01",
+                        "reviewedOn": "2026-11-17",
                         "disclaimer": "Informational, not legal advice."
                       },
                       "meta": {
@@ -8586,16 +8598,75 @@
                     "summary": "Hydrogen stations for a car within 50 km",
                     "value": {
                       "data": {
-                        "stations": [],
+                        "stations": [
+                          {
+                            "name": "H2 Schömpingbach",
+                            "operator": "H2 Synthetic",
+                            "brand": null,
+                            "location": {
+                              "lat": 48.389598,
+                              "lon": 7.422192
+                            },
+                            "distanceM": 62433,
+                            "address": null,
+                            "refill": [
+                              {
+                                "solution": "700bar_car"
+                              }
+                            ],
+                            "opening": null,
+                            "providerUpdatedAt": null,
+                            "sourceFamily": "afir_alpha"
+                          },
+                          {
+                            "name": "H2 Kansilkamp",
+                            "operator": "H2 Synthetic",
+                            "brand": null,
+                            "location": {
+                              "lat": 47.60205,
+                              "lon": 7.847536
+                            },
+                            "distanceM": 80869,
+                            "address": null,
+                            "refill": [
+                              {
+                                "solution": "700bar_car"
+                              }
+                            ],
+                            "opening": null,
+                            "providerUpdatedAt": null,
+                            "sourceFamily": "afir_alpha"
+                          }
+                        ],
                         "nearest": null
                       },
                       "meta": {
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
-                        "asOf": null,
-                        "freshness": [],
-                        "attribution": [],
+                        "asOf": "2026-03-29T23:55:00Z",
+                        "freshness": [
+                          {
+                            "family": "afir_alpha",
+                            "dataAsOf": "2026-03-29T23:55:00Z",
+                            "ageS": 300,
+                            "staleAfterS": 1800,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "afir_alpha",
+                            "domain": "energy",
+                            "publisher": "Kleber Datenwerk",
+                            "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://alpha.example/terms/afir_alpha"
+                          }
+                        ],
                         "notes": {
                           "condition": [],
                           "purpose": []
@@ -8608,7 +8679,7 @@
                         ],
                         "page": {
                           "limit": 2,
-                          "hasMore": false
+                          "hasMore": true
                         }
                       },
                       "links": {
@@ -8864,10 +8935,10 @@
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/hydrogen-options?at=47.95,6.9\u0026vehicle=car\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/hydrogen-options?at=47.95,6.9\u0026radius_m=150000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/hydrogen-options?at=47.95,6.9\u0026vehicle=car\u0026limit=2",
+        "x-example-request": "/v1/hydrogen-options?at=47.95,6.9\u0026radius_m=150000\u0026limit=2",
         "x-mcp-counterpart": "hydrogen station search",
         "x-required-scope": "energy"
       }
@@ -9100,7 +9171,18 @@
                         "address": null,
                         "municipality": null,
                         "district": null,
-                        "state": null
+                        "state": {
+                          "id": "100001",
+                          "name": "Matfienland",
+                          "code": "01",
+                          "location": {
+                            "lat": 48.24375,
+                            "lon": 7.01625
+                          },
+                          "distanceM": 81800,
+                          "sourceFamily": "geonames"
+                        },
+                        "mayLieOutsideGermany": true
                       },
                       "meta": {
                         "requestId": "example-request-0001",
@@ -9108,12 +9190,6 @@
                         "language": "en",
                         "asOf": null,
                         "freshness": [
-                          {
-                            "family": "bkg_gvisys",
-                            "dataAsOf": null,
-                            "ageS": null,
-                            "stale": false
-                          },
                           {
                             "family": "geonames",
                             "dataAsOf": null,
@@ -9128,17 +9204,6 @@
                           }
                         ],
                         "attribution": [
-                          {
-                            "family": "bkg_gvisys",
-                            "domain": "places",
-                            "publisher": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
-                            "text": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
-                            "licence": "dl-de/by-2-0",
-                            "licenceUrl": "https://licences.example/dl-de-by-2-0",
-                            "shareAlike": false,
-                            "shareAlikeOffer": null,
-                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
-                          },
                           {
                             "family": "geonames",
                             "domain": "places",
@@ -13126,14 +13191,52 @@
                   "example": {
                     "summary": "Pharmacies in a town",
                     "value": {
-                      "data": [],
+                      "data": [
+                        {
+                          "name": "Pharmacy Pößfül",
+                          "category": "amenity",
+                          "kind": "pharmacy",
+                          "brand": null,
+                          "operator": null,
+                          "street": "Marktweg",
+                          "number": "1",
+                          "postcode": "10001",
+                          "place": "Kansilkamp",
+                          "location": {
+                            "lat": 47.609833,
+                            "lon": 7.897242
+                          },
+                          "distanceM": 208,
+                          "dataAsOf": "2026-02-26",
+                          "sourceFamily": "osm"
+                        }
+                      ],
                       "meta": {
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
                         "asOf": null,
-                        "freshness": [],
-                        "attribution": [],
+                        "freshness": [
+                          {
+                            "family": "osm",
+                            "dataAsOf": null,
+                            "ageS": null,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "osm",
+                            "domain": "places",
+                            "publisher": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0",
+                            "text": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0",
+                            "licence": "ODbL 1.0",
+                            "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
+                            "shareAlike": true,
+                            "shareAlikeOffer": "https://viafrei.de/impressum",
+                            "termsUrl": "https://www.openstreetmap.org/copyright"
+                          }
+                        ],
                         "notes": {
                           "condition": [],
                           "purpose": []
@@ -13146,7 +13249,7 @@
                         ],
                         "page": {
                           "limit": 2,
-                          "total": 0,
+                          "total": 1,
                           "nextCursor": null
                         }
                       },
@@ -13403,10 +13506,10 @@
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/pois?name=pharmacy\u0026in=Z%C3%BClz%C3%BCrode\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/pois?name=pharmacy\u0026at=47.61,7.9\u0026radius_m=5000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/pois?name=pharmacy\u0026in=Z%C3%BClz%C3%BCrode\u0026limit=2",
+        "x-example-request": "/v1/pois?name=pharmacy\u0026at=47.61,7.9\u0026radius_m=5000\u0026limit=2",
         "x-mcp-counterpart": "place of interest search",
         "x-required-scope": "places"
       }
@@ -15098,16 +15201,77 @@
                       "data": {
                         "official": [],
                         "officialTotal": 0,
-                        "osm": [],
-                        "osmTotal": 0
+                        "osm": [
+                          {
+                            "id": "osm:node800005",
+                            "kind": "fixed",
+                            "enforces": "speed",
+                            "street": null,
+                            "locationLabel": "Blitzer Kansilkamp",
+                            "municipality": null,
+                            "direction": null,
+                            "limitKmh": 50,
+                            "lorryLimitKmh": null,
+                            "firstDay": null,
+                            "lastDay": null,
+                            "dataAsOf": "2026-02-28",
+                            "staleYear": null,
+                            "location": {
+                              "lat": 47.655653,
+                              "lon": 7.799556
+                            },
+                            "sourceFamily": "osm_speed_cameras"
+                          },
+                          {
+                            "id": "osm:node800006",
+                            "kind": "fixed",
+                            "enforces": "speed",
+                            "street": null,
+                            "locationLabel": "Blitzer Kansilkamp",
+                            "municipality": null,
+                            "direction": null,
+                            "limitKmh": 50,
+                            "lorryLimitKmh": null,
+                            "firstDay": null,
+                            "lastDay": null,
+                            "dataAsOf": "2026-02-28",
+                            "staleYear": null,
+                            "location": {
+                              "lat": 47.653764,
+                              "lon": 7.829412
+                            },
+                            "sourceFamily": "osm_speed_cameras"
+                          }
+                        ],
+                        "osmTotal": 2
                       },
                       "meta": {
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
                         "language": "en",
-                        "asOf": null,
-                        "freshness": [],
-                        "attribution": [],
+                        "asOf": "2026-03-29T12:00:00Z",
+                        "freshness": [
+                          {
+                            "family": "osm_speed_cameras",
+                            "dataAsOf": "2026-03-29T12:00:00Z",
+                            "ageS": 43200,
+                            "staleAfterS": 259200,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "osm_speed_cameras",
+                            "domain": "roads",
+                            "publisher": "Blitzer (OpenStreetMap): © OpenStreetMap-Mitwirkende, ODbL 1.0",
+                            "text": "Blitzer (OpenStreetMap): © OpenStreetMap-Mitwirkende, ODbL 1.0",
+                            "licence": "ODbL 1.0",
+                            "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
+                            "shareAlike": true,
+                            "shareAlikeOffer": "https://viafrei.de/impressum",
+                            "termsUrl": "https://www.openstreetmap.org/copyright"
+                          }
+                        ],
                         "notes": {
                           "condition": [
                             "Note on use (§ 23 Abs. 1c StVO): a person driving a vehicle may not, while driving, operate or use any technical device or app function that shows or disrupts traffic enforcement. This also applies to a passenger's smartphone if the driver benefits from it (OLG Karlsruhe). A violation costs €75 and one point in Flensburg. This information is meant only for planning before setting off or during a stop. The locations come from official and open sources and may be incomplete or out of date; mobile checks are possible at any time and anywhere. Always keep to the speed limit in force. Not legal advice."
@@ -15378,10 +15542,10 @@
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/speed-cameras?at=47.98,6.95\u0026radius_m=10000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/speed-cameras?at=47.655,7.81\u0026radius_m=5000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/speed-cameras?at=47.98,6.95\u0026radius_m=10000\u0026limit=2",
+        "x-example-request": "/v1/speed-cameras?at=47.655,7.81\u0026radius_m=5000\u0026limit=2",
         "x-mcp-counterpart": "speed camera search",
         "x-required-scope": "roads"
       }
@@ -17717,20 +17881,48 @@
                     "summary": "What changed on a motorway in the last three hours",
                     "value": {
                       "data": {
-                        "watchId": "eyJrIjoicm9hZCIsImtleSI6IkExMDIiLCJjIjp7fX0",
-                        "uri": "viafrei://watch/eyJrIjoicm9hZCIsImtleSI6IkExMDIiLCJjIjp7fX0",
+                        "watchId": "eyJrIjoicm9hZCIsImtleSI6IkExMDMiLCJjIjp7fX0",
+                        "uri": "viafrei://watch/eyJrIjoicm9hZCIsImtleSI6IkExMDMiLCJjIjp7fX0",
                         "kind": "road",
-                        "key": "A102",
+                        "key": "A103",
                         "from": "2026-03-30T00:00:00Z",
                         "until": "2026-03-30T03:00:00Z",
                         "ended": false,
                         "condition": {
-                          "event": "any",
-                          "events": null
+                          "event": "any"
                         },
                         "note": null,
-                        "lamp": "amber",
-                        "situations": []
+                        "situations": [
+                          {
+                            "id": "datex:syn:ev-00011",
+                            "kind": "roadworks",
+                            "severity": "lane_closed",
+                            "road": "A103",
+                            "roadType": "motorway",
+                            "direction": "unknown",
+                            "directionText": null,
+                            "location": {
+                              "lat": 52.574746,
+                              "lon": 8.489175
+                            },
+                            "validity": {
+                              "from": "2026-03-29T19:33:04Z",
+                              "fromLocal": "2026-03-29T21:33:04+02:00",
+                              "until": null,
+                              "untilLocal": null
+                            },
+                            "lanes": null,
+                            "delayMin": null,
+                            "lengthM": null,
+                            "headline": "MaintenanceWorks",
+                            "description": null,
+                            "textLanguage": "de",
+                            "updatedAt": "2026-03-29T23:57:30Z",
+                            "updatedAtLocal": "2026-03-30T01:57:30+02:00",
+                            "position": null,
+                            "sourceFamily": "roads_alpha"
+                          }
+                        ]
                       },
                       "meta": {
                         "requestId": "example-request-0001",
@@ -18023,10 +18215,10 @@
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/watch?kind=road\u0026target=A102\u0026hours=3\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/watch?kind=road\u0026target=A103\u0026hours=3\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/watch?kind=road\u0026target=A102\u0026hours=3",
+        "x-example-request": "/v1/watch?kind=road\u0026target=A103\u0026hours=3",
         "x-required-scope": "roads"
       }
     },

@@ -15,22 +15,34 @@
   "response": {
     "data": {
       "topic": "syn_winter_tyres",
-      "title": "Synthetisches Regelthema winter_tyres",
+      "title": "Synthetic rule topic winter_tyres",
       "rules": [
         {
+          "id": "syn_winter_tyres.1",
           "text": "Synthetic statement 1 about winter_tyres, for tests only.",
-          "legalBasis": "§ 0 synthetic"
+          "legalBasis": "§ 0 synthetic",
+          "sourceUrl": "https://law.example/winter_tyres",
+          "reviewedOn": "2026-11-17",
+          "unconfirmed": null
         },
         {
+          "id": "syn_winter_tyres.2",
           "text": "Synthetic statement 2 about winter_tyres, for tests only.",
-          "legalBasis": "§ 0 synthetic"
+          "legalBasis": "§ 0 synthetic",
+          "sourceUrl": "https://law.example/winter_tyres",
+          "reviewedOn": "2026-11-17",
+          "unconfirmed": null
         },
         {
+          "id": "syn_winter_tyres.3",
           "text": "Synthetic statement 3 about winter_tyres, for tests only.",
-          "legalBasis": "§ 0 synthetic"
+          "legalBasis": "§ 0 synthetic",
+          "sourceUrl": "https://law.example/winter_tyres",
+          "reviewedOn": "2026-11-17",
+          "unconfirmed": null
         }
       ],
-      "reviewedOn": "2026-02-01",
+      "reviewedOn": "2026-11-17",
       "disclaimer": "Informational, not legal advice."
     },
     "meta": {

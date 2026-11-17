@@ -1,6 +1,6 @@
 {
   "title": "Speed check locations within 10 km",
-  "request": "/v1/speed-cameras?at=47.98,6.95\u0026radius_m=10000\u0026limit=2",
+  "request": "/v1/speed-cameras?at=47.655,7.81\u0026radius_m=5000\u0026limit=2",
   "attribution": "Speed check locations come from the source families of the roads domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
   "key": {
     "useClass": "commercial",
@@ -17,16 +17,77 @@
     "data": {
       "official": [],
       "officialTotal": 0,
-      "osm": [],
-      "osmTotal": 0
+      "osm": [
+        {
+          "id": "osm:node800005",
+          "kind": "fixed",
+          "enforces": "speed",
+          "street": null,
+          "locationLabel": "Blitzer Kansilkamp",
+          "municipality": null,
+          "direction": null,
+          "limitKmh": 50,
+          "lorryLimitKmh": null,
+          "firstDay": null,
+          "lastDay": null,
+          "dataAsOf": "2026-02-28",
+          "staleYear": null,
+          "location": {
+            "lat": 47.655653,
+            "lon": 7.799556
+          },
+          "sourceFamily": "osm_speed_cameras"
+        },
+        {
+          "id": "osm:node800006",
+          "kind": "fixed",
+          "enforces": "speed",
+          "street": null,
+          "locationLabel": "Blitzer Kansilkamp",
+          "municipality": null,
+          "direction": null,
+          "limitKmh": 50,
+          "lorryLimitKmh": null,
+          "firstDay": null,
+          "lastDay": null,
+          "dataAsOf": "2026-02-28",
+          "staleYear": null,
+          "location": {
+            "lat": 47.653764,
+            "lon": 7.829412
+          },
+          "sourceFamily": "osm_speed_cameras"
+        }
+      ],
+      "osmTotal": 2
     },
     "meta": {
       "requestId": "example-request-0001",
       "generatedAt": "2026-03-30T00:00:00Z",
       "language": "en",
-      "asOf": null,
-      "freshness": [],
-      "attribution": [],
+      "asOf": "2026-03-29T12:00:00Z",
+      "freshness": [
+        {
+          "family": "osm_speed_cameras",
+          "dataAsOf": "2026-03-29T12:00:00Z",
+          "ageS": 43200,
+          "staleAfterS": 259200,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "osm_speed_cameras",
+          "domain": "roads",
+          "publisher": "Blitzer (OpenStreetMap): © OpenStreetMap-Mitwirkende, ODbL 1.0",
+          "text": "Blitzer (OpenStreetMap): © OpenStreetMap-Mitwirkende, ODbL 1.0",
+          "licence": "ODbL 1.0",
+          "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
+          "shareAlike": true,
+          "shareAlikeOffer": "https://viafrei.de/impressum",
+          "termsUrl": "https://www.openstreetmap.org/copyright"
+        }
+      ],
       "notes": {
         "condition": [
           "Note on use (§ 23 Abs. 1c StVO): a person driving a vehicle may not, while driving, operate or use any technical device or app function that shows or disrupts traffic enforcement. This also applies to a passenger's smartphone if the driver benefits from it (OLG Karlsruhe). A violation costs €75 and one point in Flensburg. This information is meant only for planning before setting off or during a stop. The locations come from official and open sources and may be incomplete or out of date; mobile checks are possible at any time and anywhere. Always keep to the speed limit in force. Not legal advice."

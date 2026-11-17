@@ -163,7 +163,7 @@ func (db *DB) migrate(ctx context.Context, containerIP func(context.Context) (st
 	if err := db.imageAddress(ctx, func(context.Context) (string, error) { return ip, nil }, owner); err != nil {
 		return err
 	}
-	return MigrateWith(ctx, db.Pin, db.imageURL, RunImage)
+	return MigrateWith(ctx, db.Pin, db.imageURL, runImage)
 }
 
 // imageAddress sets the owner's URL as the pinned image's container reaches
@@ -188,7 +188,7 @@ func (db *DB) imageAddress(ctx context.Context, containerIP func(context.Context
 // image owns how a contract row is stored in the platform's tables, so a
 // test reads it back through the contract's views as production would.
 func (db *DB) Seed(ctx context.Context, rows string) error {
-	return SeedWith(ctx, db.Pin, db.imageURL, rows, RunImage)
+	return SeedWith(ctx, db.Pin, db.imageURL, rows, runImage)
 }
 
 // SeedWith runs the pinned image's test seed of rows against dbURL with run.
@@ -315,7 +315,7 @@ func (db *DB) finish(ctx context.Context, connString func(context.Context, ...st
 // passwords sets the password of each role, as the image's roles step does
 // in production from its secret files.
 func passwords(ctx context.Context, ownerURL, readerPassword, accessPassword string) error {
-	conn, err := pgx.Connect(ctx, ownerURL)
+	conn, err := connect(ctx, ownerURL)
 	if err != nil {
 		return fmt.Errorf("connect as owner: %w", err)
 	}

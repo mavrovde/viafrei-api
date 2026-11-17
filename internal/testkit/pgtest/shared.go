@@ -13,7 +13,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
 	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 )
@@ -44,6 +43,23 @@ func sharedName(pin Pin) string {
 // emulated image takes minutes for.
 const SetupBound = 15 * time.Minute
 
+// sharedContainer is what the shared set-up reads of its container.
+type sharedContainer interface {
+	ConnectionString(ctx context.Context, args ...string) (string, error)
+	ContainerIP(ctx context.Context) (string, error)
+}
+
+// The seams of the shared set-up: how it runs its container, opens a
+// session and runs the pinned image. A test of the package swaps one for a
+// fake that fails where it is asked to.
+var (
+	runShared = func(ctx context.Context, password string, extra ...testcontainers.ContainerCustomizer) (sharedContainer, error) {
+		return runContainer(ctx, password, extra...)
+	}
+	connect         = pgx.Connect
+	runImage Runner = RunImage
+)
+
 // lockKey serialises the shared container's set-up steps across the run's
 // package processes (pg_advisory_lock on the maintenance database).
 const lockKey = 7_040_001
@@ -66,7 +82,7 @@ func sharedCopy(ctx context.Context, rows string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	maint, err := pgx.Connect(ctx, base.urlOf(base.OwnerURL, "postgres"))
+	maint, err := connect(ctx, base.urlOf(base.OwnerURL, "postgres"))
 	if err != nil {
 		return nil, fmt.Errorf("pgtest: connect to the maintenance database: %w", err)
 	}
@@ -94,25 +110,18 @@ func sharedCopy(ctx context.Context, rows string) (*DB, error) {
 // copies none of them, and the reader's (its statement bound, its search
 // path) are part of what the image migrates.
 func copySettings(ctx context.Context, maint *pgx.Conn, name string) error {
-	rows, err := maint.Query(ctx, `select r.rolname, split_part(c, '=', 1), substr(c, strpos(c, '=') + 1)
+	// A failed query is the rows' error, which CollectRows returns.
+	rows, _ := maint.Query(ctx, `select r.rolname, split_part(c, '=', 1), substr(c, strpos(c, '=') + 1)
   from pg_db_role_setting s
   join pg_database d on d.oid = s.setdatabase and d.datname = $1
   join pg_roles r on r.oid = s.setrole, unnest(s.setconfig) c`, Database)
-	if err != nil {
-		return fmt.Errorf("pgtest: read the role settings: %w", err)
-	}
-	var stmts []string
-	for rows.Next() {
+	stmts, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (string, error) {
 		var role, key, value string
-		if err := rows.Scan(&role, &key, &value); err != nil {
-			rows.Close()
-			return fmt.Errorf("pgtest: read the role settings: %w", err)
-		}
-		stmts = append(stmts, "alter role "+ident(role)+" in database "+ident(name)+
-			" set "+ident(key)+" = "+quoteLiteral(value))
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
+		err := r.Scan(&role, &key, &value)
+		return "alter role " + ident(role) + " in database " + ident(name) +
+			" set " + ident(key) + " = " + quoteLiteral(value), err
+	})
+	if err != nil {
 		return fmt.Errorf("pgtest: read the role settings: %w", err)
 	}
 	for _, q := range stmts {
@@ -141,7 +150,7 @@ func sharedBase(ctx context.Context) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("pgtest: %w", err)
 	}
-	c, err := runContainer(ctx, sessionSecret("owner"), testcontainers.WithReuseByName(sharedName(pin)))
+	c, err := runShared(ctx, sessionSecret("owner"), testcontainers.WithReuseByName(sharedName(pin)))
 	if err != nil {
 		return nil, fmt.Errorf("pgtest: shared %s: %w", Image, err)
 	}
@@ -149,7 +158,7 @@ func sharedBase(ctx context.Context) (*DB, error) {
 	if err := db.urls(ctx, c); err != nil {
 		return nil, err
 	}
-	maint, err := pgx.Connect(ctx, db.urlOf(db.OwnerURL, "postgres"))
+	maint, err := connect(ctx, db.urlOf(db.OwnerURL, "postgres"))
 	if err != nil {
 		return nil, fmt.Errorf("pgtest: connect to the maintenance database: %w", err)
 	}
@@ -162,7 +171,7 @@ func sharedBase(ctx context.Context) (*DB, error) {
 		if done {
 			return nil
 		}
-		if err := MigrateWith(ctx, pin, db.imageURL, RunImage); err != nil {
+		if err := MigrateWith(ctx, pin, db.imageURL, runImage); err != nil {
 			return fmt.Errorf("pgtest: migrate the shared database: %w", err)
 		}
 		if err := passwords(ctx, db.OwnerURL, sessionSecret(dbcontract.ReaderRole), sessionSecret(dbcontract.AccessRole)); err != nil {
@@ -193,7 +202,7 @@ func (db *DB) seedTemplate(ctx context.Context, maint *pgx.Conn, name, rows stri
 	if _, err := maint.Exec(ctx, "create database "+ident(build)+" template "+ident(Database)); err != nil {
 		return fmt.Errorf("pgtest: create %s: %w", build, err)
 	}
-	if err := SeedWith(ctx, db.Pin, db.urlOf(db.imageURL, build), rows, RunImage); err != nil {
+	if err := SeedWith(ctx, db.Pin, db.urlOf(db.imageURL, build), rows, runImage); err != nil {
 		return err
 	}
 	// A copy carries the template's statistics: gathered here once, a copy's
@@ -209,7 +218,7 @@ func (db *DB) seedTemplate(ctx context.Context, maint *pgx.Conn, name, rows stri
 
 // analyseStats gathers the statistics of the database at dbURL.
 func analyseStats(ctx context.Context, dbURL string) error {
-	conn, err := pgx.Connect(ctx, dbURL)
+	conn, err := connect(ctx, dbURL)
 	if err != nil {
 		return fmt.Errorf("pgtest: connect to analyse: %w", err)
 	}
@@ -243,7 +252,7 @@ func locked(ctx context.Context, maint *pgx.Conn, f func() error) error {
 
 // urls sets the owner, reader, access and image URLs of the shared
 // container's database; the roles' passwords are the run's.
-func (db *DB) urls(ctx context.Context, c *postgres.PostgresContainer) error {
+func (db *DB) urls(ctx context.Context, c sharedContainer) error {
 	owner, err := c.ConnectionString(ctx, "sslmode=disable")
 	if err != nil {
 		return fmt.Errorf("pgtest: connection string: %w", err)
@@ -283,7 +292,7 @@ func withUser(u, user, password string) string {
 
 // dropCopy drops a copy, ending the sessions still on it.
 func (db *DB) dropCopy(ctx context.Context) {
-	maint, err := pgx.Connect(ctx, db.urlOf(db.copyOf, "postgres"))
+	maint, err := connect(ctx, db.urlOf(db.copyOf, "postgres"))
 	if err != nil {
 		return
 	}
@@ -300,7 +309,7 @@ func (db *DB) Rollback(ctx context.Context, t interface {
 	Cleanup(func())
 }) pgx.Tx {
 	t.Helper()
-	conn, err := pgx.Connect(ctx, db.OwnerURL)
+	conn, err := connect(ctx, db.OwnerURL)
 	if err != nil {
 		t.Fatal(err)
 	}

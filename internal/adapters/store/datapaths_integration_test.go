@@ -5,6 +5,8 @@ package store_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,6 +19,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
+	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/testkit/pgtest"
 )
@@ -54,26 +57,91 @@ func every(t *testing.T) []string {
 }
 
 // At an address the location names it, near enough that the position is
-// not abroad; under a district with a region code, the Land is the one that
-// code begins.
+// not abroad.
 func TestLocationAtAnAddress(t *testing.T) {
-	st, fams := seeded(t), every(t)
 	var at geo.Point
 	if !fixtureRow(t, `select st_y(a.location), st_x(a.location) from contract.address a
 		where a.location is not null order by a.address_id limit 1`, &at.Lat, &at.Lon) {
 		t.Fatal("the fixtures hold no address")
 	}
-	l, err := st.Location(bounded(t), places.LocationQuery{At: at}, fams)
+	l, err := seeded(t).Location(bounded(t), places.LocationQuery{At: at}, every(t))
 	if err != nil || l.Address == nil || *l.Address.DistanceM != 0 || l.MayLieAbroad {
 		t.Fatalf("%+v %v", l, err)
 	}
-	if !fixtureRow(t, `select st_y(p.location), st_x(p.location) from contract.place p
-		where p.place_kind = 'district' and p.region_code is not null and p.location is not null and p.withdrawn_at is null
-		order by p.place_id limit 1`, &at.Lat, &at.Lon) {
-		dbAsk(t, "contract.place holds no district with a region code: the Land of a location is never read by its code")
+}
+
+// Under a district with a region code, the Land is the one that code
+// begins: a district planted on a municipality's point and key.
+func TestLocationUnderADistrictReadsItsLand(t *testing.T) {
+	st, cp := private(t, plantCopy("contract.place", "admin_code",
+		`w.id::text in (select place_id from contract.place where place_kind = 'municipality' and region_code is not null)`,
+		`jsonb_build_object('kind', 'district', 'external_id', w.external_id || '-district', 'closed_at', null)`))
+	var at geo.Point
+	ownerOf(t, cp, `select st_y(location), st_x(location) from contract.place
+		where place_kind = 'district' and region_code is not null limit 1`, &at.Lat, &at.Lon)
+	l, err := st.Location(bounded(t), places.LocationQuery{At: at}, every(t))
+	if err != nil || l.District == nil || l.District.RegionCode == nil || l.State == nil {
+		t.Fatalf("%+v %v", l, err)
 	}
-	if l, err = st.Location(bounded(t), places.LocationQuery{At: at}, fams); err != nil || l.District == nil {
-		t.Fatalf("at a district: %+v %v", l, err)
+}
+
+// ownerOf reads one row of the copy cp as its owner into dest.
+func ownerOf(t *testing.T, cp *pgtest.DB, sql string, dest ...any) {
+	t.Helper()
+	conn, err := cp.Owner(bounded(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(context.Background()) }()
+	if err := conn.QueryRow(bounded(t), sql).Scan(dest...); err != nil {
+		t.Fatalf("%s: %v", sql, err)
+	}
+}
+
+// plantCopy copies the first row, by id, of the platform's table under
+// the contract view that has column, among those where holds, as one more
+// row with the jsonb overrides: the table is read off the view, as it is
+// the platform's to name.
+func plantCopy(view, column, where, overrides string) string {
+	insert := "insert into %1$s overriding system value select (jsonb_populate_record(null::%1$s, to_jsonb(w)" +
+		" || jsonb_build_object('id', (select max(id) from %1$s) + 1) || " + overrides + ")).* from %1$s w where " +
+		where + " order by w.id limit 1"
+	return `do $plant$ declare t text; begin
+		select d.refobjid::regclass::text into strict t from pg_rewrite r
+		  join pg_depend d on d.classid = 'pg_rewrite'::regclass and d.objid = r.oid
+		    and d.refclassid = 'pg_class'::regclass and d.refobjid <> r.ev_class
+		  join pg_attribute a on a.attrelid = d.refobjid and a.attname = '` + column + `'
+		 where r.ev_class = '` + view + `'::regclass group by d.refobjid;
+		execute format('` + strings.ReplaceAll(insert, "'", "''") + `', t);
+	end $plant$`
+}
+
+// plantWarning copies the first placed warning as one more, version n,
+// of level, in force since an hour.
+func plantWarning(n, level int) string {
+	return plantCopy("contract.weather_warning", "warncell_id", "w.area is not null", fmt.Sprintf(`jsonb_build_object(
+		'version', w.version + 1000 + %d, 'level', %d, 'valid_from', now() - interval '1 hour', 'valid_to', null,
+		'closed_at', null, 'closed_reason', null, 'deleted_at', null)`, n, level))
+}
+
+// At a point more warnings answer than the limit: the page says so. A
+// stored level outside 1 to 4 in force there is refused, not re-graded.
+func TestWarningsAtMoreThanTheLimitAndABadLevel(t *testing.T) {
+	var fams []string
+	owner(t, `select array_agg(source_ref order by source_ref) from contract.source`, &fams)
+	const where = `select st_y(st_pointonsurface(area)), st_x(st_pointonsurface(area)) from contract.weather_warning
+		where area is not null and valid_to is null and valid_from > now() - interval '2 hours' limit 1`
+	st, cp := private(t, plantWarning(1, 2), plantWarning(2, 3))
+	var at geo.Point
+	ownerOf(t, cp, where, &at.Lat, &at.Lon)
+	got, err := st.WarningsAt(bounded(t), weather.Query{At: at, MinLevel: 1, Limit: 1}, fams, time.Now())
+	if err != nil || len(got.Warnings) != 1 || !got.HasMore {
+		t.Fatalf("%+v %v", got, err)
+	}
+	st, cp = private(t, plantWarning(1, 0))
+	ownerOf(t, cp, where, &at.Lat, &at.Lon)
+	if _, err := st.WarningsAt(bounded(t), weather.Query{At: at, MinLevel: 1, Limit: 5}, fams, time.Now()); err == nil || !strings.Contains(err.Error(), "level 0") {
+		t.Fatalf("a level-0 warning in force: %v", err)
 	}
 }
 
@@ -205,5 +273,22 @@ func TestAffectedStationsCountAnAlertOnTheirStops(t *testing.T) {
 	}
 	if !alerted {
 		t.Fatalf("no station counts the alert: %+v", got)
+	}
+}
+
+// A rule topic whose title, or a rule whose review date, the platform's
+// schema holds but a copy has lost, fails the read rather than answering a
+// topic with a blank title or a rule reviewed on no date.
+func TestTopicRefusesARuleWithNoReviewDateOrNoTitle(t *testing.T) {
+	var code string
+	owner(t, `select topic_code from public.driving_rule_facts order by fact_key limit 1`, &code)
+	for col, plant := range map[string]string{
+		"title":    `alter table public.driving_rule_topics alter column title_de drop not null; update public.driving_rule_topics set title_de = null where topic_code = '` + code + `'`,
+		"reviewed": `alter table public.driving_rule_facts alter column reviewed_on drop not null; update public.driving_rule_facts set reviewed_on = null where topic_code = '` + code + `'`,
+	} {
+		st, _ := private(t, plant)
+		if _, err := st.Topic(bounded(t), code, "de"); err == nil {
+			t.Errorf("a topic with no %s was read", col)
+		}
 	}
 }

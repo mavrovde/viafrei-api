@@ -10,6 +10,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
+	"github.com/mavrovde/viafrei-api/internal/fixtures"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
@@ -99,5 +100,27 @@ func TestStationsNearAPositionAreNearestFirst(t *testing.T) {
 	both, _, err := st.Stations(bounded(t), transit.Query{Text: ss[0].Name, At: &at, RadiusM: 25000, Limit: 100}, fams)
 	if err != nil || len(both) == 0 || both[0].ID != ss[0].ID {
 		t.Errorf("name and position: %v %v", stationIDs(both), err)
+	}
+}
+
+// A DB station is found by its EVA number and states every number of its
+// parts, the main one first; a stop that is no DB station states none (G2).
+func TestStationsStateTheirEVANumbers(t *testing.T) {
+	req.Covers(t, "FR-TRANSIT-001")
+	st := seeded(t)
+	fams := families(t, st, "transit")
+	main := fixtures.TrainBoardEVA("01")
+	ss, _, err := st.Stations(bounded(t), transit.Query{Code: main, Limit: 5}, fams)
+	if err != nil || len(ss) != 1 || ss[0].EVA == nil || *ss[0].EVA != main || !slices.Equal(ss[0].EVANumbers, []string{main, "8001002", "8001003"}) {
+		t.Fatalf("by EVA %+v, %v", ss, err)
+	}
+	all, _, err := st.Stations(bounded(t), transit.Query{Text: "a", Limit: 100}, fams)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range all {
+		if s.ID != ss[0].ID && (s.EVA != nil || len(s.EVANumbers) != 0) {
+			t.Errorf("%s states numbers %v %v", s.ID, s.EVA, s.EVANumbers)
+		}
 	}
 }

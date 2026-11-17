@@ -85,3 +85,21 @@ func (g *gen) motorwayPlaces() {
 		g.counted(landOf(at), MotorwayPlaceRef)
 	}
 }
+
+// dbStation writes one DB railway station of several parts (G2), as the
+// StaDa crosswalk holds Berlin Hbf: in the first Land near its first place,
+// a stop place whose main EVA number is the Land's train board station
+// (TrainBoardEVA) and whose two parts carry numbers of their own. Written
+// after every other table, with no draw.
+func (g *gen) dbStation() {
+	l := g.lands[0]
+	pl := g.places[l.code][1]
+	s := g.sourceByRef("delfi_static")
+	code := fmt.Sprintf("de:%s:9001", pl.district)
+	main := TrainBoardEVA(l.code)
+	g.w.begin("stop_place", "stop_place_id", "name", "location", "national_stop_code", "region_code", "source_ref",
+		"origin_key", "eva_no", "eva_numbers")
+	g.w.row(str(fmt.Sprintf("%d:%s", s.feedKey, code)), str(pl.name+" Hbf"), point(lonLat{pl.at.lon - 0.002, pl.at.lat}), str(code),
+		str(pl.district), str("delfi_static"), str(code), str(main), array(main, "80"+l.code+"002", "80"+l.code+"003"))
+	g.counted(l.code, "delfi_static")
+}

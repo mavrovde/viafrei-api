@@ -577,6 +577,7 @@ contract.stop_place	municipality_name	text
 contract.stop_place	eva_no	text
 contract.stop_place	ifopt	text
 contract.stop_place	placement_source_ref	text
+contract.stop_place	eva_numbers	text[]
 contract.stop_point	stop_point_id	text
 contract.stop_point	stop_place_id	text
 contract.stop_point	platform_label	text

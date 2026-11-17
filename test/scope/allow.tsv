@@ -48,3 +48,4 @@ column	api/openapi.json	networkState	member name of a lorry rule, the network st
 column	api/openapi.json	publishedText	member name of a lorry rule, the publisher's own words (listLorryRules); the resource vocabulary, not a storage name
 column	api/openapi.json	versionDate	member name of a lorry rule, the date of the publisher's file (listLorryRules); the resource vocabulary, not a storage name
 column	api/openapi.json	sourceUrl	member name of a driving rule's legal basis, where the provision is published (getDrivingRules); the resource vocabulary, not a storage name
+column	api/openapi.json	evaNumbers	member name of a station, every railway station number it has (listStations, listNearby, listAffectedStations, G2); the resource vocabulary of the DB station numbers, not a storage name

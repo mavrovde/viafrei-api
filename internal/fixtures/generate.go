@@ -17,7 +17,7 @@ import (
 
 // GeneratorVersion changes whenever the output for a given seed and profile
 // changes.
-const GeneratorVersion = "0.3.6"
+const GeneratorVersion = "0.3.7"
 
 // TrainBoardRef is the one source of the train boards.
 const TrainBoardRef = "db_timetables"
@@ -153,6 +153,7 @@ func generate(out io.Writer, profile string, seed uint64, contractVersion string
 	g.streetBays()
 	g.trainBoards()
 	g.motorwayPlaces()
+	g.dbStation()
 	g.w.end()
 	sum, err := g.w.close()
 	if err != nil {

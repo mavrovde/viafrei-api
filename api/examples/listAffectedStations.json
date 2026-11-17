@@ -27,6 +27,8 @@
           "lon": 14.591617
         },
         "stopCode": "de:12002:1",
+        "eva": null,
+        "evaNumbers": [],
         "districtCode": "12002",
         "modes": [],
         "distanceM": null,
@@ -44,6 +46,8 @@
           "lon": 11.690079
         },
         "stopCode": "de:15002:0",
+        "eva": null,
+        "evaNumbers": [],
         "districtCode": "15002",
         "modes": [],
         "distanceM": null,

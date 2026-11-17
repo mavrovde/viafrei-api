@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"slices"
 	"strings"
@@ -212,7 +213,7 @@ func open(t *testing.T) *rig {
 	r.key = auth.Principal{Key: access.Record{
 		ID: "benchmarkk", Environment: access.Live, ExpiresAt: r.now.Add(24 * time.Hour),
 		Plan: access.Plan{Name: "benchmark", UseClass: "commercial", Tier: "standard", Sources: sources,
-			Scopes: []access.Scope{"places", "energy", "parking", "roads", "weather", "rules"}},
+			Scopes: []access.Scope{"places", "energy", "parking", "roads", "weather", "rules", "transit", "accessibility"}},
 	}}
 	near := func(table, path string) {
 		pts, err := pgx.CollectRows(must(conn.Query(ctx, fmt.Sprintf(
@@ -226,6 +227,10 @@ func open(t *testing.T) *rig {
 	}
 	near("charging_site", "/v1/charging-options")
 	near("parking_facility", "/v1/parking-options")
+	near("fuel_station", "/v1/fuel-options")
+	near("hydrogen_station", "/v1/hydrogen-options")
+	near("stop_place", "/v1/nearby")
+	near("stop_place", "/v1/stations")
 	ids, err := pgx.CollectRows(must(conn.Query(ctx,
 		"select place_id from contract.place where withdrawn_at is null order by prominence desc, place_id limit 40")), pgx.RowTo[string])
 	if err != nil || len(ids) == 0 {
@@ -256,6 +261,48 @@ func open(t *testing.T) *rig {
 		"from (select location as p from contract.place where region_code is not null and withdrawn_at is null) d order by 1 limit 40",
 		"/v1/weather-risk?at=", "")
 	list("rules", "select topic_code from contract.rule_topic order by 1 limit 40", "/v1/driving-rules?topic=", "")
+	// The searches and lookups by name, code or position: each asks rows the
+	// fixture holds, the read the operation makes for them.
+	at := "select round(st_y(location)::numeric, 3)::text || ',' || round(st_x(location)::numeric, 3)::text from contract.%s where location is not null order by 1 limit 40"
+	list("speed", fmt.Sprintf(at, "speed_camera"), "/v1/speed-cameras?at=", "&radius_m=10000")
+	list("sharing", fmt.Sprintf(at, "sharing_station"), "/v1/sharing-options?at=", "&radius_m=5000")
+	list("location", fmt.Sprintf(at, "place"), "/v1/location?at=", "")
+	list("lorry", fmt.Sprintf(at, "junction"), "/v1/lorry-rules?vehicle=long_lorry&at=", "")
+	// named asks each pair of the query (a, b) as prefix + a + middle + b, each escaped for a query string.
+	named := func(key, query, prefix, middle string) {
+		rows, err := conn.Query(ctx, query)
+		if err != nil {
+			t.Fatalf("nothing to ask for %s: %v", key, err)
+		}
+		pairs, err := pgx.CollectRows(rows, pgx.RowToStructByPos[struct{ A, B string }])
+		if err != nil || len(pairs) == 0 {
+			t.Fatalf("nothing to ask for %s: %v", key, err)
+		}
+		for _, p := range pairs {
+			v := prefix + url.QueryEscape(p.A)
+			if middle != "" {
+				v += middle + url.QueryEscape(p.B)
+			}
+			r.targets[key] = append(r.targets[key], v)
+		}
+	}
+	named("places", "select distinct name, '' from contract.place where withdrawn_at is null and length(name) >= 2 order by 1 limit 40", "/v1/places?q=", "")
+	named("addresses", "select distinct street || ' ' || house_number || ', ' || postcode, '' from contract.address "+
+		"where street is not null and house_number is not null and postcode is not null order by 1 limit 40", "/v1/addresses?q=", "")
+	named("pois", "select distinct category_value, place_name from contract.poi where category_value is not null and place_name is not null order by 1, 2 limit 40",
+		"/v1/pois?name=", "&in=")
+	list("departures", "select stop_place_id from contract.stop_place where withdrawn_at is null order by 1 limit 40",
+		"/v1/stations/", "/departures?from="+r.now.Add(-2*time.Hour).UTC().Format(time.RFC3339)+"&duration_min=240")
+	list("facilities", "select distinct stop_place_id from contract.station_facility order by 1 limit 40", "/v1/stations/", "/facilities")
+	list("disruptions", "select region_code from contract.admin_region order by 1 limit 40", "/v1/transit-disruptions?area=", "")
+	list("states", "select distinct region_code from contract.admin_region where region_level = 'state' order by 1 limit 40",
+		"/v1/states/", "/road-conditions?road_class=motorway")
+	list("motorway-parking", "select replace(road_ref, ' ', '') from contract.road where road_ref like 'A%' order by 1 limit 40",
+		"/v1/motorways/", "/parking-options")
+	list("motorways", "select v from (values ('?limit=20'), ('?state=01'), ('?road=A100')) t(v)", "/v1/motorways", "")
+	list("sources", "select v from (values (''), ('?domain=places'), ('?domain=roads')) t(v)", "/v1/sources", "")
+	list("watch", "select replace(road_ref, ' ', '') from contract.road where road_ref like 'A%' order by 1 limit 40",
+		"/v1/watch?kind=road&target=", "&hours=3")
 	// A situation is answered only from a family the key may read: the
 	// licence gate decides, as it does for the request.
 	reg, err := r.st.Register(ctx)
@@ -333,6 +380,44 @@ func (r *rig) targetsOf(op string) []string {
 		return r.targets["weather"]
 	case "getDrivingRules":
 		return r.targets["rules"]
+	case "listFuelOptions":
+		return r.targets["/v1/fuel-options"]
+	case "listHydrogenOptions":
+		return r.targets["/v1/hydrogen-options"]
+	case "listNearby":
+		return r.targets["/v1/nearby"]
+	case "listStations":
+		return r.targets["/v1/stations"]
+	case "listSpeedCameras":
+		return r.targets["speed"]
+	case "listSharingOptions":
+		return r.targets["sharing"]
+	case "describeLocation":
+		return r.targets["location"]
+	case "listLorryRules":
+		return r.targets["lorry"]
+	case "listPlaces":
+		return r.targets["places"]
+	case "listAddresses":
+		return r.targets["addresses"]
+	case "listPois":
+		return r.targets["pois"]
+	case "listStationDepartures":
+		return r.targets["departures"]
+	case "listStationFacilities":
+		return r.targets["facilities"]
+	case "listTransitDisruptions":
+		return r.targets["disruptions"]
+	case "listStateRoadConditions":
+		return r.targets["states"]
+	case "listMotorwayParking":
+		return r.targets["motorway-parking"]
+	case "listMotorways":
+		return r.targets["motorways"]
+	case "listSources":
+		return r.targets["sources"]
+	case "getWatch":
+		return r.targets["watch"]
 	}
 	return nil
 }
@@ -423,14 +508,23 @@ func TestEveryOperationMeetsItsBudget(t *testing.T) {
 	}
 	t.Run("conditional", func(t *testing.T) {
 		cached := r.handler(t, true)
-		targets := r.targetsOf("listChargingOptions")
+		// An answer that lists nothing credits no family and so carries no
+		// ETag (the read of a site whose family the key may not read, say):
+		// the 304 is measured over the answers that carry one.
+		var targets []string
 		etags := map[string]string{}
-		for _, target := range targets {
+		for _, target := range r.targetsOf("listChargingOptions") {
 			code, etag, _ := call(cached, target, "")
-			if code != http.StatusOK || etag == "" {
-				t.Fatalf("%s: %d without an ETag", target, code)
+			if code != http.StatusOK {
+				t.Fatalf("%s answered %d, want 200", target, code)
 			}
-			etags[target] = etag
+			if etag != "" {
+				targets = append(targets, target)
+				etags[target] = etag
+			}
+		}
+		if len(targets) < 10 {
+			t.Fatalf("%d charging answers carry an ETag, want at least 10 to measure the 304 over", len(targets))
 		}
 		res := perf.Measure("304 (listChargingOptions)", timed(t, cached, targets, *samples, http.StatusNotModified, func(s string) string { return etags[s] }))
 		class := budgets.Classes[perf.Conditional]

@@ -2,6 +2,7 @@ package places_test
 
 import (
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
@@ -74,5 +75,36 @@ func TestTheAbroadJudgementIsThePlatforms(t *testing.T) {
 	// North of the centre one degree, east two (cos 60° halves a degree of longitude).
 	if len(w) != 4 || !strings.HasPrefix(w[0], "POLYGON((10.000000 60.000000,10.000000 61.000000,") || !strings.Contains(w[1], ",12.000000 60.000000,") || !strings.HasSuffix(w[3], ",10.000000 60.000000))") {
 		t.Errorf("wedges %q", w)
+	}
+}
+
+// TestNameFoldIsSafeConcurrently: NameFold is called by concurrent requests
+// (the watch's ask, the address and POI searches); a transformer shared
+// between them panicked with another call's bounds.
+func TestNameFoldIsSafeConcurrently(t *testing.T) {
+	names := []string{"Sag mir Bescheid, wenn sich ein Stau bildet", "A7", "Zülzürode", "Marktweg 1, 20000", "Straße der Einheit"}
+	want := make([]string, len(names))
+	for i, n := range names {
+		want[i] = places.NameFold(n)
+	}
+	var wg sync.WaitGroup
+	errs := make(chan string, 64)
+	for g := 0; g < 16; g++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 2000; i++ {
+				k := (g + i) % len(names)
+				if got := places.NameFold(names[k]); got != want[k] {
+					errs <- got
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for got := range errs {
+		t.Errorf("a concurrent fold answered %q", got)
 	}
 }

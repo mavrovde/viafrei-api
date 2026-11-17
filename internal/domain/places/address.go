@@ -15,14 +15,19 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 )
 
-var diacritics = transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
+// diacritics is a new chain per call: a transform.Chain keeps its buffers in
+// itself, so one shared by concurrent requests cut a name with another's
+// bounds (a panic, answered 500, under the benchmark's concurrency).
+func diacritics() transform.Transformer {
+	return transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
+}
 
 // NameFold is the platform's search form of a name, the form contract.poi
 // and contract.address keep in their fold columns: lower case, ß as ss,
 // every diacritic dropped (ä → a), every run of other characters one space.
 func NameFold(s string) string {
 	s = strings.ReplaceAll(strings.ToLower(s), "ß", "ss")
-	s, _, _ = transform.String(diacritics, s)
+	s, _, _ = transform.String(diacritics(), s)
 	return strings.Join(strings.FieldsFunc(s, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }), " ")
 }
 

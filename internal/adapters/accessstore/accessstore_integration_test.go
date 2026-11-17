@@ -40,11 +40,11 @@ const testBound = 2 * time.Second
 var db *pgtest.DB
 
 func TestMain(m *testing.M) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	var err error
-	db, err = pgtest.Start(ctx)
+	ctx, cancel := context.WithTimeout(context.Background(), pgtest.SetupBound)
+	var buf bytes.Buffer
+	_, err := fixtures.Generate(&buf, "tiny", 1, dbcontract.ContractVersion)
 	if err == nil {
-		err = seed(ctx)
+		db, err = pgtest.Seeded(ctx, buf.String())
 	}
 	cancel()
 	if err != nil {
@@ -57,14 +57,6 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	db.Stop()
 	os.Exit(code)
-}
-
-func seed(ctx context.Context) error {
-	var buf bytes.Buffer
-	if _, err := fixtures.Generate(&buf, "tiny", 1, dbcontract.ContractVersion); err != nil {
-		return err
-	}
-	return db.Seed(ctx, buf.String())
 }
 
 func bounded(t *testing.T) context.Context {

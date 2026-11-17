@@ -185,10 +185,10 @@ func TestMigrateWithRefusesEveryWrongAnswer(t *testing.T) {
 		`says "viafrei-database 0.1.1 schema-head 300"`: func(f *fakeRun) {
 			f.answers["version"] = answer{out: "viafrei-database 0.1.1 schema-head 300"}
 		},
-		"migrate exited 1: relation exists":                     func(f *fakeRun) { f.answers["migrate"] = answer{out: "applying\nrelation exists\n", code: 1} },
-		"partitions ensure --days 7 --from 2026-03-27 exited 2": func(f *fakeRun) { f.answers["partitions"] = answer{code: 2} },
-		"head: no runtime":           func(f *fakeRun) { f.answers["head"] = answer{err: errors.New("no runtime")} },
-		`head printed "PENDING 305"`: func(f *fakeRun) { f.answers["head"] = answer{out: "PENDING 305"} },
+		"migrate exited 1: relation exists":   func(f *fakeRun) { f.answers["migrate"] = answer{out: "applying\nrelation exists\n", code: 1} },
+		"partitions ensure --days 7 exited 2": func(f *fakeRun) { f.answers["partitions"] = answer{code: 2} },
+		"head: no runtime":                    func(f *fakeRun) { f.answers["head"] = answer{err: errors.New("no runtime")} },
+		`head printed "PENDING 305"`:          func(f *fakeRun) { f.answers["head"] = answer{out: "PENDING 305"} },
 	} {
 		f := healthyRun()
 		plant(f)

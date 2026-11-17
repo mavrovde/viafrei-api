@@ -23,15 +23,14 @@ import (
 // database. TestMain runs it once, as setup: generating and loading the
 // fixtures is outside every test body's bound, which it would otherwise spend
 // in whichever test happened to ask first.
-func seed(ctx context.Context) error {
+// seedRows are the store tests' rows: the tiny set and its planted rows.
+func seedRows() (string, error) {
 	var buf bytes.Buffer
 	if _, err := fixtures.Generate(&buf, "tiny", 1, dbcontract.ContractVersion); err != nil {
-		return err
+		return "", err
 	}
-	if err := fixtures.Planted(&buf, "tiny", 1, dbcontract.ContractVersion); err != nil {
-		return err
-	}
-	return db.Seed(ctx, buf.String())
+	err := fixtures.Planted(&buf, "tiny", 1, dbcontract.ContractVersion)
+	return buf.String(), err
 }
 
 // seeded opens a store on the shared test database, which TestMain seeded.

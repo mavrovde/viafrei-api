@@ -390,6 +390,32 @@
         ],
         "type": "object"
       },
+      "ChargingDropped": {
+        "additionalProperties": false,
+        "properties": {
+          "noStatus": {
+            "description": "No report at all.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "notFree": {
+            "description": "Every live report says occupied or out of order.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "stale": {
+            "description": "Reports only older than their limit.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "notFree",
+          "stale",
+          "noStatus"
+        ],
+        "type": "object"
+      },
       "ChargingEnvelope": {
         "additionalProperties": false,
         "properties": {
@@ -430,6 +456,10 @@
               "$ref": "#/components/schemas/Attribution"
             },
             "type": "array"
+          },
+          "dropped": {
+            "$ref": "#/components/schemas/ChargingDropped",
+            "description": "With only_available: the examined sites left out."
           },
           "freshness": {
             "description": "One entry per contributing source family.",
@@ -511,9 +541,29 @@
           "at": {
             "$ref": "#/components/schemas/Position"
           },
+          "conditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "connector": {
+            "type": "string"
+          },
+          "maxKw": {
+            "format": "double",
+            "type": "number"
+          },
           "minKw": {
             "format": "double",
             "type": "number"
+          },
+          "onlyAvailable": {
+            "type": "boolean"
+          },
+          "operator": {
+            "description": "The asked operator's brand key.",
+            "type": "string"
           },
           "radiusM": {
             "description": "The radius applied, in metres.",
@@ -523,6 +573,7 @@
         },
         "required": [
           "minKw",
+          "onlyAvailable",
           "access",
           "at",
           "radiusM"
@@ -6306,6 +6357,76 @@
               "maximum": 1000,
               "minimum": 0,
               "type": "number"
+            }
+          },
+          {
+            "description": "Only points of at most this power, in kW, with a stated power; never below min_kw. Default 0, no upper limit.",
+            "explode": false,
+            "in": "query",
+            "name": "max_kw",
+            "schema": {
+              "description": "Only points of at most this power, in kW, with a stated power; never below min_kw. Default 0, no upper limit.",
+              "format": "double",
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "description": "Only points with this plug: ccs2 (CCS Combo 2), type2 (Typ 2, AC), chademo or mcs (Megawatt Charging System, for lorries).",
+            "explode": false,
+            "in": "query",
+            "name": "connector",
+            "schema": {
+              "description": "Only points with this plug: ccs2 (CCS Combo 2), type2 (Typ 2, AC), chademo or mcs (Megawatt Charging System, for lorries).",
+              "enum": [
+                "ccs2",
+                "type2",
+                "chademo",
+                "mcs"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only sites of this operator brand, as a person names it. Spellings of one brand match together: the brand key is the first word of three letters or more that is not a legal-form or generic word (GmbH, Stadtwerke, Mobility, ...). Sites whose source names no operator are left out.",
+            "explode": false,
+            "in": "query",
+            "name": "operator",
+            "schema": {
+              "description": "Only sites of this operator brand, as a person names it. Spellings of one brand match together: the brand key is the first word of three letters or more that is not a legal-form or generic word (GmbH, Stadtwerke, Mobility, ...). Sites whose source names no operator are left out.",
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only sites with one point that meets every listed term: open247 (open around the clock), card (pay by card at the charger), free (free of charge; a zero ad-hoc price counts for 90 days after its update), public (open to the public, not customers only).",
+            "explode": false,
+            "in": "query",
+            "name": "conditions",
+            "schema": {
+              "description": "Only sites with one point that meets every listed term: open247 (open around the clock), card (pay by card at the charger), free (free of charge; a zero ad-hoc price counts for 90 days after its update), public (open to the public, not customers only).",
+              "items": {
+                "enum": [
+                  "open247",
+                  "card",
+                  "free",
+                  "public"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          {
+            "description": "Only sites with a point reported available now. The nearest 100 sites are examined; meta.dropped counts the others by reason, so a site whose status is unknown is never silently hidden. Default false.",
+            "explode": false,
+            "in": "query",
+            "name": "only_available",
+            "schema": {
+              "description": "Only sites with a point reported available now. The nearest 100 sites are examined; meta.dropped counts the others by reason, so a site whose status is unknown is never silently hidden. Default false.",
+              "type": "boolean"
             }
           },
           {

@@ -311,8 +311,31 @@ type NearQuery struct {
 // ChargingInput is the input of listChargingOptions.
 type ChargingInput struct {
 	Near
-	MinKw  float64 `query:"min_kw" minimum:"0" maximum:"1000" doc:"Only sites with at least one point of at least this power, in kW, and of each only those points. Default 0."`
-	Access string  `query:"access" enum:"public,restricted,all" default:"public" doc:"Who may use the site."`
+	MinKw         float64  `query:"min_kw" minimum:"0" maximum:"1000" doc:"Only sites with at least one point of at least this power, in kW, and of each only those points. Default 0."`
+	MaxKw         float64  `query:"max_kw" minimum:"0" maximum:"1000" doc:"Only points of at most this power, in kW, with a stated power; never below min_kw. Default 0, no upper limit."`
+	Connector     string   `query:"connector" enum:"ccs2,type2,chademo,mcs" doc:"Only points with this plug: ccs2 (CCS Combo 2), type2 (Typ 2, AC), chademo or mcs (Megawatt Charging System, for lorries)."`
+	Operator      string   `query:"operator" minLength:"1" maxLength:"80" doc:"Only sites of this operator brand, as a person names it. Spellings of one brand match together: the brand key is the first word of three letters or more that is not a legal-form or generic word (GmbH, Stadtwerke, Mobility, ...). Sites whose source names no operator are left out."`
+	Conditions    []string `query:"conditions" enum:"open247,card,free,public" doc:"Only sites with one point that meets every listed term: open247 (open around the clock), card (pay by card at the charger), free (free of charge; a zero ad-hoc price counts for 90 days after its update), public (open to the public, not customers only)."`
+	OnlyAvailable bool     `query:"only_available" doc:"Only sites with a point reported available now. The nearest 100 sites are examined; meta.dropped counts the others by reason, so a site whose status is unknown is never silently hidden. Default false."`
+	Access        string   `query:"access" enum:"public,restricted,all" default:"public" doc:"Who may use the site."`
+	operatorKey   string
+}
+
+// Resolve reads the position, refuses a lower power limit above the upper
+// one and an operator that names no brand, and keeps the operator's key.
+func (in *ChargingInput) Resolve(ctx huma.Context) []error {
+	errs := in.AtPosition.Resolve(ctx)
+	if in.MaxKw > 0 && in.MinKw > in.MaxKw {
+		errs = append(errs, &huma.ErrorDetail{Location: "query.max_kw", Message: "the upper power limit is below min_kw", Value: in.MaxKw})
+	}
+	if u := ctx.URL(); in.Operator != "" || u.Query().Has("operator") {
+		k, ok := energy.OperatorKey(in.Operator)
+		if !ok {
+			errs = append(errs, &huma.ErrorDetail{Location: "query.operator", Message: "names no operator, only legal-form or generic words: name the brand", Value: in.Operator})
+		}
+		in.operatorKey = k
+	}
+	return errs
 }
 
 // Availability is the last reported state of a charge point.
@@ -352,15 +375,29 @@ type ChargingSite struct {
 // ChargingQuery is meta.query of listChargingOptions.
 type ChargingQuery struct {
 	NearQuery
-	MinKw  float64 `json:"minKw"`
-	Access string  `json:"access" enum:"public,restricted,all"`
+	MinKw         float64  `json:"minKw"`
+	MaxKw         *float64 `json:"maxKw,omitempty"`
+	Connector     string   `json:"connector,omitempty"`
+	Operator      string   `json:"operator,omitempty" doc:"The asked operator's brand key."`
+	Conditions    []string `json:"conditions,omitempty"`
+	OnlyAvailable bool     `json:"onlyAvailable"`
+	Access        string   `json:"access" enum:"public,restricted,all"`
+}
+
+// ChargingDropped counts the examined sites an only-available answer left
+// out, by reason.
+type ChargingDropped struct {
+	NotFree  int `json:"notFree" doc:"Every live report says occupied or out of order."`
+	Stale    int `json:"stale" doc:"Reports only older than their limit."`
+	NoStatus int `json:"noStatus" doc:"No report at all."`
 }
 
 // ChargingMeta is the meta member of listChargingOptions.
 type ChargingMeta struct {
 	DataMeta
-	Page  Page          `json:"page"`
-	Query ChargingQuery `json:"query"`
+	Page    Page             `json:"page"`
+	Query   ChargingQuery    `json:"query"`
+	Dropped *ChargingDropped `json:"dropped,omitempty" doc:"With only_available: the examined sites left out."`
 }
 
 // ChargingEnvelope is the enveloped answer of listChargingOptions.
@@ -381,14 +418,7 @@ func chargingSites(ctx context.Context, a features.Answer[energy.Site], maxAge t
 	// Each report is judged by the status age limit and its own family's
 	// threshold, whichever is shorter (energy.StatusLimit); every family that
 	// contributed is in a.Families (ENV-003).
-	thresholds := map[string]time.Duration{}
-	for _, f := range a.Families {
-		thresholds[f.Source.Family] = f.StaleAfter
-		if f.NeverStale {
-			thresholds[f.Source.Family] = maxAge // no threshold of its own: the status age limit alone
-		}
-	}
-	limit := func(family string) time.Duration { return energy.StatusLimit(maxAge, thresholds[family]) }
+	limit := features.StatusLimits(maxAge, a.Families)
 	out := make([]ChargingSite, len(a.Items))
 	for i, v := range a.Items {
 		sum := v.Summarise(a.At, limit)
@@ -420,6 +450,20 @@ func chargingSites(ctx context.Context, a features.Answer[energy.Site], maxAge t
 	return out
 }
 
+func positive(v float64) *float64 {
+	if v <= 0 {
+		return nil
+	}
+	return &v
+}
+
+func chargingDropped(d *energy.Dropped) *ChargingDropped {
+	if d == nil {
+		return nil
+	}
+	return &ChargingDropped{NotFree: d.NotFree, Stale: d.Stale, NoStatus: d.NoStatus}
+}
+
 func registerCharging(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "Where to charge near a position"
 	op.Description = "Charging sites within the radius of a position, nearest first, then by id, each with its points and their last reported availability. Needs the scope energy."
@@ -429,7 +473,9 @@ func registerCharging(api huma.API, s *server, op huma.Operation) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
-		q := energy.Query{At: in.point, RadiusM: s.radius(in.RadiusM), MinKw: in.MinKw, Access: energy.AccessFilter(in.Access), Limit: s.limit(in.Limit)}
+		q := energy.Query{At: in.point, RadiusM: s.radius(in.RadiusM), MinKw: in.MinKw, Access: energy.AccessFilter(in.Access), Limit: s.limit(in.Limit),
+			Filter: energy.Filter{Connector: in.Connector, MaxKw: in.MaxKw, OperatorKey: in.operatorKey, Terms: in.Conditions,
+				OnlyAvailable: in.OnlyAvailable, StatusMaxAge: s.cfg.Charging.StatusMaxAge}}
 		a, err := s.features.Charging(ctx, principalFrom(ctx).Key, q)
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
@@ -439,7 +485,10 @@ func registerCharging(api huma.API, s *server, op huma.Operation) {
 			Meta: ChargingMeta{
 				DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
 				Page:     Page{Limit: q.Limit, HasMore: a.HasMore},
-				Query:    ChargingQuery{NearQuery: NearQuery{At: position(q.At), RadiusM: q.RadiusM}, MinKw: q.MinKw, Access: string(q.Access)},
+				Query: ChargingQuery{NearQuery: NearQuery{At: position(q.At), RadiusM: q.RadiusM}, MinKw: q.MinKw, Access: string(q.Access),
+					MaxKw: positive(q.Filter.MaxKw), Connector: q.Filter.Connector, Operator: q.Filter.OperatorKey, Conditions: q.Filter.Terms,
+					OnlyAvailable: q.Filter.OnlyAvailable},
+				Dropped: chargingDropped(a.Dropped),
 			},
 			Links: s.selfLink(ctx),
 		}}, nil

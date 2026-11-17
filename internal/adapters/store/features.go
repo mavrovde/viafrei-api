@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -57,6 +58,24 @@ order by s.source_ref`, families, lang)
 	})
 }
 
+// pointFilter is the platform's charging point filter over contract
+// charge point p: at least $6 kW, the plug $9, at most $10 kW with a stated
+// power, and every term of $13 held ($8 is now, for the free-price age).
+var pointFilter = `($6::float8 <= 0 or p.power_max_kw >= $6)
+    and ($9::text is null or $9 = any(p.connectors))
+    and ($10::float8 <= 0 or nullif(p.power_max_kw, 0) <= $10)
+    and ($13::text[] is null or ` + termsHeld + ` @> $13::text[])`
+
+// termsHeld is the array of the charging terms point p meets, the
+// platform's rule per term.
+var termsHeld = `array_remove(array[
+      case when (case p.opening_hours_kind when 'always' then true when 'restricted' then false end) then 'open247' end,
+      case when p.payment_card then 'card' end,
+      case when (case when p.free_of_charge is not null then p.free_of_charge when p.price_per_kwh > 0 then false
+                      when p.price_adhoc_zero = false then false
+                      when p.price_adhoc_zero and p.price_updated_at >= $8::timestamptz - interval '` + strconv.Itoa(energy.FreePriceMaxAgeDays) + ` days' then true end) then 'free' end,
+      case when (case p.parking_access when 'public' then true when 'customers' then false end) then 'public' end]::text[], null)`
+
 // ChargingNear reads the charging sites of the given families within the
 // radius, nearest first, then by id, each with its charge points (under a
 // minimum power only those of at least that power) and their last
@@ -67,6 +86,19 @@ func (s *Store) ChargingNear(ctx context.Context, q energy.Query, families []str
 	for _, a := range q.Access.Codes() {
 		accessCodes = append(accessCodes, string(a))
 	}
+	f := q.Filter
+	var connector, opKey *string
+	if f.Connector != "" {
+		connector = &f.Connector
+	}
+	if f.OperatorKey != "" {
+		opKey = &f.OperatorKey
+	}
+	var terms []string
+	if len(f.Terms) > 0 {
+		terms = f.Terms
+	}
+	pointFiltered := q.MinKw > 0 || connector != nil || f.MaxKw > 0 || terms != nil
 	type row struct {
 		site  energy.Site
 		point *energy.ChargePoint
@@ -88,16 +120,17 @@ sites as (
     and `+permitted("c")+`
     and st_dwithin(c.location::geography, here.g, $4)
     and ($5::text[] is null or c.access = any($5))
-    and ($6::float8 <= 0 or exists (
+    and ($11::text is null or coalesce(`+energy.OperatorKeySQL("c.operator_name")+`, '`+energy.NoOperatorKey+`') = $11)
+    and (not $12::boolean or exists (
           select 1 from contract.charge_point p
-          where p.site_id = c.site_id and p.power_max_kw >= $6 and `+permitted("p")+`))
+          where p.site_id = c.site_id and `+pointFilter+` and `+permitted("p")+`))
   order by dist, c.site_id
   limit $7)
 select s.site_id, s.source_ref, s.name, s.operator_name, s.access, s.lat, s.lon, s.dist,
        p.point_id, p.current_kind, p.power_max_kw::float8, o.availability, o.observed_at, o.source_ref,
        nx.next_at
 from sites s
-left join contract.charge_point p on p.site_id = s.site_id and ($6::float8 <= 0 or p.power_max_kw >= $6) and `+permitted("p")+`
+left join contract.charge_point p on p.site_id = s.site_id and `+pointFilter+` and `+permitted("p")+`
 left join lateral (
   select availability, observed_at, source_ref
   from contract.charge_point_state_observation o
@@ -108,7 +141,8 @@ left join lateral (
   select min(o.observed_at) next_at
   from contract.charge_point_state_observation o
   where o.point_id = p.point_id and o.source_ref = any($3) and o.observed_at > $8 and `+permitted("o")+`) nx on true
-order by s.dist, s.site_id, p.point_id`, q.At.Lat, q.At.Lon, families, q.RadiusM, accessCodes, q.MinKw, q.Limit+1, now)
+order by s.dist, s.site_id, p.point_id`, q.At.Lat, q.At.Lon, families, q.RadiusM, accessCodes, q.MinKw, q.Limit+1, now,
+			connector, f.MaxKw, opKey, pointFiltered, terms)
 		return pgx.CollectRows(res, func(r pgx.CollectableRow) (row, error) {
 			var (
 				v                       row

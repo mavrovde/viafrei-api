@@ -232,5 +232,7 @@ type Query struct {
 	// of each site only those points.
 	MinKw  float64
 	Access AccessFilter
+	// Filter narrows the points and sites further (the platform's filter).
+	Filter Filter
 	Limit  int
 }

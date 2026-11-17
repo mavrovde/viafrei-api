@@ -134,6 +134,8 @@ type Answer[T any] struct {
 	// starting or ending, a confirmation lapsing, an ended situation leaving
 	// the retention. Nil when nothing else does.
 	ChangesAt *time.Time
+	// Dropped counts the sites an only-available charging answer left out.
+	Dropped *energy.Dropped
 }
 
 // ErrGateViolation wraps access.ErrForbiddenItem: storage returned an item
@@ -228,14 +230,16 @@ func (s *Service) charging(ctx context.Context, reg []access.Terms, gate access.
 		return Answer[energy.Site]{}, err
 	}
 	now := s.now()
-	sites, more, next, err := s.repos.Charging.ChargingNear(ctx, q, permitted, now)
+	read := q
+	if q.Filter.OnlyAvailable {
+		// The platform examines its nearest sites and keeps the free ones.
+		read.Limit = energy.OnlyAvailableScan
+	}
+	sites, more, next, err := s.repos.Charging.ChargingNear(ctx, read, permitted, now)
 	if err != nil {
 		return Answer[energy.Site]{}, err
 	}
-	var contributed []string
-	for _, site := range sites {
-		contributed = append(contributed, site.Families()...)
-	}
+	contributed := siteFamilies(sites)
 	if err := gate.Check(contributed); err != nil {
 		return Answer[energy.Site]{}, err
 	}
@@ -243,7 +247,61 @@ func (s *Service) charging(ctx context.Context, reg []access.Terms, gate access.
 	if err != nil {
 		return Answer[energy.Site]{}, err
 	}
-	return Answer[energy.Site]{Items: sites, HasMore: more, Families: fams, Partial: partial, At: now, NextReport: next}, nil
+	out := Answer[energy.Site]{Items: sites, HasMore: more, Families: fams, Partial: partial, At: now, NextReport: next}
+	if q.Filter.OnlyAvailable {
+		onlyAvailable(&out, q)
+	}
+	return out, nil
+}
+
+func siteFamilies(sites []energy.Site) []string {
+	var out []string
+	for _, site := range sites {
+		out = append(out, site.Families()...)
+	}
+	return out
+}
+
+// StatusLimits is how old each family's charge point report may be and still
+// count: the status age limit, or the family's own threshold when shorter
+// (energy.StatusLimit); a family with no fixed interval has the limit alone.
+func StatusLimits(maxAge time.Duration, fams []provenance.Family) func(family string) time.Duration {
+	thresholds := map[string]time.Duration{}
+	for _, f := range fams {
+		thresholds[f.Source.Family] = f.StaleAfter
+		if f.NeverStale {
+			thresholds[f.Source.Family] = maxAge
+		}
+	}
+	return func(family string) time.Duration { return energy.StatusLimit(maxAge, thresholds[family]) }
+}
+
+// onlyAvailable keeps the examined sites with a point reported free now,
+// at most q.Limit, counts the others by reason, and credits the families of
+// the kept sites only.
+func onlyAvailable(a *Answer[energy.Site], q energy.Query) {
+	limit := StatusLimits(q.Filter.StatusMaxAge, a.Families)
+	kept := []energy.Site{}
+	d := energy.Dropped{}
+	for _, site := range a.Items {
+		switch site.FreeNow(a.At, limit) {
+		case energy.Free:
+			kept = append(kept, site)
+		case energy.NotFree:
+			d.NotFree++
+		case energy.Stale:
+			d.Stale++
+		default:
+			d.NoStatus++
+		}
+	}
+	a.HasMore = len(kept) > q.Limit
+	a.Items = kept[:min(len(kept), q.Limit)]
+	a.Dropped = &d
+	if len(a.Items) > 0 {
+		credited := siteFamilies(a.Items)
+		a.Families = slices.DeleteFunc(a.Families, func(f provenance.Family) bool { return !slices.Contains(credited, f.Source.Family) })
+	}
 }
 
 // Parking answers "where can I park near here" for key (FR-PARK). A family

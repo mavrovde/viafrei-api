@@ -155,3 +155,8 @@ argument:find_nearby.lat	listNearby?at	nearby-vehicle	-
 argument:find_nearby.lon	listNearby?at	nearby-vehicle	-
 argument:find_nearby.radius_km	listNearby?radius_m	nearby-small	-
 argument:find_nearby.categories	listNearby?categories	nearby-needs,nearby-small	-
+argument:find_charging_station.operator	listChargingOptions?operator	charging-operator	-
+argument:find_charging_station.max_power_kw	listChargingOptions?max_kw	charging-power-band	-
+argument:find_charging_station.connector	listChargingOptions?connector	charging-connector-terms	-
+argument:find_charging_station.conditions	listChargingOptions?conditions	charging-connector-terms	-
+argument:find_charging_station.only_available	listChargingOptions?only_available	charging-only-available	-

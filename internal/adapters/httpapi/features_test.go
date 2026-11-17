@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -212,6 +213,9 @@ func warningCodes(m map[string]any) []string {
 	return out
 }
 
+// chargeFilter is the filter of a question that asks for none.
+var chargeFilter = energy.Filter{StatusMaxAge: config.Defaults().Charging.StatusMaxAge}
+
 func TestChargingOptionsAnswer(t *testing.T) {
 	req.Covers(t, "FR-ENERGY-004", "FR-ENERGY-005", "ENV-003", "ENV-004", "ENV-011", "ENV-040", "ENV-041")
 	f := everyAnswer()
@@ -222,7 +226,7 @@ func TestChargingOptionsAnswer(t *testing.T) {
 	if w.Code != http.StatusOK || w.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("status %d, cache %q: %s", w.Code, w.Header().Get("Cache-Control"), w.Body)
 	}
-	if f.gotCharge != (energy.Query{At: geo.Point{Lat: 52.52, Lon: 13.405}, RadiusM: 2000, Access: energy.FilterPublic, Limit: 20}) || f.gotKey.ID != "abcdefghij" {
+	if !reflect.DeepEqual(f.gotCharge, energy.Query{At: geo.Point{Lat: 52.52, Lon: 13.405}, RadiusM: 2000, Access: energy.FilterPublic, Limit: 20, Filter: chargeFilter}) || f.gotKey.ID != "abcdefghij" {
 		t.Errorf("asked %+v for %q", f.gotCharge, f.gotKey.ID)
 	}
 	body := decode(t, w)
@@ -265,7 +269,7 @@ func TestChargingOptionsAnswer(t *testing.T) {
 	}
 
 	do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/charging-options?at=-1.5,-2&radius_m=500&limit=3&min_kw=50&access=all", bearer)
-	if f.gotCharge != (energy.Query{At: geo.Point{Lat: -1.5, Lon: -2}, RadiusM: 500, MinKw: 50, Access: energy.FilterAll, Limit: 3}) {
+	if !reflect.DeepEqual(f.gotCharge, energy.Query{At: geo.Point{Lat: -1.5, Lon: -2}, RadiusM: 500, MinKw: 50, Access: energy.FilterAll, Limit: 3, Filter: chargeFilter}) {
 		t.Errorf("asked %+v", f.gotCharge)
 	}
 }
@@ -673,4 +677,26 @@ func TestTermsAreAcceptedPerRequest(t *testing.T) {
 	if w := do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&accept_terms=not-even%20a-gate", bearer); w.Code != 200 {
 		t.Errorf("charging with the parameter: %d %s", w.Code, w.Body)
 	}
+}
+
+func TestChargingFilters(t *testing.T) {
+	req.Covers(t, "FR-ENERGY-004", "ENV-040")
+	f := everyAnswer()
+	f.charging.Dropped = &energy.Dropped{NotFree: 2, Stale: 1}
+	h := featureHandler(t, config.Defaults(), f, nil)
+	w := do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&min_kw=50&max_kw=149&connector=ccs2&operator=EnBW%20mobility%2B%20AG&conditions=open247,card&only_available=true", bearer)
+	body := w.Body.String()
+	want := energy.Filter{Connector: "ccs2", MaxKw: 149, OperatorKey: "enbw", Terms: []string{"open247", "card"}, OnlyAvailable: true,
+		StatusMaxAge: config.Defaults().Charging.StatusMaxAge}
+	if w.Code != http.StatusOK || !reflect.DeepEqual(f.gotCharge.Filter, want) {
+		t.Fatalf("%d asked %+v: %s", w.Code, f.gotCharge.Filter, body)
+	}
+	for _, s := range []string{`"maxKw":149`, `"connector":"ccs2"`, `"operator":"enbw"`, `"conditions":["open247","card"]`, `"onlyAvailable":true`, `"dropped":{"notFree":2,"stale":1,"noStatus":0}`} {
+		if !strings.Contains(body, s) {
+			t.Errorf("answer lacks %s: %s", s, body)
+		}
+	}
+	assertProblem(t, do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&min_kw=150&max_kw=50", bearer), 400, "invalid-parameter")
+	assertProblem(t, do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&operator=GmbH", bearer), 400, "invalid-parameter")
+	assertProblem(t, do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&conditions=cheap", bearer), 400, "invalid-parameter")
 }

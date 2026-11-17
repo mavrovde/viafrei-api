@@ -526,3 +526,34 @@ func TestAWrongTermsVersionIsRefusedWithTheCurrentTexts(t *testing.T) {
 		t.Errorf("charging with a stale acceptance: %v", err)
 	}
 }
+
+func TestChargingOnlyAvailable(t *testing.T) {
+	req.Covers(t, "FR-ENERGY-004", "ENV-003")
+	report := func(fam string, s energy.State, at time.Time) energy.Site {
+		return energy.Site{ID: "s-" + fam + string(s), Family: fam,
+			Points: []energy.ChargePoint{{Availability: &energy.Availability{State: s, ObservedAt: at, Family: fam}}}}
+	}
+	sites := []energy.Site{report("e1", energy.StateAvailable, now), report("e1", energy.StateOccupied, now),
+		report("e2", energy.StateAvailable, now.Add(-time.Minute)), site("e2"), report("e1", energy.StateAvailable, now)}
+	q := energy.Query{Limit: 1, Filter: energy.Filter{OnlyAvailable: true, StatusMaxAge: time.Hour}}
+	a, err := service(&fake{sites: sites}, nil).Charging(context.Background(), key("consumer", allScopes, everything...), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(a.Items) != 1 || !a.HasMore || *a.Dropped != (energy.Dropped{NotFree: 1, Stale: 1, NoStatus: 1}) || !slices.Equal(names(a.Families), []string{"e1"}) {
+		t.Errorf("kept %+v more %v dropped %+v credited %v", a.Items, a.HasMore, a.Dropped, names(a.Families))
+	}
+	a, err = service(&fake{sites: sites[1:2]}, nil).Charging(context.Background(), key("consumer", allScopes, everything...), q)
+	if err != nil || len(a.Items) != 0 || a.HasMore || !slices.Equal(names(a.Families), []string{"e1"}) {
+		t.Errorf("none free names the consulted: %+v %v", a, err)
+	}
+}
+
+func TestStatusLimits(t *testing.T) {
+	req.Covers(t, "FR-ENERGY-005")
+	limit := features.StatusLimits(time.Hour, []provenance.Family{
+		{Source: access.Source{Family: "short"}, StaleAfter: time.Minute}, {Source: access.Source{Family: "none"}, NeverStale: true}})
+	if limit("short") != time.Minute || limit("none") != time.Hour || limit("unknown") != 0 {
+		t.Errorf("limits %v %v %v", limit("short"), limit("none"), limit("unknown"))
+	}
+}

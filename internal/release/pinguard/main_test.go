@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mavrovde/viafrei-api/internal/release/livepin"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
@@ -57,5 +58,34 @@ func TestPinguardUsage(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	if code := run([]string{"-nope"}, &stdout, &stderr); code != 2 || stdout.Len() != 0 {
 		t.Fatalf("an unknown flag: exit %d, stdout %q", code, stdout.String())
+	}
+}
+
+// TestPinguardLive: -live prints a published live refresher release of the
+// database release database.pin names, and refuses an unreleased one; a
+// live pin that cannot be read is a usage error.
+func TestPinguardLive(t *testing.T) {
+	req.Covers(t, "REL-015")
+	database := "ghcr.io/mavrovde/viafrei-database:0.3.0@sha256:" + digest + "\nschema-head 315\n"
+	live := livepin.Published + "0.1.0@sha256:" + digest
+	for name, c := range map[string]struct {
+		pin, out, err string
+		code          int
+	}{
+		"a published release": {pin: live + "\ndatabase 0.3.0\n", out: live + "\n"},
+		"unreleased":          {pin: livepin.Unreleased + "\ndatabase 0.3.0\n", code: 1, err: "unreleased"},
+		"no live pin":         {code: 2, err: "read " + livepin.File},
+	} {
+		dir := module(t, database)
+		if c.pin != "" {
+			if err := os.WriteFile(filepath.Join(dir, livepin.File), []byte(c.pin), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		var stdout, stderr bytes.Buffer
+		code := run([]string{"-dir", dir, "-live"}, &stdout, &stderr)
+		if code != c.code || stdout.String() != c.out || !strings.Contains(stderr.String(), c.err) {
+			t.Errorf("%s: exit %d, stdout %q, stderr %q", name, code, stdout.String(), stderr.String())
+		}
 	}
 }

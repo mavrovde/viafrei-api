@@ -181,6 +181,10 @@ jobs:
           go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
       - name: The database pin is a published release, not a local build or a placeholder (REL-015)
         run: go run ./internal/release/pinguard
+      - name: The live pin is a published live refresher release of the same database release, not unreleased or a placeholder (REL-015)
+        # make live-e2e proved the refreshes against it before the release
+        # (docs/RELEASING.md); the image is private, so CI does not run it.
+        run: go run ./internal/release/pinguard -live
       - name: The inventory is as new as the platform's and the site's newest releases (REL-015)
         # test/inventory records what the MCP server and the site ask for, from
         # the releases it names; an API released past a newer consumer release

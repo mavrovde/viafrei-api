@@ -11,7 +11,7 @@ LDFLAGS   := -s -w \
 	-X github.com/mavrovde/viafrei-api/internal/buildinfo.commit=$(COMMIT)
 
 .PHONY: build test test-integration coverage lint generate check-generated fixtures fixtures-verify catalogue report run clean \
-	image image-multiarch up down logs reset compose-test docs docs-a11y docs-examples
+	image image-multiarch up down logs reset compose-test live-e2e docs docs-a11y docs-examples
 
 build: ## Build the binary into bin/
 	CGO_ENABLED=0 $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/viafrei-api
@@ -107,6 +107,9 @@ reset: ## Stop the stack and delete this project's database volume (fixtures rel
 
 compose-test: ## Smoke-test the stack: healthz, readyz, meta and a short Schemathesis pass, then tear down
 	scripts/compose-smoke.sh
+
+live-e2e: ## Before a release: fuel (ags:, anchor:) and train board refreshes settled by the pinned live refresher against a provider stub (LIVE_SOURCES=its sources/; private image, never CI)
+	scripts/live-e2e.sh
 
 clean:
 	rm -rf bin

@@ -113,6 +113,7 @@ type Service struct {
 	set         Settings
 	now         func() time.Time
 	boardWriter TrainBoardWriter
+	refresher   FuelRefresher
 }
 
 // New returns the service.

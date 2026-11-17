@@ -38,6 +38,9 @@ import (
 // records what it was asked.
 type fakeFeatures struct {
 	trainBoard features.TrainBoardAnswer
+	refresh    energy.RefreshAnswer
+	refreshErr error
+	gotRefresh energy.RefreshAsk
 	gotTrain   transit.TrainBoard
 	gotEVA     string
 	gotLang    string
@@ -177,7 +180,8 @@ func overviewAnswer() features.Overview {
 }
 
 func everyAnswer() *fakeFeatures {
-	return &fakeFeatures{charging: chargingAnswer(), parking: parkingAnswer(), overview: overviewAnswer(), conditions: conditionsAnswer(), situation: situationAnswer(), risk: riskAnswer(), topic: topicAnswer(), stations: stationsAnswer()}
+	return &fakeFeatures{charging: chargingAnswer(), parking: parkingAnswer(), overview: overviewAnswer(), conditions: conditionsAnswer(), situation: situationAnswer(), risk: riskAnswer(), topic: topicAnswer(), stations: stationsAnswer(),
+		refresh: energy.RefreshAnswer{State: energy.RefreshNoneDue, Reused: true}}
 }
 
 func featureScopes() auth.Principal {

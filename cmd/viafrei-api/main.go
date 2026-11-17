@@ -129,6 +129,12 @@ func serve(environ []string, stderr io.Writer) int {
 		Versions:  st,
 	}
 
+	// The fuel refresh asks go to the refresher that holds the provider key.
+	if svc, ok := deps.Features.(*features.Service); ok {
+		if r := wire.FuelRefresher(cfg); r != nil {
+			svc.WithFuelRefresher(r)
+		}
+	}
 	if cfg.Access.URL.IsSet() {
 		as, err := accessstore.Open(ctx, cfg)
 		if err != nil {

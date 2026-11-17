@@ -34,6 +34,10 @@ func (laterFeatures) RecordTrainBoard(context.Context, access.Record, transit.Tr
 	return nil
 }
 
+func (laterFeatures) FuelRefresh(context.Context, access.Record, energy.RefreshAsk) (energy.RefreshAnswer, error) {
+	return energy.RefreshAnswer{State: energy.RefreshNoneDue}, nil
+}
+
 func (laterFeatures) TrainBoard(context.Context, access.Record, string) (features.TrainBoardAnswer, error) {
 	return features.TrainBoardAnswer{}, nil
 }

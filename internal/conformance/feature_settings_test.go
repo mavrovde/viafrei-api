@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -22,6 +23,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
+	"github.com/mavrovde/viafrei-api/internal/runtime/wire"
 )
 
 // everyScope admits every request with a key of every feature scope.
@@ -239,4 +241,37 @@ func fuelHeld(t *testing.T, c *config.Config) string {
 		t.Fatalf("%d %v %s", w.Code, err, w.Body)
 	}
 	return body.Data.Name
+}
+
+// fuelRefreshURL: with no refresher an ask is refused as not configured;
+// with one, it is forwarded (here to a host that does not resolve).
+func fuelRefreshURL(t *testing.T, c *config.Config) string {
+	t.Helper()
+	r := wire.FuelRefresher(c)
+	if r == nil {
+		return "not configured"
+	}
+	_, err := r.Refresh(context.Background(), energy.RefreshAsk{At: "ags:09162000"})
+	return fmt.Sprint(err != nil)
+}
+
+// fuelRefreshDeadline: a refresher answering after 300 ms is waited for
+// under the default deadline and is pending under a shorter one.
+func fuelRefreshDeadline(t *testing.T, c *config.Config) string {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-time.After(300 * time.Millisecond):
+		case <-r.Context().Done():
+			return
+		}
+		_, _ = io.WriteString(w, `{"state":"refreshed","settledAt":null,"reused":false}`)
+	}))
+	defer srv.Close()
+	c.Fuel.RefreshURL = srv.URL
+	a, err := wire.FuelRefresher(c).Refresh(context.Background(), energy.RefreshAsk{At: "ags:09162000"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(a.State)
 }

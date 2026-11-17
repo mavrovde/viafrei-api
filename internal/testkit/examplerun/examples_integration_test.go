@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -26,6 +27,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/api"
 	"github.com/mavrovde/viafrei-api/internal/adapters/accessstore"
+	"github.com/mavrovde/viafrei-api/internal/adapters/fuelrefresh"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
@@ -142,6 +144,19 @@ var freshReports = []fixtures.Report{
 	{Point: "DE*SYN*E000020", Age: 8 * time.Minute, State: "available"},
 }
 
+// refresher is a stand-in for the service that holds the fuel provider key:
+// it answers every ask refreshed, settled a second before the examples'
+// clock, as the platform's refresher answers it.
+func refresher(t *testing.T) string {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, `{"state":"refreshed","settledAt":%d,"reused":false}`, now.Add(-time.Second).UnixMilli())
+	}))
+	t.Cleanup(srv.Close)
+	return srv.URL
+}
+
 // keyAuth admits every request as the example's key.
 type keyAuth struct{ p auth.Principal }
 
@@ -172,6 +187,7 @@ func ask(t *testing.T, cfg *config.Config, st *store.Store, e api.Example) (int,
 	}
 	svc := features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st, Transit: st, Fuel: st, Hydrogen: st, Speed: st, Sharing: st, Addresses: st, Pois: st, Locations: st, Disruptions: st, Nearby: st, Lorry: st, Catalogue: st, National: st, Affected: st, Coverage: st, States: st, TrainBoards: st, Bays: st}, wire.FeatureSettings(cfg), clock)
 	svc.WithTrainBoardWriter(writer(t, cfg))
+	svc.WithFuelRefresher(fuelrefresh.New(refresher(t), cfg.Fuel.RefreshDeadline, nil))
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Config: cfg, Build: build, ContractVersion: dbcontract.ContractVersion, Now: clock,
 		Readiness: health.NewChecker(st, expected, cfg.Health.ReadyTimeout),

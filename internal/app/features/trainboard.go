@@ -23,8 +23,9 @@ type TrainBoardWriter interface {
 	AppendTrainBoard(ctx context.Context, b transit.TrainBoard) error
 }
 
-// ErrOwnKeyOnly refuses a write by a key that is not one of ViaFrei's own.
-var ErrOwnKeyOnly = errors.New("features: only ViaFrei's own keys may record a board")
+// ErrOwnKeyOnly refuses a write or an ask by a key that is not one of
+// ViaFrei's own.
+var ErrOwnKeyOnly = errors.New("features: only ViaFrei's own keys may call this operation")
 
 // ErrNoWriter is the answer when no writer is configured.
 var ErrNoWriter = errors.New("features: recording boards is not configured")

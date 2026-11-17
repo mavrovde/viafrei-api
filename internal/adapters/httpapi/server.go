@@ -155,6 +155,7 @@ func operations() []operation {
 		{id: "listStations", method: http.MethodGet, path: "/v1/stations", tag: "transit", keyed: true, scope: "transit", register: registerStations},
 		{id: "listStationDepartures", method: http.MethodGet, path: "/v1/stations/{stationId}/departures", tag: "transit", keyed: true, scope: "transit", register: registerDepartures},
 		{id: "getTrainBoard", method: http.MethodGet, path: "/v1/train-boards/{eva}", tag: "transit", keyed: true, scope: "transit", register: registerTrainBoard},
+		{id: "requestFuelRefresh", method: http.MethodPost, path: "/v1/fuel-refresh", tag: "energy", keyed: true, scope: "energy", register: registerFuelRefresh},
 		{id: "recordTrainBoard", method: http.MethodPost, path: "/v1/train-boards", tag: "transit", keyed: true, scope: "transit", register: registerRecordTrainBoard},
 		{id: "listStationFacilities", method: http.MethodGet, path: "/v1/stations/{stationId}/facilities", tag: "transit", keyed: true, scope: "transit", register: registerFacilities},
 	}

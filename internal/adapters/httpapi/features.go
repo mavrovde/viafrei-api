@@ -42,6 +42,7 @@ type Features interface {
 	Departures(ctx context.Context, key access.Record, q transit.DepartureQuery) (features.Board, error)
 	Facilities(ctx context.Context, key access.Record, q transit.FacilityQuery) (features.StationFacilities, error)
 	RecordTrainBoard(ctx context.Context, key access.Record, b transit.TrainBoard) error
+	FuelRefresh(ctx context.Context, key access.Record, a energy.RefreshAsk) (energy.RefreshAnswer, error)
 	ParkingBays(ctx context.Context, key access.Record, q parking.BayQuery) (features.BaysAnswer, error)
 	TrainBoard(ctx context.Context, key access.Record, eva string) (features.TrainBoardAnswer, error)
 	Places(ctx context.Context, key access.Record, q places.Query) (features.Answer[places.Place], error)
@@ -81,6 +82,7 @@ const schemaPrefix = "#/components/schemas/"
 
 var nullableObjects = []struct{ schema, member string }{
 	{"ChargePoint", "availability"},
+	{"FuelRefreshData", "queue"},
 	{"HydrogenData", "nearest"},
 	{"DisruptionData", "punctuality"},
 	{"SpeedCamera", "location"},

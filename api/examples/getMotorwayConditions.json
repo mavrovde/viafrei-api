@@ -20,7 +20,12 @@
         "road": "A101",
         "roadType": "motorway",
         "direction": "both",
-        "states": []
+        "states": [
+          "07",
+          "10",
+          "06",
+          "08"
+        ]
       },
       "lamp": "amber",
       "lampReason": "warning",

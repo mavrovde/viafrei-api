@@ -58,7 +58,7 @@ type FuelPrice struct {
 	PriceEur        float64   `json:"priceEur" doc:"Euro per litre, three decimals."`
 	ReportedAt      time.Time `json:"reportedAt" doc:"When the price was reported."`
 	ReportedAtLocal string    `json:"reportedAtLocal" format:"date-time" doc:"reportedAt in Europe/Berlin time."`
-	Current         bool      `json:"current" doc:"True when the price was reported inside fuel.price_current (24 hours by default); an older one is the last known price, never ranked."`
+	Current         bool      `json:"current" doc:"True when the price was reported inside fuel.price_fresh (30 minutes by default, the platform's price cache window). Ranking by price uses fuel.price_current (24 hours): an older price is the last known one, never ranked."`
 }
 
 // FuelStation is a filling station of an answer.
@@ -68,7 +68,7 @@ type FuelStation struct {
 	Brand        *string     `json:"brand" nullable:"true" doc:"The brand; null when not published."`
 	Location     Position    `json:"location"`
 	DistanceM    int         `json:"distanceM" doc:"Distance from the asked position in metres."`
-	OpenState    string      `json:"openingState" doc:"open, closed or unknown, as the station reports it. Open enumeration."`
+	OpenState    string      `json:"openingState" doc:"open, closed or unknown at the answer's instant (open_at's, when asked), read from the published opening hours: unknown when there are none or they cannot be read. Open enumeration."`
 	Prices       []FuelPrice `json:"prices" doc:"The newest price per grade the station reported, by grade; empty when it reported none."`
 	SourceFamily string      `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
 }
@@ -129,7 +129,7 @@ func registerFuel(api huma.API, s *server, op huma.Operation) {
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
 		}
-		data := fuelStations(a, q.Window)
+		data := fuelStations(a, s.cfg.Fuel.PriceFresh)
 		return &FuelOutput{CacheControl: noStore, Body: FuelEnvelope{
 			Data: data,
 			Meta: FuelMeta{
@@ -144,7 +144,9 @@ func registerFuel(api huma.API, s *server, op huma.Operation) {
 }
 
 // fuelStations are the stations of a fuel answer, each price current when
-// reported within window of the answer's instant.
+// reported within window of the answer's instant, each station's opening
+// state read from its published hours at the instant open_at named, else at
+// the answer's.
 func fuelStations(a features.FuelStations, window time.Duration) []FuelStation {
 	data := make([]FuelStation, len(a.Items))
 	for i, st := range a.Items {
@@ -154,7 +156,15 @@ func fuelStations(a features.FuelStations, window time.Duration) []FuelStation {
 				ReportedAtLocal: local(p.ObservedAt), Current: p.Current(a.At, window)}
 		}
 		data[i] = FuelStation{ID: st.ID, Name: st.Name, Brand: st.Brand, Location: position(st.Location),
-			DistanceM: st.DistanceM, OpenState: st.Open, Prices: prices, SourceFamily: st.Family}
+			DistanceM: st.DistanceM, OpenState: st.OpenStateAt(openStateInstant(a)), Prices: prices, SourceFamily: st.Family}
 	}
 	return data
+}
+
+// openStateInstant is the instant a fuel answer's opening states are read at.
+func openStateInstant(a features.FuelStations) time.Time {
+	if a.OpenAt != nil {
+		return *a.OpenAt
+	}
+	return a.At
 }

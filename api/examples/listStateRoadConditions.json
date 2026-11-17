@@ -1,0 +1,136 @@
+{
+  "title": "A Land's motorway situations",
+  "request": "/v1/states/10/road-conditions?road_class=motorway\u0026limit=3",
+  "attribution": "Road situations come from the source families of the roads domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "roads"
+    ],
+    "sources": [
+      "roads_alpha",
+      "roads_epsilon"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": {
+      "state": "10",
+      "lamp": "amber",
+      "lampReason": "warning",
+      "situations": [
+        {
+          "id": "datex:syn:ev-00011",
+          "kind": "roadworks",
+          "severity": "lane_closed",
+          "road": "A103",
+          "roadType": "motorway",
+          "direction": "unknown",
+          "directionText": null,
+          "location": {
+            "lat": 52.574746,
+            "lon": 8.489175
+          },
+          "validity": {
+            "from": "2026-03-29T19:33:04Z",
+            "fromLocal": "2026-03-29T21:33:04+02:00",
+            "until": "2026-03-30T05:33:04Z",
+            "untilLocal": "2026-03-30T07:33:04+02:00"
+          },
+          "lanes": null,
+          "delayMin": null,
+          "lengthM": null,
+          "headline": "MaintenanceWorks",
+          "description": null,
+          "textLanguage": "de",
+          "updatedAt": "2026-03-29T19:34:04Z",
+          "updatedAtLocal": "2026-03-29T21:34:04+02:00",
+          "position": null,
+          "sourceFamily": "roads_alpha"
+        },
+        {
+          "id": "datex:syn:ev-00010",
+          "kind": "other",
+          "severity": "other",
+          "road": "A103",
+          "roadType": "motorway",
+          "direction": "unknown",
+          "directionText": null,
+          "location": {
+            "lat": 52.267831,
+            "lon": 10.249573
+          },
+          "validity": {
+            "from": "2026-03-29T06:42:04Z",
+            "fromLocal": "2026-03-29T08:42:04+02:00",
+            "until": "2026-03-31T17:42:04Z",
+            "untilLocal": "2026-03-31T19:42:04+02:00"
+          },
+          "lanes": null,
+          "delayMin": null,
+          "lengthM": null,
+          "headline": "Other",
+          "description": null,
+          "textLanguage": "de",
+          "updatedAt": "2026-03-29T06:43:04Z",
+          "updatedAtLocal": "2026-03-29T08:43:04+02:00",
+          "position": null,
+          "sourceFamily": "roads_alpha"
+        }
+      ]
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": "2026-03-29T23:57:30Z",
+      "freshness": [
+        {
+          "family": "roads_alpha",
+          "dataAsOf": "2026-03-29T23:57:30Z",
+          "ageS": 150,
+          "staleAfterS": 900,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "roads_alpha",
+          "domain": "roads",
+          "publisher": "Nimbruß Datenwerk",
+          "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://alpha.example/terms/roads_alpha"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ],
+      "page": {
+        "limit": 3,
+        "hasMore": false
+      },
+      "query": {
+        "state": "10",
+        "kinds": [],
+        "minSeverity": "info",
+        "roadClasses": [
+          "motorway"
+        ]
+      }
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/states/10/road-conditions"
+    }
+  }
+}

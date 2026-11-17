@@ -1678,11 +1678,11 @@
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].openingState",
-          "value": "open"
+          "value": "unknown"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[0].current",
-          "value": "true"
+          "value": "false"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[0].fuel",
@@ -1702,7 +1702,7 @@
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[1].current",
-          "value": "true"
+          "value": "false"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[1].fuel",
@@ -1722,7 +1722,7 @@
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[2].current",
-          "value": "true"
+          "value": "false"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[2].fuel",
@@ -1810,11 +1810,11 @@
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].openingState",
-          "value": "open"
+          "value": "unknown"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[0].current",
-          "value": "true"
+          "value": "false"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[0].fuel",
@@ -1834,7 +1834,7 @@
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[1].current",
-          "value": "true"
+          "value": "false"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[1].fuel",
@@ -1854,7 +1854,7 @@
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[2].current",
-          "value": "true"
+          "value": "false"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[2].fuel",
@@ -1917,96 +1917,8 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
-          "name": "data[00000000-0000-4000-8000-000000000002].brand",
-          "value": "Belnan"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].distanceM",
-          "value": "110"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].id",
-          "value": "00000000-0000-4000-8000-000000000002"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].location.lat",
-          "value": "49.16941"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].location.lon",
-          "value": "7.80879"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].name",
-          "value": "Belnan Namüningen"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].openingState",
-          "value": "open"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[0].current",
-          "value": "true"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[0].fuel",
-          "value": "diesel"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[0].priceEur",
-          "value": "1.799"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[0].reportedAt",
-          "value": "2026-03-29T22:45:59Z"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[0].reportedAtLocal",
-          "value": "2026-03-29T22:45:59Z"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[1].current",
-          "value": "true"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[1].fuel",
-          "value": "e10"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[1].priceEur",
-          "value": "1.633"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[1].reportedAt",
-          "value": "2026-03-29T15:24:44Z"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[1].reportedAtLocal",
-          "value": "2026-03-29T15:24:44Z"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[2].current",
-          "value": "true"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[2].fuel",
-          "value": "e5"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[2].priceEur",
-          "value": "2.062"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[2].reportedAt",
-          "value": "2026-03-29T21:50:02Z"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[2].reportedAtLocal",
-          "value": "2026-03-29T21:50:02Z"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].sourceFamily",
-          "value": "tankerkoenig_gamma"
+          "name": "data",
+          "value": "[]"
         },
         {
           "name": "meta.attribution[tankerkoenig_gamma].family",
@@ -2074,11 +1986,11 @@
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].openingState",
-          "value": "open"
+          "value": "unknown"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[0].current",
-          "value": "true"
+          "value": "false"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[0].fuel",
@@ -2098,7 +2010,7 @@
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[1].current",
-          "value": "true"
+          "value": "false"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[1].fuel",
@@ -2118,7 +2030,7 @@
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[2].current",
-          "value": "true"
+          "value": "false"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[2].fuel",

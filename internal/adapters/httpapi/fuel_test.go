@@ -24,11 +24,15 @@ func (f *fakeFeatures) FuelStations(_ context.Context, key access.Record, q ener
 func TestFuelStationsAnswer(t *testing.T) {
 	req.Covers(t, "FR-ENERGY-002", "ENV-040")
 	f := everyAnswer()
+	// The station reports closed, and its published hours have it open
+	// around the clock: the answer states the hours' state, as the platform
+	// does. A price is current inside fuel.price_fresh (30 minutes).
+	allDay := true
 	fam := provenance.Family{Source: access.Source{Family: "src-gamma-energy", Domain: "energy", Publisher: "P", AttributionText: "T", Licence: "L", LicenceURL: "https://licences.example/f"}, StaleAfter: time.Hour}
 	f.fuel = features.FuelStations{
 		Answer: features.Answer[energy.FuelStation]{Items: []energy.FuelStation{
-			{ID: "f1", Name: sp("ARAL Nord"), Brand: sp("ARAL"), Location: geo.Point{Lat: 50.1, Lon: 8.6}, DistanceM: 300, Open: "open",
-				Prices: []energy.FuelPrice{{Product: "e5", Price: 1.859, ObservedAt: fixedNow.Add(-time.Hour)}, {Product: "diesel", Price: 1.7, ObservedAt: fixedNow.Add(-48 * time.Hour)}},
+			{ID: "f1", Name: sp("ARAL Nord"), Brand: sp("ARAL"), Location: geo.Point{Lat: 50.1, Lon: 8.6}, DistanceM: 300, Open: "closed", Hours: energy.Hours{WholeDay: &allDay},
+				Prices: []energy.FuelPrice{{Product: "e5", Price: 1.859, ObservedAt: fixedNow.Add(-10 * time.Minute)}, {Product: "diesel", Price: 1.7, ObservedAt: fixedNow.Add(-48 * time.Hour)}},
 				Family: "src-gamma-energy"},
 		}, HasMore: true, Families: []provenance.Family{fam}, At: fixedNow},
 		Matched: 3, DroppedClosed: 1, DroppedUnknown: 2,

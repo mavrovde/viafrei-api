@@ -44,7 +44,9 @@ type FuelStation struct {
 	Brand     *string
 	Location  geo.Point
 	DistanceM int
-	// Open is the station's reported state: open, closed or unknown.
+	// Open is the station's reported state: open, closed or unknown. The
+	// answer states the published hours' state instead (OpenStateAt), as the
+	// platform does; the reported one is kept for the reader that has no hours.
 	Open string
 	// Hours are the published opening hours.
 	Hours  Hours
@@ -60,6 +62,21 @@ func (s FuelStation) Price(product string) *FuelPrice {
 		}
 	}
 	return nil
+}
+
+// OpenStateAt is open, closed or unknown at at, from the published hours,
+// as the platform's filling-station search states it: open when the hours
+// have the station open; closed when they were read and have it shut;
+// unknown otherwise (no hours, or hours that could not be read).
+func (s FuelStation) OpenStateAt(at time.Time) string {
+	sch, read := ReadSchedule(s.Hours)
+	switch open, known := sch.OpenAt(at); {
+	case open:
+		return "open"
+	case read && known:
+		return "closed"
+	}
+	return "unknown"
 }
 
 // Label is how a person reads the station: its name, else its brand, else
@@ -136,26 +153,18 @@ func RankFuel(stations []FuelStation, q FuelQuery, now time.Time) FuelAnswer {
 			out.DroppedNotWholeDay++
 			continue
 		}
-		if out.OpenAt != nil {
-			sch, read := ReadSchedule(s.Hours)
-			open, known := sch.OpenAt(*out.OpenAt)
-			switch {
-			case open:
-			case read && known:
+		// open_now and open_at are one filter, as on the platform: the
+		// published hours at the instant asked (open_at, else now).
+		if q.OpenNow || out.OpenAt != nil {
+			switch s.OpenStateAt(openAt(out.OpenAt, now)) {
+			case "open":
+			case "closed":
 				out.DroppedClosed++
 				continue
 			default:
 				out.DroppedUnknown++
 				continue
 			}
-		}
-		if q.OpenNow && s.Open != "open" {
-			if s.Open == "closed" {
-				out.DroppedClosed++
-			} else {
-				out.DroppedUnknown++
-			}
-			continue
 		}
 		out.Stations = append(out.Stations, s)
 	}
@@ -185,6 +194,15 @@ func RankFuel(stations []FuelStation, q FuelQuery, now time.Time) FuelAnswer {
 		out.Stations = out.Stations[:q.Limit]
 	}
 	return out
+}
+
+// openAt is the instant an answer states the open state at: the one open_at
+// named, else now.
+func openAt(named *time.Time, now time.Time) time.Time {
+	if named != nil {
+		return *named
+	}
+	return now
 }
 
 func contains(s *string, part string) bool {

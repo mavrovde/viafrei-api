@@ -203,7 +203,8 @@ type Charging struct {
 
 // Fuel holds the settings of the filling-station answers.
 type Fuel struct {
-	PriceCurrent time.Duration `koanf:"price_current" default:"24h" validate:"min=5m,max=72h" desc:"How long a reported fuel price is current: a current price is ranked by price, an older one is the last known price, listed after them and never ranked. The default is the MCP capability's own window, 24 hours."`
+	PriceCurrent time.Duration `koanf:"price_current" default:"24h" validate:"min=5m,max=72h" desc:"How long a reported fuel price is ranked: a price this young is ranked by price, an older one is the last known price, listed after them and never ranked. The default is the MCP capability's own limit, 24 hours."`
+	PriceFresh   time.Duration `koanf:"price_fresh" default:"30m" validate:"min=5m,max=6h" desc:"How long a reported fuel price is stated current (a price's current): the platform's price cache window (fuel.cache_fresh_s), 30 minutes by default. An older price is still listed and, inside price_current, ranked."`
 }
 
 // Compose holds the settings of composed answers.

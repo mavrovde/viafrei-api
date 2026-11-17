@@ -86,14 +86,15 @@ const thing = `{"id":"t1","sizeM":3}`
 func TestLoadFailsClosed(t *testing.T) {
 	req.Covers(t, "TST-011", "TST-015")
 	for name, src := range map[string]string{
-		"not JSON":         `{`,
-		"not OpenAPI 3":    `{"openapi":"2.0"}`,
-		"no Problem":       `{"openapi":"3.1.0","paths":{}}`,
-		"broken operation": `{"openapi":"3.1.0","paths":{"/x":{"get":5}},"components":{"schemas":{"Problem":{}}}}`,
-		"no operation id":  `{"openapi":"3.1.0","paths":{"/x":{"get":{"responses":{"200":{}}}}},"components":{"schemas":{"Problem":{}}}}`,
-		"no response":      `{"openapi":"3.1.0","paths":{"/x":{"get":{"operationId":"x"}}},"components":{"schemas":{"Problem":{}}}}`,
-		"no operation":     `{"openapi":"3.1.0","paths":{"/x":{"parameters":[]}},"components":{"schemas":{"Problem":{}}}}`,
-		"bad pattern":      `{"openapi":"3.1.0","paths":{"/x":{"get":{"operationId":"x","parameters":[{"name":"q","in":"query","schema":{"type":"string","pattern":"("}}],"responses":{"200":{}}}}},"components":{"schemas":{"Problem":{}}}}`,
+		"not JSON":               `{`,
+		"not OpenAPI 3":          `{"openapi":"2.0"}`,
+		"no Problem":             `{"openapi":"3.1.0","paths":{}}`,
+		"broken operation":       `{"openapi":"3.1.0","paths":{"/x":{"get":5}},"components":{"schemas":{"Problem":{}}}}`,
+		"no operation id":        `{"openapi":"3.1.0","paths":{"/x":{"get":{"responses":{"200":{}}}}},"components":{"schemas":{"Problem":{}}}}`,
+		"no response":            `{"openapi":"3.1.0","paths":{"/x":{"get":{"operationId":"x"}}},"components":{"schemas":{"Problem":{}}}}`,
+		"no operation":           `{"openapi":"3.1.0","paths":{"/x":{"parameters":[]}},"components":{"schemas":{"Problem":{}}}}`,
+		"a body with no example": `{"openapi":"3.1.0","paths":{"/x":{"post":{"operationId":"x","requestBody":{"content":{"application/json":{}}},"responses":{"200":{}}}}},"components":{"schemas":{"Problem":{}}}}`,
+		"bad pattern":            `{"openapi":"3.1.0","paths":{"/x":{"get":{"operationId":"x","parameters":[{"name":"q","in":"query","schema":{"type":"string","pattern":"("}}],"responses":{"200":{}}}}},"components":{"schemas":{"Problem":{}}}}`,
 	} {
 		if _, err := Load([]byte(src)); err == nil {
 			t.Errorf("%s: loaded", name)

@@ -399,3 +399,13 @@ func TestReportRetentionLogsFailuresAndRemovals(t *testing.T) {
 		t.Fatalf("not logged: %q", out)
 	}
 }
+
+// A live-sources registry that does not parse stops the start.
+func TestServeRefusesAnUnreadableRefreshRegistry(t *testing.T) {
+	req.Covers(t, "CFG-005")
+	code, _, stderr := runCmd([]string{"serve"}, []string{pepperEnv, accessURL(t), dbURL(t), allowLoopback,
+		"VFAPI_REFRESH_SOURCES_JSON={", "VFAPI_SERVER_LISTEN_ADDR=" + freeAddr(t), "VFAPI_HEALTH_LISTEN_ADDR=" + freeAddr(t)})
+	if code != config.ExitCode || stderr == "" {
+		t.Fatalf("exit %d, %q", code, stderr)
+	}
+}

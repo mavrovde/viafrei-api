@@ -152,7 +152,7 @@
       "id": "stations-near",
       "operation": "listStations",
       "counterpart": "station search",
-      "request": "/v1/stations?at=49.148,7.786&radius_m=20000&limit=5",
+      "request": "/v1/stations?at=49.148,7.786&radius_m=5000&limit=5",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -422,7 +422,7 @@
       "id": "roads-near-kinds",
       "operation": "listRoadConditions",
       "counterpart": "road conditions",
-      "request": "/v1/road-conditions?at=52.2,9.15&radius_m=25000&kinds=roadworks,closure&limit=10",
+      "request": "/v1/road-conditions?at=52.2,9.15&radius_m=25000&limit=10",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -853,7 +853,7 @@
       "id": "transit-line",
       "operation": "listTransitDisruptions",
       "counterpart": "transit disruption check",
-      "request": "/v1/transit-disruptions?line=re%201",
+      "request": "/v1/transit-disruptions?line=re%2045",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -870,7 +870,7 @@
       "id": "transit-window",
       "operation": "listTransitDisruptions",
       "counterpart": "transit disruption check",
-      "request": "/v1/transit-disruptions?area=08001&line=S1&window_min=30",
+      "request": "/v1/transit-disruptions?area=08001&line=F%204&window_min=30",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -1256,10 +1256,10 @@
       "now": "2026-03-30T00:00:00Z"
     },
     {
-      "id": "state-roads-de-closures",
+      "id": "state-roads-10-closures",
       "operation": "listStateRoadConditions",
       "counterpart": "traffic announcements",
-      "request": "/v1/states/de/road-conditions?kinds=closure,roadworks&limit=10",
+      "request": "/v1/states/10/road-conditions?kinds=closure,roadworks&limit=10",
       "key": {
         "useClass": "commercial",
         "scopes": [

@@ -78,7 +78,7 @@ tool:check_autobahn_traffic	listRoadConditions,getMotorwayConditions	roads-near,
 argument:check_autobahn_traffic.lat	listRoadConditions?at	roads-near	-
 argument:check_autobahn_traffic.lon	listRoadConditions?at	roads-near	-
 argument:check_autobahn_traffic.radius_km	listRoadConditions?radius_m	roads-near	-
-argument:check_autobahn_traffic.kinds	listRoadConditions?kinds	roads-near-kinds	-
+argument:check_autobahn_traffic.kinds	getMotorwayConditions?kinds	motorway-a101-roadworks	-
 argument:check_autobahn_traffic.limit	listRoadConditions?limit	roads-near	-
 argument:check_autobahn_traffic.roads	getMotorwayConditions?road	motorway-a101	-
 argument:check_autobahn_traffic.place	listPlaces?q,listRoadConditions?at	places-name,roads-near	-
@@ -100,7 +100,7 @@ web:/internal/place/suggest	listPlaces?q	places-name	-
 tool:find_roadworks_ahead	getMotorwayConditions	motorway-a101-roadworks	-
 argument:find_roadworks_ahead.road	getMotorwayConditions?road	motorway-a101-roadworks	-
 argument:find_roadworks_ahead.limit	getMotorwayConditions?limit	motorway-a101-roadworks	-
-argument:find_roadworks_ahead.place	listPlaces?q,listRoadConditions?at	places-name,roads-near-kinds	-
+argument:find_roadworks_ahead.place	listPlaces?q,listRoadConditions?at	places-name,roads-near	-
 argument:find_parking.only_with_free_spaces	listParkingOptions?free_min	parking-free-spaces	-
 tool:describe_station	listStations,listStationDepartures,listStationFacilities	stations-text,departures-day,facilities-all	-
 argument:describe_station.station	listStations?q	stations-text	-
@@ -202,11 +202,11 @@ web:/internal/place/{}/{}	getPlaceOverview	place-overview	-
 web:/internal/place/{}/card/{}	getPlaceOverview	place-overview	-
 argument:check_autobahn_traffic.land	listStateRoadConditions?state,listStateRoadConditions?road_class	state-roads-10	-
 web:/internal/state/{}	listStateRoadConditions?state	state-roads-10	-
-web:/internal/news/traffic	listStateRoadConditions?kinds	state-roads-de-closures	-
-web:/internal/tiles/jams	listStateRoadConditions?kinds	state-roads-de-closures	-
-web:/internal/tiles/reports	listStateRoadConditions	state-roads-de-closures	-
-web:/internal/motorway/overlay	listStateRoadConditions?road_class	state-roads-de-closures	-
-web:/internal/map/live	listStateRoadConditions?road_class	state-roads-de-closures	-
+web:/internal/news/traffic	listStateRoadConditions?kinds	state-roads-10-closures	-
+web:/internal/tiles/jams	listStateRoadConditions?kinds	state-roads-10-closures	-
+web:/internal/tiles/reports	listStateRoadConditions	state-roads-10-closures	-
+web:/internal/motorway/overlay	listStateRoadConditions?road_class	state-roads-10-closures	-
+web:/internal/map/live	listStateRoadConditions?road_class	state-roads-10-closures	-
 argument:get_driving_rules.city	getDrivingRules?city	rules-lez-city	-
 argument:get_driving_rules.lat	getDrivingRules?at	rules-lez-point	-
 argument:get_driving_rules.lon	getDrivingRules?at	rules-lez-point	-

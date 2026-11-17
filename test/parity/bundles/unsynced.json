@@ -1174,7 +1174,7 @@
       "id": "stations-near",
       "operation": "listStations",
       "counterpart": "station search",
-      "request": "/v1/stations?at=49.148,7.786\u0026radius_m=20000\u0026limit=5",
+      "request": "/v1/stations?at=49.148,7.786\u0026radius_m=5000\u0026limit=5",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -1223,42 +1223,6 @@
         {
           "name": "data[1:de:01002:0].stopCode",
           "value": "de:01002:0"
-        },
-        {
-          "name": "data[1:de:01002:1].distanceM",
-          "value": "5964"
-        },
-        {
-          "name": "data[1:de:01002:1].districtCode",
-          "value": "01002"
-        },
-        {
-          "name": "data[1:de:01002:1].id",
-          "value": "1:de:01002:1"
-        },
-        {
-          "name": "data[1:de:01002:1].location.lat",
-          "value": "49.16700"
-        },
-        {
-          "name": "data[1:de:01002:1].location.lon",
-          "value": "7.86246"
-        },
-        {
-          "name": "data[1:de:01002:1].modes",
-          "value": "[]"
-        },
-        {
-          "name": "data[1:de:01002:1].name",
-          "value": "Namüningen Mitte"
-        },
-        {
-          "name": "data[1:de:01002:1].sourceFamily",
-          "value": "delfi_static"
-        },
-        {
-          "name": "data[1:de:01002:1].stopCode",
-          "value": "de:01002:1"
         },
         {
           "name": "meta.attribution[delfi_static].family",
@@ -2654,7 +2618,7 @@
       "id": "roads-near-kinds",
       "operation": "listRoadConditions",
       "counterpart": "road conditions",
-      "request": "/v1/road-conditions?at=52.2,9.15\u0026radius_m=25000\u0026kinds=roadworks,closure\u0026limit=10",
+      "request": "/v1/road-conditions?at=52.2,9.15\u0026radius_m=25000\u0026limit=10",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -2689,8 +2653,196 @@
           "value": "warning"
         },
         {
-          "name": "data.situations",
-          "value": "[]"
+          "name": "data.situations[datex:syn:ev-00001].delayMin",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].description",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].direction",
+          "value": "unknown"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].directionText",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].distanceM",
+          "value": "167"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].headline",
+          "value": "GeneralObstruction"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].id",
+          "value": "datex:syn:ev-00001"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].kind",
+          "value": "hazard"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].lanes",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].lengthM",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].location.lat",
+          "value": "52.20145"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].location.lon",
+          "value": "9.14934"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].position",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].road",
+          "value": "A101"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].roadType",
+          "value": "motorway"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].severity",
+          "value": "info"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].sourceFamily",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].textLanguage",
+          "value": "de"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].updatedAt",
+          "value": "2026-03-28T18:10:13Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].updatedAtLocal",
+          "value": "2026-03-28T18:10:13Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].validity.from",
+          "value": "2026-03-28T18:09:13Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].validity.fromLocal",
+          "value": "2026-03-28T18:09:13Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].validity.until",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00001].validity.untilLocal",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].delayMin",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].description",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].direction",
+          "value": "unknown"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].directionText",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].distanceM",
+          "value": "15362"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].headline",
+          "value": "Other"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].id",
+          "value": "datex:syn:ev-00003"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].kind",
+          "value": "other"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].lanes",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].lengthM",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].location.lat",
+          "value": "52.12099"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].location.lon",
+          "value": "9.33409"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].position",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].road",
+          "value": "A101"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].roadType",
+          "value": "motorway"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].severity",
+          "value": "other"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].sourceFamily",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].textLanguage",
+          "value": "de"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].updatedAt",
+          "value": "2026-03-29T14:04:21Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].updatedAtLocal",
+          "value": "2026-03-29T14:04:21Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].validity.from",
+          "value": "2026-03-29T14:03:21Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].validity.fromLocal",
+          "value": "2026-03-29T14:03:21Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].validity.until",
+          "value": "2026-03-31T02:03:21Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00003].validity.untilLocal",
+          "value": "2026-03-31T02:03:21Z"
         },
         {
           "name": "meta.attribution[roads_alpha].family",
@@ -5525,7 +5677,7 @@
       "id": "transit-line",
       "operation": "listTransitDisruptions",
       "counterpart": "transit disruption check",
-      "request": "/v1/transit-disruptions?line=re%201",
+      "request": "/v1/transit-disruptions?line=re%2045",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -5539,296 +5691,12 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
+          "name": "data.alerts",
+          "value": "[]"
+        },
+        {
           "name": "data.alertsTotal",
-          "value": "16"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700000].attachedTo",
-          "value": "route"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700000].cause",
-          "value": "CONSTRUCTION"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700000].description",
-          "value": "Ersatzverkehr mit Bussen."
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700000].effect",
-          "value": "DETOUR"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700000].header",
-          "value": "Bauarbeiten auf der Linie RE 1"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700000].id",
-          "value": "delfi_sa_alpha:700000"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700000].inForceFrom",
-          "value": "2026-03-28T00:00:00Z"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700000].inForceUntil",
-          "value": "null"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700000].lines",
-          "value": "[\"RE 1\"]"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700000].sourceFamily",
-          "value": "delfi_sa_alpha"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700000].updatedAt",
-          "value": "2026-03-28T00:00:00Z"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700000].url",
-          "value": "null"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700003].attachedTo",
-          "value": "route"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700003].cause",
-          "value": "CONSTRUCTION"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700003].description",
-          "value": "Ersatzverkehr mit Bussen."
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700003].effect",
-          "value": "DETOUR"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700003].header",
-          "value": "Bauarbeiten auf der Linie RE 1"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700003].id",
-          "value": "delfi_sa_alpha:700003"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700003].inForceFrom",
-          "value": "2026-03-28T00:00:00Z"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700003].inForceUntil",
-          "value": "null"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700003].lines",
-          "value": "[\"RE 1\"]"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700003].sourceFamily",
-          "value": "delfi_sa_alpha"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700003].updatedAt",
-          "value": "2026-03-28T00:00:00Z"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700003].url",
-          "value": "null"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700006].attachedTo",
-          "value": "route"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700006].cause",
-          "value": "CONSTRUCTION"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700006].description",
-          "value": "Ersatzverkehr mit Bussen."
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700006].effect",
-          "value": "DETOUR"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700006].header",
-          "value": "Bauarbeiten auf der Linie RE 1"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700006].id",
-          "value": "delfi_sa_alpha:700006"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700006].inForceFrom",
-          "value": "2026-03-28T00:00:00Z"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700006].inForceUntil",
-          "value": "null"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700006].lines",
-          "value": "[\"RE 1\"]"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700006].sourceFamily",
-          "value": "delfi_sa_alpha"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700006].updatedAt",
-          "value": "2026-03-28T00:00:00Z"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700006].url",
-          "value": "null"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700009].attachedTo",
-          "value": "route"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700009].cause",
-          "value": "CONSTRUCTION"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700009].description",
-          "value": "Ersatzverkehr mit Bussen."
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700009].effect",
-          "value": "DETOUR"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700009].header",
-          "value": "Bauarbeiten auf der Linie RE 1"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700009].id",
-          "value": "delfi_sa_alpha:700009"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700009].inForceFrom",
-          "value": "2026-03-28T00:00:00Z"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700009].inForceUntil",
-          "value": "null"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700009].lines",
-          "value": "[\"RE 1\"]"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700009].sourceFamily",
-          "value": "delfi_sa_alpha"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700009].updatedAt",
-          "value": "2026-03-28T00:00:00Z"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700009].url",
-          "value": "null"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700012].attachedTo",
-          "value": "route"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700012].cause",
-          "value": "CONSTRUCTION"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700012].description",
-          "value": "Ersatzverkehr mit Bussen."
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700012].effect",
-          "value": "DETOUR"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700012].header",
-          "value": "Bauarbeiten auf der Linie RE 1"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700012].id",
-          "value": "delfi_sa_alpha:700012"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700012].inForceFrom",
-          "value": "2026-03-28T00:00:00Z"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700012].inForceUntil",
-          "value": "null"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700012].lines",
-          "value": "[\"RE 1\"]"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700012].sourceFamily",
-          "value": "delfi_sa_alpha"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700012].updatedAt",
-          "value": "2026-03-28T00:00:00Z"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700012].url",
-          "value": "null"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700015].attachedTo",
-          "value": "route"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700015].cause",
-          "value": "CONSTRUCTION"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700015].description",
-          "value": "Ersatzverkehr mit Bussen."
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700015].effect",
-          "value": "DETOUR"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700015].header",
-          "value": "Bauarbeiten auf der Linie RE 1"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700015].id",
-          "value": "delfi_sa_alpha:700015"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700015].inForceFrom",
-          "value": "2026-03-28T00:00:00Z"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700015].inForceUntil",
-          "value": "null"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700015].lines",
-          "value": "[\"RE 1\"]"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700015].sourceFamily",
-          "value": "delfi_sa_alpha"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700015].updatedAt",
-          "value": "2026-03-28T00:00:00Z"
-        },
-        {
-          "name": "data.alerts[delfi_sa_alpha:700015].url",
-          "value": "null"
+          "value": "0"
         },
         {
           "name": "data.punctuality",
@@ -5852,7 +5720,7 @@
         },
         {
           "name": "meta.page.hasMore",
-          "value": "true"
+          "value": "false"
         },
         {
           "name": "meta.page.limit",
@@ -5864,7 +5732,7 @@
       "id": "transit-window",
       "operation": "listTransitDisruptions",
       "counterpart": "transit disruption check",
-      "request": "/v1/transit-disruptions?area=08001\u0026line=S1\u0026window_min=30",
+      "request": "/v1/transit-disruptions?area=08001\u0026line=F%204\u0026window_min=30",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -8214,10 +8082,10 @@
       ]
     },
     {
-      "id": "state-roads-de-closures",
+      "id": "state-roads-10-closures",
       "operation": "listStateRoadConditions",
       "counterpart": "traffic announcements",
-      "request": "/v1/states/de/road-conditions?kinds=closure,roadworks\u0026limit=10",
+      "request": "/v1/states/10/road-conditions?kinds=closure,roadworks\u0026limit=10",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -8237,7 +8105,7 @@
         },
         {
           "name": "data.lampReason",
-          "value": "jam"
+          "value": "warning"
         },
         {
           "name": "data.situations[datex:syn:ev-00011].delayMin",
@@ -8333,7 +8201,7 @@
         },
         {
           "name": "data.state",
-          "value": "de"
+          "value": "10"
         },
         {
           "name": "meta.attribution[roads_alpha].family",

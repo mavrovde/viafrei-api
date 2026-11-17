@@ -2,9 +2,9 @@ package features
 
 import (
 	"context"
-	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 )
 
 // listed answers one read of one domain for key: the gate, the read over the

@@ -208,6 +208,9 @@ var Default = Rules{
 		{"data[*].location", "", "listStations", siteReason("/internal/station/:slug")},
 		{"data[*].districtCode", "", "listStations", siteReason("/internal/station/:slug")},
 		{"data[*].modes", "", "listStations", siteReason("/internal/station/:slug")},
+		{"data[*].eva", "", "listStations", siteReason("/internal/station/:slug")},
+		{"data[*].evaNumbers", "", "listStations", siteReason("/internal/station/:slug")},
+		{"data.zones", "", "getDrivingRules", zoneRowsReason},
 		{"data.lamp", "", "listStateRoadConditions", siteReason("/internal/state/:slug")},
 		{"data.lampReason", "", "listStateRoadConditions", siteReason("/internal/state/:slug")},
 		{"data.lamp", "horizon_days", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
@@ -257,6 +260,9 @@ func purposeFree(b Bundle) bool {
 func siteReason(route string) string {
 	return "the MCP capability does not state it; the site reads it from the digest route " + route
 }
+
+// zoneRowsReason is why the zone rows of a rules answer are not compared.
+const zoneRowsReason = "API-only: the MCP driving rules state the verdict at a position (zoneVerdict, compared) and a city's entry of the curated zone list, and no digest route the site reads lists the published zone rows"
 
 // watchIDReason is why a watch's id is not compared: each side mints its own.
 const watchIDReason = "each side mints the id of a watch: the platform a number of its session, the API a token of kind, key and condition; the watch it names is compared"

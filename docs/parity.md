@@ -95,6 +95,8 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
 | `meta.asOf` | Each side defines it differently: the API states the oldest `dataAsOf` of its families (ENV-004), the MCP capability the newest current point status, or its clock when none is current. Neither is a format of the other. |
 | `data.station.location`, in `listStationDepartures` only | The MCP departure board states the stop's name and code, not its position. The site reads the station's position from the digest route `/internal/station/:slug`, so the API answers it; it is not compared. |
 | `data[*].location`, `data[*].districtCode`, `data[*].modes`, in `listStations` only | The MCP stop search states a stop's name, code and distance, not its position, district or modes. The site reads all three from the digest route `/internal/station/:slug` (the page's map and Land line from the stop's position and AGS, the live board's mode filter), so the API answers them; they are not compared. A position in any other operation, a charging site's or a car park's, is compared. |
+| `data[*].eva`, `data[*].evaNumbers`, in `listStations` only | The MCP stop search states a stop's name and codes, not its EVA numbers. The site reads them from the digest route `/internal/station/:slug` (the station page's DB board and its parts), so the API answers them; they are not compared. |
+| `data.zones`, in `getDrivingRules` only | API-only. The MCP driving rules state the verdict at a position (`data.zoneVerdict`, compared) and, for a city, the curated zone list's entry; neither they nor any digest route the site reads list the published zone rows (key, role, publisher, distance) the API lists for a client to draw. |
 | `data.lamp`, `data.lampReason`, in `listStateRoadConditions` only | The MCP motorway status of a Land lists the Land's items and counts, not a lamp. The site reads the Land's lamp (the motorway pages' one rule over the Land's Autobahn items and DWD levels) from the digest route `/internal/state/:slug`, so the API answers it; it is not compared. |
 | `data.lamp`, `data.lampReason`, `data.corridor.states`, in `getMotorwayConditions` asked with `horizon_days` or `from` | The MCP roadworks-ahead answer lists the planned sites of the window, not a lamp or the Länder the road crosses. The site reads the road's lamp and Länder beside its planned works from the digest route `/internal/motorway/:road`, so the API answers them; they are not compared. |
 | `data.watchId`, `data.uri`, in `getWatch` only | Each side mints the id of a watch: the platform a number of the session that opened it, the API a token of the kind, the key and the condition. The watch the id names (kind, key, condition, window) is compared. |
@@ -216,6 +218,10 @@ nothing, so that family contributed nothing and neither side credits it.
   topic's review date is its oldest rule's, as the platform's driving rules
   state them. The platform's disclaimer opens with that date, which the
   API states as reviewedOn; the rest is compared.
+- **A weather warning is on a motorway** when its own area holds one of the
+  road's junction points, as the platform's motorway page and motorway
+  status place a DWD warning on the road's location-code points; a district
+  the road crosses does not place it.
 - **Road conditions credit the weather.** The lamp reads the DWD warnings
   of every weather family the key may read, with or without the weather
   scope (the warnings are public), and the answer credits those families

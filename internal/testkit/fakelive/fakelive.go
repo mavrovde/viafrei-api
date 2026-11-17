@@ -58,6 +58,10 @@ const Never = "never"
 
 var settled = []string{"refreshed", "none_due", "refused", "failed"}
 
+// connect opens a session; a test of the package swaps it for one whose
+// statements it can fail.
+var connect = pgx.Connect
+
 // SourceScript is one source's script.
 type SourceScript struct {
 	Ticks string `json:"ticks,omitempty"`
@@ -140,7 +144,7 @@ type Fake struct {
 // fake sets the viafrei_live_ingestor role to claim and settle, and writes
 // the ticks as the owner). It is listening when Start returns.
 func Start(ctx context.Context, url string, script Script) (*Fake, error) {
-	listener, err := pgx.Connect(ctx, url)
+	listener, err := connect(ctx, url)
 	if err != nil {
 		return nil, fmt.Errorf("fakelive: %w", err)
 	}
@@ -201,7 +205,7 @@ type claimed struct {
 
 // drain claims every pending request but the skipped ones, one by one.
 func (f *Fake) drain(ctx context.Context) error {
-	conn, err := pgx.Connect(ctx, f.url)
+	conn, err := connect(ctx, f.url)
 	if err != nil {
 		return err
 	}
@@ -260,7 +264,7 @@ func (f *Fake) settle(ctx context.Context, c claimed, o Outcome) error {
 	case <-time.After(time.Duration(o.AfterMS) * time.Millisecond):
 	}
 	at := c.createdAt.Add(time.Duration(o.AfterMS) * time.Millisecond)
-	conn, err := pgx.Connect(ctx, f.url)
+	conn, err := connect(ctx, f.url)
 	if err != nil {
 		return err
 	}

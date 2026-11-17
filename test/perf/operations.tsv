@@ -21,3 +21,8 @@ listPlaces	lookup
 listStationDepartures	lookup
 listStationFacilities	lookup
 listHydrogenOptions	near
+listSpeedCameras	near
+listSharingOptions	near
+listAddresses	lookup
+listPois	lookup
+describeLocation	lookup

@@ -1,0 +1,36 @@
+package conformance_test
+
+import (
+	"context"
+
+	"github.com/mavrovde/viafrei-api/internal/app/features"
+	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/places"
+	"github.com/mavrovde/viafrei-api/internal/domain/roads"
+	"github.com/mavrovde/viafrei-api/internal/domain/transit"
+)
+
+// laterFeatures answers every operation of 0.3.0's inventory mapping with an
+// empty answer: the conformance fakes embed it, their tests read the
+// operations they name.
+type laterFeatures struct{}
+
+func (laterFeatures) SpeedCameras(context.Context, access.Record, roads.SpeedQuery) (features.SpeedAnswer, error) {
+	return features.SpeedAnswer{}, nil
+}
+
+func (laterFeatures) Sharing(context.Context, access.Record, transit.SharingQuery) (features.SharingAnswer, error) {
+	return features.SharingAnswer{}, nil
+}
+
+func (laterFeatures) Addresses(context.Context, access.Record, places.AddressQuery) (features.AddressAnswer, error) {
+	return features.AddressAnswer{}, nil
+}
+
+func (laterFeatures) Pois(context.Context, access.Record, places.PoiQuery) (features.PoiAnswer, error) {
+	return features.PoiAnswer{}, nil
+}
+
+func (laterFeatures) Location(context.Context, access.Record, places.LocationQuery) (features.LocationAnswer, error) {
+	return features.LocationAnswer{}, nil
+}

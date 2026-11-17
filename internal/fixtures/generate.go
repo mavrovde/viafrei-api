@@ -51,7 +51,7 @@ var Tables = []string{
 	"parking_facility", "occupancy_observation",
 	"stop_place", "stop_point", "transit_line", "journey", "scheduled_call", "call_observation",
 	"station_facility", "weather_warning", "rule_topic", "rule_statement",
-	"hydrogen_station",
+	"hydrogen_station", "speed_camera", "sharing_station", "sharing_station_status", "sharing_vehicle", "poi", "address",
 }
 
 // ReferenceInstant is the start of the first generated day: the Saturday
@@ -68,6 +68,9 @@ type source struct {
 	// gazetteers, timetables, curated driving rules): the set writes its
 	// rows and its freshness, never its register.
 	platform bool
+	// publisher is the fixed name of a source appended after the first
+	// sets; empty draws one.
+	publisher string
 }
 
 type place struct {
@@ -136,6 +139,9 @@ func generate(out io.Writer, profile string, seed uint64, contractVersion string
 	g.weather()
 	g.rules()
 	g.hydrogen()
+	g.speedCameras()
+	g.sharing()
+	g.pois()
 	g.w.end()
 	sum, err := g.w.close()
 	if err != nil {
@@ -270,6 +276,12 @@ var sourceList = []source{
 	{ref: "dwd_alpha_stale", family: "alpha", domain: "weather", stale: true, target: 300},
 	{ref: "dwd_eta", family: "eta", domain: "weather", target: 300},
 	{ref: "viafrei_rules", family: "alpha", domain: "rules", platform: true},
+	// Sources read by one table each, after every other: appended last, so
+	// the picks among the sources before them stay as they were.
+	{ref: "speed_alpha", family: "alpha", domain: "roads", target: 86400, publisher: "Blitzwerk Datenwerk"},
+	{ref: "osm_speed_cameras", family: "beta", domain: "roads", platform: true, target: 86400},
+	{ref: "gbfs_nextbike", family: "alpha", domain: "transit", platform: true, target: 60},
+	{ref: "osm", family: "beta", domain: "places", platform: true},
 }
 
 // useClasses are the register's use classes of each family; nil writes no
@@ -305,7 +317,13 @@ func (g *gen) provenance() {
 		if s.platform {
 			continue
 		}
-		g.w.row(str(s.ref), str(g.names.person()+" Datenwerk"), str(termsURL(s)))
+		// A source appended after the first sets is named without a draw,
+		// so it moves no row of the sets before it.
+		name := s.publisher
+		if name == "" {
+			name = g.names.person() + " Datenwerk"
+		}
+		g.w.row(str(s.ref), str(name), str(termsURL(s)))
 	}
 	g.w.begin("licence", "licence_code", "licence_url")
 	var codes []string
@@ -1017,5 +1035,125 @@ func (g *gen) hydrogen() {
 				str(refill), str(ref), ts(g.instant()))
 			g.counted(l.code, ref)
 		}
+	}
+}
+
+// speedCameras writes, per Land, a town's official list around one place
+// (a fixed camera, a section control, an announced mobile check that is
+// current and one that is over) and two cameras OpenStreetMap maps near
+// another place: drawn after every other table.
+func (g *gen) speedCameras() {
+	g.w.begin("speed_camera", "camera_id", "camera_kind", "enforces", "location", "max_speed_kmh", "direction", "name", "street",
+		"location_text", "land_name", "data_as_of", "valid_from", "valid_to", "source_ref", "recorded_at")
+	n := 0
+	day := g.day(0)
+	for _, l := range g.lands {
+		pl := g.randomPlace(l.code)
+		for i, kind := range []string{"fixed", "section_control", "mobile_announced", "mobile_announced"} {
+			n++
+			from, to := null, null
+			if kind == "mobile_announced" {
+				from, to = date(day.AddDate(0, 0, 1-2*i)), date(day.AddDate(0, 0, 4-2*i))
+			}
+			g.w.row(str(fmt.Sprintf("se:%d", 700000+n)), str(kind), str("speed"), point(near(g.r, pl.at, l.cell)), num(30+10*i), null,
+				str(pl.name), str(fmt.Sprintf("Weg %d", n)), null, null, date(day.AddDate(0, -2, 0)),
+				from, to, str("speed_alpha"), ts(g.instant()))
+			g.counted(l.code, "speed_alpha")
+		}
+		other := g.randomPlace(l.code)
+		for range 2 {
+			n++
+			g.w.row(str(fmt.Sprintf("osm:node%d", 800000+n)), str("fixed"), str("speed"), point(near(g.r, other.at, l.cell)), num(50), null,
+				str("Blitzer "+other.name), null, null, null, date(day.AddDate(0, -1, 0)), null, null, str("osm_speed_cameras"), ts(g.instant()))
+			g.counted(l.code, "osm_speed_cameras")
+		}
+	}
+}
+
+// sharing writes, per Land, three bike-sharing stations around one place
+// (one counted with bikes, one counted empty, one never counted) and four
+// free-floating bikes: drawn after every other table.
+func (g *gen) sharing() {
+	const ref, system = "gbfs_nextbike", "nextbike_syn"
+	type st struct {
+		id string
+		at lonLat
+	}
+	var stations []st
+	var bikes []lonLat
+	for _, l := range g.lands {
+		pl := g.randomPlace(l.code)
+		for i := range 3 {
+			stations = append(stations, st{fmt.Sprintf("%s:%s%d", system, l.code, i+1), near(g.r, pl.at, l.cell)})
+		}
+		for range 4 {
+			bikes = append(bikes, near(g.r, pl.at, l.cell))
+		}
+	}
+	g.w.begin("sharing_station", "station_id", "system_id", "system_name", "name", "capacity", "is_virtual", "location", "source_ref", "recorded_at")
+	for i, s := range stations {
+		g.w.row(str(s.id), str(system), str("nextbike Synthetic"), str(fmt.Sprintf("Station %d", i+1)), num(10), boolean(false), point(s.at), str(ref), ts(g.day(0)))
+		g.counted(landOf(s.at), ref)
+	}
+	g.w.begin("sharing_station_status", "station_id", "observed_at", "vehicles_available", "electric_available", "docks_available",
+		"is_renting", "is_returning", "reported_at", "source_ref")
+	for i, s := range stations {
+		if i%3 == 2 {
+			continue
+		}
+		at := g.day(0).Add(12 * time.Hour)
+		g.w.row(str(s.id), ts(at), num(4*(1-i%3)), num(1-i%3), num(6+4*(i%3)), boolean(true), boolean(true), ts(at.Add(-time.Minute)), str(ref))
+	}
+	g.w.begin("sharing_vehicle", "vehicle_id", "system_id", "form_factor", "propulsion", "range_m", "location", "observed_at", "source_ref")
+	for i, b := range bikes {
+		prop := "human"
+		if i%2 == 0 {
+			prop = "electric_assist"
+		}
+		g.w.row(str(fmt.Sprintf("%s:%d", system, i+1)), str(system), str("bicycle"), str(prop), num(20000), point(b), ts(g.day(0).Add(12*time.Hour)), str(ref))
+		g.counted(landOf(b), ref)
+	}
+}
+
+// poiCategories are the OpenStreetMap families and one value of each the
+// synthetic places of interest are drawn from.
+var poiCategories = [][2]string{{"amenity", "pharmacy"}, {"shop", "bakery"}, {"office", "company"}, {"tourism", "hotel"}, {"healthcare", "clinic"}, {"historic", "castle"}}
+
+// pois writes, per Land, one place of interest of each category and two
+// addresses in one place: drawn after every other table.
+func (g *gen) pois() {
+	g.w.begin("poi", "poi_id", "name", "name_fold", "category", "category_value", "brand", "street", "house_number", "postcode",
+		"place_name", "place_fold", "location", "data_as_of", "source_ref", "recorded_at")
+	type addr struct {
+		street, number, place string
+		at                    lonLat
+	}
+	var addrs []addr
+	n := 0
+	for li, l := range g.lands {
+		pl := g.randomPlace(l.code)
+		for _, c := range poiCategories {
+			n++
+			name := fmt.Sprintf("%s %s", capitalise(c[1]), g.names.person())
+			brand := null
+			if c[0] == "shop" {
+				brand = str("Backhaus Synthetic")
+			}
+			at := near(g.r, pl.at, l.cell)
+			g.w.row(str(fmt.Sprintf("osm:node%d", 600000+n)), str(name), str(nameFold(name)), str(c[0]), str(c[1]), brand,
+				str("Marktweg"), str(fmt.Sprint(n)), str(fmt.Sprintf("%05d", 10000+n)), str(pl.name), str(nameFold(pl.name)),
+				point(at), date(g.day(-30)), str("osm"), ts(g.day(0)))
+			g.counted(l.code, "osm")
+			if len(addrs) < 2*(li+1) {
+				addrs = append(addrs, addr{"Marktweg", fmt.Sprint(n), pl.name, at})
+			}
+		}
+	}
+	g.w.begin("address", "address_id", "street", "street_fold", "house_number", "house_number_fold", "postcode", "place_name",
+		"place_fold", "location", "data_as_of", "source_ref", "recorded_at")
+	for i, a := range addrs {
+		g.w.row(str(fmt.Sprintf("osm:node%d", 650000+i)), str(a.street), str(streetFold(a.street)), str(a.number), str(houseNumberFold(a.number)),
+			str(fmt.Sprintf("%05d", 20000+i)), str(a.place), str(nameFold(a.place)), point(a.at), date(g.day(-30)), str("osm"), ts(g.day(0)))
+		g.counted(landOf(a.at), "osm")
 	}
 }

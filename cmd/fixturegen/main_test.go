@@ -41,7 +41,7 @@ func TestWritesTheSetAndItsManifest(t *testing.T) {
 		t.Fatalf("manifest does not record the run: %+v", m)
 	}
 	// The success line prints counts (TST-011), not just "ok".
-	if !strings.Contains(stdout.String(), "rows in 31 tables, 16 Länder, 7 families") {
+	if !strings.Contains(stdout.String(), "rows in 37 tables, 16 Länder, 7 families") {
 		t.Fatalf("success line: %q", stdout.String())
 	}
 }

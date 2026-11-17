@@ -40,6 +40,11 @@ type Features interface {
 	Places(ctx context.Context, key access.Record, q places.Query) (features.Answer[places.Place], error)
 	FuelStations(ctx context.Context, key access.Record, q energy.FuelQuery) (features.FuelStations, error)
 	HydrogenStations(ctx context.Context, key access.Record, q energy.HydrogenQuery) (features.HydrogenStations, error)
+	SpeedCameras(ctx context.Context, key access.Record, q roads.SpeedQuery) (features.SpeedAnswer, error)
+	Sharing(ctx context.Context, key access.Record, q transit.SharingQuery) (features.SharingAnswer, error)
+	Addresses(ctx context.Context, key access.Record, q places.AddressQuery) (features.AddressAnswer, error)
+	Pois(ctx context.Context, key access.Record, q places.PoiQuery) (features.PoiAnswer, error)
+	Location(ctx context.Context, key access.Record, q places.LocationQuery) (features.LocationAnswer, error)
 }
 
 // counterpartExtension names the MCP capability an operation answers the
@@ -60,6 +65,12 @@ const schemaPrefix = "#/components/schemas/"
 var nullableObjects = []struct{ schema, member string }{
 	{"ChargePoint", "availability"},
 	{"HydrogenData", "nearest"},
+	{"SpeedCamera", "location"},
+	{"SharingData", "nearest"},
+	{"LocationData", "address"},
+	{"LocationData", "municipality"},
+	{"LocationData", "district"},
+	{"LocationData", "state"},
 	{"ParkingSite", "occupancy"},
 	{"RoadSituation", "location"},
 	{"RoadSituation", "lanes"},

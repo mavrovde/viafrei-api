@@ -1,0 +1,99 @@
+{
+  "title": "What lies at a position",
+  "request": "/v1/location?at=47.5088,6.9623",
+  "attribution": "The address and the places come from the source families of the places domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "places"
+    ],
+    "sources": [
+      "osm",
+      "bkg_gvisys",
+      "geonames"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": {
+      "address": null,
+      "municipality": null,
+      "district": null,
+      "state": null
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": null,
+      "freshness": [
+        {
+          "family": "bkg_gvisys",
+          "dataAsOf": null,
+          "ageS": null,
+          "stale": false
+        },
+        {
+          "family": "geonames",
+          "dataAsOf": null,
+          "ageS": null,
+          "stale": false
+        },
+        {
+          "family": "osm",
+          "dataAsOf": null,
+          "ageS": null,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "bkg_gvisys",
+          "domain": "places",
+          "publisher": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
+          "text": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
+          "licence": "dl-de/by-2-0",
+          "licenceUrl": "https://licences.example/dl-de-by-2-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+        },
+        {
+          "family": "geonames",
+          "domain": "places",
+          "publisher": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+          "text": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://download.geonames.org/export/dump/"
+        },
+        {
+          "family": "osm",
+          "domain": "places",
+          "publisher": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0",
+          "text": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0",
+          "licence": "ODbL 1.0",
+          "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
+          "shareAlike": true,
+          "shareAlikeOffer": "https://viafrei.de/impressum",
+          "termsUrl": "https://www.openstreetmap.org/copyright"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ]
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/location"
+    }
+  }
+}

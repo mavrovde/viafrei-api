@@ -32,7 +32,10 @@ func (everyScope) Authenticate(context.Context, string, string) (auth.Principal,
 }
 
 // askedFeatures records the query each feature operation was asked.
-type askedFeatures struct{ asked string }
+type askedFeatures struct {
+	laterFeatures
+	asked string
+}
 
 func (f *askedFeatures) Charging(_ context.Context, _ access.Record, q energy.Query) (features.Answer[energy.Site], error) {
 	f.asked = fmt.Sprintf("radius=%d limit=%d", q.RadiusM, q.Limit)

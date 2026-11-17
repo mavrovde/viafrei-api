@@ -27,6 +27,7 @@ import (
 // cachedFeatures answers the charging operation from one family of a
 // given domain, padded to a given number of sites, and counts its reads.
 type cachedFeatures struct {
+	laterFeatures
 	domain string
 	sites  int
 	reads  atomic.Int32

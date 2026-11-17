@@ -66,6 +66,16 @@ type fakeFeatures struct {
 	gotFacil   transit.FacilityQuery
 	hydrogen   features.HydrogenStations
 	gotHydro   energy.HydrogenQuery
+	speed      features.SpeedAnswer
+	gotSpeed   roads.SpeedQuery
+	sharing    features.SharingAnswer
+	gotSharing transit.SharingQuery
+	addresses  features.AddressAnswer
+	gotAddress places.AddressQuery
+	pois       features.PoiAnswer
+	gotPoi     places.PoiQuery
+	location   features.LocationAnswer
+	gotLoc     places.LocationQuery
 	gotAccept  []string
 }
 

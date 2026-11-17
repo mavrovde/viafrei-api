@@ -6,7 +6,7 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "1bafcd0808da29874fab16d9ba776c317c3238532557c2415e3f0857d527df0b"
+    "sha256": "83ef5be6993b7b39a54de372789ace2ce32a2493e86fcdffea35530e68da82ea"
   },
   "cases": [
     {
@@ -4076,6 +4076,1276 @@
         {
           "name": "meta.page.limit",
           "value": "5"
+        }
+      ]
+    },
+    {
+      "id": "speed-official",
+      "operation": "listSpeedCameras",
+      "counterpart": "speed camera search",
+      "request": "/v1/speed-cameras?at=47.98,6.95\u0026radius_m=10000",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "speed_alpha",
+          "osm_speed_cameras"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T12:00:00Z",
+      "facts": [
+        {
+          "name": "data.official",
+          "value": "[]"
+        },
+        {
+          "name": "data.officialTotal",
+          "value": "0"
+        },
+        {
+          "name": "data.osm",
+          "value": "[]"
+        },
+        {
+          "name": "data.osmTotal",
+          "value": "0"
+        },
+        {
+          "name": "meta.attribution[osm_speed_cameras].family",
+          "value": "osm_speed_cameras"
+        },
+        {
+          "name": "meta.attribution[speed_alpha].family",
+          "value": "speed_alpha"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "20"
+        }
+      ]
+    },
+    {
+      "id": "speed-osm",
+      "operation": "listSpeedCameras",
+      "counterpart": "speed camera search",
+      "request": "/v1/speed-cameras?at=47.55,6.88\u0026radius_m=5000\u0026limit=1",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "speed_alpha",
+          "osm_speed_cameras"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T12:00:00Z",
+      "facts": [
+        {
+          "name": "data.official",
+          "value": "[]"
+        },
+        {
+          "name": "data.officialTotal",
+          "value": "0"
+        },
+        {
+          "name": "data.osm",
+          "value": "[]"
+        },
+        {
+          "name": "data.osmTotal",
+          "value": "0"
+        },
+        {
+          "name": "meta.attribution[osm_speed_cameras].family",
+          "value": "osm_speed_cameras"
+        },
+        {
+          "name": "meta.attribution[speed_alpha].family",
+          "value": "speed_alpha"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "id": "sharing-available",
+      "operation": "listSharingOptions",
+      "counterpart": "bike sharing search",
+      "request": "/v1/sharing-options?at=47.94,7.33\u0026radius_m=5000",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "gbfs_nextbike"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z",
+      "facts": [
+        {
+          "name": "data.nearest.available",
+          "value": "false"
+        },
+        {
+          "name": "data.nearest.bikes",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.capacity",
+          "value": "10"
+        },
+        {
+          "name": "data.nearest.countedAt",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.current",
+          "value": "false"
+        },
+        {
+          "name": "data.nearest.distanceM",
+          "value": "82235"
+        },
+        {
+          "name": "data.nearest.electricBikes",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.freeDocks",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.id",
+          "value": "nextbike_syn:023"
+        },
+        {
+          "name": "data.nearest.location.lat",
+          "value": "48.21129"
+        },
+        {
+          "name": "data.nearest.location.lon",
+          "value": "8.35667"
+        },
+        {
+          "name": "data.nearest.name",
+          "value": "Station 6"
+        },
+        {
+          "name": "data.nearest.renting",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.reportedAt",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.sourceFamily",
+          "value": "gbfs_nextbike"
+        },
+        {
+          "name": "data.nearest.system",
+          "value": "nextbike_syn"
+        },
+        {
+          "name": "data.nearest.systemLabel",
+          "value": "nextbike Synthetic"
+        },
+        {
+          "name": "data.nearest.takesReturns",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.virtual",
+          "value": "false"
+        },
+        {
+          "name": "data.stations",
+          "value": "[]"
+        },
+        {
+          "name": "data.stationsInRadius",
+          "value": "0"
+        },
+        {
+          "name": "data.vehicles.atLeast",
+          "value": "false"
+        },
+        {
+          "name": "data.vehicles.count",
+          "value": "0"
+        },
+        {
+          "name": "data.vehicles.electric",
+          "value": "0"
+        },
+        {
+          "name": "data.vehicles.nearest",
+          "value": "[]"
+        },
+        {
+          "name": "meta.attribution[gbfs_nextbike].family",
+          "value": "gbfs_nextbike"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "8"
+        }
+      ]
+    },
+    {
+      "id": "sharing-all",
+      "operation": "listSharingOptions",
+      "counterpart": "bike sharing search",
+      "request": "/v1/sharing-options?at=47.94,7.33\u0026radius_m=5000\u0026only_available=false\u0026limit=2",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "gbfs_nextbike"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z",
+      "facts": [
+        {
+          "name": "data.nearest.available",
+          "value": "false"
+        },
+        {
+          "name": "data.nearest.bikes",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.capacity",
+          "value": "10"
+        },
+        {
+          "name": "data.nearest.countedAt",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.current",
+          "value": "false"
+        },
+        {
+          "name": "data.nearest.distanceM",
+          "value": "82235"
+        },
+        {
+          "name": "data.nearest.electricBikes",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.freeDocks",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.id",
+          "value": "nextbike_syn:023"
+        },
+        {
+          "name": "data.nearest.location.lat",
+          "value": "48.21129"
+        },
+        {
+          "name": "data.nearest.location.lon",
+          "value": "8.35667"
+        },
+        {
+          "name": "data.nearest.name",
+          "value": "Station 6"
+        },
+        {
+          "name": "data.nearest.renting",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.reportedAt",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.sourceFamily",
+          "value": "gbfs_nextbike"
+        },
+        {
+          "name": "data.nearest.system",
+          "value": "nextbike_syn"
+        },
+        {
+          "name": "data.nearest.systemLabel",
+          "value": "nextbike Synthetic"
+        },
+        {
+          "name": "data.nearest.takesReturns",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.virtual",
+          "value": "false"
+        },
+        {
+          "name": "data.stations",
+          "value": "[]"
+        },
+        {
+          "name": "data.stationsInRadius",
+          "value": "0"
+        },
+        {
+          "name": "data.vehicles.atLeast",
+          "value": "false"
+        },
+        {
+          "name": "data.vehicles.count",
+          "value": "0"
+        },
+        {
+          "name": "data.vehicles.electric",
+          "value": "0"
+        },
+        {
+          "name": "data.vehicles.nearest",
+          "value": "[]"
+        },
+        {
+          "name": "meta.attribution[gbfs_nextbike].family",
+          "value": "gbfs_nextbike"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "2"
+        }
+      ]
+    },
+    {
+      "id": "sharing-nearest",
+      "operation": "listSharingOptions",
+      "counterpart": "bike sharing search",
+      "request": "/v1/sharing-options?at=47.5,7.6\u0026radius_m=100",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "gbfs_nextbike"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z",
+      "facts": [
+        {
+          "name": "data.nearest.available",
+          "value": "false"
+        },
+        {
+          "name": "data.nearest.bikes",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.capacity",
+          "value": "10"
+        },
+        {
+          "name": "data.nearest.countedAt",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.current",
+          "value": "false"
+        },
+        {
+          "name": "data.nearest.distanceM",
+          "value": "96050"
+        },
+        {
+          "name": "data.nearest.electricBikes",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.freeDocks",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.id",
+          "value": "nextbike_syn:022"
+        },
+        {
+          "name": "data.nearest.location.lat",
+          "value": "48.17242"
+        },
+        {
+          "name": "data.nearest.location.lon",
+          "value": "8.40550"
+        },
+        {
+          "name": "data.nearest.name",
+          "value": "Station 5"
+        },
+        {
+          "name": "data.nearest.renting",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.reportedAt",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.sourceFamily",
+          "value": "gbfs_nextbike"
+        },
+        {
+          "name": "data.nearest.system",
+          "value": "nextbike_syn"
+        },
+        {
+          "name": "data.nearest.systemLabel",
+          "value": "nextbike Synthetic"
+        },
+        {
+          "name": "data.nearest.takesReturns",
+          "value": "null"
+        },
+        {
+          "name": "data.nearest.virtual",
+          "value": "false"
+        },
+        {
+          "name": "data.stations",
+          "value": "[]"
+        },
+        {
+          "name": "data.stationsInRadius",
+          "value": "0"
+        },
+        {
+          "name": "data.vehicles.atLeast",
+          "value": "false"
+        },
+        {
+          "name": "data.vehicles.count",
+          "value": "0"
+        },
+        {
+          "name": "data.vehicles.electric",
+          "value": "0"
+        },
+        {
+          "name": "data.vehicles.nearest",
+          "value": "[]"
+        },
+        {
+          "name": "meta.attribution[gbfs_nextbike].family",
+          "value": "gbfs_nextbike"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "8"
+        }
+      ]
+    },
+    {
+      "id": "address-postcode",
+      "operation": "listAddresses",
+      "counterpart": "address search",
+      "request": "/v1/addresses?q=Marktweg%201,%2020000",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z",
+      "facts": [
+        {
+          "name": "data.addresses[osm:node650000].dataAsOf",
+          "value": "2026-02-26"
+        },
+        {
+          "name": "data.addresses[osm:node650000].id",
+          "value": "osm:node650000"
+        },
+        {
+          "name": "data.addresses[osm:node650000].land",
+          "value": "null"
+        },
+        {
+          "name": "data.addresses[osm:node650000].location.lat",
+          "value": "47.60983"
+        },
+        {
+          "name": "data.addresses[osm:node650000].location.lon",
+          "value": "7.89724"
+        },
+        {
+          "name": "data.addresses[osm:node650000].number",
+          "value": "1"
+        },
+        {
+          "name": "data.addresses[osm:node650000].place",
+          "value": "Kansilkamp"
+        },
+        {
+          "name": "data.addresses[osm:node650000].postcode",
+          "value": "20000"
+        },
+        {
+          "name": "data.addresses[osm:node650000].sourceFamily",
+          "value": "osm"
+        },
+        {
+          "name": "data.addresses[osm:node650000].street",
+          "value": "Marktweg"
+        },
+        {
+          "name": "data.query.number",
+          "value": "1"
+        },
+        {
+          "name": "data.query.place",
+          "value": "null"
+        },
+        {
+          "name": "data.query.postcode",
+          "value": "20000"
+        },
+        {
+          "name": "data.query.street",
+          "value": "Marktweg"
+        },
+        {
+          "name": "meta.attribution[osm].family",
+          "value": "osm"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "3"
+        }
+      ]
+    },
+    {
+      "id": "address-town",
+      "operation": "listAddresses",
+      "counterpart": "address search",
+      "request": "/v1/addresses?q=Z%C3%BClz%C3%BCrode,%20Marktweg%202\u0026limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z",
+      "facts": [
+        {
+          "name": "data.addresses",
+          "value": "[]"
+        },
+        {
+          "name": "data.query.number",
+          "value": "2"
+        },
+        {
+          "name": "data.query.place",
+          "value": "Zülzürode"
+        },
+        {
+          "name": "data.query.postcode",
+          "value": "null"
+        },
+        {
+          "name": "data.query.street",
+          "value": "Marktweg"
+        },
+        {
+          "name": "meta.attribution[osm].family",
+          "value": "osm"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "5"
+        }
+      ]
+    },
+    {
+      "id": "poi-in-town",
+      "operation": "listPois",
+      "counterpart": "place of interest search",
+      "request": "/v1/pois?name=pharmacy\u0026in=Z%C3%BClz%C3%BCrode",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z",
+      "facts": [
+        {
+          "name": "data",
+          "value": "[]"
+        },
+        {
+          "name": "meta.attribution[osm].family",
+          "value": "osm"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.atLeast",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "10"
+        },
+        {
+          "name": "meta.page.nextCursor",
+          "value": "null"
+        },
+        {
+          "name": "meta.page.total",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "id": "poi-near-brand",
+      "operation": "listPois",
+      "counterpart": "place of interest search",
+      "request": "/v1/pois?name=backhaus\u0026at=47.55,6.85\u0026radius_m=50000\u0026category=shop\u0026limit=1",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z",
+      "facts": [
+        {
+          "name": "data",
+          "value": "[]"
+        },
+        {
+          "name": "meta.attribution[osm].family",
+          "value": "osm"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.atLeast",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "1"
+        },
+        {
+          "name": "meta.page.nextCursor",
+          "value": "null"
+        },
+        {
+          "name": "meta.page.total",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "id": "poi-anywhere-page",
+      "operation": "listPois",
+      "counterpart": "place of interest search",
+      "request": "/v1/pois?name=pharmacy\u0026limit=5\u0026cursor=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z",
+      "facts": [
+        {
+          "name": "data[osm:node600013].brand",
+          "value": "null"
+        },
+        {
+          "name": "data[osm:node600013].category",
+          "value": "amenity"
+        },
+        {
+          "name": "data[osm:node600013].dataAsOf",
+          "value": "2026-02-26"
+        },
+        {
+          "name": "data[osm:node600013].distanceM",
+          "value": "null"
+        },
+        {
+          "name": "data[osm:node600013].id",
+          "value": "osm:node600013"
+        },
+        {
+          "name": "data[osm:node600013].kind",
+          "value": "pharmacy"
+        },
+        {
+          "name": "data[osm:node600013].location.lat",
+          "value": "47.97635"
+        },
+        {
+          "name": "data[osm:node600013].location.lon",
+          "value": "11.41268"
+        },
+        {
+          "name": "data[osm:node600013].name",
+          "value": "Pharmacy Greitwuck"
+        },
+        {
+          "name": "data[osm:node600013].number",
+          "value": "13"
+        },
+        {
+          "name": "data[osm:node600013].operator",
+          "value": "null"
+        },
+        {
+          "name": "data[osm:node600013].place",
+          "value": "Klomdürbrück"
+        },
+        {
+          "name": "data[osm:node600013].postcode",
+          "value": "10013"
+        },
+        {
+          "name": "data[osm:node600013].sourceFamily",
+          "value": "osm"
+        },
+        {
+          "name": "data[osm:node600013].street",
+          "value": "Marktweg"
+        },
+        {
+          "name": "data[osm:node600019].brand",
+          "value": "null"
+        },
+        {
+          "name": "data[osm:node600019].category",
+          "value": "amenity"
+        },
+        {
+          "name": "data[osm:node600019].dataAsOf",
+          "value": "2026-02-26"
+        },
+        {
+          "name": "data[osm:node600019].distanceM",
+          "value": "null"
+        },
+        {
+          "name": "data[osm:node600019].id",
+          "value": "osm:node600019"
+        },
+        {
+          "name": "data[osm:node600019].kind",
+          "value": "pharmacy"
+        },
+        {
+          "name": "data[osm:node600019].location.lat",
+          "value": "48.18694"
+        },
+        {
+          "name": "data[osm:node600019].location.lon",
+          "value": "14.94431"
+        },
+        {
+          "name": "data[osm:node600019].name",
+          "value": "Pharmacy Klasmiß"
+        },
+        {
+          "name": "data[osm:node600019].number",
+          "value": "19"
+        },
+        {
+          "name": "data[osm:node600019].operator",
+          "value": "null"
+        },
+        {
+          "name": "data[osm:node600019].place",
+          "value": "Törscheibach"
+        },
+        {
+          "name": "data[osm:node600019].postcode",
+          "value": "10019"
+        },
+        {
+          "name": "data[osm:node600019].sourceFamily",
+          "value": "osm"
+        },
+        {
+          "name": "data[osm:node600019].street",
+          "value": "Marktweg"
+        },
+        {
+          "name": "data[osm:node600025].brand",
+          "value": "null"
+        },
+        {
+          "name": "data[osm:node600025].category",
+          "value": "amenity"
+        },
+        {
+          "name": "data[osm:node600025].dataAsOf",
+          "value": "2026-02-26"
+        },
+        {
+          "name": "data[osm:node600025].distanceM",
+          "value": "null"
+        },
+        {
+          "name": "data[osm:node600025].id",
+          "value": "osm:node600025"
+        },
+        {
+          "name": "data[osm:node600025].kind",
+          "value": "pharmacy"
+        },
+        {
+          "name": "data[osm:node600025].location.lat",
+          "value": "49.45394"
+        },
+        {
+          "name": "data[osm:node600025].location.lon",
+          "value": "7.06698"
+        },
+        {
+          "name": "data[osm:node600025].name",
+          "value": "Pharmacy Motklül"
+        },
+        {
+          "name": "data[osm:node600025].number",
+          "value": "25"
+        },
+        {
+          "name": "data[osm:node600025].operator",
+          "value": "null"
+        },
+        {
+          "name": "data[osm:node600025].place",
+          "value": "Oberunterhinterkieselbrückenwaldsiedlungsgemeinschaftsgemarkung"
+        },
+        {
+          "name": "data[osm:node600025].postcode",
+          "value": "10025"
+        },
+        {
+          "name": "data[osm:node600025].sourceFamily",
+          "value": "osm"
+        },
+        {
+          "name": "data[osm:node600025].street",
+          "value": "Marktweg"
+        },
+        {
+          "name": "data[osm:node600067].brand",
+          "value": "null"
+        },
+        {
+          "name": "data[osm:node600067].category",
+          "value": "amenity"
+        },
+        {
+          "name": "data[osm:node600067].dataAsOf",
+          "value": "2026-02-26"
+        },
+        {
+          "name": "data[osm:node600067].distanceM",
+          "value": "null"
+        },
+        {
+          "name": "data[osm:node600067].id",
+          "value": "osm:node600067"
+        },
+        {
+          "name": "data[osm:node600067].kind",
+          "value": "pharmacy"
+        },
+        {
+          "name": "data[osm:node600067].location.lat",
+          "value": "51.36946"
+        },
+        {
+          "name": "data[osm:node600067].location.lon",
+          "value": "13.18011"
+        },
+        {
+          "name": "data[osm:node600067].name",
+          "value": "Pharmacy Heismeß"
+        },
+        {
+          "name": "data[osm:node600067].number",
+          "value": "67"
+        },
+        {
+          "name": "data[osm:node600067].operator",
+          "value": "null"
+        },
+        {
+          "name": "data[osm:node600067].place",
+          "value": "Famgickrode"
+        },
+        {
+          "name": "data[osm:node600067].postcode",
+          "value": "10067"
+        },
+        {
+          "name": "data[osm:node600067].sourceFamily",
+          "value": "osm"
+        },
+        {
+          "name": "data[osm:node600067].street",
+          "value": "Marktweg"
+        },
+        {
+          "name": "data[osm:node600073].brand",
+          "value": "null"
+        },
+        {
+          "name": "data[osm:node600073].category",
+          "value": "amenity"
+        },
+        {
+          "name": "data[osm:node600073].dataAsOf",
+          "value": "2026-02-26"
+        },
+        {
+          "name": "data[osm:node600073].distanceM",
+          "value": "null"
+        },
+        {
+          "name": "data[osm:node600073].id",
+          "value": "osm:node600073"
+        },
+        {
+          "name": "data[osm:node600073].kind",
+          "value": "pharmacy"
+        },
+        {
+          "name": "data[osm:node600073].location.lat",
+          "value": "54.55739"
+        },
+        {
+          "name": "data[osm:node600073].location.lon",
+          "value": "7.02831"
+        },
+        {
+          "name": "data[osm:node600073].name",
+          "value": "Pharmacy Grienlel"
+        },
+        {
+          "name": "data[osm:node600073].number",
+          "value": "73"
+        },
+        {
+          "name": "data[osm:node600073].operator",
+          "value": "null"
+        },
+        {
+          "name": "data[osm:node600073].place",
+          "value": "Hülgreinbach"
+        },
+        {
+          "name": "data[osm:node600073].postcode",
+          "value": "10073"
+        },
+        {
+          "name": "data[osm:node600073].sourceFamily",
+          "value": "osm"
+        },
+        {
+          "name": "data[osm:node600073].street",
+          "value": "Marktweg"
+        },
+        {
+          "name": "meta.attribution[osm].family",
+          "value": "osm"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        },
+        {
+          "name": "meta.page.atLeast",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "5"
+        },
+        {
+          "name": "meta.page.nextCursor",
+          "value": "10"
+        },
+        {
+          "name": "meta.page.total",
+          "value": "16"
+        }
+      ]
+    },
+    {
+      "id": "location-town",
+      "operation": "describeLocation",
+      "counterpart": "location description",
+      "request": "/v1/location?at=47.5088,6.9623",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm",
+          "bkg_gvisys",
+          "geonames"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z",
+      "facts": [
+        {
+          "name": "data.address",
+          "value": "null"
+        },
+        {
+          "name": "data.district",
+          "value": "null"
+        },
+        {
+          "name": "data.municipality",
+          "value": "null"
+        },
+        {
+          "name": "data.state",
+          "value": "null"
+        },
+        {
+          "name": "meta.attribution[bkg_gvisys].family",
+          "value": "bkg_gvisys"
+        },
+        {
+          "name": "meta.attribution[geonames].family",
+          "value": "geonames"
+        },
+        {
+          "name": "meta.attribution[osm].family",
+          "value": "osm"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "location-open-country",
+      "operation": "describeLocation",
+      "counterpart": "location description",
+      "request": "/v1/location?at=47.95,7.6",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm",
+          "bkg_gvisys",
+          "geonames"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z",
+      "facts": [
+        {
+          "name": "data.address",
+          "value": "null"
+        },
+        {
+          "name": "data.district",
+          "value": "null"
+        },
+        {
+          "name": "data.municipality.code",
+          "value": "01002"
+        },
+        {
+          "name": "data.municipality.distanceM",
+          "value": "37896"
+        },
+        {
+          "name": "data.municipality.id",
+          "value": "100005"
+        },
+        {
+          "name": "data.municipality.location.lat",
+          "value": "47.64151"
+        },
+        {
+          "name": "data.municipality.location.lon",
+          "value": "7.81508"
+        },
+        {
+          "name": "data.municipality.name",
+          "value": "Kansilkamp"
+        },
+        {
+          "name": "data.municipality.sourceFamily",
+          "value": "geonames"
+        },
+        {
+          "name": "data.state",
+          "value": "null"
+        },
+        {
+          "name": "meta.attribution[geonames].family",
+          "value": "geonames"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
         }
       ]
     }

@@ -1,0 +1,85 @@
+{
+  "title": "An address with its postcode",
+  "request": "/v1/addresses?q=Marktweg%201,%2020000",
+  "attribution": "Addresses come from the source families of the places domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "places"
+    ],
+    "sources": [
+      "osm"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": {
+      "query": {
+        "street": "Marktweg",
+        "number": "1",
+        "postcode": "20000",
+        "place": null
+      },
+      "addresses": [
+        {
+          "id": "osm:node650000",
+          "street": "Marktweg",
+          "number": "1",
+          "postcode": "20000",
+          "place": "Kansilkamp",
+          "land": null,
+          "location": {
+            "lat": 47.609833,
+            "lon": 7.897242
+          },
+          "dataAsOf": "2026-02-26",
+          "sourceFamily": "osm"
+        }
+      ]
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": null,
+      "freshness": [
+        {
+          "family": "osm",
+          "dataAsOf": null,
+          "ageS": null,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "osm",
+          "domain": "places",
+          "publisher": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0",
+          "text": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0",
+          "licence": "ODbL 1.0",
+          "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
+          "shareAlike": true,
+          "shareAlikeOffer": "https://viafrei.de/impressum",
+          "termsUrl": "https://www.openstreetmap.org/copyright"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ],
+      "page": {
+        "limit": 3,
+        "hasMore": false
+      }
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/addresses"
+    }
+  }
+}

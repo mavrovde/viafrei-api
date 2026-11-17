@@ -2,7 +2,7 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "1bafcd0808da29874fab16d9ba776c317c3238532557c2415e3f0857d527df0b"
+    "sha256": "83ef5be6993b7b39a54de372789ace2ce32a2493e86fcdffea35530e68da82ea"
   },
   "cases": [
     {
@@ -602,6 +602,216 @@
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "speed-official",
+      "operation": "listSpeedCameras",
+      "counterpart": "speed camera search",
+      "request": "/v1/speed-cameras?at=47.98,6.95&radius_m=10000",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "speed_alpha",
+          "osm_speed_cameras"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T12:00:00Z"
+    },
+    {
+      "id": "speed-osm",
+      "operation": "listSpeedCameras",
+      "counterpart": "speed camera search",
+      "request": "/v1/speed-cameras?at=47.55,6.88&radius_m=5000&limit=1",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "speed_alpha",
+          "osm_speed_cameras"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T12:00:00Z"
+    },
+    {
+      "id": "sharing-available",
+      "operation": "listSharingOptions",
+      "counterpart": "bike sharing search",
+      "request": "/v1/sharing-options?at=47.94,7.33&radius_m=5000",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "gbfs_nextbike"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "sharing-all",
+      "operation": "listSharingOptions",
+      "counterpart": "bike sharing search",
+      "request": "/v1/sharing-options?at=47.94,7.33&radius_m=5000&only_available=false&limit=2",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "gbfs_nextbike"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "sharing-nearest",
+      "operation": "listSharingOptions",
+      "counterpart": "bike sharing search",
+      "request": "/v1/sharing-options?at=47.5,7.6&radius_m=100",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "gbfs_nextbike"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "address-postcode",
+      "operation": "listAddresses",
+      "counterpart": "address search",
+      "request": "/v1/addresses?q=Marktweg%201,%2020000",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "address-town",
+      "operation": "listAddresses",
+      "counterpart": "address search",
+      "request": "/v1/addresses?q=Z%C3%BClz%C3%BCrode,%20Marktweg%202&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "poi-in-town",
+      "operation": "listPois",
+      "counterpart": "place of interest search",
+      "request": "/v1/pois?name=pharmacy&in=Z%C3%BClz%C3%BCrode",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "poi-near-brand",
+      "operation": "listPois",
+      "counterpart": "place of interest search",
+      "request": "/v1/pois?name=backhaus&at=47.55,6.85&radius_m=50000&category=shop&limit=1",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "poi-anywhere-page",
+      "operation": "listPois",
+      "counterpart": "place of interest search",
+      "request": "/v1/pois?name=pharmacy&limit=5&cursor=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "location-town",
+      "operation": "describeLocation",
+      "counterpart": "location description",
+      "request": "/v1/location?at=47.5088,6.9623",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm",
+          "bkg_gvisys",
+          "geonames"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "location-open-country",
+      "operation": "describeLocation",
+      "counterpart": "location description",
+      "request": "/v1/location?at=47.95,7.6",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm",
+          "bkg_gvisys",
+          "geonames"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
     }
   ]
 }

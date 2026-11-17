@@ -1423,6 +1423,18 @@
         ],
         "type": "object"
       },
+      "FacilityStation": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
       "FreshnessEntry": {
         "additionalProperties": false,
         "properties": {
@@ -5728,7 +5740,7 @@
             "type": "array"
           },
           "station": {
-            "$ref": "#/components/schemas/BoardStation"
+            "$ref": "#/components/schemas/FacilityStation"
           }
         },
         "required": [
@@ -5747,22 +5759,6 @@
           "kind": {
             "description": "elevator, escalator or other. Open enumeration.",
             "type": "string"
-          },
-          "observedAt": {
-            "description": "When the state was reported; null when never.",
-            "format": "date-time",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "observedAtLocal": {
-            "description": "observedAt in Europe/Berlin time.",
-            "format": "date-time",
-            "type": [
-              "string",
-              "null"
-            ]
           },
           "position": {
             "description": "Where it is, as published (zu Gleis 2); null when not published.",
@@ -5784,8 +5780,6 @@
           "kind",
           "position",
           "state",
-          "observedAt",
-          "observedAtLocal",
           "sourceFamily"
         ],
         "type": "object"

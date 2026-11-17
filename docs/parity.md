@@ -168,6 +168,8 @@ nothing, so that family contributed nothing and neither side credits it.
   that list nothing credit no family; the needs credit the families they
   consulted. A need's place carries no identifier and its distance is stated
   to 0.1 km, as the platform's nearby search states them.
+- **Station facilities** name the station only and state no report
+  instant per unit, as the platform's facilities check states them.
 
 The MCP side has further rules, specific to its sources, that the read
 contract cannot express; they are not compared here.

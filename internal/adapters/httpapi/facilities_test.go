@@ -42,8 +42,12 @@ func TestFacilitiesAnswer(t *testing.T) {
 	}
 	r0, _ := rows[0].(map[string]any)
 	r1, _ := rows[1].(map[string]any)
-	if r0["state"] != "inactive" || r0["observedAtLocal"] == nil || r1["observedAt"] != nil {
+	// The platform's facilities check states no report instant per unit and names the station only (docs/parity.md).
+	if _, has := r0["observedAt"]; r0["state"] != "inactive" || has || r1["state"] != "unknown" {
 		t.Errorf("rows %v", rows)
+	}
+	if st, _ := data["station"].(map[string]any); len(st) != 1 || st["name"] == nil {
+		t.Errorf("station %v", data["station"])
 	}
 	if do(t, h, http.MethodGet, "/v1/stations/sp-1/facilities", bearer); f.gotFacil.Limit != 20 {
 		t.Errorf("default %+v", f.gotFacil)

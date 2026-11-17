@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -22,13 +21,11 @@ type FacilitiesInput struct {
 
 // StationFacility is a lift or escalator.
 type StationFacility struct {
-	ID              string     `json:"id"`
-	Kind            string     `json:"kind" doc:"elevator, escalator or other. Open enumeration."`
-	Position        *string    `json:"position" nullable:"true" doc:"Where it is, as published (zu Gleis 2); null when not published."`
-	State           string     `json:"state" doc:"active, inactive or unknown: a state older than its family's freshness threshold is unknown. Open enumeration."`
-	ObservedAt      *time.Time `json:"observedAt" nullable:"true" doc:"When the state was reported; null when never."`
-	ObservedAtLocal *string    `json:"observedAtLocal" nullable:"true" format:"date-time" doc:"observedAt in Europe/Berlin time."`
-	SourceFamily    string     `json:"sourceFamily"`
+	ID           string  `json:"id"`
+	Kind         string  `json:"kind" doc:"elevator, escalator or other. Open enumeration."`
+	Position     *string `json:"position" nullable:"true" doc:"Where it is, as published (zu Gleis 2); null when not published."`
+	State        string  `json:"state" doc:"active, inactive or unknown: a state older than its family's freshness threshold is unknown. Open enumeration."`
+	SourceFamily string  `json:"sourceFamily"`
 }
 
 // FacilityCounts counts every facility of the asked kind by state.
@@ -38,9 +35,15 @@ type FacilityCounts struct {
 	Unknown  int `json:"unknown"`
 }
 
+// FacilityStation is the station a facilities answer is about, named as the
+// platform's facilities check names it (docs/parity.md).
+type FacilityStation struct {
+	Name string `json:"name"`
+}
+
 // StationFacilitiesData is the data of listStationFacilities.
 type StationFacilitiesData struct {
-	Station    BoardStation      `json:"station"`
+	Station    FacilityStation   `json:"station"`
 	Counts     FacilityCounts    `json:"counts"`
 	Facilities []StationFacility `json:"facilities"`
 }
@@ -83,15 +86,11 @@ func registerFacilities(api huma.API, s *server, op huma.Operation) {
 		}
 		rows := make([]StationFacility, len(a.Items))
 		for i, f := range a.Items {
-			rows[i] = StationFacility{ID: f.ID, Kind: f.Kind, Position: f.Position, State: f.State, ObservedAt: utc(f.ObservedAt), SourceFamily: f.Family}
-			if f.ObservedAt != nil {
-				l := local(*f.ObservedAt)
-				rows[i].ObservedAtLocal = &l
-			}
+			rows[i] = StationFacility{ID: f.ID, Kind: f.Kind, Position: f.Position, State: f.State, SourceFamily: f.Family}
 		}
 		return &FacilitiesOutput{CacheControl: noStore, Body: FacilitiesEnvelope{
 			Data: StationFacilitiesData{
-				Station:    BoardStation{ID: a.Station.ID, Name: a.Station.Name, Location: position(a.Station.Location), StopCode: a.Station.NationalCode},
+				Station:    FacilityStation{Name: a.Station.Name},
 				Counts:     FacilityCounts{Active: a.Active, Inactive: a.Inactive, Unknown: a.Unknown},
 				Facilities: rows,
 			},

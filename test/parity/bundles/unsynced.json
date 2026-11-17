@@ -3472,14 +3472,6 @@
           "value": "elevator"
         },
         {
-          "name": "data.facilities[equipment:100001].observedAt",
-          "value": "2026-03-29T22:20:20Z"
-        },
-        {
-          "name": "data.facilities[equipment:100001].observedAtLocal",
-          "value": "2026-03-29T22:20:20Z"
-        },
-        {
           "name": "data.facilities[equipment:100001].position",
           "value": "zu Gleis 1"
         },
@@ -3500,14 +3492,6 @@
           "value": "elevator"
         },
         {
-          "name": "data.facilities[equipment:100002].observedAt",
-          "value": "2026-03-28T19:21:25Z"
-        },
-        {
-          "name": "data.facilities[equipment:100002].observedAtLocal",
-          "value": "2026-03-28T19:21:25Z"
-        },
-        {
           "name": "data.facilities[equipment:100002].position",
           "value": "zu Gleis 2"
         },
@@ -3520,24 +3504,8 @@
           "value": "unknown"
         },
         {
-          "name": "data.station.id",
-          "value": "1:de:03001:0"
-        },
-        {
-          "name": "data.station.location.lat",
-          "value": "48.17441"
-        },
-        {
-          "name": "data.station.location.lon",
-          "value": "10.62533"
-        },
-        {
           "name": "data.station.name",
           "value": "Demzüheim Markt"
-        },
-        {
-          "name": "data.station.stopCode",
-          "value": "de:03001:0"
         },
         {
           "name": "meta.attribution[delfi_static].family",
@@ -3605,14 +3573,6 @@
           "value": "elevator"
         },
         {
-          "name": "data.facilities[equipment:100001].observedAt",
-          "value": "2026-03-29T22:20:20Z"
-        },
-        {
-          "name": "data.facilities[equipment:100001].observedAtLocal",
-          "value": "2026-03-29T22:20:20Z"
-        },
-        {
           "name": "data.facilities[equipment:100001].position",
           "value": "zu Gleis 1"
         },
@@ -3625,24 +3585,8 @@
           "value": "unknown"
         },
         {
-          "name": "data.station.id",
-          "value": "1:de:03001:0"
-        },
-        {
-          "name": "data.station.location.lat",
-          "value": "48.17441"
-        },
-        {
-          "name": "data.station.location.lon",
-          "value": "10.62533"
-        },
-        {
           "name": "data.station.name",
           "value": "Demzüheim Markt"
-        },
-        {
-          "name": "data.station.stopCode",
-          "value": "de:03001:0"
         },
         {
           "name": "meta.attribution[delfi_static].family",

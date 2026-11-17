@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -71,4 +72,19 @@ func TestFuelStationsAnswer(t *testing.T) {
 	assertProblem(t, do(t, featureHandler(t, config.Defaults(), nil, nil), http.MethodGet, "/v1/fuel-options?at=50,8", bearer), 404, "feature-disabled")
 	f.err = access.ErrNonePermitted
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/fuel-options?at=50,8", bearer), 403, "source-not-permitted")
+}
+
+func TestFuelOpenAtAndWholeDay(t *testing.T) {
+	req.Covers(t, "FR-ENERGY-002", "ENV-040")
+	f := everyAnswer()
+	at := time.Date(2026, 3, 30, 21, 30, 0, 0, time.UTC)
+	f.fuel.OpenAt, f.fuel.DroppedNotWholeDay = &at, 2
+	h := featureHandler(t, config.Defaults(), f, nil)
+	w := do(t, h, http.MethodGet, "/v1/fuel-options?at=52.52,13.405&open_at=23:30&whole_day=true", bearer)
+	if body := w.Body.String(); w.Code != http.StatusOK || f.gotFuel.OpenAt != "23:30" || !f.gotFuel.WholeDay ||
+		!strings.Contains(body, `"droppedNotWholeDay":2`) || !strings.Contains(body, `"openAt":"2026-03-30T21:30:00Z"`) {
+		t.Errorf("%d asked %+v: %s", w.Code, f.gotFuel, body)
+	}
+	assertProblem(t, do(t, h, http.MethodGet, "/v1/fuel-options?at=52.52,13.405&open_at=23:30&open_now=true", bearer), 400, "invalid-parameter")
+	assertProblem(t, do(t, h, http.MethodGet, "/v1/fuel-options?at=52.52,13.405&open_at=25:00", bearer), 400, "invalid-parameter")
 }

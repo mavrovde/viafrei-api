@@ -2,6 +2,7 @@ package features
 
 import (
 	"context"
+	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/energy"
@@ -21,6 +22,10 @@ type FuelStations struct {
 	Matched        int
 	DroppedClosed  int
 	DroppedUnknown int
+	// DroppedNotWholeDay counts the stations whole_day left out; OpenAt is
+	// the instant open_at named.
+	DroppedNotWholeDay int
+	OpenAt             *time.Time
 }
 
 // FuelStations answers "where can I fill up near here" for key (FR-ENERGY),
@@ -54,5 +59,6 @@ func (s *Service) FuelStations(ctx context.Context, key access.Record, q energy.
 	return FuelStations{
 		Answer:  Answer[energy.FuelStation]{Items: a.Stations, HasMore: a.Matched > len(a.Stations), Families: fams, Partial: partial, At: now},
 		Matched: a.Matched, DroppedClosed: a.DroppedClosed, DroppedUnknown: a.DroppedUnknown,
+		DroppedNotWholeDay: a.DroppedNotWholeDay, OpenAt: a.OpenAt,
 	}, nil
 }

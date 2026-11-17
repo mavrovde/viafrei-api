@@ -160,3 +160,5 @@ argument:find_charging_station.max_power_kw	listChargingOptions?max_kw	charging-
 argument:find_charging_station.connector	listChargingOptions?connector	charging-connector-terms	-
 argument:find_charging_station.conditions	listChargingOptions?conditions	charging-connector-terms	-
 argument:find_charging_station.only_available	listChargingOptions?only_available	charging-only-available	-
+argument:find_fuel_station.open_at	listFuelOptions?open_at	fuel-open-at	-
+argument:find_fuel_station.whole_day	listFuelOptions?whole_day	fuel-whole-day	-

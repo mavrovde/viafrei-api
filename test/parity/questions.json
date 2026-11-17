@@ -1026,6 +1026,42 @@
         "accepted": null
       },
       "now": "2026-03-29T22:10:00Z"
+    },
+    {
+      "id": "fuel-open-at",
+      "operation": "listFuelOptions",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&open_at=23:30&limit=10",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "tankerkoenig_gamma"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "fuel-whole-day",
+      "operation": "listFuelOptions",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&whole_day=true&limit=10",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "tankerkoenig_gamma"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
     }
   ]
 }

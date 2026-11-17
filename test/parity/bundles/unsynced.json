@@ -6704,6 +6704,94 @@
           "value": "3"
         }
       ]
+    },
+    {
+      "id": "fuel-open-at",
+      "operation": "listFuelOptions",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options?at=49.17,7.81\u0026radius_m=25000\u0026open_at=23:30\u0026limit=10",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "tankerkoenig_gamma"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data",
+          "value": "[]"
+        },
+        {
+          "name": "meta.attribution[tankerkoenig_gamma].family",
+          "value": "tankerkoenig_gamma"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[\"For consumer information only (synthetic).\"]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "10"
+        }
+      ]
+    },
+    {
+      "id": "fuel-whole-day",
+      "operation": "listFuelOptions",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options?at=49.17,7.81\u0026radius_m=25000\u0026whole_day=true\u0026limit=10",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "tankerkoenig_gamma"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data",
+          "value": "[]"
+        },
+        {
+          "name": "meta.attribution[tankerkoenig_gamma].family",
+          "value": "tankerkoenig_gamma"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[\"For consumer information only (synthetic).\"]"
+        },
+        {
+          "name": "meta.page.hasMore",
+          "value": "false"
+        },
+        {
+          "name": "meta.page.limit",
+          "value": "10"
+        }
+      ]
     }
   ]
 }

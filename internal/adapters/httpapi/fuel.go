@@ -22,13 +22,15 @@ const (
 // FuelInput is the input of listFuelOptions.
 type FuelInput struct {
 	AtPosition
-	RadiusM int    `query:"radius_m" minimum:"1000" maximum:"25000" doc:"Search radius in metres (1000 to 25000, the provider's ceiling); default 5000."`
-	Fuel    string `query:"fuel" enum:"e5,e10,diesel" doc:"Only stations with a price for this grade. Required with sort=price."`
-	Brand   string `query:"brand" maxLength:"60" doc:"Only stations of this brand: a part of it, any case."`
-	Name    string `query:"name" maxLength:"60" doc:"Only stations whose name or brand holds this text, any case."`
-	OpenNow bool   `query:"open_now" doc:"Only stations reported open now; meta.query counts those left out as closed and as of unknown state."`
-	Sort    string `query:"sort" enum:"distance,price,name" doc:"distance (default, nearest first), price (every current price cheapest first, then the last known prices nearest first; needs fuel) or name (alphabetical, as German sorts it)."`
-	Limit   int    `query:"limit" minimum:"1" maximum:"10" doc:"Most stations to return; default 5."`
+	RadiusM  int    `query:"radius_m" minimum:"1000" maximum:"25000" doc:"Search radius in metres (1000 to 25000, the provider's ceiling); default 5000."`
+	Fuel     string `query:"fuel" enum:"e5,e10,diesel" doc:"Only stations with a price for this grade. Required with sort=price."`
+	Brand    string `query:"brand" maxLength:"60" doc:"Only stations of this brand: a part of it, any case."`
+	Name     string `query:"name" maxLength:"60" doc:"Only stations whose name or brand holds this text, any case."`
+	OpenNow  bool   `query:"open_now" doc:"Only stations reported open now; meta.query counts those left out as closed and as of unknown state."`
+	OpenAt   string `query:"open_at" maxLength:"16" pattern:"^([0-9]{4}-[0-9]{2}-[0-9]{2}[T ])?[0-9]{1,2}:[0-9]{2}$" example:"23:30" doc:"Only stations whose published opening hours have them open at that time in Germany (Europe/Berlin): 23:30 is the next time the clock shows 23:30, 2026-09-30 06:15 that date and time. Not with open_now. A station whose hours are unknown or unreadable is counted in meta.query.droppedUnknown, never guessed open."`
+	WholeDay bool   `query:"whole_day" doc:"Only stations the provider flags as open around the clock; meta.query.droppedNotWholeDay counts the others."`
+	Sort     string `query:"sort" enum:"distance,price,name" doc:"distance (default, nearest first), price (every current price cheapest first, then the last known prices nearest first; needs fuel) or name (alphabetical, as German sorts it)."`
+	Limit    int    `query:"limit" minimum:"1" maximum:"10" doc:"Most stations to return; default 5."`
 }
 
 // Resolve reads the position and requires fuel with sort=price.
@@ -36,10 +38,18 @@ func (in *FuelInput) Resolve(ctx huma.Context) []error {
 	if errs := in.AtPosition.Resolve(ctx); errs != nil {
 		return errs
 	}
+	var errs []error
 	if in.Sort == "price" && in.Fuel == "" {
-		return []error{&huma.ErrorDetail{Location: "query.fuel", Message: "fuel is required with sort=price"}}
+		errs = append(errs, &huma.ErrorDetail{Location: "query.fuel", Message: "fuel is required with sort=price"})
 	}
-	return nil
+	if in.OpenAt != "" {
+		if in.OpenNow {
+			errs = append(errs, &huma.ErrorDetail{Location: "query.open_at", Message: "give either open_now or open_at, not both", Value: in.OpenAt})
+		} else if _, ok := energy.ResolveOpenAt(in.OpenAt, time.Now()); !ok {
+			errs = append(errs, &huma.ErrorDetail{Location: "query.open_at", Message: "not a time: use HH:MM or YYYY-MM-DD HH:MM", Value: in.OpenAt})
+		}
+	}
+	return errs
 }
 
 // FuelPrice is a station's newest price for a grade.
@@ -65,12 +75,14 @@ type FuelStation struct {
 
 // FuelQueryMeta is meta.query of listFuelOptions.
 type FuelQueryMeta struct {
-	At             Position `json:"at"`
-	RadiusM        int      `json:"radiusM"`
-	Sort           string   `json:"sort"`
-	Matched        int      `json:"matched" doc:"Stations the filters kept; more than listed when meta.page.hasMore."`
-	DroppedClosed  int      `json:"droppedClosed" doc:"Stations open_now left out as reported closed."`
-	DroppedUnknown int      `json:"droppedUnknown" doc:"Stations open_now left out as of unknown state."`
+	At                 Position   `json:"at"`
+	RadiusM            int        `json:"radiusM"`
+	Sort               string     `json:"sort"`
+	Matched            int        `json:"matched" doc:"Stations the filters kept; more than listed when meta.page.hasMore."`
+	DroppedClosed      int        `json:"droppedClosed" doc:"Stations open_now left out as reported closed."`
+	DroppedUnknown     int        `json:"droppedUnknown" doc:"Stations open_now left out as of unknown state, or open_at as of unknown or unreadable hours."`
+	DroppedNotWholeDay int        `json:"droppedNotWholeDay" doc:"Stations whole_day left out."`
+	OpenAt             *time.Time `json:"openAt,omitempty" doc:"The instant open_at named."`
 }
 
 // FuelMeta is the meta member of listFuelOptions.
@@ -103,7 +115,7 @@ func registerFuel(api huma.API, s *server, op huma.Operation) {
 			return nil, err
 		}
 		q := energy.FuelQuery{At: in.point, RadiusM: in.RadiusM, Fuel: in.Fuel, Brand: in.Brand, Name: in.Name,
-			OpenNow: in.OpenNow, Sort: in.Sort, Limit: in.Limit, Window: s.cfg.Fuel.PriceCurrent}
+			OpenNow: in.OpenNow, OpenAt: in.OpenAt, WholeDay: in.WholeDay, Sort: in.Sort, Limit: in.Limit, Window: s.cfg.Fuel.PriceCurrent}
 		if q.RadiusM == 0 {
 			q.RadiusM = fuelDefaultRadiusM
 		}
@@ -124,7 +136,7 @@ func registerFuel(api huma.API, s *server, op huma.Operation) {
 				DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
 				Page:     Page{Limit: q.Limit, HasMore: a.HasMore},
 				Query: FuelQueryMeta{At: position(q.At), RadiusM: q.RadiusM, Sort: q.Sort, Matched: a.Matched,
-					DroppedClosed: a.DroppedClosed, DroppedUnknown: a.DroppedUnknown},
+					DroppedClosed: a.DroppedClosed, DroppedUnknown: a.DroppedUnknown, DroppedNotWholeDay: a.DroppedNotWholeDay, OpenAt: a.OpenAt},
 			},
 			Links: s.selfLink(ctx),
 		}}, nil

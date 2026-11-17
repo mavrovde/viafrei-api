@@ -45,7 +45,9 @@ type FuelStation struct {
 	Location  geo.Point
 	DistanceM int
 	// Open is the station's reported state: open, closed or unknown.
-	Open   string
+	Open string
+	// Hours are the published opening hours.
+	Hours  Hours
 	Prices []FuelPrice
 	Family string
 }
@@ -82,8 +84,12 @@ type FuelQuery struct {
 	Brand   string
 	Name    string
 	OpenNow bool
-	Sort    string
-	Limit   int
+	// OpenAt keeps the stations the published hours have open at that
+	// Berlin time (ResolveOpenAt); WholeDay those open around the clock.
+	OpenAt   string
+	WholeDay bool
+	Sort     string
+	Limit    int
 	// Window is how long a reported price is current.
 	Window time.Duration
 }
@@ -97,6 +103,10 @@ type FuelAnswer struct {
 	// left out: reported closed, and with no reported state.
 	DroppedClosed  int
 	DroppedUnknown int
+	// DroppedNotWholeDay counts the stations WholeDay left out.
+	DroppedNotWholeDay int
+	// OpenAt is the instant OpenAt named, when asked.
+	OpenAt *time.Time
 }
 
 // RankFuel is the answer to q from the stations within its radius, nearest
@@ -107,6 +117,11 @@ type FuelAnswer struct {
 func RankFuel(stations []FuelStation, q FuelQuery, now time.Time) FuelAnswer {
 	out := FuelAnswer{Stations: []FuelStation{}}
 	brand, name := strings.ToLower(q.Brand), strings.ToLower(q.Name)
+	if q.OpenAt != "" {
+		if at, ok := ResolveOpenAt(q.OpenAt, now); ok {
+			out.OpenAt = &at
+		}
+	}
 	for _, s := range stations {
 		if q.Fuel != "" && s.Price(q.Fuel) == nil {
 			continue
@@ -116,6 +131,23 @@ func RankFuel(stations []FuelStation, q FuelQuery, now time.Time) FuelAnswer {
 		}
 		if name != "" && !contains(s.Name, name) && !contains(s.Brand, name) {
 			continue
+		}
+		if q.WholeDay && (s.Hours.WholeDay == nil || !*s.Hours.WholeDay) {
+			out.DroppedNotWholeDay++
+			continue
+		}
+		if out.OpenAt != nil {
+			sch, read := ReadSchedule(s.Hours)
+			open, known := sch.OpenAt(*out.OpenAt)
+			switch {
+			case open:
+			case read && known:
+				out.DroppedClosed++
+				continue
+			default:
+				out.DroppedUnknown++
+				continue
+			}
 		}
 		if q.OpenNow && s.Open != "open" {
 			if s.Open == "closed" {

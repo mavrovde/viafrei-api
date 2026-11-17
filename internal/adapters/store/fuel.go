@@ -16,7 +16,7 @@ import (
 var fuelNear = `
 with here as (select st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography g)
 select s.station_id, s.name, s.brand, st_y(s.location), st_x(s.location),
-       round(st_distance(s.location::geography, here.g))::int, s.open_state, s.source_ref,
+       round(st_distance(s.location::geography, here.g))::int, s.open_state, s.source_ref, s.whole_day, s.opening_times,
        coalesce(p.products, '{}'), coalesce(p.prices, '{}'), coalesce(p.observed, '{}')
 from contract.fuel_station s
 cross join here
@@ -48,7 +48,7 @@ func (s *Store) FuelNear(ctx context.Context, q energy.FuelQuery, families []str
 				observed []time.Time
 			)
 			err := r.Scan(&v.ID, &v.Name, &v.Brand, &v.Location.Lat, &v.Location.Lon, &v.DistanceM, &v.Open, &v.Family,
-				&products, &prices, &observed)
+				&v.Hours.WholeDay, &v.Hours.Times, &products, &prices, &observed)
 			for i := range products {
 				v.Prices = append(v.Prices, energy.FuelPrice{Product: products[i], Price: prices[i], ObservedAt: observed[i]})
 			}

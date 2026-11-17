@@ -1,7 +1,7 @@
 {
   "title": "The situations on a motorway, two to a page, with its lamp",
   "request": "/v1/motorways/A101/conditions?limit=2",
-  "attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain the key is entitled to, with or without the scope weather; those families are credited whether or not a warning is in force. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
   "key": {
     "useClass": "commercial",
     "scopes": [
@@ -54,8 +54,8 @@
           "headline": "GeneralObstruction",
           "description": null,
           "textLanguage": "de",
-          "updatedAt": "2026-03-28T18:10:13Z",
-          "updatedAtLocal": "2026-03-28T19:10:13+01:00",
+          "updatedAt": "2026-03-29T23:57:30Z",
+          "updatedAtLocal": "2026-03-30T01:57:30+02:00",
           "position": null,
           "sourceFamily": "roads_alpha"
         },
@@ -83,8 +83,8 @@
           "headline": "GeneralObstruction",
           "description": null,
           "textLanguage": "de",
-          "updatedAt": "2026-03-29T14:04:21Z",
-          "updatedAtLocal": "2026-03-29T16:04:21+02:00",
+          "updatedAt": "2026-03-29T23:57:30Z",
+          "updatedAtLocal": "2026-03-30T01:57:30+02:00",
           "position": null,
           "sourceFamily": "roads_alpha"
         }
@@ -97,6 +97,13 @@
       "asOf": "2026-03-29T23:57:30Z",
       "freshness": [
         {
+          "family": "dwd_eta",
+          "dataAsOf": "2026-03-29T23:57:30Z",
+          "ageS": 150,
+          "staleAfterS": 900,
+          "stale": false
+        },
+        {
           "family": "roads_alpha",
           "dataAsOf": "2026-03-29T23:57:30Z",
           "ageS": 150,
@@ -105,6 +112,17 @@
         }
       ],
       "attribution": [
+        {
+          "family": "dwd_eta",
+          "domain": "weather",
+          "publisher": "Golmil Datenwerk",
+          "text": "Synthetic data from family eta, licence dl-de/by-2-0.",
+          "licence": "dl-de/by-2-0",
+          "licenceUrl": "https://licences.example/dl-de-by-2-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://eta.example/terms/dwd_eta"
+        },
         {
           "family": "roads_alpha",
           "domain": "roads",

@@ -95,6 +95,7 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
 | `meta.asOf` | Each side defines it differently: the API states the oldest `dataAsOf` of its families (ENV-004), the MCP capability the newest current point status, or its clock when none is current. Neither is a format of the other. |
 | `data.station.location`, in `listStationDepartures` only | The MCP departure board states the stop's name and code, not its position. The site reads the station's position from the digest route `/internal/station/:slug`, so the API answers it; it is not compared. |
 | `data[*].location`, `data[*].districtCode`, `data[*].modes`, in `listStations` only | The MCP stop search states a stop's name, code and distance, not its position, district or modes. The site reads all three from the digest route `/internal/station/:slug` (the page's map and Land line from the stop's position and AGS, the live board's mode filter), so the API answers them; they are not compared. A position in any other operation, a charging site's or a car park's, is compared. |
+| `data.lamp`, `data.lampReason`, in `listStateRoadConditions` only | The MCP motorway status of a Land lists the Land's items and counts, not a lamp. The site reads the Land's lamp (the motorway pages' one rule over the Land's Autobahn items and DWD levels) from the digest route `/internal/state/:slug`, so the API answers it; it is not compared. |
 | `meta.attribution[*].` `domain`, `licence`, `licenceUrl`, `publisher`, `shareAlike`, `shareAlikeOffer`, `termsUrl`, `text` | The fixture's families carry synthetic register texts; the platform credits its own register rows for the sources the producer stores each family as, so the texts cannot be equal on these rows. Which families are credited (`meta.attribution[*].family`) is compared. |
 | The text of a condition note (`meta.notes.condition`) and, since rules/5, of a purpose note (`meta.notes.purpose`) | The same reason, since rules/4 for conditions: the fixture's notes are synthetic and the platform states its own register's. The family of each note and how many each family has are compared (`meta.notes.<kind>[<family>]`, above). |
 
@@ -179,11 +180,19 @@ nothing, so that family contributed nothing and neither side credits it.
   timetable holds no trip on is inside the window and answers no departure.
 - **Motorway operator events.** The fixture family the producer stores as the
   Autobahn GmbH's events (`roads_alpha`) carries only rows the platform can
-  hold for that source (fixture generator 0.3.1): a closure, roadworks, or a
-  hazard, and no end. The platform's read contract (`contract.traffic_event`)
-  states an Autobahn warning as kind `hazard`, severity `info`, and an item as
-  current while its sweep lists it; the projection of the MCP answer uses that
-  translation, never its own.
+  hold for that source (fixture generator 0.3.2): a closure, roadworks, or a
+  hazard, and no end, each last seen by the family's newest sweep (its
+  `data_as_of`). The platform's read contract (`contract.traffic_event`)
+  states an Autobahn warning as kind `hazard`, severity `info`, an item as
+  current while its sweep lists it, and an item's change time (`updatedAt`)
+  as that sweep's instant, which is all the platform's motorway status
+  states of it; the projection of the MCP answer uses that translation,
+  never its own.
+- **Road conditions credit the weather.** The lamp reads the DWD warnings
+  of every weather family the key may read, with or without the weather
+  scope (the warnings are public), and the answer credits those families
+  whether or not a warning is in force, as the platform's motorway status
+  credits the DWD.
 - **Lorry rules** carry no identifier, so a row is named by its place in
   the answer (by distance, none last). A publisher's file date is stated
   for a priority route and the long-lorry network only, and the long-lorry

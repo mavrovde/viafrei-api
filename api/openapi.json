@@ -2614,7 +2614,7 @@
             ]
           },
           "situations": {
-            "description": "Ordered by position along the road (those that cannot be placed last), then severity descending, then id.",
+            "description": "In the platform's motorway status order: jams, closures, the other reports, then roadworks; within each, by traffic type (queuing, stationary, heavy, slow), delay descending, headline, then the publisher's id.",
             "items": {
               "$ref": "#/components/schemas/RoadSituation"
             },
@@ -9935,7 +9935,7 @@
                             "08"
                           ],
                           "junctions": 8,
-                          "situations": 7,
+                          "situations": 8,
                           "sourceFamily": "autobahn"
                         },
                         {
@@ -10255,7 +10255,7 @@
     },
     "/v1/motorways/{road}/conditions": {
       "get": {
-        "description": "The active situations on one road, ordered by their position along it, with the lamp over every situation on the road in the asked direction and every official weather warning in force in an area the road crosses. MCP counterpart: road status. Needs the scope roads; the weather warnings are read with the scope weather, and without it the lamp says its sight is limited.",
+        "description": "The active situations on one road, in the platform's motorway status order (jams, closures, the other reports, roadworks), with the lamp over every situation on the road in the asked direction and every official weather warning in force in an area the road crosses. MCP counterpart: road status. Needs the scope roads; the weather warnings are public and read for every key that may read the weather families, which the answer then credits; without them the lamp says its sight is limited.",
         "operationId": "getMotorwayConditions",
         "parameters": [
           {
@@ -10439,8 +10439,8 @@
                             "headline": "GeneralObstruction",
                             "description": null,
                             "textLanguage": "de",
-                            "updatedAt": "2026-03-28T18:10:13Z",
-                            "updatedAtLocal": "2026-03-28T19:10:13+01:00",
+                            "updatedAt": "2026-03-29T23:57:30Z",
+                            "updatedAtLocal": "2026-03-30T01:57:30+02:00",
                             "position": null,
                             "sourceFamily": "roads_alpha"
                           },
@@ -10468,8 +10468,8 @@
                             "headline": "GeneralObstruction",
                             "description": null,
                             "textLanguage": "de",
-                            "updatedAt": "2026-03-29T14:04:21Z",
-                            "updatedAtLocal": "2026-03-29T16:04:21+02:00",
+                            "updatedAt": "2026-03-29T23:57:30Z",
+                            "updatedAtLocal": "2026-03-30T01:57:30+02:00",
                             "position": null,
                             "sourceFamily": "roads_alpha"
                           }
@@ -10482,6 +10482,13 @@
                         "asOf": "2026-03-29T23:57:30Z",
                         "freshness": [
                           {
+                            "family": "dwd_eta",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          },
+                          {
                             "family": "roads_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
@@ -10490,6 +10497,17 @@
                           }
                         ],
                         "attribution": [
+                          {
+                            "family": "dwd_eta",
+                            "domain": "weather",
+                            "publisher": "Golmil Datenwerk",
+                            "text": "Synthetic data from family eta, licence dl-de/by-2-0.",
+                            "licence": "dl-de/by-2-0",
+                            "licenceUrl": "https://licences.example/dl-de-by-2-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://eta.example/terms/dwd_eta"
+                          },
                           {
                             "family": "roads_alpha",
                             "domain": "roads",
@@ -10772,7 +10790,7 @@
         "tags": [
           "roads"
         ],
-        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain the key is entitled to, with or without the scope weather; those families are credited whether or not a warning is in force. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
         "x-codeSamples": [
           {
             "lang": "Shell",
@@ -13328,7 +13346,7 @@
     },
     "/v1/road-conditions": {
       "get": {
-        "description": "The active situations within the radius of a position on every road class held, by severity descending, then distance, then id, with the lamp over every situation within the radius and every official weather warning in force in an area within it. MCP counterpart: road status (area form). Needs the scope roads; the weather warnings are read with the scope weather, and without it the lamp says its sight is limited.",
+        "description": "The active situations within the radius of a position on every road class held, by severity descending, then distance, then id, with the lamp over every situation within the radius and every official weather warning in force in an area within it. MCP counterpart: road status (area form). Needs the scope roads; the weather warnings are public and read for every key that may read the weather families, which the answer then credits; without them the lamp says its sight is limited.",
         "operationId": "listRoadConditions",
         "parameters": [
           {
@@ -13512,8 +13530,8 @@
                             "headline": "GeneralObstruction",
                             "description": null,
                             "textLanguage": "de",
-                            "updatedAt": "2025-12-31T23:01:00Z",
-                            "updatedAtLocal": "2026-01-01T00:01:00+01:00",
+                            "updatedAt": "2026-03-29T23:57:30Z",
+                            "updatedAtLocal": "2026-03-30T01:57:30+02:00",
                             "position": null,
                             "distanceM": 25666,
                             "sourceFamily": "roads_alpha"
@@ -13542,8 +13560,8 @@
                             "headline": "GeneralObstruction",
                             "description": null,
                             "textLanguage": "de",
-                            "updatedAt": "2026-03-29T01:31:00Z",
-                            "updatedAtLocal": "2026-03-29T03:31:00+02:00",
+                            "updatedAt": "2026-03-29T23:57:30Z",
+                            "updatedAtLocal": "2026-03-30T01:57:30+02:00",
                             "position": null,
                             "distanceM": 31153,
                             "sourceFamily": "roads_alpha"
@@ -13557,6 +13575,13 @@
                         "asOf": "2026-03-29T23:57:30Z",
                         "freshness": [
                           {
+                            "family": "dwd_eta",
+                            "dataAsOf": "2026-03-29T23:57:30Z",
+                            "ageS": 150,
+                            "staleAfterS": 900,
+                            "stale": false
+                          },
+                          {
                             "family": "roads_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
@@ -13565,6 +13590,17 @@
                           }
                         ],
                         "attribution": [
+                          {
+                            "family": "dwd_eta",
+                            "domain": "weather",
+                            "publisher": "Golmil Datenwerk",
+                            "text": "Synthetic data from family eta, licence dl-de/by-2-0.",
+                            "licence": "dl-de/by-2-0",
+                            "licenceUrl": "https://licences.example/dl-de-by-2-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://eta.example/terms/dwd_eta"
+                          },
                           {
                             "family": "roads_alpha",
                             "domain": "roads",
@@ -13850,7 +13886,7 @@
         "tags": [
           "roads"
         ],
-        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain the key is entitled to, with or without the scope weather; those families are credited whether or not a warning is in force. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
         "x-codeSamples": [
           {
             "lang": "Shell",
@@ -13915,8 +13951,8 @@
                         "headline": "GeneralObstruction",
                         "description": null,
                         "textLanguage": "de",
-                        "updatedAt": "2026-03-29T01:00:59Z",
-                        "updatedAtLocal": "2026-03-29T03:00:59+02:00",
+                        "updatedAt": "2026-03-29T23:57:30Z",
+                        "updatedAtLocal": "2026-03-30T01:57:30+02:00",
                         "position": null,
                         "sourceFamily": "roads_alpha"
                       },
@@ -14201,7 +14237,7 @@
         "tags": [
           "roads"
         ],
-        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain when the key carries the scope weather. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-attribution": "Road situations come from the source families of the roads domain the key is entitled to, and the weather warnings the lamp reads from those of the weather domain the key is entitled to, with or without the scope weather; those families are credited whether or not a warning is in force. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
         "x-codeSamples": [
           {
             "lang": "Shell",
@@ -15449,8 +15485,8 @@
                             "headline": "MaintenanceWorks",
                             "description": null,
                             "textLanguage": "de",
-                            "updatedAt": "2026-03-29T19:34:04Z",
-                            "updatedAtLocal": "2026-03-29T21:34:04+02:00",
+                            "updatedAt": "2026-03-29T23:57:30Z",
+                            "updatedAtLocal": "2026-03-30T01:57:30+02:00",
                             "position": null,
                             "sourceFamily": "roads_alpha"
                           },
@@ -15478,8 +15514,8 @@
                             "headline": "GeneralObstruction",
                             "description": null,
                             "textLanguage": "de",
-                            "updatedAt": "2026-03-28T01:01:00Z",
-                            "updatedAtLocal": "2026-03-28T02:01:00+01:00",
+                            "updatedAt": "2026-03-29T23:57:30Z",
+                            "updatedAtLocal": "2026-03-30T01:57:30+02:00",
                             "position": null,
                             "sourceFamily": "roads_alpha"
                           },
@@ -15507,8 +15543,8 @@
                             "headline": "GeneralObstruction",
                             "description": null,
                             "textLanguage": "de",
-                            "updatedAt": "2026-03-29T06:43:04Z",
-                            "updatedAtLocal": "2026-03-29T08:43:04+02:00",
+                            "updatedAt": "2026-03-29T23:57:30Z",
+                            "updatedAtLocal": "2026-03-30T01:57:30+02:00",
                             "position": null,
                             "sourceFamily": "roads_alpha"
                           }

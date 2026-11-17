@@ -208,6 +208,8 @@ var Default = Rules{
 		{"data[*].location", "", "listStations", siteReason("/internal/station/:slug")},
 		{"data[*].districtCode", "", "listStations", siteReason("/internal/station/:slug")},
 		{"data[*].modes", "", "listStations", siteReason("/internal/station/:slug")},
+		{"data.lamp", "", "listStateRoadConditions", siteReason("/internal/state/:slug")},
+		{"data.lampReason", "", "listStateRoadConditions", siteReason("/internal/state/:slug")},
 		{"meta.attribution[*].domain", "", "", attributionReason},
 		{"meta.attribution[*].licence", "", "", attributionReason},
 		{"meta.attribution[*].licenceUrl", "", "", attributionReason},

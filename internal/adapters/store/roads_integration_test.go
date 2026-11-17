@@ -110,6 +110,19 @@ func TestRoadReadsTheCanonicalReference(t *testing.T) {
 	}
 }
 
+// statusTier is a kind's tier in the platform's motorway status order.
+func statusTier(k roads.Kind) int {
+	switch k {
+	case roads.KindJam:
+		return 0
+	case roads.KindClosure:
+		return 1
+	case roads.KindRoadworks:
+		return 3
+	}
+	return 2
+}
+
 func TestSituationsOnRoadFollowTheRoad(t *testing.T) {
 	req.Covers(t, "FR-ROAD-002", "FR-ROAD-003", "FR-ROAD-004", "ENV-051", "SEC-031")
 	st := seeded(t)
@@ -174,21 +187,20 @@ func TestSituationsOnRoadFollowTheRoad(t *testing.T) {
 		t.Errorf("no family: %+v %v", none, err)
 	}
 
+	// The platform's motorway status order: jams, closures, the other
+	// reports, then roadworks; every situation still has its chainage.
 	for i, s := range sits {
 		if s.AtKm == nil {
 			dbAsk(t, noLine)
 		}
-		if i > 0 && *s.AtKm < *sits[i-1].AtKm {
-			t.Errorf("both directions not in ascending chainage at %d: %v after %v", i, *s.AtKm, *sits[i-1].AtKm)
+		if i > 0 && statusTier(s.Kind) < statusTier(sits[i-1].Kind) {
+			t.Errorf("not in the status order at %d: %s after %s", i, s.Kind, sits[i-1].Kind)
 		}
 	}
-	// One carriageway: its own, both and unknown, in the order of travel,
-	// decided by the line's own ends.
+	// One carriageway: its own, both and unknown.
 	if countOnA101(t, now, `e.direction <> 'unknown'`) == 0 {
 		dbAsk(t, noGrade)
 	}
-	var risesNorth bool
-	owner(t, `select st_y(st_endpoint(st_geometryn(geometry, st_numgeometries(geometry)))) >= st_y(st_startpoint(st_geometryn(geometry, 1))) from contract.road where road_ref = 'A101'`, &risesNorth)
 	np, err := st.SituationsOnRoad(bounded(t), roads.CorridorQuery{Road: "A101", Direction: roads.DirectionNorth, Filter: q.Filter, Limit: 100}, onRoads(fams), now)
 	north := np.Items
 	if err != nil {
@@ -201,8 +213,8 @@ func TestSituationsOnRoadFollowTheRoad(t *testing.T) {
 		if !slices.Contains([]roads.Direction{roads.DirectionNorth, roads.DirectionBoth, roads.DirectionUnknown}, s.Direction) {
 			t.Errorf("northbound answered %s", s.Direction)
 		}
-		if i > 0 && (risesNorth && *s.AtKm < *north[i-1].AtKm || !risesNorth && *s.AtKm > *north[i-1].AtKm) {
-			t.Errorf("northbound not in the order of travel at %d (rises north %v)", i, risesNorth)
+		if i > 0 && statusTier(s.Kind) < statusTier(north[i-1].Kind) {
+			t.Errorf("northbound not in the status order at %d", i)
 		}
 	}
 

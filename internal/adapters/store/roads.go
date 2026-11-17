@@ -370,18 +370,8 @@ parts as (
   from contract.road r, st_dump(r.geometry) d
   where r.road_ref = (select road_ref from road)),
 line as (
-  select road_ref, max(km) km, sum(len) total,
-         st_startpoint((array_agg(g order by n))[1]) first_point,
-         st_endpoint((array_agg(g order by n desc))[1]) last_point
+  select road_ref, max(km) km, sum(len) total
   from parts group by road_ref),
-travel as (
-  select case $9::text
-           when 'north' then st_y(last_point) < st_y(first_point)
-           when 'south' then st_y(last_point) > st_y(first_point)
-           when 'east'  then st_x(last_point) < st_x(first_point)
-           when 'west'  then st_x(last_point) > st_x(first_point)
-           else false end falling
-  from line),
 answering as (
   select `+eventRow+`, line.km road_km, line.total road_total
   from contract.traffic_event e left join line on true
@@ -404,8 +394,11 @@ select `+situationColumns+`,
             else round((e.share * e.road_km)::numeric, 1)::float8 end km,
        null::int
 from placed e
-order by case when coalesce((select falling from travel), false) then -1 else 1 end * e.share nulls last,
-         coalesce(array_position($6::text[], e.severity), 0) desc, e.event_id
+order by case when e.event_kind = 'jam' then 0 when e.event_kind = 'closure' then 1
+              when e.event_kind = 'roadworks' then 3 else 2 end,
+         case e.traffic_type when 'QUEUING_TRAFFIC' then 0 when 'STATIONARY_TRAFFIC' then 1
+              when 'HEAVY_TRAFFIC' then 2 when 'SLOW_TRAFFIC' then 3 else 4 end,
+         e.delay_min desc nulls last, e.headline, e.origin_key, e.event_id
 limit $11 offset $14`, args, q.Limit, fams, now, scope{
 		messages: messagesSelect + `
   and ` + fmt.Sprintf(canonicalRef, "e.road_ref") + ` = $3

@@ -16,8 +16,8 @@ type Roads interface {
 	// roads.ErrUnknownRoad.
 	Road(ctx context.Context, ref string) (roads.Road, error)
 	// SituationsOnRoad returns, from one snapshot, up to q.Limit active
-	// situations on the road of the roads families, in the order of their
-	// position along it, and whether there are more; the lamp's view of
+	// situations on the road of the roads families, in the platform's
+	// motorway status order, and whether there are more; the lamp's view of
 	// every situation in the scope (the road and direction, whatever the
 	// filters keep); the weather warnings of the weather families in force
 	// in an area the road crosses (none read when no weather family is
@@ -104,15 +104,13 @@ func (s *Service) conditions(ctx context.Context, key access.Record, read func(f
 	if err != nil {
 		return Conditions{}, err
 	}
-	// A key without the weather scope, or that may read no weather family,
-	// reads no warning: the weather group is then missing, never an error of
-	// the roads question.
-	var weather []string
-	weatherRead := false
-	if key.Plan.Has("weather") {
-		w, wpartial, werr := gate.Answer(access.Answering(reg, "weather"))
-		weather, weatherRead = w, werr == nil && !wpartial
-	}
+	// The weather warnings are public: the lamp reads every weather family
+	// the key may read, whether or not its plan holds the weather scope, as
+	// the platform's road status reads the DWD warnings for every asker. A
+	// key that may read no weather family reads no warning: the weather group
+	// is then missing, never an error of the roads question.
+	w, wpartial, werr := gate.Answer(access.Answering(reg, "weather"))
+	weather, weatherRead := w, werr == nil && !wpartial
 	fams := roads.Families{Roads: permitted, Weather: weather}
 	now := s.now()
 	p, err := read(fams, now)
@@ -130,11 +128,14 @@ func (s *Service) conditions(ctx context.Context, key access.Record, read func(f
 		return Conditions{}, err
 	}
 	// The attribution: the families that contributed a situation or a
-	// warning, or every permitted roads family when none did.
+	// warning, or every permitted roads family when none did; and every
+	// weather family the lamp read, whose warnings (or their absence) the
+	// lamp states, as the platform credits the DWD on every road status.
 	consulted := slices.Clone(contributed)
 	if len(consulted) == 0 {
 		consulted = slices.Clone(permitted)
 	}
+	consulted = append(consulted, weather...)
 	slices.Sort(consulted)
 	consulted = slices.Compact(consulted)
 	attributed, err := s.repos.Register.Provenance(ctx, consulted, s.set.Language)

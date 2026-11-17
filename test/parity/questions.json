@@ -2,7 +2,7 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "6fbd92d11590b0384fb6662fbfab9f6cdbae6326a3663db04353906f9918c4b5"
+    "sha256": "5160a640d41085c59f7c6dce1298f82ff9c7b7936075d87b6a9c010264a875d2"
   },
   "cases": [
     {
@@ -406,6 +406,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],
@@ -424,6 +426,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],
@@ -442,6 +446,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],
@@ -515,6 +521,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],
@@ -1125,6 +1133,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],
@@ -1143,6 +1153,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],
@@ -1161,6 +1173,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],

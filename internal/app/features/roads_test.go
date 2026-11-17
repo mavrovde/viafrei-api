@@ -176,7 +176,7 @@ func TestMotorwayConditionsAreGatedAttributedAndLit(t *testing.T) {
 	if c.Road == nil || c.Road.Ref != "A8" || f.gotRoad.Road != "A8" || f.gotRoad.Limit != 1 || !slices.Equal(f.gotFams.Roads, []string{"r1"}) || !slices.Equal(f.gotFams.Weather, []string{"w1"}) || !f.gotNow.Equal(now) {
 		t.Errorf("road %v, asked %+v of %v", c.Road, f.gotRoad, f.gotFams)
 	}
-	if !c.Partial || !c.HasMore || !c.At.Equal(now) || len(c.Items) != 2 || !slices.Equal(names(c.Families), []string{"r1"}) {
+	if !c.Partial || !c.HasMore || !c.At.Equal(now) || len(c.Items) != 2 || !slices.Equal(names(c.Families), []string{"r1", "w1"}) {
 		t.Errorf("answer %+v", c.Answer)
 	}
 	// Works on the carriageway are amber, and come before the limited sight
@@ -196,8 +196,8 @@ func TestMotorwayConditionsAreGatedAttributedAndLit(t *testing.T) {
 
 	f = &roadFake{road: roads.Road{Ref: "A8"}}
 	c, err = roadService(f).MotorwayConditions(ctx, key("consumer", weatherScope, "r1", "r2", "w1", "w2"), roads.CorridorQuery{Road: "A8"})
-	if err != nil || c.Partial || !slices.Equal(names(c.Families), []string{"r1", "r2"}) {
-		t.Errorf("an empty answer names the consulted roads families: %v %v %v", names(c.Families), c.Partial, err)
+	if err != nil || c.Partial || !slices.Equal(names(c.Families), []string{"r1", "r2", "w1", "w2"}) {
+		t.Errorf("an empty answer names the consulted roads and weather families: %v %v %v", names(c.Families), c.Partial, err)
 	}
 	lit(t, "nothing, every group fresh", c, roads.LampGreen, "")
 }
@@ -220,10 +220,11 @@ func TestTheLampSeesStaleFamilies(t *testing.T) {
 	req.Covers(t, "FR-ROAD-004", "ENV-003")
 	consumer := key("consumer", weatherScope, "r1", "r2", "w1", "w2")
 	// r1 contributed nothing and is stale: the sight is limited, so amber,
-	// while the attribution names only the family that answered.
+	// while the attribution names only the roads family that answered and
+	// the weather families the lamp read.
 	f := &roadFake{sits: []roads.Situation{{ID: "a", Family: "r2"}}, stale: []string{"r1"}}
 	c, err := roadService(f).RoadConditions(context.Background(), consumer, roads.AreaQuery{})
-	if err != nil || !slices.Equal(names(c.Families), []string{"r2"}) {
+	if err != nil || !slices.Equal(names(c.Families), []string{"r2", "w1", "w2"}) {
 		t.Errorf("a stale family: %v, %v", names(c.Families), err)
 	}
 	lit(t, "a stale roads family", c, roads.LampAmber, roads.ReasonLimitedSight)
@@ -232,7 +233,7 @@ func TestTheLampSeesStaleFamilies(t *testing.T) {
 		t.Fatal(err)
 	}
 	lit(t, "every family fresh and nothing reported", c, roads.LampGreen, "")
-	if !slices.Equal(f.gotProv[0], []string{"r1", "r2"}) || len(f.gotProv) != 1 {
+	if !slices.Equal(f.gotProv[0], []string{"r1", "r2", "w1", "w2"}) || len(f.gotProv) != 1 {
 		t.Errorf("the register was asked %v", f.gotProv)
 	}
 	for name, f := range map[string]*roadFake{
@@ -264,7 +265,7 @@ func TestTheLampReadsTheWeatherWarnings(t *testing.T) {
 	} {
 		f := &roadFake{warns: []roads.Warning{{Family: "w2", Level: c.level}}}
 		got, err := roadService(f).RoadConditions(ctx, consumer, roads.AreaQuery{})
-		if err != nil || !slices.Equal(names(got.Families), []string{"w2"}) || !slices.Equal(f.gotFams.Weather, []string{"w1", "w2"}) {
+		if err != nil || !slices.Equal(names(got.Families), []string{"w1", "w2"}) || !slices.Equal(f.gotFams.Weather, []string{"w1", "w2"}) {
 			t.Errorf("level %d: attributed %v, asked %v, %v", c.level, names(got.Families), f.gotFams, err)
 		}
 		lit(t, "a weather warning", got, c.lamp, c.reason)
@@ -275,11 +276,10 @@ func TestTheLampReadsTheWeatherWarnings(t *testing.T) {
 	c, _ := roadService(f).RoadConditions(ctx, consumer, roads.AreaQuery{})
 	lit(t, "a long jam and a red warning", c, roads.LampRed, roads.ReasonLongJam)
 
-	// A key without the weather scope, or one that may read only some of
-	// the weather families, or none, does not see the warnings: the weather
-	// group is missing, so the sight is limited.
+	// A key that may read only some of the weather families, or none, does
+	// not see the warnings: the weather group is missing, so the sight is
+	// limited.
 	for name, k := range map[string]access.Record{
-		"no weather scope":           key("consumer", roadsScope, "r1", "r2", "w1", "w2"),
 		"some weather families only": key("commercial", weatherScope, "r1", "w1", "w2"),
 		"no weather family":          key("consumer", weatherScope, "r1", "r2"),
 	} {
@@ -290,11 +290,14 @@ func TestTheLampReadsTheWeatherWarnings(t *testing.T) {
 		}
 		lit(t, name, c, roads.LampAmber, roads.ReasonLimitedSight)
 	}
+	// The warnings are public: a key without the weather scope reads them
+	// too, and the answer credits the weather families read.
 	f = &roadFake{}
-	_, _ = roadService(f).RoadConditions(ctx, key("consumer", roadsScope, "r1", "r2", "w1", "w2"), roads.AreaQuery{})
-	if f.gotFams.Weather != nil {
-		t.Errorf("a key without the weather scope asked for %v", f.gotFams.Weather)
+	c, err := roadService(f).RoadConditions(ctx, key("consumer", roadsScope, "r1", "r2", "w1", "w2"), roads.AreaQuery{})
+	if err != nil || !slices.Equal(f.gotFams.Weather, []string{"w1", "w2"}) || !slices.Equal(names(c.Families), []string{"r1", "r2", "w1", "w2"}) {
+		t.Errorf("a key without the weather scope asked for %v, credited %v, %v", f.gotFams.Weather, names(c.Families), err)
 	}
+	lit(t, "no weather scope", c, roads.LampGreen, "")
 }
 
 func TestConditionsRefusals(t *testing.T) {

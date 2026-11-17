@@ -6,7 +6,7 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "6fbd92d11590b0384fb6662fbfab9f6cdbae6326a3663db04353906f9918c4b5"
+    "sha256": "5160a640d41085c59f7c6dce1298f82ff9c7b7936075d87b6a9c010264a875d2"
   },
   "cases": [
     {
@@ -2288,6 +2288,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],
@@ -2389,11 +2391,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00001].updatedAt",
-          "value": "2026-03-28T18:10:13Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00001].updatedAtLocal",
-          "value": "2026-03-28T18:10:13Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00001].validity.from",
@@ -2485,11 +2487,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00003].updatedAt",
-          "value": "2026-03-29T14:04:21Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00003].updatedAtLocal",
-          "value": "2026-03-29T14:04:21Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00003].validity.from",
@@ -2506,6 +2508,14 @@
         {
           "name": "data.situations[datex:syn:ev-00003].validity.untilLocal",
           "value": "null"
+        },
+        {
+          "name": "meta.attribution[dwd_alpha].family",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "meta.attribution[dwd_eta].family",
+          "value": "dwd_eta"
         },
         {
           "name": "meta.attribution[roads_alpha].family",
@@ -2540,6 +2550,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],
@@ -2641,11 +2653,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00001].updatedAt",
-          "value": "2026-03-28T18:10:13Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00001].updatedAtLocal",
-          "value": "2026-03-28T18:10:13Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00001].validity.from",
@@ -2737,11 +2749,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00003].updatedAt",
-          "value": "2026-03-29T14:04:21Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00003].updatedAtLocal",
-          "value": "2026-03-29T14:04:21Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00003].validity.from",
@@ -2758,6 +2770,14 @@
         {
           "name": "data.situations[datex:syn:ev-00003].validity.untilLocal",
           "value": "null"
+        },
+        {
+          "name": "meta.attribution[dwd_alpha].family",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "meta.attribution[dwd_eta].family",
+          "value": "dwd_eta"
         },
         {
           "name": "meta.attribution[roads_alpha].family",
@@ -2792,6 +2812,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],
@@ -2893,11 +2915,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00001].updatedAt",
-          "value": "2026-03-28T18:10:13Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00001].updatedAtLocal",
-          "value": "2026-03-28T18:10:13Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00001].validity.from",
@@ -2985,11 +3007,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00003].updatedAt",
-          "value": "2026-03-29T14:04:21Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00003].updatedAtLocal",
-          "value": "2026-03-29T14:04:21Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00003].validity.from",
@@ -3077,11 +3099,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00020].updatedAt",
-          "value": "2026-03-29T01:00:59Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00020].updatedAtLocal",
-          "value": "2026-03-29T01:00:59Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00020].validity.from",
@@ -3169,11 +3191,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00022].updatedAt",
-          "value": "2026-03-29T01:31:00Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00022].updatedAtLocal",
-          "value": "2026-03-29T01:31:00Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00022].validity.from",
@@ -3189,6 +3211,98 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00022].validity.untilLocal",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].delayMin",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].description",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].direction",
+          "value": "unknown"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].directionText",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].headline",
+          "value": "MaintenanceWorks"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].id",
+          "value": "datex:syn:ev-00028"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].kind",
+          "value": "roadworks"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].lanes",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].lengthM",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].location.lat",
+          "value": "51.44173"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].location.lon",
+          "value": "12.95947"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].position",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].road",
+          "value": "A101"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].roadType",
+          "value": "motorway"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].severity",
+          "value": "lane_closed"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].sourceFamily",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].textLanguage",
+          "value": "de"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].updatedAt",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].updatedAtLocal",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].validity.from",
+          "value": "2026-03-29T22:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].validity.fromLocal",
+          "value": "2026-03-29T22:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].validity.until",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].validity.untilLocal",
           "value": "null"
         },
         {
@@ -3261,11 +3375,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00031].updatedAt",
-          "value": "2025-12-31T23:00:59Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00031].updatedAtLocal",
-          "value": "2025-12-31T23:00:59Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00031].validity.from",
@@ -3353,11 +3467,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00032].updatedAt",
-          "value": "2025-12-31T23:01:00Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00032].updatedAtLocal",
-          "value": "2025-12-31T23:01:00Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00032].validity.from",
@@ -3445,11 +3559,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00033].updatedAt",
-          "value": "2026-03-28T01:01:00Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00033].updatedAtLocal",
-          "value": "2026-03-28T01:01:00Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00033].validity.from",
@@ -3466,6 +3580,14 @@
         {
           "name": "data.situations[datex:syn:ev-00033].validity.untilLocal",
           "value": "null"
+        },
+        {
+          "name": "meta.attribution[dwd_alpha].family",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "meta.attribution[dwd_eta].family",
+          "value": "dwd_eta"
         },
         {
           "name": "meta.attribution[roads_alpha].family",
@@ -3797,6 +3919,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],
@@ -3829,8 +3953,104 @@
           "value": "warning"
         },
         {
-          "name": "data.situations",
-          "value": "[]"
+          "name": "data.situations[datex:syn:ev-00028].delayMin",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].description",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].direction",
+          "value": "unknown"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].directionText",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].headline",
+          "value": "MaintenanceWorks"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].id",
+          "value": "datex:syn:ev-00028"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].kind",
+          "value": "roadworks"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].lanes",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].lengthM",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].location.lat",
+          "value": "51.44173"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].location.lon",
+          "value": "12.95947"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].position",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].road",
+          "value": "A101"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].roadType",
+          "value": "motorway"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].severity",
+          "value": "lane_closed"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].sourceFamily",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].textLanguage",
+          "value": "de"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].updatedAt",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].updatedAtLocal",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].validity.from",
+          "value": "2026-03-29T22:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].validity.fromLocal",
+          "value": "2026-03-29T22:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].validity.until",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].validity.untilLocal",
+          "value": "null"
+        },
+        {
+          "name": "meta.attribution[dwd_alpha].family",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "meta.attribution[dwd_eta].family",
+          "value": "dwd_eta"
         },
         {
           "name": "meta.attribution[roads_alpha].family",
@@ -6609,6 +6829,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],
@@ -6710,11 +6932,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00001].updatedAt",
-          "value": "2026-03-28T18:10:13Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00001].updatedAtLocal",
-          "value": "2026-03-28T18:10:13Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00001].validity.from",
@@ -6802,11 +7024,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00003].updatedAt",
-          "value": "2026-03-29T14:04:21Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00003].updatedAtLocal",
-          "value": "2026-03-29T14:04:21Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00003].validity.from",
@@ -6894,11 +7116,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00020].updatedAt",
-          "value": "2026-03-29T01:00:59Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00020].updatedAtLocal",
-          "value": "2026-03-29T01:00:59Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00020].validity.from",
@@ -6986,11 +7208,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00022].updatedAt",
-          "value": "2026-03-29T01:31:00Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00022].updatedAtLocal",
-          "value": "2026-03-29T01:31:00Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00022].validity.from",
@@ -7006,6 +7228,98 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00022].validity.untilLocal",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].delayMin",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].description",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].direction",
+          "value": "unknown"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].directionText",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].headline",
+          "value": "MaintenanceWorks"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].id",
+          "value": "datex:syn:ev-00028"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].kind",
+          "value": "roadworks"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].lanes",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].lengthM",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].location.lat",
+          "value": "51.44173"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].location.lon",
+          "value": "12.95947"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].position",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].road",
+          "value": "A101"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].roadType",
+          "value": "motorway"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].severity",
+          "value": "lane_closed"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].sourceFamily",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].textLanguage",
+          "value": "de"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].updatedAt",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].updatedAtLocal",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].validity.from",
+          "value": "2026-03-29T22:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].validity.fromLocal",
+          "value": "2026-03-29T22:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].validity.until",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].validity.untilLocal",
           "value": "null"
         },
         {
@@ -7078,11 +7392,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00030].updatedAt",
-          "value": "2026-03-31T22:01:00Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00030].updatedAtLocal",
-          "value": "2026-03-31T22:01:00Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00030].validity.from",
@@ -7170,11 +7484,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00031].updatedAt",
-          "value": "2025-12-31T23:00:59Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00031].updatedAtLocal",
-          "value": "2025-12-31T23:00:59Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00031].validity.from",
@@ -7262,11 +7576,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00032].updatedAt",
-          "value": "2025-12-31T23:01:00Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00032].updatedAtLocal",
-          "value": "2025-12-31T23:01:00Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00032].validity.from",
@@ -7354,11 +7668,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00033].updatedAt",
-          "value": "2026-03-28T01:01:00Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00033].updatedAtLocal",
-          "value": "2026-03-28T01:01:00Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00033].validity.from",
@@ -7375,6 +7689,14 @@
         {
           "name": "data.situations[datex:syn:ev-00033].validity.untilLocal",
           "value": "null"
+        },
+        {
+          "name": "meta.attribution[dwd_alpha].family",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "meta.attribution[dwd_eta].family",
+          "value": "dwd_eta"
         },
         {
           "name": "meta.attribution[roads_alpha].family",
@@ -7413,6 +7735,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],
@@ -7445,8 +7769,104 @@
           "value": "warning"
         },
         {
-          "name": "data.situations",
-          "value": "[]"
+          "name": "data.situations[datex:syn:ev-00028].delayMin",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].description",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].direction",
+          "value": "unknown"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].directionText",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].headline",
+          "value": "MaintenanceWorks"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].id",
+          "value": "datex:syn:ev-00028"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].kind",
+          "value": "roadworks"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].lanes",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].lengthM",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].location.lat",
+          "value": "51.44173"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].location.lon",
+          "value": "12.95947"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].position",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].road",
+          "value": "A101"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].roadType",
+          "value": "motorway"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].severity",
+          "value": "lane_closed"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].sourceFamily",
+          "value": "roads_alpha"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].textLanguage",
+          "value": "de"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].updatedAt",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].updatedAtLocal",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].validity.from",
+          "value": "2026-03-29T22:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].validity.fromLocal",
+          "value": "2026-03-29T22:00:00Z"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].validity.until",
+          "value": "null"
+        },
+        {
+          "name": "data.situations[datex:syn:ev-00028].validity.untilLocal",
+          "value": "null"
+        },
+        {
+          "name": "meta.attribution[dwd_alpha].family",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "meta.attribution[dwd_eta].family",
+          "value": "dwd_eta"
         },
         {
           "name": "meta.attribution[roads_alpha].family",
@@ -7485,6 +7905,8 @@
           "roads"
         ],
         "sources": [
+          "dwd_alpha",
+          "dwd_eta",
           "roads_alpha",
           "roads_epsilon"
         ],
@@ -7586,11 +8008,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00020].updatedAt",
-          "value": "2026-03-29T01:00:59Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00020].updatedAtLocal",
-          "value": "2026-03-29T01:00:59Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00020].validity.from",
@@ -7678,11 +8100,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00022].updatedAt",
-          "value": "2026-03-29T01:31:00Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00022].updatedAtLocal",
-          "value": "2026-03-29T01:31:00Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00022].validity.from",
@@ -7699,6 +8121,14 @@
         {
           "name": "data.situations[datex:syn:ev-00022].validity.untilLocal",
           "value": "null"
+        },
+        {
+          "name": "meta.attribution[dwd_alpha].family",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "meta.attribution[dwd_eta].family",
+          "value": "dwd_eta"
         },
         {
           "name": "meta.attribution[roads_alpha].family",
@@ -7836,14 +8266,6 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
-          "name": "data.lamp",
-          "value": "amber"
-        },
-        {
-          "name": "data.lampReason",
-          "value": "warning"
-        },
-        {
           "name": "data.situations[datex:syn:ev-00010].delayMin",
           "value": "null"
         },
@@ -7913,11 +8335,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00010].updatedAt",
-          "value": "2026-03-29T06:43:04Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00010].updatedAtLocal",
-          "value": "2026-03-29T06:43:04Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00010].validity.from",
@@ -8005,11 +8427,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00011].updatedAt",
-          "value": "2026-03-29T19:34:04Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00011].updatedAtLocal",
-          "value": "2026-03-29T19:34:04Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00011].validity.from",
@@ -8097,11 +8519,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00033].updatedAt",
-          "value": "2026-03-28T01:01:00Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00033].updatedAtLocal",
-          "value": "2026-03-28T01:01:00Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00033].validity.from",
@@ -8163,14 +8585,6 @@
       },
       "now": "2026-03-30T00:00:00Z",
       "facts": [
-        {
-          "name": "data.lamp",
-          "value": "amber"
-        },
-        {
-          "name": "data.lampReason",
-          "value": "warning"
-        },
         {
           "name": "data.situations[datex:syn:ev-00011].delayMin",
           "value": "null"
@@ -8241,11 +8655,11 @@
         },
         {
           "name": "data.situations[datex:syn:ev-00011].updatedAt",
-          "value": "2026-03-29T19:34:04Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00011].updatedAtLocal",
-          "value": "2026-03-29T19:34:04Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.situations[datex:syn:ev-00011].validity.from",
@@ -10326,7 +10740,7 @@
         },
         {
           "name": "data[1].situations",
-          "value": "7"
+          "value": "8"
         },
         {
           "name": "data[1].sourceFamily",
@@ -10972,6 +11386,14 @@
           "value": "bast_lcl"
         },
         {
+          "name": "meta.attribution[dwd_alpha].family",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "meta.attribution[dwd_eta].family",
+          "value": "dwd_eta"
+        },
+        {
           "name": "meta.attribution[lez_alpha].family",
           "value": "lez_alpha"
         },
@@ -11101,6 +11523,14 @@
           "value": "bast_lcl"
         },
         {
+          "name": "meta.attribution[dwd_alpha].family",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "meta.attribution[dwd_eta].family",
+          "value": "dwd_eta"
+        },
+        {
           "name": "meta.attribution[lez_alpha].family",
           "value": "lez_alpha"
         },
@@ -11224,6 +11654,14 @@
         {
           "name": "meta.attribution[bast_lcl].family",
           "value": "bast_lcl"
+        },
+        {
+          "name": "meta.attribution[dwd_alpha].family",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "meta.attribution[dwd_eta].family",
+          "value": "dwd_eta"
         },
         {
           "name": "meta.attribution[lez_alpha].family",
@@ -11353,6 +11791,14 @@
         {
           "name": "meta.attribution[bast_lcl].family",
           "value": "bast_lcl"
+        },
+        {
+          "name": "meta.attribution[dwd_alpha].family",
+          "value": "dwd_alpha"
+        },
+        {
+          "name": "meta.attribution[dwd_eta].family",
+          "value": "dwd_eta"
         },
         {
           "name": "meta.attribution[lez_alpha].family",

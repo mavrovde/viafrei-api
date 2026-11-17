@@ -17,7 +17,7 @@ import (
 
 // GeneratorVersion changes whenever the output for a given seed and profile
 // changes.
-const GeneratorVersion = "0.3.1"
+const GeneratorVersion = "0.3.2"
 
 // Profile sets the size of a generated set.
 type Profile struct {
@@ -380,13 +380,27 @@ func (g *gen) provenance() {
 		if s.target == 0 {
 			continue // no interval: never stale, and no state of its own
 		}
-		asOf := g.end().Add(-time.Duration(s.target/2) * time.Second)
+		asOf := g.sweep(s.ref)
 		if s.stale {
-			asOf = g.end().Add(-time.Duration(30*s.target) * time.Second)
 			g.edges["stale_family"]++
 		}
 		g.w.row(str(s.ref), ts(asOf), ts(asOf), num(s.target))
 	}
+}
+
+// sweep is the data_as_of the source_freshness rows state for the source
+// ref: half its target before the end, or thirty targets for a stale one.
+func (g *gen) sweep(ref string) time.Time {
+	for _, s := range sourceList {
+		if s.ref != ref {
+			continue
+		}
+		if s.stale {
+			return g.end().Add(-time.Duration(30*s.target) * time.Second)
+		}
+		return g.end().Add(-time.Duration(s.target/2) * time.Second)
+	}
+	return g.end()
 }
 
 // termsURL is a source's terms page, on the reserved domain.
@@ -515,7 +529,10 @@ var eventKinds = []string{"closure", "roadworks", "jam", "accident", "hazard", "
 // hazard of severity info (its traffic type, which would make a warning a
 // jam, is not published here); and no end, since an item is current while its
 // sweep lists it. Its events carry only those kinds and no end, so the rows
-// are ones the platform can hold.
+// are ones the platform can hold, and none the newest sweep lists is
+// withdrawn; and each was last seen by the family's
+// newest sweep (its data_as_of), the change time the read contract states
+// for an Autobahn item (the sweep's observation instant).
 const autobahnFamily = "roads_alpha"
 
 // autobahnKind is the kind an event of kind k is as an Autobahn item.
@@ -593,14 +610,21 @@ func (g *gen) roadsAndEvents() {
 			to = from.Add(time.Duration(1+g.r.IntN(72)) * time.Hour)
 		}
 		withdrawn := null
-		if g.r.IntN(20) == 0 {
+		gone := g.r.IntN(20) == 0
+		if gone {
 			withdrawn = ts(from.Add(2 * time.Hour))
 		}
+		seen := from.Add(time.Minute)
 		if ref == autobahnFamily {
-			kind, to = autobahnKind(kind), time.Time{}
+			kind, to, seen = autobahnKind(kind), time.Time{}, g.sweep(ref)
+			// An item the newest sweep still lists is not withdrawn: it
+			// leaves the operator's list only with a later sweep.
+			if gone && from.Add(2*time.Hour).After(seen) {
+				withdrawn = null
+			}
 		}
 		g.w.row(str(eventID(pub)), str(kind), str(rd.ref), str("motorway"), point(at), ts(from), optTS(to),
-			str(ref), str(pub), ts(from), ts(from.Add(time.Minute)), ts(from.Add(time.Minute)), withdrawn)
+			str(ref), str(pub), ts(from), ts(seen), ts(seen), withdrawn)
 		g.counted(landOf(at), ref)
 		if edge != "" {
 			g.edges[edge]++

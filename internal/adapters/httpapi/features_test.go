@@ -183,7 +183,7 @@ func overviewAnswer() features.Overview {
 
 func everyAnswer() *fakeFeatures {
 	return &fakeFeatures{charging: chargingAnswer(), parking: parkingAnswer(), overview: overviewAnswer(), conditions: conditionsAnswer(), situation: situationAnswer(), risk: riskAnswer(), topic: topicAnswer(), stations: stationsAnswer(),
-		refresh: refresh.Request{ID: "01968a3c-1f00-7000-8000-000000000001", Source: "fuel", State: refresh.NoneDue}}
+		refresh: refresh.Request{ID: "42", Source: "fuel-prices-de", State: refresh.NoneDue}}
 }
 
 func featureScopes() auth.Principal {

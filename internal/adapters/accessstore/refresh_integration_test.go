@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/mavrovde/viafrei-api/internal/adapters/accessstore"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
@@ -29,7 +27,7 @@ var refreshAt = fixtures.ReferenceInstant.AddDate(0, 0, 2)
 // repository's registry and script.
 func fake(t *testing.T) *fakelive.Fake {
 	t.Helper()
-	sc, err := fakelive.Load(filepath.Join("..", "..", "..", "test", "live", "sources.json"), filepath.Join("..", "..", "..", "test", "live", "fakelive.json"))
+	sc, err := fakelive.Load(filepath.Join("..", "..", "..", "test", "live", "registry.json"), filepath.Join("..", "..", "..", "test", "live", "fakelive.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,9 +59,16 @@ func askers(t *testing.T, s *accessstore.Store, n int) []string {
 	return ids
 }
 
+const fuel, board = "fuel-prices-de", "train-board-de"
+
+// ask is a request as the use case records it: the stored subject is the
+// public id its key names (at for fuel, eva for a train board).
 func ask(source, key, keyID string) refresh.New {
-	return refresh.New{ID: uuid.Must(uuid.NewV7()).String(), Source: source, Subject: map[string]any{"k": key},
-		SubjectKey: key, KeyID: keyID, At: refreshAt}
+	field := "at"
+	if source == board {
+		field = "eva"
+	}
+	return refresh.New{Source: source, Subject: map[string]any{field: key}, SubjectKey: key, KeyID: keyID, At: refreshAt}
 }
 
 func TestARefreshSettlesByTheFakeAndAnswersItsAskers(t *testing.T) {
@@ -83,13 +88,13 @@ func TestARefreshSettlesByTheFakeAndAnswersItsAskers(t *testing.T) {
 		{"ags:02000000", refresh.Refused, "the hourly refresh cap of the area is reached"},
 		{"ags:14612000", refresh.Failed, "the provider did not answer"},
 	} {
-		n := ask("fuel", c.key, ids[0])
+		n := ask(fuel, c.key, ids[0])
 		r, err := s.Request(ctx, n, time.Time{}, wait)
-		if err != nil || r.ID != n.ID || r.Source != "fuel" || r.State != c.state || r.Reason != c.reason ||
+		if err != nil || r.ID == "" || r.Source != fuel || r.State != c.state || r.Reason != c.reason || r.Reused ||
 			r.SettledAt == nil || !r.SettledAt.Equal(refreshAt) || !r.CreatedAt.Equal(refreshAt) || r.Position != nil {
 			t.Fatalf("%s: %+v %v", c.key, r, err)
 		}
-		got, err := s.Refresh(ctx, n.ID, ids[0])
+		got, err := s.Refresh(ctx, r.ID, ids[0])
 		if err != nil || got.State != c.state {
 			t.Fatalf("%s read back: %+v %v", c.key, got, err)
 		}
@@ -102,31 +107,31 @@ func TestARefreshSettlesByTheFakeAndAnswersItsAskers(t *testing.T) {
 	}
 
 	// A refresh the key did not ask for, an id of none and an id that is
-	// no UUID are not found.
-	first := ask("fuel", "ags:09162000", ids[0])
-	if _, err := s.Refresh(ctx, uuid.Must(uuid.NewV7()).String(), ids[0]); !errors.Is(err, refresh.ErrNotFound) {
+	// no request id are not found.
+	first := ask(fuel, "ags:09162000", ids[0])
+	if _, err := s.Refresh(ctx, "999999999", ids[0]); !errors.Is(err, refresh.ErrNotFound) {
 		t.Fatalf("none: %v", err)
 	}
-	if _, err := s.Refresh(ctx, "not-a-uuid", ids[0]); !errors.Is(err, refresh.ErrNotFound) {
-		t.Fatalf("no uuid: %v", err)
+	if _, err := s.Refresh(ctx, "not-an-id", ids[0]); !errors.Is(err, refresh.ErrNotFound) {
+		t.Fatalf("no id: %v", err)
 	}
 
 	// Inside the freshness window a settled refresh answers a new ask, and
 	// the new asker may read it; outside it a new refresh is made.
 	again, err := s.Request(ctx, first, refreshAt.Add(-time.Minute), wait)
-	if err != nil || again.State != refresh.Refreshed || again.ID == first.ID {
+	if err != nil || again.State != refresh.Refreshed || !again.Reused || f.Claims() != 4 {
 		t.Fatalf("fresh: %+v %v", again, err)
 	}
-	other := ask("fuel", "ags:09162000", ids[1])
+	other := ask(fuel, "ags:09162000", ids[1])
 	shared, err := s.Request(ctx, other, refreshAt.Add(-time.Minute), wait)
-	if err != nil || shared.ID != again.ID || f.Claims() != 4 {
+	if err != nil || shared.ID != again.ID || !shared.Reused || f.Claims() != 4 {
 		t.Fatalf("shared fresh: %+v %v, %d claims", shared, err, f.Claims())
 	}
 	if _, err := s.Refresh(ctx, shared.ID, ids[1]); err != nil {
 		t.Fatalf("the second asker reads it: %v", err)
 	}
-	newer, err := s.Request(ctx, ask("fuel", "ags:09162000", ids[1]), refreshAt.Add(time.Minute), wait)
-	if err != nil || newer.ID == shared.ID || newer.State != refresh.Refreshed || f.Claims() != 5 {
+	newer, err := s.Request(ctx, ask(fuel, "ags:09162000", ids[1]), refreshAt.Add(time.Minute), wait)
+	if err != nil || newer.ID == shared.ID || newer.State != refresh.Refreshed || newer.Reused || f.Claims() != 5 {
 		t.Fatalf("stale: %+v %v, %d claims", newer, err, f.Claims())
 	}
 }
@@ -137,43 +142,49 @@ func TestAnOpenRefreshAnswersPendingAtTheDeadline(t *testing.T) {
 	ids := askers(t, s, 1)
 	ctx := bounded(t)
 	// never: the fake leaves it pending, first in the queue of pending ones.
-	n := ask("fuel", "ags:05315000", ids[0])
+	n := ask(fuel, "ags:05315000", ids[0])
 	r, err := s.Request(ctx, n, time.Time{}, 150*time.Millisecond)
 	if err != nil || r.State != refresh.Pending || r.Position == nil || *r.Position < 1 || r.SettledAt != nil {
 		t.Fatalf("never: %+v %v", r, err)
 	}
 	// slow: claimed, running, at position 0; it settles after 3 s.
-	slow := ask("fuel", "ags:06412000", ids[0])
+	slow := ask(fuel, "ags:06412000", ids[0])
 	r, err = s.Request(ctx, slow, time.Time{}, 300*time.Millisecond)
-	if err != nil || r.State != refresh.Claimed || r.Position == nil || *r.Position != 0 {
+	if err != nil || r.State != refresh.Pending || r.Position == nil || *r.Position != 0 || r.Reused {
 		t.Fatalf("slow: %+v %v", r, err)
 	}
-	// No wait at all reads it as it stands.
-	r, err = s.Request(ctx, ask("fuel", "ags:06412000", ids[0]), time.Time{}, 0)
-	if err != nil || r.ID != slow.ID || r.State != refresh.Claimed || f.Claims() != 1 {
+	// No wait at all reads it as it stands; the second ask joined it.
+	slowID := r.ID
+	r, err = s.Request(ctx, ask(fuel, "ags:06412000", ids[0]), time.Time{}, 0)
+	if err != nil || r.ID != slowID || r.State != refresh.Pending || !r.Reused || f.Claims() != 1 {
 		t.Fatalf("no wait: %+v %v", r, err)
 	}
 	// A cancelled ask is an error, not an answer, whether it was cancelled
 	// before it was recorded or while it waits.
 	cctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := s.Request(cctx, ask("fuel", "ags:05315000", ids[0]), time.Time{}, time.Second); err == nil {
+	if _, err := s.Request(cctx, ask(fuel, "ags:05315000", ids[0]), time.Time{}, time.Second); err == nil {
 		t.Fatal("a cancelled ask answered")
 	}
 	dctx, stop := context.WithTimeout(ctx, 300*time.Millisecond)
 	defer stop()
-	if _, err := s.Request(dctx, ask("fuel", "ags:05315000", ids[0]), time.Time{}, 5*time.Second); !errors.Is(err, context.DeadlineExceeded) {
+	if _, err := s.Request(dctx, ask(fuel, "ags:05315000", ids[0]), time.Time{}, 5*time.Second); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("an ask cancelled in its wait: %v", err)
 	}
-	// An asker of no key is refused by the store; an ask with no subject is
-	// stored with an empty one.
-	if _, err := s.Request(ctx, ask("fuel", "ags:05315000", "no-such-key"), time.Time{}, 0); err == nil {
+	// An asker of no key is refused by the store, and so is a subject that
+	// is no public id (the database's privacy checks): a position, a
+	// station's name, none.
+	if _, err := s.Request(ctx, ask(fuel, "ags:05315000", "no-such-key"), time.Time{}, 0); err == nil {
 		t.Fatal("an asker of no key was recorded")
 	}
-	bare := ask("train_board", "eva:8011160", ids[0])
-	bare.Subject = nil
-	if r, err := s.Request(ctx, bare, time.Time{}, 0); err != nil || r.State != refresh.Pending {
-		t.Fatalf("no subject: %+v %v", r, err)
+	for _, n := range []refresh.New{ask(fuel, "pt:48.137,11.575", ids[0]), ask(board, "Köln Hbf", ids[0]), {Source: board, SubjectKey: "8011160", KeyID: ids[0], At: refreshAt}} {
+		if _, err := s.Request(ctx, n, time.Time{}, 0); err == nil {
+			t.Fatalf("%+v was recorded", n)
+		}
+	}
+	var leaked int
+	if err := owner(t).QueryRow(ctx, `select count(*) from live.refresh_requests where subject::text like '%pt:%' or subject ? 'name'`).Scan(&leaked); err != nil || leaked != 0 {
+		t.Fatalf("%d rows hold a position or a name: %v", leaked, err)
 	}
 }
 
@@ -189,17 +200,17 @@ func TestALostListenerIsOpenedAgain(t *testing.T) {
 	f := fake(t)
 	ids := askers(t, s, 1)
 	ctx := bounded(t)
-	r, err := s.Request(ctx, ask("fuel", "ags:05315000", ids[0]), time.Time{}, 200*time.Millisecond)
+	r, err := s.Request(ctx, ask(fuel, "ags:05315000", ids[0]), time.Time{}, 200*time.Millisecond)
 	if err != nil || r.State != refresh.Pending {
 		t.Fatalf("never: %+v %v", r, err)
 	}
 	var lost int
 	if err := owner(t).QueryRow(ctx, `select count(pg_terminate_backend(pid)) from pg_stat_activity
-		where usename = 'api_access' and query like '%listen "refresh_%'`).Scan(&lost); err != nil || lost != 1 {
+		where usename = 'api_access' and query like '%listen "live_refresh_settled"%'`).Scan(&lost); err != nil || lost != 1 {
 		t.Fatalf("%d listeners ended: %v", lost, err)
 	}
 	start := time.Now()
-	r, err = s.Request(ctx, ask("train_board", "eva:8000209", ids[0]), time.Time{}, 5*time.Second)
+	r, err = s.Request(ctx, ask(board, "8000209", ids[0]), time.Time{}, 5*time.Second)
 	if err != nil || r.State != refresh.Refreshed || time.Since(start) > 3*time.Second || f.Claims() != 1 {
 		t.Fatalf("after the loss: %+v %v after %s, %d claims", r, err, time.Since(start), f.Claims())
 	}
@@ -220,7 +231,7 @@ func TestConcurrentAsksShareOneRefresh(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := range n {
 		wg.Go(func() {
-			answers[i], errs[i] = s.Request(ctx, ask("train_board", "eva:8000207", ids[i]), time.Time{}, 1200*time.Millisecond)
+			answers[i], errs[i] = s.Request(ctx, ask(board, "8000207", ids[i]), time.Time{}, 1200*time.Millisecond)
 		})
 	}
 	wg.Wait()
@@ -235,10 +246,10 @@ func TestConcurrentAsksShareOneRefresh(t *testing.T) {
 	}
 	var rows, linked int
 	o := owner(t)
-	if err := o.QueryRow(ctx, `select count(*) from live.refresh_request where subject_key = 'eva:8000207'`).Scan(&rows); err != nil || rows != 1 {
+	if err := o.QueryRow(ctx, `select count(*) from live.refresh_requests where subject_key = '8000207'`).Scan(&rows); err != nil || rows != 1 {
 		t.Fatalf("%d rows %v", rows, err)
 	}
-	if err := o.QueryRow(ctx, `select count(*) from live.refresh_asker where request_id = $1`, answers[0].ID).Scan(&linked); err != nil || linked != n {
+	if err := o.QueryRow(ctx, `select count(*) from live.refresh_askers where request_id = $1::bigint`, answers[0].ID).Scan(&linked); err != nil || linked != n {
 		t.Fatalf("%d askers %v", linked, err)
 	}
 	for i := range n {
@@ -246,7 +257,7 @@ func TestConcurrentAsksShareOneRefresh(t *testing.T) {
 			t.Fatalf("asker %d reads it: %v", i, err)
 		}
 	}
-	other, err := s.Request(ctx, ask("train_board", "eva:8000096", ids[0]), time.Time{}, 1200*time.Millisecond)
+	other, err := s.Request(ctx, ask(board, "8000096", ids[0]), time.Time{}, 1200*time.Millisecond)
 	if err != nil || other.ID == answers[0].ID || f.Claims() != 2 {
 		t.Fatalf("another subject: %+v %v, %d claims", other, err, f.Claims())
 	}
@@ -260,5 +271,44 @@ func TestPruneRefreshesKeepsThirtyDays(t *testing.T) {
 	}
 	if _, err := s.PruneRefreshes(ctx, time.Now().Add(-accessstore.RefreshRetention-time.Hour)); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestRefreshRetentionRunsAtOnceAndOnItsInterval: the retention job prunes
+// at start and then on its interval, at RefreshRetention before its clock,
+// and reports each round: a request made 31 days ago goes, in any state,
+// with its askers (the database refuses a younger cut by its own clock).
+func TestRefreshRetentionRunsAtOnceAndOnItsInterval(t *testing.T) {
+	s := open(t)
+	ids := askers(t, s, 1)
+	ctx := bounded(t)
+	n := ask(fuel, "ags:05315000", ids[0])
+	n.At = time.Now().Add(-accessstore.RefreshRetention - 24*time.Hour)
+	if _, err := s.Request(ctx, n, time.Time{}, 0); err != nil {
+		t.Fatal(err)
+	}
+	rctx, stop := context.WithCancel(ctx)
+	rounds := make(chan int64, 8)
+	done := make(chan struct{})
+	go func() {
+		s.RunRefreshRetention(rctx, 20*time.Millisecond, func(n int64, err error) {
+			if err != nil {
+				t.Error(err)
+			}
+			rounds <- n
+		})
+		close(done)
+	}()
+	if got := <-rounds; got < 1 {
+		t.Fatalf("the first round removed %d", got)
+	}
+	if got := <-rounds; got != 0 {
+		t.Fatalf("the second round removed %d", got)
+	}
+	stop()
+	<-done
+	var left int
+	if err := owner(t).QueryRow(ctx, `select count(*) from live.refresh_askers where key_id = $1`, ids[0]).Scan(&left); err != nil || left != 0 {
+		t.Fatalf("%d askers left: %v", left, err)
 	}
 }

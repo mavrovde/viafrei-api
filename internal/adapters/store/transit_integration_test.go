@@ -5,6 +5,7 @@ package store_test
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -128,7 +129,7 @@ func TestStationsStateTheirEVANumbers(t *testing.T) {
 	}
 }
 
-// The station_eva lookup a live source's key rule names resolves a
+// The eva lookup a live source's key rule names resolves a
 // station's name to its EVA number: the exact folded name first, else the
 // shortest it starts; a name of none, a blank one and an unknown lookup
 // resolve nothing.
@@ -152,5 +153,27 @@ func TestLookupResolvesAStationNameToItsEVA(t *testing.T) {
 	}
 	if _, err := st.Lookup(bounded(t), "postcode_ags", "Berlin"); err == nil {
 		t.Error("an unknown lookup answered")
+	}
+}
+
+// The ags lookup resolves a position, "lat,lon", to the AGS of its Gemeinde:
+// the nearest BKG municipality within the municipality reach. A position
+// out of every Gemeinde's reach, a malformed one and one out of range
+// resolve nothing. It is how a fuel subject's point is stored: as its AGS.
+func TestLookupResolvesAPositionToItsGemeinde(t *testing.T) {
+	st := seeded(t)
+	var key string
+	var lat, lon float64
+	owner(t, `select official_key, st_y(location), st_x(location) from contract.place
+		where source_ref = 'bkg_gvisys' and place_kind = 'municipality' and withdrawn_at is null and official_key ~ '^[0-9]{8}$'
+		order by official_key limit 1`, &key, &lat, &lon)
+	at := strconv.FormatFloat(lat, 'f', 6, 64) + "," + strconv.FormatFloat(lon, 'f', 6, 64)
+	if ags, err := st.Lookup(bounded(t), store.LookupAGS, at); err != nil || ags != key {
+		t.Fatalf("%s: %q %v, want %s", at, ags, err, key)
+	}
+	for _, v := range []string{"0,0", "48.1", "x,y", "91,10", "48,181", ""} {
+		if ags, err := st.Lookup(bounded(t), store.LookupAGS, v); err != nil || ags != "" {
+			t.Errorf("%q: %q %v", v, ags, err)
+		}
 	}
 }

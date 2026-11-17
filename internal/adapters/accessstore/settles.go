@@ -2,9 +2,6 @@ package accessstore
 
 import (
 	"context"
-	"maps"
-	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -17,11 +14,12 @@ import (
 // the access pool, so it never holds back a key check, and the store's role
 // holds one connection more, not one per waiting ask.
 //
-// An ask registers its request's id and is poked once the connection
-// listens on the request's channel (it then reads the request again, so a
-// settle between its first read and the LISTEN is not missed) and on each
-// notification of the channel. While the connection is down the asks are
-// answered at their deadlines; it is opened again after a pause.
+// The connection LISTENs on SettledChannel, whose payload is the settled
+// request's id. An ask registers its request's id and is poked on each
+// notification naming it, and every ask is poked once the connection
+// listens (after a start or a reconnect), so a settle the connection did
+// not hear is read then. While the connection is down the asks are answered
+// at their deadlines; it is opened again after a pause.
 type settles struct {
 	connect func(context.Context) (listenConn, error)
 	pause   time.Duration
@@ -32,8 +30,7 @@ type settles struct {
 	done   chan struct{}
 
 	mu      sync.Mutex
-	waiters map[string]map[chan struct{}]bool // channel → its asks
-	wake    chan struct{}
+	waiters map[string]map[chan struct{}]bool // request id → its asks
 }
 
 // listenConn is what the listener needs of its connection (a *pgx.Conn).
@@ -46,60 +43,51 @@ type listenConn interface {
 func newSettles(connect func(context.Context) (listenConn, error), pause time.Duration) *settles {
 	run, cancel := context.WithCancel(context.Background())
 	return &settles{connect: connect, pause: pause, run: run, cancel: cancel, done: make(chan struct{}),
-		waiters: map[string]map[chan struct{}]bool{}, wake: make(chan struct{}, 1)}
+		waiters: map[string]map[chan struct{}]bool{}}
 }
 
-// add registers an ask for channel ch; the returned poke is signalled when
-// the ask should read its request again.
-func (h *settles) add(ch string) chan struct{} {
+// add registers an ask for the request id; the returned poke is signalled
+// when the ask should read its request again.
+func (h *settles) add(id string) chan struct{} {
 	h.once.Do(func() { go h.loop() })
 	poke := make(chan struct{}, 1)
 	h.mu.Lock()
-	if h.waiters[ch] == nil {
-		h.waiters[ch] = map[chan struct{}]bool{}
+	if h.waiters[id] == nil {
+		h.waiters[id] = map[chan struct{}]bool{}
 	}
-	h.waiters[ch][poke] = true
+	h.waiters[id][poke] = true
 	h.mu.Unlock()
-	h.nudge()
 	return poke
 }
 
 // remove deregisters the ask.
-func (h *settles) remove(ch string, poke chan struct{}) {
+func (h *settles) remove(id string, poke chan struct{}) {
 	h.mu.Lock()
-	delete(h.waiters[ch], poke)
-	if len(h.waiters[ch]) == 0 {
-		delete(h.waiters, ch)
+	delete(h.waiters[id], poke)
+	if len(h.waiters[id]) == 0 {
+		delete(h.waiters, id)
 	}
 	h.mu.Unlock()
-	h.nudge()
 }
 
-func (h *settles) nudge() {
-	select {
-	case h.wake <- struct{}{}:
-	default:
-	}
-}
-
-// poke signals every ask of the channels.
-func (h *settles) poke(chs ...string) {
+// poke signals the asks of the ids; every ask when all is set.
+func (h *settles) poke(all bool, ids ...string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	for _, ch := range chs {
-		for p := range h.waiters[ch] {
+	if all {
+		ids = ids[:0]
+		for id := range h.waiters {
+			ids = append(ids, id)
+		}
+	}
+	for _, id := range ids {
+		for p := range h.waiters[id] {
 			select {
 			case p <- struct{}{}:
 			default:
 			}
 		}
 	}
-}
-
-func (h *settles) wanted() []string {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return slices.Sorted(maps.Keys(h.waiters))
 }
 
 // close stops the listener, if it runs.
@@ -112,8 +100,7 @@ func (h *settles) close() {
 	}
 }
 
-// loop keeps the connection open and listening on the channels of the
-// waiting asks until close.
+// loop keeps the connection open and listening until close.
 func (h *settles) loop() {
 	defer close(h.done)
 	for h.run.Err() == nil {
@@ -131,48 +118,17 @@ func (h *settles) loop() {
 
 // listen serves one connection until it fails or the store closes.
 func (h *settles) listen(conn listenConn) error {
-	on := map[string]bool{}
+	if _, err := conn.Exec(h.run, "listen "+pgx.Identifier{SettledChannel}.Sanitize()); err != nil {
+		return err
+	}
+	h.poke(true)
 	for {
-		want := h.wanted()
-		var added []string
-		for _, ch := range want {
-			if !on[ch] {
-				if _, err := conn.Exec(h.run, "listen "+pgx.Identifier{ch}.Sanitize()); err != nil {
-					return err
-				}
-				on[ch], added = true, append(added, ch)
-			}
-		}
-		for ch := range on {
-			if !slices.Contains(want, ch) {
-				if _, err := conn.Exec(h.run, "unlisten "+pgx.Identifier{ch}.Sanitize()); err != nil {
-					return err
-				}
-				delete(on, ch)
-			}
-		}
-		h.poke(added...)
-
-		wctx, stop := context.WithCancel(h.run)
-		go func() {
-			select {
-			case <-h.wake:
-				stop()
-			case <-wctx.Done():
-			}
-		}()
-		note, err := conn.WaitForNotification(wctx)
-		woken := wctx.Err() != nil && h.run.Err() == nil
-		stop()
-		switch {
-		case err == nil:
-			if strings.HasPrefix(note.Channel, "refresh_") {
-				h.poke(note.Channel)
-			}
-		case woken:
-			// the set of asks changed: listen again
-		default:
+		note, err := conn.WaitForNotification(h.run)
+		if err != nil {
 			return err
+		}
+		if note.Channel == SettledChannel {
+			h.poke(false, note.Payload)
 		}
 	}
 }

@@ -21,8 +21,8 @@ import (
 
 // RefreshIn is a refresh ask.
 type RefreshIn struct {
-	Source  string         `json:"source" minLength:"1" maxLength:"32" example:"fuel" doc:"The live source: a name of the instance's registry (refresh.sources_file), fuel and train_board on ViaFrei's own."`
-	Subject map[string]any `json:"subject" example:"{\"at\":\"ags:09162000\"}" doc:"What to refresh, as the source's registered JSON Schema admits it: fuel takes at (ags:<8 digits> or pt:lat,lon) with snap or anchor; train_board takes eva or name, exactly one."`
+	Source  string         `json:"source" minLength:"1" maxLength:"64" example:"fuel-prices-de" doc:"The live source: an id of the instance's registry (refresh.sources_file, the live refresher's registry), fuel-prices-de and train-board-de on ViaFrei's own."`
+	Subject map[string]any `json:"subject" example:"{\"at\":\"ags:09162000\"}" doc:"What to refresh, as the source's registered JSON Schema admits it: fuel-prices-de takes at (ags:<8 digits> or pt:lat,lon) with snap or anchor; train-board-de takes eva or name, exactly one. Only a public id is stored: a position is resolved, in memory, to the AGS of its Gemeinde, and a station's name to its EVA number; neither the position nor the name is kept or echoed."`
 }
 
 // RefreshInput is the input of createRefresh.
@@ -37,12 +37,13 @@ type RefreshQueue struct {
 
 // RefreshData is a refresh as its askers see it.
 type RefreshData struct {
-	ID        string        `json:"id" format:"uuid" doc:"The refresh's id: GET /v1/refreshes/{id} reads it again."`
+	ID        string        `json:"id" pattern:"^[1-9][0-9]{0,17}$" doc:"The refresh's id, decimal digits: GET /v1/refreshes/{id} reads it again."`
 	Source    string        `json:"source"`
 	State     string        `json:"state" enum:"pending,refreshed,none_due,refused,failed" doc:"pending: queued or running (queue says where; read it again). refreshed: the subject was refreshed, and its data is served fresh under the source's resources. none_due: its stored data was inside its cache window, so none was needed. refused: no refresh was made (reason, when known, says why). failed: the provider did not answer."`
 	CreatedAt time.Time     `json:"createdAt" doc:"When the first asker asked."`
 	SettledAt *time.Time    `json:"settledAt" nullable:"true" doc:"When it settled; null while pending."`
 	Reason    *string       `json:"reason" nullable:"true" doc:"Why it was refused or failed, when known."`
+	Reused    bool          `json:"reused" doc:"True when this answer is a refresh asked before: one settled inside the source's freshness window, an open one this ask joined, or one the live refresher answered from a refresh already under way."`
 	Queue     *RefreshQueue `json:"queue" doc:"While pending, where it stands; null once settled."`
 }
 
@@ -63,7 +64,7 @@ type RefreshOutput struct {
 
 // RefreshGetInput is the input of getRefresh.
 type RefreshGetInput struct {
-	ID string `path:"id" maxLength:"36" example:"01968a3c-1f00-7000-8000-000000000001" doc:"The refresh's id, as createRefresh answered it."`
+	ID string `path:"id" maxLength:"18" example:"1" doc:"The refresh's id, as createRefresh answered it."`
 }
 
 // RefreshGetOutput is the answer of getRefresh.
@@ -75,10 +76,7 @@ type RefreshGetOutput struct {
 var reflectRefreshEnvelope = reflect.TypeFor[RefreshEnvelope]()
 
 func refreshData(r refresh.Request) RefreshData {
-	out := RefreshData{ID: r.ID, Source: r.Source, State: string(r.State), CreatedAt: r.CreatedAt.UTC()}
-	if r.State == refresh.Claimed {
-		out.State = string(refresh.Pending) // running is pending to its askers, at position 0
-	}
+	out := RefreshData{ID: r.ID, Source: r.Source, State: string(r.State), CreatedAt: r.CreatedAt.UTC(), Reused: r.Reused}
 	if r.SettledAt != nil {
 		t := r.SettledAt.UTC()
 		out.SettledAt = &t
@@ -111,6 +109,8 @@ func refreshProblem(ctx context.Context, err error) error {
 		return newProblem(ctx, SlugFeatureDisabled, "Refreshes are switched off on this instance.", 0)
 	case errors.Is(err, refresh.ErrNotFound):
 		return newProblem(ctx, SlugNotFound, "No refresh of this id was asked for by this key.", 0)
+	case errors.Is(err, refresh.ErrPaused):
+		return newProblem(ctx, SlugFeatureDisabled, "This live source is switched off.", 0)
 	case errors.Is(err, refresh.ErrSource):
 		p := newProblem(ctx, SlugInvalidParameter, "No live source of this name is registered; see errors.", 0)
 		p.Errors = append(p.Errors, ParamError{Parameter: "body.source", Code: "invalid", Detail: err.Error()})
@@ -125,7 +125,7 @@ func refreshProblem(ctx context.Context, err error) error {
 
 func registerCreateRefresh(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "Ask for a refresh of a live source on a person's view"
-	op.Description = "Records a refresh of one subject of a live source, as a person's view asks it (the fuel prices about an area, a station's train board): the live refresher refreshes it once for everyone asking about the same subject while it is open, under its own guards, and the source's resources then serve it. Only a key of ViaFrei's own audience may call it; any other key gets 403 (scope-denied). The answer waits about 1.2 s (refresh.wait) for the refresh to settle: settled, it is 201 with the outcome; still open, it is 202 with state pending and its place in the queue; either way Location names the refresh, which GET reads again. A refresh of the subject settled inside the source's freshness window answers at once, with no new refresh. An unknown source is a 400 naming body.source; a subject the source refuses is a 400 naming the field (body.subject.at, say). No provider data is ever in this answer."
+	op.Description = "Records a refresh of one subject of a live source, as a person's view asks it (the fuel prices about an area, a station's train board): the live refresher refreshes it once for everyone asking about the same subject while it is open, under its own guards, and the source's resources then serve it. Only a key of ViaFrei's own audience may call it; any other key gets 403 (scope-denied). The answer waits up to the source's deadline (its registry's deadline_ms, 1.2 s on ViaFrei's own; refresh.wait when it sets none) for the refresh to settle: settled, it is 201 with the outcome; still open, it is 202 with state pending and its place in the queue; either way Location names the refresh, which GET reads again. A refresh of the subject settled inside the source's freshness window answers at once, with no new refresh and reused true. A position is resolved to the AGS of its Gemeinde before anything is recorded, and only that public id is stored; a position no Gemeinde answers is a 400 naming body.subject.at, with nothing recorded. A switched-off source is a 404 (feature-disabled). An unknown source is a 400 naming body.source; a subject the source refuses is a 400 naming the field (body.subject.at, say). No provider data is ever in this answer."
 	op.DefaultStatus = http.StatusCreated
 	featureResponses(api, &op, "Not used by this operation.")
 	created := op.Responses["201"]
@@ -162,7 +162,7 @@ func registerCreateRefresh(api huma.API, s *server, op huma.Operation) {
 
 func registerGetRefresh(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "Read a refresh"
-	op.Description = "A refresh this key asked for, as it now stands; a refresh of another key, or of no such id, is a 404. Only a key of ViaFrei's own audience may call it; any other key gets 403 (scope-denied). Refreshes are kept 30 days after they settle."
+	op.Description = "A refresh this key asked for, as it now stands; a refresh of another key, or of no such id, is a 404. Only a key of ViaFrei's own audience may call it; any other key gets 403 (scope-denied). Refreshes are kept 30 days after they were asked, in any state."
 	featureResponses(api, &op, "No refresh of this id was asked for by this key (not-found).")
 	huma.Register(api, op, func(ctx context.Context, in *RefreshGetInput) (*RefreshGetOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {

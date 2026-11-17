@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "sources": [
+    {
+      "id": "fuel-prices-de",
+      "status": "enabled",
+      "summary": "Tankerkönig (MTS-K) fuel prices of the area a person views, refreshed on that view.",
+      "subject": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^(ags:[0-9]{8}|pt:-?[0-9]{1,2}(\\.[0-9]{1,6})?,-?[0-9]{1,3}(\\.[0-9]{1,6})?)$"
+          },
+          "snap": {
+            "type": "boolean"
+          },
+          "anchor": {
+            "type": "boolean"
+          }
+        }
+      },
+      "subject_key": {
+        "cases": [
+          {
+            "match": {
+              "at": "^ags:(?<ags>[0-9]{8})$"
+            },
+            "emit": "ags:{ags}"
+          },
+          {
+            "match": {
+              "at": "^pt:(?<lat>-?[0-9]{1,2}\\.[0-9]{1,4}),(?<lon>-?[0-9]{1,3}\\.[0-9]{1,4})$",
+              "anchor": "^true$"
+            },
+            "emit": "anchor:{lat},{lon}"
+          },
+          {
+            "match": {
+              "at": "^pt:(?<lat>-?[0-9]{1,2}(\\.[0-9]{1,6})?),(?<lon>-?[0-9]{1,3}(\\.[0-9]{1,6})?)$"
+            },
+            "emit": "cell:{lat|grid:0.005},{lon|grid:0.0075}:{snap|bool}"
+          }
+        ]
+      },
+      "freshness_s": 1800,
+      "deadline_ms": 1200,
+      "max_wait_s": 600,
+      "licence": {
+        "licence": "CC BY 4.0",
+        "attribution": "Tankstellenpreise: Tankerkönig.de — MTS-K, CC BY 4.0, bearbeitet",
+        "url": "https://creativecommons.tankerkoenig.de",
+        "terms": "MTS-K purpose limitation (Bundeskartellamt, Stand 26.02.2025): the prices serve consumer information only. Tankerkönig API terms: \"Requests on Demand - auf Useraktion - durchführen\"; \"Regelmäßige, nicht explizit vom User initiierte Requests sind zu vermeiden\"."
+      }
+    },
+    {
+      "id": "train-board-de",
+      "status": "enabled",
+      "summary": "DB Timetables (IRIS) departures of a station and its parts for the next two hours, refreshed when a person opens its board.",
+      "subject": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "maxProperties": 1,
+        "properties": {
+          "eva": {
+            "type": "string",
+            "pattern": "^[0-9]{7}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 120
+          }
+        }
+      },
+      "subject_key": {
+        "lookups": {
+          "eva": {
+            "table": "db_station_numbers",
+            "match_column": "name",
+            "value_column": "eva_no",
+            "fold": "lower",
+            "order_by": "eva_no"
+          }
+        },
+        "cases": [
+          {
+            "match": {
+              "eva": "^(?<eva>[0-9]{7})$"
+            },
+            "emit": "{eva}"
+          },
+          {
+            "match": {
+              "name": "\\S"
+            },
+            "emit": "{name|trim|lookup:eva}"
+          }
+        ]
+      },
+      "freshness_s": 30,
+      "deadline_ms": 1200,
+      "max_wait_s": 60,
+      "licence": {
+        "licence": "CC BY 4.0",
+        "attribution": "Fahrplandaten: Deutsche Bahn AG, DB API Marketplace, CC BY 4.0, bearbeitet",
+        "url": "https://developers.deutschebahn.com/db-api-marketplace/apis/product/timetables",
+        "terms": "/plan and /fchg are asked; /rchg is never asked (data-steward re-read 2026-11-12)."
+      }
+    }
+  ]
+}

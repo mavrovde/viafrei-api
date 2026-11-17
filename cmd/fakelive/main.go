@@ -3,7 +3,7 @@
 // for the parity producer: it claims and settles every refresh the API
 // records, by a script, until interrupted.
 //
-//	fakelive -db <owner URL> [-registry test/live/sources.json] [-script test/live/fakelive.json]
+//	fakelive -db <owner URL> [-registry test/live/registry.json] [-script test/live/fakelive.json]
 package main
 
 import (
@@ -30,7 +30,7 @@ func run(ctx context.Context, args []string, stderr io.Writer) int {
 	fs := flag.NewFlagSet("fakelive", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	db := fs.String("db", "", "the database's owner URL (required)")
-	registry := fs.String("registry", "test/live/sources.json", "the live sources registry the API reads")
+	registry := fs.String("registry", "test/live/registry.json", "the live sources registry the API reads")
 	script := fs.String("script", "test/live/fakelive.json", "the script the fake settles by")
 	if err := fs.Parse(args); err != nil {
 		return 2

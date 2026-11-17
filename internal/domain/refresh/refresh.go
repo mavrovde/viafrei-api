@@ -17,10 +17,8 @@ type State string
 
 // The refresh states.
 const (
-	// Pending: recorded, not yet claimed by the live refresher.
+	// Pending: recorded and not yet settled, queued or running.
 	Pending State = "pending"
-	// Claimed: the live refresher runs it.
-	Claimed State = "claimed"
 	// Refreshed: the subject was refreshed; its data is served fresh.
 	Refreshed State = "refreshed"
 	// NoneDue: the subject's stored data was inside its cache window.
@@ -33,7 +31,7 @@ const (
 )
 
 // Settled says whether the state is final.
-func (s State) Settled() bool { return s != Pending && s != Claimed }
+func (s State) Settled() bool { return s != Pending }
 
 // Ask is one refresh ask: a live source of the configured registry and the
 // subject to refresh it about, a JSON object its registered schema admits.
@@ -45,6 +43,7 @@ type Ask struct {
 
 // Request is a refresh as a key sees it.
 type Request struct {
+	// ID is the request's id, decimal digits.
 	ID     string
 	Source string
 	State  State
@@ -54,15 +53,20 @@ type Request struct {
 	SettledAt *time.Time
 	// Reason says why it was refused or failed, when known.
 	Reason string
+	// Reused is true when the answer is a refresh asked before: one settled
+	// inside the source's freshness window, an open one this ask joined, or
+	// one the live refresher answered from a refresh already under way.
+	Reused bool
 	// Position is where an open request stands among the pending ones: 1
 	// is next, 0 while it runs; nil once settled.
 	Position *int
 }
 
-// New is a request to record: the ask with its canonical subject key, the
-// asking key and the instant of the ask.
+// New is a request to record: the source, the canonical subject (public ids
+// only, never a raw position) with its key, the asking key and the instant
+// of the ask.
 type New struct {
-	ID, Source string
+	Source     string
 	Subject    map[string]any
 	SubjectKey string
 	KeyID      string
@@ -71,6 +75,10 @@ type New struct {
 
 // ErrSource is the error of an ask naming no registered source.
 var ErrSource = errors.New("refresh: no such live source")
+
+// ErrPaused is the error of an ask naming a registered source that is
+// switched off (its registry status is not enabled).
+var ErrPaused = errors.New("refresh: the live source is switched off")
 
 // ErrNotFound is the answer for a refresh the key did not ask for, or none.
 var ErrNotFound = errors.New("refresh: no such refresh")
@@ -83,6 +91,7 @@ type SubjectError struct {
 
 func (e *SubjectError) Error() string { return "refresh: " + e.Location + ": " + e.Detail }
 
-// Lookup resolves value by the named lookup of the read store (station_eva:
-// a station's name to its EVA number); "" when nothing answers.
+// Lookup resolves value by the named lookup of the read store (eva: a
+// station's name to its EVA number; ags: a position "lat,lon" to the AGS of
+// its Gemeinde); "" when nothing answers.
 type Lookup func(ctx context.Context, name, value string) (string, error)

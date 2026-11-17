@@ -363,7 +363,7 @@ const sourcesLiveReason = "live-varying: the API states a family's status and da
 // sourcesTextReason: the register texts of a source family, prose the
 // fixture states synthetically (attributionReason).
 // sourcesReferenceReason: the lead's ruling of 2026-11-17 on listSources.
-const sourcesReferenceReason = "API-only (lead ruling 2026-11-17): viafrei://coverage lists the live feeds of the deployment, not the reference families (places, the road register, timetables, rules), and states no domain; the live-feed families it lists are compared"
+const sourcesReferenceReason = "API-only (lead ruling 2026-11-17): viafrei://coverage lists the live sources of the deployment, not the reference families (places, the road register, timetables, rules), and states no domain; the live-source families it lists are compared"
 
 const sourcesTextReason = "prose: the fixture's families carry synthetic register texts and the platform states its own register's; which families are listed, their domain, stale threshold and share-alike flag are compared"
 

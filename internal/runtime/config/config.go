@@ -213,9 +213,9 @@ type Fuel struct {
 // Refresh holds the settings of the on-demand refreshes of live sources
 // (createRefresh).
 type Refresh struct {
-	SourcesFile string        `koanf:"sources_file" validate:"omitempty,max=4096" desc:"Path of the registry of the live sources a refresh may name, each with the JSON Schema of its subject, its key rules and its freshness window (docs: the registry layout). Read once at start; a registry that does not parse stops the start. Empty: sources_json, else no source, and every ask is a 400 naming body.source."`
+	SourcesFile string        `koanf:"sources_file" validate:"omitempty,max=4096" desc:"Path of the registry of the live sources a refresh may name: the live refresher's registry.json, each source with its id, its status, the JSON Schema of its subject, its subject_key cases, its freshness window (freshness_s) and its deadline (deadline_ms). Read once at start; a registry that does not parse stops the start. Empty: sources_json, else no source, and every ask is a 400 naming body.source."`
 	SourcesJSON string        `koanf:"sources_json" validate:"omitempty,max=65536" desc:"The registry as JSON text, read when sources_file is empty."`
-	Wait        time.Duration `koanf:"wait" default:"1200ms" validate:"min=0s,max=10s" desc:"How long a refresh ask waits for its refresh to settle: the platform's 1.2 seconds by default. A refresh still open then is answered 202 pending."`
+	Wait        time.Duration `koanf:"wait" default:"1200ms" validate:"min=0s,max=10s" desc:"How long a refresh ask waits for its refresh to settle when its source's registry entry sets no deadline_ms: the platform's 1.2 seconds by default. A refresh still open then is answered 202 pending."`
 }
 
 // Compose holds the settings of composed answers.

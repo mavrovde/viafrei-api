@@ -72,11 +72,11 @@ func TestConsoleSettings(t *testing.T) {
 func TestRefreshesReadTheConfiguredRegistry(t *testing.T) {
 	cfg := config.Defaults()
 	r, err := wire.Refreshes(cfg, nil, nil)
-	if err != nil || r.Wait != 1200*time.Millisecond || r.Sources.FreshFor("fuel") != 0 {
+	if err != nil || r.Wait != 1200*time.Millisecond || r.Sources.FreshFor("fuel-prices-de") != 0 {
 		t.Fatalf("defaults: %+v %v", r, err)
 	}
-	cfg.Refresh.SourcesFile = filepath.Join("..", "..", "..", "test", "live", "sources.json")
-	if r, err = wire.Refreshes(cfg, nil, nil); err != nil || r.Sources.FreshFor("fuel") != 5*time.Minute {
+	cfg.Refresh.SourcesFile = filepath.Join("..", "..", "..", "test", "live", "registry.json")
+	if r, err = wire.Refreshes(cfg, nil, nil); err != nil || r.Sources.FreshFor("fuel-prices-de") != 30*time.Minute {
 		t.Fatalf("file: %+v %v", r, err)
 	}
 	cfg.Refresh.SourcesFile, cfg.Refresh.SourcesJSON = "", "{"

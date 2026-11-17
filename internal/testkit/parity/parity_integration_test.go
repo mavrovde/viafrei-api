@@ -139,7 +139,7 @@ func load(fx parity.Fixture) (string, error) {
 // The repository's refresh registry and the fake live refresher's script
 // (test/live): a question's refresh is settled by the fake, never a provider.
 var (
-	liveSources = filepath.Join("..", "..", "..", "test", "live", "sources.json")
+	liveSources = filepath.Join("..", "..", "..", "test", "live", "registry.json")
 	liveScript  = filepath.Join("..", "..", "..", "test", "live", "fakelive.json")
 )
 
@@ -282,8 +282,8 @@ func refresh(t *testing.T, h http.Handler, c parity.Case) func() {
 			args []any
 		}
 		stmts := []stmt{
-			{`delete from live.refresh_asker where request_id in (select request_id from live.refresh_request where source = $1 and created_at = $2)`, []any{c.Refresh.Source, c.Now}},
-			{`delete from live.refresh_request where source = $1 and created_at = $2`, []any{c.Refresh.Source, c.Now}},
+			{`delete from live.refresh_askers where request_id in (select id from live.refresh_requests where source = $1 and created_at = $2)`, []any{c.Refresh.Source, c.Now}},
+			{`delete from live.refresh_requests where source = $1 and created_at = $2`, []any{c.Refresh.Source, c.Now}},
 		}
 		for _, tb := range tables {
 			stmts = append(stmts, stmt{`delete from ` + pgx.Identifier(strings.Split(tb, ".")).Sanitize() + ` where observed_at = $1`, []any{c.Now}})

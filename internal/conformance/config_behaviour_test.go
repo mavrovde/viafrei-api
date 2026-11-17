@@ -215,8 +215,8 @@ func behaviours() map[string]behaviour {
 		"fuel.price_fresh":         {"1h", fuelFresh},
 		"fuel.price_held":          {"24h", fuelHeld},
 		"refresh.wait":             {"300ms", refreshWait},
-		"refresh.sources_file":     {"../../test/live/sources.json", refreshSources},
-		"refresh.sources_json":     {`{"sources":{"weather":{"subject":{"type":"object"},"key":[{"field":"at"}]}}}`, refreshSources},
+		"refresh.sources_file":     {"../../test/live/registry.json", refreshSources},
+		"refresh.sources_json":     {`{"schema":1,"sources":[{"id":"weather-de","status":"enabled","subject":{"type":"object"},"subject_key":{"cases":[{"match":{"at":"."},"emit":"{at}"}]}}]}`, refreshSources},
 		"compose.part_deadline": {"300ms", func(t *testing.T, c *config.Config) string {
 			return wire.FeatureSettings(c).PartDeadline.String()
 		}},

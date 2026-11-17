@@ -10200,7 +10200,7 @@
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z",
-      "ruling": "Lead ruling 2026-11-17: compared are the live-feed families viafrei://coverage lists (family, staleAfterS, shareAlike); the reference families (bast_lcl, bkg_gvisys, delfi_static, geonames, osm, osm_speed_cameras, viafrei_rules), the domain and the domain filter are API-only.",
+      "ruling": "Lead ruling 2026-11-17: compared are the live-source families viafrei://coverage lists (family, staleAfterS, shareAlike); the reference families (bast_lcl, bkg_gvisys, delfi_static, geonames, osm, osm_speed_cameras, viafrei_rules), the domain and the domain filter are API-only.",
       "facts": [
         {
           "name": "data[afir_alpha].family",
@@ -12828,7 +12828,7 @@
       },
       "now": "2026-03-30T01:00:00Z",
       "refresh": {
-        "source": "fuel",
+        "source": "fuel-prices-de",
         "subject": {
           "at": "pt:49.17,7.81",
           "snap": true
@@ -12967,7 +12967,7 @@
       },
       "now": "2026-03-30T01:00:00Z",
       "refresh": {
-        "source": "train_board",
+        "source": "train-board-de",
         "subject": {
           "eva": "8001001"
         }

@@ -99,27 +99,36 @@ func execd(t *testing.T, c *fakeConn, want string) {
 	}
 }
 
+const listenSQL = `listen "live_refresh_settled"`
+
 func TestSettlesListensPokesAndForgets(t *testing.T) {
 	c := newFakeConn()
 	k := &connector{conns: []*fakeConn{c}, failFirst: true}
 	h := newSettles(k.connect, time.Millisecond)
 	defer h.close()
 
-	p := h.add("refresh_a")
-	execd(t, c, `listen "refresh_a"`)
+	p := h.add("7")
+	q := h.add("8")
+	execd(t, c, listenSQL)
 	poked(t, p, "listening")
-	c.notes <- &pgconn.Notification{Channel: "elsewhere"}
-	c.notes <- &pgconn.Notification{Channel: "refresh_a"}
-	poked(t, p, "the settle")
-	h.remove("refresh_a", p)
-	execd(t, c, `unlisten "refresh_a"`)
-	if k.calls != 2 {
-		t.Fatalf("%d connects, want a failed one and an open one", k.calls)
+	poked(t, q, "listening")
+	c.notes <- &pgconn.Notification{Channel: "elsewhere", Payload: "7"}
+	c.notes <- &pgconn.Notification{Channel: "live_refresh_settled", Payload: "8"}
+	poked(t, q, "the settle of 8")
+	c.notes <- &pgconn.Notification{Channel: "live_refresh_settled", Payload: "7"}
+	poked(t, p, "the settle of 7")
+	h.remove("7", p)
+	h.remove("8", q)
+	h.mu.Lock()
+	left := len(h.waiters)
+	h.mu.Unlock()
+	if left != 0 || k.calls != 2 {
+		t.Fatalf("%d ids left, %d connects, want none and a failed one and an open one", left, k.calls)
 	}
 }
 
 func TestSettlesOpensALostConnectionAgain(t *testing.T) {
-	for _, fail := range []string{"listen", "unlisten", ""} {
+	for _, fail := range []string{"listen", ""} {
 		t.Run(fail, func(t *testing.T) {
 			c1, c2 := newFakeConn(), newFakeConn()
 			c1.failOn = fail
@@ -127,22 +136,13 @@ func TestSettlesOpensALostConnectionAgain(t *testing.T) {
 			h := newSettles(k.connect, time.Millisecond)
 			defer h.close()
 
-			p := h.add("refresh_a")
-			switch fail {
-			case "listen":
-				// c1 refused the LISTEN: c2 listens.
-			case "unlisten":
-				execd(t, c1, `listen "refresh_a"`)
-				poked(t, p, "listening on c1")
-				q := h.add("refresh_b")
-				execd(t, c1, `listen "refresh_b"`)
-				h.remove("refresh_b", q) // c1 refuses the UNLISTEN
-			default:
-				execd(t, c1, `listen "refresh_a"`)
+			p := h.add("7")
+			if fail == "" {
+				execd(t, c1, listenSQL)
 				poked(t, p, "listening on c1")
 				c1.waitErr <- errors.New("connection lost")
 			}
-			execd(t, c2, `listen "refresh_a"`)
+			execd(t, c2, listenSQL)
 			poked(t, p, "listening on c2")
 			c1.mu.Lock()
 			closed := c1.closed
@@ -157,5 +157,5 @@ func TestSettlesOpensALostConnectionAgain(t *testing.T) {
 func TestSettlesCloseWithoutAWait(t *testing.T) {
 	h := newSettles((&connector{}).connect, time.Millisecond)
 	h.close()
-	h.remove("refresh_none", make(chan struct{}))
+	h.remove("1", make(chan struct{}))
 }

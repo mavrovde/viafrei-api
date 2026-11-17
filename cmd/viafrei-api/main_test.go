@@ -385,3 +385,17 @@ func TestReportUsageLogsOnlyTrouble(t *testing.T) {
 		t.Fatalf("trouble not logged: %q", out)
 	}
 }
+
+func TestReportRetentionLogsFailuresAndRemovals(t *testing.T) {
+	var buf bytes.Buffer
+	report := reportRetention(slog.New(slog.NewTextHandler(&buf, nil)))
+	report(0, nil)
+	if buf.Len() != 0 {
+		t.Fatalf("a round that removed nothing logged %q", buf.String())
+	}
+	report(3, nil)
+	report(0, errors.New("store down"))
+	if out := buf.String(); !strings.Contains(out, "removed=3") || !strings.Contains(out, "refresh retention failed") {
+		t.Fatalf("not logged: %q", out)
+	}
+}

@@ -5604,8 +5604,8 @@
             "type": "string"
           },
           "id": {
-            "description": "The refresh's id: GET /v1/refreshes/{id} reads it again.",
-            "format": "uuid",
+            "description": "The refresh's id, decimal digits: GET /v1/refreshes/{id} reads it again.",
+            "pattern": "^[1-9][0-9]{0,17}$",
             "type": "string"
           },
           "queue": {
@@ -5633,6 +5633,10 @@
               "string",
               "null"
             ]
+          },
+          "reused": {
+            "description": "True when this answer is a refresh asked before: one settled inside the source's freshness window, an open one this ask joined, or one the live refresher answered from a refresh already under way.",
+            "type": "boolean"
           },
           "settledAt": {
             "description": "When it settled; null while pending.",
@@ -5664,6 +5668,7 @@
           "createdAt",
           "settledAt",
           "reason",
+          "reused",
           "queue"
         ],
         "type": "object"
@@ -5692,17 +5697,17 @@
         "additionalProperties": false,
         "properties": {
           "source": {
-            "description": "The live source: a name of the instance's registry (refresh.sources_file), fuel and train_board on ViaFrei's own.",
+            "description": "The live source: an id of the instance's registry (refresh.sources_file, the live refresher's registry), fuel-prices-de and train-board-de on ViaFrei's own.",
             "examples": [
-              "fuel"
+              "fuel-prices-de"
             ],
-            "maxLength": 32,
+            "maxLength": 64,
             "minLength": 1,
             "type": "string"
           },
           "subject": {
             "additionalProperties": {},
-            "description": "What to refresh, as the source's registered JSON Schema admits it: fuel takes at (ags:\u003c8 digits\u003e or pt:lat,lon) with snap or anchor; train_board takes eva or name, exactly one.",
+            "description": "What to refresh, as the source's registered JSON Schema admits it: fuel-prices-de takes at (ags:\u003c8 digits\u003e or pt:lat,lon) with snap or anchor; train-board-de takes eva or name, exactly one. Only a public id is stored: a position is resolved, in memory, to the AGS of its Gemeinde, and a station's name to its EVA number; neither the position nor the name is kept or echoed.",
             "examples": [
               {
                 "at": "ags:09162000"
@@ -18202,13 +18207,13 @@
     },
     "/v1/refreshes": {
       "post": {
-        "description": "Records a refresh of one subject of a live source, as a person's view asks it (the fuel prices about an area, a station's train board): the live refresher refreshes it once for everyone asking about the same subject while it is open, under its own guards, and the source's resources then serve it. Only a key of ViaFrei's own audience may call it; any other key gets 403 (scope-denied). The answer waits about 1.2 s (refresh.wait) for the refresh to settle: settled, it is 201 with the outcome; still open, it is 202 with state pending and its place in the queue; either way Location names the refresh, which GET reads again. A refresh of the subject settled inside the source's freshness window answers at once, with no new refresh. An unknown source is a 400 naming body.source; a subject the source refuses is a 400 naming the field (body.subject.at, say). No provider data is ever in this answer.",
+        "description": "Records a refresh of one subject of a live source, as a person's view asks it (the fuel prices about an area, a station's train board): the live refresher refreshes it once for everyone asking about the same subject while it is open, under its own guards, and the source's resources then serve it. Only a key of ViaFrei's own audience may call it; any other key gets 403 (scope-denied). The answer waits up to the source's deadline (its registry's deadline_ms, 1.2 s on ViaFrei's own; refresh.wait when it sets none) for the refresh to settle: settled, it is 201 with the outcome; still open, it is 202 with state pending and its place in the queue; either way Location names the refresh, which GET reads again. A refresh of the subject settled inside the source's freshness window answers at once, with no new refresh and reused true. A position is resolved to the AGS of its Gemeinde before anything is recorded, and only that public id is stored; a position no Gemeinde answers is a 400 naming body.subject.at, with nothing recorded. A switched-off source is a 404 (feature-disabled). An unknown source is a 400 naming body.source; a subject the source refuses is a 400 naming the field (body.subject.at, say). No provider data is ever in this answer.",
         "operationId": "createRefresh",
         "requestBody": {
           "content": {
             "application/json": {
               "example": {
-                "source": "fuel",
+                "source": "fuel-prices-de",
                 "subject": {
                   "at": "ags:09162000"
                 }
@@ -18229,12 +18234,13 @@
                     "summary": "Refresh the fuel prices about a Gemeinde a person is viewing: refreshed",
                     "value": {
                       "data": {
-                        "id": "45efff05-510c-5f97-a727-c239a9efb87e",
-                        "source": "fuel",
+                        "id": "1",
+                        "source": "fuel-prices-de",
                         "state": "refreshed",
                         "createdAt": "2026-03-30T00:00:00Z",
                         "settledAt": "2026-03-30T00:00:00Z",
                         "reason": null,
+                        "reused": false,
                         "queue": null
                       },
                       "meta": {
@@ -18243,7 +18249,7 @@
                         "language": "en"
                       },
                       "links": {
-                        "self": "https://api.viafrei.de/v1/refreshes/45efff05-510c-5f97-a727-c239a9efb87e"
+                        "self": "https://api.viafrei.de/v1/refreshes/1"
                       }
                     }
                   },
@@ -18251,12 +18257,13 @@
                     "summary": "The provider did not answer: failed",
                     "value": {
                       "data": {
-                        "id": "acb62300-933e-524d-ad08-a2e7ec22c71d",
-                        "source": "fuel",
+                        "id": "2",
+                        "source": "fuel-prices-de",
                         "state": "failed",
                         "createdAt": "2026-03-30T00:00:00Z",
                         "settledAt": "2026-03-30T00:00:00Z",
                         "reason": "the provider did not answer",
+                        "reused": false,
                         "queue": null
                       },
                       "meta": {
@@ -18265,7 +18272,7 @@
                         "language": "en"
                       },
                       "links": {
-                        "self": "https://api.viafrei.de/v1/refreshes/acb62300-933e-524d-ad08-a2e7ec22c71d"
+                        "self": "https://api.viafrei.de/v1/refreshes/2"
                       }
                     }
                   },
@@ -18273,12 +18280,13 @@
                     "summary": "Every fuel price of the area is inside its cache window: none_due",
                     "value": {
                       "data": {
-                        "id": "ac98580b-6326-5804-8ae5-9b7e3aaf828f",
-                        "source": "fuel",
+                        "id": "3",
+                        "source": "fuel-prices-de",
                         "state": "none_due",
                         "createdAt": "2026-03-30T00:00:00Z",
                         "settledAt": "2026-03-30T00:00:00Z",
                         "reason": null,
+                        "reused": false,
                         "queue": null
                       },
                       "meta": {
@@ -18287,7 +18295,7 @@
                         "language": "en"
                       },
                       "links": {
-                        "self": "https://api.viafrei.de/v1/refreshes/ac98580b-6326-5804-8ae5-9b7e3aaf828f"
+                        "self": "https://api.viafrei.de/v1/refreshes/3"
                       }
                     }
                   },
@@ -18295,12 +18303,13 @@
                     "summary": "Refresh the fuel prices about a point, snapped to its Gemeinde: refreshed",
                     "value": {
                       "data": {
-                        "id": "29dd685a-6829-59e2-b0b1-c5e8f569f91e",
-                        "source": "fuel",
+                        "id": "5",
+                        "source": "fuel-prices-de",
                         "state": "refreshed",
                         "createdAt": "2026-03-30T00:00:00Z",
                         "settledAt": "2026-03-30T00:00:00Z",
                         "reason": null,
+                        "reused": false,
                         "queue": null
                       },
                       "meta": {
@@ -18309,7 +18318,7 @@
                         "language": "en"
                       },
                       "links": {
-                        "self": "https://api.viafrei.de/v1/refreshes/29dd685a-6829-59e2-b0b1-c5e8f569f91e"
+                        "self": "https://api.viafrei.de/v1/refreshes/5"
                       }
                     }
                   },
@@ -18317,12 +18326,13 @@
                     "summary": "The area's refresh cap is reached: refused, with the reason",
                     "value": {
                       "data": {
-                        "id": "ff9d3911-2951-5a1c-ac63-08e1f5e72eff",
-                        "source": "fuel",
+                        "id": "6",
+                        "source": "fuel-prices-de",
                         "state": "refused",
                         "createdAt": "2026-03-30T00:00:00Z",
                         "settledAt": "2026-03-30T00:00:00Z",
                         "reason": "the hourly refresh cap of the area is reached",
+                        "reused": false,
                         "queue": null
                       },
                       "meta": {
@@ -18331,7 +18341,7 @@
                         "language": "en"
                       },
                       "links": {
-                        "self": "https://api.viafrei.de/v1/refreshes/ff9d3911-2951-5a1c-ac63-08e1f5e72eff"
+                        "self": "https://api.viafrei.de/v1/refreshes/6"
                       }
                     }
                   },
@@ -18339,12 +18349,13 @@
                     "summary": "Refresh a station's train board by its EVA number: refreshed",
                     "value": {
                       "data": {
-                        "id": "741bb17e-d8b6-56cc-b27d-68e675c8db2a",
-                        "source": "train_board",
+                        "id": "7",
+                        "source": "train-board-de",
                         "state": "refreshed",
                         "createdAt": "2026-03-30T00:00:00Z",
                         "settledAt": "2026-03-30T00:00:00Z",
                         "reason": null,
+                        "reused": false,
                         "queue": null
                       },
                       "meta": {
@@ -18353,7 +18364,7 @@
                         "language": "en"
                       },
                       "links": {
-                        "self": "https://api.viafrei.de/v1/refreshes/741bb17e-d8b6-56cc-b27d-68e675c8db2a"
+                        "self": "https://api.viafrei.de/v1/refreshes/7"
                       }
                     }
                   },
@@ -18361,12 +18372,13 @@
                     "summary": "Refresh a station's train board by its name, resolved to its EVA number: refreshed",
                     "value": {
                       "data": {
-                        "id": "741bb17e-d8b6-56cc-b27d-68e675c8db2a",
-                        "source": "train_board",
+                        "id": "7",
+                        "source": "train-board-de",
                         "state": "refreshed",
                         "createdAt": "2026-03-30T00:00:00Z",
                         "settledAt": "2026-03-30T00:00:00Z",
                         "reason": null,
+                        "reused": true,
                         "queue": null
                       },
                       "meta": {
@@ -18375,7 +18387,7 @@
                         "language": "en"
                       },
                       "links": {
-                        "self": "https://api.viafrei.de/v1/refreshes/741bb17e-d8b6-56cc-b27d-68e675c8db2a"
+                        "self": "https://api.viafrei.de/v1/refreshes/7"
                       }
                     }
                   },
@@ -18383,12 +18395,13 @@
                     "summary": "The station's board is inside its cache window: none_due",
                     "value": {
                       "data": {
-                        "id": "a05be048-ad8f-50f7-a886-725338bcde93",
-                        "source": "train_board",
+                        "id": "8",
+                        "source": "train-board-de",
                         "state": "none_due",
                         "createdAt": "2026-03-30T00:00:00Z",
                         "settledAt": "2026-03-30T00:00:00Z",
                         "reason": null,
+                        "reused": false,
                         "queue": null
                       },
                       "meta": {
@@ -18397,7 +18410,7 @@
                         "language": "en"
                       },
                       "links": {
-                        "self": "https://api.viafrei.de/v1/refreshes/a05be048-ad8f-50f7-a886-725338bcde93"
+                        "self": "https://api.viafrei.de/v1/refreshes/8"
                       }
                     }
                   },
@@ -18405,12 +18418,13 @@
                     "summary": "No provider key: refused, with the reason",
                     "value": {
                       "data": {
-                        "id": "88d039c8-6f08-55ab-b43a-ecdfa28718de",
-                        "source": "train_board",
+                        "id": "10",
+                        "source": "train-board-de",
                         "state": "refused",
                         "createdAt": "2026-03-30T00:00:00Z",
                         "settledAt": "2026-03-30T00:00:00Z",
                         "reason": "no provider key",
+                        "reused": false,
                         "queue": null
                       },
                       "meta": {
@@ -18419,7 +18433,7 @@
                         "language": "en"
                       },
                       "links": {
-                        "self": "https://api.viafrei.de/v1/refreshes/88d039c8-6f08-55ab-b43a-ecdfa28718de"
+                        "self": "https://api.viafrei.de/v1/refreshes/10"
                       }
                     }
                   }
@@ -18464,12 +18478,13 @@
                     "summary": "Not settled within the wait: 202 pending, with its place in the queue",
                     "value": {
                       "data": {
-                        "id": "ed5c8f44-f43f-5c72-838f-3846201e6ad5",
-                        "source": "fuel",
+                        "id": "4",
+                        "source": "fuel-prices-de",
                         "state": "pending",
                         "createdAt": "2026-03-30T00:00:00Z",
                         "settledAt": null,
                         "reason": null,
+                        "reused": false,
                         "queue": {
                           "position": 1
                         }
@@ -18480,7 +18495,7 @@
                         "language": "en"
                       },
                       "links": {
-                        "self": "https://api.viafrei.de/v1/refreshes/ed5c8f44-f43f-5c72-838f-3846201e6ad5"
+                        "self": "https://api.viafrei.de/v1/refreshes/4"
                       }
                     }
                   },
@@ -18488,14 +18503,15 @@
                     "summary": "Not settled within the wait: 202 pending, behind the open ones",
                     "value": {
                       "data": {
-                        "id": "8134a06c-af6b-5560-ab7f-a7fd3458cf3f",
-                        "source": "train_board",
+                        "id": "9",
+                        "source": "train-board-de",
                         "state": "pending",
                         "createdAt": "2026-03-30T00:00:00Z",
                         "settledAt": null,
                         "reason": null,
+                        "reused": false,
                         "queue": {
-                          "position": 1
+                          "position": 2
                         }
                       },
                       "meta": {
@@ -18504,7 +18520,7 @@
                         "language": "en"
                       },
                       "links": {
-                        "self": "https://api.viafrei.de/v1/refreshes/8134a06c-af6b-5560-ab7f-a7fd3458cf3f"
+                        "self": "https://api.viafrei.de/v1/refreshes/9"
                       }
                     }
                   }
@@ -18702,12 +18718,12 @@
         "tags": [
           "live"
         ],
-        "x-attribution": "A refresh carries no data and no attribution: the data it refreshes is served, with its source's attribution, by that source's own resources (listFuelOptions and getFuelStation for fuel, getTrainBoard for train_board).",
+        "x-attribution": "A refresh carries no data and no attribution: the data it refreshes is served, with its source's attribution, by that source's own resources (listFuelOptions and getFuelStation for fuel, getTrainBoard for train-board-de).",
         "x-codeSamples": [
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/refreshes\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\" \\\n  -X POST \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"source\": \"fuel\",\n    \"subject\": {\n      \"at\": \"ags:09162000\"\n    }\n  }'"
+            "source": "curl -sS \"https://api.viafrei.de/v1/refreshes\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\" \\\n  -X POST \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"source\": \"fuel-prices-de\",\n    \"subject\": {\n      \"at\": \"ags:09162000\"\n    }\n  }'"
           }
         ],
         "x-example-request": "/v1/refreshes"
@@ -18715,7 +18731,7 @@
     },
     "/v1/refreshes/{id}": {
       "get": {
-        "description": "A refresh this key asked for, as it now stands; a refresh of another key, or of no such id, is a 404. Only a key of ViaFrei's own audience may call it; any other key gets 403 (scope-denied). Refreshes are kept 30 days after they settle.",
+        "description": "A refresh this key asked for, as it now stands; a refresh of another key, or of no such id, is a 404. Only a key of ViaFrei's own audience may call it; any other key gets 403 (scope-denied). Refreshes are kept 30 days after they were asked, in any state.",
         "operationId": "getRefresh",
         "parameters": [
           {
@@ -18726,9 +18742,9 @@
             "schema": {
               "description": "The refresh's id, as createRefresh answered it.",
               "examples": [
-                "01968a3c-1f00-7000-8000-000000000001"
+                "1"
               ],
-              "maxLength": 36,
+              "maxLength": 18,
               "type": "string"
             }
           },
@@ -18755,12 +18771,13 @@
                     "summary": "Read a refresh this key asked for again",
                     "value": {
                       "data": {
-                        "id": "45efff05-510c-5f97-a727-c239a9efb87e",
-                        "source": "fuel",
+                        "id": "1",
+                        "source": "fuel-prices-de",
                         "state": "refreshed",
                         "createdAt": "2026-03-30T00:00:00Z",
                         "settledAt": "2026-03-30T00:00:00Z",
                         "reason": null,
+                        "reused": false,
                         "queue": null
                       },
                       "meta": {
@@ -18769,7 +18786,7 @@
                         "language": "en"
                       },
                       "links": {
-                        "self": "https://api.viafrei.de/v1/refreshes/45efff05-510c-5f97-a727-c239a9efb87e"
+                        "self": "https://api.viafrei.de/v1/refreshes/1"
                       }
                     }
                   }
@@ -18961,15 +18978,15 @@
         "tags": [
           "live"
         ],
-        "x-attribution": "A refresh carries no data and no attribution: the data it refreshes is served, with its source's attribution, by that source's own resources (listFuelOptions and getFuelStation for fuel, getTrainBoard for train_board).",
+        "x-attribution": "A refresh carries no data and no attribution: the data it refreshes is served, with its source's attribution, by that source's own resources (listFuelOptions and getFuelStation for fuel, getTrainBoard for train-board-de).",
         "x-codeSamples": [
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/refreshes/45efff05-510c-5f97-a727-c239a9efb87e\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/refreshes/1\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/refreshes/45efff05-510c-5f97-a727-c239a9efb87e"
+        "x-example-request": "/v1/refreshes/1"
       }
     },
     "/v1/road-conditions": {

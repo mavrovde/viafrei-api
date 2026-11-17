@@ -149,6 +149,9 @@ func serve(environ []string, stderr io.Writer) int {
 			}
 			svc.WithRefreshes(r)
 		}
+		// The refresh requests are kept 30 days after they were asked, in
+		// any state (the data-steward's privacy ruling); pruned hourly.
+		go as.RunRefreshRetention(ctx, time.Hour, reportRetention(log))
 		deps.Keys = ratelimit.NewKeyLimiter(wire.QuotaZone(cfg), as, nil)
 		meter := metering.New(wire.MeteringSettings(cfg), as, nil)
 		deps.Meter = meter
@@ -377,6 +380,19 @@ func startConsole(ctx context.Context, cfg *config.Config, addr string, as *acce
 
 // reportUsage logs a usage flush that failed or dropped counts; a clean
 // flush is silent.
+// reportRetention logs a failed prune of the refresh requests, and the
+// count of a round that removed any.
+func reportRetention(log *slog.Logger) func(int64, error) {
+	return func(n int64, err error) {
+		switch {
+		case err != nil:
+			log.Error("refresh retention failed; the next round tries again", "error", err)
+		case n > 0:
+			log.Info("refresh requests past retention removed", "removed", n)
+		}
+	}
+}
+
 func reportUsage(log *slog.Logger) func(metering.Report) {
 	return func(r metering.Report) {
 		if r.Err != nil {

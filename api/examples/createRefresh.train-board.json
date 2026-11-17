@@ -3,12 +3,12 @@
   "request": "/v1/refreshes",
   "method": "POST",
   "body": {
-    "source": "train_board",
+    "source": "train-board-de",
     "subject": {
       "eva": "8001001"
     }
   },
-  "attribution": "A refresh carries no data and no attribution: the data it refreshes is served, with its source's attribution, by that source's own resources (listFuelOptions and getFuelStation for fuel, getTrainBoard for train_board).",
+  "attribution": "A refresh carries no data and no attribution: the data it refreshes is served, with its source's attribution, by that source's own resources (listFuelOptions and getFuelStation for fuel, getTrainBoard for train-board-de).",
   "key": {
     "useClass": "commercial",
     "scopes": [],
@@ -18,12 +18,13 @@
   "status": 201,
   "response": {
     "data": {
-      "id": "741bb17e-d8b6-56cc-b27d-68e675c8db2a",
-      "source": "train_board",
+      "id": "7",
+      "source": "train-board-de",
       "state": "refreshed",
       "createdAt": "2026-03-30T00:00:00Z",
       "settledAt": "2026-03-30T00:00:00Z",
       "reason": null,
+      "reused": false,
       "queue": null
     },
     "meta": {
@@ -32,7 +33,7 @@
       "language": "en"
     },
     "links": {
-      "self": "https://api.viafrei.de/v1/refreshes/741bb17e-d8b6-56cc-b27d-68e675c8db2a"
+      "self": "https://api.viafrei.de/v1/refreshes/7"
     }
   }
 }

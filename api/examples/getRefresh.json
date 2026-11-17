@@ -1,7 +1,7 @@
 {
   "title": "Read a refresh this key asked for again",
-  "request": "/v1/refreshes/45efff05-510c-5f97-a727-c239a9efb87e",
-  "attribution": "A refresh carries no data and no attribution: the data it refreshes is served, with its source's attribution, by that source's own resources (listFuelOptions and getFuelStation for fuel, getTrainBoard for train_board).",
+  "request": "/v1/refreshes/1",
+  "attribution": "A refresh carries no data and no attribution: the data it refreshes is served, with its source's attribution, by that source's own resources (listFuelOptions and getFuelStation for fuel, getTrainBoard for train-board-de).",
   "key": {
     "useClass": "commercial",
     "scopes": [],
@@ -11,12 +11,13 @@
   "status": 200,
   "response": {
     "data": {
-      "id": "45efff05-510c-5f97-a727-c239a9efb87e",
-      "source": "fuel",
+      "id": "1",
+      "source": "fuel-prices-de",
       "state": "refreshed",
       "createdAt": "2026-03-30T00:00:00Z",
       "settledAt": "2026-03-30T00:00:00Z",
       "reason": null,
+      "reused": false,
       "queue": null
     },
     "meta": {
@@ -25,7 +26,7 @@
       "language": "en"
     },
     "links": {
-      "self": "https://api.viafrei.de/v1/refreshes/45efff05-510c-5f97-a727-c239a9efb87e"
+      "self": "https://api.viafrei.de/v1/refreshes/1"
     }
   }
 }

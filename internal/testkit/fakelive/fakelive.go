@@ -1,10 +1,12 @@
 // Package fakelive is a fake live refresher for tests and local runs: it
-// claims the on-demand refresh requests the API records (live.refresh_request)
-// as the live refresher does, LISTENing on the insert channel and claiming with
-// FOR UPDATE SKIP LOCKED under the viafrei_ingestor role, and settles each by
-// a script instead of calling a provider.
+// stands in for the live refresher of the request protocol, LISTENing on
+// live_refresh_requested, claiming the requests the API records
+// (live.refresh_requests) with FOR UPDATE SKIP LOCKED and settling them once
+// (settled_at is null), all as the live refresher's own role,
+// viafrei_live_ingestor, and settles each by a script instead of calling a
+// provider. The API's role is never used here: it records and reads only.
 //
-// The script is JSON, one entry per source of the registry the API reads:
+// The script is JSON, one entry per source id of the registry the API reads:
 //
 //	{"sources": {"<source>": {
 //	  "ticks": "<SQL run on refreshed>",
@@ -135,14 +137,14 @@ type Fake struct {
 }
 
 // Start runs the fake against the database at url (an owner's URL: the
-// fake sets the viafrei_ingestor role to claim and settle, and writes the
-// ticks as the owner). It is listening when Start returns.
+// fake sets the viafrei_live_ingestor role to claim and settle, and writes
+// the ticks as the owner). It is listening when Start returns.
 func Start(ctx context.Context, url string, script Script) (*Fake, error) {
 	listener, err := pgx.Connect(ctx, url)
 	if err != nil {
 		return nil, fmt.Errorf("fakelive: %w", err)
 	}
-	if _, err := listener.Exec(ctx, "listen refresh_request"); err != nil {
+	if _, err := listener.Exec(ctx, "listen live_refresh_requested"); err != nil {
 		_ = listener.Close(ctx)
 		return nil, fmt.Errorf("fakelive: %w", err)
 	}
@@ -221,18 +223,19 @@ func (f *Fake) claim(ctx context.Context, conn *pgx.Conn) (claimed, Outcome, boo
 		var c claimed
 		var o Outcome
 		err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-			if _, err := tx.Exec(ctx, "set local role viafrei_ingestor"); err != nil {
+			if _, err := tx.Exec(ctx, "set local role viafrei_live_ingestor"); err != nil {
 				return err
 			}
-			if err := tx.QueryRow(ctx, `select request_id::text, source, subject_key, subject::text, created_at from live.refresh_request
-				where state = 'pending' and not request_id::text = any($1)
-				order by created_at, request_id for update skip locked limit 1`, f.skipped).Scan(&c.id, &c.source, &c.key, &c.subject, &c.createdAt); err != nil {
+			if err := tx.QueryRow(ctx, `select id::text, source, subject_key, subject::text, created_at from live.refresh_requests
+				where state = 'pending' and claimed_at is null and not id::text = any($1)
+				order by created_at, id for update skip locked limit 1`, f.skipped).Scan(&c.id, &c.source, &c.key, &c.subject, &c.createdAt); err != nil {
 				return err
 			}
 			if o = f.script.outcome(c.source, c.key); o.State == Never {
 				return nil
 			}
-			_, err := tx.Exec(ctx, `update live.refresh_request set state = 'claimed', claimed_at = created_at where request_id = $1`, c.id)
+			// the claim of the protocol, at the asker's clock: the state stays pending
+			_, err := tx.Exec(ctx, `update live.refresh_requests set claimed_at = created_at where id = $1::bigint`, c.id)
 			return err
 		})
 		switch {
@@ -279,15 +282,16 @@ func (f *Fake) settle(ctx context.Context, c claimed, o Outcome) error {
 				return fmt.Errorf("fakelive: ticks of %s: %w", c.source, err)
 			}
 		}
-		if _, err := tx.Exec(ctx, "set local role viafrei_ingestor"); err != nil {
+		if _, err := tx.Exec(ctx, "set local role viafrei_live_ingestor"); err != nil {
 			return err
 		}
 		var reason *string
 		if o.Reason != "" {
 			reason = &o.Reason
 		}
-		_, err := tx.Exec(ctx, `update live.refresh_request set state = $2, settled_at = $3, reason = $4 where request_id = $1`,
-			c.id, o.State, at, reason)
+		// the settle of the protocol, once, in the transaction of the ticks
+		_, err := tx.Exec(ctx, `update live.refresh_requests set state = $2, settled_at = $3, reason = $4, reused = false
+			where id = $1::bigint and settled_at is null`, c.id, o.State, at, reason)
 		return err
 	})
 }

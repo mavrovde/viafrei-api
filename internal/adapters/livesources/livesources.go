@@ -1,36 +1,40 @@
 // Package livesources reads the registry of live sources an on-demand
-// refresh may name (G8) and checks an ask's subject against its source's
-// JSON Schema. The registry is configuration, never code: a new live source
-// is a new entry, with no change to the API.
+// refresh may name (G8), the live refresher's own registry.json, and checks
+// and keys an ask's subject by it. The registry is configuration, never
+// code: a new live source is a new entry, with no change to the API.
 //
-// The registry is one JSON object:
+// The registry is one JSON object (fields the API does not read, such as a
+// source's licence, are left alone):
 //
-//	{"sources": {"<name>": {
-//	  "description": "...",
+//	{"schema": 1, "sources": [{
+//	  "id": "<source id>", "status": "enabled" | ...,
 //	  "subject": <JSON Schema of an object>,
-//	  "key": [<rule>, ...],
-//	  "flags": ["<boolean property>", ...],
-//	  "fresh_for": "<duration>"}}}
+//	  "subject_key": {"lookups": {"<name>": {...}}, "cases": [<case>, ...]},
+//	  "freshness_s": <n>, "deadline_ms": <n>, "max_wait_s": <n>}]}
 //
-// A name is a lower-case letter followed by at most 31 lower-case letters,
-// digits or underscores. A subject schema is of type object and uses the
-// JSON Schema keywords the OpenAPI document does; a $ref or an unknown
-// keyword (a misspelt one, say) is refused when the registry is read.
+// An id is a lower-case letter followed by at most 63 lower-case letters,
+// digits or hyphens. A source whose status is not enabled is switched off:
+// an ask naming it is refused as paused. A subject schema is of type object
+// and uses the JSON Schema keywords the OpenAPI document does; a $ref or an
+// unknown keyword (a misspelt one, say) is refused when the registry is read.
 //
-// The key rules build a subject's canonical key, so that everyone asking
-// about one subject shares one refresh. The first rule whose field the
-// subject holds as a string matching its pattern applies:
+// The cases build a subject's key, so that everyone asking about one subject
+// shares one refresh. The first case all of whose match patterns match
+// applies (a boolean is matched as true or false); its emit template is
+// filled from the patterns' named groups, else from the subject's fields:
 //
-//	{"field": "at", "match": "^pt:(-?[0-9.]+),(-?[0-9.]+)$", "grid": [0.005, 0.0075], "prefix": "pt:"}
-//	    each capture group snapped to its grid step, four decimals at most;
-//	{"field": "name", "lookup": "station_eva", "prefix": "eva:"}
-//	    the value resolved by a lookup the read store answers;
-//	{"field": "eva", "match": "^([0-9]{7})$", "prefix": "eva:"}
-//	    the first capture group, or the whole value without one.
+//	{"match": {"at": "^ags:(?<ags>[0-9]{8})$"}, "emit": "ags:{ags}"}
+//	{"match": {"name": "\\S"}, "emit": "{name|trim|lookup:eva}"}
 //
-// Then "|<flag>" is appended for each flag property the subject sets true.
-// fresh_for is how long a settled refresh of a subject answers a new ask
-// about it with no new refresh (a Go duration; empty for never).
+// A placeholder's filters run in order: trim, bool (true or false),
+// grid:<step> (the number snapped to the step, four decimals at most) and
+// lookup:<name> (the value resolved by a lookup the read store answers).
+//
+// The stored subject holds public ids only (the data-steward's privacy
+// ruling): it is the one-field subject a case keys to the key itself (at
+// ags:<AGS> for fuel, eva for a train board). A key no such case gives back
+// (a cell, an anchor) is refused, and a position is resolved to its Gemeinde
+// before it is keyed (features), so it never reaches the store.
 package livesources
 
 import (
@@ -53,32 +57,42 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/refresh"
 )
 
-// sourceName is the shape of a source's name.
-var sourceName = regexp.MustCompile(`^[a-z][a-z0-9_]{0,31}$`)
+// sourceID is the shape of a source's id, as the request table checks it.
+var sourceID = regexp.MustCompile(`^[a-z][a-z0-9-]{0,63}$`)
+
+// placeholder is one {name|filter|...} of an emit template.
+var placeholder = regexp.MustCompile(`\{([^{}]*)\}`)
+
+// Enabled is the status of a source that is switched on.
+const Enabled = "enabled"
 
 // Source is one registered live source.
 type Source struct {
-	// Description says what the source refreshes.
-	Description string `json:"description"`
+	ID     string `json:"id"`
+	Status string `json:"status"`
 	// Subject is the JSON Schema of the source's subject object.
-	Subject *huma.Schema `json:"subject"`
-	// Key holds the rules building the subject's canonical key.
-	Key []Rule `json:"key"`
-	// Flags are the boolean properties a key states when true.
-	Flags []string `json:"flags,omitempty"`
-	// FreshFor is how long a settled refresh answers a new ask.
-	FreshFor string `json:"fresh_for,omitempty"`
-	freshFor time.Duration
+	Subject    *huma.Schema `json:"subject"`
+	SubjectKey KeyRule      `json:"subject_key"`
+	// FreshnessS is how long a settled refresh answers a new ask with no
+	// new refresh, in seconds; 0 for never.
+	FreshnessS int `json:"freshness_s"`
+	// DeadlineMS is how long an ask waits for its refresh to settle.
+	DeadlineMS int `json:"deadline_ms"`
+	// MaxWaitS is how long the live refresher keeps a request queued.
+	MaxWaitS int `json:"max_wait_s"`
 }
 
-// Rule is one key rule.
-type Rule struct {
-	Field  string    `json:"field"`
-	Match  string    `json:"match,omitempty"`
-	Grid   []float64 `json:"grid,omitempty"`
-	Lookup string    `json:"lookup,omitempty"`
-	Prefix string    `json:"prefix,omitempty"`
-	match  *regexp.Regexp
+// KeyRule is a source's subject_key rule.
+type KeyRule struct {
+	Lookups map[string]json.RawMessage `json:"lookups,omitempty"`
+	Cases   []Case                     `json:"cases"`
+}
+
+// Case is one case of a key rule.
+type Case struct {
+	Match map[string]string `json:"match"`
+	Emit  string            `json:"emit"`
+	match map[string]*regexp.Regexp
 }
 
 // Registry is the registered live sources; the zero value holds none.
@@ -89,43 +103,49 @@ type Registry struct {
 
 // file is the registry's layout.
 type file struct {
-	Sources map[string]Source `json:"sources"`
+	Schema  int      `json:"schema"`
+	Sources []Source `json:"sources"`
 }
 
 // Parse reads a registry from its JSON text.
 func Parse(raw []byte) (*Registry, error) {
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
 	var f file
-	if err := dec.Decode(&f); err != nil {
+	if err := json.NewDecoder(bytes.NewReader(raw)).Decode(&f); err != nil {
 		return nil, fmt.Errorf("livesources: %w", err)
+	}
+	if f.Schema != 1 {
+		return nil, fmt.Errorf("livesources: schema %d, this reader knows schema 1", f.Schema)
 	}
 	// huma ignores a keyword it does not read; the raw text is read again
 	// so that a misspelt one is refused, not silently left out.
 	var rf rawFile
 	_ = json.Unmarshal(raw, &rf) // the same text decoded above
-	for _, name := range slices.Sorted(maps.Keys(rf.Sources)) {
-		if err := keywords(rf.Sources[name].Subject, "subject"); err != nil {
-			return nil, fmt.Errorf("livesources: source %q: %w", name, err)
+	for i, s := range rf.Sources {
+		if err := keywords(s.Subject, "subject"); err != nil {
+			return nil, fmt.Errorf("livesources: sources[%d]: %w", i, err)
 		}
 	}
-	for _, name := range slices.Sorted(maps.Keys(f.Sources)) {
-		s := f.Sources[name]
+	out := map[string]Source{}
+	for i, s := range f.Sources {
 		switch {
-		case !sourceName.MatchString(name):
-			return nil, fmt.Errorf("livesources: source %q: a name is a lower-case letter and at most 31 lower-case letters, digits or underscores", name)
+		case !sourceID.MatchString(s.ID):
+			return nil, fmt.Errorf("livesources: sources[%d]: an id is a lower-case letter and at most 63 lower-case letters, digits or hyphens", i)
+		case out[s.ID].ID != "":
+			return nil, fmt.Errorf("livesources: source %q: registered twice", s.ID)
 		case s.Subject == nil || s.Subject.Type != huma.TypeObject:
-			return nil, fmt.Errorf("livesources: source %q: subject must be the JSON Schema of an object", name)
+			return nil, fmt.Errorf("livesources: source %q: subject must be the JSON Schema of an object", s.ID)
+		case s.FreshnessS < 0 || s.DeadlineMS < 0 || s.MaxWaitS < 0:
+			return nil, fmt.Errorf("livesources: source %q: freshness_s, deadline_ms and max_wait_s are zero or more", s.ID)
 		}
 		if err := plain(s.Subject, "subject"); err != nil {
-			return nil, fmt.Errorf("livesources: source %q: %w", name, err)
+			return nil, fmt.Errorf("livesources: source %q: %w", s.ID, err)
 		}
-		if err := s.compile(); err != nil {
-			return nil, fmt.Errorf("livesources: source %q: %w", name, err)
+		if err := s.SubjectKey.compile(); err != nil {
+			return nil, fmt.Errorf("livesources: source %q: subject_key: %w", s.ID, err)
 		}
-		f.Sources[name] = s
+		out[s.ID] = s
 	}
-	return &Registry{sources: f.Sources, schemas: huma.NewMapRegistry("#/components/schemas/", huma.DefaultSchemaNamer)}, nil
+	return &Registry{sources: out, schemas: huma.NewMapRegistry("#/components/schemas/", huma.DefaultSchemaNamer)}, nil
 }
 
 // Load reads the registry: from the file at path when path is set, else from
@@ -144,41 +164,65 @@ func Load(path, inline string) (*Registry, error) {
 	return &Registry{}, nil
 }
 
-// compile reads the key rules and the freshness window.
-func (s *Source) compile() error {
-	if len(s.Key) == 0 {
-		return errors.New("key: at least one rule")
+// compile reads the cases: each matches at least one field, and each of its
+// placeholders names a group or a field with known filters.
+func (k *KeyRule) compile() error {
+	if len(k.Cases) == 0 {
+		return errors.New("at least one case")
 	}
-	for i := range s.Key {
-		r := &s.Key[i]
-		re, err := regexp.Compile(r.Match)
-		switch {
-		case r.Field == "":
-			return fmt.Errorf("key[%d]: a rule names its field", i)
-		case err != nil:
-			return fmt.Errorf("key[%d]: %w", i, err)
-		case r.Lookup != "" && len(r.Grid) > 0:
-			return fmt.Errorf("key[%d]: a rule either looks up or snaps to a grid", i)
-		case len(r.Grid) > 0 && re.NumSubexp() != len(r.Grid):
-			return fmt.Errorf("key[%d]: a grid step for each capture group", i)
-		case slices.ContainsFunc(r.Grid, func(g float64) bool { return g <= 0 }):
-			return fmt.Errorf("key[%d]: a grid step is positive", i)
+	for i := range k.Cases {
+		c := &k.Cases[i]
+		if len(c.Match) == 0 {
+			return fmt.Errorf("cases[%d]: a case matches at least one field", i)
 		}
-		r.match = re
-	}
-	if s.FreshFor != "" {
-		d, err := time.ParseDuration(s.FreshFor)
-		if err != nil || d < 0 {
-			return fmt.Errorf("fresh_for: %q is no duration of zero or more", s.FreshFor)
+		c.match = map[string]*regexp.Regexp{}
+		for _, field := range slices.Sorted(maps.Keys(c.Match)) {
+			re, err := regexp.Compile(c.Match[field])
+			if err != nil {
+				return fmt.Errorf("cases[%d].match.%s: %w", i, field, err)
+			}
+			c.match[field] = re
 		}
-		s.freshFor = d
+		if c.Emit == "" {
+			return fmt.Errorf("cases[%d]: a case emits a key", i)
+		}
+		for _, m := range placeholder.FindAllStringSubmatch(c.Emit, -1) {
+			parts := strings.Split(m[1], "|")
+			if parts[0] == "" {
+				return fmt.Errorf("cases[%d]: an empty placeholder", i)
+			}
+			for _, f := range parts[1:] {
+				if err := k.filterKnown(f); err != nil {
+					return fmt.Errorf("cases[%d]: %w", i, err)
+				}
+			}
+		}
 	}
 	return nil
 }
 
+func (k *KeyRule) filterKnown(f string) error {
+	name, arg, _ := strings.Cut(f, ":")
+	switch name {
+	case "trim", "bool":
+		return nil
+	case "grid":
+		if step, err := strconv.ParseFloat(arg, 64); err != nil || step <= 0 || math.IsInf(step, 0) {
+			return fmt.Errorf("filter %q: a grid step is a positive number", f)
+		}
+		return nil
+	case "lookup":
+		if _, ok := k.Lookups[arg]; !ok {
+			return fmt.Errorf("filter %q: no such lookup", f)
+		}
+		return nil
+	}
+	return fmt.Errorf("unknown filter %q", f)
+}
+
 // rawFile is the registry's layout with each subject schema as its text.
 type rawFile struct {
-	Sources map[string]struct {
+	Sources []struct {
 		Subject json.RawMessage `json:"subject"`
 	} `json:"sources"`
 }
@@ -279,16 +323,19 @@ func plain(s *huma.Schema, at string) error {
 	return plain(s.Not, at+".not")
 }
 
-// Names lists the registered sources in name order.
+// Names lists the registered sources in id order.
 func (r *Registry) Names() []string { return slices.Sorted(maps.Keys(r.sources)) }
 
 // Check checks an ask: refresh.ErrSource when its source is not registered,
-// a *refresh.SubjectError naming the first location its source's schema
-// refuses.
+// refresh.ErrPaused when it is switched off, a *refresh.SubjectError naming
+// the first location its source's schema refuses.
 func (r *Registry) Check(a refresh.Ask) error {
 	s, ok := r.sources[a.Source]
-	if !ok {
+	switch {
+	case !ok:
 		return refresh.ErrSource
+	case s.Status != Enabled:
+		return refresh.ErrPaused
 	}
 	res := &huma.ValidateResult{}
 	huma.Validate(r.schemas, s.Subject, huma.NewPathBuffer([]byte{}, 0), huma.ModeWriteToServer, subjectValue(a.Subject), res)
@@ -306,68 +353,147 @@ func (r *Registry) Check(a refresh.Ask) error {
 
 // FreshFor is how long a settled refresh of the source answers a new ask;
 // zero for an unknown source.
-func (r *Registry) FreshFor(source string) time.Duration { return r.sources[source].freshFor }
+func (r *Registry) FreshFor(source string) time.Duration {
+	return time.Duration(r.sources[source].FreshnessS) * time.Second
+}
 
-// Key builds the canonical key of a checked ask's subject.
-func (r *Registry) Key(ctx context.Context, a refresh.Ask, lookup refresh.Lookup) (string, error) {
-	s, ok := r.sources[a.Source]
+// Deadline is how long an ask of the source waits for its refresh to
+// settle; zero for an unknown source or none set.
+func (r *Registry) Deadline(source string) time.Duration {
+	return time.Duration(r.sources[source].DeadlineMS) * time.Millisecond
+}
+
+// Key builds the key of a checked subject of the source.
+func (r *Registry) Key(ctx context.Context, source string, subject map[string]any, lookup refresh.Lookup) (string, error) {
+	s, ok := r.sources[source]
 	if !ok {
 		return "", refresh.ErrSource
 	}
-	for _, rule := range s.Key {
-		v, _ := a.Subject[rule.Field].(string)
-		m := rule.match.FindStringSubmatch(v)
-		if v == "" || m == nil {
+	for _, c := range s.SubjectKey.Cases {
+		groups, ok := c.matches(subject)
+		if !ok {
 			continue
 		}
-		key, err := rule.build(ctx, v, m, lookup)
+		return c.emit(ctx, subject, groups, lookup)
+	}
+	return "", &refresh.SubjectError{Location: "subject", Detail: "no key case of the source applies"}
+}
+
+// Stored is the subject stored for key: the one-field subject a case of the
+// source keys to key itself, with no lookup. A key no case gives back is
+// not a public id, and is refused.
+func (r *Registry) Stored(source, key string) (map[string]any, error) {
+	s, ok := r.sources[source]
+	if !ok {
+		return nil, refresh.ErrSource
+	}
+	for _, c := range s.SubjectKey.Cases {
+		if len(c.match) != 1 || strings.Contains(c.Emit, "lookup:") {
+			continue
+		}
+		for field := range c.match {
+			subject := map[string]any{field: key}
+			groups, ok := c.matches(subject)
+			if !ok {
+				continue
+			}
+			if got, err := c.emit(context.Background(), subject, groups, nil); err == nil && got == key {
+				return subject, nil
+			}
+		}
+	}
+	return nil, &refresh.SubjectError{Location: "subject", Detail: "the source keys this subject by no public id"}
+}
+
+// matches says whether every pattern of the case matches its field, with
+// the patterns' named groups.
+func (c Case) matches(subject map[string]any) (map[string]string, bool) {
+	groups := map[string]string{}
+	for field, re := range c.match {
+		v, ok := text(subject[field])
+		if !ok {
+			return nil, false
+		}
+		m := re.FindStringSubmatch(v)
+		if m == nil {
+			return nil, false
+		}
+		for i, name := range re.SubexpNames() {
+			if name != "" {
+				groups[name] = m[i]
+			}
+		}
+	}
+	return groups, true
+}
+
+// emit fills the case's template.
+func (c Case) emit(ctx context.Context, subject map[string]any, groups map[string]string, lookup refresh.Lookup) (string, error) {
+	var b strings.Builder
+	last := 0
+	for _, loc := range placeholder.FindAllStringSubmatchIndex(c.Emit, -1) {
+		b.WriteString(c.Emit[last:loc[0]])
+		last = loc[1]
+		parts := strings.Split(c.Emit[loc[2]:loc[3]], "|")
+		v, ok := groups[parts[0]]
+		if !ok {
+			v, _ = text(subject[parts[0]])
+		}
+		for _, f := range parts[1:] {
+			var err error
+			if v, err = filter(ctx, f, parts[0], v, lookup); err != nil {
+				return "", err
+			}
+		}
+		b.WriteString(v)
+	}
+	b.WriteString(c.Emit[last:])
+	return b.String(), nil
+}
+
+// filter runs one filter over the value v of the subject's field.
+func filter(ctx context.Context, f, field, v string, lookup refresh.Lookup) (string, error) {
+	name, arg, _ := strings.Cut(f, ":")
+	switch name {
+	case "trim":
+		return strings.TrimSpace(v), nil
+	case "bool":
+		return strconv.FormatBool(v == "true"), nil
+	case "grid":
+		step, _ := strconv.ParseFloat(arg, 64) // checked when the registry was read
+		x, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			return "", err
+			return "", &refresh.SubjectError{Location: "subject." + field, Detail: "not a number"}
 		}
-		if key == "" {
-			return "", &refresh.SubjectError{Location: "subject." + rule.Field, Detail: "nothing answers this value"}
-		}
-		for _, f := range s.Flags {
-			if a.Subject[f] == true {
-				key += "|" + f
-			}
-		}
-		return key, nil
+		return snap(x, step), nil
 	}
-	return "", &refresh.SubjectError{Location: "subject", Detail: "no key rule of the source applies"}
+	// lookup, the one filter left once the registry is read
+	if lookup == nil {
+		return "", &refresh.SubjectError{Location: "subject." + field, Detail: "nothing answers this value"}
+	}
+	got, err := lookup(ctx, arg, v)
+	if err != nil {
+		return "", err
+	}
+	if got == "" {
+		return "", &refresh.SubjectError{Location: "subject." + field, Detail: "nothing answers this value"}
+	}
+	return got, nil
 }
 
-// build is the key part of one rule over the matched value v; "" when the
-// lookup finds nothing.
-func (r Rule) build(ctx context.Context, v string, m []string, lookup refresh.Lookup) (string, error) {
-	switch {
-	case r.Lookup != "":
-		if lookup == nil {
-			return "", nil
-		}
-		got, err := lookup(ctx, r.Lookup, v)
-		if err != nil || got == "" {
-			return "", err
-		}
-		return r.Prefix + got, nil
-	case len(r.Grid) > 0:
-		parts := make([]string, len(r.Grid))
-		for i, step := range r.Grid {
-			x, err := strconv.ParseFloat(m[i+1], 64)
-			if err != nil {
-				return "", &refresh.SubjectError{Location: "subject." + r.Field, Detail: "not a number: " + m[i+1]}
-			}
-			parts[i] = snap(x, step)
-		}
-		return r.Prefix + strings.Join(parts, ","), nil
-	case len(m) > 1:
-		return r.Prefix + m[1], nil
+// text is a subject value as a pattern matches it: a string as it is, a
+// boolean as true or false; false for anything else or none.
+func text(v any) (string, bool) {
+	switch x := v.(type) {
+	case string:
+		return x, true
+	case bool:
+		return strconv.FormatBool(x), true
 	}
-	return r.Prefix + v, nil
+	return "", false
 }
 
-// snap is x on the grid of step, at most four decimals, as the site rounds
-// a position to its cell.
+// snap is x on the grid of step, at most four decimals.
 func snap(x, step float64) string {
 	v := math.Round(math.Round(x/step)*step*1e4) / 1e4
 	if v == 0 {

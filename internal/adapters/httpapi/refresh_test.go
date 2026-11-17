@@ -25,13 +25,14 @@ func (f *fakeFeatures) Refresh(_ context.Context, key access.Record, id string) 
 	return f.refresh, f.refreshErr
 }
 
-const refreshID = "01968a3c-1f00-7000-8000-000000000001"
+const refreshID = "42"
 
 type refreshBody struct {
 	Data struct {
 		ID, Source, State string
 		SettledAt         *time.Time
 		Reason            *string
+		Reused            bool
 		Queue             *struct{ Position int }
 	}
 	Links struct{ Self string }
@@ -50,17 +51,17 @@ func TestCreateRefreshAnswersSettled201AndOpen202WithLocation(t *testing.T) {
 	f := everyAnswer()
 	h := featureHandler(t, config.Defaults(), f, nil)
 	at := time.Date(2026, 3, 30, 0, 0, 0, 0, time.UTC)
-	f.refresh = refresh.Request{ID: refreshID, Source: "fuel", State: refresh.Refused, CreatedAt: at, SettledAt: &at, Reason: "no provider key"}
+	f.refresh = refresh.Request{ID: refreshID, Source: "fuel", State: refresh.Refused, CreatedAt: at, SettledAt: &at, Reason: "no provider key", Reused: true}
 	w := post(t, h, "/v1/refreshes", `{"source":"fuel","subject":{"at":"ags:09162000"}}`, bearer)
 	b := readRefresh(t, w.Body)
 	if w.Code != http.StatusCreated || w.Header().Get("Location") != b.Links.Self || b.Data.ID != refreshID || b.Data.State != "refused" ||
-		*b.Data.Reason != "no provider key" || b.Data.Queue != nil || f.gotRefresh.Source != "fuel" || f.gotRefresh.Subject["at"] != "ags:09162000" {
+		*b.Data.Reason != "no provider key" || !b.Data.Reused || b.Data.Queue != nil || f.gotRefresh.Source != "fuel" || f.gotRefresh.Subject["at"] != "ags:09162000" {
 		t.Fatalf("settled: %d %s %+v", w.Code, w.Body, f.gotRefresh)
 	}
 	zero := 0
-	f.refresh = refresh.Request{ID: refreshID, Source: "fuel", State: refresh.Claimed, CreatedAt: at, Position: &zero}
+	f.refresh = refresh.Request{ID: refreshID, Source: "fuel", State: refresh.Pending, CreatedAt: at, Position: &zero}
 	w = post(t, h, "/v1/refreshes", `{"source":"fuel","subject":{"at":"ags:09162000"}}`, bearer)
-	if b = readRefresh(t, w.Body); w.Code != http.StatusAccepted || b.Data.State != "pending" || b.Data.Queue == nil || b.Data.Queue.Position != 0 ||
+	if b = readRefresh(t, w.Body); w.Code != http.StatusAccepted || b.Data.State != "pending" || b.Data.Reused || b.Data.Queue == nil || b.Data.Queue.Position != 0 ||
 		b.Data.SettledAt != nil || w.Header().Get("Location") == "" {
 		t.Fatalf("open: %d %s", w.Code, w.Body)
 	}
@@ -78,6 +79,8 @@ func TestRefreshProblems(t *testing.T) {
 	if w := post(t, h, "/v1/refreshes", ask, bearer); assertProblem(t, w, 400, "invalid-parameter") != nil && !bytes.Contains(w.Body.Bytes(), []byte(`"body.subject.at"`)) {
 		t.Errorf("field not named: %s", w.Body)
 	}
+	f.refreshErr = refresh.ErrPaused
+	assertProblem(t, post(t, h, "/v1/refreshes", ask, bearer), 404, "feature-disabled")
 	f.refreshErr = features.ErrOwnKeyOnly
 	assertProblem(t, post(t, h, "/v1/refreshes", ask, bearer), 403, "scope-denied")
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/refreshes/"+refreshID, bearer), 403, "scope-denied")

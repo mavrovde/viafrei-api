@@ -24,7 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/mavrovde/viafrei-api/api"
@@ -104,7 +103,7 @@ func TestMain(m *testing.M) {
 func load(t *testing.T) (*config.Config, *store.Store) {
 	t.Helper()
 	cfg, err := config.Load(config.Options{Environ: []string{"VFAPI_DB_URL=" + db.ReaderURL, "VFAPI_ACCESS_URL=" + db.AccessURL, "VFAPI_AUTH_PEPPER=" + examplePepper,
-		"VFAPI_REFRESH_SOURCES_FILE=" + filepath.Join(root, "test", "live", "sources.json")}, RequireSecrets: true})
+		"VFAPI_REFRESH_SOURCES_FILE=" + filepath.Join(root, "test", "live", "registry.json")}, RequireSecrets: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,15 +164,6 @@ var freshReports = []fixtures.Report{
 	{Point: "DE*SYN*E000020", Age: 8 * time.Minute, State: "available"},
 }
 
-// refreshIDs makes a refresh's id from its source and subject key, so an
-// example states the same id on every run: each example asks about a
-// subject of its own, and getRefresh reads the base example's refresh.
-var refreshNS = uuid.MustParse("6f1d2c3b-4a59-4e6f-8a7b-9c0d1e2f3a4b")
-
-func refreshID(source, subjectKey string) string {
-	return uuid.NewSHA1(refreshNS, []byte(source+"|"+subjectKey)).String()
-}
-
 // startFake runs the fake live refresher over the examples' database with
 // the repository's registry and script, and records the example key every
 // example asks as, so a refresh can link its asker.
@@ -193,7 +183,7 @@ func startFake() (*fakelive.Fake, error) {
 		values ($2, 'live', 'example', 'examples', 'examples@example.test', decode(repeat('00', 32), 'hex'), $1, $1::timestamptz + interval '90 days', $1, 'own')`, now, keyID); err != nil {
 		return nil, err
 	}
-	sc, err := fakelive.Load(filepath.Join(root, "test", "live", "sources.json"), filepath.Join(root, "test", "live", "fakelive.json"))
+	sc, err := fakelive.Load(filepath.Join(root, "test", "live", "registry.json"), filepath.Join(root, "test", "live", "fakelive.json"))
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +223,6 @@ func ask(t *testing.T, cfg *config.Config, st *store.Store, e api.Example) (int,
 	if err != nil {
 		t.Fatal(err)
 	}
-	refreshes.NewID = refreshID
 	svc.WithRefreshes(refreshes)
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Config: cfg, Build: build, ContractVersion: dbcontract.ContractVersion, Now: clock,

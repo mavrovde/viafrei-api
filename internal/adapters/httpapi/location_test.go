@@ -10,6 +10,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
+	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
@@ -32,7 +33,7 @@ func TestLocationAnswer(t *testing.T) {
 	if w.Code != http.StatusOK || f.gotLoc.At.Lat != 50.94 {
 		t.Fatalf("status %d: %s", w.Code, body)
 	}
-	for _, want := range []string{`"id":"osm:node1"`, `"distanceM":40`, `"municipality":null`, `"name":"Kreis"`, `"state":null`} {
+	for _, want := range []string{`"id":"osm:node1"`, `"distanceM":40`, `"municipality":null`, `"name":"Kreis"`, `"state":null`, `"lowEmissionZone":null`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("answer lacks %s: %s", want, body)
 		}
@@ -40,6 +41,23 @@ func TestLocationAnswer(t *testing.T) {
 	f.location = features.LocationAnswer{Location: places.Location{Address: &places.Address{ID: "osm:node2"}}, Meta: features.Answer[struct{}]{At: fixedNow}}
 	if w = do(t, h, http.MethodGet, "/v1/location?at=50.94,6.96", bearer); !strings.Contains(w.Body.String(), `"distanceM":0`) {
 		t.Errorf("no distance: %s", w.Body.String())
+	}
+	zone := rules.Zone{Key: "k1", Name: "Umweltzone Köln", DistanceM: 1200}
+	road := rules.Zone{Key: "k2", Name: "A 4"}
+	area := rules.Zone{Key: "k3", Name: "Freigabe"}
+	for _, c := range []struct {
+		v    rules.Verdict
+		want string
+	}{
+		{rules.Verdict{Kind: "inside", Zone: &zone, ExemptRoad: &road}, `"lowEmissionZone":{"verdict":"inside","zone":"Umweltzone Köln","zoneKey":"k1","distanceM":null,"exemptRoad":"A 4","releasedArea":null}`},
+		{rules.Verdict{Kind: "outside", Zone: &zone}, `"lowEmissionZone":{"verdict":"outside","zone":"Umweltzone Köln","zoneKey":"k1","distanceM":1200,"exemptRoad":null,"releasedArea":null}`},
+		{rules.Verdict{Kind: "transfer", Transfer: &area}, `"lowEmissionZone":{"verdict":"transfer","zone":null,"zoneKey":null,"distanceM":null,"exemptRoad":null,"releasedArea":"Freigabe"}`},
+		{rules.Verdict{Kind: "unknown"}, `"lowEmissionZone":{"verdict":"unknown","zone":null,"zoneKey":null,"distanceM":null,"exemptRoad":null,"releasedArea":null}`},
+	} {
+		f.location = features.LocationAnswer{Zone: &c.v, Meta: features.Answer[struct{}]{At: fixedNow}}
+		if w = do(t, h, http.MethodGet, "/v1/location?at=50.94,6.96", bearer); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), c.want) {
+			t.Errorf("%s: %d %s", c.v.Kind, w.Code, w.Body.String())
+		}
 	}
 	assertProblem(t, do(t, featureHandler(t, config.Defaults(), nil, nil), http.MethodGet, "/v1/location?at=50.94,6.96", bearer), 404, "feature-disabled")
 	f.err = access.ErrNonePermitted

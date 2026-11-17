@@ -7,6 +7,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
+	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 )
 
 // LocationInput is the input of describeLocation.
@@ -37,6 +38,34 @@ type LocationData struct {
 	Municipality *LocationPlace   `json:"municipality" doc:"The nearest municipality within 50 km; null when none."`
 	District     *LocationPlace   `json:"district" doc:"The nearest district within 100 km; null when none."`
 	State        *LocationPlace   `json:"state" doc:"The Land of the district; null when no district."`
+	Zone         *LocationZone    `json:"lowEmissionZone" doc:"The low-emission zone the position lies in, as the platform's description of a position states it; null when the key may read no zone source."`
+}
+
+// LocationZone is the low-emission-zone verdict at a position.
+type LocationZone struct {
+	Verdict      string  `json:"verdict" enum:"inside,transfer,outside,unknown" doc:"inside a zone; in an area released at its edge; outside (zone names the nearest within 25 km); unknown: none within 25 km, which is not that there is no zone."`
+	Zone         *string `json:"zone" nullable:"true" doc:"The name of the zone it is inside, or of the nearest."`
+	ZoneKey      *string `json:"zoneKey" nullable:"true" doc:"The key of that zone row, as getDrivingRules lists it."`
+	DistanceM    *int    `json:"distanceM" nullable:"true" doc:"Outside: the distance to the nearest zone in metres; else null."`
+	ExemptRoad   *string `json:"exemptRoad" nullable:"true" doc:"The name of an exempt road within 60 m, a road the zone does not apply to."`
+	ReleasedArea *string `json:"releasedArea" nullable:"true" doc:"The name of the released area at the zone's edge the position is in."`
+}
+
+func locationZone(v *rules.Verdict) *LocationZone {
+	if v == nil {
+		return nil
+	}
+	name := func(z *rules.Zone) *string {
+		if z == nil {
+			return nil
+		}
+		return &z.Name
+	}
+	out := &LocationZone{Verdict: v.Kind, Zone: name(v.Zone), ZoneKey: zoneKey(v.Zone), ExemptRoad: name(v.ExemptRoad), ReleasedArea: name(v.Transfer)}
+	if v.Kind == "outside" {
+		out.DistanceM = &v.Zone.DistanceM
+	}
+	return out
 }
 
 // LocationEnvelope is the enveloped answer of describeLocation.
@@ -61,7 +90,7 @@ func locationPlace(p *places.Place) *LocationPlace {
 
 func registerLocation(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "What lies at a position"
-	op.Description = "A coordinate as a person understands it: the nearest address, municipality and district, and the district's Land; each fact on its own, null when none is within its reach. Needs the scope places."
+	op.Description = "A coordinate as a person understands it: the nearest address, municipality and district, the district's Land and the low-emission zone it lies in; each fact on its own, null when none is within its reach. Needs the scope places."
 	featureResponses(api, &op, "Not used by this operation.")
 	op.Extensions[counterpartExtension] = "location description"
 	huma.Register(api, op, func(ctx context.Context, in *LocationInput) (*LocationOutput, error) {
@@ -77,7 +106,7 @@ func registerLocation(api huma.API, s *server, op huma.Operation) {
 }
 
 func locationEnvelope(s *server, ctx context.Context, a features.LocationAnswer) LocationEnvelope {
-	data := LocationData{Municipality: locationPlace(a.Municipality), District: locationPlace(a.District), State: locationPlace(a.State)}
+	data := LocationData{Municipality: locationPlace(a.Municipality), District: locationPlace(a.District), State: locationPlace(a.State), Zone: locationZone(a.Zone)}
 	if v := a.Address; v != nil {
 		data.Address = &LocationAddress{Address: Address{ID: v.ID, Street: v.Street, HouseNumber: v.HouseNumber, Postcode: v.Postcode, Place: v.Place,
 			Land: v.Land, Location: position(v.Location), DataAsOf: day(v.DataAsOf), SourceFamily: v.Family}}

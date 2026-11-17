@@ -2682,6 +2682,70 @@
               "null"
             ]
           },
+          "lowEmissionZone": {
+            "additionalProperties": false,
+            "description": "The low-emission zone the position lies in, as the platform's description of a position states it; null when the key may read no zone source.",
+            "properties": {
+              "distanceM": {
+                "description": "Outside: the distance to the nearest zone in metres; else null.",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "exemptRoad": {
+                "description": "The name of an exempt road within 60 m, a road the zone does not apply to.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "releasedArea": {
+                "description": "The name of the released area at the zone's edge the position is in.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "verdict": {
+                "description": "inside a zone; in an area released at its edge; outside (zone names the nearest within 25 km); unknown: none within 25 km, which is not that there is no zone.",
+                "enum": [
+                  "inside",
+                  "transfer",
+                  "outside",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              "zone": {
+                "description": "The name of the zone it is inside, or of the nearest.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "zoneKey": {
+                "description": "The key of that zone row, as getDrivingRules lists it.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "verdict",
+              "zone",
+              "zoneKey",
+              "distanceM",
+              "exemptRoad",
+              "releasedArea"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "municipality": {
             "additionalProperties": false,
             "description": "The nearest municipality within 50 km; null when none.",
@@ -2777,7 +2841,8 @@
           "address",
           "municipality",
           "district",
-          "state"
+          "state",
+          "lowEmissionZone"
         ],
         "type": "object"
       },
@@ -11785,7 +11850,7 @@
     },
     "/v1/location": {
       "get": {
-        "description": "A coordinate as a person understands it: the nearest address, municipality and district, and the district's Land; each fact on its own, null when none is within its reach. Needs the scope places.",
+        "description": "A coordinate as a person understands it: the nearest address, municipality and district, the district's Land and the low-emission zone it lies in; each fact on its own, null when none is within its reach. Needs the scope places.",
         "operationId": "describeLocation",
         "parameters": [
           {
@@ -11816,7 +11881,8 @@
                         "address": null,
                         "municipality": null,
                         "district": null,
-                        "state": null
+                        "state": null,
+                        "lowEmissionZone": null
                       },
                       "meta": {
                         "requestId": "example-request-0001",

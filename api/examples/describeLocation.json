@@ -19,7 +19,8 @@
       "address": null,
       "municipality": null,
       "district": null,
-      "state": null
+      "state": null,
+      "lowEmissionZone": null
     },
     "meta": {
       "requestId": "example-request-0001",

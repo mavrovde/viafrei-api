@@ -14,10 +14,10 @@ import (
 
 // plantLiveCalls plants, at the read contract's now, a station with a page
 // (an EVA number gives it one) and five departures of its next hour: through
-// a live SIRI ET feed one cancelled and two on time, and through the Trip
+// a live estimated-timetable source one cancelled and two on time, and through the Trip
 // Updates two ticks of the station's quay, 15 and 2 minutes late. Its key
-// 09999 is no fixture area. The seed writes a SIRI ET call with no delay,
-// so a late SIRI ET call is the database's own test's.
+// 09999 is no fixture area. The seed writes an estimated-timetable call with no delay,
+// so a late call of that kind is the database's own test's.
 func plantLiveCalls(t *testing.T) {
 	t.Helper()
 	plant(t, `insert into contract.stop_place (stop_place_id, name, location, national_stop_code, source_ref, eva_no)
@@ -25,12 +25,12 @@ values ('1:de:09999:1', 'Testbahnhof Live', st_setsrid(st_makepoint(11.0, 49.0),
 	n := plant(t, `insert into contract.departure (stop_place_id, stop_point_id, journey_id, call_order, line_name, transport_mode, planned_departure_at,
   boarding, realtime_source, cancelled, delay_s, source_ref)
 select '1:de:09999:1', v.point, '1:' || v.trip || ':' || to_char(now() at time zone 'Europe/Berlin', 'YYYYMMDD'), 1, v.line, 'rail',
-       date_trunc('minute', now()) + v.at, true, v.feed, v.cancelled, v.delay, 'delfi_static'
+       date_trunc('minute', now()) + v.at, true, v.src, v.cancelled, v.delay, 'delfi_static'
 from (values ('1:de:09999:1', 'live-1', 'RE 9', interval '10 minutes', 'delfi_siri_et_zz', true, null::int),
              ('1:de:09999:1', 'live-2', 'RE 9', interval '12 minutes', 'delfi_siri_et_zz', false, null),
              ('1:de:09999:1', 'live-3', 'S 1', interval '20 minutes', 'delfi_siri_et_zz', false, null),
              ('1:de:09999:1:1', 'live-4', 'RB 2', interval '15 minutes', 'delfi_rt_tu', false, 900),
-             ('1:de:09999:1:1', 'live-5', 'RB 2', interval '25 minutes', 'delfi_rt_tu', false, 120)) v(point, trip, line, at, feed, cancelled, delay)`)
+             ('1:de:09999:1:1', 'live-5', 'RB 2', interval '25 minutes', 'delfi_rt_tu', false, 120)) v(point, trip, line, at, src, cancelled, delay)`)
 	if n != 5 {
 		t.Fatalf("planted %d of 5", n)
 	}
@@ -61,7 +61,7 @@ func TestLiveCallsCountAsThePlatformCountsThem(t *testing.T) {
 	var fams []string
 	owner(t, `select array_agg(distinct source_ref order by source_ref) from contract.source`, &fams)
 	if !slices.Contains(fams, "delfi_siri_et_zz") {
-		t.Fatalf("the planted feed is no family: %v", fams)
+		t.Fatalf("the planted source is no family: %v", fams)
 	}
 	ctx := access.WithAudience(bounded(t), access.AudienceOwn)
 
@@ -77,10 +77,10 @@ func TestLiveCallsCountAsThePlatformCountsThem(t *testing.T) {
 		if a := got[i]; a.Cancelled != 1 || a.Late != 0 || a.Alerts != 0 || a.LiftsOut != 0 || !slices.Equal(a.Families, []string{"delfi_static", "delfi_siri_et_zz"}) {
 			t.Errorf("counted %+v", a)
 		}
-		// without the feed's family nothing names it
+		// without the source's family nothing names it
 		none, err := st.AffectedStations(ctx, slices.DeleteFunc(slices.Clone(fams), func(f string) bool { return f == "delfi_siri_et_zz" }), time.Now(), 500)
 		if err != nil || slices.ContainsFunc(none, func(a transit.Affected) bool { return a.Station.ID == "1:de:09999:1" }) {
-			t.Errorf("listed without its feed: %v", err)
+			t.Errorf("listed without its source: %v", err)
 		}
 	})
 

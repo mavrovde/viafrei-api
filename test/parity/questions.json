@@ -2053,6 +2053,52 @@
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "affected-stations",
+      "operation": "listAffectedStations",
+      "counterpart": "station board",
+      "request": "/v1/affected-stations?limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places",
+          "energy",
+          "parking",
+          "roads",
+          "weather",
+          "transit"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "afir_zeta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
     }
   ]
 }

@@ -76,7 +76,14 @@ type Case struct {
 	Key         Key       `json:"key"`
 	Now         time.Time `json:"now"`
 	Refresh     *Refresh  `json:"refresh,omitempty"`
-	Facts       []Fact    `json:"facts"`
+	// Ruling is the lead's ruling on how the question is compared, kept
+	// with it (docs/parity.md); it changes nothing the harness does.
+	Ruling string `json:"ruling,omitempty"`
+	// APIOnly, when set, is why the question has no MCP form: the API's
+	// recording (the unsynced bundle) keeps it as a regression golden, and
+	// a platform bundle neither answers it nor may state it.
+	APIOnly string `json:"apiOnly,omitempty"`
+	Facts   []Fact `json:"facts"`
 }
 
 // Refresh is the on-demand refresh a question asks before its read: the
@@ -257,6 +264,21 @@ var Default = Rules{
 		{"data.parking.sites[*].occupancy.total", "", "getPlaceOverview", overviewReason},
 		{"data.parking.sites[*].occupancy.state", "", "getPlaceOverview", overviewReason},
 		{"data.parking.sites[*].occupancy.observedAt", "", "getPlaceOverview", overviewReason},
+		{"data[bast_lcl]", "", "listSources", sourcesReferenceReason},
+		{"meta.attribution[bast_lcl]", "", "listSources", sourcesReferenceReason},
+		{"data[bkg_gvisys]", "", "listSources", sourcesReferenceReason},
+		{"meta.attribution[bkg_gvisys]", "", "listSources", sourcesReferenceReason},
+		{"data[delfi_static]", "", "listSources", sourcesReferenceReason},
+		{"meta.attribution[delfi_static]", "", "listSources", sourcesReferenceReason},
+		{"data[geonames]", "", "listSources", sourcesReferenceReason},
+		{"meta.attribution[geonames]", "", "listSources", sourcesReferenceReason},
+		{"data[osm]", "", "listSources", sourcesReferenceReason},
+		{"meta.attribution[osm]", "", "listSources", sourcesReferenceReason},
+		{"data[osm_speed_cameras]", "", "listSources", sourcesReferenceReason},
+		{"meta.attribution[osm_speed_cameras]", "", "listSources", sourcesReferenceReason},
+		{"data[viafrei_rules]", "", "listSources", sourcesReferenceReason},
+		{"meta.attribution[viafrei_rules]", "", "listSources", sourcesReferenceReason},
+		{"data[*].domain", "", "listSources", sourcesReferenceReason},
 		{"data[*].status", "", "listSources", sourcesLiveReason},
 		{"data[*].dataAsOf", "", "listSources", sourcesLiveReason},
 		{"data[*].attribution", "", "listSources", sourcesTextReason},
@@ -340,6 +362,9 @@ const sourcesLiveReason = "live-varying: the API states a family's status and da
 
 // sourcesTextReason: the register texts of a source family, prose the
 // fixture states synthetically (attributionReason).
+// sourcesReferenceReason: the lead's ruling of 2026-11-17 on listSources.
+const sourcesReferenceReason = "API-only (lead ruling 2026-11-17): viafrei://coverage lists the live feeds of the deployment, not the reference families (places, the road register, timetables, rules), and states no domain; the live-feed families it lists are compared"
+
 const sourcesTextReason = "prose: the fixture's families carry synthetic register texts and the platform states its own register's; which families are listed, their domain, stale threshold and share-alike flag are compared"
 
 const watchIDReason = "each side mints the id of a watch: the platform a number of its session, the API a token of kind, key and condition; the watch it names is compared"
@@ -497,6 +522,13 @@ type Question struct {
 	Key         Key       `json:"key"`
 	Now         time.Time `json:"now"`
 	Refresh     *Refresh  `json:"refresh,omitempty"`
+	// Ruling is the lead's ruling on how the question is compared, kept
+	// with it (docs/parity.md); it changes nothing the harness does.
+	Ruling string `json:"ruling,omitempty"`
+	// APIOnly, when set, is why the question has no MCP form: the API's
+	// recording (the unsynced bundle) keeps it as a regression golden, and
+	// a platform bundle neither answers it nor may state it.
+	APIOnly string `json:"apiOnly,omitempty"`
 }
 
 // Questions are the parity questions and the fixture rows they are asked on.
@@ -541,7 +573,7 @@ func LoadQuestions(fsys fs.FS) (Questions, error) {
 
 // QuestionOf is the question a case answers.
 func QuestionOf(c Case) Question {
-	return Question{ID: c.ID, Operation: c.Operation, Counterpart: c.Counterpart, Request: c.Request, Key: c.Key, Now: c.Now, Refresh: c.Refresh}
+	return Question{ID: c.ID, Operation: c.Operation, Counterpart: c.Counterpart, Request: c.Request, Key: c.Key, Now: c.Now, Refresh: c.Refresh, Ruling: c.Ruling, APIOnly: c.APIOnly}
 }
 
 // Answers states every way in which b does not answer exactly q: a question
@@ -563,12 +595,14 @@ func Answers(b Bundle, q Questions) []string {
 		switch {
 		case !ok:
 			out = append(out, "case "+c.ID+": not a question")
+		case want.APIOnly != "" && b.Producer == ProducerMCP:
+			out = append(out, "case "+c.ID+": an api-only question, which an MCP bundle may not answer")
 		case !sameQuestion(QuestionOf(c), want):
 			out = append(out, "case "+c.ID+": asked differently from the question")
 		}
 	}
 	for _, c := range q.Cases {
-		if !answered[c.ID] {
+		if !answered[c.ID] && (c.APIOnly == "" || b.Producer != ProducerMCP) {
 			out = append(out, "question "+c.ID+": no case answers it")
 		}
 	}

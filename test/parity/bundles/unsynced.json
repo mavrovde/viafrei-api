@@ -10196,14 +10196,12 @@
           "truckpark_sid_static",
           "viafrei_rules"
         ],
+        "audience": "own",
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z",
+      "ruling": "Lead ruling 2026-11-17: compared are the live-feed families viafrei://coverage lists (family, staleAfterS, shareAlike); the reference families (bast_lcl, bkg_gvisys, delfi_static, geonames, osm, osm_speed_cameras, viafrei_rules), the domain and the domain filter are API-only.",
       "facts": [
-        {
-          "name": "data[afir_alpha].domain",
-          "value": "energy"
-        },
         {
           "name": "data[afir_alpha].family",
           "value": "afir_alpha"
@@ -10215,10 +10213,6 @@
         {
           "name": "data[afir_alpha].staleAfterS",
           "value": "1800"
-        },
-        {
-          "name": "data[afir_beta].domain",
-          "value": "energy"
         },
         {
           "name": "data[afir_beta].family",
@@ -10233,34 +10227,6 @@
           "value": "1800"
         },
         {
-          "name": "data[bast_lcl].domain",
-          "value": "roads"
-        },
-        {
-          "name": "data[bast_lcl].family",
-          "value": "bast_lcl"
-        },
-        {
-          "name": "data[bast_lcl].shareAlike",
-          "value": "false"
-        },
-        {
-          "name": "data[bkg_gvisys].domain",
-          "value": "places"
-        },
-        {
-          "name": "data[bkg_gvisys].family",
-          "value": "bkg_gvisys"
-        },
-        {
-          "name": "data[bkg_gvisys].shareAlike",
-          "value": "false"
-        },
-        {
-          "name": "data[chargepool_gamma].domain",
-          "value": "energy"
-        },
-        {
           "name": "data[chargepool_gamma].family",
           "value": "chargepool_gamma"
         },
@@ -10271,10 +10237,6 @@
         {
           "name": "data[chargepool_gamma].staleAfterS",
           "value": "1800"
-        },
-        {
-          "name": "data[delfi_rt_tu].domain",
-          "value": "transit"
         },
         {
           "name": "data[delfi_rt_tu].family",
@@ -10289,10 +10251,6 @@
           "value": "180"
         },
         {
-          "name": "data[delfi_sa_alpha].domain",
-          "value": "transit"
-        },
-        {
           "name": "data[delfi_sa_alpha].family",
           "value": "delfi_sa_alpha"
         },
@@ -10303,26 +10261,6 @@
         {
           "name": "data[delfi_sa_alpha].staleAfterS",
           "value": "900"
-        },
-        {
-          "name": "data[delfi_static].domain",
-          "value": "transit"
-        },
-        {
-          "name": "data[delfi_static].family",
-          "value": "delfi_static"
-        },
-        {
-          "name": "data[delfi_static].shareAlike",
-          "value": "false"
-        },
-        {
-          "name": "data[delfi_static].staleAfterS",
-          "value": "259200"
-        },
-        {
-          "name": "data[dwd_alpha].domain",
-          "value": "weather"
         },
         {
           "name": "data[dwd_alpha].family",
@@ -10337,10 +10275,6 @@
           "value": "900"
         },
         {
-          "name": "data[dwd_eta].domain",
-          "value": "weather"
-        },
-        {
           "name": "data[dwd_eta].family",
           "value": "dwd_eta"
         },
@@ -10351,10 +10285,6 @@
         {
           "name": "data[dwd_eta].staleAfterS",
           "value": "900"
-        },
-        {
-          "name": "data[gbfs_nextbike].domain",
-          "value": "transit"
         },
         {
           "name": "data[gbfs_nextbike].family",
@@ -10369,22 +10299,6 @@
           "value": "180"
         },
         {
-          "name": "data[geonames].domain",
-          "value": "places"
-        },
-        {
-          "name": "data[geonames].family",
-          "value": "geonames"
-        },
-        {
-          "name": "data[geonames].shareAlike",
-          "value": "false"
-        },
-        {
-          "name": "data[lez_alpha].domain",
-          "value": "roads"
-        },
-        {
           "name": "data[lez_alpha].family",
           "value": "lez_alpha"
         },
@@ -10397,10 +10311,6 @@
           "value": "259200"
         },
         {
-          "name": "data[lorry_bast_langlkw].domain",
-          "value": "roads"
-        },
-        {
           "name": "data[lorry_bast_langlkw].family",
           "value": "lorry_bast_langlkw"
         },
@@ -10409,20 +10319,12 @@
           "value": "false"
         },
         {
-          "name": "data[lorry_koeln_beschraenkungen].domain",
-          "value": "roads"
-        },
-        {
           "name": "data[lorry_koeln_beschraenkungen].family",
           "value": "lorry_koeln_beschraenkungen"
         },
         {
           "name": "data[lorry_koeln_beschraenkungen].shareAlike",
           "value": "false"
-        },
-        {
-          "name": "data[openstation_siri_fm].domain",
-          "value": "accessibility"
         },
         {
           "name": "data[openstation_siri_fm].family",
@@ -10437,38 +10339,6 @@
           "value": "2700"
         },
         {
-          "name": "data[osm].domain",
-          "value": "places"
-        },
-        {
-          "name": "data[osm].family",
-          "value": "osm"
-        },
-        {
-          "name": "data[osm].shareAlike",
-          "value": "true"
-        },
-        {
-          "name": "data[osm_speed_cameras].domain",
-          "value": "roads"
-        },
-        {
-          "name": "data[osm_speed_cameras].family",
-          "value": "osm_speed_cameras"
-        },
-        {
-          "name": "data[osm_speed_cameras].shareAlike",
-          "value": "true"
-        },
-        {
-          "name": "data[osm_speed_cameras].staleAfterS",
-          "value": "259200"
-        },
-        {
-          "name": "data[park_alpha].domain",
-          "value": "parking"
-        },
-        {
           "name": "data[park_alpha].family",
           "value": "park_alpha"
         },
@@ -10479,10 +10349,6 @@
         {
           "name": "data[park_alpha].staleAfterS",
           "value": "900"
-        },
-        {
-          "name": "data[park_beta].domain",
-          "value": "parking"
         },
         {
           "name": "data[park_beta].family",
@@ -10497,10 +10363,6 @@
           "value": "900"
         },
         {
-          "name": "data[roads_alpha].domain",
-          "value": "roads"
-        },
-        {
           "name": "data[roads_alpha].family",
           "value": "roads_alpha"
         },
@@ -10511,10 +10373,6 @@
         {
           "name": "data[roads_alpha].staleAfterS",
           "value": "900"
-        },
-        {
-          "name": "data[speed_alpha].domain",
-          "value": "roads"
         },
         {
           "name": "data[speed_alpha].family",
@@ -10529,16 +10387,16 @@
           "value": "259200"
         },
         {
-          "name": "data[viafrei_rules].domain",
-          "value": "rules"
+          "name": "data[tankerkoenig_gamma].family",
+          "value": "tankerkoenig_gamma"
         },
         {
-          "name": "data[viafrei_rules].family",
-          "value": "viafrei_rules"
-        },
-        {
-          "name": "data[viafrei_rules].shareAlike",
+          "name": "data[tankerkoenig_gamma].shareAlike",
           "value": "false"
+        },
+        {
+          "name": "data[tankerkoenig_gamma].staleAfterS",
+          "value": "900"
         },
         {
           "name": "meta.attribution[afir_alpha].family",
@@ -10547,14 +10405,6 @@
         {
           "name": "meta.attribution[afir_beta].family",
           "value": "afir_beta"
-        },
-        {
-          "name": "meta.attribution[bast_lcl].family",
-          "value": "bast_lcl"
-        },
-        {
-          "name": "meta.attribution[bkg_gvisys].family",
-          "value": "bkg_gvisys"
         },
         {
           "name": "meta.attribution[chargepool_gamma].family",
@@ -10569,10 +10419,6 @@
           "value": "delfi_sa_alpha"
         },
         {
-          "name": "meta.attribution[delfi_static].family",
-          "value": "delfi_static"
-        },
-        {
           "name": "meta.attribution[dwd_alpha].family",
           "value": "dwd_alpha"
         },
@@ -10583,10 +10429,6 @@
         {
           "name": "meta.attribution[gbfs_nextbike].family",
           "value": "gbfs_nextbike"
-        },
-        {
-          "name": "meta.attribution[geonames].family",
-          "value": "geonames"
         },
         {
           "name": "meta.attribution[lez_alpha].family",
@@ -10605,14 +10447,6 @@
           "value": "openstation_siri_fm"
         },
         {
-          "name": "meta.attribution[osm].family",
-          "value": "osm"
-        },
-        {
-          "name": "meta.attribution[osm_speed_cameras].family",
-          "value": "osm_speed_cameras"
-        },
-        {
           "name": "meta.attribution[park_alpha].family",
           "value": "park_alpha"
         },
@@ -10629,8 +10463,8 @@
           "value": "speed_alpha"
         },
         {
-          "name": "meta.attribution[viafrei_rules].family",
-          "value": "viafrei_rules"
+          "name": "meta.attribution[tankerkoenig_gamma].family",
+          "value": "tankerkoenig_gamma"
         },
         {
           "name": "meta.notes.condition[lorry_bast_langlkw]",
@@ -10638,6 +10472,10 @@
         },
         {
           "name": "meta.notes.purpose[chargepool_gamma]",
+          "value": "1"
+        },
+        {
+          "name": "meta.notes.purpose[tankerkoenig_gamma]",
           "value": "1"
         }
       ]
@@ -10684,54 +10522,11 @@
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z",
+      "apiOnly": "The domain filter is API-only (lead ruling 2026-11-17): viafrei://coverage states no domain, and the places domain holds only reference families, which the coverage resource does not list.",
       "facts": [
         {
-          "name": "data[bkg_gvisys].domain",
-          "value": "places"
-        },
-        {
-          "name": "data[bkg_gvisys].family",
-          "value": "bkg_gvisys"
-        },
-        {
-          "name": "data[bkg_gvisys].shareAlike",
-          "value": "false"
-        },
-        {
-          "name": "data[geonames].domain",
-          "value": "places"
-        },
-        {
-          "name": "data[geonames].family",
-          "value": "geonames"
-        },
-        {
-          "name": "data[geonames].shareAlike",
-          "value": "false"
-        },
-        {
-          "name": "data[osm].domain",
-          "value": "places"
-        },
-        {
-          "name": "data[osm].family",
-          "value": "osm"
-        },
-        {
-          "name": "data[osm].shareAlike",
-          "value": "true"
-        },
-        {
-          "name": "meta.attribution[bkg_gvisys].family",
-          "value": "bkg_gvisys"
-        },
-        {
-          "name": "meta.attribution[geonames].family",
-          "value": "geonames"
-        },
-        {
-          "name": "meta.attribution[osm].family",
-          "value": "osm"
+          "name": "data",
+          "value": "{}"
         },
         {
           "name": "meta.notes.condition",
@@ -12192,6 +11987,7 @@
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z",
+      "apiOnly": "The MCP side has no matching form (the coverage resource counts places per platform kind, with no family or Land; the home's national tiles are HTML); site parity comes with the web switch to the API (lead ruling 2026-11-17).",
       "facts": [
         {
           "name": "data.addresses[0].dataAsOf",
@@ -12586,6 +12382,7 @@
         "accepted": null
       },
       "now": "2026-03-30T00:00:00Z",
+      "apiOnly": "The MCP side has no matching form (the coverage resource counts places per platform kind, with no family or Land; the home's national tiles are HTML); site parity comes with the web switch to the API (lead ruling 2026-11-17).",
       "facts": [
         {
           "name": "data.charging[0].chargePoints",

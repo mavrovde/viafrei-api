@@ -527,7 +527,7 @@ func recordBundle(t *testing.T) {
 	}
 	a := open(t)
 	for _, qq := range q.Cases {
-		c := parity.Case{ID: qq.ID, Operation: qq.Operation, Counterpart: qq.Counterpart, Request: qq.Request, Key: qq.Key, Now: qq.Now, Refresh: qq.Refresh}
+		c := parity.Case{ID: qq.ID, Operation: qq.Operation, Counterpart: qq.Counterpart, Request: qq.Request, Key: qq.Key, Now: qq.Now, Refresh: qq.Refresh, Ruling: qq.Ruling, APIOnly: qq.APIOnly}
 		facts, err := parity.Project(a.ask(t, c), parity.Default, c.Operation, c.Request, a.owners)
 		if err != nil {
 			t.Fatal(err)

@@ -1486,9 +1486,11 @@
           "truckpark_sid_static",
           "viafrei_rules"
         ],
+        "audience": "own",
         "accepted": null
       },
-      "now": "2026-03-30T00:00:00Z"
+      "now": "2026-03-30T00:00:00Z",
+      "ruling": "Lead ruling 2026-11-17: compared are the live-feed families viafrei://coverage lists (family, staleAfterS, shareAlike); the reference families (bast_lcl, bkg_gvisys, delfi_static, geonames, osm, osm_speed_cameras, viafrei_rules), the domain and the domain filter are API-only."
     },
     {
       "id": "sources-places",
@@ -1531,7 +1533,8 @@
         ],
         "accepted": null
       },
-      "now": "2026-03-30T00:00:00Z"
+      "now": "2026-03-30T00:00:00Z",
+      "apiOnly": "The domain filter is API-only (lead ruling 2026-11-17): viafrei://coverage states no domain, and the places domain holds only reference families, which the coverage resource does not list."
     },
     {
       "id": "motorways-all",
@@ -2141,7 +2144,8 @@
         ],
         "accepted": null
       },
-      "now": "2026-03-30T00:00:00Z"
+      "now": "2026-03-30T00:00:00Z",
+      "apiOnly": "The MCP side has no matching form (the coverage resource counts places per platform kind, with no family or Land; the home's national tiles are HTML); site parity comes with the web switch to the API (lead ruling 2026-11-17)."
     },
     {
       "id": "national-summary",
@@ -2189,7 +2193,8 @@
         ],
         "accepted": null
       },
-      "now": "2026-03-30T00:00:00Z"
+      "now": "2026-03-30T00:00:00Z",
+      "apiOnly": "The MCP side has no matching form (the coverage resource counts places per platform kind, with no family or Land; the home's national tiles are HTML); site parity comes with the web switch to the API (lead ruling 2026-11-17)."
     },
     {
       "id": "fuel-refreshed",

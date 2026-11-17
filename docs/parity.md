@@ -116,6 +116,7 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
 | `data.fresh`, `data.fetchedAt`, `data.ageSeconds`, in `getTrainBoard` only | API-only: the age of the recorded board the API serves. The train tool asks the timetable provider at the time of the question; the producer gives it a departures port fed from the fixture's recorded boards (`contract.train_board`), so both sides answer from the same rows and no provider is called. |
 | `data.place.location`, `data.charging.sites[*].access`, `data.charging.sites[*].chargePoints`, `data.parking.sites[*].kind`, `data.parking.sites[*].operator`, `data.parking.sites[*].occupancy.total`, `.state`, `.observedAt`, in `getPlaceOverview` only | API-only. The site's form of the overview is the place page of the Gemeinde (digest route `/internal/place/cards`): it shows the place's name, and per charging site its name, operator, map point, highest power and number of charge points, per car park its name, map point and free spaces. Those are compared; the place's position, a charging site's access and charge points, and a car park's kind, operator, capacity, state and reading time are not shown. A site's id is the read contract's row at the point the row links its map to. |
 | `data.charging.sites[*].distanceM`, `data.parking.sites[*].distanceM`, in `getPlaceOverview` only | The cards state a site's distance in kilometres to one decimal with a direction, the API in metres. The site's point, which both measure from, is compared. |
+| `data[<family>]` and `meta.attribution[<family>]` of the reference families `bast_lcl`, `bkg_gvisys`, `delfi_static`, `geonames`, `osm`, `osm_speed_cameras`, `viafrei_rules`, and `data[*].domain`, in `listSources` only | API-only, lead ruling 2026-11-17: the coverage resource lists the deployment's live feeds, not its reference data (places, the road register, timetables, rules), and states no domain. The live-feed families it lists are compared: which are listed, `staleAfterS`, `shareAlike`. |
 | `data[*].status`, `data[*].dataAsOf`, in `listSources` only | Live-varying. The source register's MCP form is the coverage resource (`viafrei://coverage`), generated from the source catalogue: it states a source's freshness from the platform's run ledger, the API a family's status and age from its newest `dataAsOf`. The fixture rows hold no runs, so the two cannot agree on these rows. Which families are listed, their `domain`, `staleAfterS` and `shareAlike` are compared. |
 | `data[*].attribution`, `data[*].licence`, `data[*].licenceUrl`, `data[*].publisher`, `data[*].termsUrl`, in `listSources` only | Prose: the register texts of a family. The fixture's families carry synthetic texts and the platform states its own register's (the reason of `meta.attribution[*]` below). |
 | `data.watchId`, `data.uri`, in `getWatch` only | Each side mints the id of a watch: the platform a number of the session that opened it, the API a token of the kind, the key and the condition. The watch the id names (kind, key, condition, window) is compared. |
@@ -153,10 +154,17 @@ refresh after the read, so every pass over the questions reads the same
 rows; a refresh question is asked at a clock no fixture row is dated.
 `fuel-refreshed` and `train-board-refreshed` are asked so.
 
-`sources-all` is asked with a `consumer` key: the MCP coverage resource
-lists the deployment's sources for the site's and an assistant's readers,
-which is the consumer use class; a commercial key would withhold the
-consumer-only families the resource lists.
+`sources-all` is asked with ViaFrei's own consumer key: the MCP coverage
+resource lists the deployment's sources for the site's and an assistant's
+readers, which is that key; a commercial or public key would withhold the
+consumer-only and own-only families the resource lists.
+
+**API-only questions.** A question stating `apiOnly` (its reason) has no
+MCP form. The API's recording keeps it as a regression golden; a platform
+bundle neither answers it nor may state it. `sources-places` (the domain
+filter), `places-coverage` and `national-summary` are api-only (lead ruling
+2026-11-17): site parity of the last two comes with the web switch to the
+API. A question's `ruling` keeps the lead's ruling on how it is compared.
 
 `charging-reserved` is asked at the same place 7 minutes after a point
 reported `reserved`. Both sides must answer it `occupied`: a reserved point

@@ -73,12 +73,9 @@ func TestLocationAtAnAddress(t *testing.T) {
 // Under a district with a region code, the Land is the one that code
 // begins: a district planted on a municipality's point and key.
 func TestLocationUnderADistrictReadsItsLand(t *testing.T) {
-	st, cp := private(t, `insert into public.gazetteer_places overriding system value
-		select (jsonb_populate_record(null::public.gazetteer_places, to_jsonb(g) || jsonb_build_object(
-		  'id', (select max(id) from public.gazetteer_places) + 1, 'kind', 'district',
-		  'external_id', g.external_id || '-district', 'closed_at', null))).*
-		from public.gazetteer_places g join contract.place p on p.place_id = g.id::text
-		where p.place_kind = 'municipality' and p.region_code is not null order by g.id limit 1`)
+	st, cp := private(t, plantCopy("contract.place", "admin_code",
+		`w.id::text in (select place_id from contract.place where place_kind = 'municipality' and region_code is not null)`,
+		`jsonb_build_object('kind', 'district', 'external_id', w.external_id || '-district', 'closed_at', null)`))
 	var at geo.Point
 	ownerOf(t, cp, `select st_y(location), st_x(location) from contract.place
 		where place_kind = 'district' and region_code is not null limit 1`, &at.Lat, &at.Lon)
@@ -101,15 +98,30 @@ func ownerOf(t *testing.T, cp *pgtest.DB, sql string, dest ...any) {
 	}
 }
 
+// plantCopy copies the first row, by id, of the platform's table under
+// the contract view that has column, among those where holds, as one more
+// row with the jsonb overrides: the table is read off the view, as it is
+// the platform's to name.
+func plantCopy(view, column, where, overrides string) string {
+	insert := "insert into %1$s overriding system value select (jsonb_populate_record(null::%1$s, to_jsonb(w)" +
+		" || jsonb_build_object('id', (select max(id) from %1$s) + 1) || " + overrides + ")).* from %1$s w where " +
+		where + " order by w.id limit 1"
+	return `do $plant$ declare t text; begin
+		select d.refobjid::regclass::text into strict t from pg_rewrite r
+		  join pg_depend d on d.classid = 'pg_rewrite'::regclass and d.objid = r.oid
+		    and d.refclassid = 'pg_class'::regclass and d.refobjid <> r.ev_class
+		  join pg_attribute a on a.attrelid = d.refobjid and a.attname = '` + column + `'
+		 where r.ev_class = '` + view + `'::regclass group by d.refobjid;
+		execute format('` + strings.ReplaceAll(insert, "'", "''") + `', t);
+	end $plant$`
+}
+
 // plantWarning copies the first placed warning as one more, version n,
 // of level, in force since an hour.
 func plantWarning(n, level int) string {
-	return fmt.Sprintf(`insert into public.weather_warnings overriding system value
-		select (jsonb_populate_record(null::public.weather_warnings, to_jsonb(w) || jsonb_build_object(
-		  'id', (select max(id) from public.weather_warnings) + 1, 'version', w.version + 1000 + %d, 'level', %d,
-		  'valid_from', now() - interval '1 hour', 'valid_to', null, 'closed_at', null, 'closed_reason', null,
-		  'deleted_at', null))).*
-		from public.weather_warnings w where w.area is not null order by w.id limit 1`, n, level)
+	return plantCopy("contract.weather_warning", "warncell_id", "w.area is not null", fmt.Sprintf(`jsonb_build_object(
+		'version', w.version + 1000 + %d, 'level', %d, 'valid_from', now() - interval '1 hour', 'valid_to', null,
+		'closed_at', null, 'closed_reason', null, 'deleted_at', null)`, n, level))
 }
 
 // At a point more warnings answer than the limit: the page says so. A
@@ -117,8 +129,8 @@ func plantWarning(n, level int) string {
 func TestWarningsAtMoreThanTheLimitAndABadLevel(t *testing.T) {
 	var fams []string
 	owner(t, `select array_agg(source_ref order by source_ref) from contract.source`, &fams)
-	const where = `select st_y(st_pointonsurface(area::geometry)), st_x(st_pointonsurface(area::geometry))
-		from public.weather_warnings where version > 1000 limit 1`
+	const where = `select st_y(st_pointonsurface(area)), st_x(st_pointonsurface(area)) from contract.weather_warning
+		where area is not null and valid_to is null and valid_from > now() - interval '2 hours' limit 1`
 	st, cp := private(t, plantWarning(1, 2), plantWarning(2, 3))
 	var at geo.Point
 	ownerOf(t, cp, where, &at.Lat, &at.Lon)

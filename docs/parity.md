@@ -139,6 +139,20 @@ last report: older than the status age limit (30 minutes) and younger than
 its family's design threshold (an hour). Both sides must answer it `stale`,
 so a change of either side's limit fails here.
 
+A question may ask a **refresh** before its read (`refresh`: the
+`source` and `subject` of `createRefresh`). The harness asks
+`POST /v1/refreshes` as the question's key (an own key: only ViaFrei's own
+keys may ask one), the fake live refresher (`internal/testkit/fakelive`)
+settles it by the repository's script (`test/live/fakelive.json`), and the
+read is asked once it has settled `refreshed`; any other outcome fails the
+run. The read is compared, not the refresh's own answer: the MCP tool
+states no refresh of its own. The MCP side settles the same script's ticks
+on its rows at the question's clock, through the tool's own port (the fuel
+tools' price refresh, the train board's provider). Both sides undo the
+refresh after the read, so every pass over the questions reads the same
+rows; a refresh question is asked at a clock no fixture row is dated.
+`fuel-refreshed` and `train-board-refreshed` are asked so.
+
 `sources-all` is asked with a `consumer` key: the MCP coverage resource
 lists the deployment's sources for the site's and an assistant's readers,
 which is the consumer use class; a commercial key would withhold the

@@ -40,10 +40,14 @@ func fuService(f *fuFake) *features.Service {
 
 func TestFuelStationsAreRankedGatedAndAttributed(t *testing.T) {
 	req.Covers(t, "FR-ENERGY-001", "SEC-030")
+	// The hours decide: a keeps Saturday hours (closed on this Sunday) though
+	// it reports open; b and c are open around the clock.
+	yes := true
+	allDay, saturday := energy.Hours{WholeDay: &yes}, energy.Hours{Times: []energy.OpeningTime{{Text: "Sa", Start: "08:00", End: "12:00"}}}
 	f := &fuFake{stations: []energy.FuelStation{
-		{ID: "a", DistanceM: 1, Open: "closed", Family: "f1"},
-		{ID: "b", DistanceM: 2, Open: "open", Family: "f1"},
-		{ID: "c", DistanceM: 3, Open: "open", Family: "f1"},
+		{ID: "a", DistanceM: 1, Open: "open", Hours: saturday, Family: "f1"},
+		{ID: "b", DistanceM: 2, Open: "closed", Hours: allDay, Family: "f1"},
+		{ID: "c", DistanceM: 3, Hours: allDay, Family: "f1"},
 	}}
 	a, err := fuService(f).FuelStations(context.Background(), key("commercial", []access.Scope{"energy"}, "f1", "f2"), energy.FuelQuery{OpenNow: true, Limit: 1})
 	if err != nil {

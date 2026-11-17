@@ -449,3 +449,32 @@ func TestAnEndedSituationChangesWhenItLeavesTheRetention(t *testing.T) {
 		t.Errorf("an open-ended situation changes at %v", a.ChangesAt)
 	}
 }
+
+type catFake struct {
+	*fake
+	ms []roads.Motorway
+}
+
+func (f *catFake) Motorways(context.Context, roads.CatalogueQuery, []string, time.Time) ([]roads.Motorway, error) {
+	return f.ms, nil
+}
+
+func TestMotorwayCatalogueCreditsOnlyTheFamiliesItsRoadsState(t *testing.T) {
+	req.Covers(t, "SEC-030")
+	f := &catFake{fake: &fake{reg: roadRegister}, ms: []roads.Motorway{
+		{Road: "A1", Family: "ref", Sources: []string{"r1"}},
+		{Road: "A2", Family: "ref"},
+	}}
+	s := features.New(features.Repositories{Register: f, Catalogue: f}, features.Settings{Language: "en"}, func() time.Time { return now })
+	a, err := s.Motorways(context.Background(), key("commercial", []access.Scope{"roads"}, "r1", "r2"), roads.CatalogueQuery{Limit: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(a.Motorways) != 2 || !slices.Equal(names(a.Meta.Families), []string{"r1"}) {
+		t.Errorf("answer %+v", a.Meta)
+	}
+	f.ms = nil
+	if a, err = s.Motorways(context.Background(), key("commercial", []access.Scope{"roads"}, "r1"), roads.CatalogueQuery{Limit: 3}); err != nil || !slices.Equal(names(a.Meta.Families), []string{"r1"}) {
+		t.Errorf("a catalogue with no situation names the families consulted: %+v %v", a.Meta, err)
+	}
+}

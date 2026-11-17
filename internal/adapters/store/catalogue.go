@@ -10,7 +10,8 @@ import (
 )
 
 // Motorways reads the motorway catalogue (reference rows of no family; the
-// situations counted are the given families'): each road
+// situations counted are the given families'; each road names the families of
+// the situations it counts, which its answer credits): each road
 // (of one Land, or one road) with its length, Länder, junction count and the
 // count of its situations in force at now, by road number. One road also
 // carries its junctions.
@@ -22,7 +23,11 @@ select r.road_ref, r.name, r.length_km::float8, coalesce(r.states, '{}'),
        (select count(*) from contract.traffic_event e
          where e.road_ref = r.road_ref and e.source_ref = any($1) and `+eventPermitted+`
            and e.withdrawn_at is null and e.valid_from <= $5 and (e.valid_to is null or e.valid_to > $5))::int,
-       r.source_ref
+       r.source_ref,
+       array(select distinct e.source_ref from contract.traffic_event e
+          where e.road_ref = r.road_ref and e.source_ref = any($1) and `+eventPermitted+`
+            and e.withdrawn_at is null and e.valid_from <= $5 and (e.valid_to is null or e.valid_to > $5)
+          order by 1)
 from contract.road r
 where `+permitted("r")+`
   and ($2::text = '' or $2::text = any(r.states)
@@ -32,7 +37,7 @@ order by length(r.road_ref), r.road_ref
 limit $4`, families, q.State, q.Road, q.Limit, now)
 		ms, err := pgx.CollectRows(res, func(r pgx.CollectableRow) (roads.Motorway, error) {
 			var m roads.Motorway
-			err := r.Scan(&m.Road, &m.Name, &m.LengthKm, &m.States, &m.Junctions, &m.Situations, &m.Family)
+			err := r.Scan(&m.Road, &m.Name, &m.LengthKm, &m.States, &m.Junctions, &m.Situations, &m.Family, &m.Sources)
 			return m, err
 		})
 		if err != nil || q.Road == "" || len(ms) == 0 {

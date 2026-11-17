@@ -23,10 +23,29 @@ type MotorwaysAnswer struct {
 // it may read.
 func (s *Service) Motorways(ctx context.Context, key access.Record, q roads.CatalogueQuery) (MotorwaysAnswer, error) {
 	v, meta, err := listed(ctx, s, key, "roads", func(permitted []string) ([]roads.Motorway, []string, error) {
-		// The catalogue is reference rows: the answer names the families
-		// consulted for its situation counts.
+		// An answer credits the families whose rows it states, as the
+		// platform's answers do: those of the situations its roads count.
+		// A family that stated nothing (a lorry or zone register, say) is
+		// not credited, and its condition is not carried; with no situation,
+		// the families consulted are named.
 		ms, err := s.repos.Catalogue.Motorways(ctx, q, permitted, s.now())
-		return ms, nil, err
+		return ms, motorwayFamilies(ms), err
 	})
 	return MotorwaysAnswer{Motorways: v, Meta: meta}, err
+}
+
+// motorwayFamilies are the families of the listed roads' situations, each
+// once, in order of first appearance; empty when none is counted.
+func motorwayFamilies(ms []roads.Motorway) []string {
+	out := []string{}
+	seen := map[string]bool{}
+	for _, m := range ms {
+		for _, f := range m.Sources {
+			if f != "" && !seen[f] {
+				seen[f] = true
+				out = append(out, f)
+			}
+		}
+	}
+	return out
 }

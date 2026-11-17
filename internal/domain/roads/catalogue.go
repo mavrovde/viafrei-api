@@ -18,6 +18,9 @@ type Motorway struct {
 	// Situations counts its situations in force now, not withdrawn.
 	Situations int
 	Family     string
+	// Sources are the families of the situations it counts, the families
+	// an answer listing it credits.
+	Sources []string
 	// Exits are its junctions in number order, when one road was asked for.
 	Exits []Junction
 }

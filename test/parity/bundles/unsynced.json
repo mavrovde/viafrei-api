@@ -10453,36 +10453,12 @@
           "value": "[\"03\",\"07\",\"11\",\"12\",\"15\",\"16\"]"
         },
         {
-          "name": "meta.attribution[bast_lcl].family",
-          "value": "bast_lcl"
-        },
-        {
-          "name": "meta.attribution[lez_alpha].family",
-          "value": "lez_alpha"
-        },
-        {
-          "name": "meta.attribution[lorry_bast_langlkw].family",
-          "value": "lorry_bast_langlkw"
-        },
-        {
-          "name": "meta.attribution[lorry_koeln_beschraenkungen].family",
-          "value": "lorry_koeln_beschraenkungen"
-        },
-        {
-          "name": "meta.attribution[osm_speed_cameras].family",
-          "value": "osm_speed_cameras"
-        },
-        {
           "name": "meta.attribution[roads_alpha].family",
           "value": "roads_alpha"
         },
         {
-          "name": "meta.attribution[speed_alpha].family",
-          "value": "speed_alpha"
-        },
-        {
-          "name": "meta.notes.condition[lorry_bast_langlkw]",
-          "value": "1"
+          "name": "meta.notes.condition",
+          "value": "[]"
         },
         {
           "name": "meta.notes.purpose",

@@ -26,6 +26,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
 	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/runtime/wire"
@@ -218,6 +219,13 @@ func noteOwners(t *testing.T) parity.Owners {
 	out := parity.Owners{}
 	for _, p := range pairs {
 		out[p.Body] = append(out[p.Body], p.Family)
+	}
+	// The speed cameras' § 23 Abs. 1c StVO notice is the platform's own
+	// wording, no family's row: it is stated unowned, as the MCP side states it.
+	if n := roads.SpeedNotice(wire.Language); out[n] == nil {
+		out[n] = []string{parity.Unowned}
+	} else {
+		t.Fatal("a fixture family owns the speed cameras' notice")
 	}
 	return out
 }

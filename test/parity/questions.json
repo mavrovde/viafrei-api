@@ -91,7 +91,7 @@
       "counterpart": "parking search",
       "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&limit=5",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
@@ -109,9 +109,9 @@
       "id": "parking-terms-accepted",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&limit=5",
+      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&limit=5&accept_terms=sid-terms-1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
@@ -121,12 +121,7 @@
           "truckpark_sid_static",
           "truckpark_sid_dyn"
         ],
-        "accepted": [
-          {
-            "source": "src-delta-parking",
-            "version": "2026-03-01"
-          }
-        ]
+        "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
     },
@@ -531,9 +526,9 @@
       "id": "parking-free-spaces",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&free_min=1&limit=5",
+      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&free_min=1&limit=5&accept_terms=sid-terms-1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
@@ -543,12 +538,7 @@
           "truckpark_sid_static",
           "truckpark_sid_dyn"
         ],
-        "accepted": [
-          {
-            "source": "src-delta-parking",
-            "version": "2026-03-01"
-          }
-        ]
+        "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
     },
@@ -1067,9 +1057,9 @@
       "id": "parking-kind-truck",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&kind=truck&limit=5",
+      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&kind=truck&limit=5&accept_terms=sid-terms-1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
@@ -1079,12 +1069,7 @@
           "truckpark_sid_static",
           "truckpark_sid_dyn"
         ],
-        "accepted": [
-          {
-            "source": "src-delta-parking",
-            "version": "2026-03-01"
-          }
-        ]
+        "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
     },
@@ -1092,9 +1077,9 @@
       "id": "parking-facilities-toilet",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&facilities=toilet&limit=5",
+      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&facilities=toilet&limit=5&accept_terms=sid-terms-1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
@@ -1104,12 +1089,7 @@
           "truckpark_sid_static",
           "truckpark_sid_dyn"
         ],
-        "accepted": [
-          {
-            "source": "src-delta-parking",
-            "version": "2026-03-01"
-          }
-        ]
+        "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
     },
@@ -1117,9 +1097,9 @@
       "id": "parking-road-a101",
       "operation": "listMotorwayParking",
       "counterpart": "parking search",
-      "request": "/v1/motorways/A101/parking-options?limit=5",
+      "request": "/v1/motorways/A101/parking-options?limit=5&accept_terms=sid-terms-1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
@@ -1127,14 +1107,10 @@
           "park_alpha",
           "park_beta",
           "truckpark_sid_static",
-          "truckpark_sid_dyn"
+          "truckpark_sid_dyn",
+          "bast_lcl"
         ],
-        "accepted": [
-          {
-            "source": "src-delta-parking",
-            "version": "2026-03-01"
-          }
-        ]
+        "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
     },

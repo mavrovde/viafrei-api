@@ -1710,11 +1710,11 @@
             ]
           },
           "openingState": {
-            "description": "open, closed or unknown at the answer's instant (open_at's, when asked), read from the published opening hours: unknown when there are none or they cannot be read. Open enumeration.",
+            "description": "open, closed or unknown at the answer's instant (open_at's, when asked), read from the published opening hours: unknown when there are none or they cannot be read. Under sort=price, the state the station reported, as the platform's cheapest-fuel search states it. Open enumeration.",
             "type": "string"
           },
           "prices": {
-            "description": "The newest price per grade the station reported, by grade; empty when it reported none.",
+            "description": "The newest price per grade the station reported, by grade; empty when it reported none. Under sort=price, the asked grade's only.",
             "items": {
               "$ref": "#/components/schemas/FuelPrice"
             },
@@ -1775,9 +1775,6 @@
                 "format": "int64",
                 "type": "integer"
               },
-              "id": {
-                "type": "string"
-              },
               "location": {
                 "$ref": "#/components/schemas/Position"
               },
@@ -1814,7 +1811,6 @@
               }
             },
             "required": [
-              "id",
               "name",
               "operator",
               "brand",
@@ -1882,9 +1878,6 @@
             "format": "int64",
             "type": "integer"
           },
-          "id": {
-            "type": "string"
-          },
           "location": {
             "$ref": "#/components/schemas/Position"
           },
@@ -1921,7 +1914,6 @@
           }
         },
         "required": [
-          "id",
           "name",
           "operator",
           "brand",
@@ -3774,9 +3766,12 @@
         "additionalProperties": false,
         "properties": {
           "distanceM": {
-            "description": "Distance from the asked position, in metres.",
+            "description": "Distance from the asked position, in metres; null along a motorway (no point was asked) and for a site whose terms need accepting (a Toll Collect site), which the platform names without a distance.",
             "format": "int64",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "id": {
             "type": "string"
@@ -4986,144 +4981,6 @@
       "SharingData": {
         "additionalProperties": false,
         "properties": {
-          "nearest": {
-            "additionalProperties": false,
-            "description": "When no station is in the radius, the nearest one within 100 km; otherwise null.",
-            "properties": {
-              "available": {
-                "description": "A bike can be taken: current, renting, and at least one counted.",
-                "type": "boolean"
-              },
-              "bikes": {
-                "description": "Bikes counted; null when no count of the last 24 hours.",
-                "format": "int64",
-                "type": [
-                  "integer",
-                  "null"
-                ]
-              },
-              "capacity": {
-                "description": "Docks; null when not published.",
-                "format": "int64",
-                "type": [
-                  "integer",
-                  "null"
-                ]
-              },
-              "countedAt": {
-                "description": "When the count was read; null when none.",
-                "format": "date-time",
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "current": {
-                "description": "The count stands: counted, and the system's status at most 15 minutes old.",
-                "type": "boolean"
-              },
-              "distanceM": {
-                "description": "Distance from the asked position in metres.",
-                "format": "int64",
-                "type": "integer"
-              },
-              "electricBikes": {
-                "description": "Electric bikes counted; null when not published.",
-                "format": "int64",
-                "type": [
-                  "integer",
-                  "null"
-                ]
-              },
-              "freeDocks": {
-                "description": "Free docks; null when not published.",
-                "format": "int64",
-                "type": [
-                  "integer",
-                  "null"
-                ]
-              },
-              "id": {
-                "type": "string"
-              },
-              "location": {
-                "$ref": "#/components/schemas/Position"
-              },
-              "name": {
-                "description": "The station's name; null when not published.",
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "renting": {
-                "description": "The station rents; null when not published.",
-                "type": [
-                  "boolean",
-                  "null"
-                ]
-              },
-              "reportedAt": {
-                "description": "When the system reported the count; null when not published.",
-                "format": "date-time",
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "sourceFamily": {
-                "type": "string"
-              },
-              "system": {
-                "type": "string"
-              },
-              "systemLabel": {
-                "description": "The system's name; null when not published.",
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "takesReturns": {
-                "description": "The station takes returns; null when not published.",
-                "type": [
-                  "boolean",
-                  "null"
-                ]
-              },
-              "virtual": {
-                "description": "A virtual station (no docks); null when not published.",
-                "type": [
-                  "boolean",
-                  "null"
-                ]
-              }
-            },
-            "required": [
-              "id",
-              "system",
-              "systemLabel",
-              "name",
-              "capacity",
-              "virtual",
-              "location",
-              "distanceM",
-              "current",
-              "available",
-              "bikes",
-              "electricBikes",
-              "freeDocks",
-              "renting",
-              "takesReturns",
-              "countedAt",
-              "reportedAt",
-              "sourceFamily"
-            ],
-            "type": [
-              "object",
-              "null"
-            ]
-          },
           "stations": {
             "items": {
               "$ref": "#/components/schemas/SharingStation"
@@ -5142,8 +4999,7 @@
         "required": [
           "stations",
           "stationsInRadius",
-          "vehicles",
-          "nearest"
+          "vehicles"
         ],
         "type": "object"
       },
@@ -11070,7 +10926,7 @@
     },
     "/v1/motorways/{road}/parking-options": {
       "get": {
-        "description": "Parking sites along a motorway, in name order (unnamed last), then by id, each with its last reported occupancy: the sites within 1 500 m of one of the motorway's location-code points, and those their source files under the motorway. distanceM is 0: no point was asked. A site whose terms need accepting first is listed without its occupancy and marked termsRequired. Needs the scope parking.",
+        "description": "Parking sites along a motorway, in name order (unnamed last), then by id, each with its last reported occupancy: the sites within 1 500 m of one of the motorway's location-code points, and those their source files under the motorway. distanceM is null: no point was asked. A site whose terms are not accepted (accept_terms) is not listed; meta.terms offers its terms. Needs the scope parking.",
         "operationId": "listMotorwayParking",
         "parameters": [
           {
@@ -11929,7 +11785,7 @@
     },
     "/v1/parking-options": {
       "get": {
-        "description": "Parking sites within the radius of a position, nearest first, then by id, each with its last reported occupancy. A site whose terms need accepting first is listed without its occupancy and marked termsRequired. Needs the scope parking.",
+        "description": "Parking sites within the radius of a position, nearest first, then by id, each with its last reported occupancy. A site whose terms are not accepted (accept_terms) is not listed; meta.terms offers its terms. Needs the scope parking.",
         "operationId": "listParkingOptions",
         "parameters": [
           {
@@ -14592,7 +14448,7 @@
     },
     "/v1/sharing-options": {
       "get": {
-        "description": "The bike-sharing stations within the radius, nearest first (only those with a bike to take now unless only_available=false), the free-floating vehicles around, and the nearest station within 100 km when none is in the radius. Needs the scope transit.",
+        "description": "The bike-sharing stations within the radius, nearest first (only those with a bike to take now unless only_available=false) and the free-floating vehicles around; no station beyond the radius is listed, as the platform's sharing search lists none. Needs the scope transit.",
         "operationId": "listSharingOptions",
         "parameters": [
           {

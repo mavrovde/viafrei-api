@@ -70,7 +70,7 @@ func TestHydrogenStationsRefusals(t *testing.T) {
 		"read":       {&h2Fake{nearErr: errStore}, full, errStore},
 		"nearest":    {&h2Fake{nearestErr: errStore}, full, errStore},
 		"post-check": {&h2Fake{nearest: []energy.HydrogenStation{{Family: "f2"}}}, full, features.ErrGateViolation},
-		"provenance": {&h2Fake{fake: &fake{provErr: errStore}}, full, errStore},
+		"provenance": {&h2Fake{fake: &fake{provErr: errStore}, near: []energy.HydrogenStation{{Family: "f1"}}}, full, errStore},
 	} {
 		if _, err := h2Service(c.f).HydrogenStations(context.Background(), c.k, energy.HydrogenQuery{Limit: 5}); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)

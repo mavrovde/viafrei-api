@@ -174,6 +174,16 @@ func (s *Service) provenanceOf(ctx context.Context, contributed, consulted []str
 	return s.repos.Register.Provenance(ctx, slices.Compact(fams), s.set.Language)
 }
 
+// creditsOf reads the provenance of the families that contributed, and of
+// none when none did: the platform's searches credit the registers whose
+// rows they state, so an empty answer credits nothing.
+func (s *Service) creditsOf(ctx context.Context, contributed []string) ([]provenance.Family, error) {
+	if len(contributed) == 0 {
+		return nil, nil
+	}
+	return s.provenanceOf(ctx, contributed, nil)
+}
+
 // sight reads every permitted family's provenance once: for a lamp, whether
 // one is missing (no provenance row) or stale, which limits the sight, and
 // the earliest instant after now at which one that is fresh turns stale (nil
@@ -245,7 +255,7 @@ func (s *Service) charging(ctx context.Context, reg []access.Terms, gate access.
 	if err := gate.Check(contributed); err != nil {
 		return Answer[energy.Site]{}, err
 	}
-	fams, err := s.provenanceOf(ctx, contributed, permitted)
+	fams, err := s.creditsOf(ctx, contributed)
 	if err != nil {
 		return Answer[energy.Site]{}, err
 	}
@@ -364,6 +374,37 @@ func (s *Service) termsOf(ctx context.Context, reg []access.Terms, pending []str
 	return s.repos.Register.TermsTexts(ctx, gates)
 }
 
+// CorridorFamily is the family of the location-code points (the read
+// contract's junctions) a motorway's parking corridor is drawn from.
+const CorridorFamily = "bast_lcl"
+
+// parkingCoverage are the families of the sites in q's scope of its kind,
+// else of any kind, before the free-space and amenity filters, gated
+// families left out; empty when the scope holds none.
+func (s *Service) parkingCoverage(ctx context.Context, q parking.Query, listed, permitted []string, gated map[string]bool, now time.Time) ([]string, error) {
+	q.FreeMin, q.Amenities, q.Limit = 0, nil, coverageScan
+	for _, kind := range []string{q.Kind, ""} {
+		q.Kind = kind
+		sites, _, _, err := s.repos.Parking.ParkingNear(ctx, q, listed, permitted, now)
+		if err != nil {
+			return nil, err
+		}
+		var out []string
+		for _, site := range sites {
+			if !gated[site.Family] {
+				out = append(out, site.Family)
+			}
+		}
+		if len(out) > 0 || kind == "" {
+			return out, nil
+		}
+	}
+	return nil, nil
+}
+
+// coverageScan bounds the sites a coverage read takes.
+const coverageScan = 200
+
 // parking answers Parking under a register and gate already read.
 func (s *Service) parking(ctx context.Context, reg []access.Terms, gate access.Gate, q parking.Query) (Answer[parking.Site], error) {
 	answering := access.Answering(reg, "parking")
@@ -384,12 +425,23 @@ func (s *Service) parking(ctx context.Context, reg []access.Terms, gate access.G
 		return Answer[parking.Site]{}, err
 	}
 	var contributed, occupancy []string
+	// A site whose terms are not accepted is not listed, as the platform's
+	// parking search lists no Toll Collect site before its terms are
+	// accepted: the answer offers the terms (Terms) instead.
+	sites = slices.DeleteFunc(sites, func(site parking.Site) bool { return slices.Contains(pending, site.Family) })
+	gated := map[string]bool{}
+	for _, t := range reg {
+		gated[t.Family] = t.AcceptanceRequired
+	}
+	// A site of a gated family (a Toll Collect site) is named beside the
+	// list, as the platform names it: with no other site listed, the
+	// platform's answer is empty and names none.
+	if !slices.ContainsFunc(sites, func(site parking.Site) bool { return !gated[site.Family] }) {
+		sites = nil
+	}
 	for i, site := range sites {
 		contributed = append(contributed, site.Family)
-		if slices.Contains(pending, site.Family) {
-			sites[i] = site.Withheld()
-			continue
-		}
+		sites[i].Unranged = q.Road != "" || gated[site.Family]
 		if site.Occupancy != nil {
 			// The report may come from another family than the site's: it is
 			// checked and attributed as its own family.
@@ -400,7 +452,22 @@ func (s *Service) parking(ctx context.Context, reg []access.Terms, gate access.G
 	if err := errors.Join(checkAll(contributed, listed), gate.Check(occupancy)); err != nil {
 		return Answer[parking.Site]{}, ErrGateViolation
 	}
-	fams, err := s.provenanceOf(ctx, contributed, listed)
+	credited := contributed
+	if len(sites) == 0 {
+		// An empty answer credits the families of the sites the circle
+		// holds of the kind asked, else of any kind, before the other
+		// filters, as the platform's parking search counts its coverage;
+		// a gated family is never counted.
+		if credited, err = s.parkingCoverage(ctx, q, listed, permitted, gated, now); err != nil {
+			return Answer[parking.Site]{}, err
+		}
+	}
+	if q.Road != "" && gate.Permits(CorridorFamily) {
+		// The corridor is a use of the location-code points, whatever it
+		// found: the platform credits their register on every road search.
+		credited = append(slices.Clone(credited), CorridorFamily)
+	}
+	fams, err := s.repos.Register.Provenance(ctx, slices.Compact(slices.Sorted(slices.Values(credited))), s.set.Language)
 	if err != nil {
 		return Answer[parking.Site]{}, err
 	}

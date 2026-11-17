@@ -65,7 +65,7 @@ func (s *Service) HydrogenStations(ctx context.Context, key access.Record, q ene
 	if err := gate.Check(contributed); err != nil {
 		return HydrogenStations{}, err
 	}
-	fams, err := s.provenanceOf(ctx, contributed, permitted)
+	fams, err := s.creditsOf(ctx, contributed)
 	if err != nil {
 		return HydrogenStations{}, err
 	}

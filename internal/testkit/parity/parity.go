@@ -136,6 +136,14 @@ type Rules struct {
 // from the fixture rows.
 type Owners map[string][]string
 
+// Unowned is the owner of a note no family's row carries: the platform's own
+// wording, which every answer of its operation states whatever it credits
+// (the § 23 Abs. 1c StVO notice of the speed cameras). The MCP side states
+// such a note as meta.notes.<kind>[unowned]; Owners names it so, and only a
+// text Owners names so is unowned: any other text no family owns is an
+// error (ErrUnownedNote).
+const Unowned = "unowned"
+
 // Exclusion is one fact, or family of facts, left out of the comparison.
 // Pattern is a fact name in which [*] stands for any element key; it covers
 // the name itself and every fact under it. When Asked names a request
@@ -596,7 +604,7 @@ func (p *projector) notes(notes map[string]any, owners Owners) error {
 		credited := p.credited()
 		for _, text := range texts {
 			fams := owners[text]
-			if len(credited) > 0 {
+			if len(credited) > 0 && !slices.Equal(fams, []string{Unowned}) {
 				// A text two families own (a register's shared wording) is
 				// the note of the one the answer credits: an answer's notes
 				// are its credited families'.

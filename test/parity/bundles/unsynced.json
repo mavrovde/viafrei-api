@@ -871,7 +871,7 @@
       "counterpart": "parking search",
       "request": "/v1/parking-options?at=50.25,10.43\u0026radius_m=25000\u0026limit=5",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
@@ -963,9 +963,9 @@
       "id": "parking-terms-accepted",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.25,10.43\u0026radius_m=25000\u0026limit=5",
+      "request": "/v1/parking-options?at=50.25,10.43\u0026radius_m=25000\u0026limit=5\u0026accept_terms=sid-terms-1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
@@ -975,12 +975,7 @@
           "truckpark_sid_static",
           "truckpark_sid_dyn"
         ],
-        "accepted": [
-          {
-            "source": "src-delta-parking",
-            "version": "2026-03-01"
-          }
-        ]
+        "accepted": null
       },
       "now": "2026-03-30T00:00:00Z",
       "facts": [
@@ -1037,12 +1032,76 @@
           "value": "false"
         },
         {
+          "name": "data[sid:7].distanceM",
+          "value": "null"
+        },
+        {
+          "name": "data[sid:7].id",
+          "value": "sid:7"
+        },
+        {
+          "name": "data[sid:7].kind",
+          "value": "truck_parking"
+        },
+        {
+          "name": "data[sid:7].location.lat",
+          "value": "50.25093"
+        },
+        {
+          "name": "data[sid:7].location.lon",
+          "value": "10.42698"
+        },
+        {
+          "name": "data[sid:7].name",
+          "value": "Lurzonheim Parken"
+        },
+        {
+          "name": "data[sid:7].occupancy.free",
+          "value": "328"
+        },
+        {
+          "name": "data[sid:7].occupancy.observedAt",
+          "value": "2026-03-29T18:23:12Z"
+        },
+        {
+          "name": "data[sid:7].occupancy.state",
+          "value": "free"
+        },
+        {
+          "name": "data[sid:7].occupancy.total",
+          "value": "375"
+        },
+        {
+          "name": "data[sid:7].operator",
+          "value": "null"
+        },
+        {
+          "name": "data[sid:7].sourceFamily",
+          "value": "truckpark_sid_static"
+        },
+        {
+          "name": "data[sid:7].termsRequired",
+          "value": "false"
+        },
+        {
           "name": "meta.attribution[park_alpha].family",
           "value": "park_alpha"
         },
         {
-          "name": "meta.notes.condition",
-          "value": "[]"
+          "name": "meta.attribution[truckpark_sid_dyn].family",
+          "value": "truckpark_sid_dyn"
+        },
+        {
+          "name": "meta.attribution[truckpark_sid_static].family",
+          "value": "truckpark_sid_static"
+        },
+        {
+          "name": "meta.notes.condition[truckpark_sid_dyn]",
+          "value": "1"
+        },
+        {
+          "name": "meta.notes.condition[truckpark_sid_static]",
+          "value": "1"
         },
         {
           "name": "meta.notes.purpose",
@@ -1786,7 +1845,7 @@
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].openingState",
-          "value": "unknown"
+          "value": "open"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[0].current",
@@ -1794,59 +1853,19 @@
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].prices[0].fuel",
-          "value": "diesel"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[0].priceEur",
-          "value": "1.799"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[0].reportedAt",
-          "value": "2026-03-29T22:45:59Z"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[0].reportedAtLocal",
-          "value": "2026-03-29T22:45:59Z"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[1].current",
-          "value": "false"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[1].fuel",
           "value": "e10"
         },
         {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[1].priceEur",
+          "name": "data[00000000-0000-4000-8000-000000000002].prices[0].priceEur",
           "value": "1.633"
         },
         {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[1].reportedAt",
+          "name": "data[00000000-0000-4000-8000-000000000002].prices[0].reportedAt",
           "value": "2026-03-29T15:24:44Z"
         },
         {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[1].reportedAtLocal",
+          "name": "data[00000000-0000-4000-8000-000000000002].prices[0].reportedAtLocal",
           "value": "2026-03-29T15:24:44Z"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[2].current",
-          "value": "false"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[2].fuel",
-          "value": "e5"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[2].priceEur",
-          "value": "2.062"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[2].reportedAt",
-          "value": "2026-03-29T21:50:02Z"
-        },
-        {
-          "name": "data[00000000-0000-4000-8000-000000000002].prices[2].reportedAtLocal",
-          "value": "2026-03-29T21:50:02Z"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].sourceFamily",
@@ -3727,9 +3746,9 @@
       "id": "parking-free-spaces",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.25,10.43\u0026radius_m=25000\u0026free_min=1\u0026limit=5",
+      "request": "/v1/parking-options?at=50.25,10.43\u0026radius_m=25000\u0026free_min=1\u0026limit=5\u0026accept_terms=sid-terms-1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
@@ -3739,12 +3758,7 @@
           "truckpark_sid_static",
           "truckpark_sid_dyn"
         ],
-        "accepted": [
-          {
-            "source": "src-delta-parking",
-            "version": "2026-03-01"
-          }
-        ]
+        "accepted": null
       },
       "now": "2026-03-30T00:00:00Z",
       "facts": [
@@ -3755,10 +3769,6 @@
         {
           "name": "meta.attribution[park_alpha].family",
           "value": "park_alpha"
-        },
-        {
-          "name": "meta.attribution[park_beta].family",
-          "value": "park_beta"
         },
         {
           "name": "meta.notes.condition",
@@ -3800,199 +3810,183 @@
           "value": "null"
         },
         {
-          "name": "data.stations[afir_alpha:900001].address",
+          "name": "data.stations[0].address",
           "value": "null"
         },
         {
-          "name": "data.stations[afir_alpha:900001].brand",
+          "name": "data.stations[0].brand",
           "value": "null"
         },
         {
-          "name": "data.stations[afir_alpha:900001].distanceM",
+          "name": "data.stations[0].distanceM",
           "value": "62433"
         },
         {
-          "name": "data.stations[afir_alpha:900001].id",
-          "value": "afir_alpha:900001"
-        },
-        {
-          "name": "data.stations[afir_alpha:900001].location.lat",
+          "name": "data.stations[0].location.lat",
           "value": "48.38960"
         },
         {
-          "name": "data.stations[afir_alpha:900001].location.lon",
+          "name": "data.stations[0].location.lon",
           "value": "7.42219"
         },
         {
-          "name": "data.stations[afir_alpha:900001].name",
+          "name": "data.stations[0].name",
           "value": "H2 Schömpingbach"
         },
         {
-          "name": "data.stations[afir_alpha:900001].opening",
+          "name": "data.stations[0].opening",
           "value": "null"
         },
         {
-          "name": "data.stations[afir_alpha:900001].operator",
+          "name": "data.stations[0].operator",
           "value": "H2 Synthetic"
         },
         {
-          "name": "data.stations[afir_alpha:900001].providerUpdatedAt",
+          "name": "data.stations[0].providerUpdatedAt",
           "value": "null"
         },
         {
-          "name": "data.stations[afir_alpha:900001].refill[0].solution",
+          "name": "data.stations[0].refill[0].solution",
           "value": "700bar_car"
         },
         {
-          "name": "data.stations[afir_alpha:900001].sourceFamily",
+          "name": "data.stations[0].sourceFamily",
           "value": "afir_alpha"
         },
         {
-          "name": "data.stations[afir_alpha:900002].address",
+          "name": "data.stations[1].address",
           "value": "null"
         },
         {
-          "name": "data.stations[afir_alpha:900002].brand",
+          "name": "data.stations[1].brand",
           "value": "null"
         },
         {
-          "name": "data.stations[afir_alpha:900002].distanceM",
+          "name": "data.stations[1].distanceM",
           "value": "80869"
         },
         {
-          "name": "data.stations[afir_alpha:900002].id",
-          "value": "afir_alpha:900002"
-        },
-        {
-          "name": "data.stations[afir_alpha:900002].location.lat",
+          "name": "data.stations[1].location.lat",
           "value": "47.60205"
         },
         {
-          "name": "data.stations[afir_alpha:900002].location.lon",
+          "name": "data.stations[1].location.lon",
           "value": "7.84754"
         },
         {
-          "name": "data.stations[afir_alpha:900002].name",
+          "name": "data.stations[1].name",
           "value": "H2 Kansilkamp"
         },
         {
-          "name": "data.stations[afir_alpha:900002].opening",
+          "name": "data.stations[1].opening",
           "value": "null"
         },
         {
-          "name": "data.stations[afir_alpha:900002].operator",
+          "name": "data.stations[1].operator",
           "value": "H2 Synthetic"
         },
         {
-          "name": "data.stations[afir_alpha:900002].providerUpdatedAt",
+          "name": "data.stations[1].providerUpdatedAt",
           "value": "null"
         },
         {
-          "name": "data.stations[afir_alpha:900002].refill[0].solution",
+          "name": "data.stations[1].refill[0].solution",
           "value": "700bar_car"
         },
         {
-          "name": "data.stations[afir_alpha:900002].sourceFamily",
+          "name": "data.stations[1].sourceFamily",
           "value": "afir_alpha"
         },
         {
-          "name": "data.stations[afir_alpha:900003].address",
+          "name": "data.stations[2].address",
           "value": "null"
         },
         {
-          "name": "data.stations[afir_alpha:900003].brand",
+          "name": "data.stations[2].brand",
           "value": "null"
         },
         {
-          "name": "data.stations[afir_alpha:900003].distanceM",
-          "value": "143591"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].id",
-          "value": "afir_alpha:900003"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].location.lat",
-          "value": "47.41901"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].location.lon",
-          "value": "8.64346"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].name",
-          "value": "H2 Gickpängingen"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].opening",
-          "value": "null"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].operator",
-          "value": "H2 Synthetic"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].providerUpdatedAt",
-          "value": "null"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].refill[0].solution",
-          "value": "700bar_car"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].refill[1].solution",
-          "value": "350bar_truck"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].sourceFamily",
-          "value": "afir_alpha"
-        },
-        {
-          "name": "data.stations[afir_alpha:900004].address",
-          "value": "null"
-        },
-        {
-          "name": "data.stations[afir_alpha:900004].brand",
-          "value": "null"
-        },
-        {
-          "name": "data.stations[afir_alpha:900004].distanceM",
+          "name": "data.stations[2].distanceM",
           "value": "116957"
         },
         {
-          "name": "data.stations[afir_alpha:900004].id",
-          "value": "afir_alpha:900004"
-        },
-        {
-          "name": "data.stations[afir_alpha:900004].location.lat",
+          "name": "data.stations[2].location.lat",
           "value": "48.21151"
         },
         {
-          "name": "data.stations[afir_alpha:900004].location.lon",
+          "name": "data.stations[2].location.lon",
           "value": "8.42044"
         },
         {
-          "name": "data.stations[afir_alpha:900004].name",
+          "name": "data.stations[2].name",
           "value": "H2 Nombörbrück"
         },
         {
-          "name": "data.stations[afir_alpha:900004].opening",
+          "name": "data.stations[2].opening",
           "value": "null"
         },
         {
-          "name": "data.stations[afir_alpha:900004].operator",
+          "name": "data.stations[2].operator",
           "value": "H2 Synthetic"
         },
         {
-          "name": "data.stations[afir_alpha:900004].providerUpdatedAt",
+          "name": "data.stations[2].providerUpdatedAt",
           "value": "null"
         },
         {
-          "name": "data.stations[afir_alpha:900004].refill[0].solution",
+          "name": "data.stations[2].refill[0].solution",
           "value": "700bar_car"
         },
         {
-          "name": "data.stations[afir_alpha:900004].sourceFamily",
+          "name": "data.stations[2].sourceFamily",
+          "value": "afir_alpha"
+        },
+        {
+          "name": "data.stations[3].address",
+          "value": "null"
+        },
+        {
+          "name": "data.stations[3].brand",
+          "value": "null"
+        },
+        {
+          "name": "data.stations[3].distanceM",
+          "value": "143591"
+        },
+        {
+          "name": "data.stations[3].location.lat",
+          "value": "47.41901"
+        },
+        {
+          "name": "data.stations[3].location.lon",
+          "value": "8.64346"
+        },
+        {
+          "name": "data.stations[3].name",
+          "value": "H2 Gickpängingen"
+        },
+        {
+          "name": "data.stations[3].opening",
+          "value": "null"
+        },
+        {
+          "name": "data.stations[3].operator",
+          "value": "H2 Synthetic"
+        },
+        {
+          "name": "data.stations[3].providerUpdatedAt",
+          "value": "null"
+        },
+        {
+          "name": "data.stations[3].refill[0].solution",
+          "value": "700bar_car"
+        },
+        {
+          "name": "data.stations[3].refill[1].solution",
+          "value": "350bar_truck"
+        },
+        {
+          "name": "data.stations[3].sourceFamily",
           "value": "afir_alpha"
         },
         {
@@ -4039,60 +4033,12 @@
           "value": "null"
         },
         {
-          "name": "data.stations[afir_alpha:900003].address",
-          "value": "null"
+          "name": "data.stations",
+          "value": "[]"
         },
         {
-          "name": "data.stations[afir_alpha:900003].brand",
-          "value": "null"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].distanceM",
-          "value": "143591"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].id",
-          "value": "afir_alpha:900003"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].location.lat",
-          "value": "47.41901"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].location.lon",
-          "value": "8.64346"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].name",
-          "value": "H2 Gickpängingen"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].opening",
-          "value": "null"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].operator",
-          "value": "H2 Synthetic"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].providerUpdatedAt",
-          "value": "null"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].refill[0].solution",
-          "value": "700bar_car"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].refill[1].solution",
-          "value": "350bar_truck"
-        },
-        {
-          "name": "data.stations[afir_alpha:900003].sourceFamily",
-          "value": "afir_alpha"
-        },
-        {
-          "name": "meta.attribution[afir_alpha].family",
-          "value": "afir_alpha"
+          "name": "meta.attribution",
+          "value": "[]"
         },
         {
           "name": "meta.notes.condition",
@@ -4140,10 +4086,6 @@
         {
           "name": "data.nearest.distanceM",
           "value": "62433"
-        },
-        {
-          "name": "data.nearest.id",
-          "value": "afir_alpha:900001"
         },
         {
           "name": "data.nearest.location.lat",
@@ -4238,16 +4180,12 @@
           "value": "0"
         },
         {
-          "name": "meta.attribution[osm_speed_cameras].family",
-          "value": "osm_speed_cameras"
-        },
-        {
-          "name": "meta.attribution[speed_alpha].family",
-          "value": "speed_alpha"
-        },
-        {
-          "name": "meta.notes.condition",
+          "name": "meta.attribution",
           "value": "[]"
+        },
+        {
+          "name": "meta.notes.condition[unowned]",
+          "value": "1"
         },
         {
           "name": "meta.notes.purpose",
@@ -4298,16 +4236,12 @@
           "value": "0"
         },
         {
-          "name": "meta.attribution[osm_speed_cameras].family",
-          "value": "osm_speed_cameras"
-        },
-        {
-          "name": "meta.attribution[speed_alpha].family",
-          "value": "speed_alpha"
-        },
-        {
-          "name": "meta.notes.condition",
+          "name": "meta.attribution",
           "value": "[]"
+        },
+        {
+          "name": "meta.notes.condition[unowned]",
+          "value": "1"
         },
         {
           "name": "meta.notes.purpose",
@@ -4340,82 +4274,6 @@
       },
       "now": "2026-03-28T18:00:00Z",
       "facts": [
-        {
-          "name": "data.nearest.available",
-          "value": "false"
-        },
-        {
-          "name": "data.nearest.bikes",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.capacity",
-          "value": "10"
-        },
-        {
-          "name": "data.nearest.countedAt",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.current",
-          "value": "false"
-        },
-        {
-          "name": "data.nearest.distanceM",
-          "value": "82235"
-        },
-        {
-          "name": "data.nearest.electricBikes",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.freeDocks",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.id",
-          "value": "nextbike_syn:023"
-        },
-        {
-          "name": "data.nearest.location.lat",
-          "value": "48.21129"
-        },
-        {
-          "name": "data.nearest.location.lon",
-          "value": "8.35667"
-        },
-        {
-          "name": "data.nearest.name",
-          "value": "Station 6"
-        },
-        {
-          "name": "data.nearest.renting",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.reportedAt",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.sourceFamily",
-          "value": "gbfs_nextbike"
-        },
-        {
-          "name": "data.nearest.system",
-          "value": "nextbike_syn"
-        },
-        {
-          "name": "data.nearest.systemLabel",
-          "value": "nextbike Synthetic"
-        },
-        {
-          "name": "data.nearest.takesReturns",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.virtual",
-          "value": "false"
-        },
         {
           "name": "data.stations",
           "value": "[]"
@@ -4480,82 +4338,6 @@
       "now": "2026-03-28T18:00:00Z",
       "facts": [
         {
-          "name": "data.nearest.available",
-          "value": "false"
-        },
-        {
-          "name": "data.nearest.bikes",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.capacity",
-          "value": "10"
-        },
-        {
-          "name": "data.nearest.countedAt",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.current",
-          "value": "false"
-        },
-        {
-          "name": "data.nearest.distanceM",
-          "value": "82235"
-        },
-        {
-          "name": "data.nearest.electricBikes",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.freeDocks",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.id",
-          "value": "nextbike_syn:023"
-        },
-        {
-          "name": "data.nearest.location.lat",
-          "value": "48.21129"
-        },
-        {
-          "name": "data.nearest.location.lon",
-          "value": "8.35667"
-        },
-        {
-          "name": "data.nearest.name",
-          "value": "Station 6"
-        },
-        {
-          "name": "data.nearest.renting",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.reportedAt",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.sourceFamily",
-          "value": "gbfs_nextbike"
-        },
-        {
-          "name": "data.nearest.system",
-          "value": "nextbike_syn"
-        },
-        {
-          "name": "data.nearest.systemLabel",
-          "value": "nextbike Synthetic"
-        },
-        {
-          "name": "data.nearest.takesReturns",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.virtual",
-          "value": "false"
-        },
-        {
           "name": "data.stations",
           "value": "[]"
         },
@@ -4618,82 +4400,6 @@
       },
       "now": "2026-03-28T18:00:00Z",
       "facts": [
-        {
-          "name": "data.nearest.available",
-          "value": "false"
-        },
-        {
-          "name": "data.nearest.bikes",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.capacity",
-          "value": "10"
-        },
-        {
-          "name": "data.nearest.countedAt",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.current",
-          "value": "false"
-        },
-        {
-          "name": "data.nearest.distanceM",
-          "value": "96050"
-        },
-        {
-          "name": "data.nearest.electricBikes",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.freeDocks",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.id",
-          "value": "nextbike_syn:022"
-        },
-        {
-          "name": "data.nearest.location.lat",
-          "value": "48.17242"
-        },
-        {
-          "name": "data.nearest.location.lon",
-          "value": "8.40550"
-        },
-        {
-          "name": "data.nearest.name",
-          "value": "Station 5"
-        },
-        {
-          "name": "data.nearest.renting",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.reportedAt",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.sourceFamily",
-          "value": "gbfs_nextbike"
-        },
-        {
-          "name": "data.nearest.system",
-          "value": "nextbike_syn"
-        },
-        {
-          "name": "data.nearest.systemLabel",
-          "value": "nextbike Synthetic"
-        },
-        {
-          "name": "data.nearest.takesReturns",
-          "value": "null"
-        },
-        {
-          "name": "data.nearest.virtual",
-          "value": "false"
-        },
         {
           "name": "data.stations",
           "value": "[]"
@@ -5910,10 +5616,6 @@
           "value": "delfi_static"
         },
         {
-          "name": "meta.attribution[park_alpha].family",
-          "value": "park_alpha"
-        },
-        {
           "name": "meta.notes.condition",
           "value": "[]"
         },
@@ -6118,10 +5820,6 @@
         {
           "name": "meta.attribution[osm].family",
           "value": "osm"
-        },
-        {
-          "name": "meta.attribution[park_alpha].family",
-          "value": "park_alpha"
         },
         {
           "name": "meta.notes.condition",
@@ -6474,12 +6172,8 @@
           "value": "[]"
         },
         {
-          "name": "meta.attribution[afir_alpha].family",
-          "value": "afir_alpha"
-        },
-        {
-          "name": "meta.attribution[afir_beta].family",
-          "value": "afir_beta"
+          "name": "meta.attribution",
+          "value": "[]"
         },
         {
           "name": "meta.notes.condition",
@@ -6637,9 +6331,9 @@
       "id": "parking-kind-truck",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.25,10.43\u0026radius_m=25000\u0026kind=truck\u0026limit=5",
+      "request": "/v1/parking-options?at=50.25,10.43\u0026radius_m=25000\u0026kind=truck\u0026limit=5\u0026accept_terms=sid-terms-1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
@@ -6649,12 +6343,7 @@
           "truckpark_sid_static",
           "truckpark_sid_dyn"
         ],
-        "accepted": [
-          {
-            "source": "src-delta-parking",
-            "version": "2026-03-01"
-          }
-        ]
+        "accepted": null
       },
       "now": "2026-03-30T00:00:00Z",
       "facts": [
@@ -6665,10 +6354,6 @@
         {
           "name": "meta.attribution[park_alpha].family",
           "value": "park_alpha"
-        },
-        {
-          "name": "meta.attribution[park_beta].family",
-          "value": "park_beta"
         },
         {
           "name": "meta.notes.condition",
@@ -6692,9 +6377,9 @@
       "id": "parking-facilities-toilet",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.25,10.43\u0026radius_m=25000\u0026facilities=toilet\u0026limit=5",
+      "request": "/v1/parking-options?at=50.25,10.43\u0026radius_m=25000\u0026facilities=toilet\u0026limit=5\u0026accept_terms=sid-terms-1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
@@ -6704,12 +6389,7 @@
           "truckpark_sid_static",
           "truckpark_sid_dyn"
         ],
-        "accepted": [
-          {
-            "source": "src-delta-parking",
-            "version": "2026-03-01"
-          }
-        ]
+        "accepted": null
       },
       "now": "2026-03-30T00:00:00Z",
       "facts": [
@@ -6791,9 +6471,9 @@
       "id": "parking-road-a101",
       "operation": "listMotorwayParking",
       "counterpart": "parking search",
-      "request": "/v1/motorways/A101/parking-options?limit=5",
+      "request": "/v1/motorways/A101/parking-options?limit=5\u0026accept_terms=sid-terms-1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
@@ -6801,20 +6481,16 @@
           "park_alpha",
           "park_beta",
           "truckpark_sid_static",
-          "truckpark_sid_dyn"
+          "truckpark_sid_dyn",
+          "bast_lcl"
         ],
-        "accepted": [
-          {
-            "source": "src-delta-parking",
-            "version": "2026-03-01"
-          }
-        ]
+        "accepted": null
       },
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
           "name": "data[p:9].distanceM",
-          "value": "0"
+          "value": "null"
         },
         {
           "name": "data[p:9].id",
@@ -6863,6 +6539,10 @@
         {
           "name": "data[p:9].termsRequired",
           "value": "false"
+        },
+        {
+          "name": "meta.attribution[bast_lcl].family",
+          "value": "bast_lcl"
         },
         {
           "name": "meta.attribution[park_alpha].family",
@@ -7816,24 +7496,8 @@
           "value": "geonames"
         },
         {
-          "name": "meta.attribution[afir_alpha].family",
-          "value": "afir_alpha"
-        },
-        {
-          "name": "meta.attribution[afir_beta].family",
-          "value": "afir_beta"
-        },
-        {
           "name": "meta.attribution[geonames].family",
           "value": "geonames"
-        },
-        {
-          "name": "meta.attribution[park_alpha].family",
-          "value": "park_alpha"
-        },
-        {
-          "name": "meta.attribution[park_beta].family",
-          "value": "park_beta"
         },
         {
           "name": "meta.notes.condition",

@@ -114,7 +114,12 @@ func registerSpeed(api huma.API, s *server, op huma.Operation) {
 func speedEnvelope(s *server, ctx context.Context, a features.SpeedAnswer, limit int) SpeedEnvelope {
 	data := SpeedData{Official: speedCameras(a.Official), OfficialTotal: a.OfficialTotal, OSM: speedCameras(a.OSM), OSMTotal: a.OSMTotal}
 	more := a.OfficialTotal > len(a.Official) || a.OSMTotal > len(a.OSM)
+	m := s.dataMeta(ctx, a.Meta.Families, a.Meta.At, a.Meta.Partial, partialDetail)
+	if a.Notice != "" {
+		// The § 23 Abs. 1c StVO notice is a condition of every answer.
+		m.Notes.Condition = append(m.Notes.Condition, a.Notice)
+	}
 	return SpeedEnvelope{Data: data,
-		Meta:  PagedMeta{DataMeta: s.dataMeta(ctx, a.Meta.Families, a.Meta.At, a.Meta.Partial, partialDetail), Page: Page{Limit: limit, HasMore: more}},
+		Meta:  PagedMeta{DataMeta: m, Page: Page{Limit: limit, HasMore: more}},
 		Links: s.selfLink(ctx)}
 }

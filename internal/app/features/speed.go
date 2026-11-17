@@ -21,6 +21,9 @@ type Speed interface {
 type SpeedAnswer struct {
 	roads.SpeedCameras
 	Meta Answer[struct{}]
+	// Notice is the § 23 Abs. 1c StVO notice every answer carries as a
+	// condition, listed or not, in the answers' language.
+	Notice string
 }
 
 var berlin, _ = time.LoadLocation("Europe/Berlin")
@@ -39,5 +42,13 @@ func (s *Service) SpeedCameras(ctx context.Context, key access.Record, q roads.S
 		}
 		return v, contributed, err
 	})
-	return SpeedAnswer{SpeedCameras: v, Meta: meta}, err
+	if err != nil {
+		return SpeedAnswer{}, err
+	}
+	if len(v.Official)+len(v.OSM) == 0 {
+		// The platform's speed-camera search credits the registers whose
+		// rows it lists: an answer listing none credits none.
+		meta.Families = nil
+	}
+	return SpeedAnswer{SpeedCameras: v, Meta: meta, Notice: roads.SpeedNotice(s.set.Language)}, nil
 }

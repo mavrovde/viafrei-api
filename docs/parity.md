@@ -62,7 +62,9 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
   texts, so the harness reads which family owns each text from the fixture
   rows (`contract.source_note`; every kind but `purpose`, because the service
   answers an unknown kind as a condition). A text no family owns is an error,
-  not a fact. A bundle stating a condition note's text, or a count that is
+  not a fact, except the notes the platform states on its own behalf (the
+  §23 StVO notice on speed cameras): those are counted under `unowned`,
+  whatever the answer credits. A bundle stating a condition note's text, or a count that is
   not a positive whole number, is refused, and so is a case stating a kind
   both as `[]` and per family.
 - **One value per name.** Two values that project onto one name (two array
@@ -133,6 +135,28 @@ nothing, so that family contributed nothing and neither side credits it.
 - **`min_kw`** keeps the sites with a point of at least that power, and of
   each site lists only those points; `summary.chargePoints` counts the
   listed points.
+
+- **An empty answer credits no family**, as the platform's searches credit
+  the registers whose rows they state.
+
+## Other rules both sides follow
+
+- **Parking.** A site whose terms are not accepted is not listed; the
+  answer offers its terms. A Toll Collect site, once accepted, is listed
+  beside the other sites with no distance (`distanceM: null`), and an
+  answer with no other site lists none. A search along a motorway lists no
+  distance and credits the location-code points (`bast_lcl`) its corridor is
+  drawn from. An empty answer credits the families with a site of the kind
+  asked in the circle, else of any kind, before the free-space and amenity
+  filters.
+- **Speed cameras.** An answer listing nothing credits no family, and every
+  answer carries the §23 StVO notice as a condition.
+- **Sharing.** No station beyond the radius is named.
+- **Hydrogen.** A station has no id: the platform names it by name and
+  position. The vehicle filter matches the AFIR solution's ending (`Car`,
+  `Truck`).
+- **Cheapest fuel** (`sort=price`) lists only the asked grade's price, and
+  each station's reported open state.
 
 The MCP side has further rules, specific to its sources, that the read
 contract cannot express; they are not compared here.

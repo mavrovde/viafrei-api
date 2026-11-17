@@ -27,8 +27,10 @@ type HydrogenInput struct {
 }
 
 // HydrogenStation is a hydrogen filling station of an answer.
+//
+// It carries no id: the platform's hydrogen search names a station by its
+// name and position only, and so does the answer.
 type HydrogenStation struct {
-	ID                string     `json:"id"`
 	Name              *string    `json:"name" nullable:"true" doc:"The station's name; null when not published."`
 	Operator          *string    `json:"operator" nullable:"true" doc:"The operator; null when not published."`
 	Brand             *string    `json:"brand" nullable:"true" doc:"The brand; null when not published."`
@@ -61,7 +63,7 @@ type HydrogenOutput struct {
 }
 
 func hydrogenStation(h energy.HydrogenStation) HydrogenStation {
-	return HydrogenStation{ID: h.ID, Name: h.Name, Operator: h.Operator, Brand: h.Brand, Location: position(h.Location),
+	return HydrogenStation{Name: h.Name, Operator: h.Operator, Brand: h.Brand, Location: position(h.Location),
 		DistanceM: h.DistanceM, Address: published(h.Address), Refill: published(h.Refill), Opening: published(h.Opening),
 		ProviderUpdatedAt: utc(h.ProviderUpdatedAt), SourceFamily: h.Family}
 }

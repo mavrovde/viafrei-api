@@ -1291,7 +1291,7 @@
       "id": "place-overview",
       "operation": "getPlaceOverview",
       "counterpart": "place cards",
-      "request": "/v1/places/100003/overview",
+      "request": "/v1/places/100079/overview?radius_m=5000",
       "key": {
         "useClass": "commercial",
         "scopes": [
@@ -1305,6 +1305,7 @@
         "sources": [
           "afir_alpha",
           "afir_beta",
+          "afir_zeta",
           "bast_lcl",
           "bkg_gvisys",
           "chargepool_gamma",

@@ -235,6 +235,16 @@ var Default = Rules{
 		{"data.fresh", "", "getTrainBoard", trainAgeReason},
 		{"data.fetchedAt", "", "getTrainBoard", trainAgeReason},
 		{"data.ageSeconds", "", "getTrainBoard", trainAgeReason},
+		{"data.place.location", "", "getPlaceOverview", overviewReason},
+		{"data.charging.sites[*].access", "", "getPlaceOverview", overviewReason},
+		{"data.charging.sites[*].chargePoints", "", "getPlaceOverview", overviewReason},
+		{"data.charging.sites[*].distanceM", "", "getPlaceOverview", overviewDistanceReason},
+		{"data.parking.sites[*].distanceM", "", "getPlaceOverview", overviewDistanceReason},
+		{"data.parking.sites[*].kind", "", "getPlaceOverview", overviewReason},
+		{"data.parking.sites[*].operator", "", "getPlaceOverview", overviewReason},
+		{"data.parking.sites[*].occupancy.total", "", "getPlaceOverview", overviewReason},
+		{"data.parking.sites[*].occupancy.state", "", "getPlaceOverview", overviewReason},
+		{"data.parking.sites[*].occupancy.observedAt", "", "getPlaceOverview", overviewReason},
 		{"data.watchId", "", "getWatch", watchIDReason},
 		{"data.uri", "", "getWatch", watchIDReason},
 		{"meta.attribution[*].domain", "", "", attributionReason},
@@ -294,6 +304,14 @@ const trainLabelReason = "the train tool states one label, what a person reads o
 
 // trainAgeReason is why the age of a train board is not compared.
 const trainAgeReason = "API-only: the age of the recorded board the API serves (fresh, fetchedAt, ageSeconds); the train tool asks the timetable provider at the time of the question"
+
+// overviewReason is why a member of the place overview is not compared:
+// the place page's cards, the site's form of the overview, do not show it.
+const overviewReason = "API-only: the place page's cards (the digest route /internal/place/cards) show no position of the place, no access or charge points of a charging site, and no kind, operator, capacity, state or reading time of a car park"
+
+// overviewDistanceReason is why a site's distance in the overview is not
+// compared: the cards round it.
+const overviewDistanceReason = "the place page's cards state a site's distance in kilometres to one decimal with a direction, the API in metres; the site's point, which both measure from, is compared"
 
 // watchIDReason is why a watch's id is not compared: each side mints its own.
 const watchIDReason = "each side mints the id of a watch: the platform a number of its session, the API a token of kind, key and condition; the watch it names is compared"

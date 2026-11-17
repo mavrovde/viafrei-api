@@ -17,7 +17,7 @@ import (
 
 // GeneratorVersion changes whenever the output for a given seed and profile
 // changes.
-const GeneratorVersion = "0.3.0"
+const GeneratorVersion = "0.3.1"
 
 // Profile sets the size of a generated set.
 type Profile struct {
@@ -509,6 +509,23 @@ func (rd road) along(f float64) lonLat {
 // eventKinds are the event kinds the platform reads a traffic message's event type as.
 var eventKinds = []string{"closure", "roadworks", "jam", "accident", "hazard", "restriction", "weather", "other"}
 
+// autobahnFamily is the source the platform stores as the motorway
+// operator's (Autobahn GmbH) events. Its API publishes three kinds: a closure,
+// roadworks, and a warning, which the platform's read contract states as a
+// hazard of severity info (its traffic type, which would make a warning a
+// jam, is not published here); and no end, since an item is current while its
+// sweep lists it. Its events carry only those kinds and no end, so the rows
+// are ones the platform can hold.
+const autobahnFamily = "roads_alpha"
+
+// autobahnKind is the kind an event of kind k is as an Autobahn item.
+func autobahnKind(k string) string {
+	if k == "closure" || k == "roadworks" {
+		return k
+	}
+	return "hazard"
+}
+
 // eventColumns are the columns of a traffic event row. An event is a Land or
 // city traffic message (see eventID): the platform keeps its history,
 // where an Autobahn tick is only read within a day of now. Its headline is
@@ -578,6 +595,9 @@ func (g *gen) roadsAndEvents() {
 		withdrawn := null
 		if g.r.IntN(20) == 0 {
 			withdrawn = ts(from.Add(2 * time.Hour))
+		}
+		if ref == autobahnFamily {
+			kind, to = autobahnKind(kind), time.Time{}
 		}
 		g.w.row(str(eventID(pub)), str(kind), str(rd.ref), str("motorway"), point(at), ts(from), optTS(to),
 			str(ref), str(pub), ts(from), ts(from.Add(time.Minute)), ts(from.Add(time.Minute)), withdrawn)

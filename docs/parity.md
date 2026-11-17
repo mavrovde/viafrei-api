@@ -177,6 +177,13 @@ nothing, so that family contributed nothing and neither side credits it.
 - **Departure boards** state the station by the read contract's id, its
   name and its national stop code, and the window asked. A day the
   timetable holds no trip on is inside the window and answers no departure.
+- **Motorway operator events.** The fixture family the producer stores as the
+  Autobahn GmbH's events (`roads_alpha`) carries only rows the platform can
+  hold for that source (fixture generator 0.3.1): a closure, roadworks, or a
+  hazard, and no end. The platform's read contract (`contract.traffic_event`)
+  states an Autobahn warning as kind `hazard`, severity `info`, and an item as
+  current while its sweep lists it; the projection of the MCP answer uses that
+  translation, never its own.
 - **Lorry rules** carry no identifier, so a row is named by its place in
   the answer (by distance, none last). A publisher's file date is stated
   for a priority route and the long-lorry network only, and the long-lorry

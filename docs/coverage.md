@@ -73,8 +73,21 @@ each survivor of the first run was either killed by a new test or removed
 by restructuring (a `switch`'s case expressions are reported as not covered,
 so the rules use `if` chains).
 
+The full run is cut into four parallel jobs. Mutation shard k (k = 1 to 4)
+mutates the scope roots at the positions p of `test/mutation/scope.tsv` with
+p mod 4 = k − 1 (`mutgate -plan -shard k/4`). The Mutation testing job then
+gathers the shards' reports into one full-mode gate, so the score and the
+findings are those of one full run. A bad `K/N` or a shard that selects no
+root is exit 2. The gather is exit 2 when a scope root has no report or has
+two, and the gate is red unless every shard ended green.
+`internal/testkit/mutgate/shard_test.go` proves the four shards of the real
+scope disjoint, together every root and none empty. A conformance test holds
+`mutation.yml` to the matrix and the fan-in.
+
 Run it locally with `scripts/mutation.sh pr origin/main` or
-`scripts/mutation.sh full`. The script runs Gremlins as
+`scripts/mutation.sh full`; or run the shards side by side with
+`scripts/mutation.sh shard K/4 DIR/shard-K` and gather them with
+`scripts/mutation.sh gather DIR`. The script runs Gremlins as
 `go run github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0`, as CI runs its
 other tools: the version is verified against the checksum database and never
 enters the service's dependencies.

@@ -55,6 +55,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/mavrovde/viafrei-api/internal/domain/number"
 	"github.com/mavrovde/viafrei-api/internal/domain/refresh"
 )
 
@@ -208,7 +209,7 @@ func (k *KeyRule) filterKnown(f string) error {
 	case "trim", "bool":
 		return nil
 	case "grid":
-		if step, err := strconv.ParseFloat(arg, 64); err != nil || step <= 0 || math.IsInf(step, 0) {
+		if step, err := number.ParseFinite(arg); err != nil || step <= 0 {
 			return fmt.Errorf("filter %q: a grid step is a positive number", f)
 		}
 		return nil
@@ -462,8 +463,8 @@ func filter(ctx context.Context, f, field, v string, lookup refresh.Lookup) (str
 	case "bool":
 		return strconv.FormatBool(v == "true"), nil
 	case "grid":
-		step, _ := strconv.ParseFloat(arg, 64) // checked when the registry was read
-		x, err := strconv.ParseFloat(v, 64)
+		step, _ := number.ParseFinite(arg) // checked when the registry was read
+		x, err := number.ParseFinite(v)
 		if err != nil {
 			return "", &refresh.SubjectError{Location: "subject." + field, Detail: "not a number"}
 		}

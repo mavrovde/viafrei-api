@@ -11,8 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
-
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
@@ -248,7 +246,19 @@ func (s *server) readChargerWatch(ctx context.Context, key access.Record, in *Wa
 	return r, nil
 }
 
-// errWatchUntil is the refusal of a window more than 24 hours ahead.
-func errWatchUntil(until string) error {
-	return huma.Error422UnprocessableEntity("until is more than 24 hours ahead", &huma.ErrorDetail{Location: "query.until", Value: until})
+// errWatchUntil is the refusal of a window more than 24 hours ahead, and
+// errWatchPast of one that does not end in the future: problems of the
+// request, as every invalid parameter (the platform's watch refuses both).
+func errWatchUntil(ctx context.Context, until string) error {
+	return untilProblem(ctx, until, "until is more than 24 hours ahead")
+}
+
+func errWatchPast(ctx context.Context, until string) error {
+	return untilProblem(ctx, until, "until is already past; a watch must end in the future")
+}
+
+func untilProblem(ctx context.Context, until, detail string) error {
+	p := newProblem(ctx, SlugInvalidParameter, "One or more parameters are invalid.", 0)
+	p.Errors = append(p.Errors, ParamError{Parameter: "query.until", Code: "invalid", Detail: detail})
+	return p
 }

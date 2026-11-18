@@ -5,11 +5,11 @@ import (
 	"io"
 	"mime"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/andybalholm/brotli"
 
+	"github.com/mavrovde/viafrei-api/internal/domain/number"
 	"github.com/mavrovde/viafrei-api/internal/invariant"
 )
 
@@ -48,7 +48,7 @@ func negotiateCoding(accept string) string {
 		name, params, _ := strings.Cut(strings.TrimSpace(part), ";")
 		weight := 1.0
 		if v, ok := strings.CutPrefix(strings.TrimSpace(params), "q="); ok {
-			f, err := strconv.ParseFloat(v, 64)
+			f, err := number.ParseFinite(v)
 			if err != nil {
 				continue
 			}

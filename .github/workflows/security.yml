@@ -41,13 +41,13 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
-      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           languages: go
           build-mode: manual
           queries: security-extended
       - run: go build ./... && go vet -tags integration ./...
-      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           category: /language:go
 
@@ -93,7 +93,7 @@ jobs:
           # matches these entries by name and ignores the version, so the
           # versions are held by scripts/docs-a11y-pins.sh in the CI docs
           # job: an upgrade fails there until this exception is reviewed.
-          allow-dependencies-licenses: pkg:npm/pa11y@10.0.0, pkg:npm/pa11y-ci@5.0.0
+          allow-dependencies-licenses: pkg:npm/pa11y@10.0.0, pkg:npm/pa11y-ci@5.0.0, pkg:githubactions/SonarSource/sonarqube-scan-action@8.4.1
           comment-summary-in-pr: on-failure
 
   licenses:

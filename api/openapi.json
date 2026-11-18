@@ -7956,6 +7956,7 @@
             "type": "array"
           },
           "ended": {
+            "description": "Whether the window is over; false when answered, as until is after now. Kept from the platform's watch, whose stored watches end.",
             "type": "boolean"
           },
           "from": {
@@ -7995,7 +7996,7 @@
             "description": "region: the distinct trips observed at the area's stops in the last half hour and those more than delay_min late at one of them; the condition holds when at least min_trips were observed and at least late_share of them were late. Absent when none was observed."
           },
           "until": {
-            "description": "The end of the window; a read after it answers ended.",
+            "description": "The end of the window, always after from: a window must end in the future.",
             "format": "date-time",
             "type": "string"
           },
@@ -24697,12 +24698,12 @@
             }
           },
           {
-            "description": "The window's end instant, at most 24 hours ahead. Give hours or until, not both.",
+            "description": "The window's end instant, after now and at most 24 hours ahead. Give hours or until, not both.",
             "explode": false,
             "in": "query",
             "name": "until",
             "schema": {
-              "description": "The window's end instant, at most 24 hours ahead. Give hours or until, not both.",
+              "description": "The window's end instant, after now and at most 24 hours ahead. Give hours or until, not both.",
               "format": "date-time",
               "type": "string"
             }

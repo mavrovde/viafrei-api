@@ -18,6 +18,7 @@ import (
 	"github.com/knadh/koanf/v2"
 
 	"github.com/mavrovde/viafrei-api/internal/app/features"
+	"github.com/mavrovde/viafrei-api/internal/domain/number"
 	"github.com/mavrovde/viafrei-api/internal/invariant"
 )
 
@@ -213,12 +214,16 @@ func assign(dst reflect.Value, typ string, raw any) error {
 	case "float":
 		switch v := raw.(type) {
 		case string:
-			x, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+			x, err := number.ParseFinite(strings.TrimSpace(v))
 			if err != nil {
 				return fmt.Errorf("%q is not a number", v)
 			}
 			dst.SetFloat(x)
 		case float64:
+			// A YAML .nan or .inf arrives here as a float, not as text.
+			if !number.Finite(v) {
+				return fmt.Errorf("%v is not a number", v)
+			}
 			dst.SetFloat(v)
 		case int:
 			dst.SetFloat(float64(v))

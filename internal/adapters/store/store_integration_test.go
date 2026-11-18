@@ -143,7 +143,7 @@ func TestReaderRoleLimits(t *testing.T) {
 	if err := owner.QueryRow(ctx, "select rolsuper, rolinherit, rolconnlimit from pg_roles where rolname = $1", dbcontract.ReaderRole).Scan(&super, &inherit, &limit); err != nil {
 		t.Fatal(err)
 	}
-	// 16 is the largest db.pool_max (db/contract TestRoleLimitCoversPoolMax).
+	// 16 is the largest db.pool_max (internal/dbcontract TestRoleLimitCoversPoolMax).
 	if super || inherit || limit != 16 {
 		t.Fatalf("role attributes: super=%v inherit=%v connlimit=%d", super, inherit, limit)
 	}

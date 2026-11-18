@@ -34,6 +34,7 @@ compares each one with the platform's own answers (bundle 2.6.22).
 * **database:** tests, the local stack and CI migrate with the signed viafrei-database 0.3.2 image (`database.pin`, by digest); this repository runs no DDL.
 * **live:** the on-demand refreshes are proven with the live refresher's release 0.1.0, pinned by digest, which `make live-e2e` runs against the same database release before a release.
 * **sources:** own keys see unreviewed families listed in `listSources`; other keys do not.
+* **freshness:** a family with no fixed interval states `staleAfterS` 9007199254740991 (2^53 − 1, an age no data reaches) and `stale` false, also when its `dataAsOf` is null; the field stays a required integer, as in 0.2.
 * **tests:** the performance package (`internal/perf`) runs alone (`-p 1`) after the other integration packages, into its own coverage profile; its budgets are unchanged.
 
 ### Fixed

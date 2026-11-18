@@ -405,11 +405,9 @@ produced the bundle it compared.
 
 The platform's parity producer makes the MCP side's bundle.
 
-- **Inputs:** `test/parity/questions.json`, the read-contract schema as
-  the service builds it (`contract.SchemaSQL`: `db/contract/0001_contract.sql`
-  followed by `db/contract/0003_physical.sql`, in one file, because the
-  relations alone have partitioned observation tables with no partition a
-  fixture row can be written into), the fixture SQL the questions name
+- **Inputs:** `test/parity/questions.json`, the read-contract schema of the
+  database release `database.pin` names (its migrator builds it, the
+  partitions a fixture row is written into included), the fixture SQL the questions name
   (`make fixtures PROFILE=tiny SEED=1` writes it to
   `testdata/fixtures/tiny/seed.sql`) and the platform version.
 - **What it does:** it loads the fixture rows into a throwaway database, asks

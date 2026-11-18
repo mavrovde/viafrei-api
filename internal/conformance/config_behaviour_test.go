@@ -184,7 +184,10 @@ func behaviours() map[string]behaviour {
 			return buf.String()[:1]
 		}},
 		"docs.enabled": {"false", func(t *testing.T, c *config.Config) string {
-			return fmt.Sprint(get(t, c, "/v1/openapi.json").Code)
+			// The document's routes are there or not: /openapi.json, the
+			// redirect to it, says which without marshalling the ~1 MB
+			// document (half a second under the race detector, TST-012).
+			return fmt.Sprint(get(t, c, "/openapi.json").Code)
 		}},
 		"endpoints.disabled": {"getMeta", func(t *testing.T, c *config.Config) string {
 			return fmt.Sprint(get(t, c, "/v1/meta").Code)

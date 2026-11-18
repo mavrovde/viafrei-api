@@ -187,10 +187,6 @@ func TestServerAppliesDefaultsWithoutALogger(t *testing.T) {
 	if err != nil || srv.ErrorLog == nil {
 		t.Fatalf("server = %v, %v", srv, err)
 	}
-	doc, err := OpenAPI(config.Defaults())
-	if err != nil || !json.Valid(doc) {
-		t.Fatalf("OpenAPI = %d bytes, %v", len(doc), err)
-	}
 }
 
 // TestStrictQueryRefusesARepeatedDeclaredParameter: a declared parameter

@@ -9,6 +9,61 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [0.3.0](https://github.com/mavrovde/viafrei-api/compare/v0.2.1...v0.3.0) (2026-11-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* release candidates and builds of main publish no image; verify release images with the narrowed identity regexp in docs/container.md.
+
+### Added
+
+* **auth:** API keys and the licence gate ([#7](https://github.com/mavrovde/viafrei-api/issues/7)) ([#60](https://github.com/mavrovde/viafrei-api/issues/60)) ([b328629](https://github.com/mavrovde/viafrei-api/commit/b328629b8d4fda066d923a8bf5d27cf73e9d22ab))
+* **cache:** serve stored answers with served_stale while storage is down ([#79](https://github.com/mavrovde/viafrei-api/issues/79)) ([#89](https://github.com/mavrovde/viafrei-api/issues/89)) ([a68e955](https://github.com/mavrovde/viafrei-api/commit/a68e955e74e91185be1d2a750c63d9839879f442))
+* **console:** owner console for keys with passkey sign-in on a loopback admin listener ([#74](https://github.com/mavrovde/viafrei-api/issues/74)) ([06b84d8](https://github.com/mavrovde/viafrei-api/commit/06b84d8e6aa79b942eecb1b4a4bfa4936f1bdc25)), closes [#61](https://github.com/mavrovde/viafrei-api/issues/61)
+* contract 0.3, serve everything the site and the MCP server ask for ([#137](https://github.com/mavrovde/viafrei-api/issues/137)) ([e628721](https://github.com/mavrovde/viafrei-api/commit/e6287212b7f347a3c8e78d9a55ba428abf88bf89))
+* **endpoints:** charging and parking near a position, and a composed place overview ([#64](https://github.com/mavrovde/viafrei-api/issues/64)) ([4d18138](https://github.com/mavrovde/viafrei-api/commit/4d1813840bbbe05c482cc1c5baa817032c85df0c)), closes [#10](https://github.com/mavrovde/viafrei-api/issues/10)
+* **limits:** rate limits, quotas, priority tiers, load shedding and usage meter ([#65](https://github.com/mavrovde/viafrei-api/issues/65)) ([fa1f49f](https://github.com/mavrovde/viafrei-api/commit/fa1f49f0049c53765d0bdbf91ecce2bf88ef55c7))
+* **load:** each run writes its figures; the nightly run on main is compared with the previous one (TST-021) ([#86](https://github.com/mavrovde/viafrei-api/issues/86)) ([ffb3c0a](https://github.com/mavrovde/viafrei-api/commit/ffb3c0a05a48ef28b7326cbfc6a04294be725c3f))
+* **perf:** latency budgets, conditional requests, a result cache and plan checks ([#77](https://github.com/mavrovde/viafrei-api/issues/77)) ([9c572bd](https://github.com/mavrovde/viafrei-api/commit/9c572bd182494d24b8103c412c343721443838ce))
+* **release:** version sync with the ViaFrei platform, /v1/meta reports the platform version ([#6](https://github.com/mavrovde/viafrei-api/issues/6)) ([#58](https://github.com/mavrovde/viafrei-api/issues/58)) ([15101fd](https://github.com/mavrovde/viafrei-api/commit/15101fddad33bbc3208fed9aa3ee3bb08661308c))
+* **roads:** road conditions on a motorway, near a position and by id ([#71](https://github.com/mavrovde/viafrei-api/issues/71)) ([e99fbad](https://github.com/mavrovde/viafrei-api/commit/e99fbadeb10b2bdddfda1b9591825172b7620da1))
+* **store:** a circuit breaker in front of storage (NFR-RES-002) ([#84](https://github.com/mavrovde/viafrei-api/issues/84)) ([86abfa9](https://github.com/mavrovde/viafrei-api/commit/86abfa92958f5569d0ebb85ea8503ed1997ae176))
+* **store:** share the storage concurrency budget with the other readers of the store ([#69](https://github.com/mavrovde/viafrei-api/issues/69)) ([a5fc447](https://github.com/mavrovde/viafrei-api/commit/a5fc447803daee57a78f0c68cd88ba6a3fa68a6a)), closes [#8](https://github.com/mavrovde/viafrei-api/issues/8)
+* **weather,rules:** weather warnings at a position and the driving rules on a topic ([#76](https://github.com/mavrovde/viafrei-api/issues/76)) ([23b3f24](https://github.com/mavrovde/viafrei-api/commit/23b3f24c8f08b86b8c073a16faab8c9d1c222dde))
+
+
+### Fixed
+
+* **charging:** a reserved charge point is answered occupied, as the MCP capability answers it ([#18](https://github.com/mavrovde/viafrei-api/issues/18)) ([#87](https://github.com/mavrovde/viafrei-api/issues/87)) ([3b4ad4a](https://github.com/mavrovde/viafrei-api/commit/3b4ad4a978917de9c8109ecc172011c42e4c31eb))
+* **charging:** a stale or unknown report is no availability, min_kw limits the listed points, and parity is compared at platform 2.6.8 ([#68](https://github.com/mavrovde/viafrei-api/issues/68)) ([a518283](https://github.com/mavrovde/viafrei-api/commit/a518283bb73983102df2757d5702ba5a34080734)), closes [#10](https://github.com/mavrovde/viafrei-api/issues/10)
+* **deps:** build with Go 1.27.4, which fixes GO-2026-6859 in net/http ([#72](https://github.com/mavrovde/viafrei-api/issues/72)) ([81f49bc](https://github.com/mavrovde/viafrei-api/commit/81f49bc1837fb1bdfa30d9dcd1e8d891a6bf6637))
+* **docs:** the portal loads nothing from a third party (no Google fonts, Redoc served from the site) ([#83](https://github.com/mavrovde/viafrei-api/issues/83)) ([3b12b8c](https://github.com/mavrovde/viafrei-api/commit/3b12b8cc9226a4edc13926818c9517b6a60eecaa))
+* **review:** independent review findings on [#64](https://github.com/mavrovde/viafrei-api/issues/64) and [#66](https://github.com/mavrovde/viafrei-api/issues/66) ([#67](https://github.com/mavrovde/viafrei-api/issues/67)) ([627689c](https://github.com/mavrovde/viafrei-api/commit/627689c6c101502cc961f0e548403d62a8ca3140)), closes [#10](https://github.com/mavrovde/viafrei-api/issues/10) [#18](https://github.com/mavrovde/viafrei-api/issues/18)
+
+
+### Dependencies
+
+* bump github.com/fxamacker/cbor/v2 from 2.9.6 to 2.10.0 ([#135](https://github.com/mavrovde/viafrei-api/issues/135)) ([8cd9f06](https://github.com/mavrovde/viafrei-api/commit/8cd9f06b146c7363a2eb89aff520c17a1c142ca9))
+* bump the testcontainers group across 1 directory with 2 updates ([#133](https://github.com/mavrovde/viafrei-api/issues/133)) ([a70ef78](https://github.com/mavrovde/viafrei-api/commit/a70ef786ec281e3320346b1b9dffb57ab2fd020e))
+* keep in step with ViaFrei platform 2.6.12 ([#82](https://github.com/mavrovde/viafrei-api/issues/82)) ([dabb42b](https://github.com/mavrovde/viafrei-api/commit/dabb42b4116bb6f500d0cf8c99ab3b9638b51d93))
+* keep in step with ViaFrei platform 2.6.13 ([#90](https://github.com/mavrovde/viafrei-api/issues/90)) ([d9f8073](https://github.com/mavrovde/viafrei-api/commit/d9f80734457a5a8d683fe153105f81cc04fe9752))
+
+
+### Documentation
+
+* developer portal with guide, recorded examples, attribution rules, error codes and versioning policy ([#70](https://github.com/mavrovde/viafrei-api/issues/70)) ([51deafd](https://github.com/mavrovde/viafrei-api/commit/51deafd7faae33ef3ac213c5b7e0d139970d2159))
+
+
+### Build and CI
+
+* bump docker/login-action from 4.7.0 to 4.8.0 ([#134](https://github.com/mavrovde/viafrei-api/issues/134)) ([c8829fe](https://github.com/mavrovde/viafrei-api/commit/c8829fe774ca0fefa586bab603e18bb86be97d19))
+* bump sigstore/cosign-installer from 4.1.2 to 4.1.3 ([#131](https://github.com/mavrovde/viafrei-api/issues/131)) ([e4deb0c](https://github.com/mavrovde/viafrei-api/commit/e4deb0c085eb143cf9e02ee1a4ea0e3a8c080da4))
+* fuzz and load run weekly instead of nightly, platform sync weekly instead of daily; Scorecard and Security no longer run on every push to main (owner: GitHub by minimum) ([#97](https://github.com/mavrovde/viafrei-api/issues/97)) ([9d2b8a0](https://github.com/mavrovde/viafrei-api/commit/9d2b8a09ffa2722754aee0e47a9d187eb26f06e0))
+* **mutation:** mutation testing of the domain, access and admission code ([#17](https://github.com/mavrovde/viafrei-api/issues/17)) ([#62](https://github.com/mavrovde/viafrei-api/issues/62)) ([20dcbeb](https://github.com/mavrovde/viafrei-api/commit/20dcbeb3f7439f692846469525960f70a9947279))
+* **security:** one tool per kind of check ([#12](https://github.com/mavrovde/viafrei-api/issues/12), [#5](https://github.com/mavrovde/viafrei-api/issues/5)) ([#54](https://github.com/mavrovde/viafrei-api/issues/54)) ([1309955](https://github.com/mavrovde/viafrei-api/commit/1309955749ae2f5d3fe272b71f875adf08a70d25))
+* Snyk runs weekly on main and once per release, before publish ([#99](https://github.com/mavrovde/viafrei-api/issues/99)) ([9f83e93](https://github.com/mavrovde/viafrei-api/commit/9f83e93a50719038641a10dd8a9c3744fa4588a0))
+
 ## [0.3.0] (unreleased)
 
 The API serves what the site and the MCP server answer today, from the read

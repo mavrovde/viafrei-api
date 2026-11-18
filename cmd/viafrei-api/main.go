@@ -111,7 +111,8 @@ func serve(environ []string, stderr io.Writer) int {
 	}
 	defer st.Close()
 	adm := admission.New(wire.AdmissionSettings(cfg), nil)
-	st.WithAdmission(adm).WithSharedBudget(wire.SharedBudget(cfg)).WithLogger(log).WithBreaker(wire.Breaker(cfg, log))
+	st.WithAdmission(adm).WithSharedBudget(wire.SharedBudget(cfg)).WithLogger(log).WithBreaker(wire.Breaker(cfg, log)).WithRegisterSnapshot(store.RegisterSnapshotTTL, store.RegisterStaleFor)
+	go st.KeepRegister(ctx)
 	addresses := ratelimit.NewIPLimiter(wire.AddressSettings(cfg), nil)
 	go addresses.Run(ctx)
 

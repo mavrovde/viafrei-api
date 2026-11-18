@@ -49,6 +49,7 @@ type Store struct {
 	pace    pace
 	log     *slog.Logger
 	breaker *breaker.Breaker
+	reg     registerSnapshot
 }
 
 // WithBreaker puts the circuit breaker in front of every read (NFR-RES-002):

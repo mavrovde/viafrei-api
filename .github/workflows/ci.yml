@@ -97,7 +97,8 @@ jobs:
       - name: go test -tags integration
         run: |
           set -o pipefail
-          go test -race -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out -json $(go list ./... | grep -v '/internal/perf$') | tee test-integration.json | go run ./internal/testkit/gotestsum-lite
+          mapfile -t pkgs < <(go list ./... | grep -v '/internal/perf$')
+          go test -race -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out -json "${pkgs[@]}" | tee test-integration.json | go run ./internal/testkit/gotestsum-lite
       - name: go test -tags integration (internal/perf alone, its budgets time the queries)
         run: |
           set -o pipefail

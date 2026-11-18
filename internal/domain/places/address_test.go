@@ -73,8 +73,13 @@ func TestTheAbroadJudgementIsThePlatforms(t *testing.T) {
 	}
 	w := places.SectorWedges(geo.Point{Lat: 60, Lon: 10}, 111320, 4)
 	// North of the centre one degree, east two (cos 60° halves a degree of longitude).
-	if len(w) != 4 || !strings.HasPrefix(w[0], "POLYGON((10.000000 60.000000,10.000000 61.000000,") || !strings.Contains(w[1], ",12.000000 60.000000,") || !strings.HasSuffix(w[3], ",10.000000 60.000000))") {
+	if len(w) != 4 || !strings.Contains(w[1], ",12.000000 60.000000,") || !strings.HasSuffix(w[3], ",10.000000 60.000000))") {
 		t.Errorf("wedges %q", w)
+	}
+	// One whole wedge: the centre, the seven arc points from north to east, the centre again.
+	if want := "POLYGON((10.000000 60.000000,10.000000 61.000000,10.517638 60.965926,11.000000 60.866025,11.414214 60.707107," +
+		"11.732051 60.500000,11.931852 60.258819,12.000000 60.000000,10.000000 60.000000))"; len(w) == 4 && w[0] != want {
+		t.Errorf("wedge 0 %q, want %q", w[0], want)
 	}
 }
 

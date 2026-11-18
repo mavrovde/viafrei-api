@@ -223,7 +223,10 @@ func TestRegisterSnapshotKeep(t *testing.T) {
 	r := &registerSnapshot{ttl: 5 * time.Millisecond, staleFor: time.Second}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
-	go func() { r.keep(ctx, time.Now, f.read, log, "the background read failed"); close(done) }()
+	go func() {
+		r.keep(ctx, func(ctx context.Context) error { return r.refresh(ctx, time.Now, f.read) }, log, "the background read failed")
+		close(done)
+	}()
 	for f.reads.Load() < 2 {
 		time.Sleep(time.Millisecond)
 	}

@@ -3,10 +3,12 @@
 package store_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -129,6 +131,54 @@ from contract.road`, &wantShapes)
 		if _, _, _, err := st.ParkingNear(ctx, parking.Query{Road: ref, Limit: 5}, listed, listed, time.Now()); err == nil {
 			t.Fatal("the parking read no road shapes from a closed pool")
 		}
+	}
+}
+
+// TestColdRoadListServesLiveDuringTheJunctionRead: on a pod whose snapshot
+// is empty, the background read holds the road shapes once its shape read
+// is done; the junction read, road by road, is no flight a request waits
+// for. While it is held part-way, a road's exits and a Land's list answer
+// live, inside their own read, as the views state them.
+func TestColdRoadListServesLiveDuringTheJunctionRead(t *testing.T) {
+	req.Covers(t, "NFR-PERF-001")
+	var ref, state string
+	owner(t, `select j.road_ref, j.state_code from contract.junction j where j.state_code is not null
+order by j.road_ref, j.junction_id limit 1`, &ref, &state)
+	st := openStore(t, bounded(t))
+	held, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	st.HoldJunctionRead(func() {
+		once.Do(func() { close(held) })
+		<-release
+	})
+	warmed := make(chan error, 1)
+	go func() { warmed <- st.WarmRoads(context.Background()) }()
+	<-held
+	// A request that waited for the junction read would wait for release;
+	// its deadline is well short of the test's bound.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	one, _, err := st.Motorways(ctx, roads.CatalogueQuery{Road: ref, Limit: 1}, nil, time.Now())
+	if err != nil || len(one) != 1 {
+		t.Fatalf("%s during the junction read: %v %v", ref, one, err)
+	}
+	exits := map[string]*string{}
+	for _, j := range one[0].Exits {
+		exits[j.ID] = j.State
+	}
+	b, _ := json.Marshal(exits)
+	var wantExits string
+	owner(t, `select coalesce(json_object_agg(junction_id, state_code), '{}')::text from contract.junction where road_ref = '`+strings.ReplaceAll(ref, "'", "''")+`'`, &wantExits)
+	if string(b) != canonical(t, wantExits) {
+		t.Fatalf("%s's exits during the junction read %s, the view's %s", ref, b, wantExits)
+	}
+	ms, _, err := st.Motorways(ctx, roads.CatalogueQuery{State: state, Limit: 500}, nil, time.Now())
+	if err != nil || !slices.ContainsFunc(ms, func(m roads.Motorway) bool { return m.Road == ref }) {
+		t.Fatalf("the roads in %s during the junction read: %v %v", state, ms, err)
+	}
+	close(release)
+	if err := <-warmed; err != nil {
+		t.Fatalf("the junction read after release: %v", err)
 	}
 }
 

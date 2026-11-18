@@ -52,6 +52,10 @@ type Store struct {
 	reg     registerSnapshot
 	roads   roadSnapshot
 	lands   junctionLands
+
+	// landsRead, when set (tests), is called before each road's junction
+	// read of the background read.
+	landsRead func()
 }
 
 // WithBreaker puts the circuit breaker in front of every read (NFR-RES-002):

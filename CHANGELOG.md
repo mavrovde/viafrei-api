@@ -9,6 +9,18 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [0.3.1](https://github.com/mavrovde/viafrei-api/compare/v0.3.0...v0.3.1) (2026-11-18)
+
+
+### Changed
+
+* every operation within its latency budget ([#141](https://github.com/mavrovde/viafrei-api/issues/141)), a cold road snapshot never blocks, TST-012 held ([#143](https://github.com/mavrovde/viafrei-api/issues/143)) ([b491eb6](https://github.com/mavrovde/viafrei-api/commit/b491eb6f28d84284e9b6e371236a8f640532d5b3))
+
+
+### Build and CI
+
+* mutation testing in 4 parallel shards, once per release before publish, never per pull request ([#139](https://github.com/mavrovde/viafrei-api/issues/139)) ([e4a6214](https://github.com/mavrovde/viafrei-api/commit/e4a621403f5adfd5028be23ee81cae407b7c715b))
+
 ## [0.3.0](https://github.com/mavrovde/viafrei-api/compare/v0.2.1...v0.3.0) (2026-11-18)
 
 

@@ -10,7 +10,7 @@ import (
 
 // MotorwaysInput is the input of listMotorways.
 type MotorwaysInput struct {
-	State string `query:"state" pattern:"^[0-9]{2}$" example:"09" doc:"Only the motorways that run through this Land (its two-digit key)."`
+	State string `query:"state" pattern:"^(0[1-9]|1[0-6])$" example:"09" doc:"Only the motorways that run through this Land (its key, 01 to 16)."`
 	Road  string `query:"road" maxLength:"6" pattern:"^[Aa] ?[0-9]{1,3}$" example:"A7" doc:"Only this motorway, with its junctions (exits) in number order."`
 	Limit int    `query:"limit" minimum:"1" maximum:"200" doc:"Most motorways; default 200 (every motorway)."`
 	road  string

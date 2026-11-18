@@ -45,7 +45,12 @@ var watchConditionKeys = map[string][]string{
 // watchScopes are the scopes a watch of each other kind needs besides roads.
 var watchScopes = map[string]access.Scope{"station": "transit", "region": "transit", "weather": "weather", "charger": "energy"}
 
-var regionKey = regexp.MustCompile(`^[0-9]{2,12}$`)
+// regionKey is an official region key: it starts with its Land's key, 01 to
+// 16, and runs to at most 12 digits (#152). Every parameter that takes a Land
+// or a region key states the same rule in its pattern (state paths,
+// listMotorways' state, listTransitDisruptions' area); TestEveryLandParameterTakesTheSixteenLaender
+// walks them all.
+var regionKey = regexp.MustCompile(`^(0[1-9]|1[0-6])[0-9]{0,10}$`)
 
 // conditionBounds are the bounds the platform takes each numeric condition
 // value in (watch_situation's schema); a value outside is refused by name.

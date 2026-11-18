@@ -22,7 +22,7 @@ const (
 
 // DisruptionInput is the input of listTransitDisruptions.
 type DisruptionInput struct {
-	Area      string `query:"area" pattern:"^[0-9]{2,12}$" example:"05315" doc:"The official region code of the area (two digits a Land, five a Kreis), as listPlaces or describeLocation give it. Give area, line or both."`
+	Area      string `query:"area" pattern:"^(0[1-9]|1[0-6])[0-9]{0,10}$" example:"05315" doc:"The official region code of the area (two digits a Land, 01 to 16, five a Kreis; every key starts with its Land's), as listPlaces or describeLocation give it. Give area, line or both."`
 	Line      string `query:"line" minLength:"1" maxLength:"16" doc:"A line name as on the vehicle (RB33, S1, RE 1); white space and case do not matter. Without area, the line's alerts anywhere."`
 	WindowMin int    `query:"window_min" minimum:"5" maximum:"120" doc:"How many minutes back to look (5 to 120); default 60, echoed as data.windowMin. The punctuality is counted over the source's own window, data.punctuality.windowMin."`
 	Limit     int    `query:"limit" minimum:"1" maximum:"20" doc:"Most alerts to return; default 6. data.alertsTotal says how many are in force."`

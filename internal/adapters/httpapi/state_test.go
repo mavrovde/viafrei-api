@@ -88,22 +88,34 @@ func TestStateServiceAlerts(t *testing.T) {
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/states/05/service-alerts", bearer), 403, "source-not-permitted")
 }
 
-// TestStatePathsTakeTheSixteenLaender (#152): a code that is no Land (00,
-// 17, 99) is refused on every state operation with a 400 naming path.state,
-// never a believable all-clear; 01 and 16, the first and the last Land, are
-// answered.
-func TestStatePathsTakeTheSixteenLaender(t *testing.T) {
-	h := featureHandler(t, config.Defaults(), everyAnswer(), nil)
-	for _, op := range []string{"weather", "road-conditions", "service-alerts"} {
-		for _, code := range []string{"00", "17", "99", "1", "016"} {
-			w := do(t, h, http.MethodGet, "/v1/states/"+code+"/"+op, bearer)
-			if assertProblem(t, w, http.StatusBadRequest, "invalid-parameter"); !strings.Contains(w.Body.String(), `"parameter":"path.state"`) {
-				t.Errorf("%s %s: %s", op, code, w.Body)
+// TestEveryLandParameterTakesTheSixteenLaender (#152): a code that is no
+// Land (00, 17, 99), or a region key that does not start with one, is refused
+// with a 400 naming the parameter on every operation that takes a Land or a
+// region key, never a believable all-clear; 01 and 16, the first and the last
+// Land, are answered, and de where road-conditions takes the whole country.
+func TestEveryLandParameterTakesTheSixteenLaender(t *testing.T) {
+	h := featureHandler(t, config.Defaults(), watchAnswer(), nil)
+	for _, c := range []struct {
+		target    func(code string) string
+		parameter string
+		bad, good []string
+	}{
+		{func(c string) string { return "/v1/states/" + c + "/weather" }, "path.state", []string{"00", "17", "99", "1", "016", "de"}, []string{"01", "16"}},
+		{func(c string) string { return "/v1/states/" + c + "/service-alerts" }, "path.state", []string{"00", "17", "99", "1", "016", "de"}, []string{"01", "16"}},
+		{func(c string) string { return "/v1/states/" + c + "/road-conditions" }, "path.state", []string{"00", "17", "99", "1", "016"}, []string{"01", "16", "de"}},
+		{func(c string) string { return "/v1/motorways?state=" + c }, "query.state", []string{"00", "17", "99", "1", "016"}, []string{"01", "16"}},
+		{func(c string) string { return "/v1/transit-disruptions?area=" + c }, "query.area", []string{"00", "17", "99", "00315", "17000"}, []string{"01", "16", "05315"}},
+		{func(c string) string { return "/v1/watch?kind=region&target=" + c }, "query.target", []string{"00", "17", "99", "00315", "17000"}, []string{"01", "16", "05315"}},
+	} {
+		for _, code := range c.bad {
+			w := do(t, h, http.MethodGet, c.target(code), bearer)
+			if assertProblem(t, w, http.StatusBadRequest, "invalid-parameter"); !strings.Contains(w.Body.String(), `"parameter":"`+c.parameter+`"`) {
+				t.Errorf("%s: %s", c.target(code), w.Body)
 			}
 		}
-		for _, code := range []string{"01", "16"} {
-			if w := do(t, h, http.MethodGet, "/v1/states/"+code+"/"+op, bearer); w.Code != http.StatusOK {
-				t.Errorf("%s %s: %d %s", op, code, w.Code, w.Body)
+		for _, code := range c.good {
+			if w := do(t, h, http.MethodGet, c.target(code), bearer); w.Code != http.StatusOK {
+				t.Errorf("%s: %d %s", c.target(code), w.Code, w.Body)
 			}
 		}
 	}

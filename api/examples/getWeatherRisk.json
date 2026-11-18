@@ -15,6 +15,7 @@
   "status": 200,
   "response": {
     "data": {
+      "lamp": "amber",
       "warnings": [
         {
           "id": "dwd:100008",
@@ -37,6 +38,7 @@
           "sourceFamily": "dwd_eta"
         }
       ],
+      "truncated": false,
       "roadWeather": []
     },
     "meta": {

@@ -61,8 +61,14 @@ type RoadWeatherObservation struct {
 }
 
 // WeatherRiskData is the answer of getWeatherRisk.
+//
+// lamp and truncated are API-only: the platform's weather warnings check
+// states neither, and the /v1 contract keeps both (VER-001), so the parity
+// harness leaves them out (parity.Default).
 type WeatherRiskData struct {
+	Lamp        string                   `json:"lamp" enum:"green,amber,red" doc:"Over every warning in force at the position, whatever min_level and hazards keep (they filter only the list), first match: red when a warning of level 3 or 4 is in force; amber for a warning of level 1 or 2, or, with no warning in force, when the sight is limited: a weather family the key may not read was left out (meta.partial), or a weather family read has no data or stale data (meta.freshness), since no warning cannot then be told from none heard; green when no warning is in force and every family is fresh."`
 	Warnings    []WeatherWarning         `json:"warnings" doc:"The warnings min_level and hazards keep, ordered by level descending, then validity.from ascending, then id; at most weather.max_warnings."`
+	Truncated   bool                     `json:"truncated" doc:"True when more warnings answer than weather.max_warnings and only the first are listed; the lamp reads them all."`
 	RoadWeather []RoadWeatherObservation `json:"roadWeather" doc:"Road-weather observations near a corridor; present for along questions only, so always empty on a question about one position."`
 }
 
@@ -94,7 +100,7 @@ type WeatherRiskOutput struct {
 
 func registerWeatherRisk(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "The official weather warnings at a position"
-	op.Description = "Every official weather warning in force now whose area contains the position, with the issuer's level and wording unchanged, as the platform's weather warnings check states them. MCP counterpart: weather warnings check. Needs the scope weather."
+	op.Description = "Every official weather warning in force now whose area contains the position, with the issuer's level and wording unchanged, as the platform's weather warnings check states them, and the lamp over every warning in force there, whatever min_level and hazards keep (API-only: the check states no lamp). MCP counterpart: weather warnings check. Needs the scope weather."
 	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, in *WeatherRiskInput) (*WeatherRiskOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
@@ -114,7 +120,7 @@ func registerWeatherRisk(api huma.API, s *server, op huma.Operation) {
 		noteWeatherLamp(ctx, a)
 		ws := weatherWarnings(a.Items)
 		return &WeatherRiskOutput{CacheControl: noStore, Body: WeatherRiskEnvelope{
-			Data: WeatherRiskData{Warnings: ws, RoadWeather: []RoadWeatherObservation{}},
+			Data: WeatherRiskData{Lamp: string(a.Lamp), Warnings: ws, Truncated: a.HasMore, RoadWeather: []RoadWeatherObservation{}},
 			Meta: WeatherRiskMeta{
 				DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
 				Query:    WeatherRiskQuery{At: position(q.At), MinLevel: in.MinLevel, Hazards: hazards},

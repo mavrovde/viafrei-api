@@ -232,6 +232,8 @@ var Default = Rules{
 		{"data[*].eva", "", "listStations", siteReason("/internal/station/:slug")},
 		{"data[*].evaNumbers", "", "listStations", siteReason("/internal/station/:slug")},
 		{"data.zones", "", "getDrivingRules", zoneRowsReason},
+		{"data.lamp", "", "getWeatherRisk", weatherLampReason},
+		{"data.truncated", "", "getWeatherRisk", weatherLampReason},
 		{"data.lamp", "", "listStateRoadConditions", siteReason("/internal/state/:slug")},
 		{"data.lampReason", "", "listStateRoadConditions", siteReason("/internal/state/:slug")},
 		{"data.lamp", "horizon_days", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
@@ -331,6 +333,10 @@ func siteReason(route string) string {
 
 // zoneRowsReason is why the zone rows of a rules answer are not compared.
 const zoneRowsReason = "API-only: the MCP driving rules state the verdict at a position (zoneVerdict, compared) and a city's entry of the curated zone list, and no digest route the site reads lists the published zone rows"
+
+// weatherLampReason is why the lamp and the truncation flag of the warnings
+// at a position are not compared: the /v1 contract keeps both (VER-001).
+const weatherLampReason = "API-only: the /v1 contract states the lamp over every warning at the position and whether the list was cut (VER-001); the platform's weather warnings check states neither, and no digest route the site reads serves a lamp for a position"
 
 // motorwayListReason is why a motorway's length and register family are
 // not compared: the site's motorway list, index and pages show neither.

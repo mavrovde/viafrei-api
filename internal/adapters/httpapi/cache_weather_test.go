@@ -160,6 +160,9 @@ func TestAFamilyTheLampReadTurningStaleEndsAWeatherAnswer(t *testing.T) {
 	if w.Code != http.StatusOK || w.Header().Get("ETag") == etag {
 		t.Fatalf("at the turn: %d", w.Code)
 	}
+	if data, _ := decode(t, w)["data"].(map[string]any); data["lamp"] != "amber" {
+		t.Fatalf("at the turn the lamp is %v", data["lamp"])
+	}
 }
 
 func TestAnEditedRuleEndsADrivingRulesAnswer(t *testing.T) {

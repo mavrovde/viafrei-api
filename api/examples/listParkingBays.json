@@ -99,6 +99,7 @@
           "family": "frankfurt_behindertenparkplaetze",
           "dataAsOf": null,
           "ageS": null,
+          "staleAfterS": 9007199254740991,
           "stale": false
         }
       ],

@@ -63,18 +63,21 @@
           "family": "bkg_gvisys",
           "dataAsOf": null,
           "ageS": null,
+          "staleAfterS": 9007199254740991,
           "stale": false
         },
         {
           "family": "geonames",
           "dataAsOf": null,
           "ageS": null,
+          "staleAfterS": 9007199254740991,
           "stale": false
         },
         {
           "family": "osm",
           "dataAsOf": null,
           "ageS": null,
+          "staleAfterS": 9007199254740991,
           "stale": false
         }
       ],

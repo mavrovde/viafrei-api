@@ -95,6 +95,7 @@ var nullableObjects = []struct{ schema, member string }{
 	{"LocationData", "lowEmissionZone"},
 	{"MotorwayData", "coverage"},
 	{"ParkingSite", "occupancy"},
+	{"OverviewParkingSite", "occupancy"},
 	{"RoadSituation", "location"},
 	{"RoadSituation", "lanes"},
 	{"RoadSituation", "position"},
@@ -135,8 +136,22 @@ type FreshnessEntry struct {
 	Family      string     `json:"family" doc:"The source family."`
 	DataAsOf    *time.Time `json:"dataAsOf" nullable:"true" doc:"The instant up to which the family's data was last known current. It advances when the data is confirmed unchanged, so it is not the instant of the last change in the data. Null when the family's data has never been known current."`
 	AgeS        *int64     `json:"ageS" nullable:"true" doc:"generatedAt minus dataAsOf, in whole seconds; null when dataAsOf is."`
-	StaleAfterS *int64     `json:"staleAfterS,omitempty" doc:"The family's design threshold: data older than this is stale. Absent for a family with no fixed interval, which is never stale: its age is shown only."`
-	Stale       bool       `json:"stale" doc:"True when ageS is above staleAfterS, or dataAsOf is unknown; never for a family without staleAfterS."`
+	StaleAfterS int64      `json:"staleAfterS" doc:"The family's design threshold: data older than this is stale. A family with no fixed interval, which is never stale, has 9007199254740991 (2^53 - 1, the largest integer every JSON reader holds exactly), which no age passes: its age is shown only."`
+	Stale       bool       `json:"stale" doc:"True when ageS is above staleAfterS, or dataAsOf is unknown; never for a family with no fixed interval."`
+}
+
+// neverStaleS is staleAfterS of a family with no fixed interval: the /v1
+// contract states a threshold for every family (VER-001), and no age passes
+// this one, so ageS > staleAfterS still says whether the family is stale.
+const neverStaleS int64 = 1<<53 - 1
+
+// staleAfterS is the threshold of a freshness entry: its own, or
+// neverStaleS for a family that is never stale.
+func staleAfterS(fr provenance.Freshness) int64 {
+	if fr.StaleAfterS == nil {
+		return neverStaleS
+	}
+	return *fr.StaleAfterS
 }
 
 // Notes are the verbatim licence notes of the contributing families.
@@ -190,7 +205,7 @@ func (s *server) dataMeta(ctx context.Context, fams []provenance.Family, at time
 		fr := f.Assess(at)
 		noteFreshness(ctx, f, fr, at)
 		fs = append(fs, fr)
-		m.Freshness = append(m.Freshness, FreshnessEntry{Family: fr.Family, DataAsOf: fr.DataAsOf, AgeS: fr.AgeS, StaleAfterS: fr.StaleAfterS, Stale: fr.Stale})
+		m.Freshness = append(m.Freshness, FreshnessEntry{Family: fr.Family, DataAsOf: fr.DataAsOf, AgeS: fr.AgeS, StaleAfterS: staleAfterS(fr), Stale: fr.Stale})
 		m.Attribution = append(m.Attribution, attribution(f.Source))
 	}
 	m.AsOf = provenance.AsOf(fs)
@@ -793,7 +808,34 @@ type ChargingPart struct {
 
 // ParkingPart is the parking part of an overview.
 type ParkingPart struct {
-	Sites []ParkingSite `json:"sites"`
+	Sites []OverviewParkingSite `json:"sites"`
+}
+
+// OverviewParkingSite is one parking site of an overview. An overview is
+// asked around a place, so every site has its distance: the /v1 contract
+// states one for each (VER-001), a Toll Collect site's too.
+type OverviewParkingSite struct {
+	ID            string     `json:"id"`
+	Name          *string    `json:"name" nullable:"true"`
+	Operator      *string    `json:"operator" nullable:"true"`
+	Kind          string     `json:"kind" enum:"garage,lot,park_and_ride,on_street,rest_area,truck_parking,other" doc:"Open enumeration; treat an unknown value as other."`
+	Location      Position   `json:"location"`
+	DistanceM     int        `json:"distanceM" doc:"Distance from the place, in metres."`
+	Occupancy     *Occupancy `json:"occupancy" doc:"The last report; null when none is published, or while the terms are not accepted."`
+	TermsRequired bool       `json:"termsRequired" doc:"True when the occupancy is withheld until the family's terms are accepted."`
+	SourceFamily  string     `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
+}
+
+// overviewParkingSites are the sites of an overview's parking part, each
+// with its distance from the place.
+func overviewParkingSites(a features.Answer[parking.Site]) ([]OverviewParkingSite, bool) {
+	listed, withheld := parkingSites(a)
+	out := make([]OverviewParkingSite, len(listed))
+	for i, v := range listed {
+		out[i] = OverviewParkingSite{ID: v.ID, Name: v.Name, Operator: v.Operator, Kind: v.Kind, Location: v.Location,
+			DistanceM: a.Items[i].DistanceM, Occupancy: v.Occupancy, TermsRequired: v.TermsRequired, SourceFamily: v.SourceFamily}
+	}
+	return out, withheld
 }
 
 // OverviewData is the composed answer about a place. A part that is not ok
@@ -922,8 +964,8 @@ func registerOverview(api huma.API, s *server, op huma.Operation) {
 			data.Charging = &ChargingPart{Sites: chargingSites(ctx, *o.Charging, s.cfg.Charging.StatusMaxAge)}
 		}
 		if o.Parking != nil {
-			var sites []ParkingSite
-			sites, withheld = parkingSites(*o.Parking)
+			var sites []OverviewParkingSite
+			sites, withheld = overviewParkingSites(*o.Parking)
 			terms = termsOffers(o.Parking.Terms)
 			noteNextReport(ctx, o.Parking.NextReport)
 			data.Parking = &ParkingPart{Sites: sites}

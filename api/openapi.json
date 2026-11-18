@@ -1850,11 +1850,11 @@
             "type": "string"
           },
           "stale": {
-            "description": "True when ageS is above staleAfterS, or dataAsOf is unknown; never for a family without staleAfterS.",
+            "description": "True when ageS is above staleAfterS, or dataAsOf is unknown; never for a family with no fixed interval.",
             "type": "boolean"
           },
           "staleAfterS": {
-            "description": "The family's design threshold: data older than this is stale. Absent for a family with no fixed interval, which is never stale: its age is shown only.",
+            "description": "The family's design threshold: data older than this is stale. A family with no fixed interval, which is never stale, has 9007199254740991 (2^53 - 1, the largest integer every JSON reader holds exactly), which no age passes: its age is shown only.",
             "format": "int64",
             "type": "integer"
           }
@@ -1863,6 +1863,7 @@
           "family",
           "dataAsOf",
           "ageS",
+          "staleAfterS",
           "stale"
         ],
         "type": "object"
@@ -4276,6 +4277,116 @@
         ],
         "type": "object"
       },
+      "OverviewParkingSite": {
+        "additionalProperties": false,
+        "properties": {
+          "distanceM": {
+            "description": "Distance from the place, in metres.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "description": "Open enumeration; treat an unknown value as other.",
+            "enum": [
+              "garage",
+              "lot",
+              "park_and_ride",
+              "on_street",
+              "rest_area",
+              "truck_parking",
+              "other"
+            ],
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "occupancy": {
+            "additionalProperties": false,
+            "description": "The last report; null when none is published, or while the terms are not accepted.",
+            "properties": {
+              "free": {
+                "description": "Free spaces; null when not published, never 0 for unknown.",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "observedAt": {
+                "description": "When the occupancy was reported.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "state": {
+                "description": "Open enumeration; treat an unknown value as other.",
+                "enum": [
+                  "free",
+                  "filling",
+                  "full",
+                  "closed",
+                  "unknown",
+                  "other"
+                ],
+                "type": "string"
+              },
+              "total": {
+                "description": "Spaces in total; null when not published.",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "free",
+              "total",
+              "state",
+              "observedAt"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "operator": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceFamily": {
+            "description": "The source family of the item; its attribution is in meta.attribution.",
+            "type": "string"
+          },
+          "termsRequired": {
+            "description": "True when the occupancy is withheld until the family's terms are accepted.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "operator",
+          "kind",
+          "location",
+          "distanceM",
+          "occupancy",
+          "termsRequired",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
       "OverviewQuery": {
         "additionalProperties": false,
         "properties": {
@@ -4709,7 +4820,7 @@
         "properties": {
           "sites": {
             "items": {
-              "$ref": "#/components/schemas/ParkingSite"
+              "$ref": "#/components/schemas/OverviewParkingSite"
             },
             "type": "array"
           }
@@ -7941,12 +8052,25 @@
       "WeatherRiskData": {
         "additionalProperties": false,
         "properties": {
+          "lamp": {
+            "description": "Over every warning in force at the position, whatever min_level and hazards keep (they filter only the list), first match: red when a warning of level 3 or 4 is in force; amber for a warning of level 1 or 2, or, with no warning in force, when the sight is limited: a weather family the key may not read was left out (meta.partial), or a weather family read has no data or stale data (meta.freshness), since no warning cannot then be told from none heard; green when no warning is in force and every family is fresh.",
+            "enum": [
+              "green",
+              "amber",
+              "red"
+            ],
+            "type": "string"
+          },
           "roadWeather": {
             "description": "Road-weather observations near a corridor; present for along questions only, so always empty on a question about one position.",
             "items": {
               "$ref": "#/components/schemas/RoadWeatherObservation"
             },
             "type": "array"
+          },
+          "truncated": {
+            "description": "True when more warnings answer than weather.max_warnings and only the first are listed; the lamp reads them all.",
+            "type": "boolean"
           },
           "warnings": {
             "description": "The warnings min_level and hazards keep, ordered by level descending, then validity.from ascending, then id; at most weather.max_warnings.",
@@ -7957,7 +8081,9 @@
           }
         },
         "required": [
+          "lamp",
           "warnings",
+          "truncated",
           "roadWeather"
         ],
         "type": "object"
@@ -8595,6 +8721,7 @@
                             "family": "osm",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           }
                         ],
@@ -10347,6 +10474,7 @@
                             "family": "viafrei_rules",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           }
                         ],
@@ -12732,12 +12860,14 @@
                             "family": "geonames",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           },
                           {
                             "family": "osm",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           }
                         ],
@@ -13169,6 +13299,7 @@
                             "family": "lorry_bast_langlkw",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           }
                         ],
@@ -15105,6 +15236,7 @@
                             "family": "osm",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           }
                         ],
@@ -15580,6 +15712,7 @@
                             "family": "frankfurt_behindertenparkplaetze",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           }
                         ],
@@ -16483,6 +16616,7 @@
                             "family": "geonames",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           }
                         ],
@@ -16952,18 +17086,21 @@
                             "family": "bkg_gvisys",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           },
                           {
                             "family": "geonames",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           },
                           {
                             "family": "osm",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           }
                         ],
@@ -17400,6 +17537,7 @@
                             "family": "geonames",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           }
                         ],
@@ -17859,6 +17997,7 @@
                             "family": "osm",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           }
                         ],
@@ -20368,18 +20507,21 @@
                             "family": "bkg_gvisys",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           },
                           {
                             "family": "geonames",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           },
                           {
                             "family": "osm",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           }
                         ],
@@ -21307,6 +21449,7 @@
                             "family": "bkg_gvisys",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           },
                           {
@@ -22493,6 +22636,7 @@
                             "family": "bkg_gvisys",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           },
                           {
@@ -23732,6 +23876,7 @@
                             "family": "db_timetables",
                             "dataAsOf": null,
                             "ageS": null,
+                            "staleAfterS": 9007199254740991,
                             "stale": false
                           }
                         ],
@@ -24898,7 +25043,7 @@
     },
     "/v1/weather-risk": {
       "get": {
-        "description": "Every official weather warning in force now whose area contains the position, with the issuer's level and wording unchanged, as the platform's weather warnings check states them. MCP counterpart: weather warnings check. Needs the scope weather.",
+        "description": "Every official weather warning in force now whose area contains the position, with the issuer's level and wording unchanged, as the platform's weather warnings check states them, and the lamp over every warning in force there, whatever min_level and hazards keep (API-only: the check states no lamp). MCP counterpart: weather warnings check. Needs the scope weather.",
         "operationId": "getWeatherRisk",
         "parameters": [
           {
@@ -24979,6 +25124,7 @@
                     "summary": "The official weather warnings at a position, with their lamp",
                     "value": {
                       "data": {
+                        "lamp": "amber",
                         "warnings": [
                           {
                             "id": "dwd:100008",
@@ -25001,6 +25147,7 @@
                             "sourceFamily": "dwd_eta"
                           }
                         ],
+                        "truncated": false,
                         "roadWeather": []
                       },
                       "meta": {

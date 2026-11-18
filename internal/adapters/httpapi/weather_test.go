@@ -80,7 +80,7 @@ func TestWeatherRiskAnswer(t *testing.T) {
 	body := decode(t, w)
 	data, _ := body["data"].(map[string]any)
 	ws, _ := data["warnings"].([]any)
-	if _, lamp := data["lamp"]; lamp || len(ws) != 2 || data["truncated"] != nil {
+	if data["lamp"] != "red" || len(ws) != 2 || data["truncated"] != true {
 		t.Fatalf("data %v", data)
 	}
 	w0, _ := ws[0].(map[string]any)
@@ -112,7 +112,7 @@ func TestWeatherRiskAnswer(t *testing.T) {
 	body = decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/weather-risk?at=52.52,13.405", bearer))
 	data, _ = body["data"].(map[string]any)
 	q, _ = meta(t, body)["query"].(map[string]any)
-	if ws, _ := data["warnings"].([]any); data["lamp"] != nil || ws == nil || len(ws) != 0 || f.gotRisk.MinLevel != 1 || f.gotRisk.Hazards != nil {
+	if ws, _ := data["warnings"].([]any); data["lamp"] != "amber" || data["truncated"] != false || ws == nil || len(ws) != 0 || f.gotRisk.MinLevel != 1 || f.gotRisk.Hazards != nil {
 		t.Errorf("defaults: data %v, asked %+v", data, f.gotRisk)
 	}
 	if hz, _ := q["hazards"].([]any); hz == nil || len(hz) != 0 {

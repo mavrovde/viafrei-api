@@ -29,21 +29,28 @@ func (s *Store) Motorways(ctx context.Context, q roads.CatalogueQuery, families 
 	if err != nil {
 		return nil, nil, err
 	}
-	// The roads whose Länder hold the asked Land: the view's states, from
-	// the snapshot.
+	// The junction Länder of every road, while the background read of them
+	// is current; else the list derives them live, in its own read.
+	lands := s.lands.current(s.nowFn(), s.roads.staleFor)
+	// The roads in the asked Land: its Länder hold it, from the snapshot, or
+	// a junction of it is in it, from the junction Länder or live.
 	var inState []string
 	for ref, sh := range shapes {
-		if q.State != "" && slices.Contains(sh.states, q.State) {
+		if q.State != "" && (slices.Contains(sh.states, q.State) || slices.Contains(lands[ref].states, q.State)) {
 			inState = append(inState, ref)
 		}
 	}
-	// One road's exits name each junction's Land: from the road's junction
-	// snapshot, read before the list's own transaction.
-	var lands map[string]*string
-	if q.Road != "" {
-		if lands, err = s.junctionStates(ctx, q.Road); err != nil {
-			return nil, nil, err
-		}
+	junctionInState := `
+       or exists (select 1 from contract.junction j where j.road_ref = r.road_ref and j.state_code = $2::text)`
+	if lands != nil {
+		junctionInState = ``
+	}
+	// One road's exits name each junction's Land: from the junction Länder,
+	// else live.
+	road, warm := lands[q.Road]
+	exitState := `j.state_code`
+	if warm {
+		exitState = `null::text`
 	}
 	var counted []string
 	ms, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]roads.Motorway, error) {
@@ -72,8 +79,7 @@ select r.road_ref, r.name,
        array(select distinct j.source_ref from contract.junction j where j.road_ref = r.road_ref order by 1)
 from contract.road r
 where `+permitted("r")+`
-  and ($2::text = '' or r.road_ref = any($6::text[])
-       or exists (select 1 from contract.junction j where j.road_ref = r.road_ref and j.state_code = $2::text))
+  and ($2::text = '' or r.road_ref = any($6::text[])`+junctionInState+`)
   and ($3::text = '' or r.road_ref = $3::text)
 order by length(r.road_ref), r.road_ref
 limit $4`, families, q.State, q.Road, q.Limit, now, inState)
@@ -89,14 +95,16 @@ limit $4`, families, q.State, q.Road, q.Limit, now, inState)
 			return ms, err
 		}
 		res, _ = tx.Query(ctx, `
-select j.junction_id, j.name, j.junction_kind, j.number, st_y(j.location), st_x(j.location)
+select j.junction_id, j.name, j.junction_kind, j.number, `+exitState+`, st_y(j.location), st_x(j.location)
 from contract.junction j
 where j.road_ref = $1 and `+permitted("j")+`
 order by nullif(regexp_replace(coalesce(j.number, ''), '[^0-9].*$', ''), '')::int nulls last, j.number, j.junction_id`, q.Road)
 		ms[0].Exits, err = pgx.CollectRows(res, func(r pgx.CollectableRow) (roads.Junction, error) {
 			var j roads.Junction
-			err := r.Scan(&j.ID, &j.Name, &j.Kind, &j.Number, &j.Lat, &j.Lon)
-			j.State = lands[j.ID]
+			err := r.Scan(&j.ID, &j.Name, &j.Kind, &j.Number, &j.State, &j.Lat, &j.Lon)
+			if warm {
+				j.State = road.byJunction[j.ID]
+			}
 			return j, err
 		})
 		return ms, err

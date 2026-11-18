@@ -217,6 +217,11 @@ func open(t *testing.T) *rig {
 	}
 	t.Cleanup(pool.Close)
 	r := &rig{cfg: cfg, st: store.New(pool, cfg), sql: c, now: fixtures.ReferenceInstant.AddDate(0, 0, 2), targets: map[string][]string{}}
+	// The service reads the road shapes and junction Länder in the
+	// background from its start (KeepRoads); the rig reads them once.
+	if err := r.st.WarmRoads(ctx); err != nil {
+		t.Fatal(err)
+	}
 	conn, err := db.Owner(ctx)
 	if err != nil {
 		t.Fatal(err)

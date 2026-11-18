@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 
@@ -40,15 +41,16 @@ func (s *Store) RoadSnapshot() (ttl, staleFor time.Duration) {
 	return s.roads.ttl, s.roads.staleFor
 }
 
-// KeepRoads reads the road shapes at once and again every ttl until ctx
-// ends, so no request walks the location code list itself. A failed read is
+// KeepRoads reads the road shapes and every road's junction Länder at once
+// and again every ttl until ctx ends, so no request walks the location code
+// list or derives a junction's Land itself. A failed read is
 // logged at warn and tried again at the next tick. A no-op without
 // WithRoadSnapshot.
 func (s *Store) KeepRoads(ctx context.Context) {
 	if s.roads.ttl <= 0 {
 		return
 	}
-	s.roads.keep(ctx, s.nowFn, s.readRoadShapes, s.log, "store: the background road shape read failed; the snapshot answers until it is db.road_stale_for old")
+	s.roads.keep(ctx, s.nowFn, s.readRoadsAndLands, s.log, "store: the background road shape read failed; the snapshot answers until it is db.road_stale_for old")
 }
 
 // roadShapes answers every road's shape by its reference, from the snapshot
@@ -91,78 +93,93 @@ order by r.road_ref`)
 	})
 }
 
-// junctionLand is a junction's Land (state_code), nil when it has none.
-type junctionLand struct {
-	id    string
-	state *string
+// roadLands are the Länder of one road's junctions: each junction's Land by
+// its id (nil when it has none), and the set of them.
+type roadLands struct {
+	byJunction map[string]*string
+	states     []string
 }
 
-// junctionLands keeps the junction Länder of each road asked: the junction
-// view derives a junction's Land per read from the nearest municipality
-// (milliseconds a junction), so one road's exits paid that for every
-// junction on every request. A road's Länder are read by the first request
-// that asks the road and read again by the first past db.road_snapshot_ttl;
-// a failed read leaves the last answering until db.road_stale_for.
+// junctionLands is the last background read of every road's junction Länder
+// and when it was read. The junction view derives a junction's Land per read
+// from the nearest municipality (milliseconds a junction), so one road's
+// exits and the Land filter of the list (a junction test per road) paid it
+// on every request. It is read road by road, one bounded read a road, off
+// the request path only (KeepRoads, WarmRoads); while it is empty or older
+// than db.road_stale_for a request reads the Länder live, inside its own
+// read. It holds one entry per road of the road register.
 type junctionLands struct {
 	mu    sync.Mutex
-	roads map[string]*snapshot[junctionLand]
+	roads map[string]roadLands
+	at    time.Time
 }
 
-// get answers road's junction Länder by junction id.
-func (j *junctionLands) get(ctx context.Context, road string, ttl, staleFor time.Duration, now func() time.Time,
-	read func(context.Context) ([]junctionLand, error),
-) (map[string]*string, error) {
+// current answers the read while it is younger than staleFor, else nil.
+func (j *junctionLands) current(now time.Time, staleFor time.Duration) map[string]roadLands {
 	j.mu.Lock()
-	if j.roads == nil {
-		j.roads = map[string]*snapshot[junctionLand]{}
+	defer j.mu.Unlock()
+	if j.roads == nil || now.Sub(j.at) >= staleFor {
+		return nil
 	}
-	sn, ok := j.roads[road]
-	if !ok {
-		sn = &snapshot[junctionLand]{ttl: ttl, staleFor: staleFor}
-		j.roads[road] = sn
-	}
-	j.mu.Unlock()
-	sn.mu.Lock()
-	old := sn.items != nil && now().Sub(sn.at) >= sn.ttl
-	sn.mu.Unlock()
-	if old {
-		// No background loop renews a road's junctions: the request past
-		// ttl does; its failure leaves the last read answering.
-		_ = sn.refresh(ctx, now, read)
-	}
-	items, err := sn.get(ctx, now, read)
+	return j.roads
+}
+
+// set replaces the read.
+func (j *junctionLands) set(roads map[string]roadLands, at time.Time) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.roads, j.at = roads, at
+}
+
+// WarmRoads reads the road shapes and then every road's junction Länder
+// once, off the request path: KeepRoads' read, every ttl.
+func (s *Store) WarmRoads(ctx context.Context) error {
+	return s.roads.refresh(ctx, s.nowFn, s.readRoadsAndLands)
+}
+
+// readRoadsAndLands reads the road shapes, then the junction Länder of every
+// road, one read a road; a failed read of either is the read's failure,
+// and the last read answers until db.road_stale_for.
+func (s *Store) readRoadsAndLands(ctx context.Context) ([]roadShape, error) {
+	shapes, err := s.readRoadShapes(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[string]*string, len(items))
-	for _, l := range items {
-		out[l.id] = l.state
+	at := s.nowFn()
+	out := make(map[string]roadLands, len(shapes))
+	for _, r := range shapes {
+		l, err := s.readRoadLands(ctx, r.ref)
+		if err != nil {
+			return nil, err
+		}
+		out[r.ref] = l
 	}
-	return out, nil
+	s.lands.set(out, at)
+	return shapes, nil
 }
 
-// junctionStates answers the Land of every junction of road by its id, kept
-// per road while the road snapshot is on, else read.
-func (s *Store) junctionStates(ctx context.Context, road string) (map[string]*string, error) {
-	read := func(ctx context.Context) ([]junctionLand, error) { return s.readJunctionLands(ctx, road) }
-	ttl := s.roads.ttl
-	if ttl <= 0 {
-		// A snapshot no read outlives: every request reads.
-		return (&junctionLands{}).get(ctx, road, 0, 0, s.nowFn, read)
+// readRoadLands reads the Land of every junction of road, whatever a key
+// may read: the reads that use them apply their own row rule.
+func (s *Store) readRoadLands(ctx context.Context, road string) (roadLands, error) {
+	type land struct {
+		id    string
+		state *string
 	}
-	return s.lands.get(ctx, road, ttl, s.roads.staleFor, s.nowFn, read)
-}
-
-// readJunctionLands reads the Land of every junction of road, whatever a key
-// may read: the exits read applies its own row rule.
-func (s *Store) readJunctionLands(ctx context.Context, road string) ([]junctionLand, error) {
-	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]junctionLand, error) {
+	ls, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]land, error) {
 		rows, _ := tx.Query(ctx, `
 select j.junction_id, j.state_code from contract.junction j where j.road_ref = $1 order by j.junction_id`, road)
-		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (junctionLand, error) {
-			var v junctionLand
+		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (land, error) {
+			var v land
 			err := r.Scan(&v.id, &v.state)
 			return v, err
 		})
 	})
+	out := roadLands{byJunction: make(map[string]*string, len(ls)), states: []string{}}
+	for _, l := range ls {
+		out.byJunction[l.id] = l.state
+		if l.state != nil && !slices.Contains(out.states, *l.state) {
+			out.states = append(out.states, *l.state)
+		}
+	}
+	return out, err
 }

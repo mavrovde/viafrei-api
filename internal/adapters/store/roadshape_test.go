@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 )
@@ -30,46 +29,30 @@ func TestRoadSnapshotStore(t *testing.T) {
 	}
 }
 
-// TestJunctionLands reads a road's junction Länder on first use, answers
-// them within ttl without a read, reads again past ttl, keeps the last read
-// answering while a read fails until staleFor, and then fails.
+// TestJunctionLands answers the junction Länder while they are younger
+// than staleFor, and none before the first read or past it.
 func TestJunctionLands(t *testing.T) {
-	clock := time.Unix(0, 0)
-	now := func() time.Time { return clock }
-	land := "01"
-	var reads int
-	down := false
-	read := func(context.Context) ([]junctionLand, error) {
-		reads++
-		if down {
-			return nil, errors.New("storage down")
-		}
-		return []junctionLand{{id: "j", state: &land}}, nil
-	}
 	var j junctionLands
-	ctx := context.Background()
-	ask := func() (map[string]*string, error) {
-		return j.get(ctx, "A1", time.Second, 3*time.Second, now, read)
+	at := time.Unix(0, 0)
+	if j.current(at, time.Second) != nil {
+		t.Fatal("Länder before any read")
 	}
-	for range 2 {
-		if got, err := ask(); err != nil || *got["j"] != "01" {
-			t.Fatalf("%v %v", got, err)
-		}
+	j.set(map[string]roadLands{"A1": {states: []string{"01"}}}, at)
+	if got := j.current(at.Add(time.Second-1), time.Second); got["A1"].states[0] != "01" {
+		t.Fatalf("within staleFor: %v", got)
 	}
-	if reads != 1 {
-		t.Fatalf("%d reads within ttl, want 1", reads)
+	if j.current(at.Add(time.Second), time.Second) != nil {
+		t.Fatal("Länder past staleFor")
 	}
-	clock = clock.Add(time.Second)
-	if _, err := ask(); err != nil || reads != 2 {
-		t.Fatalf("past ttl: %d reads, %v", reads, err)
-	}
-	down = true
-	clock = clock.Add(2 * time.Second)
-	if got, err := ask(); err != nil || *got["j"] != "01" {
-		t.Fatalf("a failed read within staleFor: %v %v", got, err)
-	}
-	clock = clock.Add(time.Second)
-	if _, err := ask(); err == nil {
-		t.Fatal("a read past staleFor answered while storage is down")
+}
+
+// TestRoadShapesMissingRoad: a road the snapshot does not hold yet (added
+// since its read) has no length, no Länder and no line until the next read.
+func TestRoadShapesMissingRoad(t *testing.T) {
+	s := (&Store{nowFn: time.Now}).WithRoadSnapshot(time.Minute, time.Minute)
+	s.roads.items, s.roads.at = []roadShape{{ref: "A1"}}, time.Now()
+	got, err := s.roadShapes(context.Background())
+	if sh, ok := got["A2"]; err != nil || ok || sh.lengthKm != nil || sh.states != nil || sh.line != nil {
+		t.Fatalf("a missing road: %+v %v %v", sh, ok, err)
 	}
 }

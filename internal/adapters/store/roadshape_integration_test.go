@@ -4,6 +4,7 @@ package store_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -34,6 +35,38 @@ order by states is null, length_km is null, road_ref limit 1`, &ref, &state, &km
 		if err != nil {
 			t.Fatal(err)
 		}
+		if extra == nil {
+			// The background read: the junction Länder answer from it.
+			if err := st.WarmRoads(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// Every Land's roads equal the view's: its Länder or a junction's.
+		var lands []string
+		owner(t, `select coalesce(array_agg(distinct s order by s), '{}') from (
+  select unnest(states) s from contract.road union select state_code from contract.junction where state_code is not null) l`, &lands)
+		for _, land := range lands {
+			// A leaf of its own each: the live junction test is one Land's
+			// read of every junction (TST-012).
+			t.Run(fmt.Sprintf("%v %s", extra, land), func(t *testing.T) {
+				ms, _, err := st.Motorways(bounded(t), roads.CatalogueQuery{State: land, Limit: 500}, nil, time.Now())
+				if err != nil {
+					t.Fatal(err)
+				}
+				var got, want []string
+				for _, m := range ms {
+					got = append(got, m.Road)
+				}
+				owner(t, `select coalesce(array_agg(road_ref order by length(road_ref), road_ref), '{}') from contract.road r
+where r.display_class <> 'withhold' and r.audience = 'public' and ('`+land+`' = any(r.states)
+  or exists (select 1 from contract.junction j where j.road_ref = r.road_ref and j.state_code = '`+land+`'))`, &want)
+				if !slices.Equal(got, want) {
+					t.Fatalf("the roads in %s: %v, the view's %v", land, got, want)
+				}
+			})
+		}
+		// The rest of this configuration's reads are bounded from here.
+		ctx = bounded(t)
 		ms, _, err := st.Motorways(ctx, roads.CatalogueQuery{State: state, Limit: 500}, nil, time.Now())
 		i := slices.IndexFunc(ms, func(m roads.Motorway) bool { return m.Road == ref })
 		if err != nil || i < 0 || (km == nil) != (ms[i].LengthKm == nil) || (km != nil && *ms[i].LengthKm != *km) ||

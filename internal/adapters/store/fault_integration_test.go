@@ -93,7 +93,9 @@ func (c *faultConn) Write(b []byte) (int, error) {
 // statements f can fail.
 func faulty(t *testing.T) (*store.Store, *fault) {
 	t.Helper()
-	cfg := readerConfig(t)
+	// The road snapshot off: its reads are statements of every call, so
+	// each statement of a read takes its fault in turn.
+	cfg := readerConfig(t, "VFAPI_DB_ROAD_SNAPSHOT_TTL=0s")
 	pc, err := store.PoolConfig(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -216,6 +218,7 @@ func TestEveryStatementFaultFailsTheRead(t *testing.T) {
 			_, err := s.WarningsAt(ctx, weather.Query{At: berlin, MinLevel: 1, Limit: 5}, every, now)
 			return err
 		},
+		"WarmRoads": func(ctx context.Context, s *store.Store) error { return s.WarmRoads(ctx) },
 		"Motorways": func(ctx context.Context, s *store.Store) error {
 			_, _, err := s.Motorways(ctx, roads.CatalogueQuery{Limit: 5}, every, now)
 			return err

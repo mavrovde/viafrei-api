@@ -5,7 +5,9 @@ package fakelive
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +19,22 @@ import (
 
 // bound is the ceiling on each wait of these tests.
 const bound = 10 * time.Second
+
+// TestMain joins the run's shared database before any test: its migration
+// under the pinned image takes tens of seconds, which the first test to ask
+// for a copy carried (TST-012); a test's copy is then a template copy.
+func TestMain(m *testing.M) {
+	ctx, cancel := context.WithTimeout(context.Background(), pgtest.SetupBound)
+	db, err := pgtest.Shared(ctx)
+	if err != nil {
+		cancel()
+		fmt.Fprintln(os.Stderr, "the shared database:", err)
+		os.Exit(1)
+	}
+	db.StopWith(ctx)
+	cancel()
+	os.Exit(m.Run())
+}
 
 // fresh is a migrated, empty database of the test's own, and its owner.
 func fresh(t *testing.T) (*pgtest.DB, *pgx.Conn) {
@@ -121,11 +139,13 @@ func TestATickFaultIsTheStopsError(t *testing.T) {
 		"partition of nodot": `{"sources":{"fuel-prices-de":{"ticks":"select 1","partitions":["nodot"],"default":{"state":"refreshed"}}}}`,
 		"ticks of":           `{"sources":{"fuel-prices-de":{"ticks":"select no_such_function()","default":{"state":"refreshed"}}}}`,
 	} {
-		db, owner := fresh(t)
-		f := start(t, db.OwnerURL, script)
-		ask(t, owner, "09162000")
-		until(t, func() bool { return f.Claims() == 1 })
-		stopWith(t, f, says)
+		t.Run(says, func(t *testing.T) {
+			db, owner := fresh(t)
+			f := start(t, db.OwnerURL, script)
+			ask(t, owner, "09162000")
+			until(t, func() bool { return f.Claims() == 1 })
+			stopWith(t, f, says)
+		})
 	}
 }
 

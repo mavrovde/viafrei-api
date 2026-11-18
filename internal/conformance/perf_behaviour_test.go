@@ -177,18 +177,28 @@ func staleRun(t *testing.T, c *config.Config, domain string) string {
 	return fmt.Sprintf("status=%d age=%q", w.Code, w.Header().Get("Age"))
 }
 
-// compressed fetches the OpenAPI document gzip-encoded and reports the coding
+// compressedSites is how many sites the compressed answer lists: tens of
+// kilobytes, above the default smallest compressed body and below the
+// largest a key may set. The OpenAPI document, a megabyte marshalled and
+// compressed twice per key, took this test past its bound (TST-012).
+const compressedSites = 300
+
+// compressed fetches a charging answer gzip-encoded and reports the coding
 // and the encoded size.
 func compressed(t *testing.T, c *config.Config) string {
 	t.Helper()
-	h, err := httpapi.NewHandler(httpapi.Deps{Config: c, ContractVersion: "0.1"})
+	h, err := httpapi.NewHandler(httpapi.Deps{Config: c, ContractVersion: "0.1", Auth: everyScope{},
+		Features: &cachedFeatures{domain: "energy", sites: compressedSites}, Versions: &countedVersions{}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/openapi.json", nil)
+	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/charging-options?at=1,2", nil)
 	r.Header.Set("Accept-Encoding", "gzip")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", w.Code, w.Body)
+	}
 	return fmt.Sprintf("%s %d", w.Header().Get("Content-Encoding"), w.Body.Len())
 }
 

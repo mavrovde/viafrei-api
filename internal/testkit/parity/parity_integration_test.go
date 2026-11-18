@@ -457,18 +457,23 @@ func compare(t *testing.T, name string) (parity.Bundle, asker) {
 	a := open(t)
 	compared := map[string][]string{}
 	facts, differ := 0, 0
+	// Each case is a subtest of its own: a case is a read (and a refresh it
+	// waits on), and the bundle's cases together outgrow one leaf's bound
+	// (TST-012).
 	for _, c := range b.Cases {
-		got, err := parity.Project(a.ask(t, c), parity.Default, c.Operation, c.Request, a.owners)
-		if err != nil {
-			t.Fatal(err)
-		}
-		d := parity.Diff(c.Facts, got)
-		if len(d) > 0 {
-			t.Errorf("case %s (%s, MCP %q): %d of %d facts differ:\n  %s", c.ID, c.Operation, c.Counterpart, len(d), len(c.Facts), strings.Join(d, "\n  "))
-		}
-		facts += len(c.Facts)
-		differ += len(d)
-		compared[c.Operation] = append(compared[c.Operation], c.ID)
+		t.Run(c.ID, func(t *testing.T) {
+			got, err := parity.Project(a.ask(t, c), parity.Default, c.Operation, c.Request, a.owners)
+			if err != nil {
+				t.Fatal(err)
+			}
+			d := parity.Diff(c.Facts, got)
+			if len(d) > 0 {
+				t.Errorf("case %s (%s, MCP %q): %d of %d facts differ:\n  %s", c.ID, c.Operation, c.Counterpart, len(d), len(c.Facts), strings.Join(d, "\n  "))
+			}
+			facts += len(c.Facts)
+			differ += len(d)
+			compared[c.Operation] = append(compared[c.Operation], c.ID)
+		})
 	}
 	for op, ids := range compared {
 		t.Logf("compared %s: %d case(s): %s", op, len(ids), strings.Join(ids, ", "))
@@ -491,6 +496,13 @@ func TestParity(t *testing.T) {
 	}
 
 	// A planted change in one projection rule must fail and name the fact.
+	t.Run("a planted rule change names the fact", func(t *testing.T) { plantedRule(t, b, a) })
+}
+
+// plantedRule: a position rounded to four decimals differs from the
+// default projection of the first case, and only in its positions.
+func plantedRule(t *testing.T, b parity.Bundle, a asker) {
+	t.Helper()
 	planted := parity.Default
 	planted.PositionDecimals = 4
 	answer := a.ask(t, b.Cases[0])

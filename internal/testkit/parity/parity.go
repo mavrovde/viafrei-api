@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/invariant"
@@ -203,9 +204,18 @@ func Asks(request, param string) bool {
 	return err != nil || n > 0
 }
 
+// exclusionPatterns holds each exclusion pattern compiled once: Excludes is
+// asked for every fact of every case, and compiling the pattern per fact
+// made loading a bundle take seconds (TST-012).
+var exclusionPatterns sync.Map // pattern -> *regexp.Regexp
+
 func exclusionPattern(p string) *regexp.Regexp {
+	if re, ok := exclusionPatterns.Load(p); ok {
+		return re.(*regexp.Regexp)
+	}
 	q := strings.ReplaceAll(regexp.QuoteMeta(p), `\[\*\]`, `\[[^\]]*\]`)
-	return regexp.MustCompile(`^` + q + `(?:$|[.\[])`)
+	re, _ := exclusionPatterns.LoadOrStore(p, regexp.MustCompile(`^`+q+`(?:$|[.\[])`))
+	return re.(*regexp.Regexp)
 }
 
 // Default is the projection rule set of this format.

@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -52,30 +53,34 @@ func TestScopeIsEnforcedPerOperation(t *testing.T) {
 		{nil, http.StatusForbidden},
 		{[]access.Scope{"energy", "roads"}, http.StatusOK},
 	} {
-		a := &stubAuth{p: auth.Principal{Key: access.Record{Plan: access.Plan{Name: "pro", Scopes: c.scopes}}}}
-		h, doc, err := build(Deps{Config: config.Defaults(), Auth: a}, []operation{scoped}, onPublic)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(string(doc()), `"x-required-scope": "roads"`) {
-			t.Fatal("the scope is not in the document")
-		}
-		w := httptest.NewRecorder()
-		r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/scoped", nil)
-		r.RemoteAddr = "198.51.100.7"
-		h.ServeHTTP(w, r)
-		if w.Code != c.status {
-			t.Fatalf("scopes %v: %d %s", c.scopes, w.Code, w.Body)
-		}
-		if c.status == http.StatusForbidden && !strings.Contains(w.Body.String(), "/problems/scope-denied") {
-			t.Fatalf("scopes %v: %s", c.scopes, w.Body)
-		}
-		if c.status == http.StatusOK && !strings.Contains(w.Body.String(), `"plan":"pro"`) {
-			t.Fatalf("the operation did not see its key: %s", w.Body)
-		}
-		if a.client != "198.51.100.7" {
-			t.Fatalf("an address without a port became %q", a.client)
-		}
+		// Each case builds the API, which is most of its cost: one subtest
+		// each (TST-012).
+		t.Run(fmt.Sprintf("scopes %v", c.scopes), func(t *testing.T) {
+			a := &stubAuth{p: auth.Principal{Key: access.Record{Plan: access.Plan{Name: "pro", Scopes: c.scopes}}}}
+			h, doc, err := build(Deps{Config: config.Defaults(), Auth: a}, []operation{scoped}, onPublic)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(doc()), `"x-required-scope": "roads"`) {
+				t.Fatal("the scope is not in the document")
+			}
+			w := httptest.NewRecorder()
+			r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/scoped", nil)
+			r.RemoteAddr = "198.51.100.7"
+			h.ServeHTTP(w, r)
+			if w.Code != c.status {
+				t.Fatalf("scopes %v: %d %s", c.scopes, w.Code, w.Body)
+			}
+			if c.status == http.StatusForbidden && !strings.Contains(w.Body.String(), "/problems/scope-denied") {
+				t.Fatalf("scopes %v: %s", c.scopes, w.Body)
+			}
+			if c.status == http.StatusOK && !strings.Contains(w.Body.String(), `"plan":"pro"`) {
+				t.Fatalf("the operation did not see its key: %s", w.Body)
+			}
+			if a.client != "198.51.100.7" {
+				t.Fatalf("an address without a port became %q", a.client)
+			}
+		})
 	}
 }
 

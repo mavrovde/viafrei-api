@@ -20,9 +20,12 @@ func TestSetUpStepsReportTheirFaults(t *testing.T) {
 	_ = closed.Close(ctx)
 	steps := map[string]func(*pgx.Conn) error{
 		"copySettings": func(c *pgx.Conn) error { return copySettings(ctx, c, "pgtest_none") },
+		"isTemplate":   func(c *pgx.Conn) error { _, err := isTemplate(ctx, c, Database); return err },
 		"seedTemplate": func(c *pgx.Conn) error { return harness.seedTemplate(ctx, c, "pgtest_none", "-- no rows\n") },
 		"markTemplate": func(c *pgx.Conn) error { return markTemplate(ctx, c, Database) },
-		"locked":       func(c *pgx.Conn) error { return locked(ctx, c, func() error { return nil }) },
+		"once": func(c *pgx.Conn) error {
+			return once(ctx, c, func() (bool, error) { return false, nil }, func() error { return nil })
+		},
 	}
 	for name, step := range steps {
 		if err := step(closed); err == nil {

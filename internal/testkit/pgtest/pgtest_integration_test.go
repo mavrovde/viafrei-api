@@ -32,9 +32,34 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, "integration tests need a container runtime:", err)
 		os.Exit(1)
 	}
+	// So is joining the run's shared container, migrated once, and seeding
+	// the template TestSharedCopiesAreTheirOwn copies: under the pinned
+	// image they take tens of seconds, which the first test to ask for
+	// them carried (TST-012); the test then times only its copies.
+	if err := warmShared(); err != nil {
+		fmt.Fprintln(os.Stderr, "the shared database:", err)
+		harness.Stop()
+		os.Exit(1)
+	}
 	code := m.Run()
 	harness.Stop()
 	os.Exit(code)
+}
+
+// noRows is the seeded set TestSharedCopiesAreTheirOwn copies.
+const noRows = "-- no rows\n"
+
+// warmShared migrates the run's shared database and seeds noRows' template,
+// unless the run has, before any test.
+func warmShared() error {
+	ctx, cancel := context.WithTimeout(context.Background(), SetupBound)
+	defer cancel()
+	db, err := Seeded(ctx, noRows)
+	if err != nil {
+		return err
+	}
+	db.StopWith(ctx)
+	return nil
 }
 
 func bounded(t *testing.T) context.Context {
@@ -186,7 +211,7 @@ func TestSharedCopiesAreTheirOwn(t *testing.T) {
 	defer empty.Stop()
 	var copies [2]*DB
 	for i := range copies {
-		if copies[i], err = Seeded(ctx, "-- no rows\n"); err != nil {
+		if copies[i], err = Seeded(ctx, noRows); err != nil {
 			t.Fatal(err)
 		}
 	}

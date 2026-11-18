@@ -149,7 +149,11 @@ func TestSharedBaseReportsEachFault(t *testing.T) {
 		},
 		"the template read": func(t *testing.T) {
 			swapShared(t, onHarness{}, nil)
-			cutAt(t, "select datistemplate", false)
+			cutAt(t, "and datistemplate", false)
+		},
+		"the set-up lock": func(t *testing.T) {
+			swapShared(t, onHarness{}, nil)
+			cutAt(t, "pg_advisory_lock", false)
 		},
 		"the migration": func(t *testing.T) {
 			swapShared(t, onHarness{}, nil)

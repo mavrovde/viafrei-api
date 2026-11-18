@@ -237,6 +237,8 @@ func TestEveryStatementFaultFailsTheRead(t *testing.T) {
 			return err
 		},
 	} {
-		failEach(t, st, f, name, call)
+		// Each read fails at each of its statements in turn, a reconnect
+		// each: one subtest per read (TST-012).
+		t.Run(name, func(t *testing.T) { failEach(t, st, f, name, call) })
 	}
 }

@@ -91,12 +91,16 @@ func sharedCopy(ctx context.Context, rows string) (*DB, error) {
 	if rows != "" {
 		h := sha256.Sum256([]byte(rows))
 		template = "test_tpl_" + hex.EncodeToString(h[:8])
-		if err := locked(ctx, maint, func() error { return base.seedTemplate(ctx, maint, template, rows) }); err != nil {
+		seeded := func() (bool, error) { return isTemplate(ctx, maint, template) }
+		if err := once(ctx, maint, seeded, func() error { return base.seedTemplate(ctx, maint, template, rows) }); err != nil {
 			return nil, err
 		}
 	}
 	name := "test_c_" + strings.ToLower(rand.Text())[:16]
-	if _, err := maint.Exec(ctx, "create database "+ident(name)+" template "+ident(template)); err != nil {
+	// A copy is the template's files copied whole (file_copy): the default,
+	// block by block through the WAL, took twice as long for the migrated
+	// schema, a cost every test that asks for a copy carries (TST-012).
+	if _, err := maint.Exec(ctx, "create database "+ident(name)+" template "+ident(template)+" strategy file_copy"); err != nil {
 		return nil, fmt.Errorf("pgtest: copy %s: %w", template, err)
 	}
 	if err := copySettings(ctx, maint, name); err != nil {
@@ -163,14 +167,8 @@ func sharedBase(ctx context.Context) (*DB, error) {
 		return nil, fmt.Errorf("pgtest: connect to the maintenance database: %w", err)
 	}
 	defer func() { _ = maint.Close(context.WithoutCancel(ctx)) }()
-	err = locked(ctx, maint, func() error {
-		var done bool
-		if err := maint.QueryRow(ctx, "select datistemplate from pg_database where datname = $1", Database).Scan(&done); err != nil {
-			return fmt.Errorf("pgtest: read the shared database: %w", err)
-		}
-		if done {
-			return nil
-		}
+	migrated := func() (bool, error) { return isTemplate(ctx, maint, Database) }
+	err = once(ctx, maint, migrated, func() error {
 		if err := MigrateWith(ctx, pin, db.imageURL, runImage); err != nil {
 			return fmt.Errorf("pgtest: migrate the shared database: %w", err)
 		}
@@ -185,16 +183,19 @@ func sharedBase(ctx context.Context) (*DB, error) {
 	return db, nil
 }
 
-// seedTemplate seeds rows into the template name, unless the run has: into
-// a copy of the migrated database, marked a template once seeded.
-func (db *DB) seedTemplate(ctx context.Context, maint *pgx.Conn, name, rows string) error {
+// isTemplate reports whether the database name is a template: the run has
+// built it.
+func isTemplate(ctx context.Context, maint *pgx.Conn, name string) (bool, error) {
 	var n int
 	if err := maint.QueryRow(ctx, "select count(*) from pg_database where datname = $1 and datistemplate", name).Scan(&n); err != nil {
-		return fmt.Errorf("pgtest: read template %s: %w", name, err)
+		return false, fmt.Errorf("pgtest: read template %s: %w", name, err)
 	}
-	if n == 1 {
-		return nil
-	}
+	return n == 1, nil
+}
+
+// seedTemplate seeds rows into the template name: into a copy of the
+// migrated database, marked a template once seeded.
+func (db *DB) seedTemplate(ctx context.Context, maint *pgx.Conn, name, rows string) error {
 	build := name + "_b"
 	if _, err := maint.Exec(ctx, "drop database if exists "+ident(build)); err != nil {
 		return fmt.Errorf("pgtest: drop %s: %w", build, err)
@@ -241,13 +242,30 @@ func markTemplate(ctx context.Context, maint *pgx.Conn, name string) error {
 	return nil
 }
 
-// locked runs f holding the run's set-up lock.
-func locked(ctx context.Context, maint *pgx.Conn, f func() error) error {
-	if _, err := maint.Exec(ctx, "select pg_advisory_lock($1)", lockKey); err != nil {
-		return fmt.Errorf("pgtest: take the set-up lock: %w", err)
+// once runs build holding the run's set-up lock, unless ready says the run
+// has built it. ready is read before the lock is taken, so a step already
+// built waits on no other package's set-up (a test that asked for a copy
+// waited out another package's seed, past its bound: TST-012), and again
+// once the lock is held, so no two packages build one step.
+func once(ctx context.Context, maint *pgx.Conn, ready func() (bool, error), build func() error) error {
+	held := false
+	defer func() {
+		if held {
+			_, _ = maint.Exec(context.WithoutCancel(ctx), "select pg_advisory_unlock($1)", lockKey)
+		}
+	}()
+	for {
+		if done, err := ready(); err != nil || done {
+			return err
+		}
+		if held {
+			return build()
+		}
+		if _, err := maint.Exec(ctx, "select pg_advisory_lock($1)", lockKey); err != nil {
+			return fmt.Errorf("pgtest: take the set-up lock: %w", err)
+		}
+		held = true
 	}
-	defer func() { _, _ = maint.Exec(context.WithoutCancel(ctx), "select pg_advisory_unlock($1)", lockKey) }()
-	return f()
 }
 
 // urls sets the owner, reader, access and image URLs of the shared

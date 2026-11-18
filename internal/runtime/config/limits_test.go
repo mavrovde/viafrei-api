@@ -44,6 +44,8 @@ func TestAFloatKeyReadsEveryNumberShape(t *testing.T) {
 	assertRefused(t, err, `admission.ewma_alpha: "half" is not a number`)
 	_, err = config.Load(config.Options{Environ: []string{"VFAPI_ADMISSION_EWMA_ALPHA=NaN"}})
 	assertRefused(t, err, `admission.ewma_alpha: "NaN" is not a number`)
+	_, err = config.Load(config.Options{File: writeFile(t, "admission:\n  ewma_alpha: .nan\n")})
+	assertRefused(t, err, "admission.ewma_alpha: NaN is not a number")
 }
 
 func TestTheSharedBudgetLeavesASlotAndEndsInsideTheDeadline(t *testing.T) {

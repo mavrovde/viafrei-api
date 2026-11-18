@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -133,8 +134,9 @@ func TestWatchRefusesWhatDoesNotFit(t *testing.T) {
 			t.Errorf("%v: %d, want 400", q, code)
 		}
 	}
-	if code, _ := watch(t, h, url.Values{"kind": {"weather"}, "target": {"52.5,13.4"}, "until": {fixedNow.Add(30 * time.Hour).Format(time.RFC3339)}}); code != http.StatusBadRequest {
-		t.Errorf("a window over 24 hours: %d", code)
+	over := do(t, h, http.MethodGet, "/v1/watch?"+url.Values{"kind": {"weather"}, "target": {"52.5,13.4"}, "until": {fixedNow.Add(30 * time.Hour).Format(time.RFC3339)}}.Encode(), bearer)
+	if assertProblem(t, over, http.StatusBadRequest, "invalid-parameter"); !strings.Contains(over.Body.String(), `"parameter":"query.until","code":"invalid","detail":"until is more than 24 hours ahead"`) {
+		t.Errorf("a window over 24 hours: %s", over.Body)
 	}
 	cells := watchAnswer()
 	h = featureHandler(t, config.Defaults(), cells, nil)

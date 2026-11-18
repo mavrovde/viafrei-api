@@ -94,14 +94,21 @@ func TestEveryNumberParameterRefusesNaNAndInfinity(t *testing.T) {
 }
 
 // TestWatchHoursOutsideTheWindowAreRefused (#150): hours refuses NaN, the
-// infinities and a number over the 24-hour window, and no answer's until is
-// before its from.
+// infinities and a number over the 24-hour window; until refuses an instant
+// not after now, as the platform's watch; no answer's until is before its
+// from.
 func TestWatchHoursOutsideTheWindowAreRefused(t *testing.T) {
 	h := featureHandler(t, config.Defaults(), watchAnswer(), nil)
 	for _, v := range []string{"NaN", "Infinity", "-Infinity", "1e30", "1e999", "0.1", "-1"} {
 		w := do(t, h, http.MethodGet, "/v1/watch?"+url.Values{"kind": {"road"}, "target": {"A100"}, "hours": {v}}.Encode(), bearer)
 		if assertProblem(t, w, http.StatusBadRequest, "invalid-parameter"); !strings.Contains(w.Body.String(), `"parameter":"query.hours"`) {
 			t.Errorf("hours=%s: %s", v, w.Body)
+		}
+	}
+	for _, at := range []time.Time{fixedNow.Add(-time.Hour), fixedNow} {
+		w := do(t, h, http.MethodGet, "/v1/watch?"+url.Values{"kind": {"road"}, "target": {"A100"}, "until": {at.Format(time.RFC3339)}}.Encode(), bearer)
+		if assertProblem(t, w, http.StatusBadRequest, "invalid-parameter"); !strings.Contains(w.Body.String(), `"parameter":"query.until"`) {
+			t.Errorf("until=%s: %s", at, w.Body)
 		}
 	}
 	for _, v := range []string{"0.25", "1", "3.5", "24"} {

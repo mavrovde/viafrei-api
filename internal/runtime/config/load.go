@@ -220,6 +220,10 @@ func assign(dst reflect.Value, typ string, raw any) error {
 			}
 			dst.SetFloat(x)
 		case float64:
+			// A YAML .nan or .inf arrives here as a float, not as text.
+			if !number.Finite(v) {
+				return fmt.Errorf("%v is not a number", v)
+			}
 			dst.SetFloat(v)
 		case int:
 			dst.SetFloat(float64(v))

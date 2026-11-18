@@ -189,7 +189,12 @@ func registerWatch(api huma.API, s *server, op huma.Operation) {
 			end = *in.end
 		}
 		if end.After(now.Add(watchMaxHours * time.Hour)) {
-			return nil, errWatchUntil(in.Until)
+			return nil, errWatchUntil(ctx, in.Until)
+		}
+		if !end.After(now) {
+			// As the platform's watch: a window must end in the future, so
+			// no answer has an until before its from (#150).
+			return nil, errWatchPast(ctx, in.Until)
 		}
 		raw, _ := json.Marshal(watchToken{Kind: in.Kind, Key: in.Key, Condition: in.cond})
 		id := base64.RawURLEncoding.EncodeToString(raw)

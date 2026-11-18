@@ -12,11 +12,13 @@ import (
 	"strconv"
 )
 
-// ErrNotFinite is the error for NaN and the infinities.
+// ErrNotFinite is the error for NaN and the infinities as written. An
+// overflow (1e999) is strconv's own range error instead, so a caller can
+// tell a value written non-finite from one too large to read.
 var ErrNotFinite = errors.New("not a finite number")
 
-// ParseFinite reads s as a 64-bit float and refuses NaN and ±Inf, also when
-// they arise by overflow (1e999).
+// ParseFinite reads s as a 64-bit float and refuses NaN and ±Inf
+// (ErrNotFinite), and an overflow such as 1e999 (strconv's ErrRange).
 func ParseFinite(s string) (float64, error) {
 	f, err := strconv.ParseFloat(s, 64)
 	if err != nil {

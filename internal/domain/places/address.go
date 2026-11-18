@@ -138,7 +138,9 @@ func SectorWedges(at geo.Point, radiusM float64, n int) []string {
 	out := make([]string, n)
 	for i := range n {
 		pts := []string{centre}
-		for j := 0; j <= steps; j++ {
+		// A range, not j++: the mutation run's j-- of a counted loop appended
+		// without end and took the runner's memory (the 0.3.1 release).
+		for j := range steps + 1 {
 			az := (float64(i) + float64(j)/steps) * 2 * math.Pi / float64(n)
 			pts = append(pts, fmt.Sprintf("%.6f %.6f", at.Lon+radiusM*math.Sin(az)/perDegLon, at.Lat+radiusM*math.Cos(az)/perDegLat))
 		}

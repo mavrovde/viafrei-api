@@ -65,19 +65,24 @@ where e.source_ref = any($1) and `+eventPermitted+`
 			return nil, err
 		}
 		counted = c
+		// The situations in force are read once and grouped by road, not
+		// twice per road: each read of contract.traffic_event plans and scans
+		// the whole view.
 		res, _ = tx.Query(ctx, `
+with es as (
+  select e.road_ref, count(*)::int as n, array_agg(distinct e.source_ref order by e.source_ref) as sources
+  from contract.traffic_event e
+  where e.source_ref = any($1) and `+eventPermitted+`
+    and e.withdrawn_at is null and e.valid_from <= $5 and (e.valid_to is null or e.valid_to > $5)
+  group by e.road_ref)
 select r.road_ref, r.name,
        (select count(*) from contract.junction j where j.road_ref = r.road_ref)::int,
-       (select count(*) from contract.traffic_event e
-         where e.road_ref = r.road_ref and e.source_ref = any($1) and `+eventPermitted+`
-           and e.withdrawn_at is null and e.valid_from <= $5 and (e.valid_to is null or e.valid_to > $5))::int,
+       coalesce(es.n, 0),
        r.source_ref,
-       array(select distinct e.source_ref from contract.traffic_event e
-          where e.road_ref = r.road_ref and e.source_ref = any($1) and `+eventPermitted+`
-            and e.withdrawn_at is null and e.valid_from <= $5 and (e.valid_to is null or e.valid_to > $5)
-          order by 1),
+       coalesce(es.sources, '{}'),
        array(select distinct j.source_ref from contract.junction j where j.road_ref = r.road_ref order by 1)
 from contract.road r
+left join es on es.road_ref = r.road_ref
 where `+permitted("r")+`
   and ($2::text = '' or r.road_ref = any($6::text[])`+junctionInState+`)
   and ($3::text = '' or r.road_ref = $3::text)

@@ -420,6 +420,18 @@ The platform's parity producer makes the MCP side's bundle.
   commit it answered from.
 - **Outputs:** `test/parity/bundles/X.Y.Z.json`, and its line for
   `test/parity/lock.tsv`.
+- **Known lag (follow-up open):** the producer at the commit the 2.6.22
+  bundle names still states `data[*].distanceM` in the `listParkingOptions`
+  cases that ask `accept_terms`, which `viafrei.parity.rules/5` now excludes
+  (above). The 2.6.22 and `unsynced` bundles were trimmed of those three
+  facts by hand and re-pinned. Until the platform's producer stops stating
+  them, a bundle it produces is refused by the loader (a case that states an
+  excluded fact); the follow-up, tracked with the platform's parity
+  producer, is that it drops the fact under `accept_terms`. The loader keeps
+  refusing rather than dropping such a fact at load: the refusal is the one
+  check that the producer projects by the same rule set as the API side (the
+  rule-set id alone did not change when this exclusion was added), and
+  dropping the fact would accept a producer that has not followed.
 
 ### Why the producer and not the public server
 

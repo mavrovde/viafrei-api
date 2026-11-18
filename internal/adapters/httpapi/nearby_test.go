@@ -47,6 +47,13 @@ func TestNearbyAnswer(t *testing.T) {
 	if !slices.Equal(f.gotNearby.Categories, []string{"fuel", "police", "toilets", "food"}) || f.gotNearby.At.RadiusM != 5000 {
 		t.Errorf("asked %+v", f.gotNearby)
 	}
+	// The nearby answer states a parking site as the platform states it:
+	// with its distance, and the Toll Collect site (Unranged) without one.
+	for _, want := range []string{`"id":"pk-01-0000","name":null,"operator":null,"kind":"garage","location":{"lat":0,"lon":0},"distanceM":350`, `"id":"pk-01-0001","name":null,"operator":null,"kind":"truck_parking","location":{"lat":0,"lon":0},"distanceM":null`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("answer lacks %s: %s", want, body)
+		}
+	}
 	for _, want := range []string{`"id":"fu:1"`, `"id":"j:1"`, `"need":"food"`, `"radiusM":3000`, `"kind":"amenity=cafe"`, `"part":"needs"`, `"stations":[`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("answer lacks %s: %s", want, body)

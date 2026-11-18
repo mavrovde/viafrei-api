@@ -168,8 +168,10 @@ func chargingAnswer() features.Answer[energy.Site] {
 func parkingAnswer() features.Answer[parking.Site] {
 	return features.Answer[parking.Site]{
 		Items: []parking.Site{
-			{ID: "pk-01-0000", Family: "src-alpha-parking", Kind: parking.KindGarage, Occupancy: &parking.Occupancy{Free: ip(3), Total: ip(40), State: parking.StateFree, ObservedAt: fixedNow.Add(-time.Minute)}},
-			{ID: "pk-01-0001", Family: "src-delta-parking", Kind: parking.KindTruckParking, TermsRequired: true},
+			{ID: "pk-01-0000", Family: "src-alpha-parking", Kind: parking.KindGarage, DistanceM: 350, Occupancy: &parking.Occupancy{Free: ip(3), Total: ip(40), State: parking.StateFree, ObservedAt: fixedNow.Add(-time.Minute)}},
+			// An accepted Toll Collect site: the platform names it without a
+			// distance (Unranged), the /v1 answers around a position state it.
+			{ID: "pk-01-0001", Family: "src-delta-parking", Kind: parking.KindTruckParking, TermsRequired: true, DistanceM: 1840, Unranged: true},
 		},
 		Families: []provenance.Family{terms}, Partial: true, At: fixedNow,
 	}
@@ -343,6 +345,11 @@ func TestParkingOptionsAnswer(t *testing.T) {
 	if held["occupancy"] != nil || held["termsRequired"] != true || held["kind"] != "truck_parking" {
 		t.Errorf("withheld site %v", held)
 	}
+	// The /v1 contract states every site's whole-metre distance (VER-001),
+	// the Toll Collect site's too, which the platform names without one.
+	if open["distanceM"] != 350.0 || held["distanceM"] != 1840.0 {
+		t.Errorf("distances %v, %v", open["distanceM"], held["distanceM"])
+	}
 	m := meta(t, body)
 	ws, _ := m["warnings"].([]any)
 	w0, _ := ws[0].(map[string]any)
@@ -383,6 +390,10 @@ func TestPlaceOverviewAnswer(t *testing.T) {
 	pl, _ := data["place"].(map[string]any)
 	if pl["id"] != "pl-01-0001" || pl["kind"] != "locality" || data["charging"] == nil || data["parking"] == nil {
 		t.Errorf("data %v", data)
+	}
+	pk, _ := data["parking"].(map[string]any)
+	if sites, _ := pk["sites"].([]any); len(sites) != 2 || sites[0].(map[string]any)["distanceM"] != 350.0 || sites[1].(map[string]any)["distanceM"] != 1840.0 {
+		t.Errorf("an overview states every site's distance, a Toll Collect site's too: %v", pk)
 	}
 	m := meta(t, body)
 	parts, _ := m["parts"].([]any)
@@ -741,8 +752,13 @@ func TestMotorwayParkingAnswer(t *testing.T) {
 	if q["road"] != "A7" || q["kind"] != "rest_area" || q["freeMin"] != 0.0 {
 		t.Errorf("query %v", q)
 	}
-	if data, _ := body["data"].([]any); len(data) != 2 {
-		t.Errorf("data %v", data)
+	data, _ := body["data"].([]any)
+	if len(data) != 2 {
+		t.Fatalf("data %v", data)
+	}
+	// A site stated without a distance (Unranged) has distanceM null.
+	if d, ok := data[1].(map[string]any)["distanceM"]; !ok || d != nil {
+		t.Errorf("the Toll Collect site's distance %v (stated %v)", d, ok)
 	}
 	if w := do(t, h, http.MethodGet, "/v1/motorways/B7/parking-options", bearer); w.Code != http.StatusBadRequest {
 		t.Errorf("a federal road: %d", w.Code)

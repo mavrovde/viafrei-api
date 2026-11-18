@@ -834,11 +834,21 @@ select count(*) from ins`, &n)
 		t.Fatalf("%d warnings planted", n)
 	}
 	q := roads.CorridorQuery{Road: "A101", Direction: roads.DirectionBoth, Filter: roads.Filter{MinSeverity: roads.SeverityInfo}, Limit: 1}
-	p, err := st.SituationsOnRoad(bounded(t), q, roads.Families{Roads: families(t, st, "roads"), Weather: []string{family}}, time.Date(2104, 1, 1, 12, 0, 0, 0, time.UTC))
+	fams, at := roads.Families{Roads: families(t, st, "roads"), Weather: []string{family}}, time.Date(2104, 1, 1, 12, 0, 0, 0, time.UTC)
+	p, err := st.SituationsOnRoad(bounded(t), q, fams, at)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if want := []roads.Warning{{Family: family, Level: 3}}; !slices.Equal(p.Warnings, want) {
 		t.Errorf("warnings %v, want %v (the one whose area holds a junction)", p.Warnings, want)
+	}
+	// The catalogue's lamp read places the warnings as the road's own
+	// conditions read does.
+	lamps, err := st.RoadLamps(bounded(t), []string{"A101"}, fams, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []roads.Warning{{Family: family, Level: 3}}; !slices.Equal(lamps["A101"].Warnings, want) {
+		t.Errorf("lamp warnings %v, want %v", lamps["A101"].Warnings, want)
 	}
 }

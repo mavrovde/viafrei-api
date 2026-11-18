@@ -2,11 +2,14 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/mavrovde/viafrei-api/internal/domain/ampel"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 )
 
@@ -115,4 +118,115 @@ order by nullif(regexp_replace(coalesce(j.number, ''), '[^0-9].*$', ''), '')::in
 		return ms, err
 	})
 	return ms, counted, err
+}
+
+// RoadLamps reads, in one snapshot, what the lamp of each road (a stored
+// road reference) states over the whole road in both directions, as
+// SituationsOnRoad reads it for one road: the lamp's view of the
+// situations on it, the weather warnings in force on its junctions, the
+// freshness of every family read, the states of its junctions and their
+// message coverage. A page carries no list of situations and no next
+// change. The catalogue reads each road's lamp in a handful of statements,
+// not a full conditions read per road.
+func (s *Store) RoadLamps(ctx context.Context, refs []string, fams roads.Families, now time.Time) (map[string]roads.Page, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (map[string]roads.Page, error) {
+		messages, warnings := map[string][]storedMessage{}, map[string][]roads.Warning{}
+		states := map[string][]string{}
+		confirmations := map[string]ampel.Confirmation{}
+		var (
+			sources  []provenance.Family
+			coverage map[string]ampel.Coverage
+		)
+		// The reads in order; the first that fails ends the snapshot.
+		for _, step := range []func() error{
+			func() error {
+				res, _ := tx.Query(ctx, `select `+fmt.Sprintf(canonicalRef, "e.road_ref")+`, `+messagesAgg+`
+`+messagesFrom+`
+  and `+fmt.Sprintf(canonicalRef, "e.road_ref")+` = any($3)
+group by 1`, fams.Roads, now, refs)
+				var (
+					ref    string
+					stored []storedMessage
+				)
+				_, err := pgx.ForEachRow(res, []any{&ref, &stored}, func() error {
+					messages[ref], stored = stored, nil
+					return nil
+				})
+				return err
+			},
+			func() error {
+				if len(fams.Weather) == 0 {
+					return nil
+				}
+				// A warning is on a road when its own area holds one of the
+				// road's junction points, as SituationsOnRoad places it.
+				res, _ := tx.Query(ctx, `select q.ref, w.source_ref, w.warning_level
+from unnest($3::text[]) q(ref)
+cross join lateral (select w.source_ref, w.warning_level, w.warning_id `+warningsPending+`
+  and w.valid_from <= $2
+  and exists (select 1 from contract.junction j
+              where `+fmt.Sprintf(canonicalRef, "j.road_ref")+` = q.ref and `+permitted("j")+`
+                and st_intersects(w.area, j.location))) w
+order by q.ref, w.warning_level desc, w.warning_id`, fams.Weather, now, refs)
+				var (
+					ref string
+					w   roads.Warning
+				)
+				_, err := pgx.ForEachRow(res, []any{&ref, &w.Family, &w.Level}, func() error {
+					warnings[ref] = append(warnings[ref], w)
+					return nil
+				})
+				return err
+			},
+			func() (err error) {
+				res, _ := tx.Query(ctx, sourcesSelect, append(slices.Clone(fams.Roads), fams.Weather...))
+				sources, err = sourcesOf(res, confirmations)
+				return err
+			},
+			func() error {
+				res, _ := tx.Query(ctx, `select q.ref, coalesce(array_agg(distinct j.state_code order by j.state_code) filter (where j.state_code is not null), '{}')
+from unnest($1::text[]) q(ref)
+join contract.junction j on `+fmt.Sprintf(canonicalRef, "j.road_ref")+` = q.ref and `+permitted("j")+`
+group by q.ref`, refs)
+				var (
+					ref string
+					in  []string
+				)
+				_, err := pgx.ForEachRow(res, []any{&ref, &in}, func() error {
+					states[ref], in = in, nil
+					return nil
+				})
+				return err
+			},
+			func() (err error) {
+				var all []string
+				for _, in := range states {
+					all = append(all, in...)
+				}
+				slices.Sort(all)
+				res, _ := tx.Query(ctx, coverageSelect, slices.Compact(all), fams.Roads)
+				coverage, err = coverageOf(res)
+				return err
+			},
+		} {
+			if err := step(); err != nil {
+				return nil, err
+			}
+		}
+		out := make(map[string]roads.Page, len(refs))
+		for _, ref := range refs {
+			p := roads.Page{Messages: messagesOf(messages[ref]), Sources: sources, Confirmations: confirmations,
+				States: append([]string{}, states[ref]...), Coverage: map[string]ampel.Coverage{}}
+			if len(fams.Weather) > 0 {
+				p.Warnings = append([]roads.Warning{}, warnings[ref]...)
+			}
+			for _, st := range p.States {
+				if c, ok := coverage[st]; ok {
+					p.Coverage[st] = c
+				}
+			}
+			out[ref] = p
+		}
+		return out, nil
+	})
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -125,15 +126,25 @@ func TestCommands(t *testing.T) {
 		{"console usage", []string{"console"}, []string{pepperEnv, accessURL(t)}, 2, ""},
 		{"console store unreachable", []string{"console", "passkeys"}, []string{pepperEnv, accessURL(t)}, 1, ""},
 	}
+	// A leaf a command (TST-012): the openapi command builds and marshals
+	// the ~1 MB document, the larger part of a second under the race
+	// detector, which the other commands should not share a bound with.
 	for _, c := range cases {
-		code, stdout, stderr := runCmd(c.args, c.environ)
-		if code != c.code || !strings.Contains(stdout, c.out) {
-			t.Errorf("%s: exit %d (want %d), stdout %.80q, stderr %.200q", c.name, code, c.code, stdout, stderr)
+		t.Run(c.name, func(t *testing.T) {
+			code, stdout, stderr := runCmd(c.args, c.environ)
+			if code != c.code || !strings.Contains(stdout, c.out) {
+				t.Errorf("exit %d (want %d), stdout %.80q, stderr %.200q", code, c.code, stdout, stderr)
+			}
+			if c.name == "openapi" && !json.Valid([]byte(stdout)) {
+				t.Errorf("the document is not JSON: %.80q", stdout)
+			}
+		})
+	}
+	t.Run("config docs into a closed writer", func(t *testing.T) {
+		if code := run([]string{"config", "docs"}, nil, failingWriter{}, &bytes.Buffer{}); code != 1 {
+			t.Errorf("exit %d, want 1", code)
 		}
-	}
-	if code := run([]string{"config", "docs"}, nil, failingWriter{}, &bytes.Buffer{}); code != 1 {
-		t.Errorf("config docs into a closed writer: exit %d, want 1", code)
-	}
+	})
 }
 
 // TestServeAddressInUse: either listener failing to bind ends serve with 1,

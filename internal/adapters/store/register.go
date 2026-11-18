@@ -98,6 +98,20 @@ func (r *snapshot[T]) get(ctx context.Context, now func() time.Time, read func(c
 			return items, nil
 		}
 	}
+	return r.join(ctx, now, read)
+}
+
+// renew reads again, or answers the read in progress as get does: the
+// background's read, which the reads that follow it in that background step
+// depend on.
+func (r *snapshot[T]) renew(ctx context.Context, now func() time.Time, read func(context.Context) ([]T, error)) ([]T, error) {
+	r.mu.Lock()
+	return r.join(ctx, now, read)
+}
+
+// join starts a read, or waits for the one in progress (reading itself when
+// that one fails); r.mu is held and is released.
+func (r *snapshot[T]) join(ctx context.Context, now func() time.Time, read func(context.Context) ([]T, error)) ([]T, error) {
 	f := r.flight
 	if f == nil {
 		f = r.start(ctx, now, read)
@@ -137,16 +151,16 @@ func (s *Store) KeepRegister(ctx context.Context) {
 	if s.reg.ttl <= 0 {
 		return
 	}
-	s.reg.keep(ctx, s.nowFn, s.readRegister, s.log, "store: the background register read failed; the snapshot answers until it is db.register_stale_for old")
+	s.reg.keep(ctx, func(ctx context.Context) error { return s.reg.refresh(ctx, s.nowFn, s.readRegister) }, s.log, "store: the background register read failed; the snapshot answers until it is db.register_stale_for old")
 }
 
-// keep is the loop of KeepRegister and KeepRoads over read; a failed read is
-// logged at warn with the message warn.
-func (r *snapshot[T]) keep(ctx context.Context, now func() time.Time, read func(context.Context) ([]T, error), log *slog.Logger, warn string) {
+// keep is the loop of KeepRegister and KeepRoads: step at once and every
+// ttl until ctx ends; a failed step is logged at warn with the message warn.
+func (r *snapshot[T]) keep(ctx context.Context, step func(context.Context) error, log *slog.Logger, warn string) {
 	tick := time.NewTicker(r.ttl)
 	defer tick.Stop()
 	for {
-		if err := r.refresh(ctx, now, read); err != nil && ctx.Err() == nil {
+		if err := step(ctx); err != nil && ctx.Err() == nil {
 			log.Warn(warn, "err", err)
 		}
 		select {

@@ -551,6 +551,8 @@ type catFake struct {
 	ms      []roads.Motorway
 	counted []string
 	gotQ    roads.CatalogueQuery
+	// lampReads counts the reads of the lamps.
+	lampReads int
 	// after runs once the catalogue is read: the register may change before
 	// the lamps' read of it.
 	after func()
@@ -562,6 +564,22 @@ func (f *catFake) Motorways(_ context.Context, q roads.CatalogueQuery, _ []strin
 		f.after()
 	}
 	return slices.Clone(f.ms), f.counted, nil
+}
+
+// RoadLamps reads each road's page as a conditions read of the whole road
+// in both directions would, so a lamp is what that answer states.
+func (f *catFake) RoadLamps(ctx context.Context, refs []string, fams roads.Families, now time.Time) (map[string]roads.Page, error) {
+	f.lampReads++
+	out := map[string]roads.Page{}
+	for _, ref := range refs {
+		p, err := f.SituationsOnRoad(ctx, roads.CorridorQuery{Road: ref, Direction: roads.DirectionBoth,
+			Filter: roads.Filter{MinSeverity: roads.SeverityInfo}, Limit: 1}, fams, now)
+		if err != nil {
+			return nil, err
+		}
+		out[ref] = p
+	}
+	return out, nil
 }
 
 func catService(f *catFake) *features.Service {
@@ -624,9 +642,9 @@ func TestMotorwayCatalogueLamps(t *testing.T) {
 			t.Errorf("%s: lamp %q, its conditions state %q", m.Road, m.Lamp, c.Lamp)
 		}
 	}
-	if f.readCalls != 2 || f.gotRoad.Road != "A2" || f.gotRoad.Direction != roads.DirectionBoth || f.gotRoad.MinSeverity != roads.SeverityInfo ||
+	if f.lampReads != 1 || f.readCalls != 2 || f.gotRoad.Road != "A2" || f.gotRoad.Direction != roads.DirectionBoth || f.gotRoad.MinSeverity != roads.SeverityInfo ||
 		!slices.Equal(f.gotFams.Roads, []string{"r1", "r2"}) || !slices.Equal(f.gotFams.Weather, []string{"w1", "w2"}) {
-		t.Errorf("lamps read %d times, last %+v with %+v", f.readCalls, f.gotRoad, f.gotFams)
+		t.Errorf("lamps read %d times (%d roads), last %+v with %+v", f.lampReads, f.readCalls, f.gotRoad, f.gotFams)
 	}
 	f.readErr = errors.New("down")
 	f.ms = []roads.Motorway{{Road: "A1"}}

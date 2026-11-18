@@ -50,7 +50,7 @@ func (s *Store) KeepRoads(ctx context.Context) {
 	if s.roads.ttl <= 0 {
 		return
 	}
-	s.roads.keep(ctx, s.nowFn, s.readRoadsAndLands, s.log, "store: the background road shape read failed; the snapshot answers until it is db.road_stale_for old")
+	s.roads.keep(ctx, s.readRoadsAndLands, s.log, "store: the background road shape read failed; the snapshot answers until it is db.road_stale_for old")
 }
 
 // roadShapes answers every road's shape by its reference, from the snapshot
@@ -134,28 +134,38 @@ func (j *junctionLands) set(roads map[string]roadLands, at time.Time) {
 // WarmRoads reads the road shapes and then every road's junction Länder
 // once, off the request path: KeepRoads' read, every ttl.
 func (s *Store) WarmRoads(ctx context.Context) error {
-	return s.roads.refresh(ctx, s.nowFn, s.readRoadsAndLands)
+	return s.readRoadsAndLands(ctx)
 }
 
 // readRoadsAndLands reads the road shapes, then the junction Länder of every
-// road, one read a road; a failed read of either is the read's failure,
-// and the last read answers until db.road_stale_for.
-func (s *Store) readRoadsAndLands(ctx context.Context) ([]roadShape, error) {
-	shapes, err := s.readRoadShapes(ctx)
+// road, one read a road; a failed read of either is the read's failure, and
+// the last read answers until db.road_stale_for.
+//
+// Only the shape read is the snapshot's flight, which a request without a
+// current snapshot waits for: one read, the one it would make itself. The
+// junction read, road by road, comes after it, outside the flight, so a
+// request on a cold pod is answered from the shapes and reads the Länder live
+// inside its own read while the junction read fills, never waiting for it.
+func (s *Store) readRoadsAndLands(ctx context.Context) error {
+	// The shapes read now, or a request's read in flight.
+	shapes, err := s.roads.renew(ctx, s.nowFn, s.readRoadShapes)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	at := s.nowFn()
 	out := make(map[string]roadLands, len(shapes))
 	for _, r := range shapes {
+		if s.landsRead != nil {
+			s.landsRead()
+		}
 		l, err := s.readRoadLands(ctx, r.ref)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		out[r.ref] = l
 	}
 	s.lands.set(out, at)
-	return shapes, nil
+	return nil
 }
 
 // readRoadLands reads the Land of every junction of road, whatever a key

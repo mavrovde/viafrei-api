@@ -168,10 +168,9 @@ func (s *server) readOtherKind(ctx context.Context, in *WatchInput, now, end tim
 		return s.readRegionWatch(ctx, key, in)
 	case "weather":
 		return s.readWeatherWatch(ctx, key, in)
-	case "charger":
+	default: // "charger": the schema's enum leaves no other kind here
 		return s.readChargerWatch(ctx, key, in)
 	}
-	return r, nil
 }
 
 // readStationWatch reads a station watch: the departures cancelled or at

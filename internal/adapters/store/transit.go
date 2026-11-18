@@ -192,12 +192,20 @@ where a.source_ref = any($1) and ` + "a.display_class <> 'withhold' and (a.audie
   and ` + alertLive("a", "$2")
 
 // affectedLifts are the stations' lifts and escalators out of service, of
-// the families ($1).
+// the families ($1). The out-of-service rows are kept first, in a subquery
+// the filter on the stop place id is not pushed into (offset 0): the view's
+// stop place id is a lookup per row, which that filter would otherwise run
+// for every facility, in service or not.
 const affectedLifts = `
 select f.stop_place_id, count(*)::int, array_agg(distinct f.source_ref order by f.source_ref)
-from contract.station_facility f
-where f.facility_status = 'inactive' and f.stop_place_id is not null and f.source_ref = any($1)
-  and ` + "f.display_class <> 'withhold' and (f.audience = 'public' or " + ownKeyOn + ")" + `
+from (
+  select f.stop_place_id, f.source_ref
+  from contract.station_facility f
+  where f.facility_status = 'inactive' and f.source_ref = any($1)
+    and ` + "f.display_class <> 'withhold' and (f.audience = 'public' or " + ownKeyOn + ")" + `
+  offset 0
+) f
+where f.stop_place_id is not null
 group by 1`
 
 // affectedCalls are the stations (by IFOPT) with departures of the next hour

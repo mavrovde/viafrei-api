@@ -37,7 +37,7 @@ const snykCheckout = "\n        with:\n          ref: ${{ inputs.ref || github.s
 
 // publishHeader: publish waits for the scan and carries no condition that
 // could run it past a failed one.
-const publishHeader = "\n  publish:\n    name: Build, sign, attest, publish\n    needs: [commit, snyk]\n    runs-on: ubuntu-24.04\n"
+const publishHeader = "\n  publish:\n    name: Build, sign, attest, publish\n    needs: [commit, snyk, mutation]\n    runs-on: ubuntu-24.04\n"
 
 // publishBinding: the commit built is the commit Snyk scanned.
 const publishBinding = `[[ $(git rev-parse "$TAG^{commit}") == "$SCANNED" ]] || {`
@@ -242,8 +242,11 @@ func snykFindings(files map[string][]byte) []string {
 	if !slices.Contains(needs(rel.Jobs["publish"].Needs), "snyk") {
 		out = append(out, "release.yml's publish does not need snyk")
 	}
+	if !slices.Contains(needs(rel.Jobs["publish"].Needs), "mutation") {
+		out = append(out, "release.yml's publish does not need the mutation run")
+	}
 	if !strings.Contains(string(files["release.yml"]), publishHeader) {
-		out = append(out, "release.yml's publish header is not exactly needs: [commit, snyk] with no condition")
+		out = append(out, "release.yml's publish header is not exactly needs: [commit, snyk, mutation] with no condition")
 	}
 	if rel.Jobs["publish"].If != "" {
 		out = append(out, "release.yml's publish carries a condition, which could let it run past a failed scan")
@@ -310,8 +313,9 @@ func TestSnykRunsWeeklyAndOncePerRelease(t *testing.T) {
 		"release.yml passes secrets: inherit":                        plant("release.yml", "    secrets:\n      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}\n\n", "    secrets: inherit\n\n"),
 		"release-please.yml job release does not pass exactly":       plant("release-please.yml", "    secrets:\n      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}\n", "    secrets: inherit\n"),
 		"does not require the SNYK_TOKEN secret":                     plant("release.yml", "    secrets:\n      SNYK_TOKEN:\n        required: true\n  push:", "  push:"),
-		"release.yml's publish does not need snyk":                   plant("release.yml", "    needs: [commit, snyk]\n", "    needs: [commit]\n"),
-		"release.yml's publish header is not exactly":                plant("release.yml", "    needs: [commit, snyk]\n", "    needs: [commit, snyk]\n    if: always()\n"),
+		"release.yml's publish does not need snyk":                   plant("release.yml", "    needs: [commit, snyk, mutation]\n", "    needs: [commit, mutation]\n"),
+		"release.yml's publish does not need the mutation run":       plant("release.yml", "    needs: [commit, snyk, mutation]\n", "    needs: [commit, snyk]\n"),
+		"release.yml's publish header is not exactly":                plant("release.yml", "    needs: [commit, snyk, mutation]\n", "    needs: [commit, snyk, mutation]\n    if: always()\n"),
 		"another commit than the one Snyk scanned":                   plant("release.yml", publishBinding, "true || {"),
 		"for an annotated tag":                                       plant("release.yml", deref, "          if false; then read -r type sha"),
 		"for a tag of a tree":                                        plant("release.yml", "          [[ $type == commit ]] || {", "          true || {"),

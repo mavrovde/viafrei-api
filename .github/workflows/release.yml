@@ -18,7 +18,8 @@
 # are never moved or deleted here, and a tag whose release is published, or
 # whose :X.Y.Z image exists, is refused before anything is built. Before
 # anything is built, Snyk (snyk.yml, called) tests the tagged commit's
-# dependencies; a high or critical advisory stops the release. See
+# dependencies, where a high or critical advisory stops the release, and the
+# full mutation run (mutation.yml, called) tests it, where a red run does. See
 # docs/RELEASING.md.
 name: Release
 
@@ -92,9 +93,21 @@ jobs:
     secrets:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
+  # The full mutation run once per release, on the commit about to be
+  # published (mutation.yml, four shards); a red run stops the release before
+  # anything is built.
+  mutation:
+    name: Mutation
+    needs: commit
+    permissions:
+      contents: read
+    uses: ./.github/workflows/mutation.yml
+    with:
+      ref: ${{ needs.commit.outputs.sha }}
+
   publish:
     name: Build, sign, attest, publish
-    needs: [commit, snyk]
+    needs: [commit, snyk, mutation]
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# mutation.sh pr BASE [REPORT] | full [REPORT]
+# mutation.sh pr BASE [REPORT] | full [REPORT] | shard K/N OUTDIR | gather OUTDIR [REPORT]
 #
 # Mutation testing of the domain, access and admission code (TST-002,
 # issue #17) with Gremlins, scored by internal/testkit/mutgate against the
@@ -16,6 +16,17 @@
 #            red whatever the score.
 #   full     every in-scope mutant (per minor release). Fails below 70 %,
 #            and on a stale equivalent entry.
+#   shard K/N OUTDIR
+#            the Gremlins runs of shard K of N of the scope roots (the roots
+#            at the positions p of the scope file with p mod N = K-1, mutgate
+#            -plan -shard), one JSON report per root into OUTDIR, and no
+#            score: mutation.yml runs the four shards of a full run as
+#            parallel jobs. Exit 2 on a bad K/N or a shard with no root.
+#   gather OUTDIR [REPORT]
+#            the full-mode gate over the reports the shards wrote into OUTDIR
+#            (it may hold subdirectories, one per shard): the same score and
+#            the same findings as full, and exit 2 when a scope root has no
+#            report or has two.
 #
 # A change that touches no in-scope code mutates nothing and passes, and
 # says so. The report (default mutation-report.md) carries the counts and
@@ -54,7 +65,7 @@ case "$mode" in
     report=${3:-mutation-report.md}
     min=80
     if [[ -z $base ]]; then
-      echo "usage: mutation.sh pr BASE [REPORT] | full [REPORT]" >&2
+      echo "usage: mutation.sh pr BASE [REPORT] | full [REPORT] | shard K/N OUTDIR | gather OUTDIR [REPORT]" >&2
       exit 2
     fi
     if ! from=$(git merge-base "$base" HEAD); then
@@ -111,8 +122,54 @@ case "$mode" in
     while IFS=$'\t' read -r r _; do roots+=("$r"); done < <(grep -v '^#' "$scope" | grep -v '^[[:space:]]*$')
     flags=(-mode full -min "$min")
     ;;
+  shard)
+    spec=${2:-}
+    out=${3:-}
+    if [[ -z $spec || -z $out ]]; then
+      echo "usage: mutation.sh pr BASE [REPORT] | full [REPORT] | shard K/N OUTDIR | gather OUTDIR [REPORT]" >&2
+      exit 2
+    fi
+    # mutgate refuses a bad K/N and an empty shard with exit 2, before anything is mutated.
+    if ! planned=$(gate -mode full -min 70 -plan -shard "$spec"); then
+      exit 2
+    fi
+    roots=()
+    while IFS= read -r r; do roots+=("$r"); done <<<"$planned"
+    mkdir -p "$out"
+    echo "mutation: shard $spec: ${#roots[@]} scope root(s): ${roots[*]}"
+    for r in "${roots[@]}"; do
+      echo "mutation: $r"
+      mutate "$out/$(tr / _ <<<"$r").json" "./$r"
+    done
+    exit 0
+    ;;
+  gather)
+    dir=${2:-}
+    report=${3:-mutation-report.md}
+    min=70
+    if [[ -z $dir || ! -d $dir ]]; then
+      echo "usage: mutation.sh pr BASE [REPORT] | full [REPORT] | shard K/N OUTDIR | gather OUTDIR [REPORT]" >&2
+      exit 2
+    fi
+    roots=()
+    while IFS=$'\t' read -r r _; do roots+=("$r"); done < <(grep -v '^#' "$scope" | grep -v '^[[:space:]]*$')
+    flags=(-mode full -min "$min")
+    args=()
+    for r in "${roots[@]}"; do
+      name="$(tr / _ <<<"$r").json"
+      found=()
+      while IFS= read -r f; do found+=("$f"); done < <(find "$dir" -type f -name "$name")
+      if [[ ${#found[@]} -ne 1 ]]; then
+        echo "mutation: gather: ${#found[@]} report(s) for the scope root $r in $dir, not one: a shard did not finish, or two ran it" >&2
+        exit 2
+      fi
+      args+=("$r=${found[0]}")
+    done
+    gate "${flags[@]}" -report "$report" "${args[@]}"
+    exit $?
+    ;;
   *)
-    echo "usage: mutation.sh pr BASE [REPORT] | full [REPORT]" >&2
+    echo "usage: mutation.sh pr BASE [REPORT] | full [REPORT] | shard K/N OUTDIR | gather OUTDIR [REPORT]" >&2
     exit 2
     ;;
 esac

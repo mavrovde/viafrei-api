@@ -137,13 +137,13 @@ func TestRegisterSnapshotStore(t *testing.T) {
 	}
 
 	s := (&Store{nowFn: time.Now}).WithRegisterSnapshot(time.Second, 2*time.Second)
-	s.reg.terms, s.reg.at = []access.Terms{{Family: "kept"}}, time.Now()
+	s.reg.items, s.reg.at = []access.Terms{{Family: "kept"}}, time.Now()
 	got, err := s.Register(context.Background())
 	if err != nil || len(got) != 1 || got[0].Family != "kept" {
 		t.Fatalf("Register with the snapshot on: %v %v", got, err)
 	}
 	got[0].Family = "changed"
-	if s.reg.terms[0].Family != "kept" {
+	if s.reg.items[0].Family != "kept" {
 		t.Fatal("the answer shares the snapshot's slice")
 	}
 }
@@ -207,7 +207,7 @@ func TestRegisterSnapshotWaiters(t *testing.T) {
 		}
 		if !fail {
 			got[0].Family = "changed"
-			if leader[0].Family != "shared" || r.terms[0].Family != "shared" {
+			if leader[0].Family != "shared" || r.items[0].Family != "shared" {
 				t.Fatal("the waiter's answer shares the leader's or the snapshot's slice")
 			}
 		}
@@ -223,14 +223,14 @@ func TestRegisterSnapshotKeep(t *testing.T) {
 	r := &registerSnapshot{ttl: 5 * time.Millisecond, staleFor: time.Second}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
-	go func() { r.keep(ctx, time.Now, f.read, log); close(done) }()
+	go func() { r.keep(ctx, time.Now, f.read, log, "the background read failed"); close(done) }()
 	for f.reads.Load() < 2 {
 		time.Sleep(time.Millisecond)
 	}
 	f.set("b", false)
 	for {
 		r.mu.Lock()
-		ok := len(r.terms) == 1 && r.terms[0].Family == "b"
+		ok := len(r.items) == 1 && r.items[0].Family == "b"
 		r.mu.Unlock()
 		if ok {
 			break

@@ -116,6 +116,14 @@ func behaviours() map[string]behaviour {
 			_, staleFor := store.New(nil, c).RegisterSnapshot()
 			return staleFor.String()
 		}},
+		"db.road_snapshot_ttl": {"10m", func(t *testing.T, c *config.Config) string {
+			ttl, _ := store.New(nil, c).RoadSnapshot()
+			return ttl.String()
+		}},
+		"db.road_stale_for": {"3h", func(t *testing.T, c *config.Config) string {
+			_, staleFor := store.New(nil, c).RoadSnapshot()
+			return staleFor.String()
+		}},
 		"db.statement_timeout_floor": {"980ms", func(t *testing.T, c *config.Config) string {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()

@@ -35,26 +35,31 @@ func (s *Store) Register(ctx context.Context) ([]access.Terms, error) {
 // on every request, between the request's admission to its register read and
 // its admission to its feature read, it put a shed request's refusal that
 // much past the tier's queue_max_wait (RATE-011).
-type registerSnapshot struct {
+type registerSnapshot = snapshot[access.Terms]
+
+// snapshot is the last read of a slowly changing set of rows and when it was
+// read, renewed off the request path every ttl and answered while younger
+// than staleFor.
+type snapshot[T any] struct {
 	ttl      time.Duration
 	staleFor time.Duration
 
 	mu     sync.Mutex
-	terms  []access.Terms
+	items  []T
 	at     time.Time
-	flight *registerFlight
+	flight *flight[T]
 
 	// waiting, when set (tests), is called by a caller that waits for
 	// another's read, before it waits.
 	waiting func()
 }
 
-// registerFlight is a register read in progress, which callers arriving
-// meanwhile wait for instead of reading again.
-type registerFlight struct {
+// flight is a read in progress, which callers arriving meanwhile wait for
+// instead of reading again.
+type flight[T any] struct {
 	done  chan struct{}
 	run   func()
-	terms []access.Terms
+	items []T
 	err   error
 }
 
@@ -80,17 +85,17 @@ func (s *Store) RegisterSnapshot() (ttl, staleFor time.Duration) {
 // snapshot that young the caller reads, and callers arriving during that
 // read wait for it, each no longer than its own context. A failed read is
 // not kept.
-func (r *registerSnapshot) get(ctx context.Context, now func() time.Time, read func(context.Context) ([]access.Terms, error)) ([]access.Terms, error) {
+func (r *snapshot[T]) get(ctx context.Context, now func() time.Time, read func(context.Context) ([]T, error)) ([]T, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	r.mu.Lock()
-	if r.terms != nil {
+	if r.items != nil {
 		age := now().Sub(r.at)
 		if age < r.staleFor {
-			terms := slices.Clone(r.terms)
+			items := slices.Clone(r.items)
 			r.mu.Unlock()
-			return terms, nil
+			return items, nil
 		}
 	}
 	f := r.flight
@@ -101,7 +106,7 @@ func (r *registerSnapshot) get(ctx context.Context, now func() time.Time, read f
 		if f.err != nil {
 			return nil, f.err
 		}
-		return slices.Clone(f.terms), nil
+		return slices.Clone(f.items), nil
 	}
 	r.mu.Unlock()
 	if r.waiting != nil {
@@ -115,7 +120,7 @@ func (r *registerSnapshot) get(ctx context.Context, now func() time.Time, read f
 			// one reads itself.
 			return read(ctx)
 		}
-		return slices.Clone(f.terms), nil
+		return slices.Clone(f.items), nil
 	case <-ctx.Done():
 		return nil, fmt.Errorf("%w: %w", ErrDeadlineExhausted, ctx.Err())
 	}
@@ -132,16 +137,17 @@ func (s *Store) KeepRegister(ctx context.Context) {
 	if s.reg.ttl <= 0 {
 		return
 	}
-	s.reg.keep(ctx, s.nowFn, s.readRegister, s.log)
+	s.reg.keep(ctx, s.nowFn, s.readRegister, s.log, "store: the background register read failed; the snapshot answers until it is db.register_stale_for old")
 }
 
-// keep is KeepRegister's loop over read.
-func (r *registerSnapshot) keep(ctx context.Context, now func() time.Time, read func(context.Context) ([]access.Terms, error), log *slog.Logger) {
+// keep is the loop of KeepRegister and KeepRoads over read; a failed read is
+// logged at warn with the message warn.
+func (r *snapshot[T]) keep(ctx context.Context, now func() time.Time, read func(context.Context) ([]T, error), log *slog.Logger, warn string) {
 	tick := time.NewTicker(r.ttl)
 	defer tick.Stop()
 	for {
 		if err := r.refresh(ctx, now, read); err != nil && ctx.Err() == nil {
-			log.Warn("store: the background register read failed; the snapshot answers until it is db.register_stale_for old", "err", err)
+			log.Warn(warn, "err", err)
 		}
 		select {
 		case <-ctx.Done():
@@ -153,7 +159,7 @@ func (r *registerSnapshot) keep(ctx context.Context, now func() time.Time, read 
 
 // refresh reads the register again unless a read is in progress, and
 // answers that read's failure.
-func (r *registerSnapshot) refresh(ctx context.Context, now func() time.Time, read func(context.Context) ([]access.Terms, error)) error {
+func (r *snapshot[T]) refresh(ctx context.Context, now func() time.Time, read func(context.Context) ([]T, error)) error {
 	r.mu.Lock()
 	if r.flight != nil {
 		r.mu.Unlock()
@@ -167,14 +173,14 @@ func (r *registerSnapshot) refresh(ctx context.Context, now func() time.Time, re
 
 // start registers a read as the flight; r.mu is held. The caller runs it
 // (f.run) once r.mu is released.
-func (r *registerSnapshot) start(ctx context.Context, now func() time.Time, read func(context.Context) ([]access.Terms, error)) *registerFlight {
-	f := &registerFlight{done: make(chan struct{})}
+func (r *snapshot[T]) start(ctx context.Context, now func() time.Time, read func(context.Context) ([]T, error)) *flight[T] {
+	f := &flight[T]{done: make(chan struct{})}
 	f.run = func() {
 		at := now()
-		f.terms, f.err = read(ctx)
+		f.items, f.err = read(ctx)
 		r.mu.Lock()
 		if f.err == nil {
-			r.terms, r.at = slices.Clone(f.terms), at
+			r.items, r.at = slices.Clone(f.items), at
 		}
 		r.flight = nil
 		r.mu.Unlock()

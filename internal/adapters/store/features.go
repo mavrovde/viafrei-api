@@ -168,7 +168,10 @@ const parkingHere = `with here as (select st_setsrid(st_makepoint($2, $1), 4326)
 
 // parkingWhere is the where of a parking read past its gates, and its order:
 // $5 the radius, $7 the stored kind or null, $8 the amenities or null, $9
-// the road or empty. A road read keeps the platform's corridor (CorridorM of
+// the road or empty; a road read's $10 is the road's line (hex EWKB, null
+// without one), from the road snapshot: the read contract's road view derives
+// it per read, and the corridor test asked it once per facility. A road read
+// keeps the platform's corridor (CorridorM of
 // one of the road's location-code points, which only the platform's own
 // parking family is matched by, or filed under the road by its source) and
 // is in name order, unnamed last; a position read keeps the radius and is
@@ -179,14 +182,23 @@ func parkingWhere(q parking.Query) (where, order string) {
 		return `$9 = '' and st_dwithin(f.location::geography, here.g, $5) and ` + filters, `8, f.facility_id`
 	}
 	return `$5::int >= 0 and f.facility_id like 'p:%' and (f.road_ref = $9 or exists (
-    select 1 from contract.road r, st_dumppoints(r.geometry) d
-    where r.road_ref = $9 and st_dwithin(f.location::geography, d.geom::geography, ` + strconv.Itoa(parking.CorridorM) + `))) and ` + filters, `f.name nulls last, f.facility_id`
+    select 1 from st_dumppoints($10::text::geometry) d
+    where st_dwithin(f.location::geography, d.geom::geography, ` + strconv.Itoa(parking.CorridorM) + `))) and ` + filters, `f.name nulls last, f.facility_id`
 }
 
-// shiftParams moves the where's $7..$9 to $8..$10, the positions the list
-// read gives them after its own $7.
+// shiftParams moves the where's $7..$10 to $8..$10 and $12, the positions
+// the list read gives them after its own $7 and $11.
 func shiftParams(where string) string {
-	return strings.NewReplacer("$7", "$8", "$8", "$9", "$9", "$10").Replace(where)
+	return strings.NewReplacer("$10", "$12", "$7", "$8", "$8", "$9", "$9", "$10").Replace(where)
+}
+
+// parkingArgs appends a road read's line ($10 of parkingWhere) to args; a
+// position read's where names no $10.
+func parkingArgs(q parking.Query, line *string, args ...any) []any {
+	if q.Road == "" {
+		return args
+	}
+	return append(args, line)
 }
 
 // parkingDistance is the distance column: the metres from the asked
@@ -224,6 +236,16 @@ func (s *Store) ParkingNear(ctx context.Context, q parking.Query, listed, occupa
 		sites []parking.Site
 		next  *time.Time
 	}
+	// The road's line is read before the read's own transaction: a cold
+	// snapshot is a read of its own.
+	var line *string
+	if q.Road != "" {
+		shapes, err := s.roadShapes(ctx)
+		if err != nil {
+			return nil, false, nil, err
+		}
+		line = shapes[q.Road].line
+	}
 	a, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (answer, error) {
 		var a answer
 		// The earliest future report, before the free_min filter: a site it
@@ -242,7 +264,7 @@ cross join lateral (
 where f.withdrawn_at is null
   and f.source_ref = any($3)
   and `+held("f")+`
-  and `+where, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, now, parkingKind(q), parkingAmenities(q), q.Road).Scan(&a.next)
+  and `+where, parkingArgs(q, line, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, now, parkingKind(q), parkingAmenities(q), q.Road)...).Scan(&a.next)
 		rows, _ := tx.Query(ctx, parkingHere+`
 select f.facility_id, f.source_ref, f.name, f.operator_name, f.parking_kind,
        st_y(f.location), st_x(f.location),
@@ -264,7 +286,7 @@ where f.withdrawn_at is null
         select s.stale_after_s is null or o.observed_at >= $7::timestamptz - make_interval(secs => s.stale_after_s)
         from contract.source s where s.source_ref = o.source_ref)))
 order by `+order+`
-limit $11`, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, q.FreeMin, now, parkingKind(q), parkingAmenities(q), q.Road, q.Limit+1)
+limit $11`, parkingArgs(q, line, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, q.FreeMin, now, parkingKind(q), parkingAmenities(q), q.Road, q.Limit+1)...)
 		var err error
 		a.sites, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (parking.Site, error) {
 			var (

@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -18,7 +19,24 @@ import (
 // force at now on any road of the register, whatever the query keeps: the
 // families whose counts the catalogue states, zero included, which its answer
 // credits as the site's motorway index does.
+//
+// A road's length and Länder come from the road snapshot (roadShapes), not
+// from the read contract's road view, which derives them per road and per
+// read: the list would walk the location code list for every road on every
+// request.
 func (s *Store) Motorways(ctx context.Context, q roads.CatalogueQuery, families []string, now time.Time) ([]roads.Motorway, []string, error) {
+	shapes, err := s.roadShapes(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	// The roads in the asked Land: its Länder hold it, or a junction of it
+	// is in it, from the snapshot.
+	var inState []string
+	for ref, sh := range shapes {
+		if q.State != "" && (slices.Contains(sh.states, q.State) || slices.Contains(sh.junctionStates, q.State)) {
+			inState = append(inState, ref)
+		}
+	}
 	var counted []string
 	ms, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]roads.Motorway, error) {
 		res, _ := tx.Query(ctx, `
@@ -33,7 +51,7 @@ where e.source_ref = any($1) and `+eventPermitted+`
 		}
 		counted = c
 		res, _ = tx.Query(ctx, `
-select r.road_ref, r.name, r.length_km::float8, coalesce(r.states, '{}'),
+select r.road_ref, r.name,
        (select count(*) from contract.junction j where j.road_ref = r.road_ref)::int,
        (select count(*) from contract.traffic_event e
          where e.road_ref = r.road_ref and e.source_ref = any($1) and `+eventPermitted+`
@@ -46,14 +64,16 @@ select r.road_ref, r.name, r.length_km::float8, coalesce(r.states, '{}'),
        array(select distinct j.source_ref from contract.junction j where j.road_ref = r.road_ref order by 1)
 from contract.road r
 where `+permitted("r")+`
-  and ($2::text = '' or $2::text = any(r.states)
-       or exists (select 1 from contract.junction j where j.road_ref = r.road_ref and j.state_code = $2::text))
+  and ($2::text = '' or r.road_ref = any($6::text[]))
   and ($3::text = '' or r.road_ref = $3::text)
 order by length(r.road_ref), r.road_ref
-limit $4`, families, q.State, q.Road, q.Limit, now)
+limit $4`, families, q.State, q.Road, q.Limit, now, inState)
 		ms, err := pgx.CollectRows(res, func(r pgx.CollectableRow) (roads.Motorway, error) {
 			var m roads.Motorway
-			err := r.Scan(&m.Road, &m.Name, &m.LengthKm, &m.States, &m.Junctions, &m.Situations, &m.Family, &m.Sources, &m.Registers)
+			err := r.Scan(&m.Road, &m.Name, &m.Junctions, &m.Situations, &m.Family, &m.Sources, &m.Registers)
+			sh := shapes[m.Road]
+			// Never nil, as the view's coalesce(states, '{}') answered.
+			m.LengthKm, m.States = sh.lengthKm, append([]string{}, sh.states...)
 			return m, err
 		})
 		if err != nil || q.Road == "" || len(ms) == 0 {

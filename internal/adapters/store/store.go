@@ -50,6 +50,7 @@ type Store struct {
 	log     *slog.Logger
 	breaker *breaker.Breaker
 	reg     registerSnapshot
+	roads   roadSnapshot
 }
 
 // WithBreaker puts the circuit breaker in front of every read (NFR-RES-002):
@@ -137,6 +138,7 @@ func New(pool *pgxpool.Pool, cfg *config.Config) *Store {
 		pace:    realPace,
 		log:     slog.Default(),
 		reg:     registerSnapshot{ttl: cfg.DB.RegisterSnapshotTTL, staleFor: max(cfg.DB.RegisterSnapshotTTL, cfg.DB.RegisterStaleFor)},
+		roads:   roadSnapshot{ttl: cfg.DB.RoadSnapshotTTL, staleFor: max(cfg.DB.RoadSnapshotTTL, cfg.DB.RoadStaleFor)},
 	}
 }
 

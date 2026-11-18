@@ -113,6 +113,7 @@ func serve(environ []string, stderr io.Writer) int {
 	adm := admission.New(wire.AdmissionSettings(cfg), nil)
 	st.WithAdmission(adm).WithSharedBudget(wire.SharedBudget(cfg)).WithLogger(log).WithBreaker(wire.Breaker(cfg, log))
 	go st.KeepRegister(ctx)
+	go st.KeepRoads(ctx)
 	addresses := ratelimit.NewIPLimiter(wire.AddressSettings(cfg), nil)
 	go addresses.Run(ctx)
 

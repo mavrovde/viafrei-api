@@ -288,14 +288,14 @@ func TestAWindowAheadReadsThePlannedWorksAlone(t *testing.T) {
 	}
 }
 
-// TestTheConditionsNearAPositionReadNoWeather: the conditions near a
-// position state no lamp, as the platform's road status states none there,
-// so they read no weather warning and credit no weather family.
-func TestTheConditionsNearAPositionReadNoWeather(t *testing.T) {
+// TestTheConditionsNearAPositionReadTheWeather: the lamp of the conditions
+// near a position reads the weather warnings, as main's /v1 contract states
+// it (VER-001), and the answer credits the weather families it read.
+func TestTheConditionsNearAPositionReadTheWeather(t *testing.T) {
 	req.Covers(t, "FR-ROAD-006")
 	f := &roadFake{sits: []roads.Situation{{ID: "a", Family: "r2"}}}
 	c, err := roadService(f).RoadConditions(context.Background(), key("consumer", weatherScope, "r1", "r2", "w1"), roads.AreaQuery{RadiusM: 900})
-	if err != nil || !slices.Equal(f.gotFams.Roads, []string{"r1", "r2"}) || f.gotFams.Weather != nil || !slices.Equal(names(c.Families), []string{"r2"}) {
+	if err != nil || !slices.Equal(f.gotFams.Roads, []string{"r1", "r2"}) || !slices.Equal(f.gotFams.Weather, []string{"w1"}) || !slices.Equal(names(c.Families), []string{"r2", "w1"}) {
 		t.Errorf("near a position read %+v, credits %v: %v", f.gotFams, names(c.Families), err)
 	}
 }

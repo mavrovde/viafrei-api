@@ -23,6 +23,8 @@
         },
         "radiusM": 25000
       },
+      "lamp": "amber",
+      "lampReason": "narrowing",
       "situations": [
         {
           "id": "datex:syn:ev-00011",
@@ -63,6 +65,13 @@
       "asOf": "2026-03-29T23:57:30Z",
       "freshness": [
         {
+          "family": "dwd_eta",
+          "dataAsOf": "2026-03-29T23:57:30Z",
+          "ageS": 150,
+          "staleAfterS": 900,
+          "stale": false
+        },
+        {
           "family": "roads_alpha",
           "dataAsOf": "2026-03-29T23:57:30Z",
           "ageS": 150,
@@ -71,6 +80,17 @@
         }
       ],
       "attribution": [
+        {
+          "family": "dwd_eta",
+          "domain": "weather",
+          "publisher": "Golmil Datenwerk",
+          "text": "Synthetic data from family eta, licence dl-de/by-2-0.",
+          "licence": "dl-de/by-2-0",
+          "licenceUrl": "https://licences.example/dl-de-by-2-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://eta.example/terms/dwd_eta"
+        },
         {
           "family": "roads_alpha",
           "domain": "roads",

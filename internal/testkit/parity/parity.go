@@ -232,6 +232,9 @@ var Default = Rules{
 		{"data[*].eva", "", "listStations", siteReason("/internal/station/:slug")},
 		{"data[*].evaNumbers", "", "listStations", siteReason("/internal/station/:slug")},
 		{"data.zones", "", "getDrivingRules", zoneRowsReason},
+		{"data.lamp", "", "listRoadConditions", roadsLampReason},
+		{"data.lampReason", "", "listRoadConditions", roadsLampReason},
+		{"data[*].distanceM", "accept_terms", "listParkingOptions", tollCollectDistanceReason},
 		{"data.lamp", "", "getWeatherRisk", weatherLampReason},
 		{"data.truncated", "", "getWeatherRisk", weatherLampReason},
 		{"data.lamp", "", "listStateRoadConditions", siteReason("/internal/state/:slug")},
@@ -337,6 +340,14 @@ const zoneRowsReason = "API-only: the MCP driving rules state the verdict at a p
 // weatherLampReason is why the lamp and the truncation flag of the warnings
 // at a position are not compared: the /v1 contract keeps both (VER-001).
 const weatherLampReason = "API-only: the /v1 contract states the lamp over every warning at the position and whether the list was cut (VER-001); the platform's weather warnings check states neither, and no digest route the site reads serves a lamp for a position"
+
+// roadsLampReason is why the lamp of the conditions near a position is not
+// compared: the /v1 contract keeps it (VER-001).
+const roadsLampReason = "API-only: the /v1 contract states the lamp over every situation and weather warning within the radius and its reason (VER-001); the platform's road status states no lamp around a position, and no digest route the site reads serves one there"
+
+// tollCollectDistanceReason is why the distances of a parking answer that
+// accepts terms are not compared: an accepted Toll Collect site has one.
+const tollCollectDistanceReason = "the /v1 contract states every site's distance from the asked position (VER-001), an accepted Toll Collect site's too, which the platform names beside its list without one; the distances of the same sites are compared in the cases that accept no terms"
 
 // motorwayListReason is why a motorway's length and register family are
 // not compared: the site's motorway list, index and pages show neither.

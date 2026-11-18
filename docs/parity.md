@@ -107,6 +107,8 @@ rule set `viafrei.parity.rules/5` (`parity.Default`):
 | `data[*].location`, `data[*].districtCode`, `data[*].modes`, in `listStations` only | The MCP stop search states a stop's name, code and distance, not its position, district or modes. The site reads all three from the digest route `/internal/station/:slug` (the page's map and Land line from the stop's position and AGS, the live board's mode filter), so the API answers them; they are not compared. A position in any other operation, a charging site's or a car park's, is compared. |
 | `data[*].eva`, `data[*].evaNumbers`, in `listStations` only | The MCP stop search states a stop's name and codes, not its EVA numbers. The site reads them from the digest route `/internal/station/:slug` (the station page's DB board and its parts), so the API answers them; they are not compared. |
 | `data.zones`, in `getDrivingRules` only | API-only. The MCP driving rules state the verdict at a position (`data.zoneVerdict`, compared) and, for a city, the curated zone list's entry; neither they nor any digest route the site reads list the published zone rows (key, role, publisher, distance) the API lists for a client to draw. |
+| `data.lamp`, `data.lampReason`, in `listRoadConditions` only | API-only: the /v1 contract states the lamp over every situation within the radius and every official weather warning in force in an area within it, and its reason, and a change inside /v1 may not remove them (VER-001). The platform's road status states no lamp around a position, and no digest route the site reads serves one there. Every other fact, the situations and the credited families included, is compared. |
+| `data[*].distanceM`, in `listParkingOptions` asked with `accept_terms` only | The /v1 contract states every site's distance from the asked position in whole metres (VER-001), an accepted Toll Collect site's too; the platform names that site beside its list without a distance. The same sites' distances are compared in the cases that accept no terms. |
 | `data.lamp`, `data.truncated`, in `getWeatherRisk` only | API-only: the /v1 contract states the lamp over every warning in force at the position and whether the list was cut at `weather.max_warnings`, and a change inside /v1 may not remove them (VER-001). The platform's weather warnings check states neither, and no digest route the site reads serves a lamp for a position. The warnings and the credited families are compared. |
 | `data.lamp`, `data.lampReason`, in `listStateRoadConditions` only | The MCP motorway status of a Land lists the Land's items and counts, not a lamp. The site reads the Land's lamp (the motorway pages' one rule over the Land's Autobahn items and DWD levels) from the digest route `/internal/state/:slug`, so the API answers it; it is not compared. |
 | `data.lamp`, `data.lampReason`, `data.corridor.states`, in `getMotorwayConditions` asked with `horizon_days` or `from` | The MCP roadworks-ahead answer lists the planned sites of the window, not a lamp or the Länder the road crosses. The site reads the road's lamp and Länder beside its planned works from the digest route `/internal/motorway/:road`, so the API answers them; they are not compared. |
@@ -203,7 +205,8 @@ nothing, so that family contributed nothing and neither side credits it.
 
 - **Parking.** A site whose terms are not accepted is not listed; the
   answer offers its terms. A Toll Collect site, once accepted, is listed
-  beside the other sites with no distance (`distanceM: null`), and an
+  beside the other sites with no distance (the API states its distance;
+  excluded above; along a motorway `distanceM: null`), and an
   answer with no other site lists none. A search along a motorway lists no
   distance and credits the location-code points (`bast_lcl`) its corridor is
   drawn from. An empty answer credits the families with a site of the kind
@@ -239,9 +242,9 @@ nothing, so that family contributed nothing and neither side credits it.
   alert and reads no punctuality credits no family.
 - **Road conditions near a position** list what the platform's road status
   lists there: closures, roadworks and lane restrictions, and jams, each
-  distance to 0.1 km. A hazard or an accident is not listed, and the answer
-  states no lamp and reads no weather warning: the road status states none
-  around a position, and no digest route the site reads serves one there.
+  distance to 0.1 km. A hazard or an accident is not listed. Its lamp, which
+  reads the weather warnings and credits the weather families read, is
+  API-only (the /v1 contract keeps it; excluded above).
 - **Weather warnings** at a position are listed as the platform's weather
   warnings check lists them. Its lamp and truncation flag are API-only (the
   /v1 contract keeps them; excluded above). A family the platform does not

@@ -78,7 +78,7 @@ func (s *Service) motorwayLamps(ctx context.Context, key access.Record, ms []roa
 	if err != nil {
 		return err
 	}
-	fams, partial, weatherRead, err := roadFamilies(reg, gate, false, false, s.set.PlannedWorks)
+	fams, partial, weatherRead, err := roadFamilies(reg, gate, false, s.set.PlannedWorks)
 	if err != nil {
 		return err
 	}

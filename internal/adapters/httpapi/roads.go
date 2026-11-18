@@ -360,11 +360,14 @@ type Area struct {
 	RadiusM int      `json:"radiusM" doc:"The radius applied, in metres."`
 }
 
-// RoadConditionsData is the answer of listRoadConditions. It states no
-// lamp: the platform's road status around a position states none, and no
-// digest route the site reads serves one for a position.
+// RoadConditionsData is the answer of listRoadConditions. Its lamp and
+// lampReason are API-only: the platform's road status around a position
+// states none, and the /v1 contract keeps both (VER-001), so the parity
+// harness leaves them out (parity.Default).
 type RoadConditionsData struct {
 	Area       Area            `json:"area"`
+	Lamp       string          `json:"lamp" enum:"green,amber,red" doc:"The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope as its record is read (the motorway operator's event, any other traffic message, a bridge's state) and every official weather warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a closed bridge; a jam with a delay of 30 minutes or more; a weather warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a weather warning of level 1 or 2; any other message (an accident without a closure, a restricted bridge, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the weather warnings not readable with the key or their source not current, or a state in scope whose traffic messages no current roads family the key may read covers. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is current, which is no guarantee that the road is free."`
+	LampReason *string         `json:"lampReason" nullable:"true" enum:"road_closed,ramp_closed,safety,bridge_closed,long_jam,jam,weather_warning,slippery,warning,narrowing,limited_sight" doc:"Why the lamp has its colour: the first of its reasons, a red one before any amber one, and inside a colour in the platform's order, which is this enumeration's order; null for green. slippery is never given while the read contract holds no road-weather forecast. Open enumeration."`
 	Situations []RoadSituation `json:"situations" doc:"What the platform's road status lists around a position: the closures, the roadworks and lane restrictions, and the jams, whatever kinds asks beyond them (a hazard, an accident or a weather report is not listed). Ordered by severity descending, then distance, then id; distanceM is rounded to 100 m, as the platform states it in tenths of a kilometre."`
 }
 
@@ -397,7 +400,7 @@ type RoadConditionsOutput struct {
 
 func registerRoadConditions(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "What is happening on the roads near a position"
-	op.Description = "The active closures, roadworks, lane restrictions and jams within the radius of a position on every road class held, what the platform's road status lists there (a hazard, an accident or a weather report is not listed), by severity descending, then distance, then id. No lamp: the platform's road status states none around a position. MCP counterpart: road status (area form). Needs the scope roads."
+	op.Description = "The active closures, roadworks, lane restrictions and jams within the radius of a position on every road class held, what the platform's road status lists there (a hazard, an accident or a weather report is not listed), by severity descending, then distance, then id. With the lamp over every situation within the radius and every official weather warning in force in an area within it (API-only: the platform's road status states no lamp around a position). MCP counterpart: road status (area form). Needs the scope roads; the weather warnings are public and read for every key that may read the weather families, which the answer then credits; without them the lamp says its sight is limited."
 	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, in *RoadConditionsInput) (*RoadConditionsOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
@@ -415,7 +418,7 @@ func registerRoadConditions(api huma.API, s *server, op huma.Operation) {
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
 		}
-		noteChanges(ctx, c.ChangesAt)
+		noteLamp(ctx, c)
 		listed := roadSituations(c.Items)
 		for i := range listed {
 			if listed[i].DistanceM != nil {
@@ -426,6 +429,8 @@ func registerRoadConditions(api huma.API, s *server, op huma.Operation) {
 		return &RoadConditionsOutput{CacheControl: noStore, Body: RoadConditionsEnvelope{
 			Data: RoadConditionsData{
 				Area:       Area{At: position(q.At), RadiusM: q.RadiusM},
+				Lamp:       string(c.Lamp),
+				LampReason: lampReason(c.Reason),
 				Situations: listed,
 			},
 			Meta: RoadConditionsMeta{

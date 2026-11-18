@@ -77,7 +77,7 @@ type NeedBlock struct {
 type NearbyData struct {
 	Fuel      *[]NearbyFuelStation `json:"fuel,omitempty" doc:"The cheapest current E5 prices first, three at most, each with its E5 price only."`
 	Charging  *[]ChargingSite      `json:"charging,omitempty" doc:"Public charging sites, nearest first, three at most."`
-	Parking   *[]ParkingSite       `json:"parking,omitempty" doc:"Parking sites, nearest first, three at most."`
+	Parking   *[]ParkingListing    `json:"parking,omitempty" doc:"Parking sites, nearest first, three at most."`
 	Stations  *[]Station           `json:"stations,omitempty" doc:"Stations, nearest first, three at most."`
 	Junctions *[]NearbyJunction    `json:"junctions,omitempty" doc:"Motorway junctions, nearest first, three at most; services areas and car parks are none."`
 	Needs     *[]NeedBlock         `json:"needs,omitempty" doc:"The asked everyday needs, in the order asked."`

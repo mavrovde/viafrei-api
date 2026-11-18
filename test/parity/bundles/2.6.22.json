@@ -1115,10 +1115,6 @@
    "now": "2026-03-30T00:00:00Z",
    "facts": [
     {
-     "name": "data[p:27].distanceM",
-     "value": "18079"
-    },
-    {
      "name": "data[p:27].id",
      "value": "p:27"
     },
@@ -1165,10 +1161,6 @@
     {
      "name": "data[p:27].termsRequired",
      "value": "false"
-    },
-    {
-     "name": "data[sid:7].distanceM",
-     "value": "null"
     },
     {
      "name": "data[sid:7].id",
@@ -7400,10 +7392,6 @@
    },
    "now": "2026-03-30T00:00:00Z",
    "facts": [
-    {
-     "name": "data[p:27].distanceM",
-     "value": "18079"
-    },
     {
      "name": "data[p:27].id",
      "value": "p:27"

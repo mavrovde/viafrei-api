@@ -95,7 +95,7 @@ var nullableObjects = []struct{ schema, member string }{
 	{"LocationData", "lowEmissionZone"},
 	{"MotorwayData", "coverage"},
 	{"ParkingSite", "occupancy"},
-	{"OverviewParkingSite", "occupancy"},
+	{"ParkingListing", "occupancy"},
 	{"RoadSituation", "location"},
 	{"RoadSituation", "lanes"},
 	{"RoadSituation", "position"},
@@ -574,8 +574,10 @@ type Occupancy struct {
 	ObservedAt time.Time `json:"observedAt" doc:"When the occupancy was reported."`
 }
 
-// ParkingSite is one item of listParkingOptions.
-type ParkingSite struct {
+// ParkingListing is one parking site as the platform states it, with or
+// without a distance: an item of listMotorwayParking and of the nearby
+// answer.
+type ParkingListing struct {
 	ID            string     `json:"id"`
 	Name          *string    `json:"name" nullable:"true"`
 	Operator      *string    `json:"operator" nullable:"true"`
@@ -625,11 +627,11 @@ type ParkingOutput struct {
 	Body         ParkingEnvelope
 }
 
-func parkingSites(a features.Answer[parking.Site]) ([]ParkingSite, bool) {
-	out := make([]ParkingSite, len(a.Items))
+func parkingSites(a features.Answer[parking.Site]) ([]ParkingListing, bool) {
+	out := make([]ParkingListing, len(a.Items))
 	withheld := false
 	for i, v := range a.Items {
-		item := ParkingSite{
+		item := ParkingListing{
 			ID: v.ID, Name: v.Name, Operator: v.Operator, Kind: string(v.Kind), Location: position(v.Location),
 			TermsRequired: v.TermsRequired, SourceFamily: v.Family,
 		}
@@ -692,25 +694,26 @@ func registerParking(api huma.API, s *server, op huma.Operation) {
 			return nil, err
 		}
 		meta.Query = ParkingQuery{NearQuery: NearQuery{At: position(q.At), RadiusM: q.RadiusM}, ParkingFilterQuery: parkingFilterQuery(q)}
-		return &ParkingOutput{CacheControl: noStore, Body: ParkingEnvelope{Data: a, Meta: meta, Links: s.selfLink(ctx)}}, nil
+		data, _ := rangedParkingSites(a)
+		return &ParkingOutput{CacheControl: noStore, Body: ParkingEnvelope{Data: data, Meta: meta, Links: s.selfLink(ctx)}}, nil
 	})
 }
 
 // parkingAnswer asks the parking search and builds its data and meta, but
 // for meta.query.
-func (s *server) parkingAnswer(ctx context.Context, q parking.Query) ([]ParkingSite, ParkingMeta, error) {
+func (s *server) parkingAnswer(ctx context.Context, q parking.Query) (features.Answer[parking.Site], ParkingMeta, error) {
 	a, err := s.features.Parking(ctx, principalFrom(ctx).Key, q)
 	if err != nil {
-		return nil, ParkingMeta{}, s.featureProblem(ctx, err)
+		return a, ParkingMeta{}, s.featureProblem(ctx, err)
 	}
-	data, withheld := parkingSites(a)
+	withheld := slices.ContainsFunc(a.Items, func(v parking.Site) bool { return v.TermsRequired })
 	noteNextReport(ctx, a.NextReport)
 	noteFreeMin(ctx, a, q.FreeMin)
 	detail := partialDetail
 	if withheld {
 		detail += " " + termsDetail
 	}
-	return data, ParkingMeta{
+	return a, ParkingMeta{
 		DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, detail),
 		Page:     Page{Limit: q.Limit, HasMore: a.HasMore},
 		Terms:    termsOffers(a.Terms),
@@ -748,7 +751,7 @@ type MotorwayParkingMeta struct {
 
 // MotorwayParkingEnvelope is the enveloped answer of listMotorwayParking.
 type MotorwayParkingEnvelope struct {
-	Data  []ParkingSite       `json:"data"`
+	Data  []ParkingListing    `json:"data"`
 	Meta  MotorwayParkingMeta `json:"meta"`
 	Links Links               `json:"links"`
 }
@@ -773,8 +776,9 @@ func registerMotorwayParking(api huma.API, s *server, op huma.Operation) {
 		if err != nil {
 			return nil, err
 		}
+		data, _ := parkingSites(a)
 		return &MotorwayParkingOutput{CacheControl: noStore, Body: MotorwayParkingEnvelope{
-			Data:  a,
+			Data:  data,
 			Meta:  MotorwayParkingMeta{DataMeta: meta.DataMeta, Page: meta.Page, Terms: meta.Terms, Query: MotorwayParkingQuery{Road: q.Road, ParkingFilterQuery: parkingFilterQuery(q)}},
 			Links: s.selfLink(ctx),
 		}}, nil
@@ -808,31 +812,32 @@ type ChargingPart struct {
 
 // ParkingPart is the parking part of an overview.
 type ParkingPart struct {
-	Sites []OverviewParkingSite `json:"sites"`
+	Sites []ParkingSite `json:"sites"`
 }
 
-// OverviewParkingSite is one parking site of an overview. An overview is
-// asked around a place, so every site has its distance: the /v1 contract
-// states one for each (VER-001), a Toll Collect site's too.
-type OverviewParkingSite struct {
+// ParkingSite is one item of listParkingOptions and of an overview's
+// parking part. Both are asked around a position, so every site has its
+// distance: the /v1 contract states one for each (VER-001), a Toll Collect
+// site's too, which the platform names without one.
+type ParkingSite struct {
 	ID            string     `json:"id"`
 	Name          *string    `json:"name" nullable:"true"`
 	Operator      *string    `json:"operator" nullable:"true"`
 	Kind          string     `json:"kind" enum:"garage,lot,park_and_ride,on_street,rest_area,truck_parking,other" doc:"Open enumeration; treat an unknown value as other."`
 	Location      Position   `json:"location"`
-	DistanceM     int        `json:"distanceM" doc:"Distance from the place, in metres."`
+	DistanceM     int        `json:"distanceM" doc:"Distance from the asked position, in metres."`
 	Occupancy     *Occupancy `json:"occupancy" doc:"The last report; null when none is published, or while the terms are not accepted."`
 	TermsRequired bool       `json:"termsRequired" doc:"True when the occupancy is withheld until the family's terms are accepted."`
 	SourceFamily  string     `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
 }
 
-// overviewParkingSites are the sites of an overview's parking part, each
-// with its distance from the place.
-func overviewParkingSites(a features.Answer[parking.Site]) ([]OverviewParkingSite, bool) {
+// rangedParkingSites are the sites of an answer around a position, each
+// with its distance.
+func rangedParkingSites(a features.Answer[parking.Site]) ([]ParkingSite, bool) {
 	listed, withheld := parkingSites(a)
-	out := make([]OverviewParkingSite, len(listed))
+	out := make([]ParkingSite, len(listed))
 	for i, v := range listed {
-		out[i] = OverviewParkingSite{ID: v.ID, Name: v.Name, Operator: v.Operator, Kind: v.Kind, Location: v.Location,
+		out[i] = ParkingSite{ID: v.ID, Name: v.Name, Operator: v.Operator, Kind: v.Kind, Location: v.Location,
 			DistanceM: a.Items[i].DistanceM, Occupancy: v.Occupancy, TermsRequired: v.TermsRequired, SourceFamily: v.SourceFamily}
 	}
 	return out, withheld
@@ -964,8 +969,8 @@ func registerOverview(api huma.API, s *server, op huma.Operation) {
 			data.Charging = &ChargingPart{Sites: chargingSites(ctx, *o.Charging, s.cfg.Charging.StatusMaxAge)}
 		}
 		if o.Parking != nil {
-			var sites []OverviewParkingSite
-			sites, withheld = overviewParkingSites(*o.Parking)
+			var sites []ParkingSite
+			sites, withheld = rangedParkingSites(*o.Parking)
 			terms = termsOffers(o.Parking.Terms)
 			noteNextReport(ctx, o.Parking.NextReport)
 			data.Parking = &ParkingPart{Sites: sites}

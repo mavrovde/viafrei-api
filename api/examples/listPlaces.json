@@ -1,0 +1,81 @@
+{
+  "title": "The places a typed name finds",
+  "request": "/v1/places?q=Matfienland\u0026limit=3",
+  "attribution": "Places come from the source families of the places domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "places"
+    ],
+    "sources": [
+      "bkg_gvisys",
+      "geonames"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": [
+      {
+        "id": "100001",
+        "name": "Matfienland",
+        "kind": "state",
+        "location": {
+          "lat": 48.24375,
+          "lon": 7.01625
+        },
+        "sourceFamily": "geonames",
+        "districtCode": "01"
+      }
+    ],
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": null,
+      "freshness": [
+        {
+          "family": "geonames",
+          "dataAsOf": null,
+          "ageS": null,
+          "staleAfterS": 9007199254740991,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "geonames",
+          "domain": "places",
+          "publisher": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+          "text": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://download.geonames.org/export/dump/"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ],
+      "page": {
+        "limit": 3,
+        "hasMore": false
+      },
+      "query": {
+        "q": "Matfienland",
+        "kind": null,
+        "radiusM": null
+      }
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/places"
+    }
+  }
+}

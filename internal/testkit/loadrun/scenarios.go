@@ -678,10 +678,14 @@ func instanceKilled(ctx context.Context, r *runner, o *outcome) {
 }
 
 // The clock-skew statements: the freshness instants are saved, moved and
-// put back, all as the owner of the throwaway database.
+// put back, all as the owner of the throwaway database. The read contract's
+// contract.source_freshness is a view, which cannot be written; its
+// data_as_of is the last_changed_at of the platform's source ledger
+// (control.feed_state, keyed by ledger and key), which is moved instead.
 const (
-	skewSave    = "drop table if exists loadrun_freshness; create table loadrun_freshness as select * from contract.source_freshness"
-	skewRestore = "update contract.source_freshness f set data_as_of = s.data_as_of from loadrun_freshness s where s.source_ref = f.source_ref; drop table loadrun_freshness"
+	skewSave    = "drop table if exists loadrun_freshness; create table loadrun_freshness as select ledger, key, last_changed_at from control.feed_state"
+	skewMove    = "update control.feed_state set last_changed_at = "
+	skewRestore = "update control.feed_state f set last_changed_at = s.last_changed_at from loadrun_freshness s where s.ledger = f.ledger and s.key = f.key; drop table loadrun_freshness"
 )
 
 func clockSkew(ctx context.Context, r *runner, o *outcome) {
@@ -698,7 +702,7 @@ func clockSkew(ctx context.Context, r *runner, o *outcome) {
 		{"source clock 10 minutes ahead: age 0 and fresh", "now() + interval '10 minutes'", func(f freshnessView) bool { return f.n > 0 && f.zeroAge == f.n && f.stale == 0 }},
 		{"source clock 30 days behind: stale, with the data_stale warning", "now() - interval '30 days'", func(f freshnessView) bool { return f.n > 0 && f.stale == f.n && f.staleWarning }},
 	} {
-		if _, err := r.psql(ctx, "update contract.source_freshness set data_as_of = "+c.at); err != nil {
+		if _, err := r.psql(ctx, skewMove+c.at); err != nil {
 			o.add(c.name, false, "%v", err)
 			continue
 		}

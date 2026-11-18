@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/invariant"
@@ -75,18 +76,44 @@ type Case struct {
 	Request     string    `json:"request"`
 	Key         Key       `json:"key"`
 	Now         time.Time `json:"now"`
-	Facts       []Fact    `json:"facts"`
+	Refresh     *Refresh  `json:"refresh,omitempty"`
+	// Ruling is the lead's ruling on how the question is compared, kept
+	// with it (docs/parity.md); it changes nothing the harness does.
+	Ruling string `json:"ruling,omitempty"`
+	// APIOnly, when set, is why the question has no MCP form: the API's
+	// recording (the unsynced bundle) keeps it as a regression golden, and
+	// a platform bundle neither answers it nor may state it.
+	APIOnly string `json:"apiOnly,omitempty"`
+	Facts   []Fact `json:"facts"`
+}
+
+// Refresh is the on-demand refresh a question asks before its read: the
+// API is asked createRefresh (POST /v1/refreshes) with it, as the key, and
+// the read is asked once the refresh has settled; the MCP side asks its
+// tool with a refresh port that settles the same way (docs/parity.md). The
+// read's answer is compared; the refresh's own answer is not, since the MCP
+// tool states no refresh of its own.
+type Refresh struct {
+	Source  string         `json:"source"`
+	Subject map[string]any `json:"subject"`
 }
 
 // Key is the caller the question is asked as.
 type Key struct {
-	UseClass string       `json:"useClass"`
-	Scopes   []string     `json:"scopes"`
-	Sources  []string     `json:"sources"`
+	UseClass string   `json:"useClass"`
+	Scopes   []string `json:"scopes"`
+	Sources  []string `json:"sources"`
+	// Audience is the key's licence audience (own or public, empty: public),
+	// what an own-keys-only family such as fuel is served to.
+	Audience string `json:"audience,omitempty"`
+	// Accepted is the acceptance a recorded bundle states with its key. It is
+	// decoded so that pinned bundles still read, and never applied to a key:
+	// terms are accepted per request (accept_terms), never by a key.
 	Accepted []Acceptance `json:"accepted"`
 }
 
-// Acceptance is one accepted version of a family's terms.
+// Acceptance is one accepted version of a family's terms, as a recorded
+// bundle states it.
 type Acceptance struct {
 	Source  string `json:"source"`
 	Version string `json:"version"`
@@ -129,21 +156,33 @@ type Rules struct {
 // from the fixture rows.
 type Owners map[string][]string
 
+// Unowned is the owner of a note no family's row carries: the platform's own
+// wording, which every answer of its operation states whatever it credits
+// (the § 23 Abs. 1c StVO notice of the speed cameras). The MCP side states
+// such a note as meta.notes.<kind>[unowned]; Owners names it so, and only a
+// text Owners names so is unowned: any other text no family owns is an
+// error (ErrUnownedNote).
+const Unowned = "unowned"
+
 // Exclusion is one fact, or family of facts, left out of the comparison.
 // Pattern is a fact name in which [*] stands for any element key; it covers
 // the name itself and every fact under it. When Asked names a request
-// parameter, the exclusion holds only in a case that asks it (Asks).
+// parameter, the exclusion holds only in a case that asks it (Asks). When
+// Operation names an operation, it holds only in a case of that operation:
+// a station's position is left out of a station answer, a charging site's
+// is compared.
 type Exclusion struct {
-	Pattern string
-	Asked   string
-	Reason  string
+	Pattern   string
+	Asked     string
+	Operation string
+	Reason    string
 }
 
 // Excludes reports whether the fact name falls under one of r's exclusions
-// in a case asking request.
-func (r Rules) Excludes(request, name string) bool {
+// in a case of operation asking request.
+func (r Rules) Excludes(operation, request, name string) bool {
 	for _, e := range r.Excluded {
-		if exclusionPattern(e.Pattern).MatchString(name) && (e.Asked == "" || Asks(request, e.Asked)) {
+		if exclusionPattern(e.Pattern).MatchString(name) && (e.Asked == "" || Asks(request, e.Asked)) && (e.Operation == "" || e.Operation == operation) {
 			return true
 		}
 	}
@@ -165,40 +204,206 @@ func Asks(request, param string) bool {
 	return err != nil || n > 0
 }
 
+// exclusionPatterns holds each exclusion pattern compiled once: Excludes is
+// asked for every fact of every case, and compiling the pattern per fact
+// made loading a bundle take seconds (TST-012).
+var exclusionPatterns sync.Map // pattern -> *regexp.Regexp
+
 func exclusionPattern(p string) *regexp.Regexp {
+	if re, ok := exclusionPatterns.Load(p); ok {
+		return re.(*regexp.Regexp)
+	}
 	q := strings.ReplaceAll(regexp.QuoteMeta(p), `\[\*\]`, `\[[^\]]*\]`)
-	return regexp.MustCompile(`^` + q + `(?:$|[.\[])`)
+	re, _ := exclusionPatterns.LoadOrStore(p, regexp.MustCompile(`^`+q+`(?:$|[.\[])`))
+	return re.(*regexp.Regexp)
 }
 
 // Default is the projection rule set of this format.
 var Default = Rules{
-	ID:               "viafrei.parity.rules/4",
+	ID:               "viafrei.parity.rules/5",
 	PositionDecimals: 5,
 	Positions:        []string{"lat", "lon"},
 	Keys:             []string{"id", "family", "code"},
 	Identifiers:      []string{"sourceFamily"},
 	Meta:             []string{"asOf", "attribution", "freshness", "notes", "page", "warnings"},
 	Excluded: []Exclusion{
-		{"data[*].access", "", "the MCP capability has no access concept: no charging source of the platform publishes who may use a site"},
-		{"data[*].chargePoints[*].current", "", "the MCP capability states no current per point"},
-		{"meta.freshness", "", "API-only: the per-family freshness block of the read contract (ENV-003)"},
-		{"meta.warnings", "", "API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got"},
-		{"meta.page.hasMore", "min_kw", "the MCP capability states no count of the sites a power filter keeps, so it cannot say whether there are more"},
-		{"meta.asOf", "", "each side defines it differently: the API the oldest family dataAsOf (ENV-004), MCP the newest current status or its clock"},
-		{"meta.attribution[*].domain", "", attributionReason},
-		{"meta.attribution[*].licence", "", attributionReason},
-		{"meta.attribution[*].licenceUrl", "", attributionReason},
-		{"meta.attribution[*].publisher", "", attributionReason},
-		{"meta.attribution[*].shareAlike", "", attributionReason},
-		{"meta.attribution[*].shareAlikeOffer", "", attributionReason},
-		{"meta.attribution[*].termsUrl", "", attributionReason},
-		{"meta.attribution[*].text", "", attributionReason},
+		{"data[*].access", "", "", "the MCP capability has no access concept: no charging source of the platform publishes who may use a site"},
+		{"data[*].chargePoints[*].current", "", "", "the MCP capability states no current per point"},
+		{"data.access", "", "getChargingSite", "the MCP capability has no access concept: no charging source of the platform publishes who may use a site"},
+		{"data.chargePoints[*].current", "", "getChargingSite", "the MCP capability states no current per point"},
+		{"meta.freshness", "", "", "API-only: the per-family freshness block of the read contract (ENV-003)"},
+		{"meta.warnings", "", "", "API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got"},
+		{"meta.page.hasMore", "min_kw", "", "the MCP capability states no count of the sites a power filter keeps, so it cannot say whether there are more"},
+		{"meta.asOf", "", "", "each side defines it differently: the API the oldest family dataAsOf (ENV-004), MCP the newest current status or its clock"},
+		{"data.station.location", "", "listStationDepartures", siteReason("/internal/station/:slug")},
+		{"data[*].location", "", "listStations", siteReason("/internal/station/:slug")},
+		{"data[*].districtCode", "", "listStations", siteReason("/internal/station/:slug")},
+		{"data[*].modes", "", "listStations", siteReason("/internal/station/:slug")},
+		{"data[*].eva", "", "listStations", siteReason("/internal/station/:slug")},
+		{"data[*].evaNumbers", "", "listStations", siteReason("/internal/station/:slug")},
+		{"data.zones", "", "getDrivingRules", zoneRowsReason},
+		{"data.lamp", "", "listRoadConditions", roadsLampReason},
+		{"data.lampReason", "", "listRoadConditions", roadsLampReason},
+		{"meta.attribution[dwd_alpha]", "", "listRoadConditions", roadsLampCreditReason},
+		{"meta.attribution[dwd_eta]", "", "listRoadConditions", roadsLampCreditReason},
+		{"data[*].distanceM", "accept_terms", "listParkingOptions", tollCollectDistanceReason},
+		{"data.lamp", "", "getWeatherRisk", weatherLampReason},
+		{"data.truncated", "", "getWeatherRisk", weatherLampReason},
+		{"data.lamp", "", "listStateRoadConditions", siteReason("/internal/state/:slug")},
+		{"data.lampReason", "", "listStateRoadConditions", siteReason("/internal/state/:slug")},
+		{"data.lamp", "horizon_days", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
+		{"data.lamp", "from", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
+		{"data.lampReason", "horizon_days", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
+		{"data.lampReason", "from", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
+		{"data.corridor.states", "horizon_days", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
+		{"data.corridor.states", "from", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
+		{"data[*].kilometres", "", "listMotorways", motorwayListReason},
+		{"data[*].sourceFamily", "", "listMotorways", motorwayListReason},
+		{"data.apiVersion", "", "getMeta", serviceMetaReason},
+		{"data.buildSha", "", "getMeta", serviceMetaReason},
+		{"data.contractVersion", "", "getMeta", serviceMetaReason},
+		{"data.languages", "", "getMeta", serviceMetaReason},
+		{"data.openapi", "", "getMeta", serviceMetaReason},
+		{"data.platformVersion", "", "getMeta", serviceMetaReason},
+		{"data.bays[*].distanceM", "", "listParkingBays", "the parking tool states a bay's distance in kilometres to two decimals, the API in metres, so they agree only to the tool's 10 m; the bay's point both measure from is compared"},
+		{"data.departures[*].line", "", "getTrainBoard", trainLabelReason},
+		{"data.departures[*].number", "", "getTrainBoard", trainLabelReason},
+		{"data.fresh", "", "getTrainBoard", trainAgeReason},
+		{"data.fetchedAt", "", "getTrainBoard", trainAgeReason},
+		{"data.ageSeconds", "", "getTrainBoard", trainAgeReason},
+		{"data.place.location", "", "getPlaceOverview", overviewReason},
+		{"data.charging.sites[*].access", "", "getPlaceOverview", overviewReason},
+		{"data.charging.sites[*].chargePoints", "", "getPlaceOverview", overviewReason},
+		{"data.charging.sites[*].distanceM", "", "getPlaceOverview", overviewDistanceReason},
+		{"data.parking.sites[*].distanceM", "", "getPlaceOverview", overviewDistanceReason},
+		{"data.parking.sites[*].kind", "", "getPlaceOverview", overviewReason},
+		{"data.parking.sites[*].operator", "", "getPlaceOverview", overviewReason},
+		{"data.parking.sites[*].occupancy.total", "", "getPlaceOverview", overviewReason},
+		{"data.parking.sites[*].occupancy.state", "", "getPlaceOverview", overviewReason},
+		{"data.parking.sites[*].occupancy.observedAt", "", "getPlaceOverview", overviewReason},
+		{"data[bast_lcl]", "", "listSources", sourcesReferenceReason},
+		{"meta.attribution[bast_lcl]", "", "listSources", sourcesReferenceReason},
+		{"data[bkg_gvisys]", "", "listSources", sourcesReferenceReason},
+		{"meta.attribution[bkg_gvisys]", "", "listSources", sourcesReferenceReason},
+		{"data[delfi_static]", "", "listSources", sourcesReferenceReason},
+		{"meta.attribution[delfi_static]", "", "listSources", sourcesReferenceReason},
+		{"data[geonames]", "", "listSources", sourcesReferenceReason},
+		{"meta.attribution[geonames]", "", "listSources", sourcesReferenceReason},
+		{"data[osm]", "", "listSources", sourcesReferenceReason},
+		{"meta.attribution[osm]", "", "listSources", sourcesReferenceReason},
+		{"data[osm_speed_cameras]", "", "listSources", sourcesReferenceReason},
+		{"meta.attribution[osm_speed_cameras]", "", "listSources", sourcesReferenceReason},
+		{"data[viafrei_rules]", "", "listSources", sourcesReferenceReason},
+		{"meta.attribution[viafrei_rules]", "", "listSources", sourcesReferenceReason},
+		{"data[*].domain", "", "listSources", sourcesReferenceReason},
+		{"data[*].status", "", "listSources", sourcesLiveReason},
+		{"data[*].dataAsOf", "", "listSources", sourcesLiveReason},
+		{"data[*].attribution", "", "listSources", sourcesTextReason},
+		{"data[*].licence", "", "listSources", sourcesTextReason},
+		{"data[*].licenceUrl", "", "listSources", sourcesTextReason},
+		{"data[*].publisher", "", "listSources", sourcesTextReason},
+		{"data[*].termsUrl", "", "listSources", sourcesTextReason},
+		{"meta.notes", "", "listSources", sourcesNotesReason},
+		{"data.watchId", "", "getWatch", watchIDReason},
+		{"data.uri", "", "getWatch", watchIDReason},
+		{"meta.attribution[*].domain", "", "", attributionReason},
+		{"meta.attribution[*].licence", "", "", attributionReason},
+		{"meta.attribution[*].licenceUrl", "", "", attributionReason},
+		{"meta.attribution[*].publisher", "", "", attributionReason},
+		{"meta.attribution[*].shareAlike", "", "", attributionReason},
+		{"meta.attribution[*].shareAlikeOffer", "", "", attributionReason},
+		{"meta.attribution[*].termsUrl", "", "", attributionReason},
+		{"meta.attribution[*].text", "", "", attributionReason},
 	},
-	// The fixture's condition notes are synthetic register texts and the
-	// platform states its own register's (attributionReason): which family
-	// a condition belongs to and how many it has are compared, the text is not.
-	OwnedNotes: []string{"condition"},
+	// The fixture's condition and purpose notes are synthetic register texts
+	// and the platform states its own register's (attributionReason): which
+	// family a note belongs to and how many it has are compared, the text is
+	// not. Purpose notes are owned since rules/5.
+	OwnedNotes: []string{"condition", "purpose"},
 }
+
+// previousRules is the rule set before purpose notes were owned. A bundle
+// projected with it is read under Default when it states no purpose note
+// (every meta.notes.purpose fact is []): the two rule sets state such an
+// answer alike. One that states a purpose text is refused.
+const previousRules = "viafrei.parity.rules/4"
+
+// purposeFree reports whether b states no purpose note.
+func purposeFree(b Bundle) bool {
+	for _, c := range b.Cases {
+		for _, f := range c.Facts {
+			if strings.HasPrefix(f.Name, "meta.notes.purpose") && (f.Name != "meta.notes.purpose" || f.Value != "[]") {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// siteReason is why a fact the MCP capability does not state is answered
+// and not compared: a digest route the site reads serves it (docs/parity.md).
+func siteReason(route string) string {
+	return "the MCP capability does not state it; the site reads it from the digest route " + route
+}
+
+// zoneRowsReason is why the zone rows of a rules answer are not compared.
+const zoneRowsReason = "API-only: the MCP driving rules state the verdict at a position (zoneVerdict, compared) and a city's entry of the curated zone list, and no digest route the site reads lists the published zone rows"
+
+// weatherLampReason is why the lamp and the truncation flag of the warnings
+// at a position are not compared: the /v1 contract keeps both (VER-001).
+const weatherLampReason = "API-only: the /v1 contract states the lamp over every warning at the position and whether the list was cut (VER-001); the platform's weather warnings check states neither, and no digest route the site reads serves a lamp for a position"
+
+// roadsLampReason is why the lamp of the conditions near a position is not
+// compared: the /v1 contract keeps it (VER-001).
+const roadsLampReason = "API-only: the /v1 contract states the lamp over every situation and weather warning within the radius and its reason (VER-001); the platform's road status states no lamp around a position, and no digest route the site reads serves one there"
+
+// roadsLampCreditReason is why the weather families the lamp of the
+// conditions near a position reads are not compared among its credits.
+const roadsLampCreditReason = "API-only: the lamp the /v1 contract keeps (VER-001) reads the DWD weather warnings, so the API's answer credits the weather families read; the platform's road status around a position has no lamp and reads no DWD warning; every other credited family is compared" //nolint:gosec // G101: prose that names credits, no credential
+
+// tollCollectDistanceReason is why the distances of a parking answer that
+// accepts terms are not compared: an accepted Toll Collect site has one.
+const tollCollectDistanceReason = "the /v1 contract states every site's distance from the asked position (VER-001), an accepted Toll Collect site's too, which the platform names beside its list without one; the distances of the same sites are compared in the cases that accept no terms"
+
+// motorwayListReason is why a motorway's length and register family are
+// not compared: the site's motorway list, index and pages show neither.
+const motorwayListReason = "API-only: the site's motorway list, index and pages (the digest routes /internal/motorway/list, /internal/motorway/index and /internal/motorway/:road) show no length and no register family of a motorway"
+
+// serviceMetaReason is why the members of the service description are not
+// compared: they describe the running build, which the site shows none of.
+const serviceMetaReason = "API-only: the versions and the document of the running service; the site reads only whether it is saturated (the digest route /internal/pressure), which the API states by answering at all"
+
+// trainLabelReason is why a departure's line and train number are not
+// compared: the train tool states one label, which cannot be split back.
+const trainLabelReason = "the train tool states one label, what a person reads on the board (ICE 571, RE 1), the API the board's line and train number apart; a label of a category and a number cannot be split back into the two"
+
+// trainAgeReason is why the age of a train board is not compared.
+const trainAgeReason = "API-only: the age of the recorded board the API serves (fresh, fetchedAt, ageSeconds); the train tool asks the timetable provider at the time of the question"
+
+// overviewReason is why a member of the place overview is not compared:
+// the place page's cards, the site's form of the overview, do not show it.
+const overviewReason = "API-only: the place page's cards (the digest route /internal/place/cards) show no position of the place, no access or charge points of a charging site, and no kind, operator, capacity, state or reading time of a car park"
+
+// overviewDistanceReason is why a site's distance in the overview is not
+// compared: the cards round it.
+const overviewDistanceReason = "the place page's cards state a site's distance in kilometres to one decimal with a direction, the API in metres; the site's point, which both measure from, is compared"
+
+// watchIDReason is why a watch's id is not compared: each side mints its own.
+// sourcesLiveReason: a source's status and data age vary with when it last
+// arrived; the MCP coverage resource reads them from the run ledger, the API
+// from the family's newest dataAsOf (docs/parity.md).
+const sourcesLiveReason = "live-varying: the API states a family's status and data age from its newest dataAsOf, the MCP coverage resource from the platform's run ledger, which the fixture rows hold none of"
+
+// sourcesTextReason: the register texts of a source family, prose the
+// fixture states synthetically (attributionReason).
+// sourcesReferenceReason: the lead's ruling of 2026-11-17 on listSources.
+const sourcesReferenceReason = "API-only (lead ruling 2026-11-17): viafrei://coverage lists the live sources of the deployment, not the reference families (places, the road register, timetables, rules), and states no domain; the live-source families it lists are compared"
+
+const sourcesTextReason = "prose: the fixture's families carry synthetic register texts and the platform states its own register's; which families are listed, their domain, stale threshold and share-alike flag are compared"
+
+const sourcesNotesReason = "register texts, lead ruling 2026-11-17: a source list's condition and purpose notes are the register's prose about its families, which the sources comparison leaves out; the platform's coverage resource states none"
+
+const watchIDReason = "each side mints the id of a watch: the platform a number of its session, the API a token of kind, key and condition; the watch it names is compared"
 
 // attributionReason is why only the credited family of an attribution entry
 // is compared.
@@ -274,8 +479,8 @@ func Parse(raw []byte, platform string) (Bundle, error) {
 		return Bundle{}, fmt.Errorf("%w: format %q, want %q", ErrMalformed, b.Format, Format)
 	case b.Platform != platform:
 		return Bundle{}, fmt.Errorf("%w: platform %q, pinned for %q", ErrMalformed, b.Platform, platform)
-	case b.Rules != Default.ID:
-		return Bundle{}, fmt.Errorf("%w: rules %q, want %q", ErrMalformed, b.Rules, Default.ID)
+	case b.Rules != Default.ID && (b.Rules != previousRules || !purposeFree(b)):
+		return Bundle{}, fmt.Errorf("%w: rules %q, want %q (or %q with no purpose note)", ErrMalformed, b.Rules, Default.ID, previousRules)
 	case b.Producer != ProducerAPI && b.Producer != ProducerMCP:
 		return Bundle{}, fmt.Errorf("%w: producer %q, want %q or %q", ErrMalformed, b.Producer, ProducerAPI, ProducerMCP)
 	case b.Producer == ProducerMCP && !commitPattern.MatchString(b.Commit):
@@ -295,7 +500,7 @@ func Parse(raw []byte, platform string) (Bundle, error) {
 			return Bundle{}, fmt.Errorf("%w: case %q names the fact %q more than once", ErrMalformed, c.ID, n)
 		}
 		for _, f := range c.Facts {
-			if Default.Excludes(c.Request, f.Name) {
+			if Default.Excludes(c.Operation, c.Request, f.Name) {
 				return Bundle{}, fmt.Errorf("%w: case %q states %q, which %s excludes from the comparison", ErrMalformed, c.ID, f.Name, Default.ID)
 			}
 			if !Default.ownedNoteFact(f) {
@@ -352,6 +557,14 @@ type Question struct {
 	Request     string    `json:"request"`
 	Key         Key       `json:"key"`
 	Now         time.Time `json:"now"`
+	Refresh     *Refresh  `json:"refresh,omitempty"`
+	// Ruling is the lead's ruling on how the question is compared, kept
+	// with it (docs/parity.md); it changes nothing the harness does.
+	Ruling string `json:"ruling,omitempty"`
+	// APIOnly, when set, is why the question has no MCP form: the API's
+	// recording (the unsynced bundle) keeps it as a regression golden, and
+	// a platform bundle neither answers it nor may state it.
+	APIOnly string `json:"apiOnly,omitempty"`
 }
 
 // Questions are the parity questions and the fixture rows they are asked on.
@@ -386,6 +599,9 @@ func LoadQuestions(fsys fs.FS) (Questions, error) {
 		if c.ID == "" || seen[c.ID] || c.Operation == "" || c.Request == "" || c.Now.IsZero() {
 			return Questions{}, fmt.Errorf("%w: %s: question %q needs a unique id, an operation, a request and a now", ErrMalformed, QuestionsFile, c.ID)
 		}
+		if c.Refresh != nil && (c.Refresh.Source == "" || len(c.Refresh.Subject) == 0) {
+			return Questions{}, fmt.Errorf("%w: %s: question %q asks a refresh without a source or a subject", ErrMalformed, QuestionsFile, c.ID)
+		}
 		seen[c.ID] = true
 	}
 	return q, nil
@@ -393,7 +609,7 @@ func LoadQuestions(fsys fs.FS) (Questions, error) {
 
 // QuestionOf is the question a case answers.
 func QuestionOf(c Case) Question {
-	return Question{ID: c.ID, Operation: c.Operation, Counterpart: c.Counterpart, Request: c.Request, Key: c.Key, Now: c.Now}
+	return Question{ID: c.ID, Operation: c.Operation, Counterpart: c.Counterpart, Request: c.Request, Key: c.Key, Now: c.Now, Refresh: c.Refresh, Ruling: c.Ruling, APIOnly: c.APIOnly}
 }
 
 // Answers states every way in which b does not answer exactly q: a question
@@ -415,12 +631,14 @@ func Answers(b Bundle, q Questions) []string {
 		switch {
 		case !ok:
 			out = append(out, "case "+c.ID+": not a question")
+		case want.APIOnly != "" && b.Producer == ProducerMCP:
+			out = append(out, "case "+c.ID+": an api-only question, which an MCP bundle may not answer")
 		case !sameQuestion(QuestionOf(c), want):
 			out = append(out, "case "+c.ID+": asked differently from the question")
 		}
 	}
 	for _, c := range q.Cases {
-		if !answered[c.ID] {
+		if !answered[c.ID] && (c.APIOnly == "" || b.Producer != ProducerMCP) {
 			out = append(out, "question "+c.ID+": no case answers it")
 		}
 	}
@@ -477,17 +695,24 @@ func Inventory(doc []byte, b Bundle) ([]string, error) {
 // so one of them could not be compared.
 var ErrDuplicateFact = errors.New("parity: two values project onto one fact name")
 
-// Project turns the response body of a case asking request into its facts
+// Project turns the response body of a case of operation asking request into its facts
 // under r, sorted by name. Two values under one name are an error: a
 // comparison keeping either would hide a difference in the other. A note of
 // a kind in r.OwnedNotes is stated by the families owners names for its text;
 // a note owners names no family for is an error (ErrUnownedNote).
-func Project(body []byte, r Rules, request string, owners Owners) ([]Fact, error) {
+func Project(body []byte, r Rules, operation, request string, owners Owners) ([]Fact, error) {
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.UseNumber()
 	var doc map[string]any
 	if err := dec.Decode(&doc); err != nil {
 		return nil, err
+	}
+	// A refusal (a problem document, RFC 9457) is one fact, as the MCP side
+	// states a tool error: what was refused is compared, not its wording.
+	if st, ok := doc["status"].(json.Number); ok && doc["data"] == nil {
+		if n, err := st.Int64(); err == nil && n >= 400 {
+			return []Fact{{Name: "error", Value: "true"}}, nil
+		}
 	}
 	p := projector{r: r}
 	p.walk("data", "data", doc["data"])
@@ -510,10 +735,24 @@ func Project(body []byte, r Rules, request string, owners Owners) ([]Fact, error
 		return nil, fmt.Errorf("%w: %q", ErrDuplicateFact, n)
 	}
 	kept := p.out[:0]
+	dataFacts, dataKept := 0, 0
 	for _, f := range p.out {
-		if !r.Excludes(request, f.Name) {
-			kept = append(kept, f)
+		isData := f.Name == "data" || strings.HasPrefix(f.Name, "data.") || strings.HasPrefix(f.Name, "data[")
+		if isData {
+			dataFacts++
 		}
+		if !r.Excludes(operation, request, f.Name) {
+			kept = append(kept, f)
+			if isData {
+				dataKept++
+			}
+		}
+	}
+	// An answer whose every data fact is excluded states data = {}: it
+	// answered, and none of what it answered is compared.
+	if dataFacts > 0 && dataKept == 0 {
+		kept = append(kept, Fact{"data", "{}"})
+		sort.Slice(kept, func(i, j int) bool { return kept[i].Name < kept[j].Name })
 	}
 	return kept, nil
 }
@@ -537,6 +776,18 @@ type projector struct {
 
 func (p *projector) add(name, value string) { p.out = append(p.out, Fact{name, value}) }
 
+// credited are the families meta.attribution credits, as stated so far
+// (attribution is walked before notes).
+func (p *projector) credited() map[string]bool {
+	out := map[string]bool{}
+	for _, f := range p.out {
+		if strings.HasPrefix(f.Name, "meta.attribution[") && strings.HasSuffix(f.Name, "].family") {
+			out[normalise(f.Value)] = true
+		}
+	}
+	return out
+}
+
 // notes states meta.notes: an owned kind per family as a count, every other
 // member as walk states it.
 func (p *projector) notes(notes map[string]any, owners Owners) error {
@@ -555,8 +806,15 @@ func (p *projector) notes(notes map[string]any, owners Owners) error {
 			return fmt.Errorf("%w: %s is not a list of texts", ErrMalformed, path)
 		}
 		count := map[string]map[string]bool{}
+		credited := p.credited()
 		for _, text := range texts {
 			fams := owners[text]
+			if len(credited) > 0 && !slices.Equal(fams, []string{Unowned}) {
+				// A text two families own (a register's shared wording) is
+				// the note of the one the answer credits: an answer's notes
+				// are its credited families'.
+				fams = slices.DeleteFunc(slices.Clone(fams), func(f string) bool { return !credited[normalise(f)] })
+			}
 			if len(fams) == 0 {
 				return fmt.Errorf("%w: %s, %d character(s)", ErrUnownedNote, path, len(text))
 			}

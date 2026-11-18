@@ -95,8 +95,10 @@ func TestNoLiteralTunables(t *testing.T) {
 		// requirement report's test bound is TST-012's fixed ceiling on a
 		// test, a rule of the specification and not of the service; the
 		// load runner's profiles are the Performance Test Plan's run lengths
-		// and rates, a tool's own flags, not tunables of the service.
-		if p := filepath.ToSlash(path); strings.Contains(p, "internal/runtime/config/") || strings.Contains(p, "internal/fixtures/") || strings.Contains(p, "internal/reqreport/") || strings.Contains(p, "internal/testkit/loadrun/") {
+		// and rates, a tool's own flags, not tunables of the service; the
+		// test database kit's set-up bound is the test harness's, never
+		// the running service's.
+		if p := filepath.ToSlash(path); strings.Contains(p, "internal/runtime/config/") || strings.Contains(p, "internal/fixtures/") || strings.Contains(p, "internal/reqreport/") || strings.Contains(p, "internal/testkit/loadrun/") || strings.Contains(p, "internal/testkit/pgtest/") {
 			continue
 		}
 		file, err := parser.ParseFile(fset, path, nil, 0)

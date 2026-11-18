@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -16,9 +17,10 @@ import (
 )
 
 type ledger struct {
-	plans []access.Plan
-	since time.Time
-	err   error
+	plans  []access.Plan
+	issued []access.Audience
+	since  time.Time
+	err    error
 }
 
 func (l *ledger) Lookup(context.Context, string) (access.Record, error) {
@@ -32,13 +34,13 @@ func (l *ledger) PutPlan(_ context.Context, _ auth.Change, p access.Plan) error 
 	l.plans = append(l.plans, p)
 	return l.err
 }
-func (l *ledger) Issue(context.Context, auth.Change, access.Record, string, string) error {
+func (l *ledger) Issue(_ context.Context, _ auth.Change, r access.Record, _, _ string) error {
+	l.issued = append(l.issued, r.Audience)
 	return l.err
 }
 func (l *ledger) Rotate(context.Context, auth.Change, []byte, time.Time) error      { return l.err }
 func (l *ledger) Revoke(context.Context, auth.Change) error                         { return l.err }
 func (l *ledger) Move(context.Context, auth.Change, string) error                   { return l.err }
-func (l *ledger) Accept(context.Context, auth.Change, access.Acceptance) error      { return l.err }
 func (l *ledger) PruneAudit(context.Context, auth.Change, time.Time) (int64, error) { return 7, l.err }
 func (l *ledger) PruneUsage(context.Context, auth.Change, int) (int64, error)       { return 4, l.err }
 func (l *ledger) Usage(_ context.Context, id string, since time.Time) ([]metering.Row, error) {
@@ -81,10 +83,11 @@ func TestCommands(t *testing.T) {
 		{[]string{"usage", "-hours", "0"}, 2, ""},
 		{[]string{"issue", "-plan", "pro", "-label", "l", "-contact", "c", "-actor", "o"}, 0, "only time the key is shown"},
 		{[]string{"issue", "-plan", "pro", "-label", "l", "-contact", "c"}, 2, ""},
+		{[]string{"issue", "-plan", "pro", "-label", "l", "-contact", "c", "-audience", "own", "-actor", "o"}, 0, "only time the key is shown"},
+		{[]string{"issue", "-plan", "pro", "-label", "l", "-contact", "c", "-audience", "internal", "-actor", "o"}, 2, ""},
 		{[]string{"rotate", "-id", "abcdefghij", "-actor", "o"}, 0, "vf_live_abcdefghij_"},
 		{[]string{"revoke", "-id", "abcdefghij", "-reason", "leaked", "-actor", "o"}, 0, "revoke done"},
 		{[]string{"move", "-id", "abcdefghij", "-plan", "dev", "-actor", "o"}, 0, "move done"},
-		{[]string{"accept", "-id", "abcdefghij", "-source", "delta", "-version", "v1", "-actor", "o"}, 0, "accept done"},
 		{[]string{"prune", "-actor", "o"}, 0, "7 audit records removed\n4 usage records removed"},
 	}
 	for _, c := range cases {
@@ -96,6 +99,10 @@ func TestCommands(t *testing.T) {
 	if p := l.plans[0]; len(p.Scopes) != 2 || p.Scopes[1] != "energy" || len(p.Sources) != 1 ||
 		p.Rate != 20 || p.Burst != 40 || p.QuotaDay != 1000 || p.QuotaMonth != 20000 {
 		t.Errorf("flags not parsed: %+v", p)
+	}
+	// A key is public unless -audience says own; an unknown audience is refused.
+	if want := []access.Audience{access.AudiencePublic, access.AudienceOwn}; !slices.Equal(l.issued, want) {
+		t.Errorf("issued audiences %v, want %v", l.issued, want)
 	}
 	if _, out, _ := run(l, "usage"); !strings.HasPrefix(out, "hour\tkey\toperation\trequests") {
 		t.Errorf("no header: %q", out)

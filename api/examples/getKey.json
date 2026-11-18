@@ -10,10 +10,9 @@
       "places"
     ],
     "sources": [
-      "src-alpha-energy",
-      "src-alpha-parking",
-      "src-alpha-places",
-      "src-zeta-places"
+      "afir_alpha",
+      "park_alpha",
+      "geonames"
     ]
   },
   "status": 200,
@@ -34,48 +33,37 @@
       "expiresAt": "2026-06-28T00:00:00Z",
       "sources": [
         {
-          "family": "src-alpha-energy",
+          "family": "afir_alpha",
           "domain": "energy",
-          "publisher": "Nimbruß Datenwerk",
-          "text": "Synthetic data from family alpha, licence lic-alpha.",
-          "licence": "Synthetic licence alpha",
-          "licenceUrl": "https://licences.example/alpha",
+          "publisher": "Kleber Datenwerk",
+          "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms"
+          "termsUrl": "https://alpha.example/terms/afir_alpha"
         },
         {
-          "family": "src-alpha-parking",
+          "family": "geonames",
+          "domain": "places",
+          "publisher": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+          "text": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://download.geonames.org/export/dump/"
+        },
+        {
+          "family": "park_alpha",
           "domain": "parking",
-          "publisher": "Nimbruß Datenwerk",
-          "text": "Synthetic data from family alpha, licence lic-alpha.",
-          "licence": "Synthetic licence alpha",
-          "licenceUrl": "https://licences.example/alpha",
+          "publisher": "Fäpung Datenwerk",
+          "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms"
-        },
-        {
-          "family": "src-alpha-places",
-          "domain": "places",
-          "publisher": "Nimbruß Datenwerk",
-          "text": "Synthetic data from family alpha, licence lic-alpha.",
-          "licence": "Synthetic licence alpha",
-          "licenceUrl": "https://licences.example/alpha",
-          "shareAlike": false,
-          "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms"
-        },
-        {
-          "family": "src-zeta-places",
-          "domain": "places",
-          "publisher": "Deingmeir Datenwerk",
-          "text": "Synthetic data from family zeta, licence lic-zeta.",
-          "licence": "Synthetic licence zeta",
-          "licenceUrl": "https://licences.example/zeta",
-          "shareAlike": false,
-          "shareAlikeOffer": null,
-          "termsUrl": "https://zeta.example/terms"
+          "termsUrl": "https://alpha.example/terms/park_alpha"
         }
       ]
     },

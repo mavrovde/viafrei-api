@@ -5,11 +5,13 @@ package wire
 import (
 	"time"
 
+	"github.com/mavrovde/viafrei-api/internal/adapters/livesources"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/refresh"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
 
@@ -47,6 +49,7 @@ func FeatureSettings(cfg *config.Config) features.Settings {
 		Language:       Language,
 		PartDeadline:   cfg.Compose.PartDeadline,
 		EndedRetention: time.Duration(cfg.Roads.EndedRetentionH) * time.Hour,
+		PlannedWorks:   cfg.Roads.PlannedFamilies,
 		MaxWarnings:    cfg.Weather.MaxWarnings,
 		Disabled:       cfg.Sources.Disabled,
 		IsTimeout:      store.IsDeadline,
@@ -68,4 +71,16 @@ func SharedBudget(cfg *config.Config) store.SharedBudget {
 		RetryInterval:    b.RetryInterval,
 		RetryAfter:       b.RetryAfter,
 	}
+}
+
+// Refreshes builds the on-demand refreshes (createRefresh) over store,
+// resolving subject values through lookup: the registry of
+// refresh.sources_file, else refresh.sources_json, waited on for up to
+// refresh.wait.
+func Refreshes(cfg *config.Config, store features.RefreshStore, lookup refresh.Lookup) (features.Refreshes, error) {
+	reg, err := livesources.Load(cfg.Refresh.SourcesFile, cfg.Refresh.SourcesJSON)
+	if err != nil {
+		return features.Refreshes{}, err
+	}
+	return features.Refreshes{Sources: reg, Store: store, Lookup: lookup, Wait: cfg.Refresh.Wait}, nil
 }

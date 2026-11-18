@@ -15,6 +15,8 @@ cd "$(dirname "$0")/.."
 
 SCHEMATHESIS_IMAGE="schemathesis/schemathesis:4.31.1@sha256:e6d34d7defc8c8a5c7a684255648a43b169cfe0c1e51b2bae7c68c310f3b0ab7"
 API_URL="${API_URL:-http://localhost:8080}"
+# The health listener (liveness and readiness), which the public one does not serve.
+HEALTH_URL="${HEALTH_URL:-http://localhost:8082}"
 EXAMPLES="${SMOKE_MAX_EXAMPLES:-25}"
 # The response-time check of the schema-driven fuzzing (TST-016): the 2 s
 # deadline plus 50 ms. The nightly long run sets it; the pull-request run
@@ -57,17 +59,21 @@ trap teardown EXIT
 docker compose up --detach --build --wait --wait-timeout 300
 
 get() { curl --silent --show-error --fail-with-body --max-time 3 "$API_URL$1"; }
+health() { curl --silent --show-error --fail-with-body --max-time 3 "$HEALTH_URL$1"; }
 
-body=$(get /healthz) || fail "/healthz: $body"
+body=$(health /healthz) || fail "/healthz: $body"
 [[ $(jq -r .status <<<"$body") == ok ]] || fail "/healthz said $body"
 checks=$((checks + 1))
 
-body=$(get /readyz) || fail "/readyz: $body"
+body=$(health /readyz) || fail "/readyz: $body"
 [[ $(jq -r .status <<<"$body") == ready ]] || fail "/readyz said $body"
 checks=$((checks + 1))
 
 body=$(get /v1/meta) || fail "/v1/meta: $body"
-want=$(tr -d '[:space:]' < db/contract/VERSION)
+# The read-contract version the service is built for (internal/dbcontract),
+# which the database release must publish for /readyz to pass.
+want=$(sed -n 's/^const ContractVersion = "\(.*\)"$/\1/p' internal/dbcontract/dbcontract.go)
+[[ $want =~ ^[0-9]+\.[0-9]+$ ]] || fail "internal/dbcontract/dbcontract.go declares no ContractVersion"
 got=$(jq -r .data.contractVersion <<<"$body")
 [[ $got == "$want" ]] || fail "/v1/meta contractVersion $got, want $want"
 [[ $(jq -r .data.apiVersion <<<"$body") != null ]] || fail "/v1/meta has no apiVersion: $body"

@@ -1,0 +1,5 @@
+go test fuzz v1
+string("Mo-Fr")
+string("06:00")
+string("22:00")
+string("23:30")

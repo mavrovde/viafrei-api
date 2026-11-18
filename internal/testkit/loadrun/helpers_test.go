@@ -69,7 +69,7 @@ func healthyDocker(a string) (string, error) {
 		return "2|0\n", nil
 	case strings.Contains(a, "pg_locks"):
 		return "1\n", nil
-	case strings.Contains(a, "begin; lock table"):
+	case strings.Contains(a, "begin; do $$"):
 		time.Sleep(20 * time.Millisecond)
 		return "", nil
 	case a == "ps -q api":

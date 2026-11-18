@@ -15,9 +15,11 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/energy"
 	"github.com/mavrovde/viafrei-api/internal/domain/parking"
+	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
+	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
@@ -25,6 +27,7 @@ import (
 // cachedFeatures answers the charging operation from one family of a
 // given domain, padded to a given number of sites, and counts its reads.
 type cachedFeatures struct {
+	laterFeatures
 	domain string
 	sites  int
 	reads  atomic.Int32
@@ -71,6 +74,14 @@ func (f *cachedFeatures) WeatherRisk(context.Context, access.Record, weather.Que
 
 func (f *cachedFeatures) DrivingRules(context.Context, access.Record, string) (rules.Topic, features.Answer[rules.Rule], error) {
 	return rules.Topic{}, features.Answer[rules.Rule]{}, nil
+}
+
+func (f *cachedFeatures) Stations(context.Context, access.Record, transit.Query) (features.Answer[transit.Station], error) {
+	return features.Answer[transit.Station]{}, nil
+}
+
+func (f *cachedFeatures) Departures(context.Context, access.Record, transit.DepartureQuery) (features.Board, error) {
+	return features.Board{}, nil
 }
 
 // countedVersions answers one fixed version for every family and counts
@@ -166,18 +177,28 @@ func staleRun(t *testing.T, c *config.Config, domain string) string {
 	return fmt.Sprintf("status=%d age=%q", w.Code, w.Header().Get("Age"))
 }
 
-// compressed fetches the OpenAPI document gzip-encoded and reports the coding
+// compressedSites is how many sites the compressed answer lists: tens of
+// kilobytes, above the default smallest compressed body and below the
+// largest a key may set. The OpenAPI document, a megabyte marshalled and
+// compressed twice per key, took this test past its bound (TST-012).
+const compressedSites = 300
+
+// compressed fetches a charging answer gzip-encoded and reports the coding
 // and the encoded size.
 func compressed(t *testing.T, c *config.Config) string {
 	t.Helper()
-	h, err := httpapi.NewHandler(httpapi.Deps{Config: c, ContractVersion: "0.1"})
+	h, err := httpapi.NewHandler(httpapi.Deps{Config: c, ContractVersion: "0.1", Auth: everyScope{},
+		Features: &cachedFeatures{domain: "energy", sites: compressedSites}, Versions: &countedVersions{}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/openapi.json", nil)
+	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/charging-options?at=1,2", nil)
 	r.Header.Set("Accept-Encoding", "gzip")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", w.Code, w.Body)
+	}
 	return fmt.Sprintf("%s %d", w.Header().Get("Content-Encoding"), w.Body.Len())
 }
 
@@ -212,4 +233,20 @@ func perfBehaviours() map[string]behaviour {
 		out["cache.stale_if_error."+d] = behaviour{"1m", cacheStale(domain)}
 	}
 	return out
+}
+
+func (f *cachedFeatures) FuelStations(context.Context, access.Record, energy.FuelQuery) (features.FuelStations, error) {
+	return features.FuelStations{}, nil
+}
+
+func (f *cachedFeatures) Places(context.Context, access.Record, places.Query) (features.Answer[places.Place], error) {
+	return features.Answer[places.Place]{}, nil
+}
+
+func (f *cachedFeatures) Facilities(context.Context, access.Record, transit.FacilityQuery) (features.StationFacilities, error) {
+	return features.StationFacilities{}, nil
+}
+
+func (f *cachedFeatures) HydrogenStations(context.Context, access.Record, energy.HydrogenQuery) (features.HydrogenStations, error) {
+	return features.HydrogenStations{}, nil
 }

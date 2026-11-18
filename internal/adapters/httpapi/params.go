@@ -5,6 +5,8 @@ import (
 	"slices"
 
 	"github.com/danielgtaylor/huma/v2"
+
+	"github.com/mavrovde/viafrei-api/internal/domain/access"
 )
 
 // strictQuery refuses a query parameter the operation does not declare, and
@@ -30,6 +32,11 @@ func strictQuery(api huma.API) func(huma.Context, func(huma.Context)) {
 		var errs []error
 		for _, n := range names {
 			switch {
+			case !declared[n] && n == access.AcceptParameter:
+				// Terms are accepted per request, and only an operation
+				// whose data they gate reads them: elsewhere the
+				// parameter is ignored, so a caller may send it on every
+				// request.
 			case !declared[n]:
 				errs = append(errs, &huma.ErrorDetail{Location: "query." + n, Message: "unknown parameter"})
 			case len(q[n]) > 1:

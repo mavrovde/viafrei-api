@@ -277,6 +277,9 @@ func newValidator() *validator.Validate {
 	_ = v.RegisterValidation("contract_version", func(fl validator.FieldLevel) bool {
 		return contractVersionPattern.MatchString(fl.Field().String())
 	})
+	_ = v.RegisterValidation("header_name", func(fl validator.FieldLevel) bool {
+		return headerNamePattern.MatchString(fl.Field().String())
+	})
 	_ = v.RegisterValidation("key_prefix", func(fl validator.FieldLevel) bool {
 		return keyPrefixPattern.MatchString(fl.Field().String())
 	})
@@ -357,6 +360,7 @@ func crossField(c *Config) Errors {
 	out = append(out, crossFieldCache(c)...)
 	out = append(out, crossFieldBudget(c)...)
 	out = append(out, crossFieldAdmin(c)...)
+	out = append(out, crossFieldCallers(c)...)
 	return append(out, crossFieldTiers(c)...)
 }
 

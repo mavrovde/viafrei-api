@@ -138,10 +138,6 @@ func (l *lifecycle) Move(_ context.Context, id, plan, actor string) error {
 	return l.record("move " + id + " " + plan + " " + actor)
 }
 
-func (l *lifecycle) Accept(_ context.Context, id, family, version, actor string) error {
-	return l.record("accept " + id + " " + family + " " + version + " " + actor)
-}
-
 func (l *lifecycle) Prune(_ context.Context, actor string) (int64, error) {
 	return 3, l.record("prune " + actor)
 }
@@ -154,7 +150,7 @@ func (l *lifecycle) PruneUsage(_ context.Context, actor string) (int64, error) {
 func (l *lifecycle) KeyList(context.Context) ([]auth.KeyView, error) {
 	revoked := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
 	return []auth.KeyView{
-		{ID: "keyid00001", Environment: access.Test, Plan: "basic", Label: "lab", Contact: "c@example.org", IssuedAt: revoked, ExpiresAt: revoked},
+		{ID: "keyid00001", Environment: access.Test, Audience: access.AudienceOwn, Plan: "basic", Label: "lab", Contact: "c@example.org", IssuedAt: revoked, ExpiresAt: revoked},
 		{ID: "keyid00002", Plan: "basic", RevokedAt: &revoked, RevokeReason: "lost"},
 	}, l.listErr[0]
 }
@@ -456,7 +452,7 @@ func TestEnrolSignInAndRunEveryChange(t *testing.T) {
 	cookie, csrf := r.signIn(a)
 
 	home := r.do(request{method: http.MethodGet, path: "/", cookie: cookie}).Body.String()
-	for _, want := range []string{"keyid00001", "lost", "basic", "read:places", "alice", console.Fingerprint(a.ID), "Sign out alice", "/act/prune"} {
+	for _, want := range []string{"keyid00001", "<td>own</td>", "lost", "basic", "read:places", "alice", console.Fingerprint(a.ID), "Sign out alice", "/act/prune"} {
 		if !strings.Contains(home, want) {
 			t.Fatalf("the home page lacks %q", want)
 		}
@@ -478,7 +474,6 @@ func TestEnrolSignInAndRunEveryChange(t *testing.T) {
 		{"rotate", []string{"id", "keyid00001"}, "rotate keyid00001 console:alice", "Key rotated"},
 		{"revoke", []string{"id", "keyid00001", "reason", "lost laptop"}, "revoke keyid00001 lost laptop console:alice", "Key keyid00001 revoked."},
 		{"move", []string{"id", "keyid00001", "plan", "pro"}, "move keyid00001 pro console:alice", "moved to pro"},
-		{"accept", []string{"id", "keyid00001", "source", "fam", "version", "v1"}, "accept keyid00001 fam v1 console:alice", "Acceptance recorded."},
 		{"prune", nil, "prune_usage console:alice", "3 audit records and 4 usage records removed."},
 	} {
 		id := r.ask(cookie, csrf, tc.action, tc.kv...)

@@ -25,13 +25,15 @@ linters:
       locale: UK
     depguard:
       rules:
-        # The domain imports the standard library only.
+        # The domain imports the standard library only, and golang.org/x/text
+        # for the German collation its orders follow.
         domain:
           files:
             - "**/internal/domain/**"
             - "!$test"
           allow:
             - $gostd
+            - golang.org/x/text
             - github.com/mavrovde/viafrei-api/internal/domain
         # Use cases know ports, never adapters or transport.
         app:

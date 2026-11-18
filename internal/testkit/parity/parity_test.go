@@ -10,7 +10,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/testkit/parity"
 )
 
-const good = `{"format":"viafrei.parity/2","platform":"1.2.3","producer":"api","rules":"viafrei.parity.rules/4",
+const good = `{"format":"viafrei.parity/2","platform":"1.2.3","producer":"api","rules":"viafrei.parity.rules/5",
 "fixture":{"profile":"tiny","seed":1,"sha256":"ab"},
 "cases":[{"id":"c1","operation":"listX","counterpart":"x search","request":"/v1/x","key":{"useClass":"consumer","scopes":["x"],"sources":["s"],"accepted":null},
 "now":"2026-03-30T00:00:00Z","facts":[{"name":"data[a].id","value":"a"}]}]}`
@@ -66,7 +66,7 @@ func TestParseRefusesWhatItCannotCompare(t *testing.T) {
 		"unknown member": strings.Replace(good, `"rules"`, `"extra":1,"rules"`, 1),
 		"other format":   strings.Replace(good, "viafrei.parity/2", "viafrei.parity/1", 1),
 		"other platform": strings.Replace(good, `"1.2.3"`, `"1.2.4"`, 1),
-		"other rules":    strings.Replace(good, "rules/4", "rules/3", 1),
+		"other rules":    strings.Replace(good, "rules/5", "rules/3", 1),
 		"no facts":       strings.Replace(good, `[{"name":"data[a].id","value":"a"}]`, `[]`, 1),
 		"no id":          strings.Replace(good, `"id":"c1"`, `"id":""`, 1),
 		"no operation":   strings.Replace(good, `"operation":"listX"`, `"operation":""`, 1),
@@ -121,7 +121,7 @@ const body = `{"data":[
 "meta":{"requestId":"r","attribution":[{"family":"src-a","text":"T"}],"warnings":[{"code":"partial"}],"notes":{"condition":["Use only after accepting."]},"huge":1}}`
 
 func TestProjectAppliesTheRules(t *testing.T) {
-	got, err := parity.Project([]byte(body), parity.Default, "/v1/x", owners)
+	got, err := parity.Project([]byte(body), parity.Default, "op", "/v1/x", owners)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,10 +149,23 @@ func TestProjectAppliesTheRules(t *testing.T) {
 	}
 }
 
+func TestProjectStatesARefusalAsOneFact(t *testing.T) {
+	problem := `{"type":"https://api.viafrei.de/problems/not-found","title":"Not found","status":404,"detail":"no such road"}`
+	got, err := parity.Project([]byte(problem), parity.Default, "getX", "/v1/x", nil)
+	if err != nil || len(got) != 1 || got[0] != (parity.Fact{Name: "error", Value: "true"}) {
+		t.Fatalf("a refusal: %+v, %v", got, err)
+	}
+	// A status member inside an answer with data is the answer's own.
+	got, err = parity.Project([]byte(`{"status":404,"data":{"a":1},"meta":{}}`), parity.Default, "getX", "/v1/x", nil)
+	if err != nil || slices.ContainsFunc(got, func(f parity.Fact) bool { return f.Name == "error" }) {
+		t.Fatalf("an answer with data: %+v, %v", got, err)
+	}
+}
+
 func TestProjectRefusesTwoValuesUnderOneName(t *testing.T) {
 	// Two elements with one key, after normalisation: either value kept
 	// alone would hide a difference in the other.
-	_, err := parity.Project([]byte(`{"data":[{"id":"a","n":1},{"id":" A ","n":2}]}`), parity.Default, "/v1/x", nil)
+	_, err := parity.Project([]byte(`{"data":[{"id":"a","n":1},{"id":" A ","n":2}]}`), parity.Default, "op", "/v1/x", nil)
 	if !errors.Is(err, parity.ErrDuplicateFact) || !strings.Contains(err.Error(), "data[a].id") {
 		t.Errorf("duplicate names projected: %v", err)
 	}
@@ -160,27 +173,27 @@ func TestProjectRefusesTwoValuesUnderOneName(t *testing.T) {
 
 func TestProjectStatesAListAsAJSONArray(t *testing.T) {
 	// A value holding the old separator stays one value.
-	got, err := parity.Project([]byte(`{"data":{"tags":["b | c","a"]}}`), parity.Default, "/v1/x", nil)
+	got, err := parity.Project([]byte(`{"data":{"tags":["b | c","a"]}}`), parity.Default, "op", "/v1/x", nil)
 	if err != nil || len(got) != 1 || got[0].Value != `["a","b | c"]` {
 		t.Errorf("%v, %v", got, err)
 	}
 }
 
 func TestProjectKeepsAnOutOfRangeNumberVerbatim(t *testing.T) {
-	got, err := parity.Project([]byte(`{"data":{"n":1e999}}`), parity.Default, "/v1/x", nil)
+	got, err := parity.Project([]byte(`{"data":{"n":1e999}}`), parity.Default, "op", "/v1/x", nil)
 	if err != nil || len(got) != 1 || got[0].Value != "1e999" {
 		t.Errorf("%v, %v", got, err)
 	}
-	if _, err := parity.Project([]byte(`[`), parity.Default, "/v1/x", nil); err == nil {
+	if _, err := parity.Project([]byte(`[`), parity.Default, "op", "/v1/x", nil); err == nil {
 		t.Error("an unreadable body was projected")
 	}
 }
 
 func TestAPlantedRuleChangeNamesTheFact(t *testing.T) {
-	want, _ := parity.Project([]byte(body), parity.Default, "/v1/x", owners)
+	want, _ := parity.Project([]byte(body), parity.Default, "op", "/v1/x", owners)
 	planted := parity.Default
 	planted.PositionDecimals = 4
-	got, _ := parity.Project([]byte(body), planted, "/v1/x", owners)
+	got, _ := parity.Project([]byte(body), planted, "op", "/v1/x", owners)
 	d := parity.Diff(want, got)
 	if !slices.Equal(d, []string{`changed data[cs-1].location.lat: want "48.40452", got "48.4045"`, `changed data[cs-1].location.lon: want "7.65994", got "7.6599"`}) {
 		t.Errorf("diff %q", d)
@@ -206,7 +219,7 @@ func TestExclusionsCoverANameAndWhatIsUnderItOnly(t *testing.T) {
 		"meta.asOf", "meta.freshness", "meta.freshness[src-a].ageS", "meta.warnings[partial].code",
 		"data[cs-1].access", "data[cs-1].chargePoints[cp-1].current", "meta.attribution[src-a].text", "meta.attribution[src-a].shareAlikeOffer",
 	} {
-		if !r.Excludes(plain, name) {
+		if !r.Excludes("listChargingOptions", plain, name) {
 			t.Errorf("%s is compared", name)
 		}
 	}
@@ -214,7 +227,7 @@ func TestExclusionsCoverANameAndWhatIsUnderItOnly(t *testing.T) {
 		"meta.asOfX", "meta.page.limit", "meta.page.hasMore", "data[cs-1].accessible", "data[cs-1].chargePoints[cp-1].currentKw",
 		"data[cs-1].chargePoints[cp-1].availability.state", "meta.attribution[src-a].family", "meta.notes.condition", "data.access",
 	} {
-		if r.Excludes(plain, name) {
+		if r.Excludes("listChargingOptions", plain, name) {
 			t.Errorf("%s is excluded", name)
 		}
 	}
@@ -223,7 +236,7 @@ func TestExclusionsCoverANameAndWhatIsUnderItOnly(t *testing.T) {
 			t.Errorf("an exclusion without its pattern or reason: %+v", e)
 		}
 	}
-	if (parity.Rules{}).Excludes(plain, "meta.asOf") {
+	if (parity.Rules{}).Excludes("listChargingOptions", plain, "meta.asOf") {
 		t.Error("a rule set with no exclusion excluded a fact")
 	}
 }
@@ -238,7 +251,7 @@ func TestHasMoreIsExcludedOnlyWhereAPowerIsAsked(t *testing.T) {
 		"/v1/charging-options?at=1,2":            false,
 		"%zz":                                    false, // an unreadable request asks nothing
 	} {
-		if got := r.Excludes(request, "meta.page.hasMore"); got != excluded {
+		if got := r.Excludes("listChargingOptions", request, "meta.page.hasMore"); got != excluded {
 			t.Errorf("%s: hasMore excluded %v", request, got)
 		}
 	}
@@ -252,5 +265,39 @@ func TestAChargePointStateIsComparedLikeAnyOtherFact(t *testing.T) {
 	d := parity.Diff(want, []parity.Fact{{state, "reserved"}, {"data[cs-1].id", "cs-1"}})
 	if len(d) != 1 || d[0] != `changed `+state+`: want "occupied", got "reserved"` {
 		t.Errorf("reserved against occupied: %q", d)
+	}
+}
+
+func TestAnOperationScopedExclusionHoldsInItsOperationOnly(t *testing.T) {
+	r := parity.Default
+	for _, c := range []struct {
+		operation, name string
+		excluded        bool
+	}{
+		{"listStations", "data[1:de:01002:0].location.lat", true},
+		{"listStations", "data[1:de:01002:0].name", false},
+		{"listStationDepartures", "data.station.location.lon", true},
+		{"listChargingOptions", "data[cs-1].location.lat", false},
+		{"listParkingOptions", "data[p-1].location.lon", false},
+		{"listChargingOptions", "data.station.location.lat", false},
+	} {
+		if got := r.Excludes(c.operation, "/v1/x", c.name); got != c.excluded {
+			t.Errorf("%s %s: excluded %v", c.operation, c.name, got)
+		}
+	}
+}
+
+func TestAnAnswerWhoseEveryDataFactIsExcludedStatesEmptyData(t *testing.T) {
+	r := parity.Default
+	r.Excluded = append(slices.Clone(r.Excluded), parity.Exclusion{Pattern: "data", Operation: "op", Reason: "test"})
+	got, err := parity.Project([]byte(`{"data":[{"id":"a","n":1},{"id":"b","n":2}],"meta":{"attribution":[{"family":"s","text":"T"}]}}`), r, "op", "/v1/x", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(got, parity.Fact{Name: "data", Value: "{}"}) || slices.ContainsFunc(got, func(f parity.Fact) bool { return strings.HasPrefix(f.Name, "data[") }) {
+		t.Errorf("every data fact excluded: %+v", got)
+	}
+	if !slices.IsSortedFunc(got, func(a, b parity.Fact) int { return strings.Compare(a.Name, b.Name) }) {
+		t.Errorf("the facts are not in name order: %+v", got)
 	}
 }

@@ -126,7 +126,7 @@ func lockedWorld(t *testing.T, shed func(http.ResponseWriter)) *world {
 	}, nil)
 	w.dock.answer = func(a string) (string, error) {
 		switch {
-		case strings.Contains(a, "begin; lock table"):
+		case strings.Contains(a, "begin; do $$"):
 			// Held well past the scenario's 40 ms of load, so a slow
 			// runner still sends every request under the lock.
 			locked.Store(true)
@@ -488,7 +488,7 @@ func TestClockSkew(t *testing.T) {
 		}
 	}, nil)
 	w.dock.answer = func(a string) (string, error) {
-		if strings.Contains(a, "set data_as_of = now()") {
+		if strings.Contains(a, "set last_changed_at = now()") {
 			at.Store(a)
 		}
 		return healthyDocker(a)
@@ -516,7 +516,7 @@ func TestClockSkew(t *testing.T) {
 	mustFail(t, runOne(t, w, "clock-skew"), "no negative age")
 
 	w.dock.answer = func(a string) (string, error) {
-		if strings.Contains(a, "set data_as_of = now()") {
+		if strings.Contains(a, "set last_changed_at = now()") {
 			return "", errFake
 		}
 		return healthyDocker(a)

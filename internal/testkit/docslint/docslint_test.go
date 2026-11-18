@@ -59,7 +59,7 @@ func okExample(op map[string]any) map[string]any {
 // TestDocsLintCanSayNo: each missing piece fails the lint and is named.
 func TestDocsLintCanSayNo(t *testing.T) {
 	req.Covers(t, "DX-003")
-	const data, svc = "/v1/charging-options", "/healthz"
+	const data, svc = "/v1/charging-options", "/v1/meta"
 	firstAttribution := func(op map[string]any) map[string]any {
 		ex := okExample(op)["examples"].(map[string]any)["example"].(map[string]any)["value"].(map[string]any)
 		return ex["meta"].(map[string]any)["attribution"].([]any)[0].(map[string]any)
@@ -130,5 +130,18 @@ func TestNonSuccessExamplesDoNotCount(t *testing.T) {
 	}
 	if len(r.Findings) != 1 || !strings.Contains(r.Findings[0], "no example answer") {
 		t.Fatalf("findings %q", r.Findings)
+	}
+}
+
+// TestABodilessSuccessNeedsNoExampleAnswer: an operation whose only success
+// is 204 has no answer to show; one with a 204 and a 200 still needs one.
+func TestABodilessSuccessNeedsNoExampleAnswer(t *testing.T) {
+	req.Covers(t, "DX-003")
+	for responses, want := range map[string]int{`{"204":{}}`: 0, `{"204":{},"200":{}}`: 1, `{"204":{},"400":{}}`: 0} {
+		raw := `{"paths":{"/x":{"post":{"operationId":"x","description":"d","x-attribution":"none","x-codeSamples":[{"source":"curl"}],"responses":` + responses + `}}}}`
+		r, err := docslint.Lint([]byte(raw))
+		if err != nil || len(r.Findings) != want {
+			t.Errorf("%s: findings %q %v, want %d", responses, r.Findings, err, want)
+		}
 	}
 }

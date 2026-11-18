@@ -1,0 +1,5 @@
+go test fuzz v1
+string("station")
+string("1:de:05315:11201")
+string("{\"delay_min\":10}")
+string("")

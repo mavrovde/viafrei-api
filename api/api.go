@@ -29,6 +29,10 @@ type Example struct {
 	Title string `json:"title"`
 	// Request is the request target: path and query, without the base URL.
 	Request string `json:"request"`
+	// Method is the request's method; empty is GET.
+	Method string `json:"method,omitempty"`
+	// Body is the request's JSON body, for an operation that takes one.
+	Body json.RawMessage `json:"body,omitempty"`
 	// Attribution says which sources answer and how their attribution
 	// reaches the client; for an operation without source data it says so.
 	Attribution string `json:"attribution"`
@@ -36,23 +40,27 @@ type Example struct {
 	Key *Key `json:"key,omitempty"`
 	// Status is the HTTP status of the answer.
 	Status int `json:"status"`
-	// Response is the answer's body.
+	// Response is the answer's body; null for an answer without one (204).
 	Response json.RawMessage `json:"response"`
 }
 
-// Key describes the fictional key of an example: its plan and the terms it
-// has accepted.
-type Key struct {
-	UseClass string       `json:"useClass"`
-	Scopes   []string     `json:"scopes"`
-	Sources  []string     `json:"sources"`
-	Accepted []Acceptance `json:"accepted,omitempty"`
+// HTTPMethod is the example request's method: Method, or GET.
+func (e Example) HTTPMethod() string {
+	if e.Method == "" {
+		return "GET"
+	}
+	return e.Method
 }
 
-// Acceptance is one accepted terms version.
-type Acceptance struct {
-	Source  string `json:"source"`
-	Version string `json:"version"`
+// Key describes the fictional key of an example: its plan. Terms are
+// accepted per request (accept_terms in the example's request), never by a
+// key.
+type Key struct {
+	UseClass string   `json:"useClass"`
+	Scopes   []string `json:"scopes"`
+	Sources  []string `json:"sources"`
+	// Audience is "own" for a key of ViaFrei's own callers; empty is public.
+	Audience string `json:"audience,omitempty"`
 }
 
 // ReadExamples reads every examples/*.json of fsys, keyed by operation id

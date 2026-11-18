@@ -24,11 +24,13 @@ var all = []access.UseClass{"consumer", "non_commercial", "commercial"}
 // register: two energy families (one consumer only), two parking families
 // (one behind acceptance), one places family.
 var register = []access.Terms{
-	{Family: "e1", Domain: "energy", UseClasses: all, Version: "v1", Reviewed: true},
-	{Family: "e2", Domain: "energy", UseClasses: []access.UseClass{"consumer"}, Version: "v1", Reviewed: true},
-	{Family: "p1", Domain: "parking", UseClasses: all, Version: "v1", Reviewed: true},
-	{Family: "p2", Domain: "parking", UseClasses: all, AcceptanceRequired: true, Version: "v1", Reviewed: true},
-	{Family: "pl", Domain: "places", UseClasses: all, Version: "v1", Reviewed: true},
+	{Family: "e1", Domain: "energy", UseClasses: all, Version: "v1"},
+	{Family: "e2", Domain: "energy", UseClasses: []access.UseClass{"consumer"}, Version: "v1"},
+	{Family: "p1", Domain: "parking", UseClasses: all, Version: "v1"},
+	{Family: "p2", Domain: "parking", UseClasses: all, AcceptanceRequired: true, Version: "p2-terms-1"},
+	{Family: "pl", Domain: "places", UseClasses: all, Version: "v1"},
+	{Family: "st", Domain: "transit", UseClasses: all, Version: "v1"},
+	{Family: "rd", Domain: "roads", UseClasses: all, Version: "v1"},
 }
 
 var errStore = errors.New("store down")
@@ -41,12 +43,17 @@ type fake struct {
 	parks                                []parking.Site
 	place                                places.Place
 	gotFamilies, gotListed, gotOccupancy []string
+	gotStops                             []string
+	gotPlaceQ                            places.Query
+	gotPlaceRoads                        []string
 	gotNow                               time.Time
 	gotLang                              string
 	gotProv                              [][]string
 	chDelay                              bool
 	reg                                  []access.Terms // replaces register when set
 	regCalls                             int
+	termsErr                             error
+	gotTerms                             []string
 	notes                                map[string][]provenance.Note
 	next                                 *time.Time // the earliest future report both reads return
 }
@@ -57,6 +64,15 @@ func (f *fake) Register(context.Context) ([]access.Terms, error) {
 		return f.reg, f.regErr
 	}
 	return register, f.regErr
+}
+
+func (f *fake) TermsTexts(_ context.Context, gates []string) ([]access.TermsText, error) {
+	f.gotTerms = slices.Clone(gates)
+	out := make([]access.TermsText, len(gates))
+	for i, g := range gates {
+		out[i] = access.TermsText{Gate: g, Lang: "de", Binding: true, Heading: g + " heading", Body: g + " body"}
+	}
+	return out, f.termsErr
 }
 
 func (f *fake) Provenance(_ context.Context, fams []string, lang string) ([]provenance.Family, error) {
@@ -89,6 +105,15 @@ func (f *fake) ParkingNear(_ context.Context, _ parking.Query, listed, occ []str
 
 func (f *fake) Place(context.Context, string, []string) (places.Place, error) {
 	return f.place, f.plErr
+}
+
+func (f *fake) Places(_ context.Context, q places.Query, fams, stops, roads []string) ([]places.Place, bool, error) {
+	f.gotPlaceQ, f.gotPlaceRoads = q, roads
+	f.gotFamilies, f.gotStops = fams, stops
+	if f.place.ID == "" {
+		return nil, false, f.plErr
+	}
+	return []places.Place{f.place}, true, f.plErr
 }
 
 func service(f *fake, isTimeout func(error) bool) *features.Service {
@@ -137,8 +162,8 @@ func TestChargingIsGatedAndAttributed(t *testing.T) {
 
 	f = &fake{}
 	a, err = service(f, nil).Charging(context.Background(), key("consumer", allScopes, everything...), energy.Query{})
-	if err != nil || a.Partial || !slices.Equal(names(a.Families), []string{"e1", "e2"}) {
-		t.Errorf("an empty answer names the consulted families: %v, %v, %v", names(a.Families), a.Partial, err)
+	if err != nil || a.Partial || len(a.Families) != 0 {
+		t.Errorf("an empty answer credits none, as the platform's charging search: %v, %v, %v", names(a.Families), a.Partial, err)
 	}
 }
 
@@ -174,7 +199,7 @@ func TestChargingRefusals(t *testing.T) {
 		{"store", &fake{chErr: errStore}, key("consumer", allScopes, everything...), errStore},
 		{"a site of a withheld family", &fake{sites: []energy.Site{site("e2")}}, key("commercial", allScopes, everything...), features.ErrGateViolation},
 		{"a report of a withheld family", &fake{sites: []energy.Site{site("e1", "e2")}}, key("commercial", allScopes, everything...), features.ErrGateViolation},
-		{"provenance", &fake{provErr: errStore}, key("consumer", allScopes, everything...), errStore},
+		{"provenance", &fake{provErr: errStore, sites: []energy.Site{site("e1")}}, key("consumer", allScopes, everything...), errStore},
 	}
 	for _, c := range cases {
 		if _, err := service(c.f, nil).Charging(context.Background(), c.key, energy.Query{}); !errors.Is(err, c.want) {
@@ -187,7 +212,7 @@ func free(n int, fam string) *parking.Occupancy {
 	return &parking.Occupancy{Free: &n, State: parking.StateFree, Family: fam}
 }
 
-func TestParkingListsPendingFamiliesWithoutOccupancy(t *testing.T) {
+func TestParkingDoesNotListPendingFamilies(t *testing.T) {
 	req.Covers(t, "FR-PARK-002", "FR-PARK-003", "SEC-030")
 	f := &fake{parks: []parking.Site{
 		{ID: "a", Family: "p1", Occupancy: free(3, "p1")},
@@ -201,22 +226,35 @@ func TestParkingListsPendingFamiliesWithoutOccupancy(t *testing.T) {
 	if !slices.Equal(f.gotListed, []string{"p1", "p2"}) || !slices.Equal(f.gotOccupancy, []string{"p1"}) {
 		t.Errorf("listed %v, occupancy from %v", f.gotListed, f.gotOccupancy)
 	}
-	if !a.Partial || a.Items[0].Occupancy == nil || a.Items[1].Occupancy != nil || !a.Items[1].TermsRequired || a.Items[2].TermsRequired {
+	// p2's terms are not accepted: its site is not listed, as the platform
+	// lists no Toll Collect site before its terms are accepted.
+	if !a.Partial || len(a.Items) != 2 || a.Items[0].ID != "a" || a.Items[0].Occupancy == nil || a.Items[1].ID != "c" || a.Items[1].TermsRequired {
 		t.Errorf("items %+v, partial %v", a.Items, a.Partial)
 	}
-	if !slices.Equal(names(a.Families), []string{"p1", "p2"}) || a.HasMore || !a.At.Equal(now) {
+	if !slices.Equal(names(a.Families), []string{"p1"}) || a.HasMore || !a.At.Equal(now) {
 		t.Errorf("attributed %v", names(a.Families))
 	}
 
-	accepted := key("commercial", allScopes, everything...)
-	accepted.Accepted = []access.Acceptance{{Source: "p2", Version: "v1"}}
-	f = &fake{parks: []parking.Site{{ID: "b", Family: "p2", Occupancy: free(5, "p2")}}}
-	if a, err := service(f, nil).Parking(context.Background(), accepted, parking.Query{}); err != nil || a.Partial || a.Items[0].Occupancy == nil {
+	if len(a.Terms) != 1 || a.Terms[0].Gate != "p2-terms-1" || a.Terms[0].Body != "p2-terms-1 body" {
+		t.Errorf("the pending family's terms: %+v", a.Terms)
+	}
+
+	accepted := access.WithAccepted(context.Background(), []string{"p2-terms-1"})
+	// Accepted, p2's site is listed with its reading beside another site,
+	// named without a distance as the platform names a Toll Collect site.
+	f = &fake{parks: []parking.Site{{ID: "a", Family: "p1"}, {ID: "b", Family: "p2", Occupancy: free(5, "p2")}}}
+	if a, err := service(f, nil).Parking(accepted, key("commercial", allScopes, everything...), parking.Query{}); err != nil || a.Partial || a.Items[1].Occupancy == nil || !a.Items[1].Unranged || a.Items[0].Unranged || a.Terms != nil || f.gotTerms != nil {
 		t.Errorf("after acceptance: %+v, %v", a, err)
 	}
+	// With no other site, the platform's answer is empty: the gated site
+	// is not named alone.
+	f = &fake{parks: []parking.Site{{ID: "b", Family: "p2", Occupancy: free(5, "p2")}}}
+	if a, err := service(f, nil).Parking(accepted, key("commercial", allScopes, everything...), parking.Query{}); err != nil || len(a.Items) != 0 {
+		t.Errorf("a gated site alone: %+v, %v", a, err)
+	}
 	f = &fake{}
-	if a, err := service(f, nil).Parking(context.Background(), key("commercial", allScopes, "p1"), parking.Query{}); err != nil || !slices.Equal(names(a.Families), []string{"p1"}) {
-		t.Errorf("an empty answer names the listed families: %v, %v", names(a.Families), err)
+	if a, err := service(f, nil).Parking(context.Background(), key("commercial", allScopes, "p1"), parking.Query{}); err != nil || len(a.Families) != 0 {
+		t.Errorf("an empty answer over an empty scope credits none: %v, %v", names(a.Families), err)
 	}
 }
 
@@ -227,30 +265,28 @@ func TestParkingStatesAPendingFamilysConditionOnlyOnceAccepted(t *testing.T) {
 	other := provenance.Note{Kind: provenance.Condition, Text: "p1 condition"}
 	notes := map[string][]provenance.Note{"p1": {other}, "p2": {cond, purpose}}
 	parks := []parking.Site{{ID: "a", Family: "p1", Occupancy: free(3, "p1")}, {ID: "b", Family: "p2", Occupancy: free(5, "p2")}}
-	ask := func(k access.Record) features.Answer[parking.Site] {
+	ask := func(ctx context.Context) features.Answer[parking.Site] {
 		t.Helper()
-		a, err := service(&fake{parks: parks, notes: notes}, nil).Parking(context.Background(), k, parking.Query{})
+		a, err := service(&fake{parks: parks, notes: notes}, nil).Parking(ctx, key("commercial", allScopes, everything...), parking.Query{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		return a
 	}
-	// Pending: p2 is listed and credited, its occupancy and its condition are
-	// withheld; its purpose and another family's condition are kept.
-	a := ask(key("commercial", allScopes, everything...))
+	// Pending: p2 is neither listed nor credited, so none of its notes is
+	// stated; another family's condition is kept.
+	a := ask(context.Background())
 	if got := provenance.Notes(a.Families, provenance.Condition); !slices.Equal(got, []string{"p1 condition"}) {
 		t.Errorf("pending: conditions %v", got)
 	}
-	if got := provenance.Notes(a.Families, provenance.Purpose); !slices.Equal(got, []string{"p2 purpose"}) {
+	if got := provenance.Notes(a.Families, provenance.Purpose); len(got) != 0 {
 		t.Errorf("pending: purposes %v", got)
 	}
-	if !slices.Equal(names(a.Families), []string{"p1", "p2"}) {
+	if !slices.Equal(names(a.Families), []string{"p1"}) {
 		t.Errorf("pending: credited %v", names(a.Families))
 	}
 	// Accepted: the reading is shown and its condition with it.
-	k := key("commercial", allScopes, everything...)
-	k.Accepted = []access.Acceptance{{Source: "p2", Version: "v1"}}
-	a = ask(k)
+	a = ask(access.WithAccepted(context.Background(), []string{"p2-terms-1"}))
 	if got := provenance.Notes(a.Families, provenance.Condition); !slices.Equal(got, []string{"p1 condition", "p2 condition"}) {
 		t.Errorf("accepted: conditions %v", got)
 	}
@@ -263,7 +299,7 @@ func TestParkingAttributesOccupancyOfAnotherFamily(t *testing.T) {
 	req.Covers(t, "FR-PARK-002", "SEC-032", "ENV-003")
 	// A site of p1 whose occupancy is reported by p3, a third permitted
 	// family: the report is gate-checked and attributed as p3's.
-	reg := append(slices.Clone(register), access.Terms{Family: "p3", Domain: "parking", UseClasses: all, Version: "v1", Reviewed: true})
+	reg := append(slices.Clone(register), access.Terms{Family: "p3", Domain: "parking", UseClasses: all, Version: "v1"})
 	f := &fake{reg: reg, parks: []parking.Site{{ID: "a", Family: "p1", Occupancy: free(2, "p3")}}}
 	a, err := service(f, nil).Parking(context.Background(), key("commercial", allScopes, "p1", "p3"), parking.Query{})
 	if err != nil {
@@ -281,11 +317,11 @@ func TestParkingAttributesOccupancyOfAnotherFamily(t *testing.T) {
 
 func TestParkingListsAKeyWhoseFamiliesAreAllPending(t *testing.T) {
 	req.Covers(t, "FR-PARK-003", "SEC-030")
-	// Every parking family that could answer waits for its terms: the sites
-	// are listed without occupancy, partial, rather than refused.
+	// Every parking family that could answer waits for its terms: the answer
+	// is partial and offers the terms rather than refusing, and lists no site.
 	reg := []access.Terms{
-		{Family: "p2", Domain: "parking", UseClasses: all, AcceptanceRequired: true, Version: "v1", Reviewed: true},
-		{Family: "p4", Domain: "parking", UseClasses: all, AcceptanceRequired: true, Version: "v1", Reviewed: true},
+		{Family: "p2", Domain: "parking", UseClasses: all, AcceptanceRequired: true, Version: "p2-terms-1"},
+		{Family: "p4", Domain: "parking", UseClasses: all, AcceptanceRequired: true, Version: "v1"},
 	}
 	f := &fake{reg: reg, parks: []parking.Site{{ID: "b", Family: "p2", Occupancy: free(5, "p2")}, {ID: "d", Family: "p4"}}}
 	a, err := service(f, nil).Parking(context.Background(), key("commercial", allScopes, "p2", "p4"), parking.Query{})
@@ -295,10 +331,10 @@ func TestParkingListsAKeyWhoseFamiliesAreAllPending(t *testing.T) {
 	if !slices.Equal(f.gotListed, []string{"p2", "p4"}) || len(f.gotOccupancy) != 0 {
 		t.Errorf("listed %v, occupancy from %v", f.gotListed, f.gotOccupancy)
 	}
-	if !a.Partial || a.Items[0].Occupancy != nil || !a.Items[0].TermsRequired || !a.Items[1].TermsRequired || !slices.Equal(names(a.Families), []string{"p2", "p4"}) {
+	if !a.Partial || len(a.Items) != 0 || len(a.Terms) != 2 || len(a.Families) != 0 {
 		t.Errorf("items %+v, partial %v, attributed %v", a.Items, a.Partial, names(a.Families))
 	}
-	// Pending and otherwise refused together: the pending one is listed.
+	// Pending and otherwise refused together: the pending one is read, not listed.
 	f = &fake{parks: []parking.Site{{ID: "b", Family: "p2"}}}
 	if a, err := service(f, nil).Parking(context.Background(), key("commercial", allScopes, "p2"), parking.Query{}); err != nil || !a.Partial || !slices.Equal(f.gotListed, []string{"p2"}) {
 		t.Errorf("a pending family beside a refused one: %+v, %v", a, err)
@@ -348,14 +384,15 @@ func TestOverviewComposesTheParts(t *testing.T) {
 	if !slices.Equal(statuses(o), []features.Status{features.StatusOK, features.StatusOK}) || o.Charging == nil || o.Parking == nil {
 		t.Fatalf("parts %v", statuses(o))
 	}
-	if !o.Partial || !slices.Equal(names(o.Families), []string{"e1", "p2", "pl"}) || o.Place.ID != "pl-1" {
+	// The pending p2 lists no site, and its gated site is no coverage: the
+	// parking part credits none.
+	if !o.Partial || !slices.Equal(names(o.Families), []string{"e1", "pl"}) || o.Place.ID != "pl-1" {
 		t.Errorf("partial %v, families %v", o.Partial, names(o.Families))
 	}
 
-	accepted := key("consumer", allScopes, everything...)
-	accepted.Accepted = []access.Acceptance{{Source: "p2", Version: "v1"}}
+	accepted := access.WithAccepted(context.Background(), []string{"p2-terms-1"})
 	f = &fake{place: berlin}
-	o, err = service(f, nil).Overview(context.Background(), accepted, features.OverviewQuery{Needs: []features.Part{features.PartParking}})
+	o, err = service(f, nil).Overview(accepted, key("consumer", allScopes, everything...), features.OverviewQuery{Needs: []features.Part{features.PartParking}})
 	if err != nil || !slices.Equal(statuses(o), []features.Status{features.StatusNotRequested, features.StatusOK}) || o.Charging != nil || o.Partial {
 		t.Errorf("needs parking: %v, %v, partial %v", statuses(o), err, o.Partial)
 	}
@@ -367,31 +404,29 @@ func TestOverviewStatesAPendingFamilysConditionOnlyOnceAccepted(t *testing.T) {
 		"p2": {{Kind: provenance.Condition, Text: "p2 condition"}, {Kind: provenance.Purpose, Text: "p2 purpose"}},
 		"pl": {{Kind: provenance.Condition, Text: "pl condition"}},
 	}
-	ask := func(k access.Record) features.Overview {
+	ask := func(ctx context.Context) features.Overview {
 		t.Helper()
-		f := &fake{place: berlin, parks: []parking.Site{{ID: "b", Family: "p2", Occupancy: free(5, "p2")}}, notes: notes}
-		o, err := service(f, nil).Overview(context.Background(), k, features.OverviewQuery{PlaceID: "pl-1", Needs: []features.Part{features.PartParking}})
+		f := &fake{place: berlin, parks: []parking.Site{{ID: "a", Family: "p1"}, {ID: "b", Family: "p2", Occupancy: free(5, "p2")}}, notes: notes}
+		o, err := service(f, nil).Overview(ctx, key("commercial", allScopes, everything...), features.OverviewQuery{PlaceID: "pl-1", Needs: []features.Part{features.PartParking}})
 		if err != nil {
 			t.Fatal(err)
 		}
 		return o
 	}
-	// Pending: the overview reads the families again; p2 is credited, its
-	// condition is withheld as the parking part withholds it, the place's is kept.
-	o := ask(key("commercial", allScopes, everything...))
+	// Pending: p2's site is not listed and p2 is not credited, so none of its
+	// notes is stated; p1's site and the place's condition are kept.
+	o := ask(context.Background())
 	if got := provenance.Notes(o.Families, provenance.Condition); !slices.Equal(got, []string{"pl condition"}) {
 		t.Errorf("pending: conditions %v", got)
 	}
-	if got := provenance.Notes(o.Families, provenance.Purpose); !slices.Equal(got, []string{"p2 purpose"}) || !slices.Equal(names(o.Families), []string{"p2", "pl"}) {
+	if got := provenance.Notes(o.Families, provenance.Purpose); len(got) != 0 || !slices.Equal(names(o.Families), []string{"p1", "pl"}) {
 		t.Errorf("pending: purposes %v, credited %v", got, names(o.Families))
 	}
 	if !slices.Equal(o.Parking.Withheld, []string{"p2"}) {
 		t.Errorf("pending: withheld %v", o.Parking.Withheld)
 	}
 	// Accepted: the reading is shown, and its condition with it.
-	k := key("commercial", allScopes, everything...)
-	k.Accepted = []access.Acceptance{{Source: "p2", Version: "v1"}}
-	o = ask(k)
+	o = ask(access.WithAccepted(context.Background(), []string{"p2-terms-1"}))
 	if got := provenance.Notes(o.Families, provenance.Condition); !slices.Equal(got, []string{"p2 condition", "pl condition"}) {
 		t.Errorf("accepted: conditions %v", got)
 	}
@@ -459,7 +494,7 @@ func TestOverviewRefusals(t *testing.T) {
 		{"a part's gate violation", &fake{place: berlin, sites: []energy.Site{site("x")}}, k, features.ErrGateViolation},
 		{"no part ok", &fake{place: berlin, chErr: errStore, pkErr: errStore}, k, features.ErrNoPart},
 		{"nothing permitted", &fake{place: berlin}, key("commercial", []access.Scope{"places"}, everything...), features.ErrNoPart},
-		{"provenance of the whole", &fake{place: berlin, provErr: errStore, provErrOnCall: 3}, k, errStore},
+		{"provenance of the whole", &fake{place: berlin, provErr: errStore, provErrOnCall: 2}, k, errStore},
 	}
 	for _, c := range cases {
 		if _, err := service(c.f, nil).Overview(context.Background(), c.key, features.OverviewQuery{}); !errors.Is(err, c.want) {
@@ -469,5 +504,74 @@ func TestOverviewRefusals(t *testing.T) {
 	o, err := service(&fake{place: berlin}, nil).Overview(context.Background(), key("commercial", []access.Scope{"places"}, everything...), features.OverviewQuery{})
 	if !errors.Is(err, features.ErrNoPart) || len(o.Parts) != 2 || !errors.Is(o.Parts[0].Err, features.ErrScopeDenied) {
 		t.Errorf("a failed overview keeps its parts: %+v", o.Parts)
+	}
+}
+
+// TestAWrongTermsVersionIsRefusedWithTheCurrentTexts: a request that accepts
+// terms which are not the current ones is refused, by parking and the
+// overview alike, and the refusal carries the current texts; a failing
+// read of the texts fails the answer (owner 2026-11-16).
+func TestAWrongTermsVersionIsRefusedWithTheCurrentTexts(t *testing.T) {
+	req.Covers(t, "FR-PARK-003", "SEC-030")
+	stale := access.WithAccepted(context.Background(), []string{"p2-terms-0"})
+	k := key("commercial", allScopes, everything...)
+	check := func(name string, err error, f *fake) {
+		t.Helper()
+		var r *features.TermsRefusal
+		if !errors.Is(err, access.ErrTermsVersion) || !errors.As(err, &r) || len(r.Texts) != 1 || r.Texts[0].Gate != "p2-terms-1" || err.Error() != access.ErrTermsVersion.Error() {
+			t.Errorf("%s: %v", name, err)
+		}
+		if !slices.Equal(f.gotTerms, []string{"p2-terms-1"}) {
+			t.Errorf("%s: texts read for %v", name, f.gotTerms)
+		}
+	}
+	f := &fake{parks: []parking.Site{{ID: "b", Family: "p2", Occupancy: free(5, "p2")}}}
+	_, err := service(f, nil).Parking(stale, k, parking.Query{})
+	check("parking", err, f)
+	f = &fake{place: berlin}
+	_, err = service(f, nil).Overview(stale, k, features.OverviewQuery{PlaceID: "pl-1"})
+	check("overview", err, f)
+
+	boom := errors.New("terms unreadable")
+	if _, err := service(&fake{termsErr: boom}, nil).Parking(stale, k, parking.Query{}); !errors.Is(err, boom) {
+		t.Errorf("a failed read of the current texts: %v", err)
+	}
+	if _, err := service(&fake{termsErr: boom, parks: []parking.Site{{ID: "b", Family: "p2"}}}, nil).Parking(context.Background(), k, parking.Query{}); !errors.Is(err, boom) {
+		t.Errorf("a failed read of the pending family's texts: %v", err)
+	}
+	// Elsewhere the parameter is ignored: charging answers whatever it says.
+	if _, err := service(&fake{sites: []energy.Site{site("e1")}}, nil).Charging(stale, k, energy.Query{}); err != nil {
+		t.Errorf("charging with a stale acceptance: %v", err)
+	}
+}
+
+func TestChargingOnlyAvailable(t *testing.T) {
+	req.Covers(t, "FR-ENERGY-004", "ENV-003")
+	report := func(fam string, s energy.State, at time.Time) energy.Site {
+		return energy.Site{ID: "s-" + fam + string(s), Family: fam,
+			Points: []energy.ChargePoint{{Availability: &energy.Availability{State: s, ObservedAt: at, Family: fam}}}}
+	}
+	sites := []energy.Site{report("e1", energy.StateAvailable, now), report("e1", energy.StateOccupied, now),
+		report("e2", energy.StateAvailable, now.Add(-time.Minute)), site("e2"), report("e1", energy.StateAvailable, now)}
+	q := energy.Query{Limit: 1, Filter: energy.Filter{OnlyAvailable: true, StatusMaxAge: time.Hour}}
+	a, err := service(&fake{sites: sites}, nil).Charging(context.Background(), key("consumer", allScopes, everything...), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(a.Items) != 1 || !a.HasMore || *a.Dropped != (energy.Dropped{NotFree: 1, Stale: 1, NoStatus: 1}) || !slices.Equal(names(a.Families), []string{"e1"}) {
+		t.Errorf("kept %+v more %v dropped %+v credited %v", a.Items, a.HasMore, a.Dropped, names(a.Families))
+	}
+	a, err = service(&fake{sites: sites[1:2]}, nil).Charging(context.Background(), key("consumer", allScopes, everything...), q)
+	if err != nil || len(a.Items) != 0 || a.HasMore || !slices.Equal(names(a.Families), []string{"e1"}) {
+		t.Errorf("none free names the consulted: %+v %v", a, err)
+	}
+}
+
+func TestStatusLimits(t *testing.T) {
+	req.Covers(t, "FR-ENERGY-005")
+	limit := features.StatusLimits(time.Hour, []provenance.Family{
+		{Source: access.Source{Family: "short"}, StaleAfter: time.Minute}, {Source: access.Source{Family: "none"}, NeverStale: true}})
+	if limit("short") != time.Minute || limit("none") != time.Hour || limit("unknown") != 0 {
+		t.Errorf("limits %v %v %v", limit("short"), limit("none"), limit("unknown"))
 	}
 }

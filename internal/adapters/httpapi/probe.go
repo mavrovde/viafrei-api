@@ -14,7 +14,7 @@ import (
 )
 
 // Probe asks the service's own /healthz on the loopback, at the port of
-// server.listen_addr, within health.probe_timeout. A distroless image has no
+// health.listen_addr, within health.probe_timeout. A distroless image has no
 // shell and no curl, so the binary's healthcheck subcommand calls this.
 func Probe(ctx context.Context, cfg *config.Config) error {
 	var body HealthBody
@@ -39,7 +39,9 @@ type Versions struct {
 // expected versions, as opposed to one that could not be read.
 var ErrVersionMismatch = errors.New("version mismatch")
 
-// CheckVersions asks the service's own /v1/meta on the loopback, like Probe,
+// CheckVersions asks the service's own /v1/meta on the health listener's
+// loopback port, like Probe (the public listener refuses a caller off
+// callers.allow_cidr, the loopback included),
 // and compares the platform and read-contract versions it reports with want.
 // A deployment check of the platform runs it in the container (the
 // meta-check subcommand), so a deployed API that does not match the
@@ -79,12 +81,12 @@ func loopback(port, path string) string {
 	return u.String()
 }
 
-// askSelf GETs path on the loopback at the port of server.listen_addr within
+// askSelf GETs path on the loopback at the port of health.listen_addr within
 // health.probe_timeout and decodes the JSON answer into out.
 func askSelf(ctx context.Context, cfg *config.Config, path string, out any) (int, error) {
-	_, port, err := net.SplitHostPort(cfg.Server.ListenAddr)
+	_, port, err := net.SplitHostPort(cfg.Health.ListenAddr)
 	if err != nil {
-		return 0, errors.New("server.listen_addr has no port")
+		return 0, errors.New("health.listen_addr has no port")
 	}
 	ctx, cancel := context.WithTimeout(ctx, cfg.Health.ProbeTimeout)
 	defer cancel()

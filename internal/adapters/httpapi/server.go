@@ -66,6 +66,8 @@ type Deps struct {
 	// answers a matching If-None-Match before the operation runs; nil
 	// validates only after it.
 	Versions VersionReader
+	// Pressure says whether the reads are saturated; nil answers ok.
+	Pressure Pressure
 }
 
 type server struct {
@@ -82,33 +84,80 @@ type server struct {
 	metering        Meter
 	results         *resultCache
 	versions        *versionCache
+	pressure        Pressure
 }
+
+// surface names the listeners an operation is served on (#92): the public
+// one, behind the caller allow-list, or the health listener, which the edge
+// never routes, or both.
+type surface uint8
+
+const (
+	onPublic surface = 1 << iota
+	onHealth
+)
 
 // operation is one registered API operation.
 type operation struct {
-	id       string
-	method   string
-	path     string
-	tag      string
-	keyed    bool         // needs a key (SEC-001)
+	id      string
+	method  string
+	path    string
+	tag     string
+	surface surface // zero means the public listener only
+	keyed   bool    // needs a key (SEC-001)
+	// legacy: served on the public listener only as a deprecated alias of
+	// the health listener's answer, with a Deprecation header (0.2 clients
+	// probed the public listener).
+	legacy   bool
 	scope    access.Scope // the scope a keyed operation needs (SEC-020); empty for none
 	register func(api huma.API, s *server, op huma.Operation)
 }
 
 func operations() []operation {
 	return []operation{
-		{id: "getHealth", method: http.MethodGet, path: "/healthz", register: registerHealth},
-		{id: "getReadiness", method: http.MethodGet, path: "/readyz", register: registerReadiness},
-		{id: "getMeta", method: http.MethodGet, path: "/v1/meta", register: registerMeta},
+		{id: "getHealth", method: http.MethodGet, path: "/healthz", surface: onPublic | onHealth, legacy: true, register: registerHealth},
+		{id: "getReadiness", method: http.MethodGet, path: "/readyz", surface: onPublic | onHealth, legacy: true, register: registerReadiness},
+		{id: "getMeta", method: http.MethodGet, path: "/v1/meta", surface: onPublic | onHealth, register: registerMeta},
+		{id: "getPressure", method: http.MethodGet, path: "/v1/pressure", surface: onPublic | onHealth, register: registerPressure},
 		{id: "getKey", method: http.MethodGet, path: "/v1/key", tag: "access", keyed: true, register: registerKey},
+		{id: "getPlacesCoverage", method: http.MethodGet, path: "/v1/places/coverage", tag: "places", keyed: true, scope: "places", register: registerPlacesCoverage},
+		{id: "listAffectedStations", method: http.MethodGet, path: "/v1/affected-stations", tag: "transit", keyed: true, scope: "transit", register: registerAffected},
+		{id: "getNationalSummary", method: http.MethodGet, path: "/v1/germany", tag: "meta", keyed: true, register: registerNational},
+		{id: "listSources", method: http.MethodGet, path: "/v1/sources", tag: "meta", keyed: true, register: registerSources},
 		{id: "listChargingOptions", method: http.MethodGet, path: "/v1/charging-options", tag: "energy", keyed: true, scope: "energy", register: registerCharging},
+		{id: "listParkingBays", method: http.MethodGet, path: "/v1/parking-bays", tag: "parking", keyed: true, scope: "parking", register: registerParkingBays},
 		{id: "listParkingOptions", method: http.MethodGet, path: "/v1/parking-options", tag: "parking", keyed: true, scope: "parking", register: registerParking},
+		{id: "listPlaces", method: http.MethodGet, path: "/v1/places", tag: "places", keyed: true, scope: "places", register: registerPlaces},
 		{id: "getPlaceOverview", method: http.MethodGet, path: "/v1/places/{placeId}/overview", tag: "places", keyed: true, scope: "places", register: registerOverview},
+		{id: "listMotorwayParking", method: http.MethodGet, path: "/v1/motorways/{road}/parking-options", tag: "parking", keyed: true, scope: "parking", register: registerMotorwayParking},
 		{id: "getMotorwayConditions", method: http.MethodGet, path: "/v1/motorways/{road}/conditions", tag: "roads", keyed: true, scope: "roads", register: registerMotorwayConditions},
 		{id: "listRoadConditions", method: http.MethodGet, path: "/v1/road-conditions", tag: "roads", keyed: true, scope: "roads", register: registerRoadConditions},
+		{id: "listStateRoadConditions", method: http.MethodGet, path: "/v1/states/{state}/road-conditions", tag: "roads", keyed: true, scope: "roads", register: registerStateConditions},
+		{id: "listStateWeatherWarnings", method: http.MethodGet, path: "/v1/states/{state}/weather", tag: "weather", keyed: true, scope: "weather", register: registerStateWarnings},
+		{id: "listStateServiceAlerts", method: http.MethodGet, path: "/v1/states/{state}/service-alerts", tag: "transit", keyed: true, scope: "transit", register: registerStateAlerts},
+		{id: "listLorryRules", method: http.MethodGet, path: "/v1/lorry-rules", tag: "roads", keyed: true, scope: "roads", register: registerLorry},
+		{id: "listMotorways", method: http.MethodGet, path: "/v1/motorways", tag: "roads", keyed: true, scope: "roads", register: registerMotorways},
 		{id: "getRoadSituation", method: http.MethodGet, path: "/v1/road-situations/{situationId}", tag: "roads", keyed: true, scope: "roads", register: registerRoadSituation},
+		{id: "getWatch", method: http.MethodGet, path: "/v1/watch", tag: "roads", keyed: true, scope: "roads", register: registerWatch},
 		{id: "getWeatherRisk", method: http.MethodGet, path: "/v1/weather-risk", tag: "weather", keyed: true, scope: "weather", register: registerWeatherRisk},
 		{id: "getDrivingRules", method: http.MethodGet, path: "/v1/driving-rules", tag: "rules", keyed: true, scope: "rules", register: registerDrivingRules},
+		{id: "getFuelStation", method: http.MethodGet, path: "/v1/fuel-options/{fuelId}", tag: "energy", keyed: true, scope: "energy", register: registerFuelStation},
+		{id: "getChargingSite", method: http.MethodGet, path: "/v1/charging-options/{chargingId}", tag: "energy", keyed: true, scope: "energy", register: registerChargingSite},
+		{id: "listFuelOptions", method: http.MethodGet, path: "/v1/fuel-options", tag: "energy", keyed: true, scope: "energy", register: registerFuel},
+		{id: "listHydrogenOptions", method: http.MethodGet, path: "/v1/hydrogen-options", tag: "energy", keyed: true, scope: "energy", register: registerHydrogen},
+		{id: "listSpeedCameras", method: http.MethodGet, path: "/v1/speed-cameras", tag: "roads", keyed: true, scope: "roads", register: registerSpeed},
+		{id: "listSharingOptions", method: http.MethodGet, path: "/v1/sharing-options", tag: "transit", keyed: true, scope: "transit", register: registerSharing},
+		{id: "listTransitDisruptions", method: http.MethodGet, path: "/v1/transit-disruptions", tag: "transit", keyed: true, scope: "transit", register: registerDisruptions},
+		{id: "listNearby", method: http.MethodGet, path: "/v1/nearby", tag: "places", keyed: true, scope: "places", register: registerNearby},
+		{id: "listAddresses", method: http.MethodGet, path: "/v1/addresses", tag: "places", keyed: true, scope: "places", register: registerAddress},
+		{id: "listPois", method: http.MethodGet, path: "/v1/pois", tag: "places", keyed: true, scope: "places", register: registerPois},
+		{id: "describeLocation", method: http.MethodGet, path: "/v1/location", tag: "places", keyed: true, scope: "places", register: registerLocation},
+		{id: "listStations", method: http.MethodGet, path: "/v1/stations", tag: "transit", keyed: true, scope: "transit", register: registerStations},
+		{id: "listStationDepartures", method: http.MethodGet, path: "/v1/stations/{stationId}/departures", tag: "transit", keyed: true, scope: "transit", register: registerDepartures},
+		{id: "getTrainBoard", method: http.MethodGet, path: "/v1/train-boards/{eva}", tag: "transit", keyed: true, scope: "transit", register: registerTrainBoard},
+		{id: "createRefresh", method: http.MethodPost, path: "/v1/refreshes", tag: "live", keyed: true, register: registerCreateRefresh},
+		{id: "getRefresh", method: http.MethodGet, path: "/v1/refreshes/{id}", tag: "live", keyed: true, register: registerGetRefresh},
+		{id: "listStationFacilities", method: http.MethodGet, path: "/v1/stations/{stationId}/facilities", tag: "transit", keyed: true, scope: "transit", register: registerFacilities},
 	}
 }
 
@@ -122,31 +171,68 @@ func OperationIDs() []string {
 	return ids
 }
 
-// NewHandler builds the complete HTTP handler.
+// NewHandler builds the handler of the public operations, without the
+// caller allow-list: what an admitted caller reaches.
 func NewHandler(d Deps) (http.Handler, error) {
-	h, _, err := build(d, nil)
+	h, _, err := build(d, nil, onPublic)
 	return h, err
 }
 
-// OpenAPI returns the OpenAPI document the handler built from cfg would
-// serve. `viafrei-api openapi` writes it to api/openapi.json.
+// NewPublicHandler is the public listener's handler: NewHandler behind the
+// caller allow-list (#92), which refuses every caller outside
+// callers.allow_cidr, and every caller when the list is empty.
+func NewPublicHandler(d Deps) (http.Handler, error) {
+	h, err := NewHandler(d)
+	if err != nil {
+		return nil, err
+	}
+	return newCallerGate(d.Config.Callers, logger(d)).wrap(h), nil
+}
+
+// NewHealthHandler is the health listener's handler: liveness, readiness
+// and the service metadata, and nothing else. It has no caller allow-list
+// and no per-address limit: the edge never routes it, and a probe of the
+// platform must never be refused.
+func NewHealthHandler(d Deps) (http.Handler, error) {
+	d.Addresses = nil
+	h, _, err := build(d, nil, onHealth)
+	return h, err
+}
+
+// OpenAPI returns the OpenAPI document the public handler built from cfg
+// would serve. `viafrei-api openapi` writes it to api/openapi.json.
 func OpenAPI(cfg *config.Config) ([]byte, error) {
-	_, doc, err := build(Deps{Config: cfg}, nil)
+	_, doc, err := build(Deps{Config: cfg}, nil, onPublic)
 	if err != nil {
 		return nil, err
 	}
 	return doc(), nil
 }
 
-// NewServer builds the http.Server with every server.* limit applied.
+// NewServer builds the public http.Server, behind the caller allow-list,
+// with every server.* limit applied.
 func NewServer(d Deps) (*http.Server, error) {
-	h, err := NewHandler(d)
+	h, err := NewPublicHandler(d)
 	if err != nil {
 		return nil, err
 	}
+	return newHTTPServer(d, d.Config.Server.ListenAddr, h), nil
+}
+
+// NewHealthServer builds the health listener's http.Server on
+// health.listen_addr, with the same server.* limits.
+func NewHealthServer(d Deps) (*http.Server, error) {
+	h, err := NewHealthHandler(d)
+	if err != nil {
+		return nil, err
+	}
+	return newHTTPServer(d, d.Config.Health.ListenAddr, h), nil
+}
+
+func newHTTPServer(d Deps, addr string, h http.Handler) *http.Server {
 	sc := d.Config.Server
 	return &http.Server{
-		Addr:              sc.ListenAddr,
+		Addr:              addr,
 		Handler:           h,
 		ReadHeaderTimeout: sc.ReadHeaderTimeout,
 		ReadTimeout:       sc.ReadTimeout,
@@ -154,7 +240,7 @@ func NewServer(d Deps) (*http.Server, error) {
 		IdleTimeout:       sc.IdleTimeout,
 		MaxHeaderBytes:    sc.MaxHeaderBytes,
 		ErrorLog:          slog.NewLogLogger(logger(d).Handler(), slog.LevelWarn),
-	}, nil
+	}
 }
 
 func logger(d Deps) *slog.Logger {
@@ -164,12 +250,13 @@ func logger(d Deps) *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-// build makes the handler and the document it serves; extra operations are
-// registered after the catalogue (tests only). The document is marshalled on
+// build makes the handler of the operations served on surf and the document
+// it serves; extra operations are registered after the catalogue (tests
+// only; one without a surface is public). The document is marshalled on
 // first use, once: it is ~100 KB with its examples, and a handler built for
 // a request path that never asks for it (every test, most processes until
 // the first /v1/openapi.json) should not pay for it.
-func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
+func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte, error) {
 	if d.Config == nil {
 		return nil, nil, errors.New("httpapi: no configuration")
 	}
@@ -186,6 +273,7 @@ func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 		features:        d.Features,
 		keyGate:         d.Keys,
 		metering:        d.Meter,
+		pressure:        d.Pressure,
 	}
 	if s.now == nil {
 		s.now = time.Now
@@ -257,12 +345,15 @@ func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 			Tags: []*huma.Tag{
 				{Name: "service", Description: "Health, readiness and service metadata."},
 				{Name: "access", Description: "The presenting key and what it may read."},
-				{Name: "energy", Description: "Where to charge."},
+				{Name: "meta", Description: "The sources behind the answers, and the national summary."},
+				{Name: "energy", Description: "Where to charge and to fill up."},
 				{Name: "parking", Description: "Where to park."},
 				{Name: "places", Description: "Places, and what is around them."},
 				{Name: "roads", Description: "What is happening on the roads."},
 				{Name: "weather", Description: "The official weather warnings."},
 				{Name: "rules", Description: "The German driving rules."},
+				{Name: "transit", Description: "Stations, their departures, lifts and escalators."},
+				{Name: "live", Description: "On-demand refreshes of live sources, for ViaFrei's own callers."},
 			},
 		},
 		Formats:       huma.DefaultFormats,
@@ -272,6 +363,12 @@ func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 	api.UseMiddleware(strictQuery(api), s.authenticate(api), s.cache)
 
 	for _, op := range ops {
+		if op.surface == 0 {
+			op.surface = onPublic
+		}
+		if op.surface&surf == 0 {
+			continue
+		}
 		if disabled[op.id] {
 			router.Method(op.method, op.path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				writeProblem(w, newProblem(r.Context(), SlugFeatureDisabled, "This operation is switched off.", 0))
@@ -286,23 +383,39 @@ func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 			keyedRoutes[op.method+" "+op.path] = d.Auth != nil
 			hop.Security = []map[string][]string{{schemeBearer: {}}, {schemeHeader: {}}}
 			hop.Responses = keyedResponses(api)
+			if op.method == http.MethodGet {
+				hop.Middlewares = append(hop.Middlewares, askLanguage(api))
+			}
+		}
+		if op.legacy && surf == onPublic {
+			hop.Deprecated = true
+			hop.Middlewares = huma.Middlewares{deprecationHeader}
 		}
 		if op.scope != "" {
 			hop.Metadata = map[string]any{scopeExtension: op.scope}
 			hop.Extensions = map[string]any{scopeExtension: string(op.scope)}
 		}
 		op.register(api, s, hop)
+		if op.keyed && op.method == http.MethodGet {
+			documentLang(api.OpenAPI().Paths[op.path].Get)
+		}
+		if op.legacy && surf == onPublic {
+			documentDeprecation(api.OpenAPI().Paths[op.path].Get)
+		}
 	}
-	amendNullableObjects(api)
-	if err := documentExamples(api.OpenAPI(), base); err != nil {
-		return nil, nil, err
-	}
-
-	if d.Config.RateLimit.Headers {
-		documentRateLimit(api)
-	}
-	if d.Config.Cache.Enabled {
-		documentCaching(api)
+	// The document describes the public listener; the health listener
+	// serves none.
+	if surf == onPublic {
+		amendNullableObjects(api)
+		if err := documentExamples(api.OpenAPI(), base); err != nil {
+			return nil, nil, err
+		}
+		if d.Config.RateLimit.Headers {
+			documentRateLimit(api)
+		}
+		if d.Config.Cache.Enabled {
+			documentCaching(api)
+		}
 	}
 
 	// The document is a value of huma's own fixed types: marshalling it
@@ -315,7 +428,7 @@ func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 		return doc.Bytes()
 	})
 
-	if d.Config.Docs.Enabled {
+	if d.Config.Docs.Enabled && surf == onPublic {
 		router.Get("/v1/openapi.json", func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", OpenAPIMediaType)
 			_, _ = w.Write(served())
@@ -325,4 +438,25 @@ func build(d Deps, extra []operation) (http.Handler, func() []byte, error) {
 		})
 	}
 	return router, served, nil
+}
+
+// deprecationHeader marks an answer of a deprecated alias (RFC 9745): the
+// public listener's /healthz and /readyz, which the health listener serves.
+func deprecationHeader(ctx huma.Context, next func(huma.Context)) {
+	ctx.SetHeader("Deprecation", "true")
+	next(ctx)
+}
+
+// documentDeprecation documents the Deprecation header on every answer of a
+// deprecated alias.
+func documentDeprecation(o *huma.Operation) {
+	for _, r := range o.Responses {
+		if r.Headers == nil {
+			r.Headers = map[string]*huma.Param{}
+		}
+		r.Headers["Deprecation"] = &huma.Param{
+			Description: "Always true: this public alias is deprecated; probe the health listener (health.listen_addr), which answers the same.",
+			Schema:      &huma.Schema{Type: "string", Enum: []any{"true"}},
+		}
+	}
 }

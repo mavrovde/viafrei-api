@@ -1,0 +1,94 @@
+{
+  "title": "The rest areas along a motorway that state a toilet, with terms accepted",
+  "request": "/v1/motorways/A101/parking-options?kind=rest_area\u0026facilities=toilet\u0026limit=2\u0026accept_terms=sid-terms-1",
+  "attribution": "Parking sites and their occupancy come from the source families of the parking domain the key is entitled to; a family whose terms need accepting answers only to a request that accepts them (accept_terms), which the caller passes after its end user has accepted their text. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "parking"
+    ],
+    "sources": [
+      "park_alpha",
+      "park_beta",
+      "truckpark_sid_static",
+      "truckpark_sid_dyn"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": [
+      {
+        "id": "p:9",
+        "name": "Stunsaltal Parken",
+        "operator": "Maunklur Parkraum",
+        "kind": "rest_area",
+        "location": {
+          "lat": 52.194239,
+          "lon": 9.165894
+        },
+        "distanceM": null,
+        "occupancy": {
+          "free": 32,
+          "total": 229,
+          "state": "free",
+          "observedAt": "2026-03-29T15:37:54Z"
+        },
+        "termsRequired": false,
+        "sourceFamily": "park_alpha"
+      }
+    ],
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": "2026-03-29T23:57:30Z",
+      "freshness": [
+        {
+          "family": "park_alpha",
+          "dataAsOf": "2026-03-29T23:57:30Z",
+          "ageS": 150,
+          "staleAfterS": 900,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "park_alpha",
+          "domain": "parking",
+          "publisher": "Fäpung Datenwerk",
+          "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://alpha.example/terms/park_alpha"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ],
+      "page": {
+        "limit": 2,
+        "hasMore": false
+      },
+      "query": {
+        "road": "A101",
+        "freeMin": 0,
+        "kind": "rest_area",
+        "facilities": [
+          "toilet"
+        ]
+      }
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/motorways/A101/parking-options"
+    }
+  }
+}

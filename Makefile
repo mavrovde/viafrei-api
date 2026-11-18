@@ -2,14 +2,16 @@
 
 GO        ?= go
 BIN       := bin/viafrei-api
-VERSION   ?= 0.2.0-dev
+# A local build is the released version.txt plus -dev; release.yml passes
+# the tag's version itself.
+VERSION   ?= $(shell tr -d '[:space:]' < version.txt)-dev
 COMMIT    ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 LDFLAGS   := -s -w \
 	-X github.com/mavrovde/viafrei-api/internal/buildinfo.version=$(VERSION) \
 	-X github.com/mavrovde/viafrei-api/internal/buildinfo.commit=$(COMMIT)
 
 .PHONY: build test test-integration coverage lint generate check-generated fixtures fixtures-verify catalogue report run clean \
-	image image-multiarch up down logs reset compose-test docs docs-a11y docs-examples
+	image image-multiarch up down logs reset compose-test live-e2e docs docs-a11y docs-examples
 
 build: ## Build the binary into bin/
 	CGO_ENABLED=0 $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/viafrei-api
@@ -17,26 +19,33 @@ build: ## Build the binary into bin/
 test: ## Unit and handler tests (no container runtime needed)
 	$(GO) test -race -shuffle=on -count=1 ./...
 
-test-integration: ## Integration tests against a throwaway PostGIS (testcontainers)
-	$(GO) test -race -count=1 -tags integration ./...
+# The performance budgets and the sequential-scan check (internal/perf) time
+# the queries, so they run alone: beside other packages' databases they
+# measure the machine's load, not the query (the budgets stay as they are).
+PERF_PKG = ./internal/perf
+NON_PERF = $$($(GO) list ./... | grep -v '/internal/perf$$')
+
+test-integration: ## Integration tests against a throwaway PostGIS (testcontainers); internal/perf alone after the rest
+	$(GO) test -race -count=1 -tags integration $(NON_PERF)
+	$(GO) test -race -p 1 -count=1 -tags integration $(PERF_PKG)
 
 coverage: ## Unit + integration + boot profiles merged, gated at 100 % per package (TST-001)
 	$(GO) test -count=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage-unit.out ./...
-	$(GO) test -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out ./...
+	$(GO) test -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out $(NON_PERF)
+	$(GO) test -p 1 -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-perf.out $(PERF_PKG)
 	scripts/boot-coverage.sh coverage-boot.out
 	$(GO) run ./internal/testkit/covergate -min 100 -exclusions test/coverage-exclusions.txt -o coverage.out \
-		coverage-unit.out coverage-integration.out coverage-boot.out
+		coverage-unit.out coverage-integration.out coverage-perf.out coverage-boot.out
 
 lint: ## golangci-lint with the repository configuration
 	golangci-lint run ./...
 
-generate: ## Regenerate sqlc code, docs/configuration.md and api/openapi.json
-	$(SQLC) generate
+generate: ## Regenerate docs/configuration.md and api/openapi.json
 	$(GO) run ./cmd/viafrei-api config docs > docs/configuration.md
 	$(GO) run ./cmd/viafrei-api openapi > api/openapi.json
 
 check-generated: generate ## Fail when a generated file differs from the committed one
-	git diff --exit-code -- internal/adapters/store/contractdb docs/configuration.md api/openapi.json
+	git diff --exit-code -- docs/configuration.md api/openapi.json
 
 SITE ?= site
 
@@ -50,7 +59,6 @@ docs-a11y: docs ## Check every page of the built portal against WCAG 2.2 AA and 
 docs-examples: ## Run every documented example against the synthetic fixtures; RECORD=1 rewrites api/examples (DX-003)
 	$(GO) test -count=1 -tags integration ./internal/testkit/examplerun $(if $(RECORD),-args -examples.record)
 
-SQLC ?= sqlc
 PROFILE ?= tiny
 SEED    ?= 1
 
@@ -99,6 +107,9 @@ reset: ## Stop the stack and delete this project's database volume (fixtures rel
 
 compose-test: ## Smoke-test the stack: healthz, readyz, meta and a short Schemathesis pass, then tear down
 	scripts/compose-smoke.sh
+
+live-e2e: ## Before a release: fuel (ags:, anchor:) and train board refreshes settled by the pinned live refresher against a provider stub (LIVE_SOURCES=its sources/; private image, never CI)
+	scripts/live-e2e.sh
 
 clean:
 	rm -rf bin

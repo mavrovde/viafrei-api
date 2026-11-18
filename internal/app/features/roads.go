@@ -2,6 +2,7 @@ package features
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"time"
 
@@ -16,8 +17,8 @@ type Roads interface {
 	// roads.ErrUnknownRoad.
 	Road(ctx context.Context, ref string) (roads.Road, error)
 	// SituationsOnRoad returns, from one snapshot, up to q.Limit active
-	// situations on the road of the roads families, in the order of their
-	// position along it, and whether there are more; the lamp's view of
+	// situations on the road of the roads families, in the platform's
+	// motorway status order, and whether there are more; the lamp's view of
 	// every situation in the scope (the road and direction, whatever the
 	// filters keep); the weather warnings of the weather families in force
 	// in an area the road crosses (none read when no weather family is
@@ -43,6 +44,10 @@ type Conditions struct {
 	Road   *roads.Road
 	Lamp   roads.Lamp
 	Reason *roads.Reason
+	// Covering are, for a road the register does not hold, the roads
+	// families read that hold a situation on a road of its class; nil for a
+	// registered road or an area.
+	Covering []string
 	// Read are every family the lamp read, whether or not it contributed
 	// (Families names only those): a new version of any of them, or of its
 	// confirmation, may change the lamp.
@@ -95,25 +100,20 @@ func sights(p roads.Page, fams roads.Families, partial, weatherRead bool, now ti
 // the weather warnings of the permitted weather families in one snapshot,
 // post-checks and attributes it, and computes the lamp over every situation
 // and warning in the scope with the sight of every group read.
-func (s *Service) conditions(ctx context.Context, key access.Record, read func(fams roads.Families, now time.Time) (roads.Page, error)) (Conditions, error) {
+//
+// An answer over a window ahead (ahead) reads only the families of planned
+// works (Settings.PlannedWorks) and no weather warning, as the platform's
+// roadworks-ahead answer reads the planning data alone.
+func (s *Service) conditions(ctx context.Context, key access.Record, ahead bool, read func(fams roads.Families, now time.Time) (roads.Page, error)) (Conditions, error) {
 	reg, gate, err := s.gate(ctx, key)
 	if err != nil {
 		return Conditions{}, err
 	}
-	permitted, partial, err := gate.Answer(access.Answering(reg, "roads"))
+	fams, partial, weatherRead, err := roadFamilies(reg, gate, ahead, s.set.PlannedWorks)
 	if err != nil {
 		return Conditions{}, err
 	}
-	// A key without the weather scope, or that may read no weather family,
-	// reads no warning: the weather group is then missing, never an error of
-	// the roads question.
-	var weather []string
-	weatherRead := false
-	if key.Plan.Has("weather") {
-		w, wpartial, werr := gate.Answer(access.Answering(reg, "weather"))
-		weather, weatherRead = w, werr == nil && !wpartial
-	}
-	fams := roads.Families{Roads: permitted, Weather: weather}
+	permitted, weather := fams.Roads, fams.Weather
 	now := s.now()
 	p, err := read(fams, now)
 	if err != nil {
@@ -130,52 +130,106 @@ func (s *Service) conditions(ctx context.Context, key access.Record, read func(f
 		return Conditions{}, err
 	}
 	// The attribution: the families that contributed a situation or a
-	// warning, or every permitted roads family when none did.
+	// warning, or every permitted roads family when none did; and every
+	// weather family the lamp read, whose warnings (or their absence) the
+	// lamp states, as the platform credits the DWD on every road status.
 	consulted := slices.Clone(contributed)
 	if len(consulted) == 0 {
 		consulted = slices.Clone(permitted)
 	}
+	consulted = append(consulted, weather...)
+	// A Land's answer credits the families that placed its situations in
+	// the Land, as the platform's Land form credits BKG.
+	consulted = append(consulted, p.Placed...)
 	slices.Sort(consulted)
 	consulted = slices.Compact(consulted)
-	attributed, err := s.repos.Register.Provenance(ctx, consulted, s.set.Language)
+	attributed, err := s.repos.Register.Provenance(ctx, consulted, s.lang(ctx))
 	if err != nil {
 		return Conditions{}, err
 	}
+	lamp, reason := roads.LampOf(p.Messages, warningLevels(p), sights(p, fams, partial, weatherRead, now))
+	return Conditions{
+		Answer: Answer[roads.Situation]{Items: p.Items, HasMore: p.HasMore, Families: attributed, Partial: partial, At: now,
+			ChangesAt: p.ChangesAt(now)},
+		Lamp: lamp, Reason: reason, Read: fams, Covering: p.Covering,
+	}, nil
+}
+
+// roadFamilies are the families a roads answer reads for key's gate: the
+// roads families it may read (only those of planned works, ahead) and
+// whether some were left out (partial), and the weather families its lamp
+// reads. The weather warnings are public: the lamp reads every weather family
+// the key may read, whether or not its plan holds the weather scope, as the
+// platform's road status reads the DWD warnings for every asker. A key that
+// may read no weather family reads no warning: the weather group is then
+// missing, never an error of the roads question. An answer over a window
+// ahead reads none.
+func roadFamilies(reg []access.Terms, gate access.Gate, ahead bool, planned []string) (fams roads.Families, partial, weatherRead bool, err error) {
+	permitted, partial, err := gate.Answer(access.Answering(reg, "roads"))
+	if err != nil {
+		return roads.Families{}, false, false, err
+	}
+	if ahead {
+		permitted = slices.DeleteFunc(permitted, func(f string) bool { return !slices.Contains(planned, f) })
+	}
+	w, wpartial, werr := gate.Answer(access.Answering(reg, "weather"))
+	weather, weatherRead := w, werr == nil && !wpartial
+	if ahead {
+		weather, weatherRead = nil, false
+	}
+	return roads.Families{Roads: permitted, Weather: weather}, partial, weatherRead, nil
+}
+
+// warningLevels are the levels of the page's weather warnings.
+func warningLevels(p roads.Page) []int {
 	levels := make([]int, len(p.Warnings))
 	for i, w := range p.Warnings {
 		levels[i] = w.Level
 	}
-	lamp, reason := roads.LampOf(p.Messages, levels, sights(p, fams, partial, weatherRead, now))
-	return Conditions{
-		Answer: Answer[roads.Situation]{Items: p.Items, HasMore: p.HasMore, Families: attributed, Partial: partial, At: now,
-			ChangesAt: p.ChangesAt(now)},
-		Lamp: lamp, Reason: reason, Read: fams,
-	}, nil
+	return levels
 }
 
 // MotorwayConditions answers "what is happening on this road" for key
-// (FR-ROAD-003, FR-ROAD-004). The road is resolved first, so an unknown road
-// is roads.ErrUnknownRoad whatever the key may read.
+// (FR-ROAD-003, FR-ROAD-004). The road is resolved first. A motorway the
+// register does not hold is unknown (roads.ErrUnknownRoad), as the
+// platform's roadworks-ahead answer refuses it (G6). Any other road it does
+// not hold (a federal, Land or city road) is answered as that answer answers
+// it: from the situations whose reference names it, with the families that
+// hold any situation on a road of its class (Covering), and crediting only
+// the families that contributed one, so an empty list credits none.
 func (s *Service) MotorwayConditions(ctx context.Context, key access.Record, q roads.CorridorQuery) (Conditions, error) {
 	road, err := s.repos.Roads.Road(ctx, q.Road)
+	if errors.Is(err, roads.ErrUnknownRoad) && roads.ClassOf(q.Road) != roads.ClassMotorway {
+		road, err = roads.Road{Ref: q.Road, Class: roads.ClassOf(q.Road), States: []string{}}, nil
+		q.Unregistered, q.Class = true, road.Class
+	}
 	if err != nil {
 		return Conditions{}, err
 	}
 	q.Road = road.Ref
-	c, err := s.conditions(ctx, key, func(fams roads.Families, now time.Time) (roads.Page, error) {
+	c, err := s.conditions(ctx, key, q.Ahead, func(fams roads.Families, now time.Time) (roads.Page, error) {
 		return s.repos.Roads.SituationsOnRoad(ctx, q, fams, now)
 	})
 	if err != nil {
 		return Conditions{}, err
 	}
 	c.Road = &road
+	if q.Unregistered {
+		if c.Covering == nil {
+			c.Covering = []string{}
+		}
+		if len(c.Items) == 0 {
+			c.Families = nil
+		}
+	}
 	return c, nil
 }
 
 // RoadConditions answers "what is happening on the roads near here" for key
-// (FR-ROAD-006).
+// (FR-ROAD-006), with the lamp over every situation in the scope and every
+// weather warning in force there, as a Land's answer (q.State) has it.
 func (s *Service) RoadConditions(ctx context.Context, key access.Record, q roads.AreaQuery) (Conditions, error) {
-	return s.conditions(ctx, key, func(fams roads.Families, now time.Time) (roads.Page, error) {
+	return s.conditions(ctx, key, q.Ahead, func(fams roads.Families, now time.Time) (roads.Page, error) {
 		return s.repos.Roads.SituationsNear(ctx, q, fams, now)
 	})
 }
@@ -202,7 +256,7 @@ func (s *Service) RoadSituation(ctx context.Context, key access.Record, id strin
 	if err := gate.Check([]string{sit.Family}); err != nil {
 		return Answer[roads.Situation]{}, err
 	}
-	fams, err := s.repos.Register.Provenance(ctx, []string{sit.Family}, s.set.Language)
+	fams, err := s.repos.Register.Provenance(ctx, []string{sit.Family}, s.lang(ctx))
 	if err != nil {
 		return Answer[roads.Situation]{}, err
 	}

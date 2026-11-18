@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -72,13 +73,13 @@ func TestCommands(t *testing.T) {
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	}))
 	defer ok.Close()
-	healthy := "VFAPI_SERVER_LISTEN_ADDR=" + strings.TrimPrefix(ok.URL, "http://")
+	healthy := "VFAPI_HEALTH_LISTEN_ADDR=" + strings.TrimPrefix(ok.URL, "http://")
 	meta := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":{"platformVersion":"2.5.21","contractVersion":"0.1"}}`))
 	}))
 	defer meta.Close()
-	synced := "VFAPI_SERVER_LISTEN_ADDR=" + strings.TrimPrefix(meta.URL, "http://")
+	synced := "VFAPI_HEALTH_LISTEN_ADDR=" + strings.TrimPrefix(meta.URL, "http://")
 	cases := []struct {
 		name    string
 		args    []string
@@ -99,10 +100,10 @@ func TestCommands(t *testing.T) {
 		{"openapi refused", []string{"openapi"}, []string{"VFAPI_NOPE=1"}, config.ExitCode, ""},
 		{"openapi bad switch", []string{"openapi"}, []string{"VFAPI_ENDPOINTS_DISABLED=noSuchOperation"}, 1, ""},
 		{"healthcheck", []string{"healthcheck"}, []string{healthy}, 0, ""},
-		{"healthcheck no answer", []string{"healthcheck"}, []string{"VFAPI_SERVER_LISTEN_ADDR=" + freeAddr(t)}, 1, ""},
+		{"healthcheck no answer", []string{"healthcheck"}, []string{"VFAPI_HEALTH_LISTEN_ADDR=" + freeAddr(t)}, 1, ""},
 		{"meta-check", []string{"meta-check", "-platform", "2.5.21", "-contract", "0.1"}, []string{synced}, 0, ""},
 		{"meta-check mismatch", []string{"meta-check", "-platform", "2.5.22"}, []string{synced}, 1, ""},
-		{"meta-check no answer", []string{"meta-check", "-contract", "0.1"}, []string{"VFAPI_SERVER_LISTEN_ADDR=" + freeAddr(t)}, 2, ""},
+		{"meta-check no answer", []string{"meta-check", "-contract", "0.1"}, []string{"VFAPI_HEALTH_LISTEN_ADDR=" + freeAddr(t)}, 2, ""},
 		{"meta-check of nothing", []string{"meta-check"}, []string{synced}, 2, ""},
 		{"meta-check bad flag", []string{"meta-check", "-nope"}, nil, 2, ""},
 		{"meta-check refused", []string{"meta-check", "-contract", "0.1"}, []string{"VFAPI_NOPE=1"}, config.ExitCode, ""},
@@ -135,6 +136,8 @@ func TestCommands(t *testing.T) {
 	}
 }
 
+// TestServeAddressInUse: either listener failing to bind ends serve with 1,
+// the public one or the health one (#92).
 func TestServeAddressInUse(t *testing.T) {
 	req.Covers(t, "FR-SVC-004")
 	l, err := net.Listen("tcp", "localhost:0")
@@ -142,23 +145,35 @@ func TestServeAddressInUse(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = l.Close() }()
-	if code, _, _ := runCmd([]string{"serve"}, []string{dbURL(t), "VFAPI_SERVER_LISTEN_ADDR=" + l.Addr().String()}); code != 1 {
-		t.Fatalf("serve on a taken address: exit %d, want 1", code)
+	taken := l.Addr().String()
+	for name, env := range map[string][]string{
+		"public": {"VFAPI_SERVER_LISTEN_ADDR=" + taken, "VFAPI_HEALTH_LISTEN_ADDR=" + freeAddr(t)},
+		"health": {"VFAPI_SERVER_LISTEN_ADDR=" + freeAddr(t), "VFAPI_HEALTH_LISTEN_ADDR=" + taken},
+	} {
+		if code, _, _ := runCmd([]string{"serve"}, append(env, dbURL(t))); code != 1 {
+			t.Errorf("serve with the %s address taken: exit %d, want 1", name, code)
+		}
 	}
 }
 
-// serveUntilTerm starts serve, waits for /healthz, runs during, then sends
-// SIGTERM and returns serve's exit code.
+// serveUntilTerm starts serve, waits for /healthz on the health listener,
+// runs during with the public listener's address, then sends SIGTERM and
+// returns serve's exit code.
 func serveUntilTerm(t *testing.T, environ []string, during func(addr string)) int {
 	t.Helper()
-	addr := freeAddr(t)
+	return serveUntilTermWithHealth(t, environ, func(addr, _ string) { during(addr) })
+}
+
+func serveUntilTermWithHealth(t *testing.T, environ []string, during func(addr, health string)) int {
+	t.Helper()
+	addr, health := freeAddr(t), freeAddr(t)
 	done := make(chan int, 1)
 	go func() {
-		code, _, _ := runCmd([]string{"serve"}, append(environ, dbURL(t), "VFAPI_SERVER_LISTEN_ADDR="+addr))
+		code, _, _ := runCmd([]string{"serve"}, append(environ, dbURL(t), "VFAPI_SERVER_LISTEN_ADDR="+addr, "VFAPI_HEALTH_LISTEN_ADDR="+health))
 		done <- code
 	}()
 	cfg := config.Defaults()
-	cfg.Server.ListenAddr = addr
+	cfg.Health.ListenAddr = health
 	for i := 0; ; i++ {
 		if httpapi.Probe(t.Context(), cfg) == nil {
 			break
@@ -172,7 +187,7 @@ func serveUntilTerm(t *testing.T, environ []string, during func(addr string)) in
 			t.Fatal("serve did not answer /healthz within 1 s")
 		}
 	}
-	during(addr)
+	during(addr, health)
 	// serve's signal context is installed before it listens, so the signal
 	// reaches it and not the default handler.
 	if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
@@ -214,7 +229,7 @@ func TestServeReportsAnIncompleteShutdown(t *testing.T) {
 
 func TestServeWithAnAccessStore(t *testing.T) {
 	req.Covers(t, "SEC-001")
-	code := serveUntilTerm(t, []string{pepperEnv, accessURL(t)}, func(addr string) {
+	code := serveUntilTerm(t, []string{pepperEnv, accessURL(t), allowLoopback}, func(addr string) {
 		r, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+addr+"/v1/key", nil)
 		r.Header.Set("Authorization", "Bearer not-a-key")
 		resp, err := http.DefaultClient.Do(r)
@@ -224,6 +239,67 @@ func TestServeWithAnAccessStore(t *testing.T) {
 		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusUnauthorized {
 			t.Errorf("a malformed key: %d", resp.StatusCode)
+		}
+	})
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+}
+
+// allowLoopback admits this machine's callers to the public listener.
+const allowLoopback = "VFAPI_CALLERS_ALLOW_CIDR=127.0.0.0/8,::1/128"
+
+// answer GETs url and returns the status and the body.
+func answer(t *testing.T, url string) (*http.Response, string) {
+	t.Helper()
+	r, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, url, nil)
+	resp, err := http.DefaultClient.Do(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(resp.Body)
+	return resp, string(body)
+}
+
+// TestServeFailsClosed (#92, criteria 1 and 3): booted with no
+// callers.allow_cidr, the public listener answers every route 403 with an
+// empty body and no header of the service, the OpenAPI document included,
+// while the health listener answers liveness, readiness and the metadata.
+func TestServeFailsClosed(t *testing.T) {
+	req.Covers(t, "SEC-001")
+	code := serveUntilTermWithHealth(t, nil, func(addr, health string) {
+		for _, path := range []string{"/v1/meta", "/v1/openapi.json", "/openapi.json", "/healthz", "/readyz", "/v1/charging-options", "/no/such/path"} {
+			resp, body := answer(t, "http://"+addr+path) //nolint:bodyclose // answer reads and closes the body
+			if resp.StatusCode != http.StatusForbidden || body != "" {
+				t.Errorf("public %s: %d %q, want 403 and no body", path, resp.StatusCode, body)
+			}
+			for _, h := range []string{"X-Request-Id", "Content-Type", "Strict-Transport-Security", "Content-Security-Policy"} {
+				if v := resp.Header.Get(h); v != "" {
+					t.Errorf("public %s: a refusal carries %s", path, h)
+				}
+			}
+		}
+		for path, want := range map[string]int{"/healthz": http.StatusOK, "/readyz": http.StatusServiceUnavailable, "/v1/meta": http.StatusOK, "/v1/openapi.json": http.StatusNotFound, "/v1/charging-options": http.StatusNotFound} {
+			if resp, body := answer(t, "http://"+health+path); resp.StatusCode != want { //nolint:bodyclose // answer reads and closes the body
+				t.Errorf("health %s: %d %s, want %d", path, resp.StatusCode, body, want)
+			}
+		}
+	})
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+}
+
+// TestServeAdmitsTheAllowList: an admitted caller gets the normal answer on
+// the public listener, liveness and readiness there as deprecated aliases.
+func TestServeAdmitsTheAllowList(t *testing.T) {
+	req.Covers(t, "SEC-001")
+	code := serveUntilTerm(t, []string{allowLoopback}, func(addr string) {
+		for path, want := range map[string]int{"/v1/meta": http.StatusOK, "/v1/openapi.json": http.StatusOK, "/healthz": http.StatusOK, "/readyz": http.StatusServiceUnavailable} {
+			if resp, body := answer(t, "http://"+addr+path); resp.StatusCode != want { //nolint:bodyclose // answer reads and closes the body
+				t.Errorf("public %s: %d %.120s, want %d", path, resp.StatusCode, body, want)
+			}
 		}
 	})
 	if code != 0 {
@@ -260,7 +336,7 @@ func TestServeRunsTheConsoleOnTheLoopbackWhenEnabled(t *testing.T) {
 		if got := get(t, "http://"+admin+"/signin", admin); got != http.StatusMisdirectedRequest {
 			t.Errorf("another host name: %d", got)
 		}
-		if got := get(t, "http://"+addr+"/signin", addr); got != http.StatusNotFound {
+		if got := get(t, "http://"+addr+"/signin", addr); got != http.StatusForbidden {
 			t.Errorf("the console on the public listener: %d", got)
 		}
 	})
@@ -290,7 +366,7 @@ func TestServeRefusesATakenConsoleAddress(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = l.Close() }()
-	env := append(consoleEnv(l.Addr().String()), dbURL(t), accessURL(t), "VFAPI_SERVER_LISTEN_ADDR="+freeAddr(t))
+	env := append(consoleEnv(l.Addr().String()), dbURL(t), accessURL(t), "VFAPI_SERVER_LISTEN_ADDR="+freeAddr(t), "VFAPI_HEALTH_LISTEN_ADDR="+freeAddr(t))
 	if code, _, stderr := runCmd([]string{"serve"}, env); code != config.ExitCode || !strings.Contains(stderr, "admin.listen_addr") {
 		t.Fatalf("exit %d, %q", code, stderr)
 	}
@@ -307,5 +383,29 @@ func TestReportUsageLogsOnlyTrouble(t *testing.T) {
 	report(metering.Report{Err: errors.New("store down"), Dropped: 2})
 	if out := buf.String(); !strings.Contains(out, "usage write failed") || !strings.Contains(out, "dropped=2") {
 		t.Fatalf("trouble not logged: %q", out)
+	}
+}
+
+func TestReportRetentionLogsFailuresAndRemovals(t *testing.T) {
+	var buf bytes.Buffer
+	report := reportRetention(slog.New(slog.NewTextHandler(&buf, nil)))
+	report(0, nil)
+	if buf.Len() != 0 {
+		t.Fatalf("a round that removed nothing logged %q", buf.String())
+	}
+	report(3, nil)
+	report(0, errors.New("store down"))
+	if out := buf.String(); !strings.Contains(out, "removed=3") || !strings.Contains(out, "refresh retention failed") {
+		t.Fatalf("not logged: %q", out)
+	}
+}
+
+// A live-sources registry that does not parse stops the start.
+func TestServeRefusesAnUnreadableRefreshRegistry(t *testing.T) {
+	req.Covers(t, "CFG-005")
+	code, _, stderr := runCmd([]string{"serve"}, []string{pepperEnv, accessURL(t), dbURL(t), allowLoopback,
+		"VFAPI_REFRESH_SOURCES_JSON={", "VFAPI_SERVER_LISTEN_ADDR=" + freeAddr(t), "VFAPI_HEALTH_LISTEN_ADDR=" + freeAddr(t)})
+	if code != config.ExitCode || stderr == "" {
+		t.Fatalf("exit %d, %q", code, stderr)
 	}
 }

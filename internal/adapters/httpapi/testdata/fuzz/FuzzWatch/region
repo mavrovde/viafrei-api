@@ -1,0 +1,5 @@
+go test fuzz v1
+string("region")
+string("05")
+string("{\"late_share\":2,\"min_trips\":0}")
+string("")

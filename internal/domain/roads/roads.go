@@ -150,6 +150,36 @@ func ParseRoad(s string) (string, error) {
 	return Canonical(s), nil
 }
 
+// anyRoadReference is roadReference widened to the Land roads: a
+// Landesstraße (L) or Staatsstraße (S), one to four digits, as the
+// platform's roadworks-ahead answer admits them. A Kreisstraße (K) is no
+// reference: its number repeats in every Kreis.
+var anyRoadReference = regexp.MustCompile(`^[AaBbLlSs] ?[0-9]{1,4}$`)
+
+// ParseAnyRoad is ParseRoad for a road of any class the conditions answer:
+// a motorway, a federal road, a Landesstraße or a Staatsstraße.
+func ParseAnyRoad(s string) (string, error) {
+	if !anyRoadReference.MatchString(s) {
+		return "", ErrRoadReference
+	}
+	return Canonical(s), nil
+}
+
+// ClassOf is the class a canonical road reference names by its letter: A
+// a motorway, B a federal road, L and S a state road; any other letter is
+// other.
+func ClassOf(ref string) Class {
+	switch {
+	case strings.HasPrefix(ref, "A"):
+		return ClassMotorway
+	case strings.HasPrefix(ref, "B"):
+		return ClassFederal
+	case strings.HasPrefix(ref, "L"), strings.HasPrefix(ref, "S"):
+		return ClassState
+	}
+	return ClassOther
+}
+
 // Canonical writes a road reference without spaces, in upper case and
 // without leading zeros in its number (CONV-011: a08 and A 8 are A8). A
 // stored reference is shown in this form too.
@@ -474,6 +504,14 @@ type Page struct {
 	// situation or a warning of the scope starts or ends (its valid_from or
 	// valid_to), whatever the list's filters keep; nil when none does.
 	NextChange *time.Time
+	// Covering are, for an unregistered road, the roads families read that
+	// hold a situation on a road of its class, in name order (empty when
+	// none does); nil for a road the register holds.
+	Covering []string
+	// Placed are the families that placed the scope's situations in their
+	// Land (contract.traffic_event's placement_source_ref), read only for
+	// a Land's answer; the platform credits them on its Land form.
+	Placed []string
 }
 
 // ChangesAt is the earliest instant after now at which the answer read in p
@@ -492,8 +530,7 @@ func (p Page) ChangesAt(now time.Time) *time.Time {
 	}
 	consider(p.NextChange)
 	for _, f := range p.Sources {
-		if f.DataAsOf != nil {
-			t := f.DataAsOf.Add((f.StaleAfter/time.Second + 1) * time.Second)
+		if t, ok := f.TurnsStale(); ok {
 			consider(&t)
 		}
 	}
@@ -510,12 +547,48 @@ type Filter struct {
 	Kinds []Kind
 	// MinSeverity keeps the situations at or above it (see Severity.Floor).
 	MinSeverity Severity
+	// From and Until bound the window a situation's validity must overlap;
+	// a zero bound is the instant of the read, so a zero window keeps the
+	// situations in force then.
+	From, Until time.Time
+	// Ahead marks a question over the days ahead (horizon_days, or from and
+	// to): it reads the planned works alone. A watch's window is not one.
+	Ahead bool
+	// Listed, when not nil, are the only kinds the question lists at all,
+	// whatever Kinds asks: the conditions near a position list what the
+	// platform's road status lists there (AreaKinds), never its warnings.
+	Listed []Kind
+}
+
+// AreaKinds are the kinds the platform's road status lists around a
+// position: the closures, the roadworks and lane restrictions, and the jams;
+// a hazard, an accident or a weather report it reads for its lamp only.
+var AreaKinds = []Kind{KindClosure, KindRoadworks, KindJam, KindRestriction}
+
+// Window is the window of the filter at now: its bounds, a zero one now.
+func (f Filter) Window(now time.Time) (start, end time.Time) {
+	start, end = f.From, f.Until
+	if start.IsZero() {
+		start = now
+	}
+	if end.IsZero() {
+		end = now
+	}
+	return start, end
 }
 
 // KnownKinds returns the mapped kinds a filter keeps, and whether it keeps
 // the kinds that cannot be mapped. No kinds keeps every kind: every mapped
 // one and the unmapped ones.
-func (f Filter) KnownKinds() ([]Kind, bool) { return split(f.Kinds, Kinds) }
+//
+// Listed narrows both: only its kinds are kept, and never an unmapped one.
+func (f Filter) KnownKinds() ([]Kind, bool) {
+	known, other := split(f.Kinds, Kinds)
+	if f.Listed == nil {
+		return known, other
+	}
+	return slices.DeleteFunc(known, func(k Kind) bool { return !slices.Contains(f.Listed, k) }), false
+}
 
 // split separates the mapped values of a filter list from its other, the
 // last value of every. An empty list keeps everything.
@@ -536,17 +609,31 @@ func split[T comparable](list, every []T) ([]T, bool) {
 // CorridorQuery asks for the situations on one road.
 type CorridorQuery struct {
 	Road string
+	// Unregistered asks for a road the road register does not hold (a
+	// federal or Land road, or a motorway it lacks): its situations are those
+	// whose reference names it, none placed along a line, and the page names
+	// the families read that hold a situation on a road of Class.
+	Unregistered bool
+	// Class is the class of an unregistered road (ClassOf).
+	Class Class
 	// Direction keeps the situations on this carriageway, on both, and
 	// those whose direction is unknown; DirectionBoth keeps every one.
 	Direction Direction
 	Filter
 	Limit int
+	// Offset skips this many situations of the order: the page a cursor names.
+	Offset int
 }
 
 // AreaQuery asks for the situations near a position.
 type AreaQuery struct {
 	At      geo.Point
 	RadiusM int
+	// State, when set, asks for the situations of one Land (its two-digit
+	// code) instead of the radius of At: a situation is in the Land of the
+	// nearest Gemeinde to its point, the platform's Land rule; de asks for
+	// every situation of the country.
+	State string
 	// Classes keeps the situations on roads of these classes; empty keeps
 	// every class.
 	Classes []Class

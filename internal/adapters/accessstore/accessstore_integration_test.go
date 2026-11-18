@@ -20,11 +20,11 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/adapters/accessstore"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
@@ -40,11 +40,11 @@ const testBound = 2 * time.Second
 var db *pgtest.DB
 
 func TestMain(m *testing.M) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	var err error
-	db, err = pgtest.Start(ctx)
+	ctx, cancel := context.WithTimeout(context.Background(), pgtest.SetupBound)
+	var buf bytes.Buffer
+	_, err := fixtures.Generate(&buf, "tiny", 1, dbcontract.ContractVersion)
 	if err == nil {
-		err = seed(ctx)
+		db, err = pgtest.Seeded(ctx, buf.String())
 	}
 	cancel()
 	if err != nil {
@@ -57,22 +57,6 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	db.Stop()
 	os.Exit(code)
-}
-
-func seed(ctx context.Context) error {
-	var buf bytes.Buffer
-	if _, err := fixtures.Generate(&buf, "tiny", 1, contract.Version()); err != nil {
-		return err
-	}
-	conn, err := db.Owner(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = conn.Close(ctx) }()
-	return pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, buf.String())
-		return err
-	})
 }
 
 func bounded(t *testing.T) context.Context {
@@ -156,7 +140,7 @@ func TestLifecycleAgainstTheStore(t *testing.T) {
 	s := open(t)
 	k := auth.NewKeys(wire.AuthSettings(c), s, nil, nil)
 	ctx := bounded(t)
-	plan := newPlan(t, k, "consumer", "src-alpha-roads")
+	plan := newPlan(t, k, "consumer", "roads_alpha")
 	key, err := k.Issue(ctx, plan, "label", "ops@example.test", 0, "tester")
 	if err != nil {
 		t.Fatal(err)
@@ -167,6 +151,25 @@ func TestLifecycleAgainstTheStore(t *testing.T) {
 	}
 	if !bytes.Equal(rec.MAC, access.MAC([]byte(testPepper[:40]), key.ID, key.Secret)) {
 		t.Fatal("the stored value is not the MAC")
+	}
+	if rec.Audience != access.AudiencePublic {
+		t.Fatalf("a key issued without an audience is %q, not public", rec.Audience)
+	}
+	own, err := k.IssueAs(ctx, access.AudienceOwn, plan, "own", "ops@example.test", 0, "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r, err := s.Lookup(ctx, own.ID); err != nil || r.Audience != access.AudienceOwn {
+		t.Fatalf("own key read back as %q: %v", r.Audience, err)
+	}
+	// A record that names no audience is stored as public.
+	bare := access.Record{ID: "Bare000000", Environment: access.Live, Plan: access.Plan{Name: plan},
+		MAC: access.MAC([]byte("x"), "Bare000000", "s"), ExpiresAt: time.Now().Add(time.Hour)}
+	if err := s.Issue(ctx, auth.Change{Action: auth.ActionIssue, KeyID: bare.ID, Actor: "tester", At: time.Now()}, bare, "l", "c"); err != nil {
+		t.Fatal(err)
+	}
+	if r, err := s.Lookup(ctx, bare.ID); err != nil || r.Audience != access.AudiencePublic {
+		t.Fatalf("a bare record read back as %q: %v", r.Audience, err)
 	}
 	rotated, err := k.Rotate(ctx, key.ID, "tester")
 	if err != nil {
@@ -189,9 +192,6 @@ func TestLifecycleAgainstTheStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	since := time.Now().Add(-time.Second)
-	if err := k.Accept(ctx, key.ID, "src-delta-parking", "2026-03-01", "tester"); err != nil {
-		t.Fatal(err)
-	}
 	other := newPlan(t, k, "commercial")
 	if err := k.Move(ctx, key.ID, other, "tester"); err != nil {
 		t.Fatal(err)
@@ -200,8 +200,8 @@ func TestLifecycleAgainstTheStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec, _ = s.Lookup(ctx, key.ID)
-	if rec.RevokedAt == nil || rec.Plan.Name != other || len(rec.Accepted) != 1 || rec.Accepted[0].Version != "2026-03-01" {
-		t.Fatalf("after accept, move and revoke: %+v", rec)
+	if rec.RevokedAt == nil || rec.Plan.Name != other {
+		t.Fatalf("after move and revoke: %+v", rec)
 	}
 	ids, mark, err := s.ChangedSince(ctx, since)
 	if err != nil || !slices.Contains(ids, key.ID) || mark.Before(since) {
@@ -234,10 +234,10 @@ func TestLifecycleAgainstTheStore(t *testing.T) {
 			t.Fatalf("an audit row holds secret material: %s", r.all)
 		}
 	}
-	if want := []string{"issue", "rotate", "accept_terms", "plan_move", "revoke"}; !slices.Equal(actions, want) {
+	if want := []string{"issue", "rotate", "plan_move", "revoke"}; !slices.Equal(actions, want) {
 		t.Fatalf("audit %v, want %v", actions, want)
 	}
-	if got[3].before != plan || got[3].after != other || got[4].reason != "leaked" || got[0].actor != "tester" {
+	if got[2].before != plan || got[2].after != other || got[3].reason != "leaked" || got[0].actor != "tester" {
 		t.Fatalf("audit details %+v", got)
 	}
 }
@@ -291,15 +291,6 @@ func TestStoreRefusals(t *testing.T) {
 		{"rotate bad mac", func(ctx context.Context, now time.Time) error {
 			return s.Rotate(ctx, auth.Change{Action: "rotate", KeyID: key.ID, Actor: "t", At: now}, []byte("short"), now)
 		}, code(checkFailed)},
-		{"accept bad id", func(ctx context.Context, now time.Time) error {
-			return s.Accept(ctx, auth.Change{Action: "accept_terms", KeyID: bad, Actor: "t", At: now}, access.Acceptance{Source: "x", Version: "1"})
-		}, code(invalidText)},
-		{"accept unknown", func(ctx context.Context, now time.Time) error {
-			return s.Accept(ctx, auth.Change{Action: "accept_terms", KeyID: "nosuchkey0", Actor: "t", At: now}, access.Acceptance{Source: "x", Version: "1"})
-		}, is(accessstore.ErrNotFound)},
-		{"accept bad source", func(ctx context.Context, now time.Time) error {
-			return s.Accept(ctx, auth.Change{Action: "accept_terms", KeyID: key.ID, Actor: "t", At: now}, access.Acceptance{Source: bad, Version: "1"})
-		}, code(invalidText)},
 		{"audit bad action", func(ctx context.Context, now time.Time) error {
 			return s.Revoke(ctx, auth.Change{Action: "bogus", KeyID: key.ID, Actor: "t", Reason: "r", At: now})
 		}, code(checkFailed)},
@@ -378,7 +369,7 @@ func newStack(t *testing.T, extra ...string) stack {
 	var log bytes.Buffer
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Config: c, Sources: st, Auth: auth.New(wire.AuthSettings(c), as, nil),
-		Logger: logging.New(c.Log, &log), ContractVersion: contract.Version(),
+		Logger: logging.New(c.Log, &log), ContractVersion: dbcontract.ContractVersion,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -425,38 +416,28 @@ func (s stack) issue(t *testing.T, use access.UseClass, families ...string) acce
 	return key
 }
 
-var allFamilies = []string{"src-alpha-energy", "src-beta-energy", "src-gamma-energy", "src-delta-parking", "src-epsilon-roads", "src-zeta-places", "src-eta-weather"}
+var allFamilies = []string{"afir_alpha", "afir_beta", "chargepool_gamma", "truckpark_sid_dyn", "roads_epsilon", "afir_zeta", "dwd_eta"}
 
 func TestGateRestrictedPurposeFamilyEndToEnd(t *testing.T) {
 	req.Covers(t, "SEC-030", "SEC-031")
 	s := newStack(t)
 	for use, served := range map[access.UseClass]bool{"consumer": true, "non_commercial": false, "commercial": false} {
 		got := s.families(t, s.issue(t, use, allFamilies...).Full)
-		if slices.Contains(got, "src-gamma-energy") != served {
+		if slices.Contains(got, "chargepool_gamma") != served {
 			t.Errorf("%s: %v", use, got)
 		}
 	}
 }
 
-func TestGateTermsFamilyEndToEnd(t *testing.T) {
+// TestGateTermsFamilyIsNeverAKeysOwn: no acceptance is stored with a key,
+// so a family whose terms need accepting is never among a key's own
+// families, however the key was issued (owner 2026-11-16).
+func TestGateTermsFamilyIsNeverAKeysOwn(t *testing.T) {
 	req.Covers(t, "SEC-030", "SEC-034")
 	s := newStack(t)
 	key := s.issue(t, "commercial", allFamilies...)
-	if slices.Contains(s.families(t, key.Full), "src-delta-parking") {
-		t.Fatal("served before acceptance")
-	}
-	if err := s.keys.Accept(bounded(t), key.ID, "src-delta-parking", "2025-12-31", "tester"); err != nil {
-		t.Fatal(err)
-	}
-	fresh := newStack(t) // a new instance, no cached copy of the key
-	if slices.Contains(fresh.families(t, key.Full), "src-delta-parking") {
-		t.Fatal("served after accepting an older terms version")
-	}
-	if err := s.keys.Accept(bounded(t), key.ID, "src-delta-parking", "2026-03-01", "tester"); err != nil {
-		t.Fatal(err)
-	}
-	if !slices.Contains(newStack(t).families(t, key.Full), "src-delta-parking") {
-		t.Fatal("withheld after accepting the current terms")
+	if slices.Contains(s.families(t, key.Full), "truckpark_sid_dyn") {
+		t.Fatal("a family whose terms need accepting is served as the key's own")
 	}
 }
 
@@ -464,7 +445,7 @@ func TestGateUnreviewedFamilyEndToEnd(t *testing.T) {
 	req.Covers(t, "SEC-030")
 	s := newStack(t)
 	for _, use := range access.UseClasses {
-		if slices.Contains(s.families(t, s.issue(t, use, allFamilies...).Full), "src-epsilon-roads") {
+		if slices.Contains(s.families(t, s.issue(t, use, allFamilies...).Full), "roads_epsilon") {
 			t.Fatalf("unreviewed family served to %s", use)
 		}
 	}
@@ -472,8 +453,8 @@ func TestGateUnreviewedFamilyEndToEnd(t *testing.T) {
 
 func TestGateDisabledFamilyEndToEnd(t *testing.T) {
 	req.Covers(t, "SEC-030")
-	s := newStack(t, "VFAPI_SOURCES_DISABLED=src-zeta-places")
-	if got := s.families(t, s.issue(t, "consumer", allFamilies...).Full); slices.Contains(got, "src-zeta-places") || !slices.Contains(got, "src-alpha-energy") {
+	s := newStack(t, "VFAPI_SOURCES_DISABLED=afir_zeta")
+	if got := s.families(t, s.issue(t, "consumer", allFamilies...).Full); slices.Contains(got, "afir_zeta") || !slices.Contains(got, "afir_alpha") {
 		t.Fatalf("disabled family: %v", got)
 	}
 }
@@ -481,7 +462,7 @@ func TestGateDisabledFamilyEndToEnd(t *testing.T) {
 func TestGateFamilyOutsideThePlanEndToEnd(t *testing.T) {
 	req.Covers(t, "SEC-030")
 	s := newStack(t)
-	if got := s.families(t, s.issue(t, "consumer", "src-alpha-energy").Full); !slices.Equal(got, []string{"src-alpha-energy"}) {
+	if got := s.families(t, s.issue(t, "consumer", "afir_alpha").Full); !slices.Equal(got, []string{"afir_alpha"}) {
 		t.Fatalf("plan with one family read %v", got)
 	}
 }
@@ -489,7 +470,7 @@ func TestGateFamilyOutsideThePlanEndToEnd(t *testing.T) {
 func TestKeyRefusalsEndToEnd(t *testing.T) {
 	req.Covers(t, "SEC-001", "SEC-004", "SEC-010", "SEC-042")
 	s := newStack(t)
-	key := s.issue(t, "consumer", "src-alpha-energy")
+	key := s.issue(t, "consumer", "afir_alpha")
 	if w := s.get(t, key.Full); w.Code != http.StatusOK {
 		t.Fatalf("valid key: %d %s", w.Code, w.Body)
 	}
@@ -500,7 +481,7 @@ func TestKeyRefusalsEndToEnd(t *testing.T) {
 		t.Fatalf("revoked: %d %s", w.Code, w.Body)
 	}
 	sandbox := newStack(t, "VFAPI_AUTH_ENVIRONMENT=test")
-	live := s.issue(t, "consumer", "src-alpha-energy")
+	live := s.issue(t, "consumer", "afir_alpha")
 	if w := sandbox.get(t, live.Full); w.Code != http.StatusUnauthorized || !strings.Contains(w.Body.String(), "invalid-key") {
 		t.Fatalf("a live key on the sandbox: %d %s", w.Code, w.Body)
 	}

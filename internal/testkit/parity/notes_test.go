@@ -14,7 +14,7 @@ var owners = parity.Owners{"Use only after accepting.": {" SRC-A "}}
 
 func notes(t *testing.T, notes string, o parity.Owners) []parity.Fact {
 	t.Helper()
-	got, err := parity.Project([]byte(`{"meta":{"notes":`+notes+`}}`), parity.Default, "/v1/x", o)
+	got, err := parity.Project([]byte(`{"meta":{"notes":`+notes+`}}`), parity.Default, "op", "/v1/x", o)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -23,13 +23,13 @@ func notes(t *testing.T, notes string, o parity.Owners) []parity.Fact {
 }
 
 func TestProjectStatesConditionNotesByFamilyAndCountNotText(t *testing.T) {
-	o := parity.Owners{"a1": {"fam-a"}, "a2": {"fam-a"}, "b1": {"fam-b"}, "shared": {"fam-a", "fam-c"}}
+	o := parity.Owners{"a1": {"fam-a"}, "a2": {"fam-a"}, "b1": {"fam-b"}, "shared": {"fam-a", "fam-c"}, "P": {"fam-p"}}
 	got := notes(t, `{"condition":["a1","b1","a2","shared","a1"],"purpose":["P"]}`, o)
 	want := []parity.Fact{
 		{"meta.notes.condition[fam-a]", "3"},
 		{"meta.notes.condition[fam-b]", "1"},
 		{"meta.notes.condition[fam-c]", "1"},
-		{"meta.notes.purpose", `["P"]`},
+		{"meta.notes.purpose[fam-p]", "1"},
 	}
 	if d := parity.Diff(want, got); len(d) > 0 {
 		t.Errorf("notes projected:\n%s", strings.Join(d, "\n"))
@@ -67,12 +67,12 @@ func TestNoteTextIsNotComparedButFamilyAndCountAre(t *testing.T) {
 }
 
 func TestProjectRefusesANoteNoFamilyOwns(t *testing.T) {
-	_, err := parity.Project([]byte(`{"meta":{"notes":{"condition":["secret text"]}}}`), parity.Default, "/v1/x", parity.Owners{"other": {"f"}})
+	_, err := parity.Project([]byte(`{"meta":{"notes":{"condition":["secret text"]}}}`), parity.Default, "op", "/v1/x", parity.Owners{"other": {"f"}})
 	if !errors.Is(err, parity.ErrUnownedNote) || strings.Contains(err.Error(), "secret") {
 		t.Errorf("an unowned note: %v", err)
 	}
 	for _, v := range []string{`"text"`, `null`, `[1]`} {
-		if _, err := parity.Project([]byte(`{"meta":{"notes":{"condition":`+v+`}}}`), parity.Default, "/v1/x", nil); !errors.Is(err, parity.ErrMalformed) {
+		if _, err := parity.Project([]byte(`{"meta":{"notes":{"condition":`+v+`}}}`), parity.Default, "op", "/v1/x", nil); !errors.Is(err, parity.ErrMalformed) {
 			t.Errorf("condition notes %s: %v", v, err)
 		}
 	}
@@ -85,7 +85,8 @@ func TestParseStatesConditionNotesOnlyByFamily(t *testing.T) {
 	for _, ok := range []string{
 		`{"name":"meta.notes.condition","value":"[]"}`,
 		`{"name":"meta.notes.condition[fam-a]","value":"2"}`,
-		`{"name":"meta.notes.purpose","value":"[\"P\"]"}`,
+		`{"name":"meta.notes.purpose[fam-p]","value":"1"}`,
+		`{"name":"meta.notes.purpose","value":"[]"}`,
 	} {
 		if _, err := parity.Parse([]byte(with(ok)), "1.2.3"); err != nil {
 			t.Errorf("%s refused: %v", ok, err)
@@ -93,6 +94,7 @@ func TestParseStatesConditionNotesOnlyByFamily(t *testing.T) {
 	}
 	for _, bad := range []string{
 		`{"name":"meta.notes.condition","value":"[\"a text\"]"}`,
+		`{"name":"meta.notes.purpose","value":"[\"P\"]"}`,
 		`{"name":"meta.notes.condition[fam-a]","value":"0"}`,
 		`{"name":"meta.notes.condition[fam-a]","value":"a text"}`,
 		`{"name":"meta.notes.condition[FAM-A]","value":"1"}`,
@@ -104,5 +106,56 @@ func TestParseStatesConditionNotesOnlyByFamily(t *testing.T) {
 		if _, err := parity.Parse([]byte(with(bad)), "1.2.3"); !errors.Is(err, parity.ErrMalformed) {
 			t.Errorf("%s: %v", bad, err)
 		}
+	}
+}
+
+// TestARules4BundleIsReadOnlyWithoutAPurposeNote: rules/4 compared purpose
+// notes by text; a bundle of it is read under rules/5 only when it states
+// none, which the two rule sets state alike.
+func TestARules4BundleIsReadOnlyWithoutAPurposeNote(t *testing.T) {
+	old := strings.Replace(good, "viafrei.parity.rules/5", "viafrei.parity.rules/4", 1)
+	with := func(fact string) string {
+		return strings.Replace(old, `[{"name":"data[a].id","value":"a"}]`, `[{"name":"data[a].id","value":"a"},`+fact+`]`, 1)
+	}
+	if _, err := parity.Parse([]byte(with(`{"name":"meta.notes.purpose","value":"[]"}`)), "1.2.3"); err != nil {
+		t.Errorf("a rules/4 bundle with no purpose note: %v", err)
+	}
+	for _, bad := range []string{`{"name":"meta.notes.purpose","value":"[\"P\"]"}`, `{"name":"meta.notes.purpose[fam-p]","value":"1"}`} {
+		if _, err := parity.Parse([]byte(with(bad)), "1.2.3"); !errors.Is(err, parity.ErrMalformed) {
+			t.Errorf("a rules/4 bundle stating %s: %v", bad, err)
+		}
+	}
+	if _, err := parity.Parse([]byte(strings.Replace(good, "viafrei.parity.rules/5", "viafrei.parity.rules/3", 1)), "1.2.3"); !errors.Is(err, parity.ErrMalformed) {
+		t.Errorf("a rules/3 bundle: %v", err)
+	}
+}
+
+// TestASharedNoteIsTheCreditedFamilys: a text two families own is stated as
+// the note of the family the answer credits.
+func TestASharedNoteIsTheCreditedFamilys(t *testing.T) {
+	o := parity.Owners{"shared": {"fam-a", "fam-b"}}
+	body := `{"meta":{"attribution":[{"family":"fam-a"}],"notes":{"purpose":["shared"],"condition":[]}}}`
+	got, err := parity.Project([]byte(body), parity.Default, "op", "/v1/x", o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []parity.Fact{{"data", "null"}, {"meta.attribution[fam-a].family", "fam-a"}, {"meta.notes.condition", "[]"}, {"meta.notes.purpose[fam-a]", "1"}}
+	if d := parity.Diff(want, got); len(d) > 0 {
+		t.Errorf("a shared note: %q", d)
+	}
+	if _, err := parity.Project([]byte(`{"meta":{"attribution":[{"family":"fam-c"}],"notes":{"purpose":["shared"]}}}`), parity.Default, "op", "/v1/x", o); !errors.Is(err, parity.ErrUnownedNote) {
+		t.Errorf("a note no credited family owns: %v", err)
+	}
+}
+
+func TestANoteKindNoFamilyOwnsIsComparedByItsText(t *testing.T) {
+	got, err := parity.Project([]byte(`{"data":{"a":1},"meta":{"notes":{"hint":["Drive slowly."]}}}`), parity.Default, "getX", "/v1/x", owners)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(got, func(f parity.Fact) bool {
+		return strings.HasPrefix(f.Name, "meta.notes.hint") && strings.Contains(f.Value, "Drive slowly.")
+	}) {
+		t.Errorf("a note kind outside OwnedNotes: %+v", got)
 	}
 }

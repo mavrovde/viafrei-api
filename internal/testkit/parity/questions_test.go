@@ -99,3 +99,34 @@ func TestAnswersNamesEveryWayABundleDiffersFromTheQuestions(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadQuestionsRefusesARefreshWithoutASourceOrASubject(t *testing.T) {
+	for name, refresh := range map[string]string{
+		"no source":  `"refresh":{"source":"","subject":{"at":"pt:1.0,2.0"}},`,
+		"no subject": `"refresh":{"source":"fuel","subject":{}},`,
+	} {
+		raw := strings.Replace(questions, `"now":`, refresh+`"now":`, 1)
+		if _, err := parity.LoadQuestions(questionsFS(raw)); !errors.Is(err, parity.ErrMalformed) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+func TestAnMCPBundleMayNotAnswerAnAPIOnlyQuestion(t *testing.T) {
+	q, err := parity.LoadQuestions(questionsFS(strings.Replace(questions, `"now":`, `"apiOnly":"no MCP form","now":`, 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := parity.Parse([]byte(good), "1.2.3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.Cases[0].APIOnly = "no MCP form"
+	if d := parity.Answers(b, q); len(d) != 0 {
+		t.Fatalf("the API's own bundle answers its api-only question, got %v", d)
+	}
+	b.Producer = parity.ProducerMCP
+	if d := parity.Answers(b, q); !slices.Contains(d, "case c1: an api-only question, which an MCP bundle may not answer") {
+		t.Errorf("an MCP bundle answering an api-only question: %v", d)
+	}
+}

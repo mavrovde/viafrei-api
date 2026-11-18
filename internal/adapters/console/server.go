@@ -57,7 +57,6 @@ type Lifecycle interface {
 	Rotate(ctx context.Context, id, actor string) (access.Key, error)
 	Revoke(ctx context.Context, id, reason, actor string) error
 	Move(ctx context.Context, id, plan, actor string) error
-	Accept(ctx context.Context, id, family, version, actor string) error
 	Prune(ctx context.Context, actor string) (int64, error)
 	PruneUsage(ctx context.Context, actor string) (int64, error)
 	auth.Directory

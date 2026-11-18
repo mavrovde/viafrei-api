@@ -14,7 +14,7 @@ import (
 )
 
 // fixtureImports is what the generator's production code may import: the
-// standard library's pure packages, the read-contract version and the
+// standard library's pure packages, the read-contract version (internal/dbcontract) and the
 // project's own helpers. No network, database, process or embedded-file
 // package is on it, so the generator can read no network resource and no
 // production data (TST-014); only the command may touch the file system, to
@@ -26,7 +26,7 @@ var fixtureImports = map[string][]string{
 	},
 	"cmd/fixturegen": {
 		"encoding/json", "errors", "flag", "fmt", "io", "os", "path/filepath", "slices", "strings",
-		"github.com/mavrovde/viafrei-api/db/contract",
+		"github.com/mavrovde/viafrei-api/internal/dbcontract",
 		"github.com/mavrovde/viafrei-api/internal/fixtures",
 		"github.com/mavrovde/viafrei-api/internal/invariant",
 	},

@@ -13,9 +13,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	accessdb "github.com/mavrovde/viafrei-api/db/access"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
 	"github.com/mavrovde/viafrei-api/internal/app/metering"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/invariant"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
@@ -27,6 +27,11 @@ var ErrNotFound = errors.New("accessstore: no such key or plan")
 // Store is the access store.
 type Store struct {
 	pool *pgxpool.Pool
+	// settles is the one connection refresh asks wait on.
+	settles *settles
+	// reserve is refresh.answer_reserve: a wait stops this far short of
+	// the ask's deadline.
+	reserve time.Duration
 }
 
 // PoolConfig translates the configuration into a pool configuration.
@@ -50,12 +55,20 @@ func Open(ctx context.Context, cfg *config.Config) (*Store, error) {
 		return nil, err
 	}
 	// NewWithConfig does not connect; it fails only on bounds PoolConfig
-	// never builds.
-	return &Store{pool: invariant.Must(pgxpool.NewWithConfig(ctx, pc))}, nil
+	// never builds. The settle listener connects at the first wait, and
+	// after a lost connection again once db.connect_timeout has passed.
+	listen := pc.ConnConfig.Copy()
+	return &Store{pool: invariant.Must(pgxpool.NewWithConfig(ctx, pc)), settles: newSettles(func(ctx context.Context) (listenConn, error) {
+		c, err := pgx.ConnectConfig(ctx, listen)
+		return c, err // the listener reads c only when err is nil
+	}, cfg.DB.ConnectTimeout), reserve: cfg.Refresh.AnswerReserve}, nil
 }
 
-// Close closes the pool.
-func (s *Store) Close() { s.pool.Close() }
+// Close closes the pool and the settle listener.
+func (s *Store) Close() {
+	s.settles.close()
+	s.pool.Close()
+}
 
 // ErrSchema is a store whose schema is not the version this build expects.
 var ErrSchema = errors.New("accessstore: the access store is not at the expected schema version")
@@ -67,8 +80,8 @@ func (s *Store) CheckSchema(ctx context.Context) error {
 	if err := s.pool.QueryRow(ctx, `select coalesce(max(version), 0) from access.schema_version`).Scan(&v); err != nil {
 		return err
 	}
-	if v != accessdb.Version {
-		return fmt.Errorf("%w: found %d, expected %d", ErrSchema, v, accessdb.Version)
+	if v != dbcontract.AccessSchemaVersion {
+		return fmt.Errorf("%w: found %d, expected %d", ErrSchema, v, dbcontract.AccessSchemaVersion)
 	}
 	return nil
 }
@@ -76,33 +89,29 @@ func (s *Store) CheckSchema(ctx context.Context) error {
 const lookupSQL = `
 select k.key_id, k.environment, k.mac, k.previous_mac, coalesce(k.previous_until, 'epoch'), k.expires_at, k.revoked_at,
        p.plan_name, p.use_class, p.tier, p.scopes, p.sources, p.rate_per_second, p.burst, p.quota_day, p.quota_month,
-       coalesce((select array_agg(a.source_family order by a.source_family, a.terms_version) from access.terms_acceptance a where a.key_id = k.key_id), '{}'),
-       coalesce((select array_agg(a.terms_version order by a.source_family, a.terms_version) from access.terms_acceptance a where a.key_id = k.key_id), '{}')
+       k.audience
 from access.api_key k join access.plan p using (plan_name)
 where k.key_id = $1`
 
 // Lookup implements auth.Store.
 func (s *Store) Lookup(ctx context.Context, id string) (access.Record, error) {
 	var (
-		r                   access.Record
-		env, useClass       string
-		scopes, fams, terms []string
+		r                  access.Record
+		env, useClass, aud string
+		scopes             []string
 	)
 	err := s.pool.QueryRow(ctx, lookupSQL, id).Scan(&r.ID, &env, &r.MAC, &r.PreviousMAC, &r.PreviousUntil, &r.ExpiresAt, &r.RevokedAt,
 		&r.Plan.Name, &useClass, &r.Plan.Tier, &scopes, &r.Plan.Sources,
-		&r.Plan.Rate, &r.Plan.Burst, &r.Plan.QuotaDay, &r.Plan.QuotaMonth, &fams, &terms)
+		&r.Plan.Rate, &r.Plan.Burst, &r.Plan.QuotaDay, &r.Plan.QuotaMonth, &aud)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return access.Record{}, auth.ErrUnknown
 	}
 	if err != nil {
 		return access.Record{}, err
 	}
-	r.Environment, r.Plan.UseClass = access.Environment(env), access.UseClass(useClass)
+	r.Environment, r.Plan.UseClass, r.Audience = access.Environment(env), access.UseClass(useClass), access.Audience(aud)
 	for _, sc := range scopes {
 		r.Plan.Scopes = append(r.Plan.Scopes, access.Scope(sc))
-	}
-	for i := range fams {
-		r.Accepted = append(r.Accepted, access.Acceptance{Source: fams[i], Version: terms[i]})
 	}
 	return r, nil
 }
@@ -186,10 +195,19 @@ on conflict (plan_name) do update set use_class = excluded.use_class, tier = exc
 func (s *Store) Issue(ctx context.Context, c auth.Change, r access.Record, label, contact string) error {
 	return s.write(ctx, c, nil, &r.Plan.Name, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `
-insert into access.api_key (key_id, environment, plan_name, label, contact, mac, issued_at, expires_at, changed_at)
-values ($1, $2, $3, $4, $5, $6, $7, $8, $7)`, r.ID, string(r.Environment), r.Plan.Name, label, contact, r.MAC, c.At, r.ExpiresAt)
+insert into access.api_key (key_id, environment, plan_name, label, contact, mac, issued_at, expires_at, changed_at, audience)
+values ($1, $2, $3, $4, $5, $6, $7, $8, $7, $9)`, r.ID, string(r.Environment), r.Plan.Name, label, contact, r.MAC, c.At, r.ExpiresAt, audience(r.Audience))
 		return err
 	})
+}
+
+// audience is the value stored for a key's audience: a record that names
+// none (issued before audiences existed in the lifecycle) is public.
+func audience(a access.Audience) string {
+	if a == "" {
+		return string(access.AudiencePublic)
+	}
+	return string(a)
 }
 
 // Rotate implements auth.Ledger.
@@ -215,24 +233,6 @@ where key_id = $1 and revoked_at is null`, c.KeyID, c.At, c.Reason)
 			return err
 		}
 		return affected(tag.RowsAffected())
-	})
-}
-
-// Accept implements auth.Ledger. The key's change instant moves too, so every
-// instance drops its cached copy (SEC-034).
-func (s *Store) Accept(ctx context.Context, c auth.Change, a access.Acceptance) error {
-	return s.write(ctx, c, nil, nil, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, `update access.api_key set changed_at = $2 where key_id = $1`, c.KeyID, c.At)
-		if err != nil {
-			return err
-		}
-		if err := affected(tag.RowsAffected()); err != nil {
-			return err
-		}
-		_, err = tx.Exec(ctx, `
-insert into access.terms_acceptance (key_id, source_family, terms_version, accepted_at) values ($1, $2, $3, $4)
-on conflict do nothing`, c.KeyID, a.Source, a.Version, c.At)
-		return err
 	})
 }
 

@@ -1,0 +1,19 @@
+# The viafrei-database release every test and development database of this
+# repository is migrated by. Each such database is postgis/postgis:16-3.4
+# (pgtest.Image) migrated by THIS image: `migrate`, then `partitions ensure`,
+# then `head`, which must print `READY <schema-head>`; the image's own
+# `version` must name the same release and head. Nothing else builds the
+# platform's schema here.
+#
+# Two lines, read by internal/testkit/pgtest (ReadPin):
+#   <image>:<X.Y.Z>@sha256:<digest>   the release, pinned by its digest
+#   schema-head <N>                   the head its `head` prints as READY <N>
+#
+# A schema change is a viafrei-database release first; then both lines here
+# are bumped in one commit with the image of compose.yaml's db-migrate and
+# db-seed; ci.yml pulls what pinguard prints.
+# A <name>:<X.Y.Z>-local line names a locally built, unpublished release:
+# the tests and the local stack run it, and internal/release/pinguard
+# refuses it, so CI and the release workflow stop on it.
+ghcr.io/mavrovde/viafrei-database:0.3.3@sha256:cbb13410895dbb483b9b17b4f38d56d8a718b8c8cc53e7a803f3a0f127d4b290
+schema-head 316

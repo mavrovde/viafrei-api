@@ -15,16 +15,28 @@ var ErrUnknownTopic = errors.New("rules: no such topic")
 
 // Rule is one statement of a topic.
 type Rule struct {
+	// ID is the statement's key (truck_ban.sunday).
+	ID   string
 	Text string
 	// LegalBasis names the provision the rule rests on; empty when none is
 	// recorded.
 	LegalBasis *string
+	// LegalBasisURL is where the provision is published; nil when none is
+	// recorded.
+	LegalBasisURL *string
+	// ReviewedOn is when the statement was last read against its source.
+	ReviewedOn time.Time
+	// ToVerify names what of the statement is not confirmed; nil when all
+	// is.
+	ToVerify *string
 }
 
 // Topic is a rule topic with its rules in their order.
 type Topic struct {
-	Code       string
-	Title      string
+	Code  string
+	Title string
+	// ReviewedOn is the oldest review of its statements: the topic is as
+	// current as its least recently read rule, as the platform states it.
 	ReviewedOn time.Time
 	Rules      []Rule
 }

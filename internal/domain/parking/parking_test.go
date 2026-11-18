@@ -45,3 +45,16 @@ func TestWithheld(t *testing.T) {
 		t.Error("Withheld changed the original")
 	}
 }
+
+func TestFilterKindAnswersARestAreaUnfiltered(t *testing.T) {
+	req.Covers(t, "FR-PARK-002")
+	for _, k := range parking.FilterKinds {
+		want := k
+		if k == "rest_area" {
+			want = ""
+		}
+		if got := parking.FilterKind(k); got != want {
+			t.Errorf("FilterKind(%q) = %q, want %q", k, got, want)
+		}
+	}
+}

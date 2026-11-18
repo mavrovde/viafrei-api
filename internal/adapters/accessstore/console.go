@@ -17,18 +17,18 @@ import (
 // MACs.
 func (s *Store) KeyList(ctx context.Context) ([]auth.KeyView, error) {
 	rows, err := s.pool.Query(ctx, `
-select key_id, environment, plan_name, label, contact, issued_at, expires_at, revoked_at, coalesce(revoke_reason, '')
+select key_id, environment, plan_name, label, contact, issued_at, expires_at, revoked_at, coalesce(revoke_reason, ''), audience
 from access.api_key order by issued_at desc, key_id`)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (auth.KeyView, error) {
 		var (
-			k   auth.KeyView
-			env string
+			k        auth.KeyView
+			env, aud string
 		)
-		err := r.Scan(&k.ID, &env, &k.Plan, &k.Label, &k.Contact, &k.IssuedAt, &k.ExpiresAt, &k.RevokedAt, &k.RevokeReason)
-		k.Environment = access.Environment(env)
+		err := r.Scan(&k.ID, &env, &k.Plan, &k.Label, &k.Contact, &k.IssuedAt, &k.ExpiresAt, &k.RevokedAt, &k.RevokeReason, &aud)
+		k.Environment, k.Audience = access.Environment(env), access.Audience(aud)
 		return k, err
 	})
 }

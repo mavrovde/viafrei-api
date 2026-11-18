@@ -21,9 +21,9 @@ import (
 	"github.com/jackc/pgx/v5/pgconn/ctxwatch"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/mavrovde/viafrei-api/internal/adapters/store/contractdb"
 	"github.com/mavrovde/viafrei-api/internal/app/admission"
 	"github.com/mavrovde/viafrei-api/internal/app/breaker"
+	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/invariant"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
@@ -49,6 +49,13 @@ type Store struct {
 	pace    pace
 	log     *slog.Logger
 	breaker *breaker.Breaker
+	reg     registerSnapshot
+	roads   roadSnapshot
+	lands   junctionLands
+
+	// landsRead, when set (tests), is called before each road's junction
+	// read of the background read.
+	landsRead func()
 }
 
 // WithBreaker puts the circuit breaker in front of every read (NFR-RES-002):
@@ -135,6 +142,8 @@ func New(pool *pgxpool.Pool, cfg *config.Config) *Store {
 		nowFn:   time.Now,
 		pace:    realPace,
 		log:     slog.Default(),
+		reg:     registerSnapshot{ttl: cfg.DB.RegisterSnapshotTTL, staleFor: max(cfg.DB.RegisterSnapshotTTL, cfg.DB.RegisterStaleFor)},
+		roads:   roadSnapshot{ttl: cfg.DB.RoadSnapshotTTL, staleFor: max(cfg.DB.RoadSnapshotTTL, cfg.DB.RoadStaleFor)},
 	}
 }
 
@@ -337,6 +346,37 @@ func guarded[T any](ctx context.Context, s *Store, fn func(context.Context, pgx.
 	return outcome[T]{value: v, err: err, reached: reached}
 }
 
+// ownKeySetting is the transaction's own setting that tells the licence
+// envelope's row rule (rowRule) whether the key is one of ViaFrei's own.
+const ownKeySetting = "viafrei_api.own_key"
+
+// ownKey is the value of ownKeySetting for the key the context's request is
+// answered for: on only for an own key (access.AudienceOf fails closed).
+func ownKey(ctx context.Context) string {
+	if access.AudienceOf(ctx) == access.AudienceOwn {
+		return "on"
+	}
+	return "off"
+}
+
+// rowRule is access.RowPermitted in SQL over the envelope columns of the
+// contract view aliased %[1]s: a withheld row is never read, and a row for
+// ViaFrei's own keys only for an own key. A missing setting reads as not own.
+const rowRule = `%[1]s.display_class <> 'withhold' and (%[1]s.audience = 'public' or ` + ownKeyOn + `)`
+
+// ownKeyOn is true when ownKeySetting is on.
+const ownKeyOn = `current_setting('` + ownKeySetting + `', true) = 'on'`
+
+// permitted is rowRule over the view aliased alias.
+func permitted(alias string) string { return fmt.Sprintf(rowRule, alias) }
+
+// held is rowRule and heldRule over the view aliased alias.
+func held(alias string) string { return permitted(alias) + " and " + fmt.Sprintf(heldRule, alias) }
+
+// heldRule is the hold of access.RowPermitted, on a view that carries a hold
+// reason: a held row is never read.
+const heldRule = `%[1]s.hold_reason is null`
+
 // transact runs fn in one read-only transaction whose statement timeout is
 // what is left of the budget, and says how far it got towards storage.
 func transact[T any](ctx context.Context, s *Store, fn func(context.Context, pgx.Tx) (T, error)) (v T, reached stage, err error) {
@@ -347,7 +387,8 @@ func transact[T any](ctx context.Context, s *Store, fn func(context.Context, pgx
 		return v, refused, ErrDeadlineExhausted
 	}
 	// One round trip opens the read-only transaction and sets its statement
-	// timeout; the budget is an integer of milliseconds, never caller text.
+	// timeout and whether the key is an own key; the budget is an integer of
+	// milliseconds and the key setting on or off, never caller text.
 	// The isolation is repeatable read, so every statement of fn reads one
 	// snapshot (under read committed each statement takes its own): a page
 	// and the lamp over its scope cannot disagree. JIT compilation is off: a
@@ -356,7 +397,8 @@ func transact[T any](ctx context.Context, s *Store, fn func(context.Context, pgx
 	// over a few rows does) spent over two seconds compiling for a millisecond
 	// of execution, so the read ran out of its deadline before it started.
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{
-		BeginQuery: "begin transaction isolation level repeatable read read only; set local jit = off; set local statement_timeout = " + strconv.FormatInt(budget.Milliseconds(), 10),
+		BeginQuery: "begin transaction isolation level repeatable read read only; set local jit = off; set local statement_timeout = " + strconv.FormatInt(budget.Milliseconds(), 10) +
+			"; set local " + ownKeySetting + " = " + ownKey(ctx),
 	})
 	if err != nil {
 		return v, begun, classify(ctx, err)
@@ -406,7 +448,10 @@ func IsDeadline(err error) bool { return errors.Is(err, ErrDeadlineExhausted) }
 // ContractVersion implements health.ContractReader.
 func (s *Store) ContractVersion(ctx context.Context) (string, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (string, error) {
-		return contractdb.New(tx).ContractVersion(ctx)
+		// The newest read-contract version the database publishes.
+		var v string
+		err := tx.QueryRow(ctx, `select contract_version from contract.contract_info order by published_at desc limit 1`).Scan(&v)
+		return v, err
 	})
 }
 

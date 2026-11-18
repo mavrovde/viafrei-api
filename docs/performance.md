@@ -261,13 +261,13 @@ A smaller body, a 304 and an already encoded answer are left alone.
 ## Storage access (NFR-PERF-004)
 
 **Partitioning.** Time-series relations of the data contract are partitioned
-by observation time. The stub in `db/contract` mirrors that:
+by observation time. The database release `database.pin` names, which
+every test database is migrated to, declares that partitioning, and adds a
+default partition and the indexes the reads use:
 
-- `0001_contract.sql` declares the partitioning;
-- `0003_physical.sql` adds a default partition and the indexes the reads use:
-  - the newest observation per item;
-  - GiST indexes on the locations;
-  - child lookups.
+- the newest observation per item;
+- GiST indexes on the locations;
+- child lookups.
 
 `TestNoSequentialScanOfTimeSeries` runs every operation once and captures
 each read statement it sends. It then explains each statement twice, as a

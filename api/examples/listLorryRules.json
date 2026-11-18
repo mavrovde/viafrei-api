@@ -1,0 +1,87 @@
+{
+  "title": "Long-lorry rules along a motorway",
+  "request": "/v1/lorry-rules?vehicle=long_lorry\u0026road=A100",
+  "attribution": "Lorry rules come from the source families of the roads domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "roads"
+    ],
+    "sources": [
+      "lorry_bast_langlkw",
+      "lorry_koeln_beschraenkungen"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": [
+      {
+        "layer": "long_lorry",
+        "kind": null,
+        "sign": null,
+        "value": null,
+        "unit": null,
+        "publishedText": null,
+        "road": "A100",
+        "street": null,
+        "municipality": null,
+        "direction": null,
+        "exceptions": [],
+        "times": null,
+        "days": null,
+        "category": null,
+        "networkState": "positive network",
+        "versionDate": "2026-01-27",
+        "distanceM": null,
+        "sourceFamily": "lorry_bast_langlkw"
+      }
+    ],
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": null,
+      "freshness": [
+        {
+          "family": "lorry_bast_langlkw",
+          "dataAsOf": null,
+          "ageS": null,
+          "staleAfterS": 9007199254740991,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "lorry_bast_langlkw",
+          "domain": "roads",
+          "publisher": "Lang-Lkw-Netz: Bundesanstalt für Straßen- und Verkehrswesen (BASt), Positivnetz Lang-LKW (Auszug Bundesfernstraßen), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), bearbeitet",
+          "text": "Lang-Lkw-Netz: Bundesanstalt für Straßen- und Verkehrswesen (BASt), Positivnetz Lang-LKW (Auszug Bundesfernstraßen), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), bearbeitet",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://www.bast.de/DE/Publikationen/Daten/Verkehrstechnik/Lang-Lkw.html"
+        }
+      ],
+      "notes": {
+        "condition": [
+          "The data make no claim to be complete or correct. They have no legal or official meaning either. The data are not suitable for navigation or similar purposes (our translation of the publisher's notice)."
+        ],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ],
+      "page": {
+        "limit": 20,
+        "hasMore": false
+      }
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/lorry-rules"
+    }
+  }
+}

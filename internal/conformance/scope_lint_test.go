@@ -201,31 +201,24 @@ func scanText(path string, src []byte, vocab []vocabEntry, deny *denyCache) []sc
 	return out
 }
 
-var (
-	createTable = regexp.MustCompile(`(?i)^\s*create\s+(table|view)\s+(if\s+not\s+exists\s+)?([a-z_][a-z0-9_]*\.)?([a-z_][a-z0-9_]*)`)
-	columnLine  = regexp.MustCompile(`(?i)^\s+([a-z_][a-z0-9_]*)\s+[a-z]`)
-	notColumn   = map[string]bool{"primary": true, "foreign": true, "unique": true, "check": true, "constraint": true, "exclude": true}
-)
-
-// contractNames returns the compound (snake_case) table and column names of
-// the read-contract stub. A single English word (name, domain) is domain
-// vocabulary and cannot leak a storage name.
-func contractNames(sql string) map[string]bool {
+// contractNames returns the compound (snake_case) relation and column names
+// of the read contract (schema contract), from the column list
+// (test/contract/columns.tsv: relation, column, type; # comments). A single
+// English word (name, domain) is domain vocabulary and cannot leak a storage
+// name.
+func contractNames(tsv string) map[string]bool {
 	out := map[string]bool{}
-	in := false
-	for _, l := range strings.Split(sql, "\n") {
-		if m := createTable.FindStringSubmatch(l); m != nil {
-			in = true
-			out[strings.ToLower(m[4])] = true
+	for _, l := range strings.Split(tsv, "\n") {
+		f := strings.Split(l, "\t")
+		if strings.HasPrefix(l, "#") || len(f) < 2 {
 			continue
 		}
-		if in && strings.HasPrefix(strings.TrimSpace(l), ")") {
-			in = false
-			continue
+		rel, ok := strings.CutPrefix(f[0], "contract.")
+		if !ok {
+			continue // the access store's names are the key console's own words
 		}
-		if m := columnLine.FindStringSubmatch(l); in && m != nil && !notColumn[strings.ToLower(m[1])] {
-			out[strings.ToLower(m[1])] = true
-		}
+		out[strings.ToLower(rel)] = true
+		out[strings.ToLower(f[1])] = true
 	}
 	for n := range out {
 		if !strings.Contains(n, "_") {
@@ -378,18 +371,13 @@ func TestScopeLint(t *testing.T) {
 		findings = append(findings, scanText(p, src, vocab, cache)...)
 	}
 
-	var sql strings.Builder
-	sqlFiles, _ := filepath.Glob(filepath.Join(root, "db", "contract", "*.sql"))
-	for _, f := range sqlFiles {
-		src, err := os.ReadFile(f)
-		if err != nil {
-			t.Fatal(err)
-		}
-		sql.Write(src)
+	list, err := os.ReadFile(filepath.Join(root, "test", "contract", "columns.tsv"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	columns := contractNames(sql.String())
+	columns := contractNames(string(list))
 	if len(columns) < 20 {
-		t.Fatalf("only %d compound names read from the read-contract stub; the parse did not read it", len(columns))
+		t.Fatalf("only %d compound names read from test/contract/columns.tsv; the parse did not read it", len(columns))
 	}
 	doc, err := os.ReadFile(filepath.Join(root, "api", "openapi.json"))
 	if err != nil {
@@ -444,8 +432,8 @@ func TestScopeLintCanSayNo(t *testing.T) {
 		}
 	}
 
-	columns := contractNames("create table contract.thing (\n    display_name text not null,\n    name text,\n    primary key (name)\n);\ncreate view other_view as select 1;\n")
-	if !columns["display_name"] || !columns["other_view"] || columns["name"] || columns["primary"] {
+	columns := contractNames("# a comment_line\ncontract.thing\tdisplay_name\ttext\ncontract.thing\tname\ttext\ncontract.other_view\tid\ttext\naccess.api_key\tkey_id\ttext\nshort\n")
+	if !columns["display_name"] || !columns["other_view"] || columns["name"] || columns["comment_line"] || len(columns) != 2 {
 		t.Fatalf("contract names: %v", columns)
 	}
 	names, err := publicNames([]byte(`{"paths":{"/x":{"get":{"parameters":[{"name":"display_name"}]}}},"components":{"schemas":{"A":{"properties":{"displayName":{},"label":{"items":{"properties":{"otherView":{}}}}}}}}}`))

@@ -40,6 +40,8 @@ type Config struct {
 	Geo        Geo        `koanf:"geo"`
 	Pagination Pagination `koanf:"pagination"`
 	Charging   Charging   `koanf:"charging"`
+	Fuel       Fuel       `koanf:"fuel"`
+	Refresh    Refresh    `koanf:"refresh"`
 	Compose    Compose    `koanf:"compose"`
 	Roads      Roads      `koanf:"roads"`
 	Weather    Weather    `koanf:"weather"`
@@ -51,6 +53,7 @@ type Config struct {
 	Metering   Metering   `koanf:"metering"`
 	Cache      Cache      `koanf:"cache"`
 	Admin      Admin      `koanf:"admin"`
+	Callers    Callers    `koanf:"callers"`
 }
 
 // Server holds the public HTTP listener settings.
@@ -87,6 +90,10 @@ type DB struct {
 	ApplicationName        string        `koanf:"application_name" default:"viafrei-api" validate:"required,max=63" desc:"application_name reported to the database."`
 	QueryExecMode          string        `koanf:"query_exec_mode" default:"cache_statement" validate:"oneof=cache_statement cache_describe describe_exec exec simple_protocol" desc:"How statements are sent: cache_statement prepares each statement once per connection and reuses it; the others are the driver's fallbacks for a pooler that cannot keep prepared statements."`
 	StatementCacheCapacity int           `koanf:"statement_cache_capacity" default:"128" validate:"min=1,max=4096" desc:"Prepared statements (or descriptions) cached per connection under cache_statement and cache_describe."`
+	RegisterSnapshotTTL    time.Duration `koanf:"register_snapshot_ttl" default:"1s" validate:"min=0s,max=10s" desc:"How often the source register (the licence terms and holds of every family) is read again off the request path; requests answer from the last read. A change of terms or a hold reaches answers within this plus one read. 0s reads it on every request."`
+	RegisterStaleFor       time.Duration `koanf:"register_stale_for" default:"5s" validate:"min=1s,max=60s" desc:"How long the last register read still answers while the next reads fail; past it a request reads the register itself, and fails if that fails. Never shorter than register_snapshot_ttl."`
+	RoadSnapshotTTL        time.Duration `koanf:"road_snapshot_ttl" default:"5m" validate:"min=0s,max=1h" desc:"How often every motorway's length, Länder and line (derived per read from the BASt location code list, milliseconds a road), and the Länder of its junctions (one read a road), are read again off the request path; the motorway list, its Land filter, one motorway's exits and the parking along a motorway answer from the last read. A reloaded location code list or road register reaches answers within this plus one read. 0s reads them on every request."`
+	RoadStaleFor           time.Duration `koanf:"road_stale_for" default:"1h" validate:"min=1s,max=24h" desc:"How long the last read of the motorways' length, Länder and line, and of their junctions' Länder, still answers while the next reads fail; past it a request reads them itself (the junction Länder inside its own read), and fails if that fails. Never shorter than road_snapshot_ttl."`
 	SharedBudget           SharedBudget  `koanf:"shared_budget"`
 }
 
@@ -117,8 +124,9 @@ type Contract struct {
 
 // Health holds the probe settings.
 type Health struct {
+	ListenAddr   string        `koanf:"listen_addr" default:"localhost:8082" validate:"required,hostname_port" desc:"Address of the health listener, host:port: liveness (/healthz), readiness (/readyz) and the service metadata (/v1/meta), and nothing else. The edge never routes it, so the platform probes the service without being on callers.allow_cidr. Its port differs from server.listen_addr's."`
 	ReadyTimeout time.Duration `koanf:"ready_timeout" default:"500ms" validate:"min=50ms,max=2s" desc:"Time the readiness probe gives storage to answer. At most deadline.request."`
-	ProbeTimeout time.Duration `koanf:"probe_timeout" default:"1s" validate:"min=100ms,max=10s" desc:"Time the healthcheck subcommand waits for /healthz."`
+	ProbeTimeout time.Duration `koanf:"probe_timeout" default:"1s" validate:"min=100ms,max=10s" desc:"Time the healthcheck and meta-check subcommands wait for the health listener."`
 }
 
 // Log holds the logging settings.
@@ -185,7 +193,8 @@ type Pagination struct {
 
 // Roads holds the settings of the road-conditions answers.
 type Roads struct {
-	EndedRetentionH int `koanf:"ended_retention_h" default:"24" validate:"min=1,max=168" desc:"Hours an ended road situation still answers 200 on its own operation, with validity.until in the past; after that it answers 404 not-found (Spec: Endpoints, Roads, section 6)."`
+	EndedRetentionH int      `koanf:"ended_retention_h" default:"24" validate:"min=1,max=168" desc:"Hours an ended road situation still answers 200 on its own operation, with validity.until in the past; after that it answers 404 not-found (Spec: Endpoints, Roads, section 6)."`
+	PlannedFamilies []string `koanf:"planned_families" default:"roadworks_bast,ald_14d,roadworks_akd" validate:"min=1,dive,required" desc:"The source families of planned motorway works: an answer over a window ahead (horizon_days, or from and to) reads only these, as the platform's roadworks-ahead answer reads the BASt planning data and its twins. Comma-separated in the environment."`
 }
 
 // Weather holds the settings of the weather answers.
@@ -196,6 +205,22 @@ type Weather struct {
 // Charging holds the settings of charging answers.
 type Charging struct {
 	StatusMaxAge time.Duration `koanf:"status_max_age" default:"30m" validate:"min=1m,max=24h" desc:"How old a charge point's reported state may be and still count; an older one, or one older than its family's freshness threshold, is answered as stale and not counted as available. The default is the MCP capability's own limit, 30 minutes. The parity harness runs on its own defaults, and its question charging-status-age-limit is asked 38 minutes after a report, so it fails only when the default is raised above 38 minutes."`
+}
+
+// Fuel holds the settings of the filling-station answers.
+type Fuel struct {
+	PriceCurrent time.Duration `koanf:"price_current" default:"24h" validate:"min=5m,max=72h" desc:"How long a reported fuel price is ranked: a price this young is ranked by price, an older one is the last known price, listed after them and never ranked. The default is the MCP capability's own limit, 24 hours."`
+	PriceHeld    time.Duration `koanf:"price_held" default:"72h" validate:"min=1h,max=168h" desc:"How far back a filling station read by its id (getFuelStation) looks for each grade's newest price: the platform's held window (FUEL_PRICE_HELD_S), 72 hours by default. A grade with no price in it is left out."`
+	PriceFresh   time.Duration `koanf:"price_fresh" default:"30m" validate:"min=5m,max=6h" desc:"How long a reported fuel price is stated current (a price's current): the platform's price cache window (fuel.cache_fresh_s), 30 minutes by default. An older price is still listed and, inside price_current, ranked."`
+}
+
+// Refresh holds the settings of the on-demand refreshes of live sources
+// (createRefresh).
+type Refresh struct {
+	SourcesFile   string        `koanf:"sources_file" validate:"omitempty,max=4096" desc:"Path of the registry of the live sources a refresh may name: the live refresher's registry.json, each source with its id, its status, the JSON Schema of its subject, its subject_key cases, its freshness window (freshness_s) and its deadline (deadline_ms). Read once at start; a registry that does not parse stops the start. Empty: sources_json, else no source, and every ask is a 400 naming body.source."`
+	SourcesJSON   string        `koanf:"sources_json" validate:"omitempty,max=65536" desc:"The registry as JSON text, read when sources_file is empty."`
+	AnswerReserve time.Duration `koanf:"answer_reserve" default:"250ms" validate:"min=0s,max=2s" desc:"The part of a refresh ask's request deadline kept for reading the request once more and answering it: the wait for the settle stops this far short of the deadline, so an ask whose deadline comes first answers 202 pending, never an error."`
+	Wait          time.Duration `koanf:"wait" default:"1200ms" validate:"min=0s,max=10s" desc:"How long a refresh ask waits for its refresh to settle when its source's registry entry sets no deadline_ms: the platform's 1.2 seconds by default. A refresh still open then is answered 202 pending."`
 }
 
 // Compose holds the settings of composed answers.

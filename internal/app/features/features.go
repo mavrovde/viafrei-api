@@ -23,6 +23,9 @@ type Register interface {
 	// Provenance returns the attribution, notes in lang and freshness of
 	// the given families only.
 	Provenance(ctx context.Context, families []string, lang string) ([]provenance.Family, error)
+	// TermsTexts returns the texts of the given terms gates, every
+	// language.
+	TermsTexts(ctx context.Context, gates []string) ([]access.TermsText, error)
 }
 
 // Charging is the port to the charging store.
@@ -50,17 +53,39 @@ type Places interface {
 	// Place returns the place of one of the given families, or
 	// places.ErrNotFound.
 	Place(ctx context.Context, id string, families []string) (places.Place, error)
+	// Places returns the places of the given families and the stops of the
+	// stop families and the motorway places of the roads families that answer
+	// q, best match first, and whether more answer.
+	Places(ctx context.Context, q places.Query, families, stops, roads []string) ([]places.Place, bool, error)
 }
 
 // Repositories are the ports a Service reads through.
 type Repositories struct {
-	Register Register
-	Charging Charging
-	Parking  Parking
-	Places   Places
-	Roads    Roads
-	Weather  Weather
-	Rules    Rules
+	Register    Register
+	Charging    Charging
+	Parking     Parking
+	Places      Places
+	Roads       Roads
+	Weather     Weather
+	Rules       Rules
+	Transit     Transit
+	Fuel        Fuel
+	Hydrogen    Hydrogen
+	Speed       Speed
+	Sharing     Sharing
+	Addresses   Addresses
+	Pois        Pois
+	Locations   Locations
+	Disruptions Disruptions
+	Nearby      Nearby
+	Lorry       Lorry
+	Catalogue   Catalogue
+	National    National
+	Affected    Affected
+	Coverage    Coverage
+	States      States
+	TrainBoards TrainBoards
+	Bays        Bays
 }
 
 // Settings are the tunables of the use cases.
@@ -71,6 +96,9 @@ type Settings struct {
 	PartDeadline time.Duration
 	// EndedRetention is how long an ended road situation still answers.
 	EndedRetention time.Duration
+	// PlannedWorks are the roads families of planned works: an answer over
+	// a window ahead reads only these.
+	PlannedWorks []string
 	// MaxWarnings is the most warnings a weather answer lists.
 	MaxWarnings int
 	// Disabled are the families the licence gate always denies.
@@ -81,9 +109,10 @@ type Settings struct {
 
 // Service answers the feature questions.
 type Service struct {
-	repos Repositories
-	set   Settings
-	now   func() time.Time
+	repos     Repositories
+	set       Settings
+	now       func() time.Time
+	refreshes *Refreshes
 }
 
 // New returns the service.
@@ -105,6 +134,9 @@ type Answer[T any] struct {
 	// withheld with that data: Families carries none of them, and a composed
 	// answer that reads the families again must drop them too.
 	Withheld []string
+	// Terms are the texts of the terms the withheld families need accepted,
+	// verbatim, for the caller to show its user before it accepts them.
+	Terms []access.TermsText
 	// At is the instant the answer is computed at.
 	At time.Time
 	// NextReport is the earliest report the read considered that is dated
@@ -115,6 +147,8 @@ type Answer[T any] struct {
 	// starting or ending, a confirmation lapsing, an ended situation leaving
 	// the retention. Nil when nothing else does.
 	ChangesAt *time.Time
+	// Dropped counts the sites an only-available charging answer left out.
+	Dropped *energy.Dropped
 }
 
 // ErrGateViolation wraps access.ErrForbiddenItem: storage returned an item
@@ -126,7 +160,7 @@ func (s *Service) gate(ctx context.Context, key access.Record) ([]access.Terms, 
 	if err != nil {
 		return nil, access.Gate{}, err
 	}
-	return reg, access.NewGate(reg, key.Plan, key.Accepted, s.set.Disabled), nil
+	return reg, access.NewGate(reg, key.Plan, key.Audience, access.AcceptedFrom(ctx), s.set.Disabled), nil
 }
 
 // checkAll is the post-check over a set: every family must be in allowed.
@@ -148,7 +182,17 @@ func (s *Service) provenanceOf(ctx context.Context, contributed, consulted []str
 	}
 	fams = slices.Clone(fams)
 	slices.Sort(fams)
-	return s.repos.Register.Provenance(ctx, slices.Compact(fams), s.set.Language)
+	return s.repos.Register.Provenance(ctx, slices.Compact(fams), s.lang(ctx))
+}
+
+// creditsOf reads the provenance of the families that contributed, and of
+// none when none did: the platform's searches credit the registers whose
+// rows they state, so an empty answer credits nothing.
+func (s *Service) creditsOf(ctx context.Context, contributed []string) ([]provenance.Family, error) {
+	if len(contributed) == 0 {
+		return nil, nil
+	}
+	return s.provenanceOf(ctx, contributed, nil)
 }
 
 // sight reads every permitted family's provenance once: for a lamp, whether
@@ -161,7 +205,7 @@ func (s *Service) sight(ctx context.Context, permitted, contributed []string, no
 	consulted := slices.Clone(permitted)
 	slices.Sort(consulted)
 	consulted = slices.Compact(consulted)
-	all, err := s.repos.Register.Provenance(ctx, consulted, s.set.Language)
+	all, err := s.repos.Register.Provenance(ctx, consulted, s.lang(ctx))
 	if err != nil {
 		return nil, false, nil, err
 	}
@@ -170,7 +214,7 @@ func (s *Service) sight(ctx context.Context, permitted, contributed []string, no
 	for _, f := range all {
 		if f.Assess(now).Stale {
 			stale = true
-		} else if t := f.DataAsOf.Add((f.StaleAfter/time.Second + 1) * time.Second); turns == nil || t.Before(*turns) {
+		} else if t, ok := f.TurnsStale(); ok && (turns == nil || t.Before(*turns)) {
 			turns = &t
 		}
 		if len(contributed) == 0 || slices.Contains(contributed, f.Source.Family) {
@@ -209,22 +253,78 @@ func (s *Service) charging(ctx context.Context, reg []access.Terms, gate access.
 		return Answer[energy.Site]{}, err
 	}
 	now := s.now()
-	sites, more, next, err := s.repos.Charging.ChargingNear(ctx, q, permitted, now)
+	read := q
+	if q.Filter.OnlyAvailable {
+		// The platform examines its nearest sites and keeps the free ones.
+		read.Limit = energy.OnlyAvailableScan
+	}
+	sites, more, next, err := s.repos.Charging.ChargingNear(ctx, read, permitted, now)
 	if err != nil {
 		return Answer[energy.Site]{}, err
 	}
-	var contributed []string
-	for _, site := range sites {
-		contributed = append(contributed, site.Families()...)
-	}
+	contributed := siteFamilies(sites)
 	if err := gate.Check(contributed); err != nil {
 		return Answer[energy.Site]{}, err
 	}
-	fams, err := s.provenanceOf(ctx, contributed, permitted)
+	fams, err := s.creditsOf(ctx, contributed)
 	if err != nil {
 		return Answer[energy.Site]{}, err
 	}
-	return Answer[energy.Site]{Items: sites, HasMore: more, Families: fams, Partial: partial, At: now, NextReport: next}, nil
+	out := Answer[energy.Site]{Items: sites, HasMore: more, Families: fams, Partial: partial, At: now, NextReport: next}
+	if q.Filter.OnlyAvailable {
+		onlyAvailable(&out, q)
+	}
+	return out, nil
+}
+
+func siteFamilies(sites []energy.Site) []string {
+	var out []string
+	for _, site := range sites {
+		out = append(out, site.Families()...)
+	}
+	return out
+}
+
+// StatusLimits is how old each family's charge point report may be and still
+// count: the status age limit, or the family's own threshold when shorter
+// (energy.StatusLimit); a family with no fixed interval has the limit alone.
+func StatusLimits(maxAge time.Duration, fams []provenance.Family) func(family string) time.Duration {
+	thresholds := map[string]time.Duration{}
+	for _, f := range fams {
+		thresholds[f.Source.Family] = f.StaleAfter
+		if f.NeverStale {
+			thresholds[f.Source.Family] = maxAge
+		}
+	}
+	return func(family string) time.Duration { return energy.StatusLimit(maxAge, thresholds[family]) }
+}
+
+// onlyAvailable keeps the examined sites with a point reported free now,
+// at most q.Limit, counts the others by reason, and credits the families of
+// the kept sites only.
+func onlyAvailable(a *Answer[energy.Site], q energy.Query) {
+	limit := StatusLimits(q.Filter.StatusMaxAge, a.Families)
+	kept := []energy.Site{}
+	d := energy.Dropped{}
+	for _, site := range a.Items {
+		switch site.FreeNow(a.At, limit) {
+		case energy.Free:
+			kept = append(kept, site)
+		case energy.NotFree:
+			d.NotFree++
+		case energy.Stale:
+			d.Stale++
+		default:
+			d.NoStatus++
+		}
+	}
+	a.HasMore = len(kept) > q.Limit
+	a.Items = kept[:min(len(kept), q.Limit)]
+	a.Dropped = &d
+	if len(a.Items) > 0 {
+		credited := siteFamilies(a.Items)
+		a.Families = slices.DeleteFunc(a.Families, func(f provenance.Family) bool { return !slices.Contains(credited, f.Source.Family) })
+	}
 }
 
 // Parking answers "where can I park near here" for key (FR-PARK). A family
@@ -233,11 +333,92 @@ func (s *Service) charging(ctx context.Context, reg []access.Terms, gate access.
 // family that could answer is such a family.
 func (s *Service) Parking(ctx context.Context, key access.Record, q parking.Query) (Answer[parking.Site], error) {
 	reg, gate, err := s.gate(ctx, key)
+	if err == nil {
+		err = s.acceptance(ctx, reg)
+	}
 	if err != nil {
 		return Answer[parking.Site]{}, err
 	}
 	return s.parking(ctx, reg, gate, q)
 }
+
+// TermsRefusal refuses a request that accepted terms which are not the
+// current terms of a family that needs accepting; it carries the current
+// texts (access.ErrTermsVersion).
+type TermsRefusal struct {
+	Texts []access.TermsText
+}
+
+func (e *TermsRefusal) Error() string { return access.ErrTermsVersion.Error() }
+
+// Unwrap makes errors.Is(err, access.ErrTermsVersion) hold.
+func (e *TermsRefusal) Unwrap() error { return access.ErrTermsVersion }
+
+// acceptance checks the terms the request accepted (accept_terms) against
+// the current terms of the register, in an operation whose data they gate:
+// a wrong or old version is refused with the current texts.
+func (s *Service) acceptance(ctx context.Context, reg []access.Terms) error {
+	err := access.CheckAcceptance(reg, access.AcceptedFrom(ctx))
+	var tv *access.TermsVersionError
+	if !errors.As(err, &tv) {
+		return nil
+	}
+	texts, terr := s.repos.Register.TermsTexts(ctx, tv.Current)
+	if terr != nil {
+		return terr
+	}
+	return &TermsRefusal{Texts: texts}
+}
+
+// termsOf returns the texts of the terms the pending families need.
+func (s *Service) termsOf(ctx context.Context, reg []access.Terms, pending []string) ([]access.TermsText, error) {
+	var gates []string
+	for _, t := range reg {
+		if slices.Contains(pending, t.Family) && !slices.Contains(gates, t.Version) {
+			gates = append(gates, t.Version)
+		}
+	}
+	if len(gates) == 0 {
+		return nil, nil
+	}
+	slices.Sort(gates)
+	return s.repos.Register.TermsTexts(ctx, gates)
+}
+
+// CorridorFamily is the family of the location-code points (the read
+// contract's junctions) a motorway's parking corridor is drawn from.
+const CorridorFamily = "bast_lcl"
+
+// parkingCoverage are the families of the sites in q's scope of its kind,
+// else of any kind, before the free-space and amenity filters, gated
+// families left out; empty when the scope holds none.
+func (s *Service) parkingCoverage(ctx context.Context, q parking.Query, listed, permitted []string, gated map[string]bool, now time.Time) ([]string, error) {
+	q.FreeMin, q.Amenities, q.Limit = 0, nil, coverageScan
+	out, err := s.coverageOfKind(ctx, q, listed, permitted, gated, now)
+	if err != nil || len(out) > 0 || q.Kind == "" {
+		return out, err
+	}
+	q.Kind = ""
+	return s.coverageOfKind(ctx, q, listed, permitted, gated, now)
+}
+
+// coverageOfKind are the families of the sites of q, gated families left out.
+func (s *Service) coverageOfKind(ctx context.Context, q parking.Query, listed, permitted []string, gated map[string]bool, now time.Time) ([]string, error) {
+	sites, _, _, err := s.repos.Parking.ParkingNear(ctx, q, listed, permitted, now)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, site := range sites {
+		if !gated[site.Family] {
+			out = append(out, site.Family)
+		}
+	}
+	return out, nil
+}
+
+// coverageScan bounds the sites a coverage read takes.
+const coverageScan = 200
 
 // parking answers Parking under a register and gate already read.
 func (s *Service) parking(ctx context.Context, reg []access.Terms, gate access.Gate, q parking.Query) (Answer[parking.Site], error) {
@@ -259,12 +440,23 @@ func (s *Service) parking(ctx context.Context, reg []access.Terms, gate access.G
 		return Answer[parking.Site]{}, err
 	}
 	var contributed, occupancy []string
+	// A site whose terms are not accepted is not listed, as the platform's
+	// parking search lists no Toll Collect site before its terms are
+	// accepted: the answer offers the terms (Terms) instead.
+	sites = slices.DeleteFunc(sites, func(site parking.Site) bool { return slices.Contains(pending, site.Family) })
+	gated := map[string]bool{}
+	for _, t := range reg {
+		gated[t.Family] = t.AcceptanceRequired
+	}
+	// A site of a gated family (a Toll Collect site) is named beside the
+	// list, as the platform names it: with no other site listed, the
+	// platform's answer is empty and names none.
+	if !slices.ContainsFunc(sites, func(site parking.Site) bool { return !gated[site.Family] }) {
+		sites = nil
+	}
 	for i, site := range sites {
 		contributed = append(contributed, site.Family)
-		if slices.Contains(pending, site.Family) {
-			sites[i] = site.Withheld()
-			continue
-		}
+		sites[i].Unranged = q.Road != "" || gated[site.Family]
 		if site.Occupancy != nil {
 			// The report may come from another family than the site's: it is
 			// checked and attributed as its own family.
@@ -275,9 +467,28 @@ func (s *Service) parking(ctx context.Context, reg []access.Terms, gate access.G
 	if err := errors.Join(checkAll(contributed, listed), gate.Check(occupancy)); err != nil {
 		return Answer[parking.Site]{}, ErrGateViolation
 	}
-	fams, err := s.provenanceOf(ctx, contributed, listed)
+	credited := contributed
+	if len(sites) == 0 {
+		// An empty answer credits the families of the sites the circle
+		// holds of the kind asked, else of any kind, before the other
+		// filters, as the platform's parking search counts its coverage;
+		// a gated family is never counted.
+		if credited, err = s.parkingCoverage(ctx, q, listed, permitted, gated, now); err != nil {
+			return Answer[parking.Site]{}, err
+		}
+	}
+	if q.Road != "" && gate.Permits(CorridorFamily) {
+		// The corridor is a use of the location-code points, whatever it
+		// found: the platform credits their register on every road search.
+		credited = append(slices.Clone(credited), CorridorFamily)
+	}
+	fams, err := s.repos.Register.Provenance(ctx, slices.Compact(slices.Sorted(slices.Values(credited))), s.lang(ctx))
 	if err != nil {
 		return Answer[parking.Site]{}, err
 	}
-	return Answer[parking.Site]{Items: sites, HasMore: more, Families: withholdConditions(fams, pending), Partial: partial, Withheld: pending, At: now, NextReport: next}, nil
+	terms, err := s.termsOf(ctx, reg, pending)
+	if err != nil {
+		return Answer[parking.Site]{}, err
+	}
+	return Answer[parking.Site]{Items: sites, HasMore: more, Families: withholdConditions(fams, pending), Partial: partial, Withheld: pending, Terms: terms, At: now, NextReport: next}, nil
 }

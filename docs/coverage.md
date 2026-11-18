@@ -48,8 +48,10 @@ and a mutant the tests do not kill is reported.
 
 | Run | When | Mutants scored | Fails |
 |---|---|---|---|
-| pull request | every pull request (`mutation.yml`) | the changed code lines of in-scope files; a changed test file puts its whole package under test | below 80 %, or zero mutants for changed in-scope code |
-| full | the release pull request of a minor version (`X.Y.0`), or a manual run of `mutation.yml` | every in-scope mutant | below 70 %, or a stale equivalent entry |
+| full | once per release, in `release.yml` on the tagged commit before anything is built (a red run stops the publish), or a manual run of `mutation.yml` | every in-scope mutant | below 70 %, or a stale equivalent entry |
+| changed code | by hand only: `scripts/mutation.sh pr origin/main report.md` | the changed code lines of in-scope files; a changed test file puts its whole package under test | below 80 %, or zero mutants for changed in-scope code |
+
+No pull request runs mutation testing (owner 2026-11-18, as in viafrei-database and viafrei-web).
 
 The scope is `test/mutation/scope.tsv`: the domain, the authenticator and
 key lifecycle, and the key check and gated answer at the HTTP edge; the
@@ -73,8 +75,21 @@ each survivor of the first run was either killed by a new test or removed
 by restructuring (a `switch`'s case expressions are reported as not covered,
 so the rules use `if` chains).
 
+The full run is cut into four parallel jobs. Mutation shard k (k = 1 to 4)
+mutates the scope roots at the positions p of `test/mutation/scope.tsv` with
+p mod 4 = k − 1 (`mutgate -plan -shard k/4`). The Mutation testing job then
+gathers the shards' reports into one full-mode gate, so the score and the
+findings are those of one full run. A bad `K/N` or a shard that selects no
+root is exit 2. The gather is exit 2 when a scope root has no report or has
+two, and the gate is red unless every shard ended green.
+`internal/testkit/mutgate/shard_test.go` proves the four shards of the real
+scope disjoint, together every root and none empty. A conformance test holds
+`mutation.yml` to the matrix and the fan-in.
+
 Run it locally with `scripts/mutation.sh pr origin/main` or
-`scripts/mutation.sh full`. The script runs Gremlins as
+`scripts/mutation.sh full`; or run the shards side by side with
+`scripts/mutation.sh shard K/4 DIR/shard-K` and gather them with
+`scripts/mutation.sh gather DIR`. The script runs Gremlins as
 `go run github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0`, as CI runs its
 other tools: the version is verified against the checksum database and never
 enters the service's dependencies.

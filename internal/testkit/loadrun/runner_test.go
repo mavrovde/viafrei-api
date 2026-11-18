@@ -106,7 +106,7 @@ func TestDatabaseReads(t *testing.T) {
 	if s, err := w.r.backends(ctx); err != nil || s != (sample{conns: 2}) {
 		t.Errorf("backends %+v %v", s, err)
 	}
-	if !w.dock.called("exec -T db psql -U owner -d contract") || !w.dock.called("interval '220 milliseconds'") {
+	if !w.dock.called("exec -T db psql -U owner -d test_contract") || !w.dock.called("interval '220 milliseconds'") {
 		t.Errorf("calls %q", w.dock.calls)
 	}
 	if n, err := w.r.busy(ctx); err != nil || n != 0 {
@@ -208,7 +208,7 @@ func TestHoldWaitsForTheLock(t *testing.T) {
 	if err != nil || wait() != nil {
 		t.Fatalf("hold %v", err)
 	}
-	if !w.dock.called("lock table contract.place, contract.charging_site") || !w.dock.called("pg_sleep(1.000)") || !w.dock.called("'contract.place'::regclass") {
+	if !w.dock.called("array['contract.place', 'contract.charging_site'") || !w.dock.called("in access exclusive mode") || !w.dock.called("pg_sleep(1.000)") || !w.dock.called("AccessExclusiveLock") {
 		t.Errorf("calls %q", w.dock.calls)
 	}
 

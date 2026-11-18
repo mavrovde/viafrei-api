@@ -998,13 +998,8 @@ func permissions(k access.Record) string {
 		scopes[i] = string(sc)
 	}
 	slices.Sort(scopes)
-	accepted := make([]string, len(k.Accepted))
-	for i, a := range k.Accepted {
-		accepted[i] = a.Source + "@" + a.Version
-	}
-	slices.Sort(accepted)
 	return strings.Join([]string{
 		string(k.Environment), string(k.Plan.UseClass),
-		strings.Join(sources, ","), strings.Join(scopes, ","), strings.Join(accepted, ","),
+		strings.Join(sources, ","), strings.Join(scopes, ","),
 	}, "|")
 }

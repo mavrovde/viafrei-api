@@ -1,0 +1,80 @@
+{
+  "title": "The newest board of a station, fresh",
+  "request": "/v1/train-boards/8001001?lang=en",
+  "attribution": "A train board is the DB Timetables board the live refresher last stored, of the transit domain's db_timetables source the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "transit"
+    ],
+    "sources": [
+      "db_timetables"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": {
+      "eva": "8001001",
+      "fresh": true,
+      "fetchedAt": "2026-03-30T00:00:00Z",
+      "ageSeconds": 0,
+      "departures": [
+        {
+          "line": null,
+          "category": "ICE",
+          "number": "578",
+          "destination": "Hamburg-Altona",
+          "plannedAt": "2026-03-30T00:12:00Z",
+          "expectedAt": "2026-03-30T00:12:00Z",
+          "delayMin": 0,
+          "platform": "4",
+          "plannedPlatform": "4",
+          "platformChanged": false,
+          "cancelled": false,
+          "sourceFamily": "db_timetables"
+        }
+      ]
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": null,
+      "freshness": [
+        {
+          "family": "db_timetables",
+          "dataAsOf": null,
+          "ageS": null,
+          "staleAfterS": 9007199254740991,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "db_timetables",
+          "domain": "transit",
+          "publisher": "Fahrplandaten: Deutsche Bahn AG, DB API Marketplace, CC BY 4.0, bearbeitet",
+          "text": "Fahrplandaten: Deutsche Bahn AG, DB API Marketplace, CC BY 4.0, bearbeitet",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://developers.deutschebahn.com"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ]
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/train-boards/8001001"
+    }
+  }
+}

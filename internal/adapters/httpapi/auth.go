@@ -152,6 +152,9 @@ func (s *server) authenticate(api huma.API) func(huma.Context, func(huma.Context
 						o := &outcome{}
 						rctx := admission.WithTally(context.WithValue(ctx.Context(), outcomeKey{}, o))
 						rctx = admission.WithCaller(rctx, admission.Caller{Tier: admission.TierNamed(principal.Key.Plan.Tier), Key: principal.Key.ID})
+						// The reads made for this key apply the licence
+						// envelope's row rule for its audience.
+						rctx = access.WithAudience(rctx, principal.Key.Audience)
 						ctx = huma.WithContext(ctx, rctx)
 						next(huma.WithValue(ctx, principalKey{}, principal))
 						refused = o.refused

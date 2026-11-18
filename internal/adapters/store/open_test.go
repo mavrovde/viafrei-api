@@ -9,7 +9,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
-	"github.com/mavrovde/viafrei-api/internal/adapters/store/contractdb"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
@@ -53,11 +52,5 @@ func TestUnreachableStorageIsUnavailable(t *testing.T) {
 	err = st.Read(context.Background(), func(context.Context, pgx.Tx) error { return nil })
 	if !errors.Is(err, store.ErrUnavailable) {
 		t.Fatalf("Read = %v, want ErrUnavailable", err)
-	}
-}
-
-func TestGeneratedQueriesBindATransaction(t *testing.T) {
-	if contractdb.New(nil).WithTx(nil) == nil {
-		t.Fatal("WithTx returned nil")
 	}
 }

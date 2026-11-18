@@ -47,6 +47,23 @@ func newHandler(t *testing.T, cfg *config.Config, ready httpapi.Readiness) http.
 	return h
 }
 
+// newHealthHandler is the health listener's handler (#92), built like
+// newHandler.
+func newHealthHandler(t *testing.T, cfg *config.Config, ready httpapi.Readiness) http.Handler {
+	t.Helper()
+	h, err := httpapi.NewHealthHandler(httpapi.Deps{
+		Config:          cfg,
+		Readiness:       ready,
+		Build:           buildinfo.Info{Version: "0.2.0-test", Commit: "abc1234"},
+		ContractVersion: "0.1",
+		Now:             func() time.Time { return fixedNow },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return h
+}
+
 func do(t *testing.T, h http.Handler, method, target string, header http.Header) *httptest.ResponseRecorder {
 	t.Helper()
 	r := httptest.NewRequestWithContext(context.Background(), method, target, nil)
@@ -56,6 +73,16 @@ func do(t *testing.T, h http.Handler, method, target string, header http.Header)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	checkContract(t, method, target, w)
+	return w
+}
+
+// doHealth is a GET of do on the health listener, which serves no document: its
+// answers are held to the tests' own assertions.
+func doHealth(t *testing.T, h http.Handler, target string) *httptest.ResponseRecorder {
+	t.Helper()
+	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, target, nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
 	return w
 }
 
@@ -71,7 +98,7 @@ func decode(t *testing.T, w *httptest.ResponseRecorder) map[string]any {
 func TestHealthzNeverTouchesStorage(t *testing.T) {
 	req.Covers(t, "FR-SVC-004")
 	ready := &fakeReadiness{}
-	w := do(t, newHandler(t, config.Defaults(), ready), http.MethodGet, "/healthz", nil)
+	w := doHealth(t, newHealthHandler(t, config.Defaults(), ready), "/healthz")
 	if w.Code != http.StatusOK || strings.TrimSpace(w.Body.String()) != `{"status":"ok"}` {
 		t.Fatalf("got %d %s", w.Code, w.Body.String())
 	}
@@ -86,12 +113,12 @@ func TestHealthzNeverTouchesStorage(t *testing.T) {
 func TestReadyzReportsChecks(t *testing.T) {
 	req.Covers(t, "FR-SVC-004")
 	ok := &fakeReadiness{result: health.Result{Ready: true}}
-	w := do(t, newHandler(t, config.Defaults(), ok), http.MethodGet, "/readyz", nil)
+	w := doHealth(t, newHealthHandler(t, config.Defaults(), ok), "/readyz")
 	if w.Code != http.StatusOK || strings.TrimSpace(w.Body.String()) != `{"status":"ready"}` {
 		t.Fatalf("ready: got %d %s", w.Code, w.Body.String())
 	}
 	bad := &fakeReadiness{result: health.Result{Checks: map[string]string{"storage": "pass", "contract": "fail"}}}
-	w = do(t, newHandler(t, config.Defaults(), bad), http.MethodGet, "/readyz", nil)
+	w = doHealth(t, newHealthHandler(t, config.Defaults(), bad), "/readyz")
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("not ready: got %d", w.Code)
 	}
@@ -239,7 +266,7 @@ func TestDisabledOperation(t *testing.T) {
 	if strings.Contains(doc, "getMeta") || strings.Contains(doc, "/v1/meta") {
 		t.Fatal("a disabled operation is still in the OpenAPI document")
 	}
-	if !strings.Contains(doc, "getHealth") {
+	if !strings.Contains(doc, "getKey") {
 		t.Fatal("the OpenAPI document lost an enabled operation")
 	}
 }
@@ -279,8 +306,16 @@ func TestOpenAPIServedIsTheCommittedDocument(t *testing.T) {
 	if err := json.Unmarshal(committed, &doc); err != nil || doc["openapi"] != "3.1.0" {
 		t.Fatalf("not an OpenAPI 3.1 document: %v", err)
 	}
+	// Liveness and readiness are served on the health listener (#92); the
+	// public document holds every operation, those two as deprecated aliases.
 	if n := len(doc["paths"].(map[string]any)); n != len(httpapi.OperationIDs()) {
 		t.Fatalf("document has %d paths, the service %d operations", n, len(httpapi.OperationIDs()))
+	}
+	for _, p := range []string{"/healthz", "/readyz"} {
+		get, _ := doc["paths"].(map[string]any)[p].(map[string]any)["get"].(map[string]any)
+		if get["deprecated"] != true {
+			t.Errorf("the public document does not mark %s deprecated", p)
+		}
 	}
 	red := do(t, h, http.MethodGet, "/openapi.json", nil)
 	if red.Code != http.StatusFound || red.Header().Get("Location") != "/v1/openapi.json" {

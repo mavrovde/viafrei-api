@@ -59,12 +59,6 @@ type Plan struct {
 // Has reports whether the plan grants scope.
 func (p Plan) Has(scope Scope) bool { return slices.Contains(p.Scopes, scope) }
 
-// Acceptance is a recorded acceptance of one source family's terms in one
-// version (SEC-034).
-type Acceptance struct {
-	Source, Version string
-}
-
 // Record is a stored key: never the secret, only its MACs.
 type Record struct {
 	ID          string
@@ -77,7 +71,10 @@ type Record struct {
 	PreviousUntil time.Time
 	ExpiresAt     time.Time
 	RevokedAt     *time.Time
-	Accepted      []Acceptance
+	// Audience is who the key is for: AudienceOwn for ViaFrei's own callers
+	// (its web and MCP), public otherwise. It decides which families and
+	// rows of the licence envelope the key may read.
+	Audience Audience
 }
 
 // The refusals of a key check. ErrInvalid covers an unknown id, a bad

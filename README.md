@@ -97,7 +97,7 @@ make build              # bin/viafrei-api, static, version and commit stamped in
 make test               # unit and handler tests
 make test-integration   # adds tests against a throwaway PostGIS container
 make coverage           # unit + integration + boot profiles, 100 % per package or it fails
-make generate           # regenerate sqlc code, docs/configuration.md, api/openapi.json
+make generate           # regenerate docs/configuration.md, api/openapi.json
 make fixtures PROFILE=ci SEED=7   # synthetic test data, see docs/test-data.md
 ```
 
@@ -106,23 +106,26 @@ The service reads its configuration from environment variables with the prefix `
 ```sh
 export VFAPI_DB_URL_FILE=/run/secrets/db_url   # or VFAPI_DB_URL=postgres://...
 bin/viafrei-api config check                    # validate and exit
-bin/viafrei-api                                 # serve on localhost:8080
-curl -s localhost:8080/healthz                  # {"status":"ok"}
+VFAPI_CALLERS_ALLOW_CIDR=127.0.0.0/8,::1/128 \
+  bin/viafrei-api                               # serve on localhost:8080, health on localhost:8082
+curl -s localhost:8082/healthz                  # {"status":"ok"}, on the health listener
 curl -s localhost:8080/v1/meta                  # API, build, read-contract and platform versions
 ```
 
-Other subcommands: `healthcheck` (exit 0 when `/healthz` answers, for container healthchecks), `meta-check` (compare the running service's versions with the expected platform and read-contract versions, [releasing](docs/RELEASING.md#version-sync-with-the-platform)), `config show` (effective values, secrets hidden), `config docs`, `openapi`, `keys` (the operator's key tool, [docs/access-keys.md](docs/access-keys.md)), `version`.
+The public listener answers only the callers of `VFAPI_CALLERS_ALLOW_CIDR` and refuses every other one with `403`; empty, the default, refuses everyone. Liveness and readiness are served on the health listener alone ([docs/container.md](docs/container.md#private-preview)).
 
-The database the service reads is described by a versioned read contract in [`db/contract/`](db/contract): logical names only, created with a read-only role. Tests build it in a throwaway container. They never reach a live data source or production.
+Other subcommands: `healthcheck` (exit 0 when `/healthz` on the health listener answers, for container healthchecks), `meta-check` (compare the running service's versions with the expected platform and read-contract versions, [releasing](docs/RELEASING.md#version-sync-with-the-platform)), `config show` (effective values, secrets hidden), `config docs`, `openapi`, `keys` (the operator's key tool, [docs/access-keys.md](docs/access-keys.md)), `version`.
+
+The database the service reads is described by a versioned read contract that the [viafrei-database](https://github.com/mavrovde/viafrei-database) release in [`database.pin`](database.pin) builds: logical names only, read with a read-only role. Tests migrate a throwaway container with that release. They never reach a live data source or production.
 
 ## Run with Docker
 
-The image is distroless, runs as non-root and is built for `linux/amd64` and `linux/arm64`. Releases and `main` are published to `ghcr.io/mavrovde/viafrei-api`, signed with cosign, and carry an SBOM and build provenance.
+The image is distroless, runs as non-root and is built for `linux/amd64` and `linux/arm64`. Confirmed releases, and only those, are published to `ghcr.io/mavrovde/viafrei-api` as `:X.Y.Z`, `:X.Y` and `:latest`, signed with cosign, with an SBOM and build provenance.
 
 ```sh
 docker run --rm --read-only -p "[::1]:8080:8080" \
   -e VFAPI_DB_URL_FILE=/run/secrets/db_url -v "$PWD/db_url:/run/secrets/db_url:ro" \
-  ghcr.io/mavrovde/viafrei-api:edge
+  ghcr.io/mavrovde/viafrei-api:latest
 ```
 
 [docs/container.md](docs/container.md) covers the tags, the `healthcheck` subcommand, resource limits and how to verify an image's signature, SBOM and provenance before running it.

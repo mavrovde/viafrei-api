@@ -7,6 +7,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/mavrovde/viafrei-api/internal/app/features"
+	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 )
@@ -60,6 +61,10 @@ type RoadWeatherObservation struct {
 }
 
 // WeatherRiskData is the answer of getWeatherRisk.
+//
+// lamp and truncated are API-only: the platform's weather warnings check
+// states neither, and the /v1 contract keeps both (VER-001), so the parity
+// harness leaves them out (parity.Default).
 type WeatherRiskData struct {
 	Lamp        string                   `json:"lamp" enum:"green,amber,red" doc:"Over every warning in force at the position, whatever min_level and hazards keep (they filter only the list), first match: red when a warning of level 3 or 4 is in force; amber for a warning of level 1 or 2, or, with no warning in force, when the sight is limited: a weather family the key may not read was left out (meta.partial), or a weather family read has no data or stale data (meta.freshness), since no warning cannot then be told from none heard; green when no warning is in force and every family is fresh."`
 	Warnings    []WeatherWarning         `json:"warnings" doc:"The warnings min_level and hazards keep, ordered by level descending, then validity.from ascending, then id; at most weather.max_warnings."`
@@ -95,7 +100,7 @@ type WeatherRiskOutput struct {
 
 func registerWeatherRisk(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "The official weather warnings at a position"
-	op.Description = "Every official weather warning in force now whose area contains the position, with the issuer's level and wording unchanged, and the lamp over every warning in force there, whatever min_level and hazards keep. MCP counterpart: weather warnings check. Needs the scope weather."
+	op.Description = "Every official weather warning in force now whose area contains the position, with the issuer's level and wording unchanged, as the platform's weather warnings check states them, and the lamp over every warning in force there, whatever min_level and hazards keep (API-only: the check states no lamp). MCP counterpart: weather warnings check. Needs the scope weather."
 	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, in *WeatherRiskInput) (*WeatherRiskOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
@@ -113,14 +118,7 @@ func registerWeatherRisk(api huma.API, s *server, op huma.Operation) {
 			return nil, s.featureProblem(ctx, err)
 		}
 		noteWeatherLamp(ctx, a)
-		ws := make([]WeatherWarning, len(a.Items))
-		for i, w := range a.Items {
-			ws[i] = WeatherWarning{
-				ID: w.ID, Hazard: string(w.Hazard), Level: int(w.Level), LevelName: w.LevelName, Issuer: w.Issuer,
-				Headline: w.Headline, TextLanguage: w.TextLanguage, Validity: timeWindow(w.From, w.Until),
-				Area: WarningArea{Name: w.AreaName}, SourceFamily: w.Family,
-			}
-		}
+		ws := weatherWarnings(a.Items)
 		return &WeatherRiskOutput{CacheControl: noStore, Body: WeatherRiskEnvelope{
 			Data: WeatherRiskData{Lamp: string(a.Lamp), Warnings: ws, Truncated: a.HasMore, RoadWeather: []RoadWeatherObservation{}},
 			Meta: WeatherRiskMeta{
@@ -151,21 +149,82 @@ func noteWeatherLamp(ctx context.Context, a features.WeatherRisk) {
 // DrivingRulesInput is the input of getDrivingRules.
 type DrivingRulesInput struct {
 	Topic string `query:"topic" required:"true" maxLength:"64" pattern:"^[a-z][a-z0-9_]*$" example:"winter_tyres" doc:"The rule topic, for example lorry_sunday_ban, holiday_ban, speed_limits, winter_tyres, emission_zones, emergency_corridor. Open enumeration."`
+	At    string `query:"at" pattern:"^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$" example:"48.776,9.18" doc:"With topic lez: a position (lat,lon) checked against the published low-emission-zone boundaries: inside, in an area released at a zone's edge, outside with the nearest zone within 25 km, or unknown. Ignored for any other topic."`
+	City  string `query:"city" minLength:"2" maxLength:"60" example:"Stuttgart" doc:"With topic lez: the city whose published zone is named. Ignored for any other topic."`
+	point *geo.Point
+}
+
+// Resolve reads the position.
+func (in *DrivingRulesInput) Resolve(huma.Context) []error {
+	if in.At == "" {
+		return nil
+	}
+	p, err := geo.ParsePoint(in.At)
+	if err != nil {
+		return []error{&huma.ErrorDetail{Location: "query.at", Message: err.Error(), Value: in.At}}
+	}
+	in.point = &p
+	return nil
+}
+
+// LowEmissionZone is one published zone row of a rules answer.
+type LowEmissionZone struct {
+	Key          string   `json:"key" doc:"<source>/<zone id>."`
+	Role         string   `json:"role" enum:"zone,exempt_road,transfer" doc:"A zone, a road the zone does not apply to, or an area released at its edge."`
+	Name         string   `json:"name"`
+	City         *string  `json:"city" nullable:"true"`
+	Publisher    *string  `json:"publisher" nullable:"true"`
+	Inside       bool     `json:"inside" doc:"Whether the position lies in it (its boundary counts); false without a position."`
+	DistanceM    int      `json:"distanceM" doc:"0 when inside or without a position, else the distance to it in metres."`
+	SameZone     []string `json:"sameZone" doc:"Other publishers' rows of the same zone in this answer (they share at least half of the smaller one's area)."`
+	SourceFamily string   `json:"sourceFamily"`
+}
+
+// ZoneVerdict is the zone answer of a position.
+type ZoneVerdict struct {
+	Kind       string  `json:"kind" enum:"inside,transfer,outside,unknown" doc:"inside a zone; in an area released at its edge; outside (zone names the nearest within 25 km); unknown: none within 25 km, which is not that there is no zone."`
+	Zone       *string `json:"zone" nullable:"true" doc:"The key of the zone it is inside, or of the nearest."`
+	Transfer   *string `json:"transfer" nullable:"true" doc:"The key of the released area it is in."`
+	ExemptRoad *string `json:"exemptRoad" nullable:"true" doc:"The key of an exempt road within 60 m."`
+	DistanceM  *int    `json:"distanceM" nullable:"true" doc:"Outside: the distance to the nearest zone in metres; null otherwise."`
+	ZoneFacts
+}
+
+func zoneKey(z *rules.Zone) *string {
+	if z == nil {
+		return nil
+	}
+	return &z.Key
 }
 
 // DrivingRule is one rule of a topic.
 type DrivingRule struct {
-	Text       string  `json:"text"`
-	LegalBasis *string `json:"legalBasis" nullable:"true" doc:"The provision the rule rests on; null when none is recorded."`
+	ID            string  `json:"id" doc:"The rule's key, stable across reviews."`
+	Text          string  `json:"text"`
+	LegalBasis    *string `json:"legalBasis" nullable:"true" doc:"The provision the rule rests on; null when none is recorded."`
+	LegalBasisURL *string `json:"sourceUrl" nullable:"true" doc:"Where the provision is published; null when none is recorded."`
+	ReviewedOn    string  `json:"reviewedOn" format:"date" doc:"When the rule was last read against its source."`
+	ToVerify      *string `json:"unconfirmed" nullable:"true" doc:"What of the rule is not confirmed, to check with the source; null when all is."`
 }
 
 // DrivingRulesData is the answer of getDrivingRules.
 type DrivingRulesData struct {
-	Topic      string        `json:"topic"`
-	Title      string        `json:"title"`
-	Rules      []DrivingRule `json:"rules" doc:"In their curated order."`
-	ReviewedOn string        `json:"reviewedOn" format:"date" doc:"When the topic was last reviewed."`
-	Disclaimer Disclaimer    `json:"disclaimer"`
+	Topic      string            `json:"topic"`
+	Title      string            `json:"title"`
+	Rules      []DrivingRule     `json:"rules" doc:"In their curated order."`
+	ReviewedOn string            `json:"reviewedOn" format:"date" doc:"The oldest review of its rules: the topic is as current as its least recently read rule."`
+	Disclaimer Disclaimer        `json:"disclaimer"`
+	Zones      []LowEmissionZone `json:"zones,omitempty" doc:"With topic lez and a position: the published zone rows, inside first, then by distance."`
+	Verdict    *ZoneVerdict      `json:"zoneVerdict,omitempty" doc:"With topic lez and a position: the platform's verdict."`
+	ZoneCity   *ZoneCity         `json:"zoneCity,omitempty" doc:"With topic lez and a city: the curated list's entry for it, or the city uncovered (no entry is not that the city has no zone; the condition note says so)."`
+}
+
+// ZoneCity is the curated zone list's entry for an asked city.
+type ZoneCity struct {
+	Name     string  `json:"name" doc:"The entry's name, or the asked city when the list holds none."`
+	Zone     *string `json:"zone" nullable:"true" doc:"The entry's description of its zone; null while the list carries none."`
+	Plakette *string `json:"plakette" nullable:"true" doc:"The plaque the zone takes (green); null when none is stated."`
+	Covered  bool    `json:"covered" doc:"Whether the list holds an entry whose zone it states."`
 }
 
 // Disclaimer is the sentence every rules answer carries. Its schema is an
@@ -205,17 +264,68 @@ func registerDrivingRules(api huma.API, s *server, op huma.Operation) {
 			return nil, s.featureProblem(ctx, err)
 		}
 		noteRules(ctx)
+		var zones []LowEmissionZone
+		var verdict *ZoneVerdict
+		var city *ZoneCity
+		var caveat string
+		if t.Code == "lez" && (in.point != nil || in.City != "") {
+			z, err := s.features.LowEmissionZones(ctx, principalFrom(ctx).Key, rules.ZoneQuery{At: in.point, City: in.City})
+			if err != nil {
+				return nil, s.featureProblem(ctx, err)
+			}
+			if c := z.City; c != nil {
+				city, caveat = &ZoneCity{Name: c.Name, Zone: c.Zone, Plakette: c.Plakette, Covered: c.Covered}, c.Caveat
+			}
+			if in.point != nil {
+				zones = []LowEmissionZone{}
+			}
+			for _, r := range z.Zones {
+				zones = append(zones, LowEmissionZone{Key: r.Key, Role: r.Role, Name: r.Name, City: r.City, Publisher: r.Publisher,
+					Inside: r.Inside, DistanceM: r.DistanceM, SameZone: append([]string{}, r.SameZone...), SourceFamily: r.Family})
+			}
+			if v := z.Verdict; v != nil {
+				verdict = &ZoneVerdict{Kind: v.Kind, Zone: zoneKey(v.Zone), Transfer: zoneKey(v.Transfer), ExemptRoad: zoneKey(v.ExemptRoad), ZoneFacts: zoneFacts(z.Answer)}
+				if v.Kind == "outside" && v.Zone != nil {
+					d := v.Zone.DistanceM
+					verdict.DistanceM = &d
+				}
+			}
+			a.Families = append(a.Families, z.Meta.Families...)
+		}
 		rs := make([]DrivingRule, len(t.Rules))
 		for i, r := range t.Rules {
-			rs[i] = DrivingRule{Text: r.Text, LegalBasis: r.LegalBasis}
+			rs[i] = DrivingRule{ID: r.ID, Text: r.Text, LegalBasis: r.LegalBasis, LegalBasisURL: r.LegalBasisURL,
+				ReviewedOn: r.ReviewedOn.Format(time.DateOnly), ToVerify: r.ToVerify}
 		}
 		return &DrivingRulesOutput{CacheControl: noStore, Body: DrivingRulesEnvelope{
 			Data: DrivingRulesData{
 				Topic: t.Code, Title: t.Title, Rules: rs,
-				ReviewedOn: t.ReviewedOn.Format(time.DateOnly), Disclaimer: rules.Disclaimer,
+				ReviewedOn: t.ReviewedOn.Format(time.DateOnly), Disclaimer: rules.Disclaimer, Zones: zones, Verdict: verdict, ZoneCity: city,
 			},
-			Meta:  s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
+			Meta:  rulesMeta(s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail), caveat),
 			Links: s.selfLink(ctx),
 		}}, nil
 	})
+}
+
+// rulesMeta states the caveat of a city the zone list holds no entry for
+// as a condition: no entry is not that there is no zone.
+func rulesMeta(m DataMeta, caveat string) DataMeta {
+	if caveat != "" {
+		m.Notes.Condition = append(m.Notes.Condition, caveat)
+	}
+	return m
+}
+
+// weatherWarnings are the answers of the warnings.
+func weatherWarnings(items []weather.Warning) []WeatherWarning {
+	ws := make([]WeatherWarning, len(items))
+	for i, w := range items {
+		ws[i] = WeatherWarning{
+			ID: w.ID, Hazard: string(w.Hazard), Level: int(w.Level), LevelName: w.LevelName, Issuer: w.Issuer,
+			Headline: w.Headline, TextLanguage: w.TextLanguage, Validity: timeWindow(w.From, w.Until),
+			Area: WarningArea{Name: w.AreaName}, SourceFamily: w.Family,
+		}
+	}
+	return ws
 }

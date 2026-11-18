@@ -187,10 +187,6 @@ func TestServerAppliesDefaultsWithoutALogger(t *testing.T) {
 	if err != nil || srv.ErrorLog == nil {
 		t.Fatalf("server = %v, %v", srv, err)
 	}
-	doc, err := OpenAPI(config.Defaults())
-	if err != nil || !json.Valid(doc) {
-		t.Fatalf("OpenAPI = %d bytes, %v", len(doc), err)
-	}
 }
 
 // TestStrictQueryRefusesARepeatedDeclaredParameter: a declared parameter
@@ -215,6 +211,16 @@ func TestStrictQueryRefusesARepeatedDeclaredParameter(t *testing.T) {
 		}
 		if want == http.StatusBadRequest && !strings.Contains(w.Body.String(), `"parameter":"query.radius_m","code":"invalid","detail":"repeated parameter"`) {
 			t.Fatalf("%s: %s", target, w.Body)
+		}
+	}
+}
+
+// TestTenthKm: a filling station's distance is stated as the platform's
+// filling-station search states it, kilometres to one decimal, halves up.
+func TestTenthKm(t *testing.T) {
+	for m, want := range map[int]int{0: 0, 49: 0, 50: 100, 110: 100, 149: 100, 150: 200, 62433: 62400} {
+		if got := tenthKm(m); got != want {
+			t.Errorf("tenthKm(%d) = %d, want %d", m, got, want)
 		}
 	}
 }

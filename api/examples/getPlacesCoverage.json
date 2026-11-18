@@ -1,0 +1,231 @@
+{
+  "title": "What the gazetteer and the addresses hold",
+  "request": "/v1/places/coverage",
+  "attribution": "Every count names its source family; each family that contributed is listed in meta.attribution with its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "places"
+    ],
+    "sources": [
+      "bkg_gvisys",
+      "geonames",
+      "osm"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": {
+      "kinds": [
+        {
+          "kind": "locality",
+          "count": 11,
+          "englishNames": 2,
+          "newestLoad": "2026-03-29T19:51:15Z",
+          "sourceFamily": "bkg_gvisys"
+        },
+        {
+          "kind": "municipality",
+          "count": 75,
+          "englishNames": 6,
+          "newestLoad": "2026-03-29T22:15:32Z",
+          "sourceFamily": "bkg_gvisys"
+        },
+        {
+          "kind": "state",
+          "count": 7,
+          "englishNames": 0,
+          "newestLoad": "2026-03-29T19:12:55Z",
+          "sourceFamily": "bkg_gvisys"
+        },
+        {
+          "kind": "locality",
+          "count": 10,
+          "englishNames": 2,
+          "newestLoad": "2026-03-29T22:35:07Z",
+          "sourceFamily": "geonames"
+        },
+        {
+          "kind": "municipality",
+          "count": 25,
+          "englishNames": 8,
+          "newestLoad": "2026-03-29T18:43:47Z",
+          "sourceFamily": "geonames"
+        },
+        {
+          "kind": "state",
+          "count": 9,
+          "englishNames": 1,
+          "newestLoad": "2026-03-29T19:17:24Z",
+          "sourceFamily": "geonames"
+        }
+      ],
+      "lands": [
+        {
+          "code": "01",
+          "name": "Matfienland",
+          "sourceFamily": "geonames"
+        },
+        {
+          "code": "02",
+          "name": "Püngmösland",
+          "sourceFamily": "geonames"
+        },
+        {
+          "code": "03",
+          "name": "Rettasland",
+          "sourceFamily": "geonames"
+        },
+        {
+          "code": "04",
+          "name": "Maungstömland",
+          "sourceFamily": "bkg_gvisys"
+        },
+        {
+          "code": "05",
+          "name": "Zenmimland",
+          "sourceFamily": "bkg_gvisys"
+        },
+        {
+          "code": "06",
+          "name": "Köndoßland",
+          "sourceFamily": "geonames"
+        },
+        {
+          "code": "07",
+          "name": "Wurhutland",
+          "sourceFamily": "geonames"
+        },
+        {
+          "code": "08",
+          "name": "Tarklelland",
+          "sourceFamily": "geonames"
+        },
+        {
+          "code": "09",
+          "name": "Fickmüngland",
+          "sourceFamily": "bkg_gvisys"
+        },
+        {
+          "code": "10",
+          "name": "Kurbamland",
+          "sourceFamily": "bkg_gvisys"
+        },
+        {
+          "code": "11",
+          "name": "Grißkleiland",
+          "sourceFamily": "bkg_gvisys"
+        },
+        {
+          "code": "12",
+          "name": "Durgroßland",
+          "sourceFamily": "geonames"
+        },
+        {
+          "code": "13",
+          "name": "Lecknämland",
+          "sourceFamily": "geonames"
+        },
+        {
+          "code": "14",
+          "name": "Hügüsland",
+          "sourceFamily": "bkg_gvisys"
+        },
+        {
+          "code": "15",
+          "name": "Nolkünland",
+          "sourceFamily": "bkg_gvisys"
+        },
+        {
+          "code": "16",
+          "name": "Zugrisland",
+          "sourceFamily": "geonames"
+        }
+      ],
+      "addresses": [
+        {
+          "land": null,
+          "dataAsOf": "2026-02-26T00:00:00Z",
+          "sourceFamily": "osm"
+        }
+      ]
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": null,
+      "freshness": [
+        {
+          "family": "bkg_gvisys",
+          "dataAsOf": null,
+          "ageS": null,
+          "staleAfterS": 9007199254740991,
+          "stale": false
+        },
+        {
+          "family": "geonames",
+          "dataAsOf": null,
+          "ageS": null,
+          "staleAfterS": 9007199254740991,
+          "stale": false
+        },
+        {
+          "family": "osm",
+          "dataAsOf": null,
+          "ageS": null,
+          "staleAfterS": 9007199254740991,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "bkg_gvisys",
+          "domain": "places",
+          "publisher": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
+          "text": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
+          "licence": "dl-de/by-2-0",
+          "licenceUrl": "https://licences.example/dl-de-by-2-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+        },
+        {
+          "family": "geonames",
+          "domain": "places",
+          "publisher": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+          "text": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://download.geonames.org/export/dump/"
+        },
+        {
+          "family": "osm",
+          "domain": "places",
+          "publisher": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0",
+          "text": "OSM-Standortdaten: © OpenStreetMap-Mitwirkende, ODbL 1.0",
+          "licence": "ODbL 1.0",
+          "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
+          "shareAlike": true,
+          "shareAlikeOffer": "https://viafrei.de/impressum",
+          "termsUrl": "https://www.openstreetmap.org/copyright"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ]
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/places/coverage"
+    }
+  }
+}

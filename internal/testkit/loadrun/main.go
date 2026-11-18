@@ -122,6 +122,7 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		openFor  = fs.Duration("breaker-open-for", 2*time.Second, "breaker.open_for of the instance under test, as test/load/compose.yaml sets it (NFR-RES-002)")
 		probes   = fs.Int("breaker-probes", 2, "breaker.half_open_probes of the instance under test (NFR-RES-002)")
 		cached   = fs.String("cached-api", "http://[::1]:8081", "base URL of the instance with the result cache, behind the same fault proxy (NFR-RES-004)")
+		healthAt = fs.String("health", "http://[::1]:8082", "base URL of the health listener of the instance under test, where /readyz is asked")
 		staleFor = fs.Duration("stale-if-error", 4*time.Second, "cache.stale_if_error.parking of the instance with the result cache, as test/load/compose.yaml sets it (NFR-RES-004)")
 		app      = fs.String("application-name", "viafrei-api", "db.application_name of the instance under test: its storage connections are counted by it, apart from the instance with the result cache (NFR-CAP-002)")
 		ageP     = fs.Duration("max-age-parking", time.Second, "cache.max_age.parking of the instance with the result cache, as test/load/compose.yaml sets it")
@@ -173,7 +174,7 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	if err != nil {
 		return fail("%v", err)
 	}
-	for _, u := range []string{*api, *proxy, *cached} {
+	for _, u := range []string{*api, *proxy, *cached, *healthAt} {
 		if err := guard(u, hosts); err != nil {
 			return fail("%v", err)
 		}
@@ -187,6 +188,7 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		return fail("%v", err)
 	}
 	r := newRunner(p, b, strings.TrimRight(*api, "/"), strings.TrimRight(*proxy, "/"), key, cold, *place, *poolMax, *deadline, *grace)
+	r.readyURL = strings.TrimRight(*healthAt, "/") + "/readyz"
 	r.docker = execDocker(*docker, *project, strings.Split(*files, ","))
 	r.host = execHost(*docker)
 	r.queued = *queued

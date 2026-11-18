@@ -14,9 +14,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/health"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/testkit/pgtest"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
@@ -29,18 +29,13 @@ var db *pgtest.DB
 
 func TestMain(m *testing.M) {
 	// Starting the container is setup, outside every test body's bound.
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	var err error
-	db, err = pgtest.Start(ctx)
-	if err != nil {
-		cancel()
-		fmt.Fprintln(os.Stderr, "integration tests need a container runtime:", err)
-		os.Exit(1)
+	ctx, cancel := context.WithTimeout(context.Background(), pgtest.SetupBound)
+	rows, err := seedRows()
+	if err == nil {
+		db, err = pgtest.Seeded(ctx, rows)
 	}
-	err = seed(ctx)
 	cancel()
 	if err != nil {
-		db.Stop()
 		fmt.Fprintln(os.Stderr, "loading the fixtures:", err)
 		os.Exit(1)
 	}
@@ -119,7 +114,9 @@ func TestWriteThroughStoreRefused(t *testing.T) {
 	ctx := bounded(t)
 	st := openStore(t, ctx)
 	err := st.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, "delete from contract.contract_info")
+		// The contract views refuse a write themselves (they are read-only
+		// views), so the write is one the role could otherwise make.
+		_, err := tx.Exec(ctx, "create temp table planted (x int)")
 		return err
 	})
 	if !errors.Is(err, store.ErrUnavailable) || sqlState(err) != "25006" {
@@ -128,7 +125,7 @@ func TestWriteThroughStoreRefused(t *testing.T) {
 	var v string
 	if err := st.Read(ctx, func(ctx context.Context, tx pgx.Tx) error {
 		return tx.QueryRow(ctx, "select contract_version from contract.contract_info").Scan(&v)
-	}); err != nil || v != contract.Version() {
+	}); err != nil || v != dbcontract.ContractVersion {
 		t.Fatalf("the row must still be there: %q %v", v, err)
 	}
 }
@@ -143,10 +140,10 @@ func TestReaderRoleLimits(t *testing.T) {
 	defer func() { _ = owner.Close(context.WithoutCancel(ctx)) }()
 	var super, inherit bool
 	var limit int
-	if err := owner.QueryRow(ctx, "select rolsuper, rolinherit, rolconnlimit from pg_roles where rolname = $1", contract.ReaderRole).Scan(&super, &inherit, &limit); err != nil {
+	if err := owner.QueryRow(ctx, "select rolsuper, rolinherit, rolconnlimit from pg_roles where rolname = $1", dbcontract.ReaderRole).Scan(&super, &inherit, &limit); err != nil {
 		t.Fatal(err)
 	}
-	// 16 is the largest db.pool_max (db/contract TestRoleLimitCoversPoolMax).
+	// 16 is the largest db.pool_max (internal/dbcontract TestRoleLimitCoversPoolMax).
 	if super || inherit || limit != 16 {
 		t.Fatalf("role attributes: super=%v inherit=%v connlimit=%d", super, inherit, limit)
 	}
@@ -319,7 +316,7 @@ func TestReadinessAgainstARealDatabase(t *testing.T) {
 	req.Covers(t, "FR-SVC-004")
 	ctx := bounded(t)
 	st := openStore(t, ctx)
-	expected, err := health.ExpectedVersion("", contract.Version())
+	expected, err := health.ExpectedVersion("", dbcontract.ContractVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -348,7 +345,7 @@ func TestUnreachableStorageIsNotReady(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer st.Close()
-	expected, _ := health.ExpectedVersion("", contract.Version())
+	expected, _ := health.ExpectedVersion("", dbcontract.ContractVersion)
 	r := health.NewChecker(st, expected, 300*time.Millisecond).Check(ctx)
 	if r.Ready || r.Checks[health.CheckStorage] != health.Fail {
 		t.Fatalf("unreachable storage reported %v", r.Checks)

@@ -1,45 +1,40 @@
 {
   "title": "Two parking sites within 50 km, with terms accepted",
-  "request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=50000\u0026limit=2",
-  "attribution": "Parking sites and their occupancy come from the source families of the parking domain the key is entitled to; a family whose terms need accepting answers only after the key has accepted them. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "request": "/v1/parking-options?at=50.39,10.23\u0026radius_m=50000\u0026limit=2\u0026accept_terms=sid-terms-1",
+  "attribution": "Parking sites and their occupancy come from the source families of the parking domain the key is entitled to; a family whose terms need accepting answers only to a request that accepts them (accept_terms), which the caller passes after its end user has accepted their text. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
   "key": {
     "useClass": "commercial",
     "scopes": [
       "parking"
     ],
     "sources": [
-      "src-alpha-parking",
-      "src-beta-parking",
-      "src-delta-parking"
-    ],
-    "accepted": [
-      {
-        "source": "src-delta-parking",
-        "version": "2026-03-01"
-      }
+      "park_alpha",
+      "park_beta",
+      "truckpark_sid_static",
+      "truckpark_sid_dyn"
     ]
   },
   "status": 200,
   "response": {
     "data": [
       {
-        "id": "pk-07-0012",
-        "name": "Gienneisfeld Parken",
-        "operator": "Firgräng Parkraum",
-        "kind": "truck_parking",
+        "id": "p:27",
+        "name": "Möniltal Parken",
+        "operator": "Biesem Parkraum",
+        "kind": "rest_area",
         "location": {
-          "lat": 50.387403,
-          "lon": 10.232051
+          "lat": 50.111313,
+          "lon": 10.561987
         },
-        "distanceM": 324,
+        "distanceM": 39008,
         "occupancy": {
-          "free": 93,
-          "total": 350,
+          "free": 106,
+          "total": 231,
           "state": "free",
-          "observedAt": "2026-03-29T22:01:21Z"
+          "observedAt": "2026-03-29T19:53:27Z"
         },
         "termsRequired": false,
-        "sourceFamily": "src-delta-parking"
+        "sourceFamily": "park_alpha"
       }
     ],
     "meta": {
@@ -49,30 +44,28 @@
       "asOf": "2026-03-29T23:57:30Z",
       "freshness": [
         {
-          "family": "src-delta-parking",
+          "family": "park_alpha",
           "dataAsOf": "2026-03-29T23:57:30Z",
           "ageS": 150,
-          "staleAfterS": 1800,
+          "staleAfterS": 900,
           "stale": false
         }
       ],
       "attribution": [
         {
-          "family": "src-delta-parking",
+          "family": "park_alpha",
           "domain": "parking",
-          "publisher": "Kleber Datenwerk",
-          "text": "Synthetic data from family delta, licence lic-delta.",
-          "licence": "Synthetic licence delta",
-          "licenceUrl": "https://licences.example/delta",
+          "publisher": "Fäpung Datenwerk",
+          "text": "Synthetic data from family alpha, licence CC BY 4.0.",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://delta.example/terms"
+          "termsUrl": "https://alpha.example/terms/park_alpha"
         }
       ],
       "notes": {
-        "condition": [
-          "Use only after accepting the terms (synthetic)."
-        ],
+        "condition": [],
         "purpose": []
       },
       "warnings": [

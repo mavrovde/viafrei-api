@@ -206,8 +206,7 @@ func TestMaxAgePerDomain(t *testing.T) {
 }
 
 func TestPermissionsSeparateEveryLicenceInput(t *testing.T) {
-	base := access.Record{Environment: "live", Plan: access.Plan{UseClass: "commercial", Sources: []string{"b", "a"}, Scopes: []access.Scope{"energy", "places"}},
-		Accepted: []access.Acceptance{{Source: "s", Version: "1"}}}
+	base := access.Record{Environment: "live", Plan: access.Plan{UseClass: "commercial", Sources: []string{"b", "a"}, Scopes: []access.Scope{"energy", "places"}}}
 	same := base
 	same.Plan.Sources = []string{"a", "b"}
 	same.Plan.Scopes = []access.Scope{"places", "energy"}
@@ -219,7 +218,6 @@ func TestPermissionsSeparateEveryLicenceInput(t *testing.T) {
 		"use class":   func(r *access.Record) { r.Plan.UseClass = "personal" },
 		"sources":     func(r *access.Record) { r.Plan.Sources = []string{"a"} },
 		"scopes":      func(r *access.Record) { r.Plan.Scopes = []access.Scope{"energy"} },
-		"accepted":    func(r *access.Record) { r.Accepted = []access.Acceptance{{Source: "s", Version: "2"}} },
 	} {
 		r := base
 		r.Plan.Sources = slicesClone(base.Plan.Sources)

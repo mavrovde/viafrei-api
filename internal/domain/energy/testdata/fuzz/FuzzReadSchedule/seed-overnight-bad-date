@@ -1,0 +1,5 @@
+go test fuzz v1
+string("Fr bis Mo")
+string("20:00")
+string("02:00")
+string("2026-02-30 10:00")

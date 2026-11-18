@@ -33,6 +33,12 @@
 //
 // With -plan (pr mode) it reads no report and prints the scope roots that
 // the change list touches, so the caller mutates those and nothing else.
+// With -plan -shard K/N (full mode) it prints shard K of N of the scope
+// roots: the roots at the positions p of the scope file with p mod N = K-1,
+// so the N shards are disjoint and together every root. A full run cut into
+// N parallel jobs mutates one shard each and gathers the reports in one
+// full-mode gate, which refuses a root with no report. A -shard that is not
+// K/N with 1 <= K <= N, or a shard that selects no root, is exit 2.
 //
 // Exit 0 when the score reaches -min, 1 below it, on zero scored mutants
 // for changed in-scope code, or on a bad equivalent entry, 2 on a usage
@@ -48,6 +54,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -126,7 +133,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 	eqPath := fs.String("equivalent", "", "equivalents file (required; it may list nothing)")
 	changedPath := fs.String("changed", "", "changed lines (pr mode, required there)")
 	reportPath := fs.String("report", "", "write a Markdown report here")
-	plan := fs.Bool("plan", false, "pr mode: print the scope roots the change list touches, one per line, and exit")
+	plan := fs.Bool("plan", false, "pr mode: print the scope roots the change list touches, one per line, and exit; full mode: with -shard, the roots of that shard")
+	shardArg, hasShard := "", false
+	fs.Func("shard", "full mode with -plan: shard K/N of the scope roots", func(v string) error {
+		shardArg, hasShard = v, true
+		return nil
+	})
 	var baseline []string
 	fs.Func("baseline", "pr mode: ROOT=REPORT of a run at the base (repeatable)", func(v string) error {
 		baseline = append(baseline, v)
@@ -150,6 +162,16 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if len(baseline) > 0 && (*mode != "pr" || *plan) {
 		return usageErr(stderr, "-baseline needs pr mode and a report")
 	}
+	var sh shard
+	if hasShard {
+		var ok bool
+		if sh, ok = parseShard(shardArg); !ok {
+			return usageErr(stderr, "-shard must be K/N with 1 <= K <= N, not %q", shardArg)
+		}
+		if *mode != "full" || !*plan {
+			return usageErr(stderr, "-shard needs full mode and -plan")
+		}
+	}
 	roots, err := readScope(*scopePath)
 	if err != nil {
 		return usageErr(stderr, "%v", err)
@@ -164,10 +186,20 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return usageErr(stderr, "%v", err)
 		}
 	}
-	if *plan {
-		if *mode != "pr" {
-			return usageErr(stderr, "-plan needs pr mode")
+	if *plan && *mode == "full" {
+		if !hasShard {
+			return usageErr(stderr, "-plan needs pr mode, or full mode with -shard K/N")
 		}
+		sel := shardOf(roots, sh)
+		if len(sel) == 0 {
+			return usageErr(stderr, "-shard %s selects no scope root of %s (%d root(s)): an empty shard is never a pass", shardArg, *scopePath, len(roots))
+		}
+		for _, r := range sel {
+			fmt.Fprintln(stdout, r.dir)
+		}
+		return 0
+	}
+	if *plan {
 		for _, r := range roots {
 			for file := range changed {
 				if inScope([]root{r}, file) {
@@ -412,6 +444,36 @@ func readScope(name string) ([]root, error) {
 }
 
 // readEquivalents reads LOCATION, MUTATOR, REASON and REVIEWER per line.
+// shard is slice index of count (1-based) of a list cut by position.
+type shard struct{ index, count int }
+
+var shardSyntax = regexp.MustCompile(`^([1-9][0-9]*)/([1-9][0-9]*)$`)
+
+// parseShard reads K/N with integers 1 <= K <= N.
+func parseShard(raw string) (shard, bool) {
+	m := shardSyntax.FindStringSubmatch(raw)
+	if m == nil {
+		return shard{}, false
+	}
+	k, errK := strconv.Atoi(m[1])
+	n, errN := strconv.Atoi(m[2])
+	if errK != nil || errN != nil || k > n {
+		return shard{}, false
+	}
+	return shard{index: k, count: n}, true
+}
+
+// shardOf keeps the items at the positions p with p mod count = index-1.
+func shardOf[T any](items []T, s shard) []T {
+	var out []T
+	for p, it := range items {
+		if p%s.count == s.index-1 {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
 func readEquivalents(name string) ([]*equivalent, error) {
 	rows, err := lines(name, 4)
 	if err != nil {

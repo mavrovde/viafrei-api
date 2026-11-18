@@ -11,6 +11,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
+	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
@@ -20,6 +21,16 @@ import (
 func (f *fakeFeatures) WeatherRisk(_ context.Context, key access.Record, q weather.Query) (features.WeatherRisk, error) {
 	f.gotKey, f.gotRisk = key, q
 	return f.risk, f.err
+}
+
+func (f *fakeFeatures) WeatherCell(_ context.Context, key access.Record, target string, at *geo.Point, minLevel int) (features.CellAnswer, error) {
+	f.gotKey, f.gotCell = key, weather.CellQuery{Cell: target, At: at, MinLevel: minLevel}
+	return f.cell, f.cellErr
+}
+
+func (f *fakeFeatures) LowEmissionZones(_ context.Context, _ access.Record, q rules.ZoneQuery) (features.ZonesAnswer, error) {
+	f.gotZones = &q
+	return f.zones, f.zonesErr
 }
 
 func (f *fakeFeatures) DrivingRules(_ context.Context, key access.Record, topic string) (rules.Topic, features.Answer[rules.Rule], error) {
@@ -132,6 +143,44 @@ func TestDrivingRulesAnswer(t *testing.T) {
 	}
 }
 
+func TestDrivingRulesZones(t *testing.T) {
+	req.Covers(t, "FR-RULES-001")
+	f := everyAnswer()
+	f.topic.Code = "lez"
+	z := rules.Zone{Key: "lez_alpha/z1", Role: "zone", Name: "Umweltzone", DistanceM: 420, Family: "lez_alpha"}
+	f.zones = features.ZonesAnswer{Zones: []rules.Zone{z}, Verdict: &rules.Verdict{Kind: "outside", Zone: &z}, Answer: &rules.ZoneAnswer{}}
+	h := featureHandler(t, config.Defaults(), f, nil)
+	body := decode(t, do(t, h, http.MethodGet, "/v1/driving-rules?topic=lez&at=52.52,13.405", bearer))
+	data, _ := body["data"].(map[string]any)
+	v, _ := data["zoneVerdict"].(map[string]any)
+	if v["distanceM"] != 420.0 || v["zone"] != "lez_alpha/z1" || data["zoneCity"] != nil || f.gotZones == nil || f.gotZones.City != "" {
+		t.Errorf("outside: %v, asked %+v", data, f.gotZones)
+	}
+	f.zones.Verdict.Kind = "inside"
+	data, _ = decode(t, do(t, h, http.MethodGet, "/v1/driving-rules?topic=lez&at=52.52,13.405", bearer))["data"].(map[string]any)
+	if v, _ = data["zoneVerdict"].(map[string]any); v["distanceM"] != nil {
+		t.Errorf("inside states no distance: %v", v)
+	}
+	green := "green"
+	f.zones = features.ZonesAnswer{City: &rules.ZoneCity{Name: "Matfienland", Caveat: "no zone held"}}
+	body = decode(t, do(t, h, http.MethodGet, "/v1/driving-rules?topic=lez&city=Matfienland", bearer))
+	data, _ = body["data"].(map[string]any)
+	c, _ := data["zoneCity"].(map[string]any)
+	notes, _ := meta(t, body)["notes"].(map[string]any)
+	cond, _ := notes["condition"].([]any)
+	if c["name"] != "Matfienland" || c["covered"] != false || c["zone"] != nil || data["zones"] != nil || f.gotZones.City != "Matfienland" ||
+		len(cond) != 1 || cond[0] != "no zone held" {
+		t.Errorf("a city with no entry: %v %v", data, notes)
+	}
+	f.zones = features.ZonesAnswer{City: &rules.ZoneCity{Name: "Berlin", Plakette: &green, Covered: true}}
+	body = decode(t, do(t, h, http.MethodGet, "/v1/driving-rules?topic=lez&city=Berlin", bearer))
+	c, _ = body["data"].(map[string]any)["zoneCity"].(map[string]any)
+	notes, _ = meta(t, body)["notes"].(map[string]any)
+	if cond, _ = notes["condition"].([]any); c["covered"] != true || c["plakette"] != "green" || len(cond) != 0 {
+		t.Errorf("an entry: %v %v", c, notes)
+	}
+}
+
 func TestWeatherAndRulesRefusals(t *testing.T) {
 	req.Covers(t, "FR-RULES-001", "NFR-SEC-002")
 	assertProblem(t, do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: rules.ErrUnknownTopic}, nil), http.MethodGet, "/v1/driving-rules?topic=nope", bearer), 404, "not-found")
@@ -142,4 +191,17 @@ func TestWeatherAndRulesRefusals(t *testing.T) {
 	} {
 		assertProblem(t, do(t, h, http.MethodGet, target, bearer), 400, "invalid-parameter")
 	}
+}
+
+func (f *fakeFeatures) LorryRules(context.Context, access.Record, roads.LorryQuery) (features.LorryAnswer, error) {
+	return f.lorry, f.err
+}
+
+func (f *fakeFeatures) Sources(context.Context, access.Record, string) ([]provenance.Family, features.Answer[struct{}], error) {
+	return nil, features.Answer[struct{}]{}, f.err
+}
+
+func (f *fakeFeatures) Motorways(_ context.Context, _ access.Record, q roads.CatalogueQuery) (features.MotorwaysAnswer, error) {
+	f.gotCat = q
+	return f.motorways, f.err
 }

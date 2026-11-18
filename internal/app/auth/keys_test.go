@@ -23,7 +23,6 @@ type fakeLedger struct {
 	issued  []access.Record
 	rotated []time.Time
 	moved   []string
-	accepts []access.Acceptance
 	before  []time.Time
 	kept    []int
 	err     error
@@ -53,11 +52,6 @@ func (l *fakeLedger) Revoke(_ context.Context, c auth.Change) error { return l.n
 
 func (l *fakeLedger) Move(_ context.Context, c auth.Change, plan string) error {
 	l.moved = append(l.moved, plan)
-	return l.note(c)
-}
-
-func (l *fakeLedger) Accept(_ context.Context, c auth.Change, a access.Acceptance) error {
-	l.accepts = append(l.accepts, a)
 	return l.note(c)
 }
 
@@ -91,6 +85,34 @@ func (l *fakeLedger) AuditList(_ context.Context, limit int) ([]auth.AuditEntry,
 
 func newKeys(l *fakeLedger) *auth.Keys {
 	return auth.NewKeys(settings(), l, nil, func() time.Time { return t0 })
+}
+
+func TestIssueAudience(t *testing.T) {
+	req.Covers(t, "SEC-012", "SEC-030")
+	l := &fakeLedger{}
+	k := newKeys(l)
+	ctx := context.Background()
+	if _, err := k.Issue(ctx, "standard", "l", "c", 0, "o"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := k.IssueAs(ctx, access.AudienceOwn, "standard", "l", "c", 0, "o"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := k.IssueAs(ctx, access.AudiencePublic, "standard", "l", "c", 0, "o"); err != nil {
+		t.Fatal(err)
+	}
+	if len(l.issued) != 3 || l.issued[0].Audience != access.AudiencePublic || l.issued[1].Audience != access.AudienceOwn ||
+		l.issued[2].Audience != access.AudiencePublic {
+		t.Fatalf("audiences stored: %+v", l.issued)
+	}
+	for _, a := range []access.Audience{"", "internal", "OWN"} {
+		if _, err := k.IssueAs(ctx, a, "standard", "l", "c", 0, "o"); !errors.Is(err, auth.ErrInput) {
+			t.Errorf("audience %q: %v", a, err)
+		}
+	}
+	if len(l.issued) != 3 {
+		t.Error("a refused audience reached the ledger")
+	}
 }
 
 func TestIssue(t *testing.T) {
@@ -207,13 +229,10 @@ func TestLifecycleValidatesAndAudits(t *testing.T) {
 	if err := k.Move(ctx, "abcdefghij", "pro", "o"); err != nil || l.moved[0] != "pro" {
 		t.Fatal(err)
 	}
-	if err := k.Accept(ctx, "abcdefghij", "delta", "2026-03-01", "o"); err != nil || l.accepts[0] != (access.Acceptance{Source: "delta", Version: "2026-03-01"}) {
-		t.Fatal(err)
-	}
 	if n, err := k.Prune(ctx, "o"); err != nil || n != 3 || !l.before[0].Equal(t0.Add(-395*24*time.Hour)) {
 		t.Fatalf("prune %d %v %v", n, err, l.before)
 	}
-	want := []string{auth.ActionPlan, auth.ActionRevoke, auth.ActionMove, auth.ActionAccept, auth.ActionPruned}
+	want := []string{auth.ActionPlan, auth.ActionRevoke, auth.ActionMove, auth.ActionPruned}
 	for i, c := range l.changes {
 		if c.Action != want[i] || c.Actor != "o" {
 			t.Errorf("change %d: %+v", i, c)
@@ -241,7 +260,6 @@ func TestLifecycleValidatesAndAudits(t *testing.T) {
 		{"usage no window", func() error { _, err := k.Usage(ctx, "", 0); return err }()},
 		{"revoke no reason", k.Revoke(ctx, "abcdefghij", "", "o")},
 		{"move no plan", k.Move(ctx, "abcdefghij", "", "o")},
-		{"accept no version", k.Accept(ctx, "abcdefghij", "delta", "", "o")},
 		{"prune no actor", func() error { _, err := k.Prune(ctx, ""); return err }()},
 	}
 	for _, b := range bad {

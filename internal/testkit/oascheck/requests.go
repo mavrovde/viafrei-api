@@ -1,10 +1,11 @@
 package oascheck
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -279,7 +280,14 @@ func countPrefix(errs []error, prefix string) int {
 }
 
 func serve(h http.Handler, r Request) *httptest.ResponseRecorder {
-	req := httptest.NewRequestWithContext(context.Background(), r.Operation.Method, r.Target, nil)
+	var body io.Reader
+	if r.Operation.body != nil {
+		body = bytes.NewReader(r.Operation.body)
+	}
+	req := httptest.NewRequestWithContext(context.Background(), r.Operation.Method, r.Target, body)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 	return w
@@ -307,7 +315,7 @@ func (d *Document) Exercise(h http.Handler) (Report, error) {
 		w := serve(h, r)
 		err := d.Check(r.Operation.Method, r.Target, w.Code, w.Header(), w.Body.Bytes())
 		if err == nil && w.Code == http.StatusBadRequest {
-			err = errors.New("answered 400")
+			err = fmt.Errorf("answered 400: %s", w.Body)
 		}
 		if err != nil {
 			rep.Findings = append(rep.Findings, fmt.Errorf("example: %s %s: %w", r.Operation.ID, r.Target, err))

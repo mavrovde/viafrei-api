@@ -26,6 +26,7 @@ type Problem struct {
 	Retryable  bool         `json:"retryable" doc:"Whether repeating the same request may succeed."`
 	RetryAfter *int         `json:"retryAfter,omitempty" doc:"Seconds, equal to Retry-After, where applicable."`
 	Errors     []ParamError `json:"errors,omitempty" doc:"One entry per violation, for invalid-parameter."`
+	Terms      []TermsOffer `json:"terms,omitempty" doc:"The current terms, for terms-not-accepted when the accepted ones are not current."`
 
 	headers http.Header
 }

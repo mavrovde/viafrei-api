@@ -91,6 +91,9 @@ type Operation struct {
 	ID, Method, Path string
 	params           []param
 	responses        map[string]response
+	// body is the documented example of a JSON request body, nil when the
+	// operation takes none.
+	body json.RawMessage
 }
 
 // Statuses returns the documented status keys of the operation, sorted.
@@ -141,6 +144,11 @@ func Load(raw []byte) (*Document, error) {
 				OperationID string              `json:"operationId"`
 				Parameters  []param             `json:"parameters"`
 				Responses   map[string]response `json:"responses"`
+				RequestBody *struct {
+					Content map[string]struct {
+						Example json.RawMessage `json:"example"`
+					} `json:"content"`
+				} `json:"requestBody"`
 			}
 			if err := json.Unmarshal(rawOp, &op); err != nil {
 				return nil, fmt.Errorf("oascheck: %s %s: %w", m, path, err)
@@ -148,7 +156,14 @@ func Load(raw []byte) (*Document, error) {
 			if op.OperationID == "" || len(op.Responses) == 0 {
 				return nil, fmt.Errorf("oascheck: %s %s has no operation id or no response", m, path)
 			}
-			d.ops = append(d.ops, &Operation{ID: op.OperationID, Method: strings.ToUpper(m), Path: path, params: op.Parameters, responses: op.Responses})
+			o := &Operation{ID: op.OperationID, Method: strings.ToUpper(m), Path: path, params: op.Parameters, responses: op.Responses}
+			if op.RequestBody != nil {
+				o.body = op.RequestBody.Content["application/json"].Example
+				if len(o.body) == 0 {
+					return nil, fmt.Errorf("oascheck: %s %s takes a JSON body with no example", m, path)
+				}
+			}
+			d.ops = append(d.ops, o)
 		}
 	}
 	if len(d.ops) == 0 {

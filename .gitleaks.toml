@@ -1,0 +1,16 @@
+# A watch id is base64url JSON whose first member is the watched kind:
+# {"k":"road","key":"A8","c":{}}. Encoded, it opens with eyJrIjoi, the prefix
+# of a Grafana API key, so the default rules read every watch id in the
+# examples and the parity bundles as one. Watch ids are public, made from what
+# the caller asked. The allowlist is only those whose decoded start is one of
+# the six watch kinds followed by "key": a Grafana key, whose k is random,
+# still matches the rule.
+title = "viafrei-api"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "watch ids (base64url JSON of a watched kind and key)"
+targetRules = ["grafana-api-key"]
+regexes = ['''^(?:eyJrIjoicm9hZCIsImtleSI6|eyJrIjoicGxhY2UiLCJrZXki|eyJrIjoic3RhdGlvbiIsImtleSI6|eyJrIjoicmVnaW9uIiwia2V5Ijoi|eyJrIjoid2VhdGhlciIsImtleSI6|eyJrIjoiY2hhcmdlciIsImtleSI6)[A-Za-z0-9_-]*$''']

@@ -1,0 +1,5 @@
+go test fuzz v1
+string("Sonn- und Feiertage")
+string("00:00")
+string("00:00")
+string("2026-10-25 02:30")

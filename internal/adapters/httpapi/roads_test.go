@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"reflect"
 	"slices"
 	"testing"
 	"time"
@@ -178,7 +179,7 @@ func TestRoadSituationAnswer(t *testing.T) {
 
 func TestRoadOperationsNotFound(t *testing.T) {
 	req.Covers(t, "FR-ROAD-001")
-	assertProblem(t, do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: roads.ErrUnknownRoad}, nil), http.MethodGet, "/v1/motorways/A999/conditions", bearer), 404, "not-found")
+	assertProblem(t, do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: roads.ErrUnknownRoad}, nil), http.MethodGet, "/v1/motorways/A999/parking-options", bearer), 404, "not-found")
 	assertProblem(t, do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: roads.ErrUnknownSituation}, nil), http.MethodGet, "/v1/road-situations/ev-x", bearer), 404, "not-found")
 }
 
@@ -186,7 +187,7 @@ func TestRoadInputsAreChecked(t *testing.T) {
 	req.Covers(t, "FR-ROAD-001", "NFR-SEC-002")
 	h := featureHandler(t, config.Defaults(), everyAnswer(), nil)
 	for _, target := range []string{
-		"/v1/motorways/C8/conditions", "/v1/motorways/A%20%208/conditions", "/v1/motorways/A8/conditions?direction=up",
+		"/v1/motorways/C8/conditions", "/v1/motorways/K7864/conditions", "/v1/motorways/L12345/conditions", "/v1/motorways/A%20%208/conditions", "/v1/motorways/A8/conditions?direction=up",
 		"/v1/motorways/A8/conditions?kinds=flood", "/v1/motorways/A8/conditions?min_severity=other", "/v1/motorways/A8/conditions?limit=0",
 		"/v1/road-conditions", "/v1/road-conditions?at=48,11&road_class=lane", "/v1/road-situations/ev%201",
 	} {
@@ -204,8 +205,15 @@ func TestMotorwayReferencesAreNormalised(t *testing.T) {
 			t.Errorf("%s: status %d, asked %q", target, w.Code, f.gotRoad.Road)
 		}
 	}
-	// The path pattern admits only what ParseRoad reads; Resolve refuses the
-	// rest on its own all the same.
+	// G6: a Land road is read too.
+	for target, want := range map[string]string{"/v1/motorways/l%201025/conditions": "L1025", "/v1/motorways/S296/conditions": "S296", "/v1/motorways/b6/conditions": "B6"} {
+		f.gotRoad = roads.CorridorQuery{}
+		if w := do(t, h, http.MethodGet, target, bearer); w.Code != http.StatusOK || f.gotRoad.Road != want {
+			t.Errorf("%s: status %d, asked %q", target, w.Code, f.gotRoad.Road)
+		}
+	}
+	// The path pattern admits only what ParseAnyRoad reads; Resolve refuses
+	// the rest on its own all the same.
 	in := &httpapi.MotorwayInput{Road: "C8"}
 	if errs := in.Resolve(nil); len(errs) != 1 {
 		t.Errorf("C8 resolved: %v", errs)
@@ -246,5 +254,78 @@ func TestTheLampEnumerationsAreTheDomains(t *testing.T) {
 		if !slices.Equal(p["lamp"].Enum, lamps) {
 			t.Errorf("%s.lamp %v, want %v", name, p["lamp"].Enum, lamps)
 		}
+	}
+}
+
+func TestConditionsWindow(t *testing.T) {
+	req.Covers(t, "FR-ROAD-001")
+	f := everyAnswer()
+	h := featureHandler(t, config.Defaults(), f, nil)
+	w := do(t, h, http.MethodGet, "/v1/motorways/A8/conditions?horizon_days=3", bearer)
+	if w.Code != http.StatusOK || !f.gotRoad.From.Equal(fixedNow) || !f.gotRoad.Until.Equal(fixedNow.Add(72*time.Hour)) {
+		t.Fatalf("horizon: %d %+v", w.Code, f.gotRoad.Filter)
+	}
+	q, _ := meta(t, decode(t, w))["query"].(map[string]any)
+	if q["windowFrom"] != "2026-03-29T01:30:00Z" || q["windowUntil"] != "2026-04-01T01:30:00Z" {
+		t.Errorf("query %v", q)
+	}
+	w = do(t, h, http.MethodGet, "/v1/road-conditions?at=52.52,13.405&from=2026-04-01&to=2026-04-02", bearer)
+	if w.Code != http.StatusOK || !f.gotArea.From.Equal(time.Date(2026, 3, 31, 22, 0, 0, 0, time.UTC)) || !f.gotArea.Until.Equal(time.Date(2026, 4, 2, 22, 0, 0, 0, time.UTC)) {
+		t.Fatalf("days: %d %+v", w.Code, f.gotArea.Filter)
+	}
+	if w = do(t, h, http.MethodGet, "/v1/road-conditions?at=52.52,13.405", bearer); w.Code != http.StatusOK || !f.gotArea.Until.IsZero() {
+		t.Errorf("no window: %d %+v", w.Code, f.gotArea.Filter)
+	}
+	for _, target := range []string{"/v1/motorways/A8/conditions?horizon_days=2&from=2026-04-01", "/v1/road-conditions?at=52.52,13.405&from=2026-04-02&to=2026-04-01"} {
+		if w := do(t, h, http.MethodGet, target, bearer); w.Code != http.StatusUnprocessableEntity && w.Code != http.StatusBadRequest {
+			t.Errorf("%s: %d", target, w.Code)
+		}
+	}
+}
+
+func TestMotorwayConditionsCursor(t *testing.T) {
+	req.Covers(t, "FR-ROAD-001")
+	f := everyAnswer()
+	f.conditions.HasMore = true
+	h := featureHandler(t, config.Defaults(), f, nil)
+	w := do(t, h, http.MethodGet, "/v1/motorways/A8/conditions?limit=1&cursor=4", bearer)
+	page, _ := meta(t, decode(t, w))["page"].(map[string]any)
+	if w.Code != http.StatusOK || f.gotRoad.Offset != 4 || page["nextCursor"] != "6" || page["hasMore"] != true {
+		t.Fatalf("%d, offset %d, page %v", w.Code, f.gotRoad.Offset, page)
+	}
+	f.conditions.HasMore = false
+	page, _ = meta(t, decode(t, do(t, h, http.MethodGet, "/v1/motorways/A8/conditions", bearer)))["page"].(map[string]any)
+	if f.gotRoad.Offset != 0 || page["nextCursor"] != nil {
+		t.Errorf("the last page: offset %d, page %v", f.gotRoad.Offset, page)
+	}
+}
+
+// TestAnUnregisteredRoadAnswersItsCoverage (G6): a road the register does
+// not hold answers 200 with data.coverage (its class and the families read
+// that hold a situation on a road of that class), never 404; a registered
+// road's coverage is null.
+func TestAnUnregisteredRoadAnswersItsCoverage(t *testing.T) {
+	req.Covers(t, "FR-ROAD-001", "FR-ROAD-003")
+	f := everyAnswer()
+	f.conditions.Road = &roads.Road{Ref: "L1025", Class: roads.ClassState, States: []string{}}
+	f.conditions.Covering = []string{"roadworks_ni"}
+	f.conditions.Items = nil
+	w := do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/motorways/L1025/conditions?from=2026-07-01&to=2026-07-08", bearer)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", w.Code, w.Body)
+	}
+	data, _ := decode(t, w)["data"].(map[string]any)
+	cov, _ := data["coverage"].(map[string]any)
+	if cov == nil || cov["registered"] != false || cov["roadType"] != "state" || !reflect.DeepEqual(cov["families"], []any{"roadworks_ni"}) {
+		t.Errorf("coverage %v", data["coverage"])
+	}
+	if sits, ok := data["situations"].([]any); !ok || len(sits) != 0 {
+		t.Errorf("situations %v", data["situations"])
+	}
+	f.conditions.Covering = nil
+	f.conditions.Road = &roads.Road{Ref: "A8", Class: roads.ClassMotorway}
+	w = do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/motorways/A8/conditions", bearer)
+	if data, _ := decode(t, w)["data"].(map[string]any); w.Code != http.StatusOK || data["coverage"] != nil {
+		t.Errorf("registered road: status %d, coverage %v", w.Code, data["coverage"])
 	}
 }

@@ -273,33 +273,42 @@ func TestRunWritesTheFiguresBesideTheReport(t *testing.T) {
 		t.Errorf("report:\n%s", report)
 	}
 	// The next run compares with these figures: the same stack shows no
-	// regression; a previous run ten times faster fails the run by name.
+	// regression; a previous run ten times faster fails the run by name. Each
+	// further run is a subtest of its own, so each is held to TST-012's bound.
 	again := filepath.Join(c.dir, "previous.json")
 	if err := os.Rename(filepath.Join(c.dir, "report.json"), again); err != nil {
 		t.Fatal(err)
 	}
-	if code, out, _ := c.run(c.args("-previous", again, "-regression-tolerance", "10")...); code != 0 || strings.Contains(out, "regression:") {
-		t.Errorf("same stack: exit %d\n%s", code, out)
-	}
-	for i := range f.Scenarios[0].Classes {
-		k := &f.Scenarios[0].Classes[i]
-		k.P95Ms, k.P99Ms, k.OK = k.P95Ms/1000, k.P99Ms/1000, 1000
-	}
-	if err := writeFigures(again, f); err != nil {
-		t.Fatal(err)
-	}
-	code, out, _ = c.run(c.args("-previous", again, "-regression-floor", "0s")...)
-	if code != 1 || !strings.Contains(out, "loadrun: regression: soak, class ") {
-		t.Errorf("regression: exit %d\n%s", code, out)
-	}
+	t.Run("the same stack", func(t *testing.T) {
+		if code, out, _ := c.run(c.args("-previous", again, "-regression-tolerance", "10")...); code != 0 || strings.Contains(out, "regression:") {
+			t.Errorf("same stack: exit %d\n%s", code, out)
+		}
+	})
+	t.Run("a previous run ten times faster", func(t *testing.T) {
+		faster := filepath.Join(c.dir, "faster.json")
+		for i := range f.Scenarios[0].Classes {
+			k := &f.Scenarios[0].Classes[i]
+			k.P95Ms, k.P99Ms, k.OK = k.P95Ms/1000, k.P99Ms/1000, 1000
+		}
+		if err := writeFigures(faster, f); err != nil {
+			t.Fatal(err)
+		}
+		code, out, _ := c.run(c.args("-previous", faster, "-regression-floor", "0s")...)
+		if code != 1 || !strings.Contains(out, "loadrun: regression: soak, class ") {
+			t.Errorf("regression: exit %d\n%s", code, out)
+		}
+	})
 	// An unreadable previous file fails the run, though every scenario passed.
-	if err := os.WriteFile(again, []byte("{"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	code, out, _ = c.run(c.args("-previous", again)...)
-	if code != 1 || !strings.Contains(out, "0 failed") {
-		t.Errorf("unreadable: exit %d\n%s", code, out)
-	}
+	t.Run("an unreadable previous file", func(t *testing.T) {
+		bad := filepath.Join(c.dir, "unreadable.json")
+		if err := os.WriteFile(bad, []byte("{"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		code, out, _ := c.run(c.args("-previous", bad)...)
+		if code != 1 || !strings.Contains(out, "0 failed") {
+			t.Errorf("unreadable: exit %d\n%s", code, out)
+		}
+	})
 }
 
 func TestRunRefusesAnUnwritableFiguresFile(t *testing.T) {

@@ -20,7 +20,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/adapters/accessstore"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
@@ -28,6 +27,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
 	"github.com/mavrovde/viafrei-api/internal/app/metering"
 	"github.com/mavrovde/viafrei-api/internal/app/ratelimit"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/runtime/logging"
 	"github.com/mavrovde/viafrei-api/internal/runtime/wire"
@@ -144,7 +144,7 @@ func newLimitedStackOf(t *testing.T, sources func(slowSources) httpapi.SourceRea
 	var log bytes.Buffer
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Config: c, Sources: sources(slowSources{st, hold}), Auth: auth.New(wire.AuthSettings(c), as, nil),
-		Logger: logging.New(c.Log, &log), ContractVersion: contract.Version(),
+		Logger: logging.New(c.Log, &log), ContractVersion: dbcontract.ContractVersion,
 		Keys: ratelimit.NewKeyLimiter(wire.QuotaZone(c), as, nil), Meter: meter,
 	})
 	if err != nil {

@@ -16,6 +16,11 @@ type Catalogue interface {
 	// families counted, and the families of the situations in force at now
 	// on any road of the register (the families its counts state).
 	Motorways(ctx context.Context, q roads.CatalogueQuery, families []string, now time.Time) ([]roads.Motorway, []string, error)
+	// RoadLamps returns, from one snapshot and by road, what the lamp of
+	// each road states over the whole road in both directions, as
+	// SituationsOnRoad's page carries it (Messages, Warnings, Sources,
+	// Confirmations, States, Coverage); a page lists no situation.
+	RoadLamps(ctx context.Context, refs []string, fams roads.Families, now time.Time) (map[string]roads.Page, error)
 }
 
 // MotorwaysAnswer is the motorway catalogue answer.
@@ -69,7 +74,8 @@ func motorwayFamilies(ms []roads.Motorway, counted, permitted []string) []string
 
 // motorwayLamps sets each motorway's lamp as MotorwayConditions states it
 // for the whole road in both directions: the same families, sight and rule,
-// read once per motorway.
+// read for every motorway listed in one read (a conditions read per
+// motorway cost the list most of its budget, #141).
 func (s *Service) motorwayLamps(ctx context.Context, key access.Record, ms []roads.Motorway) error {
 	if len(ms) == 0 {
 		return nil
@@ -83,12 +89,16 @@ func (s *Service) motorwayLamps(ctx context.Context, key access.Record, ms []roa
 		return err
 	}
 	now := s.now()
+	refs := make([]string, len(ms))
+	for i, m := range ms {
+		refs[i] = m.Road
+	}
+	pages, err := s.repos.Catalogue.RoadLamps(ctx, refs, fams, now)
+	if err != nil {
+		return err
+	}
 	for i := range ms {
-		p, err := s.repos.Roads.SituationsOnRoad(ctx, roads.CorridorQuery{Road: ms[i].Road, Direction: roads.DirectionBoth,
-			Filter: roads.Filter{MinSeverity: roads.SeverityInfo}, Limit: 1}, fams, now)
-		if err != nil {
-			return err
-		}
+		p := pages[ms[i].Road]
 		ms[i].Lamp, _ = roads.LampOf(p.Messages, warningLevels(p), sights(p, fams, partial, weatherRead, now))
 	}
 	return nil

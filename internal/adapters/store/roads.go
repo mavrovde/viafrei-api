@@ -109,12 +109,20 @@ const nextChange = `min(case when x.valid_from > $2 then x.valid_from else x.val
 // none; and the scope's next change (nextChange). It reads the scope's
 // situations that have not ended, so one that starts later is seen too; only
 // those active at now are aggregated.
-const messagesSelect = `select jsonb_agg(distinct jsonb_build_object('r', e.record_class, 'k', e.event_kind, 'h', e.headline,
+const messagesSelect = `select ` + messagesAgg + `,
+       ` + nextChange + `
+` + messagesFrom
+
+// messagesAgg is the lamp's view of the situations of messagesFrom active
+// at $2, as messagesSelect aggregates it.
+const messagesAgg = `jsonb_agg(distinct jsonb_build_object('r', e.record_class, 'k', e.event_kind, 'h', e.headline,
                                          's', e.subtitle, 't', e.description, 'p', e.place_text,
                                          'b', coalesce(e.is_blocked, false), 'y', e.traffic_type,
-                                         'ds', e.delay_s, 'd', e.delay_min)) filter (where e.valid_from <= $2),
-       ` + nextChange + `
-from contract.traffic_event e
+                                         'ds', e.delay_s, 'd', e.delay_min)) filter (where e.valid_from <= $2)`
+
+// messagesFrom reads the situations of the families $1 that have not ended
+// at $2.
+const messagesFrom = `from contract.traffic_event e
 cross join lateral (select e.valid_from, e.valid_to) x
 where e.withdrawn_at is null
   and e.source_ref = any($1)
@@ -169,6 +177,26 @@ order by state_code, source_ref`
 func statesOf(junctions string) string {
 	return `select coalesce(array_agg(distinct state_code order by state_code) filter (where state_code is not null), '{}')
 from (` + junctions + `) j`
+}
+
+// sourcesOf collects the rows of sourcesSelect: the freshness of every
+// family, and into confirmations the newest confirmation of each that has a
+// freshness row.
+func sourcesOf(rows pgx.Rows, confirmations map[string]ampel.Confirmation) ([]provenance.Family, error) {
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (provenance.Family, error) {
+		var (
+			f          provenance.Family
+			staleAfter *int64
+			held       bool
+			c          ampel.Confirmation
+		)
+		err := r.Scan(&f.Source.Family, &staleAfter, &f.DataAsOf, &held, &c.At, &c.IntervalS, &c.Paused)
+		f.StaleAfter, f.NeverStale = threshold(staleAfter)
+		if held {
+			confirmations[f.Source.Family] = c
+		}
+		return f, err
+	})
 }
 
 // coverageRow is one row of coverageSelect.
@@ -317,20 +345,7 @@ order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, s
 			},
 			func() (err error) {
 				res, _ := tx.Query(ctx, sourcesSelect, append(slices.Clone(fams.Roads), fams.Weather...))
-				out.Sources, err = pgx.CollectRows(res, func(r pgx.CollectableRow) (provenance.Family, error) {
-					var (
-						f          provenance.Family
-						staleAfter *int64
-						held       bool
-						c          ampel.Confirmation
-					)
-					err := r.Scan(&f.Source.Family, &staleAfter, &f.DataAsOf, &held, &c.At, &c.IntervalS, &c.Paused)
-					f.StaleAfter, f.NeverStale = threshold(staleAfter)
-					if held {
-						out.Confirmations[f.Source.Family] = c
-					}
-					return f, err
-				})
+				out.Sources, err = sourcesOf(res, out.Confirmations)
 				return err
 			},
 			func() error { return tx.QueryRow(ctx, sc.states, sc.stateArgs...).Scan(&out.States) },
@@ -362,15 +377,23 @@ order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, s
 		return roads.Page{}, err
 	}
 	out := snap.page
-	for _, m := range snap.stored {
-		out.Messages = append(out.Messages, roads.Message{Record: roads.MapRecord(m.Record), Kind: roads.MapKind(m.Kind),
-			Headline: m.Headline, Subtitle: m.Subtitle, Description: m.Description, PlaceText: m.PlaceText,
-			Blocked: m.Blocked, TrafficType: m.TrafficType, DelayS: m.DelayS, DelayMin: m.DelayMin})
-	}
+	out.Messages = messagesOf(snap.stored)
 	if len(out.Items) > limit {
 		out.Items, out.HasMore = out.Items[:limit], true
 	}
 	return out, nil
+}
+
+// messagesOf maps the lamp's view of the situations from stored codes; nil
+// when there is none.
+func messagesOf(stored []storedMessage) []roads.Message {
+	var out []roads.Message
+	for _, m := range stored {
+		out = append(out, roads.Message{Record: roads.MapRecord(m.Record), Kind: roads.MapKind(m.Kind),
+			Headline: m.Headline, Subtitle: m.Subtitle, Description: m.Description, PlaceText: m.PlaceText,
+			Blocked: m.Blocked, TrafficType: m.TrafficType, DelayS: m.DelayS, DelayMin: m.DelayMin})
+	}
+	return out
 }
 
 // SituationsOnRoad reads the active situations on one road in the order of

@@ -2,10 +2,10 @@ package conformance_test
 
 import (
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -120,28 +120,36 @@ func fuzzInventoryFindings(lines []fuzzLine, pkgs map[string]fuzzPackage, servic
 // from, relative to the repository root.
 func servicePackages(t *testing.T) []string {
 	t.Helper()
-	cmd := exec.Command("go", "list", "-deps", "-f", "{{if .Module}}{{if .Module.Main}}{{.Dir}}{{end}}{{end}}", "./cmd/viafrei-api")
-	cmd.Dir = root
-	b, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("go list: %v", err)
-	}
-	abs, err := filepath.Abs(root)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// The packages ./cmd/viafrei-api builds from, walked in process with
+	// go/build (the build constraints go list applies) rather than by a go
+	// list subprocess, which took over the 2 s bound on a busy runner (TST-012).
+	const module = "github.com/mavrovde/viafrei-api"
+	seen := map[string]bool{}
+	queue := []string{"cmd/viafrei-api"}
 	var out []string
-	for _, d := range strings.Fields(string(b)) {
-		rel, err := filepath.Rel(abs, d)
-		if err != nil {
-			t.Fatal(err)
+	for len(queue) > 0 {
+		dir := queue[0]
+		queue = queue[1:]
+		if seen[dir] {
+			continue
 		}
-		if rel != filepath.Join("cmd", "viafrei-api") {
-			out = append(out, filepath.ToSlash(rel))
+		seen[dir] = true
+		pkg, err := build.Default.ImportDir(filepath.Join(root, filepath.FromSlash(dir)), 0)
+		if err != nil {
+			t.Fatalf("read %s: %v", dir, err)
+		}
+		if dir != "cmd/viafrei-api" {
+			out = append(out, dir)
+		}
+		for _, imp := range pkg.Imports {
+			if rel, ok := strings.CutPrefix(imp, module+"/"); ok {
+				queue = append(queue, rel)
+			}
 		}
 	}
+	slices.Sort(out)
 	if len(out) < 5 {
-		t.Fatalf("go list named %d service packages; the walk did not read the module", len(out))
+		t.Fatalf("the import walk named %d service packages; it did not read the module", len(out))
 	}
 	return out
 }

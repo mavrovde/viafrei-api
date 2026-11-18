@@ -147,8 +147,10 @@ func TestKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := grid.Key(ctx, "s", map[string]any{"at": "x"}, nil); !errors.As(err, &se) {
-		t.Errorf("a grid value that is no number: %v", err)
+	for _, v := range []string{"x", "NaN", "Inf", "-Infinity"} {
+		if _, err := grid.Key(ctx, "s", map[string]any{"at": v}, nil); !errors.As(err, &se) {
+			t.Errorf("a grid value that is no finite number, %s: %v", v, err)
+		}
 	}
 }
 
@@ -211,6 +213,8 @@ func TestParseRefuses(t *testing.T) {
 		"unknown filter":      src(obj + `,"subject_key":{"cases":[{"match":{"a":"."},"emit":"{a|upper}"}]}`),
 		"grid zero":           src(obj + `,"subject_key":{"cases":[{"match":{"a":"."},"emit":"{a|grid:0}"}]}`),
 		"grid word":           src(obj + `,"subject_key":{"cases":[{"match":{"a":"."},"emit":"{a|grid:x}"}]}`),
+		"grid NaN":            src(obj + `,"subject_key":{"cases":[{"match":{"a":"."},"emit":"{a|grid:NaN}"}]}`),
+		"grid Inf":            src(obj + `,"subject_key":{"cases":[{"match":{"a":"."},"emit":"{a|grid:Inf}"}]}`),
 		"unknown lookup":      src(obj + `,"subject_key":{"cases":[{"match":{"a":"."},"emit":"{a|lookup:eva}"}]}`),
 		"negative freshness":  src(obj + `,` + key + `,"freshness_s":-1`),
 		"negative deadline":   src(obj + `,` + key + `,"deadline_ms":-1`),

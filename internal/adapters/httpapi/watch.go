@@ -30,7 +30,7 @@ type WatchInput struct {
 	Key       string  `query:"target" maxLength:"120" example:"A7" doc:"The thing watched: a road number, a position lat,lon (place, weather), a DWD warn cell id or a place or cell name (weather), a station id, an official region key or a charging site id."`
 	Request   string  `query:"request" maxLength:"500" doc:"The person's request in their own words; a jam is watched on a motorway only, and the answer says so."`
 	Hours     float64 `query:"hours" minimum:"0.25" maximum:"24" doc:"How long the window runs from now, in hours (default 3). Give hours or until, not both."`
-	Until     string  `query:"until" format:"date-time" doc:"The window's end instant, at most 24 hours ahead. Give hours or until, not both."`
+	Until     string  `query:"until" format:"date-time" doc:"The window's end instant, after now and at most 24 hours ahead. Give hours or until, not both."`
 	Condition string  `query:"condition" maxLength:"500" doc:"The threshold as JSON: road {\"event\": \"reopen\"|\"any\", \"events\": [\"restrictions\",\"jams\"]}; place {\"radius_km\": 25}; station {\"delay_min\": 10}; region {\"late_share\": 0.25, \"delay_min\": 5, \"min_trips\": 10}; weather {\"min_level\": 2}; charger {\"point_id\": \"...\"}. The values shown are the defaults. A key of another kind is refused by name."`
 	Since     string  `query:"since" format:"date-time" doc:"Only the situations changed after this instant: the cursor of a repeated read, the previous answer's generatedAt."`
 	cond      watchCondition
@@ -138,8 +138,8 @@ type WatchData struct {
 	Kind       string          `json:"kind"`
 	Key        string          `json:"key"`
 	From       time.Time       `json:"from"`
-	Until      time.Time       `json:"until" doc:"The end of the window; a read after it answers ended."`
-	Ended      bool            `json:"ended"`
+	Until      time.Time       `json:"until" doc:"The end of the window, always after from: a window must end in the future."`
+	Ended      bool            `json:"ended" doc:"Whether the window is over; false when answered, as until is after now. Kept from the platform's watch, whose stored watches end."`
 	Condition  map[string]any  `json:"condition" doc:"The condition applied, defaults filled in."`
 	Note       *string         `json:"note" nullable:"true" doc:"Set when the request asked for something the watch does not report (a jam off a motorway, or around a place)."`
 	Situations []RoadSituation `json:"situations" doc:"road, place: the situations in the window, changed after since when given; empty for the other kinds."`
@@ -189,7 +189,12 @@ func registerWatch(api huma.API, s *server, op huma.Operation) {
 			end = *in.end
 		}
 		if end.After(now.Add(watchMaxHours * time.Hour)) {
-			return nil, errWatchUntil(in.Until)
+			return nil, errWatchUntil(ctx, in.Until)
+		}
+		if !end.After(now) {
+			// As the platform's watch: a window must end in the future, so
+			// no answer has an until before its from (#150).
+			return nil, errWatchPast(ctx, in.Until)
 		}
 		raw, _ := json.Marshal(watchToken{Kind: in.Kind, Key: in.Key, Condition: in.cond})
 		id := base64.RawURLEncoding.EncodeToString(raw)

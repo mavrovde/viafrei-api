@@ -344,7 +344,8 @@ func (r *Registry) Check(a refresh.Ask) error {
 		return nil
 	}
 	// huma's validator adds every error as an *ErrorDetail.
-	d, _ := res.Errors[0].(*huma.ErrorDetail)
+	var d *huma.ErrorDetail
+	_ = errors.As(res.Errors[0], &d)
 	loc := "subject"
 	if d.Location != "" {
 		loc += "." + d.Location

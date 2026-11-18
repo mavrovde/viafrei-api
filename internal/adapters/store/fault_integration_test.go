@@ -81,7 +81,7 @@ func (c *faultConn) Write(b []byte) (int, error) {
 			continue
 		}
 		if (p[0] == 'B' || p[0] == 'Q') && c.f.statement() {
-			_ = c.Conn.Close()
+			_ = c.Close()
 			return 0, errInjected
 		}
 		p = p[min(1+int(binary.BigEndian.Uint32(p[1:5])), len(p)):]

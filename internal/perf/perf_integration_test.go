@@ -392,10 +392,10 @@ func (r *rig) refreshes(ctx context.Context, t *testing.T, conn *pgx.Conn) {
 		on conflict do nothing`, r.now); err != nil {
 		t.Fatal(err)
 	}
-	h := r.handler(t, false)
+	h := r.handler(t, false) //nolint:contextcheck // building the handler; each request carries its own context
 	for _, subject := range refreshSubjects {
 		target := refreshAsk(subject)
-		code, location := send(h, target)
+		code, location := send(ctx, h, target)
 		if code != http.StatusCreated && code != http.StatusAccepted {
 			t.Fatalf("%s answered %d", target, code)
 		}
@@ -583,8 +583,8 @@ func request(ctx context.Context, target string) *http.Request {
 }
 
 // send sends one request and returns its status and Location.
-func send(h http.Handler, target string) (int, string) {
-	ctx, cancel := context.WithTimeout(context.Background(), testBound)
+func send(ctx context.Context, h http.Handler, target string) (int, string) {
+	ctx, cancel := context.WithTimeout(ctx, testBound)
 	defer cancel()
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, request(ctx, target))

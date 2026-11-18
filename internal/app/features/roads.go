@@ -209,7 +209,7 @@ func (s *Service) MotorwayConditions(ctx context.Context, key access.Record, q r
 		return Conditions{}, err
 	}
 	q.Road = road.Ref
-	c, err := s.conditions(ctx, key, q.Filter.Ahead, false, func(fams roads.Families, now time.Time) (roads.Page, error) {
+	c, err := s.conditions(ctx, key, q.Ahead, false, func(fams roads.Families, now time.Time) (roads.Page, error) {
 		return s.repos.Roads.SituationsOnRoad(ctx, q, fams, now)
 	})
 	if err != nil {
@@ -232,7 +232,7 @@ func (s *Service) MotorwayConditions(ctx context.Context, key access.Record, q r
 // platform's road status states none there, so they read no weather
 // warning; a Land's answer (q.State) has its lamp.
 func (s *Service) RoadConditions(ctx context.Context, key access.Record, q roads.AreaQuery) (Conditions, error) {
-	return s.conditions(ctx, key, q.Filter.Ahead, q.State == "", func(fams roads.Families, now time.Time) (roads.Page, error) {
+	return s.conditions(ctx, key, q.Ahead, q.State == "", func(fams roads.Families, now time.Time) (roads.Page, error) {
 		return s.repos.Roads.SituationsNear(ctx, q, fams, now)
 	})
 }

@@ -282,7 +282,7 @@ func TestAWindowAheadReadsThePlannedWorksAlone(t *testing.T) {
 	}
 	// A watch's window is not a question ahead: it reads every family.
 	w := &roadFake{}
-	q.Filter.Ahead, q.State = false, "de"
+	q.Ahead, q.State = false, "de"
 	if _, err := roadService(w).RoadConditions(context.Background(), key("consumer", weatherScope, "r1", "r2", "w1"), q); err != nil || !slices.Equal(w.gotFams.Roads, []string{"r1", "r2"}) || w.gotFams.Weather == nil {
 		t.Errorf("a watch window read %+v: %v", w.gotFams, err)
 	}
@@ -598,8 +598,8 @@ func TestMotorwayCatalogueCredits(t *testing.T) {
 	if n := a.Meta.Families[0].Notes; len(n) != 1 || n[0].Kind != provenance.Purpose {
 		t.Errorf("a catalogue with no situation carries no condition: %+v", n)
 	}
-	if f.roadFake.readCalls != 0 {
-		t.Errorf("an empty catalogue read %d lamps", f.roadFake.readCalls)
+	if f.readCalls != 0 {
+		t.Errorf("an empty catalogue read %d lamps", f.readCalls)
 	}
 }
 

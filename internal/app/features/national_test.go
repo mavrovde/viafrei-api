@@ -86,11 +86,11 @@ func TestNationalRefusals(t *testing.T) {
 		t.Errorf("a foreign family must abort: %v", err)
 	}
 	f.rows = nil
-	f.fake.provErr = boom
+	f.provErr = boom
 	if _, err := s.National(ctx, key("commercial", []access.Scope{"roads"}, "r1"), time.Hour); !errors.Is(err, boom) {
 		t.Errorf("provenance error: %v", err)
 	}
-	f.fake.provErr, f.fake.regErr = nil, boom
+	f.provErr, f.regErr = nil, boom
 	if _, err := s.National(ctx, key("commercial", []access.Scope{"roads"}, "r1"), time.Hour); !errors.Is(err, boom) {
 		t.Errorf("register error: %v", err)
 	}
@@ -141,11 +141,11 @@ func TestAffectedStationsCreditTheLifts(t *testing.T) {
 	if _, _, err := s.AffectedStations(ctx, key("commercial", []access.Scope{"transit"}, "t1"), 5); !errors.Is(err, boom) {
 		t.Errorf("read error: %v", err)
 	}
-	f.err, f.fake.provErr = nil, boom
+	f.err, f.provErr = nil, boom
 	if _, _, err := s.AffectedStations(ctx, key("commercial", []access.Scope{"transit"}, "t1"), 5); !errors.Is(err, boom) {
 		t.Errorf("provenance error: %v", err)
 	}
-	f.fake.provErr, f.fake.regErr = nil, boom
+	f.provErr, f.regErr = nil, boom
 	if _, _, err := s.AffectedStations(ctx, key("commercial", []access.Scope{"transit"}, "t1"), 5); !errors.Is(err, boom) {
 		t.Errorf("register error: %v", err)
 	}

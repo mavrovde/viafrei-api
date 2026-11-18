@@ -47,6 +47,8 @@ func (s *Store) StateWarnings(ctx context.Context, land string, families []strin
 // them, of a live publication only (alertLive). Rows sharing a dedupe key
 // are one message; its key is the row of the primary family (the realtime
 // alerts) where one carries it, and every family carrying it is listed.
+//
+//nolint:misspell // materialized is the SQL keyword
 var stateAlerts = `
 with f as materialized (
   select a.alert_id, a.header, a.active_to, coalesce(a.line_names, '{}') as line_names, a.dedupe_key, a.source_ref,

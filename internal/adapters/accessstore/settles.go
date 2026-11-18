@@ -118,7 +118,7 @@ func (h *settles) loop() {
 
 // listen serves one connection until it fails or the store closes.
 func (h *settles) listen(conn listenConn) error {
-	if _, err := conn.Exec(h.run, "listen "+pgx.Identifier{SettledChannel}.Sanitize()); err != nil {
+	if _, err := conn.Exec(h.run, "listen "+pgx.Identifier{SettledChannel}.Sanitize()); err != nil { //nolint:misspell // the pgx method's name
 		return err
 	}
 	h.poke(true)

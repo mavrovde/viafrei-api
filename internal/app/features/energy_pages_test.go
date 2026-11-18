@@ -51,11 +51,11 @@ func TestFuelStationByIDIsGatedAndAttributed(t *testing.T) {
 		t.Errorf("read error: %v", err)
 	}
 	f.readErr = nil
-	f.fake.provErr = boom
+	f.provErr = boom
 	if _, _, err := s.FuelStation(context.Background(), k, "a", time.Hour); !errors.Is(err, boom) {
 		t.Errorf("provenance error: %v", err)
 	}
-	f.fake.provErr, f.fake.regErr = nil, boom
+	f.provErr, f.regErr = nil, boom
 	if _, _, err := s.FuelStation(context.Background(), k, "a", time.Hour); !errors.Is(err, boom) {
 		t.Errorf("register error: %v", err)
 	}

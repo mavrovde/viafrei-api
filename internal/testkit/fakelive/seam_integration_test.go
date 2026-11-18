@@ -21,7 +21,7 @@ type cutConn struct {
 
 func (c *cutConn) Write(b []byte) (int, error) {
 	if bytes.Contains(b, c.marker) {
-		_ = c.Conn.Close()
+		_ = c.Close()
 		return 0, errors.New("injected: the connection is lost")
 	}
 	return c.Conn.Write(b)

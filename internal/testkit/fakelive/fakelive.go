@@ -309,8 +309,8 @@ func dayPartition(ctx context.Context, tx pgx.Tx, table string, at time.Time) er
 	if !ok {
 		return errors.New("a partitioned table is named schema.table")
 	}
-	part := pgx.Identifier{schema, name + "_" + day.Format("20060102")}.Sanitize()
+	part := pgx.Identifier{schema, name + "_" + day.Format("20060102")}.Sanitize() //nolint:misspell // the pgx method's name
 	_, err := tx.Exec(ctx, fmt.Sprintf(`create table if not exists %s partition of %s for values from ('%s') to ('%s')`,
-		part, pgx.Identifier{schema, name}.Sanitize(), day.Format(time.RFC3339), day.AddDate(0, 0, 1).Format(time.RFC3339)))
+		part, pgx.Identifier{schema, name}.Sanitize(), day.Format(time.RFC3339), day.AddDate(0, 0, 1).Format(time.RFC3339))) //nolint:misspell // the pgx method's name
 	return err
 }

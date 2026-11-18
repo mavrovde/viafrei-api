@@ -31,12 +31,12 @@ type cutConn struct {
 func (c *cutConn) Write(b []byte) (int, error) {
 	if c.armed {
 		n, err := c.Conn.Write(b)
-		_ = c.Conn.Close()
+		_ = c.Close()
 		return n, err
 	}
 	if bytes.Contains(b, c.marker) {
 		if !c.next {
-			_ = c.Conn.Close()
+			_ = c.Close()
 			return 0, errCut
 		}
 		c.armed = true
@@ -191,7 +191,7 @@ func TestSharedCopyReportsEachFault(t *testing.T) {
 		}},
 		"the statistics": {"-- pgtest seam: the statistics\n", func(t *testing.T) {
 			swapImage(t, pinnedRun(t))
-			cutAt(t, "analyze", false)
+			cutAt(t, "analyze", false) //nolint:misspell // the SQL keyword
 		}},
 		"the template's name": {"-- pgtest seam: the template's name\n", func(t *testing.T) {
 			swapImage(t, pinnedRun(t))

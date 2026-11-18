@@ -36,6 +36,8 @@ func alertInForce(a, at string) string {
 // secondary publication carrying the dedupe key or the message number of a
 // primary row in force
 // is that row's duplicate: flagged, and left out of the list.
+//
+//nolint:misspell // materialized is the SQL keyword
 const regionAlerts = `in_force as materialized (
   select a.* from contract.service_alert a
   where a.source_ref = any($2) and ` + "a.display_class <> 'withhold' and (a.audience = 'public' or " + ownKeyOn + ")" + `

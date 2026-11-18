@@ -132,7 +132,7 @@ func (s *Store) waitSettled(ctx context.Context, id string, wait time.Duration) 
 	if wait <= 0 {
 		return read(ctx, s.pool, id)
 	}
-	poke := s.settles.add(id)
+	poke := s.settles.add(id) //nolint:contextcheck // the one settle listener runs on the store's own context, not the ask's
 	defer s.settles.remove(id, poke)
 	r, err := read(ctx, s.pool, id)
 	if err != nil || r.State.Settled() {

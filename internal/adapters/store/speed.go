@@ -47,6 +47,8 @@ func speedCellOf(point string) string {
 // Gemeinden are those within 80 km of the circle and the official cameras
 // those within 50 km: no Gemeinde point lies farther than that from a camera
 // whose nearest it is.
+//
+//nolint:misspell // materialized is the SQL keyword
 var speedOSM = `
 with cut_gemeinde as materialized (
   select p.official_key as cell, p.location::geography as at

@@ -255,7 +255,7 @@ func refresh(t *testing.T, h http.Handler, c parity.Case) func() {
 		tables = append(slices.Clone(tables), ownerText(t, baseTable, view))
 	}
 	for _, tb := range tables {
-		if n := ownerCount(t, `select count(*) from `+pgx.Identifier(strings.Split(tb, ".")).Sanitize()+` where observed_at = $1`, c.Now); n != 0 {
+		if n := ownerCount(t, `select count(*) from `+pgx.Identifier(strings.Split(tb, ".")).Sanitize()+` where observed_at = $1`, c.Now); n != 0 { //nolint:misspell // the pgx method's name
 			t.Fatalf("%s: %s holds %d fixture row(s) at %s; a refresh question is asked at a clock no fixture row is dated", c.ID, tb, n, c.Now.Format(time.RFC3339))
 		}
 	}
@@ -290,7 +290,7 @@ func refresh(t *testing.T, h http.Handler, c parity.Case) func() {
 			{`delete from live.refresh_requests where source = $1 and created_at = $2`, []any{c.Refresh.Source, c.Now}},
 		}
 		for _, tb := range tables {
-			stmts = append(stmts, stmt{`delete from ` + pgx.Identifier(strings.Split(tb, ".")).Sanitize() + ` where observed_at = $1`, []any{c.Now}})
+			stmts = append(stmts, stmt{`delete from ` + pgx.Identifier(strings.Split(tb, ".")).Sanitize() + ` where observed_at = $1`, []any{c.Now}}) //nolint:misspell // the pgx method's name
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), testBound)
 		defer cancel()

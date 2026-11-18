@@ -15,6 +15,7 @@ See [docs/RELEASING.md](docs/RELEASING.md).
 ### ⚠ BREAKING CHANGES
 
 * release candidates and builds of main publish no image; verify release images with the narrowed identity regexp in docs/container.md.
+* the API needs viafrei-database 0.3.3 or later (schema head 316): it reads the 0.3 read contract and migration 0316's lookups; it runs no DDL itself.
 
 ### Added
 
@@ -64,14 +65,13 @@ See [docs/RELEASING.md](docs/RELEASING.md).
 * **security:** one tool per kind of check ([#12](https://github.com/mavrovde/viafrei-api/issues/12), [#5](https://github.com/mavrovde/viafrei-api/issues/5)) ([#54](https://github.com/mavrovde/viafrei-api/issues/54)) ([1309955](https://github.com/mavrovde/viafrei-api/commit/1309955749ae2f5d3fe272b71f875adf08a70d25))
 * Snyk runs weekly on main and once per release, before publish ([#99](https://github.com/mavrovde/viafrei-api/issues/99)) ([9f83e93](https://github.com/mavrovde/viafrei-api/commit/9f83e93a50719038641a10dd8a9c3744fa4588a0))
 
-## [0.3.0] (unreleased)
+### In detail
 
 The API serves what the site and the MCP server answer today, from the read
-contract of viafrei-database 0.3.2 (schema head 315; 0.3.0 and 0.3.1 were
-never published). Every operation below is new since 0.2; the parity harness
+contract of viafrei-database 0.3.3 (schema head 316). Every operation below is new since 0.2; the parity harness
 compares each one with the platform's own answers (bundle 2.6.22).
 
-### Added
+#### Added
 
 * **access:** `getKey` (the presenting key), `listSources` (the sources a key may read: attribution, licence, freshness), `getPressure` (whether the service is saturated now).
 * **places:** `listPlaces`, `getPlaceOverview`, `getPlacesCoverage` (with each kind's newest load), `listAddresses`, `listPois`, `listNearby`, `describeLocation` (with the low-emission zone the position lies in).
@@ -84,15 +84,15 @@ compares each one with the platform's own answers (bundle 2.6.22).
 * **motorways:** each motorway of `listMotorways` states its lamp, and the catalogue credits the families its index credits.
 * **refreshes:** a motorway anchor is stored as `anchor:<BASt LCL code>` (digits only, at most six); `requested_by` names the own service that asked (`site`, `mcp`, or `dev` for any other own key), never anything about the person.
 
-### Changed
+#### Changed
 
-* **database:** tests, the local stack and CI migrate with the signed viafrei-database 0.3.2 image (`database.pin`, by digest); this repository runs no DDL.
-* **live:** the on-demand refreshes are proven with the live refresher's release 0.1.0, pinned by digest, which `make live-e2e` runs against the same database release before a release.
+* **database:** tests, the local stack and CI migrate with the signed viafrei-database 0.3.3 image (`database.pin`, by digest); this repository runs no DDL.
+* **live:** the on-demand refreshes are proven with the live refresher's release 0.1.0, pinned by digest, which `make live-e2e` runs against the same database release (0.3.3) before a release.
 * **sources:** own keys see unreviewed families listed in `listSources`; other keys do not.
 * **freshness:** a family with no fixed interval states `staleAfterS` 9007199254740991 (2^53 − 1, an age no data reaches) and `stale` false, also when its `dataAsOf` is null; the field stays a required integer, as in 0.2.
 * **tests:** the performance package (`internal/perf`) runs alone (`-p 1`) after the other integration packages, into its own coverage profile; its budgets are unchanged.
 
-### Fixed
+#### Fixed
 
 * **places:** the name fold builds its diacritics chain per call; one chain shared by concurrent requests panicked.
 * **roads:** a road the register does not hold answers its situations and what was read, never 404; a weather warning is on a motorway when its area holds one of the road's junctions.

@@ -234,6 +234,8 @@ var Default = Rules{
 		{"data.zones", "", "getDrivingRules", zoneRowsReason},
 		{"data.lamp", "", "listRoadConditions", roadsLampReason},
 		{"data.lampReason", "", "listRoadConditions", roadsLampReason},
+		{"meta.attribution[dwd_alpha]", "", "listRoadConditions", roadsLampCreditReason},
+		{"meta.attribution[dwd_eta]", "", "listRoadConditions", roadsLampCreditReason},
 		{"data[*].distanceM", "accept_terms", "listParkingOptions", tollCollectDistanceReason},
 		{"data.lamp", "", "getWeatherRisk", weatherLampReason},
 		{"data.truncated", "", "getWeatherRisk", weatherLampReason},
@@ -344,6 +346,10 @@ const weatherLampReason = "API-only: the /v1 contract states the lamp over every
 // roadsLampReason is why the lamp of the conditions near a position is not
 // compared: the /v1 contract keeps it (VER-001).
 const roadsLampReason = "API-only: the /v1 contract states the lamp over every situation and weather warning within the radius and its reason (VER-001); the platform's road status states no lamp around a position, and no digest route the site reads serves one there"
+
+// roadsLampCreditReason is why the weather families the lamp of the
+// conditions near a position reads are not compared among its credits.
+const roadsLampCreditReason = "API-only: the lamp the /v1 contract keeps (VER-001) reads the DWD weather warnings, so the API's answer credits the weather families read; the platform's road status around a position has no lamp and reads no DWD warning; every other credited family is compared"
 
 // tollCollectDistanceReason is why the distances of a parking answer that
 // accepts terms are not compared: an accepted Toll Collect site has one.

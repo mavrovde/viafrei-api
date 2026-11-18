@@ -171,7 +171,7 @@ func TestLookupResolvesAPositionToItsGemeinde(t *testing.T) {
 	if ags, err := st.Lookup(bounded(t), store.LookupAGS, at); err != nil || ags != key {
 		t.Fatalf("%s: %q %v, want %s", at, ags, err, key)
 	}
-	for _, v := range []string{"0,0", "48.1", "x,y", "91,10", "48,181", ""} {
+	for _, v := range []string{"0,0", "48.1", "x,y", "91,10", "48,181", "NaN,10", "48,Inf", ""} {
 		if ags, err := st.Lookup(bounded(t), store.LookupAGS, v); err != nil || ags != "" {
 			t.Errorf("%q: %q %v", v, ags, err)
 		}
@@ -194,7 +194,7 @@ func TestLookupResolvesAnAnchorToItsLCLCode(t *testing.T) {
 		t.Fatalf("%s: %q %v, want %s", at, got, err, code)
 	}
 	far := strconv.FormatFloat(lat+0.001, 'f', 4, 64) + "," + strconv.FormatFloat(lon, 'f', 4, 64)
-	for _, v := range []string{far, "0,0", "48.1", "x,y", "91,10", ""} {
+	for _, v := range []string{far, "0,0", "48.1", "x,y", "91,10", "NaN,10", ""} {
 		if got, err := st.Lookup(bounded(t), store.LookupAnchor, v); err != nil || got != "" {
 			t.Errorf("%q: %q %v", v, got, err)
 		}

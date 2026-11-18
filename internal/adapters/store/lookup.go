@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/mavrovde/viafrei-api/internal/domain/number"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 )
@@ -102,8 +102,8 @@ func (s *Store) Lookup(ctx context.Context, name, value string) (string, error) 
 // position reads "lat,lon" inside the coordinate ranges.
 func position(v string) (lat, lon float64, ok bool) {
 	a, b, found := strings.Cut(v, ",")
-	lat, errA := strconv.ParseFloat(a, 64)
-	lon, errB := strconv.ParseFloat(b, 64)
+	lat, errA := number.ParseFinite(a)
+	lon, errB := number.ParseFinite(b)
 	if !found || errA != nil || errB != nil || lat < -90 || lat > 90 || lon < -180 || lon > 180 {
 		return 0, 0, false
 	}

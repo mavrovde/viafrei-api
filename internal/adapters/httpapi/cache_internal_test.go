@@ -33,6 +33,7 @@ func TestNegotiateCoding(t *testing.T) {
 		"identity":                "",
 		"BR":                      codingBrotli,
 		"br;q=x, gzip;q=0.5":      codingGzip,
+		"br;q=Inf, gzip;q=0.5":    codingGzip,
 		" gzip ; q=0.2 , deflate": codingGzip,
 	} {
 		if got := negotiateCoding(accept); got != want {

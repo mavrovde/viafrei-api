@@ -44,6 +44,8 @@ fi
 export LIVE_IMAGE
 
 work=$(mktemp -d)
+# Until the full teardown below takes over: the run's key and configs never outlive it.
+trap 'rm -rf "$work"' EXIT
 export LIVE_E2E_TLS="$work/tls" LIVE_E2E_SOURCES="$work/sources"
 mkdir -p "$LIVE_E2E_TLS" "$LIVE_E2E_SOURCES"
 
@@ -54,15 +56,19 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=provider.stub" \
 chmod 0644 "$LIVE_E2E_TLS/key.pem" "$LIVE_E2E_TLS/cert.pem"
 
 # Each source config, flat as <id>.yaml, its provider host rewritten to the
-# stub: the hosts list and the base URL's host. A copy naming any other host
-# stops the run before anything starts.
+# stub: the hosts list and the base URL's host. A copy naming any other host,
+# or a hosts key in any form but the one inline list, stops the run before
+# anything starts.
 copied=0
 while IFS= read -r -d '' f; do
   id=$(sed -n 's/^id: *//p' "$f")
   [[ $id =~ ^[a-z0-9-]+$ ]] || { echo "FAIL: $f has no id" >&2; exit 2; }
   sed -E -e 's#^hosts: *\[.*\]#hosts: [provider.stub]#' -e 's#^( *base_url: *https://)[^/]+#\1provider.stub#' "$f" > "$LIVE_E2E_SOURCES/$id.yaml"
-  if grep -E '^ *(base_url|hosts):' "$LIVE_E2E_SOURCES/$id.yaml" | grep -vq 'provider\.stub'; then
-    echo "FAIL: $id.yaml still names a provider host after the rewrite" >&2; exit 2
+  bad=$(awk '/^hosts:/ { n++; if ($0 != "hosts: [provider.stub]") print; next }
+    /^ *base_url:/ && $0 !~ /base_url: *https:\/\/provider\.stub(\/|$)/ { print }
+    END { if (n != 1) print "hosts: missing or repeated" }' "$LIVE_E2E_SOURCES/$id.yaml")
+  if [[ -n $bad ]]; then
+    echo "FAIL: $id.yaml still names a provider host after the rewrite: $bad" >&2; exit 2
   fi
   copied=$((copied + 1))
 done < <(find "$LIVE_SOURCES" -name '*.yaml' -print0)
@@ -72,7 +78,10 @@ if [[ ! -f .env ]]; then
   export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(openssl rand -hex 16)}"
   export API_READER_PASSWORD="${API_READER_PASSWORD:-$(openssl rand -hex 16)}"
 fi
-export ACCESS_PASSWORD="$(openssl rand -hex 16)" LIVE_PASSWORD="$(openssl rand -hex 16)" AUTH_PEPPER="$(openssl rand -hex 32)"
+ACCESS_PASSWORD=$(openssl rand -hex 16)
+LIVE_PASSWORD=$(openssl rand -hex 16)
+AUTH_PEPPER=$(openssl rand -hex 32)
+export ACCESS_PASSWORD LIVE_PASSWORD AUTH_PEPPER
 
 compose=(docker compose -f compose.yaml -f test/live-e2e/compose.yaml)
 fail() { echo "FAIL: $*" >&2; exit 1; }

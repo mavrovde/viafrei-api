@@ -12,9 +12,9 @@ See [docs/RELEASING.md](docs/RELEASING.md).
 ## [0.3.0] (unreleased)
 
 The API serves what the site and the MCP server answer today, from the read
-contract of viafrei-database 0.3.2 (schema head 315; 0.3.0 and 0.3.1 were never published). Every operation below
-is new since 0.2; the parity harness compares each one with the platform's
-own answers (bundle 2.6.22).
+contract of viafrei-database 0.3.2 (schema head 315; 0.3.0 and 0.3.1 were
+never published). Every operation below is new since 0.2; the parity harness
+compares each one with the platform's own answers (bundle 2.6.22).
 
 ### Added
 

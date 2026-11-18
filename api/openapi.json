@@ -21253,16 +21253,16 @@
         "operationId": "listStateRoadConditions",
         "parameters": [
           {
-            "description": "The Land's official code, two digits (09 Bayern), as listPlaces or describeLocation give it; de for the whole country (every situation held).",
+            "description": "The Land's official code, 01 to 16 (09 Bayern), as listPlaces or describeLocation give it; de for the whole country (every situation held).",
             "in": "path",
             "name": "state",
             "required": true,
             "schema": {
-              "description": "The Land's official code, two digits (09 Bayern), as listPlaces or describeLocation give it; de for the whole country (every situation held).",
+              "description": "The Land's official code, 01 to 16 (09 Bayern), as listPlaces or describeLocation give it; de for the whole country (every situation held).",
               "examples": [
                 "09"
               ],
-              "pattern": "^([0-9]{2}|de)$",
+              "pattern": "^(0[1-9]|1[0-6]|de)$",
               "type": "string"
             }
           },
@@ -21825,16 +21825,16 @@
         "operationId": "listStateServiceAlerts",
         "parameters": [
           {
-            "description": "The Land's official code, two digits (09 Bayern), as listPlaces or describeLocation give it.",
+            "description": "The Land's official code, 01 to 16 (09 Bayern), as listPlaces or describeLocation give it.",
             "in": "path",
             "name": "state",
             "required": true,
             "schema": {
-              "description": "The Land's official code, two digits (09 Bayern), as listPlaces or describeLocation give it.",
+              "description": "The Land's official code, 01 to 16 (09 Bayern), as listPlaces or describeLocation give it.",
               "examples": [
                 "09"
               ],
-              "pattern": "^[0-9]{2}$",
+              "pattern": "^(0[1-9]|1[0-6])$",
               "type": "string"
             }
           },
@@ -22193,16 +22193,16 @@
         "operationId": "listStateWeatherWarnings",
         "parameters": [
           {
-            "description": "The Land's official code, two digits (09 Bayern), as listPlaces or describeLocation give it.",
+            "description": "The Land's official code, 01 to 16 (09 Bayern), as listPlaces or describeLocation give it.",
             "in": "path",
             "name": "state",
             "required": true,
             "schema": {
-              "description": "The Land's official code, two digits (09 Bayern), as listPlaces or describeLocation give it.",
+              "description": "The Land's official code, 01 to 16 (09 Bayern), as listPlaces or describeLocation give it.",
               "examples": [
                 "09"
               ],
-              "pattern": "^[0-9]{2}$",
+              "pattern": "^(0[1-9]|1[0-6])$",
               "type": "string"
             }
           },

@@ -9,7 +9,7 @@ import (
 
 // StateInput names one Land.
 type StateInput struct {
-	State string `path:"state" pattern:"^[0-9]{2}$" example:"09" doc:"The Land's official code, two digits (09 Bayern), as listPlaces or describeLocation give it."`
+	State string `path:"state" pattern:"^(0[1-9]|1[0-6])$" example:"09" doc:"The Land's official code, 01 to 16 (09 Bayern), as listPlaces or describeLocation give it."`
 }
 
 // ------------------------------------------------------- weather warnings

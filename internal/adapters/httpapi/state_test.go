@@ -87,3 +87,24 @@ func TestStateServiceAlerts(t *testing.T) {
 	f.err = access.ErrNonePermitted
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/states/05/service-alerts", bearer), 403, "source-not-permitted")
 }
+
+// TestStatePathsTakeTheSixteenLaender (#152): a code that is no Land (00,
+// 17, 99) is refused on every state operation with a 400 naming path.state,
+// never a believable all-clear; 01 and 16, the first and the last Land, are
+// answered.
+func TestStatePathsTakeTheSixteenLaender(t *testing.T) {
+	h := featureHandler(t, config.Defaults(), everyAnswer(), nil)
+	for _, op := range []string{"weather", "road-conditions", "service-alerts"} {
+		for _, code := range []string{"00", "17", "99", "1", "016"} {
+			w := do(t, h, http.MethodGet, "/v1/states/"+code+"/"+op, bearer)
+			if assertProblem(t, w, http.StatusBadRequest, "invalid-parameter"); !strings.Contains(w.Body.String(), `"parameter":"path.state"`) {
+				t.Errorf("%s %s: %s", op, code, w.Body)
+			}
+		}
+		for _, code := range []string{"01", "16"} {
+			if w := do(t, h, http.MethodGet, "/v1/states/"+code+"/"+op, bearer); w.Code != http.StatusOK {
+				t.Errorf("%s %s: %d %s", op, code, w.Code, w.Body)
+			}
+		}
+	}
+}

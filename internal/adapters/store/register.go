@@ -43,6 +43,10 @@ type registerSnapshot struct {
 	terms  []access.Terms
 	at     time.Time
 	flight *registerFlight
+
+	// waiting, when set (tests), is called by a caller that waits for
+	// another's read, before it waits.
+	waiting func()
 }
 
 // registerFlight is a register read in progress, which callers arriving
@@ -100,6 +104,9 @@ func (r *registerSnapshot) get(ctx context.Context, now func() time.Time, read f
 		return slices.Clone(f.terms), nil
 	}
 	r.mu.Unlock()
+	if r.waiting != nil {
+		r.waiting()
+	}
 	select {
 	case <-f.done:
 		if f.err != nil {

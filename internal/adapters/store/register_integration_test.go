@@ -371,3 +371,38 @@ func deref[T any](v *T) any {
 	}
 	return *v
 }
+
+// TestRegisterSnapshotTTL: with db.register_snapshot_ttl 0s every Register
+// reads storage, so a closed pool fails it at once; with the default, a read
+// within the snapshot's lifetime answers from the snapshot without storage.
+func TestRegisterSnapshotTTL(t *testing.T) {
+	ctx := bounded(t)
+	want, err := seeded(t).Register(ctx)
+	if err != nil || len(want) == 0 {
+		t.Fatalf("the register: %d families, %v", len(want), err)
+	}
+	for _, c := range []struct {
+		name   string
+		extra  []string
+		closed bool // Register still answers once the pool is closed
+	}{
+		{"0s reads every request", []string{"VFAPI_DB_REGISTER_SNAPSHOT_TTL=0s"}, false},
+		{"the default answers from the snapshot", nil, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			st, err := store.Open(ctx, readerConfig(t, c.extra...))
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := st.Register(ctx)
+			if err != nil || len(got) != len(want) {
+				t.Fatalf("first read: %d families, want %d, %v", len(got), len(want), err)
+			}
+			st.Close()
+			got, err = st.Register(ctx)
+			if c.closed != (err == nil) {
+				t.Fatalf("after the pool closed: %d families, %v", len(got), err)
+			}
+		})
+	}
+}

@@ -170,7 +170,8 @@ func TestRegisterSnapshotWaiters(t *testing.T) {
 			own.Add(1)
 			return []access.Terms{{Family: "own"}}, nil
 		}
-		r := &registerSnapshot{ttl: time.Second, staleFor: time.Second}
+		parked := make(chan struct{})
+		r := &registerSnapshot{ttl: time.Second, staleFor: time.Second, waiting: func() { close(parked) }}
 		var leader []access.Terms
 		done := make(chan struct{})
 		go func() { leader, _ = r.get(context.Background(), time.Now, lead); close(done) }()
@@ -187,15 +188,7 @@ func TestRegisterSnapshotWaiters(t *testing.T) {
 			waited <- got
 		}()
 		// The waiter is parked on the flight before the leader settles.
-		for {
-			r.mu.Lock()
-			parked := r.flight != nil
-			r.mu.Unlock()
-			if parked {
-				break
-			}
-		}
-		time.Sleep(10 * time.Millisecond)
+		<-parked
 		close(release)
 		<-done
 		got := <-waited

@@ -345,6 +345,7 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 			Tags: []*huma.Tag{
 				{Name: "service", Description: "Health, readiness and service metadata."},
 				{Name: "access", Description: "The presenting key and what it may read."},
+				{Name: "meta", Description: "The sources behind the answers, and the national summary."},
 				{Name: "energy", Description: "Where to charge and to fill up."},
 				{Name: "parking", Description: "Where to park."},
 				{Name: "places", Description: "Places, and what is around them."},

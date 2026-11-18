@@ -70,7 +70,7 @@ for p in "${pages[@]}"; do
   # badges) is GitHub's decoration and is left out of the portal, whose
   # pages load nothing from a third party (#81, scripts/docs-check.pl). A
   # line inside a fenced code block is text and is kept.
-  # marked writes the page to a file: its stdout on a pipe is cut at 64 KiB
+  # marked writes the page to a file: its stdout on a pipe is cut at 128 KiB
   # when the process exits before the pipe drains, which the endpoints page
   # passes.
   awk '/^[[:space:]]*(```|~~~)/ { fenced = !fenced; print; next }

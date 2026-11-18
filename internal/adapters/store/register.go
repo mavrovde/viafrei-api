@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"slices"
 	"sync"
 	"time"
@@ -93,7 +94,10 @@ func (r *registerSnapshot) get(ctx context.Context, now func() time.Time, read f
 		f = r.start(ctx, now, read)
 		r.mu.Unlock()
 		f.run()
-		return f.terms, f.err
+		if f.err != nil {
+			return nil, f.err
+		}
+		return slices.Clone(f.terms), nil
 	}
 	r.mu.Unlock()
 	select {
@@ -115,15 +119,23 @@ func (r *registerSnapshot) get(ctx context.Context, now func() time.Time, read f
 // register itself: a register read on a request's path is a second admission
 // of the request after its first, and a shed request's refusal would come
 // that read's time past the tier's queue_max_wait (RATE-011). A failed read
-// is tried again at the next tick. A no-op without WithRegisterSnapshot.
+// is logged at warn and tried again at the next tick. A no-op without
+// WithRegisterSnapshot.
 func (s *Store) KeepRegister(ctx context.Context) {
 	if s.reg.ttl <= 0 {
 		return
 	}
-	tick := time.NewTicker(s.reg.ttl)
+	s.reg.keep(ctx, s.nowFn, s.readRegister, s.log)
+}
+
+// keep is KeepRegister's loop over read.
+func (r *registerSnapshot) keep(ctx context.Context, now func() time.Time, read func(context.Context) ([]access.Terms, error), log *slog.Logger) {
+	tick := time.NewTicker(r.ttl)
 	defer tick.Stop()
 	for {
-		s.reg.refresh(ctx, s.nowFn, s.readRegister)
+		if err := r.refresh(ctx, now, read); err != nil && ctx.Err() == nil {
+			log.Warn("store: the background register read failed; the snapshot answers until it is RegisterStaleFor old", "err", err)
+		}
 		select {
 		case <-ctx.Done():
 			return
@@ -132,16 +144,18 @@ func (s *Store) KeepRegister(ctx context.Context) {
 	}
 }
 
-// refresh reads the register again unless a read is in progress.
-func (r *registerSnapshot) refresh(ctx context.Context, now func() time.Time, read func(context.Context) ([]access.Terms, error)) {
+// refresh reads the register again unless a read is in progress, and
+// answers that read's failure.
+func (r *registerSnapshot) refresh(ctx context.Context, now func() time.Time, read func(context.Context) ([]access.Terms, error)) error {
 	r.mu.Lock()
 	if r.flight != nil {
 		r.mu.Unlock()
-		return
+		return nil
 	}
 	f := r.start(ctx, now, read)
 	r.mu.Unlock()
 	f.run()
+	return f.err
 }
 
 // start registers a read as the flight; r.mu is held. The caller runs it

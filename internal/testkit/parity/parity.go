@@ -349,7 +349,7 @@ const roadsLampReason = "API-only: the /v1 contract states the lamp over every s
 
 // roadsLampCreditReason is why the weather families the lamp of the
 // conditions near a position reads are not compared among its credits.
-const roadsLampCreditReason = "API-only: the lamp the /v1 contract keeps (VER-001) reads the DWD weather warnings, so the API's answer credits the weather families read; the platform's road status around a position has no lamp and reads no DWD warning; every other credited family is compared"
+const roadsLampCreditReason = "API-only: the lamp the /v1 contract keeps (VER-001) reads the DWD weather warnings, so the API's answer credits the weather families read; the platform's road status around a position has no lamp and reads no DWD warning; every other credited family is compared" //nolint:gosec // G101: prose that names credits, no credential
 
 // tollCollectDistanceReason is why the distances of a parking answer that
 // accepts terms are not compared: an accepted Toll Collect site has one.

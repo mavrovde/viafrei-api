@@ -51,6 +51,7 @@ type Store struct {
 	breaker *breaker.Breaker
 	reg     registerSnapshot
 	roads   roadSnapshot
+	lands   junctionLands
 }
 
 // WithBreaker puts the circuit breaker in front of every read (NFR-RES-002):

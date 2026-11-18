@@ -78,7 +78,7 @@ compose=(docker compose -f compose.yaml -f test/live-e2e/compose.yaml)
 fail() { echo "FAIL: $*" >&2; exit 1; }
 teardown() {
   local code=$?
-  if [[ $code -ne 0 ]]; then "${compose[@]}" logs --no-color --tail 80 live stub api || true; fi
+  if [[ $code -ne 0 ]]; then "${compose[@]}" logs --no-color --tail 80 db-migrate live stub api || true; fi
   "${compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
   rm -rf "$work"
   exit "$code"
@@ -92,6 +92,15 @@ psql_owner() { "${compose[@]}" exec -T db psql -X -q -tA -v ON_ERROR_STOP=1 -U o
 psql_owner -v access="$ACCESS_PASSWORD" -v live="$LIVE_PASSWORD" <<'SQL'
 alter role api_access login password :'access';
 alter role viafrei_live_ingestor login password :'live';
+SQL
+# The request budgets of the two stub providers. Production publishes the
+# platform's terms register into control; a fresh database holds none, and
+# the live refresher refuses every refresh without one (no-budget).
+psql_owner -v terms="$(cat test/live-e2e/control-terms.json)" <<'SQL'
+begin;
+select set_config('viafrei.actor', 'live-e2e', true), set_config('viafrei.reason', 'the live e2e stub terms', true);
+select callers from control.publish_terms(:'terms'::jsonb);
+commit;
 SQL
 
 # An own key of a development plan (recorded as requested by dev).

@@ -1,0 +1,68 @@
+{
+  "callers": [
+    {
+      "caller": "site",
+      "process": "mcp",
+      "person": true,
+      "purpose": "a visitor's view on the website"
+    },
+    {
+      "caller": "mcp",
+      "process": "mcp",
+      "person": true,
+      "purpose": "an assistant's question"
+    }
+  ],
+  "budgets": [
+    {
+      "budget_key": "tankerkoenig",
+      "window_s": 3600,
+      "licence_max": 60,
+      "licence_source": "the live end-to-end test's stub provider",
+      "burst_window_s": null,
+      "burst_licence_max": null,
+      "spacing_licence_ms": 60000,
+      "hold_s": 0,
+      "reserve_pct": 0
+    },
+    {
+      "budget_key": "db_timetables",
+      "window_s": 61,
+      "licence_max": 60,
+      "licence_source": "the live end-to-end test's stub provider",
+      "burst_window_s": null,
+      "burst_licence_max": null,
+      "spacing_licence_ms": null,
+      "hold_s": 0,
+      "reserve_pct": 0
+    }
+  ],
+  "providers": [
+    {
+      "provider": "tankerkoenig",
+      "budget_key": "tankerkoenig",
+      "min_interval_ms": 60000,
+      "max_concurrent": 1
+    },
+    {
+      "provider": "db_timetables",
+      "budget_key": "db_timetables",
+      "min_interval_ms": 100,
+      "max_concurrent": 4
+    }
+  ],
+  "shares": [
+    {
+      "budget_key": "tankerkoenig",
+      "caller": "site",
+      "floor": 1,
+      "cap": 30
+    },
+    {
+      "budget_key": "db_timetables",
+      "caller": "mcp",
+      "floor": 29,
+      "cap": 58
+    }
+  ]
+}

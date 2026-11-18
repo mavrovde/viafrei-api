@@ -27,8 +27,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     volumes:
       - db16-data:/var/lib/postgresql/data
+    # Over TCP: the image's first-boot server listens on the socket alone and
+    # then restarts, so a socket check passes before the network can connect.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U owner -d test_contract"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U owner -d test_contract"]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -43,7 +45,7 @@ services:
   # gives the API's read-only role its password. It runs on every start and
   # changes nothing on a database already at the head.
   db-migrate:
-    image: viafrei-database:0.2.0-local
+    image: ghcr.io/mavrovde/viafrei-database:0.3.2@sha256:4f534cdc94ab1a5f5ba9886968c0995946a7a4ba988de2ea30240779f7c3401e
     depends_on:
       db:
         condition: service_healthy
@@ -80,10 +82,11 @@ services:
     security_opt: ["no-new-privileges:true"]
 
   # The release's test seed writes the set into the platform's tables, once:
-  # a database whose contract already lists a source is left as it is
-  # (`make reset` starts over). The image must equal db-migrate's.
+  # a database whose contract already lists a place is left as it is
+  # (`make reset` starts over). Not the source register: the migrations
+  # write that themselves. The image must equal db-migrate's.
   db-seed:
-    image: viafrei-database:0.2.0-local
+    image: ghcr.io/mavrovde/viafrei-database:0.3.2@sha256:4f534cdc94ab1a5f5ba9886968c0995946a7a4ba988de2ea30240779f7c3401e
     depends_on:
       db-migrate:
         condition: service_completed_successfully
@@ -97,7 +100,7 @@ services:
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
-        if [ "$$(psql -X -tA -c 'select exists (select 1 from contract.source)' "$$DATABASE_URL")" = t ]; then
+        if [ "$$(psql -X -tA -c 'select exists (select 1 from contract.place)' "$$DATABASE_URL")" = t ]; then
           echo "fixtures already seeded"
         else
           node /app/dist/cli.js test-fixtures seed /seed/seed.sql

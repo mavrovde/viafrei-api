@@ -43,10 +43,11 @@ func exec(t *testing.T, c *pgx.Conn, sql string, args ...any) {
 	}
 }
 
-// ask records a fuel refresh of the Gemeinde ags, as the API records one.
+// ask records a fuel refresh of the Gemeinde ags, as the API records one: with
+// its caller, which the database requires (requested_by: site, mcp or dev).
 func ask(t *testing.T, owner *pgx.Conn, ags string) {
 	t.Helper()
-	exec(t, owner, `insert into live.refresh_requests (source, subject, subject_key) values ('fuel-prices-de', $1::jsonb, $2)`,
+	exec(t, owner, `insert into live.refresh_requests (source, subject, subject_key, requested_by) values ('fuel-prices-de', $1::jsonb, $2, 'site')`,
 		`{"at":"ags:`+ags+`"}`, "ags:"+ags)
 }
 

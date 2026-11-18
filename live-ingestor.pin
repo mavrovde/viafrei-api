@@ -14,5 +14,5 @@
 # Until the live refresher's release exists the image line ends in
 # :unreleased; `go run ./internal/release/pinguard -live` (the release
 # workflow) refuses it, a placeholder digest, and another database.
-ghcr.io/mavrovde/viafrei-live-ingestor:unreleased
-database 0.3.0
+ghcr.io/mavrovde/viafrei-live-ingestor:0.1.0@sha256:a12948575cf2b2123ce2415a6c011ab1c0e21b8fe210d7b73f8434bc853a4b9d
+database 0.3.2

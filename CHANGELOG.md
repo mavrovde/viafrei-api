@@ -12,7 +12,7 @@ See [docs/RELEASING.md](docs/RELEASING.md).
 ## [0.3.0] (unreleased)
 
 The API serves what the site and the MCP server answer today, from the read
-contract of viafrei-database 0.3.0 (schema head 315). Every operation below
+contract of viafrei-database 0.3.2 (schema head 315; 0.3.0 and 0.3.1 were never published). Every operation below
 is new since 0.2; the parity harness compares each one with the platform's
 own answers (bundle 2.6.22).
 
@@ -31,7 +31,8 @@ own answers (bundle 2.6.22).
 
 ### Changed
 
-* **database:** tests, the local stack and CI migrate with the signed viafrei-database 0.3.0 image (`database.pin`, by digest); this repository runs no DDL.
+* **database:** tests, the local stack and CI migrate with the signed viafrei-database 0.3.2 image (`database.pin`, by digest); this repository runs no DDL.
+* **live:** the on-demand refreshes are proven with the live refresher's release 0.1.0, pinned by digest, which `make live-e2e` runs against the same database release before a release.
 * **sources:** own keys see unreviewed families listed in `listSources`; other keys do not.
 * **tests:** the performance package (`internal/perf`) runs alone (`-p 1`) after the other integration packages, into its own coverage profile; its budgets are unchanged.
 

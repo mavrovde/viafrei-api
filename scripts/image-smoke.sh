@@ -3,9 +3,11 @@
 #
 # Runs IMAGE the way production does (read-only root, no capabilities,
 # non-root) with a database URL that resolves nowhere, and checks that
-#   - /healthz answers ok (it never touches storage),
-#   - /readyz answers 503 not_ready (storage is unreachable),
+#   - /healthz answers ok on the health listener (it never touches storage),
+#   - /readyz answers 503 not_ready there (storage is unreachable),
 #   - /v1/meta reports the version the image was built with,
+#   - the public listener refuses a caller with 403 and an empty body, since
+#     callers.allow_cidr is empty by default (fail closed),
 #   - the image's own HEALTHCHECK turns healthy,
 #   - the process runs as uid 65532.
 # The container is removed on every exit path.
@@ -14,6 +16,7 @@ set -euo pipefail
 image=${1:?usage: image-smoke.sh IMAGE}
 name=vfapi-smoke-$$
 port=${SMOKE_PORT:-18080}
+hport=${SMOKE_HEALTH_PORT:-18082}
 # A throwaway password for a database that does not exist; never a real one.
 pass=$(openssl rand -hex 12)
 checks=0
@@ -24,27 +27,33 @@ trap cleanup EXIT
 # Published on the loopback address only, as compose.yaml does; never on
 # every interface of the runner.
 docker run -d --name "$name" --read-only --cap-drop ALL --security-opt no-new-privileges \
-  -p "[::1]:$port:8080" \
+  -p "[::1]:$port:8080" -p "[::1]:$hport:8082" \
   -e "VFAPI_DB_URL=postgres://api_reader:$pass@db.invalid:5432/contract" \
   "$image" >/dev/null
 
 url="http://[::1]:$port"
+hurl="http://[::1]:$hport"
 for _ in $(seq 1 50); do
-  curl -fsS --max-time 1 "$url/healthz" >/dev/null 2>&1 && break
+  curl -fsS --max-time 1 "$hurl/healthz" >/dev/null 2>&1 && break
   sleep 0.2
 done
 
-[[ $(curl -fsS --max-time 3 "$url/healthz" | jq -r .status) == ok ]] || { docker logs "$name"; echo "FAIL: /healthz" >&2; exit 1; }
+[[ $(curl -fsS --max-time 3 "$hurl/healthz" | jq -r .status) == ok ]] || { docker logs "$name"; echo "FAIL: /healthz" >&2; exit 1; }
 checks=$((checks + 1))
 
-code=$(curl -s -o /tmp/readyz.$$ -w '%{http_code}' --max-time 3 "$url/readyz")
+code=$(curl -s -o /tmp/readyz.$$ -w '%{http_code}' --max-time 3 "$hurl/readyz")
 [[ $code == 503 && $(jq -r .status /tmp/readyz.$$) == not_ready ]] || { echo "FAIL: /readyz answered $code" >&2; exit 1; }
 rm -f /tmp/readyz.$$
 checks=$((checks + 1))
 
-meta=$(curl -fsS --max-time 3 "$url/v1/meta")
+meta=$(curl -fsS --max-time 3 "$hurl/v1/meta")
 want=$(docker image inspect "$image" --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')
 [[ $(jq -r .data.apiVersion <<<"$meta") == "$want" ]] || { echo "FAIL: /v1/meta apiVersion is not $want: $meta" >&2; exit 1; }
+checks=$((checks + 1))
+
+code=$(curl -s -o /tmp/refused.$$ -w '%{http_code}' --max-time 3 "$url/v1/meta")
+[[ $code == 403 && ! -s /tmp/refused.$$ ]] || { echo "FAIL: the public listener answered $code to a caller off the empty allow-list" >&2; exit 1; }
+rm -f /tmp/refused.$$
 checks=$((checks + 1))
 
 uid=$(docker inspect "$name" --format '{{ .Config.User }}')
@@ -59,4 +68,4 @@ done
 [[ $state == healthy ]] || { echo "FAIL: HEALTHCHECK state is $state" >&2; exit 1; }
 checks=$((checks + 1))
 
-echo "image smoke: $checks of 5 checks passed for $image"
+echo "image smoke: $checks of 6 checks passed for $image"

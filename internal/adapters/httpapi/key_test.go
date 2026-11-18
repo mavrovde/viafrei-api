@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mavrovde/viafrei-api/api"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/auth"
@@ -60,9 +61,9 @@ func (f *fakeSources) Sources(_ context.Context, allowed []string) ([]access.Sou
 }
 
 var fixtureRegister = []access.Terms{
-	{Family: "src-alpha-energy", UseClasses: []access.UseClass{"consumer", "non_commercial", "commercial"}, Version: "2026-03-01", Reviewed: true},
-	{Family: "src-gamma-energy", UseClasses: []access.UseClass{"consumer"}, Version: "2026-03-01", Reviewed: true},
-	{Family: "src-delta-parking", UseClasses: []access.UseClass{"consumer", "commercial"}, AcceptanceRequired: true, Version: "2026-03-01", Reviewed: true},
+	{Family: "src-alpha-energy", UseClasses: []access.UseClass{"consumer", "non_commercial", "commercial"}, Version: "2026-03-01"},
+	{Family: "src-gamma-energy", UseClasses: []access.UseClass{"consumer"}, Version: "2026-03-01"},
+	{Family: "src-delta-parking", UseClasses: []access.UseClass{"consumer", "commercial"}, AcceptanceRequired: true, Version: "delta-terms-1"},
 	{Family: "src-epsilon-roads", Version: "2026-03-01"},
 }
 
@@ -194,9 +195,9 @@ func TestKeyAnswer(t *testing.T) {
 	}
 }
 
-func families(t *testing.T, h http.Handler) []string {
+func families(t *testing.T, h http.Handler, query ...string) []string {
 	t.Helper()
-	w := do(t, h, http.MethodGet, "/v1/key", bearer)
+	w := do(t, h, http.MethodGet, "/v1/key"+strings.Join(query, ""), bearer)
 	if w.Code != http.StatusOK {
 		t.Fatalf("%d %s", w.Code, w.Body)
 	}
@@ -226,22 +227,19 @@ func TestRestrictedPurposeFamilyNeverReachesACommercialKey(t *testing.T) {
 	}
 }
 
-func TestTermsFamilyNeedsAcceptanceOfTheCurrentVersion(t *testing.T) {
+// TestTermsFamilyIsNeverAKeysOwn: terms are accepted per request, never
+// stored with a key (owner 2026-11-16), so the key answer never lists a
+// family whose terms need accepting as one the key reads, and the parameter
+// is ignored there.
+func TestTermsFamilyIsNeverAKeysOwn(t *testing.T) {
 	req.Covers(t, "SEC-030", "SEC-034")
-	for _, c := range []struct {
-		accepted []access.Acceptance
-		served   bool
-	}{
-		{nil, false},
-		{[]access.Acceptance{{Source: "src-delta-parking", Version: "2025-01-01"}}, false},
-		{[]access.Acceptance{{Source: "src-delta-parking", Version: "2026-03-01"}}, true},
-	} {
-		p := principal("commercial")
-		p.Key.Accepted = c.accepted
-		got := families(t, keyedHandler(t, config.Defaults(), &fakeAuth{p: p}, &fakeSources{register: fixtureRegister}, nil))
-		if slices.Contains(got, "src-delta-parking") != c.served {
-			t.Errorf("accepted %v: served %v", c.accepted, got)
-		}
+	p := principal("commercial")
+	h := keyedHandler(t, config.Defaults(), &fakeAuth{p: p}, &fakeSources{register: fixtureRegister}, nil)
+	if got := families(t, h); slices.Contains(got, "src-delta-parking") || len(got) == 0 {
+		t.Errorf("served %v", got)
+	}
+	if got := families(t, h, "?accept_terms=delta-terms-1"); slices.Contains(got, "src-delta-parking") {
+		t.Errorf("with accept_terms: served %v", got)
 	}
 }
 
@@ -313,5 +311,60 @@ func TestNoKeyReachesTheLog(t *testing.T) {
 	}
 	if strings.Count(log.String(), `"msg":"request"`) != 4 {
 		t.Fatalf("the requests were not logged: %s", log.String())
+	}
+}
+
+// TestEveryDataOperationRefusesWithoutAValidKey: every operation but the
+// service ones needs a key; asked with none, an unknown, an expired or a
+// revoked one, or over its key's limit, each refuses (owner 2026-11-16: keys
+// for authentication and rate limiting, issued by the admin path only). The
+// operations are those the committed examples document, one request each.
+func TestEveryDataOperationRefusesWithoutAValidKey(t *testing.T) {
+	req.Covers(t, "SEC-001", "SEC-003", "RATE-004")
+	examples, err := api.ReadExamples(api.Examples)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyless := []string{}
+	for id, e := range examples {
+		if e.Key == nil {
+			keyless = append(keyless, id)
+		}
+	}
+	slices.Sort(keyless)
+	if !slices.Equal(keyless, []string{"getHealth", "getMeta", "getPressure", "getReadiness"}) {
+		t.Fatalf("operations documented without a key: %v, want the service ones alone", keyless)
+	}
+	for _, c := range []struct {
+		err    error
+		status int
+		slug   string
+	}{
+		{access.ErrMissing, 401, "missing-key"},
+		{access.ErrInvalid, 401, "invalid-key"},
+		{access.ErrExpired, 401, "key-expired"},
+		{access.ErrRevoked, 401, "key-revoked"},
+		{auth.ErrLimited, 429, "rate-limited"},
+	} {
+		h, err := httpapi.NewHandler(httpapi.Deps{
+			Config: config.Defaults(), Build: buildinfo.Info{Version: "t", Commit: "c"}, ContractVersion: "0.1",
+			Now: func() time.Time { return fixedNow }, Auth: &fakeAuth{err: c.err}, Sources: &fakeSources{register: fixtureRegister},
+			Features: everyAnswer(),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for id, e := range examples {
+			if e.Key == nil {
+				continue
+			}
+			w := do(t, h, e.HTTPMethod(), e.Request, nil)
+			if w.Code != c.status || !strings.Contains(w.Body.String(), "/problems/"+c.slug) {
+				t.Errorf("%s with %s: %d %s", id, c.slug, w.Code, w.Body)
+			}
+			if c.status == 429 && w.Header().Get("Retry-After") == "" {
+				t.Errorf("%s: a 429 without Retry-After", id)
+			}
+		}
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"math/rand/v2"
-	"strings"
 	"unicode"
 	"unicode/utf8"
 )
@@ -112,17 +111,4 @@ func (n *namer) person() string { return capitalise(n.syllable() + n.syllable())
 func capitalise(s string) string {
 	r, size := utf8.DecodeRuneInString(s)
 	return string(unicode.ToUpper(r)) + s[size:]
-}
-
-// fold is the search form of a name: lower case, umlauts and ß spelled out,
-// everything but letters and digits removed.
-func fold(s string) string {
-	repl := strings.NewReplacer("ä", "ae", "ö", "oe", "ü", "ue", "ß", "ss", "Ä", "ae", "Ö", "oe", "Ü", "ue")
-	s = strings.ToLower(repl.Replace(s))
-	return strings.Map(func(r rune) rune {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			return r
-		}
-		return -1
-	}, s)
 }

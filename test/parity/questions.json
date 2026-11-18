@@ -2,23 +2,44 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "e6562a7bd002350e239f9e25cf501a7a2f1364395f7bc176a47aac7fe8b4b7d8"
+    "sha256": "6b146cee258538b77b3eb7f018e5335c7a8c606041afee7c08a08210a2e04dea"
   },
   "cases": [
     {
       "id": "charging-commercial",
       "operation": "listChargingOptions",
       "counterpart": "charging station search",
-      "request": "/v1/charging-options?at=50.82,6.0&radius_m=20000&access=all&limit=5",
+      "request": "/v1/charging-options?at=47.62,7.79&radius_m=20000&access=all&limit=5",
       "key": {
         "useClass": "commercial",
         "scopes": [
           "energy"
         ],
         "sources": [
-          "src-alpha-energy",
-          "src-beta-energy",
-          "src-gamma-energy"
+          "afir_alpha",
+          "afir_beta",
+          "chargepool_gamma",
+          "tankerkoenig_gamma"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "charging-site",
+      "operation": "getChargingSite",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options/afir_alpha:cs-01-0002",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "chargepool_gamma",
+          "tankerkoenig_gamma"
         ],
         "accepted": null
       },
@@ -28,16 +49,17 @@
       "id": "charging-all-consumer-fast",
       "operation": "listChargingOptions",
       "counterpart": "charging station search",
-      "request": "/v1/charging-options?at=48.41,7.68&radius_m=25000&access=all&min_kw=50&limit=3",
+      "request": "/v1/charging-options?at=47.62,7.79&radius_m=25000&access=all&min_kw=50&limit=3",
       "key": {
         "useClass": "consumer",
         "scopes": [
           "energy"
         ],
         "sources": [
-          "src-alpha-energy",
-          "src-beta-energy",
-          "src-gamma-energy"
+          "afir_alpha",
+          "afir_beta",
+          "chargepool_gamma",
+          "tankerkoenig_gamma"
         ],
         "accepted": null
       },
@@ -47,16 +69,17 @@
       "id": "charging-status-age-limit",
       "operation": "listChargingOptions",
       "counterpart": "charging station search",
-      "request": "/v1/charging-options?at=48.41,7.68&radius_m=25000&access=all&limit=2",
+      "request": "/v1/charging-options?at=47.62,7.79&radius_m=25000&access=all&limit=2",
       "key": {
         "useClass": "consumer",
         "scopes": [
           "energy"
         ],
         "sources": [
-          "src-alpha-energy",
-          "src-beta-energy",
-          "src-gamma-energy"
+          "afir_alpha",
+          "afir_beta",
+          "chargepool_gamma",
+          "tankerkoenig_gamma"
         ],
         "accepted": null
       },
@@ -66,16 +89,17 @@
       "id": "charging-reserved",
       "operation": "listChargingOptions",
       "counterpart": "charging station search",
-      "request": "/v1/charging-options?at=48.41,7.68&radius_m=25000&access=all&limit=2",
+      "request": "/v1/charging-options?at=47.62,7.79&radius_m=25000&access=all&limit=2",
       "key": {
         "useClass": "consumer",
         "scopes": [
           "energy"
         ],
         "sources": [
-          "src-alpha-energy",
-          "src-beta-energy",
-          "src-gamma-energy"
+          "afir_alpha",
+          "afir_beta",
+          "chargepool_gamma",
+          "tankerkoenig_gamma"
         ],
         "accepted": null
       },
@@ -85,16 +109,17 @@
       "id": "parking-terms-pending",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.39,10.23&radius_m=25000&limit=5",
+      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&limit=5",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
         "sources": [
-          "src-alpha-parking",
-          "src-beta-parking",
-          "src-delta-parking"
+          "park_alpha",
+          "park_beta",
+          "truckpark_sid_static",
+          "truckpark_sid_dyn"
         ],
         "accepted": null
       },
@@ -104,25 +129,2122 @@
       "id": "parking-terms-accepted",
       "operation": "listParkingOptions",
       "counterpart": "parking search",
-      "request": "/v1/parking-options?at=50.39,10.23&radius_m=25000&limit=5",
+      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&limit=5&accept_terms=sid-terms-1",
       "key": {
-        "useClass": "commercial",
+        "useClass": "consumer",
         "scopes": [
           "parking"
         ],
         "sources": [
-          "src-alpha-parking",
-          "src-beta-parking",
-          "src-delta-parking"
+          "park_alpha",
+          "park_beta",
+          "truckpark_sid_static",
+          "truckpark_sid_dyn"
         ],
-        "accepted": [
-          {
-            "source": "src-delta-parking",
-            "version": "2026-03-01"
-          }
-        ]
+        "accepted": null
       },
       "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "stations-text",
+      "operation": "listStations",
+      "counterpart": "station search",
+      "request": "/v1/stations?q=Nam%C3%BCningen&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_static",
+          "delfi_rt_tu"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "stations-near",
+      "operation": "listStations",
+      "counterpart": "station search",
+      "request": "/v1/stations?at=49.148,7.786&radius_m=5000&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_static",
+          "delfi_rt_tu"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "departures-day",
+      "operation": "listStationDepartures",
+      "counterpart": "departure board",
+      "request": "/v1/stations/1:de:01002:0/departures?from=2026-03-30T04:00:00Z&duration_min=1440&limit=15",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_static",
+          "delfi_rt_tu"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "departures-modes",
+      "operation": "listStationDepartures",
+      "counterpart": "departure board",
+      "request": "/v1/stations/1:de:01002:0/departures?from=2026-03-30T04:00:00Z&duration_min=1440&modes=rail,subway&limit=15",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_static",
+          "delfi_rt_tu"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "train-board",
+      "operation": "getTrainBoard",
+      "counterpart": "train departures",
+      "request": "/v1/train-boards/8001001",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "db_timetables"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "stations-code",
+      "operation": "listStations",
+      "counterpart": "station search",
+      "request": "/v1/stations?code=de:01002:0&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_static",
+          "delfi_rt_tu"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "fuel-near",
+      "operation": "listFuelOptions",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&limit=10",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "tankerkoenig_gamma"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "fuel-station",
+      "operation": "getFuelStation",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options/00000000-0000-4000-8000-000000000002",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "tankerkoenig_gamma"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "fuel-cheapest-e10",
+      "operation": "listFuelOptions",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&fuel=e10&sort=price&limit=5",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "tankerkoenig_gamma"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "fuel-brand-open",
+      "operation": "listFuelOptions",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&brand=belnan&open_now=true&limit=10",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "tankerkoenig_gamma"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "fuel-name-by-name",
+      "operation": "listFuelOptions",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&name=nam&sort=name&limit=10",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "tankerkoenig_gamma"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "places-name",
+      "operation": "listPlaces",
+      "counterpart": "place search",
+      "request": "/v1/places?q=Nam%C3%BCningen&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "places-near",
+      "operation": "listPlaces",
+      "counterpart": "place search",
+      "request": "/v1/places?q=Sch%C3%B6mpingbach&at=48.4,7.5&radius_m=50000&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "places-kind",
+      "operation": "listPlaces",
+      "counterpart": "place search",
+      "request": "/v1/places?q=Matfienland&kind=state&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "places-motorway",
+      "operation": "listPlaces",
+      "counterpart": "place search",
+      "request": "/v1/places?q=A100&kind=motorway&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames",
+          "roads_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "places-junction",
+      "operation": "listPlaces",
+      "counterpart": "place search",
+      "request": "/v1/places?q=Kreuz%20Fixfeld&kind=junction&limit=5",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "autobahn",
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames",
+          "roads_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "weather-near",
+      "operation": "getWeatherRisk",
+      "counterpart": "weather warnings",
+      "request": "/v1/weather-risk?at=49.16,7.8",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "weather"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "weather-min-level",
+      "operation": "getWeatherRisk",
+      "counterpart": "weather warnings",
+      "request": "/v1/weather-risk?at=49.16,7.8&min_level=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "weather"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "roads-near",
+      "operation": "listRoadConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/road-conditions?at=52.2,9.15&radius_m=25000&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta",
+          "roads_alpha",
+          "roads_epsilon"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "roads-near-kinds",
+      "operation": "listRoadConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/road-conditions?at=52.57,8.49&radius_m=25000&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta",
+          "roads_alpha",
+          "roads_epsilon"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "motorway-a101",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/A101/conditions?limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta",
+          "roads_alpha",
+          "roads_epsilon"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "rules-topic",
+      "operation": "getDrivingRules",
+      "counterpart": "driving rules",
+      "request": "/v1/driving-rules?topic=truck_ban",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "rules"
+        ],
+        "sources": [
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "facilities-all",
+      "operation": "listStationFacilities",
+      "counterpart": "station facilities",
+      "request": "/v1/stations/1:de:03001:0/facilities",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_static",
+          "delfi_rt_tu",
+          "openstation_siri_fm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "facilities-lifts",
+      "operation": "listStationFacilities",
+      "counterpart": "station facilities",
+      "request": "/v1/stations/1:de:03001:0/facilities?kind=elevator&limit=1",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_static",
+          "delfi_rt_tu",
+          "openstation_siri_fm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "motorway-a101-roadworks",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/A101/conditions?kinds=roadworks&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta",
+          "roads_alpha",
+          "roads_epsilon"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "parking-free-spaces",
+      "operation": "listParkingOptions",
+      "counterpart": "parking search",
+      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&free_min=1&limit=5&accept_terms=sid-terms-1",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "parking"
+        ],
+        "sources": [
+          "park_alpha",
+          "park_beta",
+          "truckpark_sid_static",
+          "truckpark_sid_dyn"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "parking-bays",
+      "operation": "listParkingBays",
+      "counterpart": "parking search, kind disabled_badge",
+      "request": "/v1/parking-bays?at=48.388,7.521&radius_m=2000&limit=3",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "parking"
+        ],
+        "sources": [
+          "dortmund_parksensoren_bays",
+          "frankfurt_behindertenparkplaetze",
+          "park_alpha",
+          "park_beta",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "hydrogen-near",
+      "operation": "listHydrogenOptions",
+      "counterpart": "hydrogen station search",
+      "request": "/v1/hydrogen-options?at=47.95,6.9&radius_m=150000&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "afir_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "hydrogen-truck",
+      "operation": "listHydrogenOptions",
+      "counterpart": "hydrogen station search",
+      "request": "/v1/hydrogen-options?at=47.95,6.9&radius_m=150000&vehicle=truck&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "afir_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "hydrogen-nearest-beyond",
+      "operation": "listHydrogenOptions",
+      "counterpart": "hydrogen station search",
+      "request": "/v1/hydrogen-options?at=47.95,6.9&radius_m=1000",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "afir_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "speed-official",
+      "operation": "listSpeedCameras",
+      "counterpart": "speed camera search",
+      "request": "/v1/speed-cameras?at=47.98,6.95&radius_m=10000",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "speed_alpha",
+          "osm_speed_cameras"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T12:00:00Z"
+    },
+    {
+      "id": "speed-osm",
+      "operation": "listSpeedCameras",
+      "counterpart": "speed camera search",
+      "request": "/v1/speed-cameras?at=47.55,6.88&radius_m=5000&limit=1",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "speed_alpha",
+          "osm_speed_cameras"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T12:00:00Z"
+    },
+    {
+      "id": "sharing-available",
+      "operation": "listSharingOptions",
+      "counterpart": "bike sharing search",
+      "request": "/v1/sharing-options?at=47.94,7.33&radius_m=5000",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "gbfs_nextbike"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "sharing-all",
+      "operation": "listSharingOptions",
+      "counterpart": "bike sharing search",
+      "request": "/v1/sharing-options?at=47.94,7.33&radius_m=5000&only_available=false&limit=2",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "gbfs_nextbike"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "sharing-nearest",
+      "operation": "listSharingOptions",
+      "counterpart": "bike sharing search",
+      "request": "/v1/sharing-options?at=47.5,7.6&radius_m=100",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "gbfs_nextbike"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "address-postcode",
+      "operation": "listAddresses",
+      "counterpart": "address search",
+      "request": "/v1/addresses?q=Marktweg%201,%2020000",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "address-town",
+      "operation": "listAddresses",
+      "counterpart": "address search",
+      "request": "/v1/addresses?q=Z%C3%BClz%C3%BCrode,%20Marktweg%202&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "poi-in-town",
+      "operation": "listPois",
+      "counterpart": "place of interest search",
+      "request": "/v1/pois?name=pharmacy&in=Z%C3%BClz%C3%BCrode",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "poi-near-brand",
+      "operation": "listPois",
+      "counterpart": "place of interest search",
+      "request": "/v1/pois?name=backhaus&at=47.55,6.85&radius_m=50000&category=shop&limit=1",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "poi-anywhere-page",
+      "operation": "listPois",
+      "counterpart": "place of interest search",
+      "request": "/v1/pois?name=pharmacy&limit=5&cursor=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "location-town",
+      "operation": "describeLocation",
+      "counterpart": "location description",
+      "request": "/v1/location?at=47.5088,6.9623",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm",
+          "bkg_gvisys",
+          "geonames"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "location-open-country",
+      "operation": "describeLocation",
+      "counterpart": "location description",
+      "request": "/v1/location?at=47.95,7.6",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm",
+          "bkg_gvisys",
+          "geonames"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-28T18:00:00Z"
+    },
+    {
+      "id": "transit-kreis",
+      "operation": "listTransitDisruptions",
+      "counterpart": "transit disruption check",
+      "request": "/v1/transit-disruptions?area=08001",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_sa_alpha",
+          "delfi_rt_tu"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "transit-land",
+      "operation": "listTransitDisruptions",
+      "counterpart": "transit disruption check",
+      "request": "/v1/transit-disruptions?area=08&limit=1",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_sa_alpha",
+          "delfi_rt_tu"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "transit-line",
+      "operation": "listTransitDisruptions",
+      "counterpart": "transit disruption check",
+      "request": "/v1/transit-disruptions?line=re%2045",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_sa_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "transit-window",
+      "operation": "listTransitDisruptions",
+      "counterpart": "transit disruption check",
+      "request": "/v1/transit-disruptions?area=08001&line=F%204&window_min=30",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_sa_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "nearby-vehicle",
+      "operation": "listNearby",
+      "counterpart": "nearby search",
+      "request": "/v1/nearby?at=49.17,7.81&radius_m=15000",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "places",
+          "energy",
+          "parking",
+          "transit",
+          "roads"
+        ],
+        "sources": [
+          "tankerkoenig_gamma",
+          "afir_alpha",
+          "park_alpha",
+          "delfi_static",
+          "bast_lcl",
+          "osm"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "nearby-needs",
+      "operation": "listNearby",
+      "counterpart": "nearby search",
+      "request": "/v1/nearby?at=47.6098,7.8972&categories=groceries,health,food,safety",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "nearby-small",
+      "operation": "listNearby",
+      "counterpart": "nearby search",
+      "request": "/v1/nearby?at=50.25,10.43&radius_m=1000&categories=parking,station,money",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "places",
+          "parking",
+          "transit"
+        ],
+        "sources": [
+          "park_alpha",
+          "delfi_static",
+          "osm"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "charging-operator",
+      "operation": "listChargingOptions",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options?at=47.62,7.79&radius_m=20000&access=all&operator=L%C3%B6ckbrau%20Strom%20GmbH",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "chargepool_gamma",
+          "tankerkoenig_gamma"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "charging-power-band",
+      "operation": "listChargingOptions",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options?at=47.62,7.79&radius_m=25000&access=all&min_kw=20&max_kw=149&limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "chargepool_gamma",
+          "tankerkoenig_gamma"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "charging-connector-terms",
+      "operation": "listChargingOptions",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options?at=47.62,7.79&radius_m=25000&access=all&connector=ccs2&conditions=open247,public",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "chargepool_gamma",
+          "tankerkoenig_gamma"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "charging-only-available",
+      "operation": "listChargingOptions",
+      "counterpart": "charging station search",
+      "request": "/v1/charging-options?at=47.62,7.79&radius_m=25000&access=all&only_available=true&limit=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "chargepool_gamma",
+          "tankerkoenig_gamma"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-29T22:10:00Z"
+    },
+    {
+      "id": "fuel-open-at",
+      "operation": "listFuelOptions",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&open_at=23:30&limit=10",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "tankerkoenig_gamma"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "fuel-whole-day",
+      "operation": "listFuelOptions",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&whole_day=true&limit=10",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "tankerkoenig_gamma"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "parking-kind-truck",
+      "operation": "listParkingOptions",
+      "counterpart": "parking search",
+      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&kind=truck&limit=5&accept_terms=sid-terms-1",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "parking"
+        ],
+        "sources": [
+          "park_alpha",
+          "park_beta",
+          "truckpark_sid_static",
+          "truckpark_sid_dyn"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "parking-facilities-toilet",
+      "operation": "listParkingOptions",
+      "counterpart": "parking search",
+      "request": "/v1/parking-options?at=50.25,10.43&radius_m=25000&facilities=toilet&limit=5&accept_terms=sid-terms-1",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "parking"
+        ],
+        "sources": [
+          "park_alpha",
+          "park_beta",
+          "truckpark_sid_static",
+          "truckpark_sid_dyn"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "parking-road-a101",
+      "operation": "listMotorwayParking",
+      "counterpart": "parking search",
+      "request": "/v1/motorways/A101/parking-options?limit=5&accept_terms=sid-terms-1",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "parking"
+        ],
+        "sources": [
+          "park_alpha",
+          "park_beta",
+          "truckpark_sid_static",
+          "truckpark_sid_dyn",
+          "bast_lcl"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "motorway-a101-horizon",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/A101/conditions?horizon_days=14&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta",
+          "roads_alpha",
+          "roads_epsilon",
+          "roadworks_bast"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "motorway-a101-roadworks-window",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/A101/conditions?kinds=roadworks&from=2026-03-30&to=2026-04-30&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta",
+          "roads_alpha",
+          "roads_epsilon",
+          "roadworks_bast"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "motorway-a101-cursor",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/A101/conditions?limit=2&cursor=2",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta",
+          "roads_alpha",
+          "roads_epsilon"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "place-overview",
+      "operation": "getPlaceOverview",
+      "counterpart": "place cards",
+      "request": "/v1/places/100079/overview?radius_m=5000",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places",
+          "energy",
+          "parking",
+          "roads",
+          "weather",
+          "transit"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "afir_zeta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "state-roads-10",
+      "operation": "listStateRoadConditions",
+      "counterpart": "motorway traffic (Land form)",
+      "request": "/v1/states/10/road-conditions?road_class=motorway&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "roads_alpha",
+          "roads_epsilon"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "state-roads-10-closures",
+      "operation": "listStateRoadConditions",
+      "counterpart": "traffic announcements",
+      "request": "/v1/states/10/road-conditions?kinds=closure,roadworks&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "roads_alpha",
+          "roads_epsilon"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "rules-lez-point",
+      "operation": "getDrivingRules",
+      "counterpart": "driving rules",
+      "request": "/v1/driving-rules?topic=lez&at=48.2437,7.0162",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "rules"
+        ],
+        "sources": [
+          "viafrei_rules",
+          "lez_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "rules-lez-city",
+      "operation": "getDrivingRules",
+      "counterpart": "driving rules",
+      "request": "/v1/driving-rules?topic=lez&city=Matfienland",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "rules"
+        ],
+        "sources": [
+          "viafrei_rules",
+          "lez_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "lorry-long-road",
+      "operation": "listLorryRules",
+      "counterpart": "road status",
+      "request": "/v1/lorry-rules?vehicle=long_lorry&road=A100",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "lorry-near",
+      "operation": "listLorryRules",
+      "counterpart": "road status",
+      "request": "/v1/lorry-rules?vehicle=lorry&at=48.24475,7.01625",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "sources-all",
+      "operation": "listSources",
+      "counterpart": "attribution",
+      "request": "/v1/sources",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "roads",
+          "energy",
+          "parking",
+          "places",
+          "transit",
+          "weather",
+          "rules"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "ruling": "Lead ruling 2026-11-17: compared are the live-source families viafrei://coverage lists (family, staleAfterS, shareAlike); the reference families (bast_lcl, bkg_gvisys, delfi_static, geonames, osm, osm_speed_cameras, viafrei_rules), the domain and the domain filter are API-only. Lead ruling 2026-11-17 (round 3): its condition and purpose notes are register texts and are left out (meta.notes); a family not reviewed yet (no use class) is listed to ViaFrei's own keys, as the coverage resource lists it, and served to none."
+    },
+    {
+      "id": "sources-places",
+      "operation": "listSources",
+      "counterpart": "gazetteer",
+      "request": "/v1/sources?domain=places",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "apiOnly": "The domain filter is API-only (lead ruling 2026-11-17): viafrei://coverage states no domain, and the places domain holds only reference families, which the coverage resource does not list."
+    },
+    {
+      "id": "motorways-all",
+      "operation": "listMotorways",
+      "counterpart": "motorway traffic",
+      "request": "/v1/motorways?limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "motorways-exits",
+      "operation": "listMotorways",
+      "counterpart": "motorway traffic",
+      "request": "/v1/motorways?road=A100",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "motorways-state",
+      "operation": "listMotorways",
+      "counterpart": "motorway traffic",
+      "request": "/v1/motorways?state=01",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "watch-road",
+      "operation": "getWatch",
+      "counterpart": "watch situation",
+      "request": "/v1/watch?kind=road&target=A102&hours=3&request=Sag%20mir%20Bescheid%2C%20wenn%20sich%20ein%20Stau%20bildet",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "watch-road-since",
+      "operation": "getWatch",
+      "counterpart": "watch situation",
+      "request": "/v1/watch?kind=road&target=A102&condition=%7B%22events%22%3A%5B%22jams%22%5D%7D&since=2026-03-29T00:00:00Z",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "watch-place",
+      "operation": "getWatch",
+      "counterpart": "watch situation",
+      "request": "/v1/watch?kind=place&target=49.16465,7.79903&condition=%7B%22radius_km%22%3A10%7D&until=2026-03-30T06:00:00Z",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "watch-by-id",
+      "operation": "getWatch",
+      "counterpart": "stop watch",
+      "request": "/v1/watch?watch_id=eyJrIjoicm9hZCIsImtleSI6IkExMDIiLCJjIjp7ImV2ZW50cyI6WyJqYW1zIl19fQ&since=2026-03-29T00:00:00Z",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "service-meta",
+      "operation": "getMeta",
+      "counterpart": "pressure",
+      "request": "/v1/meta",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "watch-region",
+      "operation": "getWatch",
+      "counterpart": "watch situation",
+      "request": "/v1/watch?kind=region&target=08001&hours=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places",
+          "roads",
+          "transit",
+          "weather"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "watch-weather",
+      "operation": "getWatch",
+      "counterpart": "watch situation",
+      "request": "/v1/watch?kind=weather&target=49.16,7.8&hours=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places",
+          "roads",
+          "transit",
+          "weather"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "motorway-unknown-roadworks",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/A999/conditions?kinds=roadworks&from=2026-03-30&to=2026-04-06&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta",
+          "roads_alpha",
+          "roads_epsilon",
+          "roadworks_bast"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "service-pressure",
+      "operation": "getPressure",
+      "counterpart": "pressure",
+      "request": "/v1/pressure",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "road-b-no-sites",
+      "operation": "getMotorwayConditions",
+      "counterpart": "road conditions",
+      "request": "/v1/motorways/B999/conditions?kinds=roadworks&from=2026-03-30&to=2026-04-06&limit=10",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "roads"
+        ],
+        "sources": [
+          "dwd_alpha",
+          "dwd_eta",
+          "roads_alpha",
+          "roads_epsilon",
+          "roadworks_bast"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "affected-stations",
+      "operation": "listAffectedStations",
+      "counterpart": "station board",
+      "request": "/v1/affected-stations?limit=5",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places",
+          "energy",
+          "parking",
+          "roads",
+          "weather",
+          "transit"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "afir_zeta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "places-coverage",
+      "operation": "getPlacesCoverage",
+      "counterpart": "coverage",
+      "request": "/v1/places/coverage",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "apiOnly": "The MCP side has no matching form (the coverage resource counts places per platform kind, with no family or Land; the home's national tiles are HTML); site parity comes with the web switch to the API (lead ruling 2026-11-17)."
+    },
+    {
+      "id": "national-summary",
+      "operation": "getNationalSummary",
+      "counterpart": "home",
+      "request": "/v1/germany",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "roads",
+          "energy",
+          "parking",
+          "transit",
+          "weather",
+          "accessibility"
+        ],
+        "sources": [
+          "afir_alpha",
+          "afir_beta",
+          "bast_lcl",
+          "bkg_gvisys",
+          "chargepool_gamma",
+          "delfi_rt_tu",
+          "delfi_sa_alpha",
+          "delfi_static",
+          "dwd_alpha",
+          "dwd_eta",
+          "gbfs_nextbike",
+          "geonames",
+          "lez_alpha",
+          "lorry_bast_langlkw",
+          "lorry_koeln_beschraenkungen",
+          "openstation_siri_fm",
+          "osm",
+          "osm_speed_cameras",
+          "park_alpha",
+          "park_beta",
+          "roads_alpha",
+          "roads_epsilon",
+          "speed_alpha",
+          "tankerkoenig_gamma",
+          "truckpark_sid_dyn",
+          "truckpark_sid_static",
+          "viafrei_rules"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "apiOnly": "The MCP side has no matching form (the coverage resource counts places per platform kind, with no family or Land; the home's national tiles are HTML); site parity comes with the web switch to the API (lead ruling 2026-11-17)."
+    },
+    {
+      "id": "fuel-refreshed",
+      "operation": "listFuelOptions",
+      "counterpart": "filling station search",
+      "request": "/v1/fuel-options?at=49.17,7.81&radius_m=25000&limit=10",
+      "key": {
+        "useClass": "consumer",
+        "scopes": [
+          "energy"
+        ],
+        "sources": [
+          "tankerkoenig_gamma"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T01:00:00Z",
+      "refresh": {
+        "source": "fuel-prices-de",
+        "subject": {
+          "at": "pt:49.17,7.81",
+          "snap": true
+        }
+      }
+    },
+    {
+      "id": "train-board-refreshed",
+      "operation": "getTrainBoard",
+      "counterpart": "train departures",
+      "request": "/v1/train-boards/8001001",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "db_timetables"
+        ],
+        "audience": "own",
+        "accepted": null
+      },
+      "now": "2026-03-30T01:00:00Z",
+      "refresh": {
+        "source": "train-board-de",
+        "subject": {
+          "eva": "8001001"
+        }
+      }
     }
   ]
 }

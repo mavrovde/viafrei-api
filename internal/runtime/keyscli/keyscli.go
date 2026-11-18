@@ -22,11 +22,12 @@ import (
 const Usage = `usage: viafrei-api keys COMMAND [flags]
   plan    -name N -use-class consumer|non_commercial|commercial -tier critical|standard|bulk -scopes a,b -sources x,y
           -rate R -burst B [-quota-day D] [-quota-month M] -actor A    a quota of 0 is none
-  issue   -plan N -label L -contact C [-expires 8760h] -actor A     prints the key once
+  issue   -plan N -label L -contact C [-expires 8760h] [-audience public|own] -actor A
+                                                                    prints the key once; own is
+                                                                    ViaFrei's own callers only
   rotate  -id ID -actor A                                           prints the new key once
   revoke  -id ID -reason R -actor A
   move    -id ID -plan N -actor A
-  accept  -id ID -source FAMILY -version V -actor A
   prune   -actor A                                                  removes audit records past audit.retention_days
                                                                     and usage records past metering.retention_days
   usage   [-id ID] [-hours 24]                                      prints the usage of the last hours, tab-separated`
@@ -64,13 +65,12 @@ func Run(ctx context.Context, args []string, keys *auth.Keys, stdout, stderr io.
 		contact = fs.String("contact", "", "key holder contact")
 		expires = fs.Duration("expires", 0, "key lifetime; 0 means auth.default_expiry")
 		reason  = fs.String("reason", "", "revocation reason")
-		source  = fs.String("source", "", "source family")
-		version = fs.String("version", "", "terms version")
 		rate    = fs.Int("rate", 0, "plan rate, requests a second")
 		burst   = fs.Int("burst", 0, "plan burst, requests at once")
 		day     = fs.Int64("quota-day", 0, "plan units a quota day; 0 is no quota")
 		month   = fs.Int64("quota-month", 0, "plan units a quota month; 0 is no quota")
 		hours   = fs.Int("hours", 24, "usage: the hours to read back")
+		aud     = fs.String("audience", string(access.AudiencePublic), "issue: public, or own for ViaFrei's own callers")
 	)
 	if err := fs.Parse(args); err != nil || fs.NArg() > 0 {
 		fmt.Fprintln(stderr, Usage)
@@ -91,15 +91,13 @@ func Run(ctx context.Context, args []string, keys *auth.Keys, stdout, stderr io.
 		}
 		err = keys.PutPlan(ctx, p, *actor)
 	case "issue":
-		key, err = keys.Issue(ctx, *plan, *label, *contact, *expires, *actor)
+		key, err = keys.IssueAs(ctx, access.Audience(*aud), *plan, *label, *contact, *expires, *actor)
 	case "rotate":
 		key, err = keys.Rotate(ctx, *id, *actor)
 	case "revoke":
 		err = keys.Revoke(ctx, *id, *reason, *actor)
 	case "move":
 		err = keys.Move(ctx, *id, *plan, *actor)
-	case "accept":
-		err = keys.Accept(ctx, *id, *source, *version, *actor)
 	case "prune":
 		if n, err = keys.Prune(ctx, *actor); err == nil {
 			u, err = keys.PruneUsage(ctx, *actor)

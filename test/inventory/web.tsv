@@ -1,0 +1,70 @@
+# source web 0.1.1 11edb0b557ed96d6e5a36542eb88dca690b3a061
+# expanded /internal/map/{} = rail,kreise,rail-sa
+# expanded /internal/tiles/{} = punctuality,lifts,reports,jams,lorry,charging,station,fuel,carparks
+# expanded /internal/{} = fuel/{}/area,charging/{}/area,station/{}/area,exit/{}/{}/area
+# expanded /internal/{}/list = fuel,charging
+# expanded /internal/{}/{} = fuel,charging
+# path	places asked from
+/internal/charging/list	1
+/internal/charging/{}	1
+/internal/charging/{}/area	1
+/internal/examples	1
+/internal/examples/call	1
+/internal/examples/local	1
+/internal/exit/{}/{}/area	1
+/internal/fuel/list	1
+/internal/fuel/refresh	1
+/internal/fuel/{}	1
+/internal/fuel/{}/area	1
+/internal/fuel/{}/prices	1
+/internal/map/kreise	1
+/internal/map/live	1
+/internal/map/rail	1
+/internal/map/rail-sa	1
+/internal/motorway/exits	1
+/internal/motorway/index	1
+/internal/motorway/list	1
+/internal/motorway/near	1
+/internal/motorway/overlay	1
+/internal/motorway/top	1
+/internal/motorway/{}	1
+/internal/motorway/{}/around	1
+/internal/motorway/{}/fuel	1
+/internal/motorway/{}/more/{}	1
+/internal/news/traffic	1
+/internal/place/cards	1
+/internal/place/fuel	1
+/internal/place/index	1
+/internal/place/key	3
+/internal/place/suggest	1
+/internal/place/{}/card/{}	1
+/internal/place/{}/{}	2
+/internal/pressure	1
+/internal/road/list	1
+/internal/road/{}	1
+/internal/search	1
+/internal/sid/occupancy	1
+/internal/spot	1
+/internal/state/index	1
+/internal/state/list	1
+/internal/state/{}	1
+/internal/station-suggest	1
+/internal/station/index	1
+/internal/station/list	1
+/internal/station/near	1
+/internal/station/top	1
+/internal/station/{}	1
+/internal/station/{}/area	1
+/internal/station/{}/area/{}	1
+/internal/station/{}/card/{}	1
+/internal/station/{}/live	1
+/internal/station/{}/stop/{}	1
+/internal/tiles/carparks	3
+/internal/tiles/charging	3
+/internal/tiles/fuel	4
+/internal/tiles/jams	3
+/internal/tiles/lifts	3
+/internal/tiles/lorry	3
+/internal/tiles/punctuality	3
+/internal/tiles/reports	3
+/internal/tiles/station	3

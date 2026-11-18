@@ -83,3 +83,11 @@ func TestLampOf(t *testing.T) {
 		}
 	}
 }
+
+func TestLooksLikeCellAsThePlatform(t *testing.T) {
+	for in, want := range map[string]bool{"801002000": true, "52.5,13.4": true, "Kiel": false, "Kreis Plön": false, "A 7": false, "": false} {
+		if got := weather.LooksLikeCell(in); got != want {
+			t.Errorf("%q: %v, want %v", in, got, want)
+		}
+	}
+}

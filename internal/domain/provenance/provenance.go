@@ -40,6 +40,10 @@ type Family struct {
 	Source access.Source
 	// StaleAfter is the family's design threshold: older data is stale.
 	StaleAfter time.Duration
+	// NeverStale marks a family with no fixed interval (the read contract
+	// gives it no threshold): it is never stale, and an answer shows the age
+	// of its data only. StaleAfter is then unused.
+	NeverStale bool
 	// DataAsOf is the instant up to which the family's data was last known
 	// current. It advances when the data is confirmed unchanged, so it is not
 	// the instant of the last change in the data. Nil when the family's data
@@ -53,26 +57,42 @@ type Family struct {
 
 // Freshness is one entry of meta.freshness (ENV-003).
 type Freshness struct {
-	Family      string
-	DataAsOf    *time.Time
-	AgeS        *int64
-	StaleAfterS int64
+	Family   string
+	DataAsOf *time.Time
+	AgeS     *int64
+	// StaleAfterS is the threshold in seconds; nil for a family that is
+	// never stale.
+	StaleAfterS *int64
 	Stale       bool
 }
 
 // Assess says how fresh the family is at now. A family with no instant is
-// stale and has no age. Data dated after now has the age zero: the age is
-// never negative.
+// stale and has no age, unless it is never stale. Data dated after now has
+// the age zero: the age is never negative.
 func (f Family) Assess(now time.Time) Freshness {
-	out := Freshness{Family: f.Source.Family, StaleAfterS: int64(f.StaleAfter / time.Second), Stale: true}
+	out := Freshness{Family: f.Source.Family, Stale: !f.NeverStale}
+	if !f.NeverStale {
+		s := int64(f.StaleAfter / time.Second)
+		out.StaleAfterS = &s
+	}
 	if f.DataAsOf == nil {
 		return out
 	}
 	asOf := f.DataAsOf.UTC()
 	age := max(int64(now.Sub(asOf)/time.Second), 0)
 	out.DataAsOf, out.AgeS = &asOf, &age
-	out.Stale = age > out.StaleAfterS
+	out.Stale = out.StaleAfterS != nil && age > *out.StaleAfterS
 	return out
+}
+
+// TurnsStale is the instant the family's data turns stale: once its age
+// passes the threshold's whole seconds. False for a family that is never
+// stale or has no instant.
+func (f Family) TurnsStale() (time.Time, bool) {
+	if f.NeverStale || f.DataAsOf == nil {
+		return time.Time{}, false
+	}
+	return f.DataAsOf.Add((f.StaleAfter/time.Second + 1) * time.Second), true
 }
 
 // AsOf is meta.asOf (ENV-004): the oldest instant among the entries, or nil
@@ -139,4 +159,17 @@ type Versions struct {
 	// and every rule): a rules answer rests on them, and they carry no
 	// freshness version of their own.
 	RulesReference string
+}
+
+// Unconditioned is fams without their condition notes: an answer that states
+// no row names the families it consulted, but carries none of their
+// conditions, as the platform's answers carry a register's condition only
+// beside the rows it governs. The input is not changed.
+func Unconditioned(fams []Family) []Family {
+	out := make([]Family, len(fams))
+	for i, f := range fams {
+		f.Notes = slices.DeleteFunc(slices.Clone(f.Notes), func(n Note) bool { return n.Kind == Condition })
+		out[i] = f
+	}
+	return out
 }

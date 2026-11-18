@@ -30,7 +30,7 @@ expect "a page link becomes the page, keeping its fragment" "errors.md#problem-t
 expect "a site file is left as it is" "openapi.json" 0 "openapi.json"
 expect "an existing script becomes its GitHub URL" "../scripts/docs-build.sh" 0 \
   "https://github.com/mavrovde/viafrei-api/blob/main/scripts/docs-build.sh"
-expect "an existing directory becomes its GitHub URL" "../db" 0 "https://github.com/mavrovde/viafrei-api/blob/main/db"
+expect "an existing directory becomes its GitHub URL" "../api" 0 "https://github.com/mavrovde/viafrei-api/blob/main/api"
 expect "an external link is left as it is" "https://example.org/x" 0 "https://example.org/x"
 expect "a misspelt page (docs/eror.md) is refused" "eror.md" 1 "missing-in-repo/docs/eror.md" \
   "FAIL: link to docs/eror.md: neither a page of the portal nor a file of the repository"

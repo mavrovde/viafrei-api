@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -24,8 +25,10 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/parking"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
+	"github.com/mavrovde/viafrei-api/internal/domain/refresh"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
+	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/runtime/logging"
@@ -35,6 +38,21 @@ import (
 // fakeFeatures answers every feature operation from fixed values and
 // records what it was asked.
 type fakeFeatures struct {
+	motorways  features.MotorwaysAnswer
+	gotCat     roads.CatalogueQuery
+	trainBoard features.TrainBoardAnswer
+	lorry      features.LorryAnswer
+	zonesErr   error
+	refresh    refresh.Request
+	refreshErr error
+	gotRefresh refresh.Ask
+	gotRefID   string
+	gotEVA     string
+	gotLang    string
+	bays       features.BaysAnswer
+	gotBays    parking.BayQuery
+	objects    objectsFake
+	states     statesFake
 	charging   features.Answer[energy.Site]
 	parking    features.Answer[parking.Site]
 	overview   features.Overview
@@ -42,7 +60,12 @@ type fakeFeatures struct {
 	situation  features.Answer[roads.Situation]
 	risk       features.WeatherRisk
 	topic      rules.Topic
+	zones      features.ZonesAnswer
+	gotZones   *rules.ZoneQuery
 	gotRisk    weather.Query
+	cell       features.CellAnswer
+	cellErr    error
+	gotCell    weather.CellQuery
 	gotTopic   string
 	err        error
 	gotRoad    roads.CorridorQuery
@@ -53,6 +76,33 @@ type fakeFeatures struct {
 	gotOver    features.OverviewQuery
 	gotKey     access.Record
 	chargeCall int
+	stations   features.Answer[transit.Station]
+	gotStation transit.Query
+	board      features.Board
+	gotBoard   transit.DepartureQuery
+	fuel       features.FuelStations
+	gotFuel    energy.FuelQuery
+	places     features.Answer[places.Place]
+	gotPlaces  places.Query
+	facilities features.StationFacilities
+	gotFacil   transit.FacilityQuery
+	hydrogen   features.HydrogenStations
+	gotHydro   energy.HydrogenQuery
+	speed      features.SpeedAnswer
+	gotSpeed   roads.SpeedQuery
+	disruption features.DisruptionAnswer
+	gotDisrupt transit.DisruptionQuery
+	nearby     features.NearbyAnswer
+	gotNearby  features.NearbyQuery
+	sharing    features.SharingAnswer
+	gotSharing transit.SharingQuery
+	addresses  features.AddressAnswer
+	gotAddress places.AddressQuery
+	pois       features.PoiAnswer
+	gotPoi     places.PoiQuery
+	location   features.LocationAnswer
+	gotLoc     places.LocationQuery
+	gotAccept  []string
 }
 
 func (f *fakeFeatures) Charging(_ context.Context, key access.Record, q energy.Query) (features.Answer[energy.Site], error) {
@@ -61,13 +111,13 @@ func (f *fakeFeatures) Charging(_ context.Context, key access.Record, q energy.Q
 	return f.charging, f.err
 }
 
-func (f *fakeFeatures) Parking(_ context.Context, key access.Record, q parking.Query) (features.Answer[parking.Site], error) {
-	f.gotKey, f.gotPark = key, q
+func (f *fakeFeatures) Parking(ctx context.Context, key access.Record, q parking.Query) (features.Answer[parking.Site], error) {
+	f.gotKey, f.gotPark, f.gotAccept = key, q, access.AcceptedFrom(ctx)
 	return f.parking, f.err
 }
 
-func (f *fakeFeatures) Overview(_ context.Context, key access.Record, q features.OverviewQuery) (features.Overview, error) {
-	f.gotKey, f.gotOver = key, q
+func (f *fakeFeatures) Overview(ctx context.Context, key access.Record, q features.OverviewQuery) (features.Overview, error) {
+	f.gotKey, f.gotOver, f.gotAccept = key, q, access.AcceptedFrom(ctx)
 	return f.overview, f.err
 }
 
@@ -118,8 +168,10 @@ func chargingAnswer() features.Answer[energy.Site] {
 func parkingAnswer() features.Answer[parking.Site] {
 	return features.Answer[parking.Site]{
 		Items: []parking.Site{
-			{ID: "pk-01-0000", Family: "src-alpha-parking", Kind: parking.KindGarage, Occupancy: &parking.Occupancy{Free: ip(3), Total: ip(40), State: parking.StateFree, ObservedAt: fixedNow.Add(-time.Minute)}},
-			{ID: "pk-01-0001", Family: "src-delta-parking", Kind: parking.KindTruckParking, TermsRequired: true},
+			{ID: "pk-01-0000", Family: "src-alpha-parking", Kind: parking.KindGarage, DistanceM: 350, Occupancy: &parking.Occupancy{Free: ip(3), Total: ip(40), State: parking.StateFree, ObservedAt: fixedNow.Add(-time.Minute)}},
+			// An accepted Toll Collect site: the platform names it without a
+			// distance (Unranged), the /v1 answers around a position state it.
+			{ID: "pk-01-0001", Family: "src-delta-parking", Kind: parking.KindTruckParking, TermsRequired: true, DistanceM: 1840, Unranged: true},
 		},
 		Families: []provenance.Family{terms}, Partial: true, At: fixedNow,
 	}
@@ -136,12 +188,13 @@ func overviewAnswer() features.Overview {
 }
 
 func everyAnswer() *fakeFeatures {
-	return &fakeFeatures{charging: chargingAnswer(), parking: parkingAnswer(), overview: overviewAnswer(), conditions: conditionsAnswer(), situation: situationAnswer(), risk: riskAnswer(), topic: topicAnswer()}
+	return &fakeFeatures{charging: chargingAnswer(), parking: parkingAnswer(), overview: overviewAnswer(), conditions: conditionsAnswer(), situation: situationAnswer(), risk: riskAnswer(), topic: topicAnswer(), stations: stationsAnswer(),
+		refresh: refresh.Request{ID: "42", Source: "fuel-prices-de", State: refresh.NoneDue}}
 }
 
 func featureScopes() auth.Principal {
 	p := principal("commercial")
-	p.Key.Plan.Scopes = []access.Scope{"places", "energy", "parking", "roads", "weather", "rules"}
+	p.Key.Plan.Scopes = []access.Scope{"places", "energy", "parking", "roads", "weather", "rules", "transit"}
 	return p
 }
 
@@ -184,6 +237,9 @@ func warningCodes(m map[string]any) []string {
 	return out
 }
 
+// chargeFilter is the filter of a question that asks for none.
+var chargeFilter = energy.Filter{StatusMaxAge: config.Defaults().Charging.StatusMaxAge}
+
 func TestChargingOptionsAnswer(t *testing.T) {
 	req.Covers(t, "FR-ENERGY-004", "FR-ENERGY-005", "ENV-003", "ENV-004", "ENV-011", "ENV-040", "ENV-041")
 	f := everyAnswer()
@@ -194,7 +250,7 @@ func TestChargingOptionsAnswer(t *testing.T) {
 	if w.Code != http.StatusOK || w.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("status %d, cache %q: %s", w.Code, w.Header().Get("Cache-Control"), w.Body)
 	}
-	if f.gotCharge != (energy.Query{At: geo.Point{Lat: 52.52, Lon: 13.405}, RadiusM: 2000, Access: energy.FilterPublic, Limit: 20}) || f.gotKey.ID != "abcdefghij" {
+	if !reflect.DeepEqual(f.gotCharge, energy.Query{At: geo.Point{Lat: 52.52, Lon: 13.405}, RadiusM: 2000, Access: energy.FilterPublic, Limit: 20, Filter: chargeFilter}) || f.gotKey.ID != "abcdefghij" {
 		t.Errorf("asked %+v for %q", f.gotCharge, f.gotKey.ID)
 	}
 	body := decode(t, w)
@@ -237,7 +293,7 @@ func TestChargingOptionsAnswer(t *testing.T) {
 	}
 
 	do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/charging-options?at=-1.5,-2&radius_m=500&limit=3&min_kw=50&access=all", bearer)
-	if f.gotCharge != (energy.Query{At: geo.Point{Lat: -1.5, Lon: -2}, RadiusM: 500, MinKw: 50, Access: energy.FilterAll, Limit: 3}) {
+	if !reflect.DeepEqual(f.gotCharge, energy.Query{At: geo.Point{Lat: -1.5, Lon: -2}, RadiusM: 500, MinKw: 50, Access: energy.FilterAll, Limit: 3, Filter: chargeFilter}) {
 		t.Errorf("asked %+v", f.gotCharge)
 	}
 }
@@ -271,11 +327,11 @@ func TestChargingOptionsWarnsOfStaleAndWithheldData(t *testing.T) {
 func TestParkingOptionsAnswer(t *testing.T) {
 	req.Covers(t, "FR-PARK-002", "FR-PARK-003", "SEC-030", "ENV-003")
 	f := everyAnswer()
-	w := do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/parking-options?at=52.52,13.405&free_min=2&limit=5", bearer)
+	w := do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/parking-options?at=52.52,13.405&free_min=2&limit=5&kind=truck&facilities=shower,toilet", bearer)
 	if w.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", w.Code, w.Body)
 	}
-	if f.gotPark != (parking.Query{At: geo.Point{Lat: 52.52, Lon: 13.405}, RadiusM: 2000, FreeMin: 2, Limit: 5}) {
+	if !reflect.DeepEqual(f.gotPark, parking.Query{At: geo.Point{Lat: 52.52, Lon: 13.405}, RadiusM: 2000, FreeMin: 2, Kind: "truck", Amenities: []string{"shower", "toilet"}, Limit: 5}) {
 		t.Errorf("asked %+v", f.gotPark)
 	}
 	body := decode(t, w)
@@ -289,6 +345,11 @@ func TestParkingOptionsAnswer(t *testing.T) {
 	if held["occupancy"] != nil || held["termsRequired"] != true || held["kind"] != "truck_parking" {
 		t.Errorf("withheld site %v", held)
 	}
+	// The /v1 contract states every site's whole-metre distance (VER-001),
+	// the Toll Collect site's too, which the platform names without one.
+	if open["distanceM"] != 350.0 || held["distanceM"] != 1840.0 {
+		t.Errorf("distances %v, %v", open["distanceM"], held["distanceM"])
+	}
 	m := meta(t, body)
 	ws, _ := m["warnings"].([]any)
 	w0, _ := ws[0].(map[string]any)
@@ -300,7 +361,7 @@ func TestParkingOptionsAnswer(t *testing.T) {
 		t.Errorf("condition notes %v", notes)
 	}
 	q, _ := m["query"].(map[string]any)
-	if q["freeMin"] != 2.0 {
+	if fs, _ := q["facilities"].([]any); q["freeMin"] != 2.0 || q["kind"] != "truck" || len(fs) != 2 {
 		t.Errorf("query %v", q)
 	}
 
@@ -329,6 +390,10 @@ func TestPlaceOverviewAnswer(t *testing.T) {
 	pl, _ := data["place"].(map[string]any)
 	if pl["id"] != "pl-01-0001" || pl["kind"] != "locality" || data["charging"] == nil || data["parking"] == nil {
 		t.Errorf("data %v", data)
+	}
+	pk, _ := data["parking"].(map[string]any)
+	if sites, _ := pk["sites"].([]any); len(sites) != 2 || sites[0].(map[string]any)["distanceM"] != 350.0 || sites[1].(map[string]any)["distanceM"] != 1840.0 {
+		t.Errorf("an overview states every site's distance, a Toll Collect site's too: %v", pk)
 	}
 	m := meta(t, body)
 	parts, _ := m["parts"].([]any)
@@ -411,7 +476,8 @@ func TestFeatureRefusals(t *testing.T) {
 	targets := []string{
 		"/v1/charging-options?at=52.52,13.405", "/v1/parking-options?at=52.52,13.405", "/v1/places/pl-01-0001/overview",
 		"/v1/motorways/A8/conditions", "/v1/road-conditions?at=52.52,13.405", "/v1/road-situations/ev-1",
-		"/v1/weather-risk?at=52.52,13.405", "/v1/driving-rules?topic=winter_tyres",
+		"/v1/weather-risk?at=52.52,13.405", "/v1/driving-rules?topic=winter_tyres", "/v1/stations?q=koeln",
+		"/v1/motorways", "/v1/motorways/A8/parking-options",
 	}
 	cases := []struct {
 		err    error
@@ -593,5 +659,112 @@ func TestAnOpenBreakerIsUpstreamUnavailableWithItsRetryAfter(t *testing.T) {
 	w = do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: trial}, nil), http.MethodGet, "/v1/charging-options?at=52.52,13.405", bearer)
 	if got := w.Header().Get("Retry-After"); got != "1" {
 		t.Fatalf("Retry-After %q while the trials run, want 1", got)
+	}
+}
+
+// TestTermsAreAcceptedPerRequest (owner 2026-11-16): without accept_terms a
+// gated site is listed without its occupancy and meta.terms carries the
+// terms' text and the parameter that accepts them; with it, the request's
+// acceptance reaches the licence gate; terms that are not current are
+// refused with the current text; a malformed value is an invalid parameter;
+// and an operation whose data no terms gate ignores the parameter.
+func TestTermsAreAcceptedPerRequest(t *testing.T) {
+	req.Covers(t, "FR-PARK-003", "SEC-030", "FR-BRIEF-008")
+	texts := []access.TermsText{
+		{Gate: "sid-terms-1", ID: "sid-terms", Version: "1", EffectiveOn: time.Date(2026, 10, 27, 0, 0, 0, 0, time.UTC), Lang: "de", Binding: true, Heading: "2. Lkw", Body: "Angaben ...", URL: "https://viafrei.de/nutzungsbedingungen", ProviderURL: "https://provider.example/terms"},
+		{Gate: "sid-terms-1", ID: "sid-terms", Version: "1", EffectiveOn: time.Date(2026, 10, 27, 0, 0, 0, 0, time.UTC), Lang: "en", Heading: "2. Truck", Body: "Figures ...", URL: "https://viafrei.de/en/terms", ProviderURL: "https://provider.example/terms"},
+	}
+	f := everyAnswer()
+	f.parking.Terms = texts
+	h := featureHandler(t, config.Defaults(), f, nil)
+	w := do(t, h, http.MethodGet, "/v1/parking-options?at=52.52,13.405", bearer)
+	meta, _ := decode(t, w)["meta"].(map[string]any)
+	terms, _ := meta["terms"].([]any)
+	if w.Code != 200 || len(terms) != 1 || f.gotAccept != nil {
+		t.Fatalf("without the parameter: %d, accepted %v, %s", w.Code, f.gotAccept, w.Body)
+	}
+	offer := terms[0].(map[string]any)
+	bodies, _ := offer["texts"].([]any)
+	de, _ := bodies[0].(map[string]any)
+	if offer["parameter"] != "accept_terms" || offer["accept"] != "sid-terms-1" || offer["inForceFrom"] != "2026-10-27" || len(bodies) != 2 || de["binding"] != true || de["body"] != "Angaben ..." {
+		t.Errorf("meta.terms %v", offer)
+	}
+
+	if w := do(t, h, http.MethodGet, "/v1/parking-options?at=52.52,13.405&accept_terms=sid-terms-1", bearer); w.Code != 200 || !slices.Equal(f.gotAccept, []string{"sid-terms-1"}) {
+		t.Errorf("with the parameter: %d, accepted %v", w.Code, f.gotAccept)
+	}
+	if w := do(t, h, http.MethodGet, "/v1/places/pl-1/overview?accept_terms=sid-terms-1", bearer); w.Code != 200 || !slices.Equal(f.gotAccept, []string{"sid-terms-1"}) {
+		t.Errorf("the overview with the parameter: %d, accepted %v", w.Code, f.gotAccept)
+	}
+	for _, bad := range []string{"sid", "sid-terms-1,sid-terms-1", "SID-1"} {
+		assertProblem(t, do(t, h, http.MethodGet, "/v1/parking-options?at=52.52,13.405&accept_terms="+bad, bearer), 400, "invalid-parameter")
+	}
+
+	stale := featureHandler(t, config.Defaults(), &fakeFeatures{err: &features.TermsRefusal{Texts: texts}}, nil)
+	for _, target := range []string{"/v1/parking-options?at=52.52,13.405&accept_terms=sid-terms-0", "/v1/places/pl-1/overview?accept_terms=sid-terms-0"} {
+		p := assertProblem(t, do(t, stale, http.MethodGet, target, bearer), 403, "terms-not-accepted")
+		if terms, _ := p["terms"].([]any); len(terms) != 1 || terms[0].(map[string]any)["accept"] != "sid-terms-1" {
+			t.Errorf("%s: %v", target, p)
+		}
+	}
+
+	if w := do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&accept_terms=not-even%20a-gate", bearer); w.Code != 200 {
+		t.Errorf("charging with the parameter: %d %s", w.Code, w.Body)
+	}
+}
+
+func TestChargingFilters(t *testing.T) {
+	req.Covers(t, "FR-ENERGY-004", "ENV-040")
+	f := everyAnswer()
+	f.charging.Dropped = &energy.Dropped{NotFree: 2, Stale: 1}
+	h := featureHandler(t, config.Defaults(), f, nil)
+	w := do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&min_kw=50&max_kw=149&connector=ccs2&operator=EnBW%20mobility%2B%20AG&conditions=open247,card&only_available=true", bearer)
+	body := w.Body.String()
+	want := energy.Filter{Connector: "ccs2", MaxKw: 149, OperatorKey: "enbw", Terms: []string{"open247", "card"}, OnlyAvailable: true,
+		StatusMaxAge: config.Defaults().Charging.StatusMaxAge}
+	if w.Code != http.StatusOK || !reflect.DeepEqual(f.gotCharge.Filter, want) {
+		t.Fatalf("%d asked %+v: %s", w.Code, f.gotCharge.Filter, body)
+	}
+	for _, s := range []string{`"maxKw":149`, `"connector":"ccs2"`, `"operator":"enbw"`, `"conditions":["open247","card"]`, `"onlyAvailable":true`, `"dropped":{"notFree":2,"stale":1,"noStatus":0}`} {
+		if !strings.Contains(body, s) {
+			t.Errorf("answer lacks %s: %s", s, body)
+		}
+	}
+	assertProblem(t, do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&min_kw=150&max_kw=50", bearer), 400, "invalid-parameter")
+	assertProblem(t, do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&operator=GmbH", bearer), 400, "invalid-parameter")
+	assertProblem(t, do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&conditions=cheap", bearer), 400, "invalid-parameter")
+}
+
+func TestMotorwayParkingAnswer(t *testing.T) {
+	req.Covers(t, "FR-PARK-002", "SEC-030")
+	f := everyAnswer()
+	h := featureHandler(t, config.Defaults(), f, nil)
+	w := do(t, h, http.MethodGet, "/v1/motorways/a%207/parking-options?kind=rest_area&facilities=shower&limit=3", bearer)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", w.Code, w.Body)
+	}
+	if !reflect.DeepEqual(f.gotPark, parking.Query{Road: "A7", Kind: "rest_area", Amenities: []string{"shower"}, Limit: 3}) {
+		t.Errorf("asked %+v", f.gotPark)
+	}
+	body := decode(t, w)
+	m := meta(t, body)
+	q, _ := m["query"].(map[string]any)
+	if q["road"] != "A7" || q["kind"] != "rest_area" || q["freeMin"] != 0.0 {
+		t.Errorf("query %v", q)
+	}
+	data, _ := body["data"].([]any)
+	if len(data) != 2 {
+		t.Fatalf("data %v", data)
+	}
+	// A site stated without a distance (Unranged) has distanceM null.
+	if d, ok := data[1].(map[string]any)["distanceM"]; !ok || d != nil {
+		t.Errorf("the Toll Collect site's distance %v (stated %v)", d, ok)
+	}
+	if w := do(t, h, http.MethodGet, "/v1/motorways/B7/parking-options", bearer); w.Code != http.StatusBadRequest {
+		t.Errorf("a federal road: %d", w.Code)
+	}
+	f.err = errors.New("down")
+	if w := do(t, h, http.MethodGet, "/v1/motorways/A7/parking-options", bearer); w.Code < 500 {
+		t.Errorf("a failed read: %d", w.Code)
 	}
 }

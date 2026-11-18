@@ -24,12 +24,15 @@ An IPv6 address is counted by its prefix, `ratelimit.ipv6_prefix` (default
 64): one subscriber is routinely given a whole /64, so every address inside
 it shares one bucket and one table entry.
 
-The gate is decided per operation. It charges every request to a service
-endpoint (`/healthz`, `/readyz`, `/v1/meta`), to an unknown path and to a
+The gate is decided per operation. It charges every request to the public
+service endpoint (`/v1/meta`), to an unknown path and to a
 switched-off operation, whatever headers it carries, and every request to a
 keyed operation that presents neither `Authorization` nor `X-API-Key`
 (SEC-051). A header sent where no key is checked is checked by nothing, so
 it buys no exemption.
+The health listener (`/healthz`, `/readyz` and `/v1/meta` on
+`health.listen_addr`) is outside the gate: the edge never routes it, and a
+probe of the platform is never refused.
 
 RATE-001 reads "every request". A key presented to a keyed operation is not
 charged here: it is held by its own key's bucket (gate 2), and a request

@@ -43,6 +43,9 @@ invoke() {
     cmd/reqreport)
       expect 2 "$bin"
       ;;
+    cmd/fakelive)
+      expect 2 "$bin"
+      ;;
     internal/testkit/gotestsum-lite)
       echo '{"Action":"pass","Package":"p","Test":"TestBoot"}' >"$work/run/pass.json"
       expect 0 "$bin" <"$work/run/pass.json"
@@ -61,6 +64,12 @@ invoke() {
       ;;
     internal/release/platformsync)
       expect 2 "$bin"
+      ;;
+    internal/release/inventory)
+      expect 2 "$bin"
+      ;;
+    internal/release/pinguard)
+      expect 2 "$bin" -dir "$work/run"
       ;;
     *)
       echo "boot-coverage: main package $pkg has no invocation in $0" >&2

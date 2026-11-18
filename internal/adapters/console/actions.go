@@ -42,9 +42,6 @@ var actions = []actionForm{
 	{"rotate", "Rotate a key", []formField{{"id", "Key id", true}}},
 	{"revoke", "Revoke a key", []formField{{"id", "Key id", true}, {"reason", "Reason", true}}},
 	{"move", "Move a key to another plan", []formField{{"id", "Key id", true}, {"plan", "Plan", true}}},
-	{"accept", "Record a terms acceptance", []formField{
-		{"id", "Key id", true}, {"source", "Source family", true}, {"version", "Terms version", true},
-	}},
 	{"prune", "Prune audit and usage records past retention", nil},
 }
 
@@ -186,10 +183,6 @@ func build(c *pendingChange) (run, error) {
 	case "move":
 		return func(ctx context.Context, k Lifecycle, actor string) (string, access.Key, error) {
 			return "Key " + v("id") + " moved to " + v("plan") + ".", access.Key{}, k.Move(ctx, v("id"), v("plan"), actor)
-		}, nil
-	case "accept":
-		return func(ctx context.Context, k Lifecycle, actor string) (string, access.Key, error) {
-			return "Acceptance recorded.", access.Key{}, k.Accept(ctx, v("id"), v("source"), v("version"), actor)
 		}, nil
 	default: // prune: the forms above are the only actions ask admits.
 		return func(ctx context.Context, k Lifecycle, actor string) (string, access.Key, error) {

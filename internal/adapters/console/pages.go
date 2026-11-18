@@ -67,8 +67,8 @@ const layout = `{{define "top"}}<!doctype html>
 
 {{define "home"}}{{template "top" .}}
 <h2>Keys</h2>
-<table><thead><tr><th>Key id</th><th>Environment</th><th>Plan</th><th>Label</th><th>Contact</th><th>Issued</th><th>Expires</th><th>Revoked</th></tr></thead><tbody>
-{{range .Keys}}<tr><td><code>{{.ID}}</code></td><td>{{.Environment}}</td><td>{{.Plan}}</td><td>{{.Label}}</td><td>{{.Contact}}</td><td>{{when .IssuedAt}}</td><td>{{when .ExpiresAt}}</td><td>{{whenp .RevokedAt}} {{.RevokeReason}}</td></tr>
+<table><thead><tr><th>Key id</th><th>Environment</th><th>Audience</th><th>Plan</th><th>Label</th><th>Contact</th><th>Issued</th><th>Expires</th><th>Revoked</th></tr></thead><tbody>
+{{range .Keys}}<tr><td><code>{{.ID}}</code></td><td>{{.Environment}}</td><td>{{.Audience}}</td><td>{{.Plan}}</td><td>{{.Label}}</td><td>{{.Contact}}</td><td>{{when .IssuedAt}}</td><td>{{when .ExpiresAt}}</td><td>{{whenp .RevokedAt}} {{.RevokeReason}}</td></tr>
 {{else}}<tr><td colspan="8">No keys.</td></tr>{{end}}</tbody></table>
 <h2>Plans</h2>
 <table><thead><tr><th>Plan</th><th>Use class</th><th>Tier</th><th>Scopes</th><th>Sources</th><th>Rate</th><th>Burst</th><th>Quota a day</th><th>Quota a month</th></tr></thead><tbody>

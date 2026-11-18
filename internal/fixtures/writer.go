@@ -112,32 +112,6 @@ func point(p lonLat) string {
 	return "'SRID=4326;POINT(" + coord(p.lon) + " " + coord(p.lat) + ")'"
 }
 
-func box(b bbox) string {
-	return fmt.Sprintf("'SRID=4326;MULTIPOLYGON(((%s %s,%s %s,%s %s,%s %s,%s %s)))'",
-		coord(b.w), coord(b.s), coord(b.e), coord(b.s), coord(b.e), coord(b.n), coord(b.w), coord(b.n), coord(b.w), coord(b.s))
-}
-
-func line(pts []lonLat) string {
-	parts := make([]string, len(pts))
-	for i, p := range pts {
-		parts[i] = coord(p.lon) + " " + coord(p.lat)
-	}
-	return "'SRID=4326;MULTILINESTRING((" + strings.Join(parts, ",") + "))'"
-}
-
-// lines writes a line of several parts, in their order.
-func lines(parts ...[]lonLat) string {
-	out := make([]string, len(parts))
-	for i, pts := range parts {
-		coords := make([]string, len(pts))
-		for j, p := range pts {
-			coords[j] = coord(p.lon) + " " + coord(p.lat)
-		}
-		out[i] = "(" + strings.Join(coords, ",") + ")"
-	}
-	return "'SRID=4326;MULTILINESTRING(" + strings.Join(out, ",") + ")'"
-}
-
 func array(vals ...string) string {
 	quoted := make([]string, len(vals))
 	for i, v := range vals {

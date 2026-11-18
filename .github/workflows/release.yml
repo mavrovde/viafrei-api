@@ -1,17 +1,25 @@
-# Publishes one release from an annotated tag vX.Y.Z or vX.Y.Z-rc.N:
-#   build linux/amd64 + linux/arm64, push to GHCR, sign (cosign keyless),
-#   attest build provenance and the SBOM, attach openapi.json, its diff
-#   against the previous release, the SBOMs and SHA256SUMS to the release
-#   page, publish it (0.x and -rc are pre-releases), then verify what was
-#   published, close the milestone when nothing in it is open, and publish
-#   the docs (OpenAPI reference and guide) of the newest final release to
-#   GitHub Pages.
+# Publishes one CONFIRMED release from an annotated tag vX.Y.Z: build
+#   linux/amd64 + linux/arm64, push to GHCR, sign (cosign keyless), attest
+#   build provenance and the SBOM, attach openapi.json, its diff against the
+#   previous release, the SBOMs and SHA256SUMS to the release page, publish
+#   it (0.x is a pre-release), then verify what was published, close the
+#   milestone when nothing in it is open, and publish the docs (OpenAPI
+#   reference and guide) of the newest release to GitHub Pages.
+# This is the ONLY workflow that pushes an image. An image is published for
+# a confirmed release and nothing else: an annotated vX.Y.Z tag (no -rc or
+# other suffix) whose version equals version.txt, on the commit that set
+# version.txt (the release commit) of main (or of a ruleset-protected
+# hotfix/* branch) that CI passed. There is no main-line
+# (:edge, :sha-) image, and a release candidate publishes nothing: CI already
+# builds, lints, scans and smoke-tests the image of every commit without
+# pushing it.
 # Started by release-please.yml (workflow_call) after a release pull request
-# is merged, by a maintainer pushing an rc tag, or by hand for a tag that
-# exists. Tags are never moved or deleted here, and a tag whose release is
-# published, or whose :X.Y.Z image exists, is refused before anything is
-# built. Before anything is built, Snyk (snyk.yml, called) tests the tagged
-# commit's dependencies; a high or critical advisory stops the release. See
+# is merged, by a pushed vX.Y.Z tag, or by hand for a tag that exists. Tags
+# are never moved or deleted here, and a tag whose release is published, or
+# whose :X.Y.Z image exists, is refused before anything is built. Before
+# anything is built, Snyk (snyk.yml, called) tests the tagged commit's
+# dependencies, where a high or critical advisory stops the release, and the
+# full mutation run (mutation.yml, called) tests it, where a red run does. See
 # docs/RELEASING.md.
 name: Release
 
@@ -26,11 +34,11 @@ on:
       SNYK_TOKEN:
         required: true
   push:
-    tags: ["v*"]
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing annotated tag to publish, vX.Y.Z or vX.Y.Z-rc.N (a published one is refused)
+        description: Existing annotated tag to publish, vX.Y.Z (an rc or a published one is refused)
         required: true
         type: string
 
@@ -44,7 +52,7 @@ concurrency:
 env:
   IMAGE: ghcr.io/mavrovde/viafrei-api
   TAG: ${{ inputs.tag || github.ref_name }}
-  IDENTITY: ^https://github\.com/mavrovde/viafrei-api/\.github/workflows/(image|release)\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?)$
+  IDENTITY: ^https://github\.com/mavrovde/viafrei-api/\.github/workflows/release\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$
   ISSUER: https://token.actions.githubusercontent.com
 
 jobs:
@@ -62,7 +70,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
-          [[ $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]] || { echo "::error::'$TAG' is not vX.Y.Z or vX.Y.Z-rc.N"; exit 1; }
+          [[ $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::'$TAG' is not a confirmed release vX.Y.Z; an rc or any other suffix publishes no image"; exit 1; }
           read -r type sha < <(gh api "repos/$GH_REPO/git/ref/tags/$TAG" --jq '"\(.object.type) \(.object.sha)"')
           # An annotated tag is an object of its own; the commit is what it points at.
           if [[ $type == tag ]]; then read -r type sha < <(gh api "repos/$GH_REPO/git/tags/$sha" --jq '"\(.object.type) \(.object.sha)"'); fi
@@ -85,9 +93,21 @@ jobs:
     secrets:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
+  # The full mutation run once per release, on the commit about to be
+  # published (mutation.yml, four shards); a red run stops the release before
+  # anything is built.
+  mutation:
+    name: Mutation
+    needs: commit
+    permissions:
+      contents: read
+    uses: ./.github/workflows/mutation.yml
+    with:
+      ref: ${{ needs.commit.outputs.sha }}
+
   publish:
     name: Build, sign, attest, publish
-    needs: [commit, snyk]
+    needs: [commit, snyk, mutation]
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:
@@ -100,7 +120,6 @@ jobs:
     outputs:
       digest: ${{ steps.build.outputs.digest }}
       version: ${{ steps.tag.outputs.version }}
-      final: ${{ steps.tag.outputs.final }}
       highest: ${{ steps.tag.outputs.highest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -108,15 +127,21 @@ jobs:
           ref: refs/tags/${{ env.TAG }}
           fetch-depth: 0
           persist-credentials: false
-      - name: The tag is an annotated vX.Y.Z or vX.Y.Z-rc.N
+      - name: The tag is a confirmed release, an annotated vX.Y.Z equal to version.txt
         id: tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           SCANNED: ${{ needs.commit.outputs.sha }}
         run: |
-          [[ $TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-rc\.[0-9]+)?$ ]] || { echo "::error::'$TAG' is not vX.Y.Z or vX.Y.Z-rc.N"; exit 1; }
-          major=${BASH_REMATCH[1]} minor=${BASH_REMATCH[2]} rc=${BASH_REMATCH[4]}
+          # A release candidate, or any other suffix, is not a confirmed
+          # release, and no image is published for it (docs/RELEASING.md).
+          [[ $TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || { echo "::error::'$TAG' is not a confirmed release vX.Y.Z; an rc or any other suffix publishes no image"; exit 1; }
+          major=${BASH_REMATCH[1]} minor=${BASH_REMATCH[2]}
+          [[ $(tr -d '[:space:]' < version.txt) == "${TAG#v}" ]] || { echo "::error::$TAG does not equal version.txt ($(tr -d '[:space:]' < version.txt)) at the tagged commit"; exit 1; }
+          # Every later commit of main also holds version.txt = X.Y.Z, so the
+          # tag must sit on the commit that set it: the release commit itself.
+          [[ $(git rev-list -1 "$TAG" -- version.txt) == "$(git rev-parse "$TAG^{commit}")" ]] || { echo "::error::$TAG is not on the commit that set version.txt to ${TAG#v}; only the release commit is released"; exit 1; }
           # The commit Snyk scanned is the commit built here: the tag cannot have moved between the two jobs.
           [[ $(git rev-parse "$TAG^{commit}") == "$SCANNED" ]] || { echo "::error::$TAG names $(git rev-parse "$TAG^{commit}"), not $SCANNED, the commit Snyk scanned"; exit 1; }
           [[ $(gh api "repos/$GH_REPO/git/ref/tags/$TAG" --jq .object.type) == tag ]] || { echo "::error::$TAG is a lightweight tag; releases need an annotated tag (git tag -a)"; exit 1; }
@@ -147,8 +172,7 @@ jobs:
             (( reviews >= 1 )) || { echo "::error::$on requires $reviews approving reviews; the hotfix ruleset must require at least one (docs/RELEASING.md)"; exit 1; }
           fi
           version=${TAG#v}
-          final=true; [[ -n $rc ]] && final=false
-          prerelease=false; [[ $major == 0 || -n $rc ]] && prerelease=true
+          prerelease=false; [[ $major == 0 ]] && prerelease=true
           prev=""
           for t in $(git tag -l "v*" --sort=-v:refname); do
             [[ $t =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ && $t != "$TAG" ]] || continue
@@ -157,7 +181,6 @@ jobs:
           {
             echo "version=$version"
             echo "minor=$major.$minor"
-            echo "final=$final"
             echo "prerelease=$prerelease"
             echo "previous=$prev"
             echo "highest=$([[ $(git tag -l "v*" | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V | tail -n 1) == "$TAG" ]] && echo true || echo false)"
@@ -169,6 +192,23 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: The database pin is a published release, not a local build or a placeholder (REL-015)
+        run: go run ./internal/release/pinguard
+      - name: The live pin is a published live refresher release of the same database release, not unreleased or a placeholder (REL-015)
+        # make live-e2e proved the refreshes against it before the release
+        # (docs/RELEASING.md); the image is private, so CI does not run it.
+        run: go run ./internal/release/pinguard -live
+      - name: The inventory is as new as the platform's and the site's newest releases (REL-015)
+        # test/inventory records what the MCP server and the site ask for, from
+        # the releases it names; an API released past a newer consumer release
+        # could miss what that release asks for. Export it again first
+        # (docs/RELEASING.md).
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          platform=$(go run ./internal/release/platformsync read -timeout 10s)
+          web=$(gh api repos/mavrovde/viafrei-web/releases/latest --jq .tag_name)
+          go run ./internal/release/inventory age -dir test/inventory -platform "$platform" -web "${web#v}"
       - name: CI passed on the tagged commit (REL-015)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -180,19 +220,17 @@ jobs:
         env:
           VERSION: ${{ steps.tag.outputs.version }}
           MINOR: ${{ steps.tag.outputs.minor }}
-          FINAL: ${{ steps.tag.outputs.final }}
-          COMMIT: ${{ steps.tag.outputs.commit }}
           HIGHEST: ${{ steps.tag.outputs.highest }}
           HIGHEST_IN_MINOR: ${{ steps.tag.outputs.highest_in_minor }}
         run: |
           {
             echo "list<<EOF"
             echo "$IMAGE:$VERSION"
-            echo "$IMAGE:sha-${COMMIT::12}"
-            # :X.Y moves to the newest patch of its minor only; a backported
-            # patch of an older line never moves it back.
-            if [[ $FINAL == true && $HIGHEST_IN_MINOR == true ]]; then echo "$IMAGE:$MINOR"; fi
-            if [[ $FINAL == true && $HIGHEST == true ]]; then echo "$IMAGE:latest"; fi
+            # :X.Y moves to the newest patch of its minor only, and :latest to
+            # the newest release only; a backported patch of an older line
+            # never moves either back.
+            if [[ $HIGHEST_IN_MINOR == true ]]; then echo "$IMAGE:$MINOR"; fi
+            if [[ $HIGHEST == true ]]; then echo "$IMAGE:latest"; fi
             echo EOF
           } >> "$GITHUB_OUTPUT"
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
@@ -209,7 +247,7 @@ jobs:
           VERSION: ${{ steps.tag.outputs.version }}
         run: |
           # A published release page and the :X.Y.Z image are final: a re-run
-          # would build a new digest, move :X.Y.Z and sha- onto it and append
+          # would build a new digest, move :X.Y.Z onto it and append
           # the page's body a second time. Refused instead (docs/RELEASING.md).
           # A draft page is not published; the tags endpoint answers 404 for it.
           if out=$(gh api "repos/$GH_REPO/releases/tags/$TAG" --jq .html_url 2>&1); then
@@ -393,7 +431,6 @@ jobs:
           DIGEST: ${{ needs.publish.outputs.digest }}
         run: scripts/image-smoke.sh "$IMAGE@$DIGEST"
       - name: Close the milestone, or report what is still open in it
-        if: needs.publish.outputs.final == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -419,11 +456,11 @@ jobs:
   pages:
     name: Publish the docs to GitHub Pages
     needs: [publish, verify]
-    # The docs of the newest final release only: an rc or a backported patch
-    # of an older line never replaces them. The github-pages environment
+    # The docs of the newest release only: a backported patch of an older
+    # line never replaces them. The github-pages environment
     # deploys from main only, which is the ref of a release started by
     # release-please.yml or dispatched from main.
-    if: needs.publish.outputs.final == 'true' && needs.publish.outputs.highest == 'true'
+    if: needs.publish.outputs.highest == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:

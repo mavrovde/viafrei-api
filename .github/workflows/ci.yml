@@ -39,7 +39,7 @@ jobs:
       - name: actionlint (workflows, with shellcheck)
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
       - name: shellcheck (scripts)
-        run: shellcheck --version && shellcheck scripts/*.sh deploy/compose/*.sh
+        run: shellcheck --version && shellcheck scripts/*.sh
       - name: Self-test of the previous-figures fetch (TST-021)
         run: bash scripts/load-previous.test.sh
 
@@ -84,15 +84,25 @@ jobs:
       - name: Pull the test images once, by digest (SSC-005)
         # testcontainers-go starts its reaper by tag and pulls only a missing
         # image, so the pinned reaper is pulled by digest and tagged with the
-        # name it asks for. TestTestImagesArePinned holds both lines current.
+        # name it asks for; the viafrei-database release that migrates every
+        # test database is the one database.pin names, anonymous to pull,
+        # which pinguard prints (and refuses when it is a local build or a
+        # placeholder). TestTestImagesArePinned holds these lines current.
         run: |
-          docker pull postgis/postgis:18-3.6@sha256:4a43e3c3e5d55b9208240fc71db543b79c638766280c625a425bd0a2390989c4
+          docker pull postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5
+          database=$(go run ./internal/release/pinguard)
+          docker pull "$database"
           docker pull testcontainers/ryuk:0.14.0@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0
           docker tag testcontainers/ryuk:0.14.0@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0 testcontainers/ryuk:0.14.0
       - name: go test -tags integration
         run: |
           set -o pipefail
-          go test -race -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out -json ./... | tee test-integration.json | go run ./internal/testkit/gotestsum-lite
+          mapfile -t pkgs < <(go list ./... | grep -v '/internal/perf$')
+          go test -race -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out -json "${pkgs[@]}" | tee test-integration.json | go run ./internal/testkit/gotestsum-lite
+      - name: go test -tags integration (internal/perf alone, its budgets time the queries)
+        run: |
+          set -o pipefail
+          go test -race -p 1 -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-perf.out -json ./internal/perf | tee test-perf.json | go run ./internal/testkit/gotestsum-lite
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -100,6 +110,8 @@ jobs:
           path: |
             test-integration.json
             coverage-integration.out
+            test-perf.json
+            coverage-perf.out
           retention-days: 30
           if-no-files-found: error
 
@@ -163,7 +175,7 @@ jobs:
         run: |
           set -o pipefail
           go run ./internal/testkit/covergate -min 100 -exclusions test/coverage-exclusions.txt -o coverage.out \
-            coverage-unit.out coverage-integration.out coverage-boot.out | tee coverage-summary.txt
+            coverage-unit.out coverage-integration.out coverage-perf.out coverage-boot.out | tee coverage-summary.txt
       - name: Coverage table in the job summary
         if: always()
         run: |
@@ -191,7 +203,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
-      - run: make check-generated SQLC="go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1"
+      - run: make check-generated
 
   openapi:
     name: OpenAPI lint and breaking changes

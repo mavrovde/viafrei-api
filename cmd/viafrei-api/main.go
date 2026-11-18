@@ -1,7 +1,7 @@
 // Command viafrei-api is the ViaFrei API service.
 //
 //	viafrei-api [serve]            run the service (the default)
-//	viafrei-api healthcheck        exit 0 when /healthz answers ok (for container healthchecks)
+//	viafrei-api healthcheck        exit 0 when /healthz on the health listener answers ok (for container healthchecks)
 //	viafrei-api meta-check [-platform X.Y.Z] [-contract M.m]
 //	                               exit 0 when /v1/meta reports these versions, 1 on a mismatch
 //	viafrei-api config check       validate the configuration and exit
@@ -27,7 +27,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/adapters/accessstore"
 	consoleweb "github.com/mavrovde/viafrei-api/internal/adapters/console"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
@@ -40,6 +39,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/app/metering"
 	"github.com/mavrovde/viafrei-api/internal/app/ratelimit"
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/invariant"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/runtime/consolecli"
@@ -96,7 +96,7 @@ func serve(environ []string, stderr io.Writer) int {
 		return config.ExitCode
 	}
 	log := logging.New(cfg.Log, os.Stdout)
-	expected, err := health.ExpectedVersion(cfg.Contract.Expected, contract.Version())
+	expected, err := health.ExpectedVersion(cfg.Contract.Expected, dbcontract.ContractVersion)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return config.ExitCode
@@ -110,18 +110,22 @@ func serve(environ []string, stderr io.Writer) int {
 		return config.ExitCode
 	}
 	defer st.Close()
-	st.WithAdmission(admission.New(wire.AdmissionSettings(cfg), nil)).WithSharedBudget(wire.SharedBudget(cfg)).WithLogger(log).WithBreaker(wire.Breaker(cfg, log))
+	adm := admission.New(wire.AdmissionSettings(cfg), nil)
+	st.WithAdmission(adm).WithSharedBudget(wire.SharedBudget(cfg)).WithLogger(log).WithBreaker(wire.Breaker(cfg, log))
+	go st.KeepRegister(ctx)
+	go st.KeepRoads(ctx)
 	addresses := ratelimit.NewIPLimiter(wire.AddressSettings(cfg), nil)
 	go addresses.Run(ctx)
 
 	deps := httpapi.Deps{
 		Config:          cfg,
 		Readiness:       health.NewChecker(st, expected, cfg.Health.ReadyTimeout),
+		Pressure:        adm,
 		Logger:          log,
 		Build:           buildinfo.Get(),
-		ContractVersion: contract.Version(),
+		ContractVersion: dbcontract.ContractVersion,
 		Sources:         st,
-		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st},
+		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st, Transit: st, Fuel: st, Hydrogen: st, Speed: st, Sharing: st, Addresses: st, Pois: st, Locations: st, Disruptions: st, Nearby: st, Lorry: st, Catalogue: st, National: st, Affected: st, Coverage: st, States: st, TrainBoards: st, Bays: st},
 			wire.FeatureSettings(cfg), time.Now),
 		Addresses: addresses,
 		Versions:  st,
@@ -137,6 +141,19 @@ func serve(environ []string, stderr io.Writer) int {
 		authn := auth.New(wire.AuthSettings(cfg), as, nil)
 		go authn.Run(ctx)
 		deps.Auth = authn
+		// The on-demand refreshes are recorded in the access store, for the
+		// live refresher to claim and settle.
+		if svc, ok := deps.Features.(*features.Service); ok {
+			r, err := wire.Refreshes(cfg, as, st.Lookup)
+			if err != nil {
+				fmt.Fprintln(stderr, err)
+				return config.ExitCode
+			}
+			svc.WithRefreshes(r)
+		}
+		// The refresh requests are kept 30 days after they were asked, in
+		// any state (the data-steward's privacy ruling); pruned hourly.
+		go as.RunRefreshRetention(ctx, time.Hour, reportRetention(log))
 		deps.Keys = ratelimit.NewKeyLimiter(wire.QuotaZone(cfg), as, nil)
 		meter := metering.New(wire.MeteringSettings(cfg), as, nil)
 		deps.Meter = meter
@@ -163,12 +180,23 @@ func serve(environ []string, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return config.ExitCode
 	}
-	errc := make(chan error, 1)
+	// The health listener's operations are a subset of the public ones,
+	// so the catalogue that built the public server builds it too.
+	hsrv := invariant.Must(httpapi.NewHealthServer(deps))
+	if len(cfg.Callers.AllowCIDR) == 0 {
+		log.Warn("callers.allow_cidr is empty: the public listener refuses every caller (fail closed)")
+	}
+	errc := make(chan error, 2)
 	go func() { errc <- srv.ListenAndServe() }()
-	log.Info("listening", "addr", cfg.Server.ListenAddr, "version", buildinfo.Get().Version)
+	go func() { errc <- hsrv.ListenAndServe() }()
+	log.Info("listening", "addr", cfg.Server.ListenAddr, "health", cfg.Health.ListenAddr, "version", buildinfo.Get().Version)
 
 	select {
 	case err := <-errc:
+		// Either listener ending ends the process: an instance whose
+		// probes cannot reach it, or that serves nothing, is not running.
+		_ = srv.Close()
+		_ = hsrv.Close()
 		if !errors.Is(err, http.ErrServerClosed) {
 			log.Error("server stopped", "error", err)
 			return 1
@@ -177,7 +205,12 @@ func serve(environ []string, stderr io.Writer) int {
 		log.Info("shutting down")
 		sctx, cancel := httpapi.ShutdownContext(cfg)
 		defer cancel()
-		if err := srv.Shutdown(sctx); err != nil {
+		// Readiness is answered until the public listener has drained.
+		err := srv.Shutdown(sctx)
+		if herr := hsrv.Shutdown(sctx); err == nil {
+			err = herr
+		}
+		if err != nil {
 			log.Error("shutdown incomplete", "error", err)
 			return 1
 		}
@@ -345,6 +378,19 @@ func startConsole(ctx context.Context, cfg *config.Config, addr string, as *acce
 	go func() { _ = srv.Serve(l) }()
 	log.Info("console listening", "addr", l.Addr().String())
 	return func() { _ = srv.Close() }, nil
+}
+
+// reportRetention logs a failed prune of the refresh requests, and the
+// count of a round that removed any.
+func reportRetention(log *slog.Logger) func(int64, error) {
+	return func(n int64, err error) {
+		switch {
+		case err != nil:
+			log.Error("refresh retention failed; the next round tries again", "error", err)
+		case n > 0:
+			log.Info("refresh requests past retention removed", "removed", n)
+		}
+	}
 }
 
 // reportUsage logs a usage flush that failed or dropped counts; a clean

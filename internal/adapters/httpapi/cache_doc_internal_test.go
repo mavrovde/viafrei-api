@@ -124,3 +124,30 @@ func TestAFreeMinAnswerEndsWhenAKeptReportAges(t *testing.T) {
 		t.Fatal("an answer without free_min does not change with the clock")
 	}
 }
+
+// TestAFamilyWithNoFixedIntervalStatesTheThresholdNoAgePasses: the /v1
+// contract states staleAfterS for every family (VER-001); a family that is
+// never stale states 2^53 - 1, and is not stale, with or without an instant.
+// A family with a threshold states its own.
+func TestAFamilyWithNoFixedIntervalStatesTheThresholdNoAgePasses(t *testing.T) {
+	req.Covers(t, "ENV-003")
+	now := time.Date(2026, 3, 29, 1, 30, 0, 0, time.UTC)
+	s := &server{cfg: config.Defaults(), now: func() time.Time { return now }}
+	old := now.Add(-400 * 24 * time.Hour)
+	fams := []provenance.Family{
+		{Source: access.Source{Family: "ref"}, NeverStale: true, DataAsOf: &old},
+		{Source: access.Source{Family: "unknown"}, NeverStale: true},
+		{Source: access.Source{Family: "live"}, StaleAfter: time.Hour, DataAsOf: &old},
+	}
+	m := s.dataMeta(context.Background(), fams, now, false, "")
+	want := []int64{1<<53 - 1, 1<<53 - 1, 3600}
+	stale := []bool{false, false, true}
+	for i, f := range m.Freshness {
+		if f.StaleAfterS != want[i] || f.Stale != stale[i] {
+			t.Errorf("%s: staleAfterS %d, stale %v", f.Family, f.StaleAfterS, f.Stale)
+		}
+	}
+	if len(m.Freshness) != 3 || len(m.Warnings) != 1 {
+		t.Errorf("freshness %+v, warnings %+v", m.Freshness, m.Warnings)
+	}
+}

@@ -14,13 +14,45 @@ type Terms struct {
 	// parking: the families that can answer a feature's question.
 	Domain     string
 	UseClasses []UseClass
-	// AcceptanceRequired families are withheld until the key holder has
-	// accepted Version of their terms.
+	// AcceptanceRequired families are withheld from a request that has not
+	// accepted their terms: Version is then their terms gate (sid-terms-1),
+	// the value the request passes in accept_terms.
 	AcceptanceRequired bool
 	Version            string
-	// Reviewed is false until the family's licence review is signed off;
-	// an unreviewed family is never served (LIC-009).
-	Reviewed bool
+	// Audience is who may read the family at all: AudienceOwn families
+	// (licences that permit our own display only) are read by ViaFrei's own
+	// keys alone. Anything but AudienceOwn is public.
+	Audience Audience
+	// HoldReason, when set, holds the family back from every key, whatever
+	// its plan, audience or acceptances (LIC-009): the read contract states
+	// why (for example no_api_terms).
+	HoldReason string
+}
+
+// Audience is who a key, a source family or a row is for.
+type Audience string
+
+// The two audiences of the read contract's licence envelope.
+const (
+	// AudiencePublic is any key.
+	AudiencePublic Audience = "public"
+	// AudienceOwn is ViaFrei's own keys only (its web and MCP callers).
+	AudienceOwn Audience = "own"
+)
+
+// RowPermitted is the licence envelope's rule for one row of the read
+// contract, checked for a key of audience key: a row its publisher or the
+// steward withholds (display class withhold), a row held back (hold reason
+// set) and a row for ViaFrei's own keys read by any other key are never
+// served. Any audience but AudienceOwn is public, for a row and a key alike.
+func RowPermitted(displayClass string, rowAudience Audience, holdReason string, key Audience) bool {
+	if displayClass == "withhold" {
+		return false
+	}
+	if holdReason != "" {
+		return false
+	}
+	return rowAudience != AudienceOwn || key == AudienceOwn
 }
 
 // Refusal says why the gate denies one family. The zero value is "allowed".
@@ -31,31 +63,43 @@ const (
 	Allowed           Refusal = ""
 	NotInPlan         Refusal = "not_in_plan"
 	UseClassForbidden Refusal = "use_class_forbidden"
-	TermsNotAccepted  Refusal = "terms_not_accepted"
-	NotReviewed       Refusal = "not_reviewed"
-	Disabled          Refusal = "disabled"
+	// Unreviewed is a family whose terms grant no use class yet: it is
+	// never served, though ViaFrei's own keys see it listed (Catalogued).
+	Unreviewed       Refusal = "unreviewed"
+	TermsNotAccepted Refusal = "terms_not_accepted"
+	Held             Refusal = "held"
+	OwnAudienceOnly  Refusal = "audience_own"
+	Unknown          Refusal = "unknown_family"
+	Disabled         Refusal = "disabled"
 )
 
-// Decide applies the licence gate to one family: it is readable only if it
-// is in the plan, reviewed, not disabled, the plan's use class is permitted
-// by its terms, and any required acceptance of the current terms version is
-// recorded for the key (SEC-030, SEC-034). Anything else is denied.
-func Decide(t Terms, plan Plan, accepted []Acceptance, disabled []string) Refusal {
+// Decide applies the licence gate to one family for a key of plan and
+// audience: it is readable only if it is not disabled, not held, for the
+// key's audience, in the plan, the plan's use class is permitted by its
+// terms, and the request accepted the current terms when they need
+// accepting (SEC-030, SEC-034). Anything else is denied.
+func Decide(t Terms, plan Plan, audience Audience, accepted []string, disabled []string) Refusal {
 	// An if chain, not a switch: a mutation tool reports a switch's case
 	// expressions as uncovered, and these are the rules it must mutate.
 	if slices.Contains(disabled, t.Family) {
 		return Disabled
 	}
-	if !t.Reviewed {
-		return NotReviewed
+	if t.HoldReason != "" {
+		return Held
+	}
+	if t.Audience == AudienceOwn && audience != AudienceOwn {
+		return OwnAudienceOnly
 	}
 	if !slices.Contains(plan.Sources, t.Family) {
 		return NotInPlan
 	}
+	if len(t.UseClasses) == 0 {
+		return Unreviewed
+	}
 	if !slices.Contains(t.UseClasses, plan.UseClass) {
 		return UseClassForbidden
 	}
-	if t.AcceptanceRequired && !slices.Contains(accepted, Acceptance{Source: t.Family, Version: t.Version}) {
+	if t.AcceptanceRequired && !slices.Contains(accepted, t.Version) {
 		return TermsNotAccepted
 	}
 	return Allowed
@@ -66,13 +110,15 @@ func Decide(t Terms, plan Plan, accepted []Acceptance, disabled []string) Refusa
 type Gate struct {
 	allowed []string
 	refused map[string]Refusal
+	own     bool
 }
 
-// NewGate decides every family of the register for plan.
-func NewGate(register []Terms, plan Plan, accepted []Acceptance, disabled []string) Gate {
-	g := Gate{refused: map[string]Refusal{}}
+// NewGate decides every family of the register for a key of plan and
+// audience.
+func NewGate(register []Terms, plan Plan, audience Audience, accepted []string, disabled []string) Gate {
+	g := Gate{refused: map[string]Refusal{}, own: audience == AudienceOwn}
 	for _, t := range register {
-		if r := Decide(t, plan, accepted, disabled); r != Allowed {
+		if r := Decide(t, plan, audience, accepted, disabled); r != Allowed {
 			g.refused[t.Family] = r
 			continue
 		}
@@ -93,7 +139,7 @@ func (g Gate) Permits(family string) bool {
 }
 
 // Refused returns the reason a family is denied; a family missing from the
-// register is denied as not reviewed.
+// register is denied as unknown.
 func (g Gate) Refused(family string) Refusal {
 	if g.Permits(family) {
 		return Allowed
@@ -101,7 +147,7 @@ func (g Gate) Refused(family string) Refusal {
 	if r, ok := g.refused[family]; ok {
 		return r
 	}
-	return NotReviewed
+	return Unknown
 }
 
 // ErrForbiddenItem is the post-check's verdict: storage returned an item of a
@@ -181,6 +227,21 @@ func (g Gate) Pending(answering []string) []string {
 	var out []string
 	for _, f := range answering {
 		if g.Refused(f) == TermsNotAccepted {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// Catalogued returns the families among answering that a source list names
+// although the key may not read them: for ViaFrei's own keys, the families of
+// their plan whose terms are not reviewed yet, as the own catalogue lists them
+// (the platform's coverage resource). No data of theirs is served to any key
+// (SEC-030); any other key gets none.
+func (g Gate) Catalogued(answering []string) []string {
+	var out []string
+	for _, f := range answering {
+		if g.own && g.Refused(f) == Unreviewed {
 			out = append(out, f)
 		}
 	}

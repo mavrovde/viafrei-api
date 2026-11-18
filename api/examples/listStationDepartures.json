@@ -1,0 +1,89 @@
+{
+  "title": "The next departures of a station",
+  "request": "/v1/stations/1:de:04002:2/departures?limit=3",
+  "attribution": "The station and its departures come from the source families of the transit domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "transit"
+    ],
+    "sources": [
+      "delfi_static",
+      "mobilithek_connect_gtfs",
+      "delfi_rt_tu"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": {
+      "station": {
+        "id": "1:de:04002:2",
+        "name": "Pienköckheim Nord",
+        "location": {
+          "lat": 47.403474,
+          "lon": 14.561662
+        },
+        "stopCode": "de:04002:2"
+      },
+      "window": {
+        "from": "2026-03-30T00:00:00Z",
+        "fromLocal": "2026-03-30T02:00:00+02:00",
+        "until": "2026-03-30T01:00:00Z",
+        "untilLocal": "2026-03-30T03:00:00+02:00",
+        "matched": 0,
+        "matchedAll": 0,
+        "dropped": []
+      },
+      "departures": []
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": "2026-03-29T12:00:00Z",
+      "freshness": [
+        {
+          "family": "delfi_static",
+          "dataAsOf": "2026-03-29T12:00:00Z",
+          "ageS": 43200,
+          "staleAfterS": 259200,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "delfi_static",
+          "domain": "transit",
+          "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+          "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://www.opendata-oepnv.de"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ],
+      "page": {
+        "limit": 3,
+        "hasMore": false
+      },
+      "query": {
+        "modes": [],
+        "categories": []
+      }
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/stations/1:de:04002:2/departures"
+    }
+  }
+}

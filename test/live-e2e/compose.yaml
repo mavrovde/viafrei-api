@@ -1,0 +1,53 @@
+# The pre-release refresh run (make live-e2e, scripts/live-e2e.sh): an overlay
+# on compose.yaml that adds the live refresher at the release live pin names,
+# running as the database role viafrei_live_ingestor, and a provider stub in
+# place of every provider its sources call. The live refresher and the stub
+# sit on the stack's internal network alone, so no request leaves the stack.
+# Paths are relative to the repository root (the project directory).
+#
+# The script sets every variable below; the image is private, so this runs
+# on a maintainer's machine before a release, never in public CI.
+
+services:
+  api:
+    environment:
+      VFAPI_ACCESS_URL: postgres://api_access:${ACCESS_PASSWORD:?}@db:5432/test_contract?sslmode=disable
+      VFAPI_AUTH_PEPPER: ${AUTH_PEPPER:?}
+      VFAPI_REFRESH_SOURCES_FILE: /e2e/registry.json
+    volumes:
+      - ./test/live/registry.json:/e2e/registry.json:ro
+
+  stub:
+    image: ${LIVE_IMAGE:?}
+    entrypoint: ["node", "/e2e/stub.mjs"]
+    volumes:
+      - ./test/live-e2e/stub.mjs:/e2e/stub.mjs:ro
+      - ${LIVE_E2E_TLS:?}:/tls:ro
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks:
+      backend:
+        aliases: [provider.stub]
+
+  live:
+    image: ${LIVE_IMAGE:?}
+    depends_on:
+      db-seed:
+        condition: service_completed_successfully
+      stub:
+        condition: service_started
+    environment:
+      LIVE_DATABASE_URL: postgres://viafrei_live_ingestor:${LIVE_PASSWORD:?}@db:5432/test_contract?sslmode=disable
+      LIVE_CONFIG: /e2e/sources
+      LIVE_FUEL_PRICES_DE_API_KEY: stub-key
+      LIVE_TRAIN_BOARD_DE_CLIENT_ID: stub-client
+      LIVE_TRAIN_BOARD_DE_API_KEY: stub-key
+      NODE_EXTRA_CA_CERTS: /tls/cert.pem
+    volumes:
+      - ${LIVE_E2E_SOURCES:?}:/e2e/sources:ro
+      - ${LIVE_E2E_TLS:?}:/tls:ro
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [backend]

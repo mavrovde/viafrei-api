@@ -102,3 +102,28 @@ func TestNamesAreBuiltFromOurSyllablesOnly(t *testing.T) {
 		t.Fatal("the grammar accepts a name outside the lists")
 	}
 }
+
+// TestSourceByRefRefusesAnUnknownKey: a key the set has no source of is a
+// generator bug, named.
+func TestSourceByRefRefusesAnUnknownKey(t *testing.T) {
+	defer func() {
+		msg, _ := recover().(string)
+		if !strings.Contains(msg, "no source nowhere") {
+			t.Fatalf("recover() = %q, want a panic naming the key", msg)
+		}
+	}()
+	(&gen{}).sourceByRef("nowhere")
+	t.Fatal("sourceByRef returned without a source")
+}
+
+// A ref no source has is swept at the end of the window; a street's "str"
+// is folded to "strasse", as the platform folds it.
+func TestSweepOfAnUnknownRefAndStreetFold(t *testing.T) {
+	g := &gen{p: Profile{Days: 1}}
+	if got := g.sweep("no-such-ref"); !got.Equal(g.end()) {
+		t.Fatalf("sweep: %s, end %s", got, g.end())
+	}
+	if got := streetFold("Hauptstr. 5"); got != "hauptstrasse5" {
+		t.Fatalf("streetFold: %q", got)
+	}
+}

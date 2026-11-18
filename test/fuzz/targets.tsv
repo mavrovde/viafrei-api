@@ -22,4 +22,9 @@ location	internal/domain/geo	ParsePoint	FuzzParsePoint	-
 fields	-	-	-	#10
 lang	-	-	-	#10
 query-body	-	-	-	#10
-road-reference	internal/domain/roads	ParseRoad	FuzzParseRoad	-
+road-reference	internal/domain/roads	ParseRoad,ParseAnyRoad	FuzzParseRoad	-
+accept-terms	internal/domain/access	ParseAcceptance	FuzzParseAcceptance	-
+live-sources	internal/adapters/livesources	Parse,Load	FuzzParse	-
+address	internal/domain/places	ParseAddress	FuzzParseAddress	-
+opening-hours	internal/domain/energy	ReadSchedule,ParseDays,ParseClock,ResolveOpenAt	FuzzReadSchedule	-
+watch	internal/adapters/httpapi	Resolve,parseAt,conditionKeysOf,resolveOtherKind	FuzzWatch	-

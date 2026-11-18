@@ -29,9 +29,10 @@ func TestEveryExampleNamesAnOperation(t *testing.T) {
 	}
 	ids := OperationIDs()
 	for id := range examples {
+		op, _, _ := strings.Cut(id, ".") // <op>.<variant> is a named example of op
 		found := false
 		for _, known := range ids {
-			found = found || known == id
+			found = found || known == op
 		}
 		if !found {
 			t.Errorf("api/examples/%s.json names no operation", id)
@@ -48,11 +49,15 @@ func TestBuildRefusesABrokenExample(t *testing.T) {
 		want string
 	}{
 		"no example at all":      {fstest.MapFS{}, "no examples"},
-		"an undocumented status": {fstest.MapFS{"examples/getHealth.json": {Data: []byte(`{"title":"t","request":"/healthz","attribution":"none","status":201,"response":{}}`)}}, "status 201 is not documented"},
+		"an undocumented status": {fstest.MapFS{"examples/getMeta.json": {Data: []byte(`{"title":"t","request":"/v1/meta","attribution":"none","status":201,"response":{}}`)}}, "status 201 is not documented"},
+		"a variant of an undocumented status": {fstest.MapFS{
+			"examples/getMeta.json":      {Data: []byte(`{"title":"t","request":"/v1/meta","attribution":"none","status":200,"response":{}}`)},
+			"examples/getMeta.gone.json": {Data: []byte(`{"title":"t","request":"/v1/meta","attribution":"none","status":201,"response":{}}`)},
+		}, "getMeta.gone.json: status 201 is not documented"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			withExamples(t, c.fs)
-			if _, _, err := build(Deps{Config: config.Defaults()}, nil); err == nil || !strings.Contains(err.Error(), c.want) {
+			if _, _, err := build(Deps{Config: config.Defaults()}, nil, onPublic); err == nil || !strings.Contains(err.Error(), c.want) {
 				t.Fatalf("build err = %v, want %q", err, c.want)
 			}
 		})

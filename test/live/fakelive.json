@@ -1,0 +1,59 @@
+{
+  "sources": {
+    "fuel-prices-de": {
+      "ticks": "do $$ declare t regclass; s text; n text; d date := (current_setting('fakelive.at')::timestamptz at time zone 'UTC')::date; begin select c.oid, ns.nspname, c.relname into t, s, n from pg_rewrite r join pg_depend dep on dep.objid = r.oid and dep.classid = 'pg_rewrite'::regclass join pg_class c on c.oid = dep.refobjid and c.relkind = 'p' join pg_namespace ns on ns.oid = c.relnamespace where r.ev_class = 'contract.fuel_price_observation'::regclass and exists (select 1 from pg_attribute a where a.attrelid = c.oid and a.attname = 'price') limit 1; if t is null then raise exception 'no partitioned table under contract.fuel_price_observation'; end if; execute format('create table if not exists %I.%I partition of %s for values from (%L) to (%L)', s, n || '_' || to_char(d, 'YYYYMMDD'), t, d::timestamp at time zone 'UTC', (d + 1)::timestamp at time zone 'UTC'); execute format('insert into %s (observed_at, station_id, product, price, source) select current_setting(''fakelive.at'')::timestamptz, station_id, product, price, source from (select distinct on (station_id, product) station_id, product, price, source from %s where observed_at <= current_setting(''fakelive.at'')::timestamptz order by station_id, product, observed_at desc) newest on conflict do nothing', t, t); end $$",
+      "default": {
+        "state": "refreshed"
+      },
+      "subjects": {
+        "ags:11000000": {
+          "state": "none_due"
+        },
+        "ags:02000000": {
+          "state": "refused",
+          "reason": "the hourly refresh cap of the area is reached"
+        },
+        "ags:14612000": {
+          "state": "failed",
+          "reason": "the provider did not answer"
+        },
+        "ags:05315000": {
+          "state": "never"
+        },
+        "ags:06412000": {
+          "state": "refreshed",
+          "after_ms": 3000
+        }
+      }
+    },
+    "train-board-de": {
+      "ticks": "insert into domains.train_board_departures (eva, observed_at, planned_at, platform, category, train_number, destination) values (current_setting('fakelive.subject_key'), current_setting('fakelive.at')::timestamptz, current_setting('fakelive.at')::timestamptz + interval '12 minutes', '4', 'ICE', '578', 'Hamburg-Altona')",
+      "partitions": [
+        "domains.train_board_departures"
+      ],
+      "default": {
+        "state": "refreshed"
+      },
+      "subjects": {
+        "8000105": {
+          "state": "none_due"
+        },
+        "8000261": {
+          "state": "refused",
+          "reason": "no provider key"
+        },
+        "8011160": {
+          "state": "never"
+        },
+        "8000207": {
+          "state": "refreshed",
+          "after_ms": 500
+        },
+        "8000209": {
+          "state": "refreshed",
+          "after_ms": 500
+        }
+      }
+    }
+  }
+}

@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	_ "time/tzdata" // the Europe/Berlin rendering never depends on the host
@@ -144,6 +145,25 @@ type SituationFilters struct {
 	MinSeverity string   `query:"min_severity" enum:"info,minor,lane_closed,major,road_closed" default:"info" doc:"Only situations at or above this severity; info also keeps those that cannot be graded."`
 }
 
+// SituationWindow asks for the situations whose validity overlaps a window
+// instead of those in force now.
+type SituationWindow struct {
+	HorizonDays int    `query:"horizon_days" minimum:"0" maximum:"14" doc:"Also the situations that start within this many days from now: the window is now to now plus the days, and a situation is kept when its validity overlaps it (the platform's road status horizon). 0, the default, keeps those in force now. Not with from or to."`
+	From        string `query:"from" format:"date" doc:"The first day of a window of German calendar days (Europe/Berlin), YYYY-MM-DD: a situation is kept when its validity overlaps the window (the platform's roadworks window). Default: today, when to is given."`
+	To          string `query:"to" format:"date" doc:"The last day of the window, inclusive, YYYY-MM-DD. Default: 7 days after from. The window spans at most 92 days."`
+}
+
+// check refuses a window that cannot be read.
+func (w SituationWindow) check() []error {
+	if _, _, err := roads.DayWindow(time.Now(), w.HorizonDays, w.From, w.To); err != nil {
+		return []error{&huma.ErrorDetail{Location: "query.from", Message: err.Error(), Value: w.From + ".." + w.To}}
+	}
+	return nil
+}
+
+// asked reports whether a window was asked for.
+func (w SituationWindow) asked() bool { return w.HorizonDays > 0 || w.From != "" || w.To != "" }
+
 func (f SituationFilters) filter() roads.Filter {
 	out := roads.Filter{MinSeverity: roads.Severity(f.MinSeverity)}
 	for _, k := range f.Kinds {
@@ -152,14 +172,33 @@ func (f SituationFilters) filter() roads.Filter {
 	return out
 }
 
+// windowed is the filter with the window at now: an answer over a window
+// moves with the clock, so it changes at its read.
+func (s *server) windowed(ctx context.Context, f roads.Filter, w SituationWindow) roads.Filter {
+	if !w.asked() {
+		return f
+	}
+	now := s.now()
+	f.From, f.Until, _ = roads.DayWindow(now, w.HorizonDays, w.From, w.To)
+	f.Ahead = true
+	noteChangesAt(ctx, now)
+	return f
+}
+
 // FilterQuery is the filter part of meta.query of a conditions answer.
 type FilterQuery struct {
-	Kinds       []string `json:"kinds" doc:"The kinds asked for; empty for every kind."`
-	MinSeverity string   `json:"minSeverity"`
+	Kinds       []string   `json:"kinds" doc:"The kinds asked for; empty for every kind."`
+	MinSeverity string     `json:"minSeverity"`
+	WindowFrom  *time.Time `json:"windowFrom,omitempty" doc:"The start of the window asked for (horizon_days, or from and to); absent for the situations in force now."`
+	WindowUntil *time.Time `json:"windowUntil,omitempty" doc:"The end of the window asked for; absent for the situations in force now."`
 }
 
 func filterQuery(f roads.Filter) FilterQuery {
 	out := FilterQuery{Kinds: []string{}, MinSeverity: string(f.MinSeverity)}
+	if !f.Until.IsZero() {
+		from, until := f.From.UTC(), f.Until.UTC()
+		out.WindowFrom, out.WindowUntil = &from, &until
+	}
 	for _, k := range f.Kinds {
 		out.Kinds = append(out.Kinds, string(k))
 	}
@@ -170,22 +209,26 @@ func filterQuery(f roads.Filter) FilterQuery {
 
 // MotorwayInput is the input of getMotorwayConditions.
 type MotorwayInput struct {
-	Road      string `path:"road" maxLength:"6" pattern:"^[AaBb] ?[0-9]{1,4}$" example:"A8" doc:"The road reference, case-insensitive, with an optional space (A8, a 8)."`
+	Road      string `path:"road" maxLength:"6" pattern:"^[AaBbLlSs] ?[0-9]{1,4}$" example:"A8" doc:"The road reference, case-insensitive, with an optional space (A8, a 8): a motorway (A), a federal road (B), a Landesstraße (L) or a Staatsstraße (S). A Kreisstraße (K) is no reference, its number repeating in every Kreis."`
 	Direction string `query:"direction" enum:"north,east,south,west,both" default:"both" doc:"The carriageway; both keeps every situation. A direction keeps that carriageway's situations, those on both and those whose direction is unknown."`
 	SituationFilters
-	Limit int `query:"limit" minimum:"1" maximum:"100" doc:"Most situations to return. Default: pagination.default_limit."`
-	road  string
+	SituationWindow
+	Limit  int    `query:"limit" minimum:"1" maximum:"100" doc:"Most situations to return. Default: pagination.default_limit."`
+	Cursor string `query:"cursor" pattern:"^[0-9]{1,4}$" doc:"The meta.page.nextCursor of the page before; omit for the first page."`
+	road   string
+	offset int
 }
 
 // Resolve reads the road reference into its canonical form (CONV-011; huma
 // calls it after the schema checks).
 func (in *MotorwayInput) Resolve(huma.Context) []error {
-	road, err := roads.ParseRoad(in.Road)
+	road, err := roads.ParseAnyRoad(in.Road)
 	if err != nil {
 		return []error{&huma.ErrorDetail{Location: "path.road", Message: err.Error(), Value: in.Road}}
 	}
 	in.road = road
-	return nil
+	in.offset, _ = strconv.Atoi(in.Cursor)
+	return in.check()
 }
 
 // Corridor is the road a conditions answer is about.
@@ -201,7 +244,16 @@ type MotorwayData struct {
 	Corridor   Corridor        `json:"corridor"`
 	Lamp       string          `json:"lamp" enum:"green,amber,red" doc:"The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope as its record is read (the motorway operator's event, any other traffic message, a bridge's state) and every official weather warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a closed bridge; a jam with a delay of 30 minutes or more; a weather warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a weather warning of level 1 or 2; any other message (an accident without a closure, a restricted bridge, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the weather warnings not readable with the key or their source not current, or a state in scope whose traffic messages no current roads family the key may read covers. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is current, which is no guarantee that the road is free."`
 	LampReason *string         `json:"lampReason" nullable:"true" enum:"road_closed,ramp_closed,safety,bridge_closed,long_jam,jam,weather_warning,slippery,warning,narrowing,limited_sight" doc:"Why the lamp has its colour: the first of its reasons, a red one before any amber one, and inside a colour in the platform's order, which is this enumeration's order; null for green. slippery is never given while the read contract holds no road-weather forecast. Open enumeration."`
-	Situations []RoadSituation `json:"situations" doc:"Ordered by position along the road (those that cannot be placed last), then severity descending, then id."`
+	Coverage   *RoadCoverage   `json:"coverage" doc:"Null for a road the road register holds. For a road it does not hold (a federal or Land road, or a motorway it lacks), the answer is read from the situations whose reference names the road, none placed along a line and no state named; coverage then says what was read, as the platform's roadworks-ahead answer says it: an empty list is no sites on what the named families publish, never a road with no works."`
+	Situations []RoadSituation `json:"situations" doc:"In the platform's motorway status order: jams, closures, the other reports, then roadworks; within each, by traffic type (queuing, stationary, heavy, slow), delay descending, headline, then the publisher's id."`
+}
+
+// RoadCoverage is what a conditions answer about a road the road register
+// does not hold read.
+type RoadCoverage struct {
+	Registered bool     `json:"registered" doc:"Always false: the road register (the motorways of the Autobahn GmbH) does not hold the road."`
+	RoadType   string   `json:"roadType" enum:"motorway,federal,state,urban,other" doc:"The class the reference names by its letter: A motorway, B federal, L and S state."`
+	Families   []string `json:"families" doc:"The roads families read (those the key may read; with a window ahead, those of planned works) that hold a situation on a road of this class, in name order; meta.attribution names their publishers. Empty when none does: no source read covers roads of this class."`
 }
 
 // MotorwayQuery is meta.query of getMotorwayConditions.
@@ -211,10 +263,25 @@ type MotorwayQuery struct {
 	FilterQuery
 }
 
+// CursorPage is a page that a cursor continues.
+type CursorPage struct {
+	Page
+	NextCursor *string `json:"nextCursor" nullable:"true" doc:"The cursor of the next page; null on the last."`
+}
+
+func cursorPage(q roads.CorridorQuery, more bool, n int) CursorPage {
+	out := CursorPage{Page: Page{Limit: q.Limit, HasMore: more}}
+	if more {
+		next := strconv.Itoa(q.Offset + n)
+		out.NextCursor = &next
+	}
+	return out
+}
+
 // MotorwayMeta is the meta member of getMotorwayConditions.
 type MotorwayMeta struct {
 	DataMeta
-	Page  Page          `json:"page"`
+	Page  CursorPage    `json:"page"`
 	Query MotorwayQuery `json:"query"`
 }
 
@@ -233,13 +300,13 @@ type MotorwayOutput struct {
 
 func registerMotorwayConditions(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "What is happening on a motorway"
-	op.Description = "The active situations on one road, ordered by their position along it, with the lamp over every situation on the road in the asked direction and every official weather warning in force in an area the road crosses. MCP counterpart: road status. Needs the scope roads; the weather warnings are read with the scope weather, and without it the lamp says its sight is limited."
-	featureResponses(api, &op, "No road with this reference (not-found), or the operation is switched off on this instance (feature-disabled).")
+	op.Description = "The active situations on one road, in the platform's motorway status order (jams, closures, the other reports, roadworks), with the lamp over every situation on the road in the asked direction and every official weather warning in force in an area the road crosses. MCP counterpart: road status, and, with a window (from, to), roadworks ahead on one road. A federal road, a Landesstraße or a Staatsstraße, or a motorway the road register lacks, is answered from the situations that name it, with data.coverage stating which families hold situations on roads of its class: no sites is a 200 with an empty list, never a 404. Needs the scope roads; the weather warnings are public and read for every key that may read the weather families, which the answer then credits; without them the lamp says its sight is limited."
+	featureResponses(api, &op, "The operation is switched off on this instance (feature-disabled). A well-formed road the road register does not hold is no 404: it is answered with data.coverage.")
 	huma.Register(api, op, func(ctx context.Context, in *MotorwayInput) (*MotorwayOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
-		q := roads.CorridorQuery{Road: in.road, Direction: roads.Direction(in.Direction), Filter: in.filter(), Limit: s.limit(in.Limit)}
+		q := roads.CorridorQuery{Road: in.road, Direction: roads.Direction(in.Direction), Filter: s.windowed(ctx, in.filter(), in.SituationWindow), Limit: s.limit(in.Limit), Offset: in.offset}
 		c, err := s.features.MotorwayConditions(ctx, principalFrom(ctx).Key, q)
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
@@ -250,16 +317,26 @@ func registerMotorwayConditions(api huma.API, s *server, op huma.Operation) {
 				Corridor:   Corridor{Road: c.Road.Ref, RoadType: string(c.Road.Class), Direction: string(q.Direction), States: append([]string{}, c.Road.States...)},
 				Lamp:       string(c.Lamp),
 				LampReason: lampReason(c.Reason),
+				Coverage:   roadCoverage(c),
 				Situations: roadSituations(c.Items),
 			},
 			Meta: MotorwayMeta{
 				DataMeta: s.dataMeta(ctx, c.Families, c.At, c.Partial, partialDetail),
-				Page:     Page{Limit: q.Limit, HasMore: c.HasMore},
+				Page:     cursorPage(q, c.HasMore, len(c.Items)),
 				Query:    MotorwayQuery{Road: c.Road.Ref, Direction: string(q.Direction), FilterQuery: filterQuery(q.Filter)},
 			},
 			Links: s.selfLink(ctx),
 		}}, nil
 	})
+}
+
+// roadCoverage is data.coverage of a conditions answer: nil for a road the
+// register holds.
+func roadCoverage(c features.Conditions) *RoadCoverage {
+	if c.Covering == nil {
+		return nil
+	}
+	return &RoadCoverage{RoadType: string(c.Road.Class), Families: append([]string{}, c.Covering...)}
 }
 
 // ------------------------------------------------------------ area conditions
@@ -268,7 +345,13 @@ func registerMotorwayConditions(api huma.API, s *server, op huma.Operation) {
 type RoadConditionsInput struct {
 	Near
 	SituationFilters
+	SituationWindow
 	RoadClass []string `query:"road_class" enum:"motorway,federal,state,urban,other" doc:"Only situations on roads of these classes, comma-separated; other keeps the classes that cannot be mapped. Default: every class held."`
+}
+
+// Resolve reads the position and refuses a window that cannot be read.
+func (in *RoadConditionsInput) Resolve(ctx huma.Context) []error {
+	return append(in.AtPosition.Resolve(ctx), in.check()...)
 }
 
 // Area is the area a conditions answer is about.
@@ -277,12 +360,15 @@ type Area struct {
 	RadiusM int      `json:"radiusM" doc:"The radius applied, in metres."`
 }
 
-// RoadConditionsData is the answer of listRoadConditions.
+// RoadConditionsData is the answer of listRoadConditions. Its lamp and
+// lampReason are API-only: the platform's road status around a position
+// states none, and the /v1 contract keeps both (VER-001), so the parity
+// harness leaves them out (parity.Default).
 type RoadConditionsData struct {
 	Area       Area            `json:"area"`
 	Lamp       string          `json:"lamp" enum:"green,amber,red" doc:"The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope as its record is read (the motorway operator's event, any other traffic message, a bridge's state) and every official weather warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a closed bridge; a jam with a delay of 30 minutes or more; a weather warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a weather warning of level 1 or 2; any other message (an accident without a closure, a restricted bridge, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the weather warnings not readable with the key or their source not current, or a state in scope whose traffic messages no current roads family the key may read covers. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is current, which is no guarantee that the road is free."`
 	LampReason *string         `json:"lampReason" nullable:"true" enum:"road_closed,ramp_closed,safety,bridge_closed,long_jam,jam,weather_warning,slippery,warning,narrowing,limited_sight" doc:"Why the lamp has its colour: the first of its reasons, a red one before any amber one, and inside a colour in the platform's order, which is this enumeration's order; null for green. slippery is never given while the read contract holds no road-weather forecast. Open enumeration."`
-	Situations []RoadSituation `json:"situations" doc:"Ordered by severity descending, then distance, then id."`
+	Situations []RoadSituation `json:"situations" doc:"What the platform's road status lists around a position: the closures, the roadworks and lane restrictions, and the jams, whatever kinds asks beyond them (a hazard, an accident or a weather report is not listed). Ordered by severity descending, then distance, then id; distanceM is rounded to 100 m, as the platform states it in tenths of a kilometre."`
 }
 
 // RoadConditionsQuery is meta.query of listRoadConditions.
@@ -314,13 +400,15 @@ type RoadConditionsOutput struct {
 
 func registerRoadConditions(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "What is happening on the roads near a position"
-	op.Description = "The active situations within the radius of a position on every road class held, by severity descending, then distance, then id, with the lamp over every situation within the radius and every official weather warning in force in an area within it. MCP counterpart: road status (area form). Needs the scope roads; the weather warnings are read with the scope weather, and without it the lamp says its sight is limited."
+	op.Description = "The active closures, roadworks, lane restrictions and jams within the radius of a position on every road class held, what the platform's road status lists there (a hazard, an accident or a weather report is not listed), by severity descending, then distance, then id. With the lamp over every situation within the radius and every official weather warning in force in an area within it (API-only: the platform's road status states no lamp around a position). MCP counterpart: road status (area form). Needs the scope roads; the weather warnings are public and read for every key that may read the weather families, which the answer then credits; without them the lamp says its sight is limited."
 	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, in *RoadConditionsInput) (*RoadConditionsOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
-		q := roads.AreaQuery{At: in.point, RadiusM: s.radius(in.RadiusM), Filter: in.filter(), Limit: s.limit(in.Limit)}
+		f := in.filter()
+		f.Listed = roads.AreaKinds
+		q := roads.AreaQuery{At: in.point, RadiusM: s.radius(in.RadiusM), Filter: s.windowed(ctx, f, in.SituationWindow), Limit: s.limit(in.Limit)}
 		types := []string{}
 		for _, c := range in.RoadClass {
 			q.Classes = append(q.Classes, roads.Class(c))
@@ -331,12 +419,19 @@ func registerRoadConditions(api huma.API, s *server, op huma.Operation) {
 			return nil, s.featureProblem(ctx, err)
 		}
 		noteLamp(ctx, c)
+		listed := roadSituations(c.Items)
+		for i := range listed {
+			if listed[i].DistanceM != nil {
+				d := tenthKm(*listed[i].DistanceM)
+				listed[i].DistanceM = &d
+			}
+		}
 		return &RoadConditionsOutput{CacheControl: noStore, Body: RoadConditionsEnvelope{
 			Data: RoadConditionsData{
 				Area:       Area{At: position(q.At), RadiusM: q.RadiusM},
 				Lamp:       string(c.Lamp),
 				LampReason: lampReason(c.Reason),
-				Situations: roadSituations(c.Items),
+				Situations: listed,
 			},
 			Meta: RoadConditionsMeta{
 				DataMeta: s.dataMeta(ctx, c.Families, c.At, c.Partial, partialDetail),
@@ -352,7 +447,7 @@ func registerRoadConditions(api huma.API, s *server, op huma.Operation) {
 
 // SituationInput is the input of getRoadSituation.
 type SituationInput struct {
-	SituationID string `path:"situationId" maxLength:"64" pattern:"^[A-Za-z0-9_.-]+$" example:"ev-00001" doc:"The situation's id."`
+	SituationID string `path:"situationId" maxLength:"64" pattern:"^[A-Za-z0-9_.:-]+$" example:"datex:syn:ev-00001" doc:"The situation's id."`
 }
 
 // SituationEnvelope is the enveloped answer of getRoadSituation.
@@ -386,5 +481,80 @@ func registerRoadSituation(api huma.API, s *server, op huma.Operation) {
 			Meta:  s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
 			Links: s.selfLink(ctx),
 		}}, nil
+	})
+}
+
+// ------------------------------------------------------------- one Land
+
+// StateConditionsInput is the input of listStateRoadConditions.
+type StateConditionsInput struct {
+	State string `path:"state" pattern:"^([0-9]{2}|de)$" example:"09" doc:"The Land's official code, two digits (09 Bayern), as listPlaces or describeLocation give it; de for the whole country (every situation held)."`
+	SituationFilters
+	SituationWindow
+	RoadClass []string `query:"road_class" enum:"motorway,federal,state,urban,other" doc:"Only situations on roads of these classes, comma-separated; motorway for a Land's motorways. Default: every class held."`
+	Limit     int      `query:"limit" minimum:"1" maximum:"100" doc:"Most situations to return. Default: pagination.default_limit."`
+}
+
+// Resolve refuses a window that cannot be read.
+func (in *StateConditionsInput) Resolve(huma.Context) []error { return in.check() }
+
+// StateConditionsData is the answer of listStateRoadConditions.
+type StateConditionsData struct {
+	State      string          `json:"state" doc:"The Land's code."`
+	Lamp       string          `json:"lamp" enum:"green,amber,red" doc:"The lamp over every situation of the Land and every official weather warning in force in its areas, by the rules of listRoadConditions."`
+	LampReason *string         `json:"lampReason" nullable:"true" doc:"Why the lamp has its colour, as in listRoadConditions; null for green."`
+	Situations []RoadSituation `json:"situations" doc:"Ordered by severity descending, then road, then id. A situation is in the Land of the nearest municipality centre (BKG, within 20 km) to its point; near a Land border that can be the neighbouring Land."`
+}
+
+// StateConditionsQuery is meta.query of listStateRoadConditions.
+type StateConditionsQuery struct {
+	State string `json:"state"`
+	FilterQuery
+	RoadClasses []string `json:"roadClasses" doc:"The road classes asked for; empty for every class."`
+}
+
+// StateConditionsEnvelope is the enveloped answer of listStateRoadConditions.
+type StateConditionsEnvelope struct {
+	Data StateConditionsData `json:"data"`
+	Meta struct {
+		DataMeta
+		Page  Page                 `json:"page"`
+		Query StateConditionsQuery `json:"query"`
+	} `json:"meta"`
+	Links Links `json:"links"`
+}
+
+// StateConditionsOutput is the response of listStateRoadConditions.
+type StateConditionsOutput struct {
+	CacheControl string `header:"Cache-Control"`
+	Body         StateConditionsEnvelope
+}
+
+func registerStateConditions(api huma.API, s *server, op huma.Operation) {
+	op.Summary = "What is happening on the roads of one Land"
+	op.Description = "The active situations of one Land (each placed in the Land of the nearest municipality centre to its point, the platform's Land rule), by severity descending, then road, then id, with the lamp over the Land. road_class=motorway answers a Land's motorways. MCP counterpart: motorway traffic (Land form). Needs the scope roads."
+	featureResponses(api, &op, featureOffDoc)
+	huma.Register(api, op, func(ctx context.Context, in *StateConditionsInput) (*StateConditionsOutput, error) {
+		if err := s.featuresOff(ctx); err != nil {
+			return nil, err
+		}
+		q := roads.AreaQuery{State: in.State, Filter: s.windowed(ctx, in.filter(), in.SituationWindow), Limit: s.limit(in.Limit)}
+		types := []string{}
+		for _, c := range in.RoadClass {
+			q.Classes = append(q.Classes, roads.Class(c))
+			types = append(types, c)
+		}
+		c, err := s.features.RoadConditions(ctx, principalFrom(ctx).Key, q)
+		if err != nil {
+			return nil, s.featureProblem(ctx, err)
+		}
+		noteLamp(ctx, c)
+		out := &StateConditionsOutput{CacheControl: noStore}
+		out.Body.Data = StateConditionsData{State: q.State, Lamp: string(c.Lamp), LampReason: lampReason(c.Reason), Situations: roadSituations(c.Items)}
+		out.Body.Meta.DataMeta = s.dataMeta(ctx, c.Families, c.At, c.Partial, partialDetail)
+		out.Body.Meta.Page = Page{Limit: q.Limit, HasMore: c.HasMore}
+		out.Body.Meta.Query = StateConditionsQuery{State: q.State, FilterQuery: filterQuery(q.Filter), RoadClasses: types}
+		out.Body.Links = s.selfLink(ctx)
+		return out, nil
 	})
 }

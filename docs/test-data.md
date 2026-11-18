@@ -16,7 +16,7 @@ The command writes two files and prints the counts it wrote:
 
 | File | Content |
 |---|---|
-| `seed.sql` | `insert` statements into the tables of the read-contract stub (`db/contract`). Load it in one transaction into a database built from that stub, for example `psql --single-transaction -f seed.sql`. |
+| `seed.sql` | `insert` statements into the tables of the read contract. Load it in one transaction into a database migrated to the release `database.pin` names, for example `psql --single-transaction -f seed.sql`. |
 | `manifest.json` | generator version, seed, profile, contract version, row counts per table, per Land and per source family, the licence class of each family, the planted edge cases, the licence of every input, and the SHA-256 of `seed.sql` |
 
 The same generator version, profile and seed give the same bytes on every

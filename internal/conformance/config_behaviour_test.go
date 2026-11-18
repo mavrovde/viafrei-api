@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mavrovde/viafrei-api/db/contract"
 	"github.com/mavrovde/viafrei-api/internal/adapters/accessstore"
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/health"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/runtime/logging"
@@ -71,7 +71,7 @@ type slowReader struct{ delay time.Duration }
 func (r slowReader) ContractVersion(ctx context.Context) (string, error) {
 	select {
 	case <-time.After(r.delay):
-		return contract.Version(), nil
+		return dbcontract.ContractVersion, nil
 	case <-ctx.Done():
 		return "", ctx.Err()
 	}
@@ -108,6 +108,22 @@ func behaviours() map[string]behaviour {
 		"db.max_conn_idle":     {"1m", poolConfig},
 		"db.cancel_grace":      {"400ms", poolConfig},
 		"db.application_name":  {"another-name", poolConfig},
+		"db.register_snapshot_ttl": {"3s", func(t *testing.T, c *config.Config) string {
+			ttl, _ := store.New(nil, c).RegisterSnapshot()
+			return ttl.String()
+		}},
+		"db.register_stale_for": {"20s", func(t *testing.T, c *config.Config) string {
+			_, staleFor := store.New(nil, c).RegisterSnapshot()
+			return staleFor.String()
+		}},
+		"db.road_snapshot_ttl": {"10m", func(t *testing.T, c *config.Config) string {
+			ttl, _ := store.New(nil, c).RoadSnapshot()
+			return ttl.String()
+		}},
+		"db.road_stale_for": {"3h", func(t *testing.T, c *config.Config) string {
+			_, staleFor := store.New(nil, c).RoadSnapshot()
+			return staleFor.String()
+		}},
 		"db.statement_timeout_floor": {"980ms", func(t *testing.T, c *config.Config) string {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
@@ -123,17 +139,40 @@ func behaviours() map[string]behaviour {
 			return b.Round(100 * time.Millisecond).String()
 		}},
 		"contract.expected": {"0.7", func(t *testing.T, c *config.Config) string {
-			v, err := health.ExpectedVersion(c.Contract.Expected, contract.Version())
+			v, err := health.ExpectedVersion(c.Contract.Expected, dbcontract.ContractVersion)
 			if err != nil {
 				t.Fatal(err)
 			}
 			return v.String()
 		}},
 		"health.ready_timeout": {"1s", func(t *testing.T, c *config.Config) string {
-			expected, _ := health.ExpectedVersion("", contract.Version())
+			expected, _ := health.ExpectedVersion("", dbcontract.ContractVersion)
 			return fmt.Sprint(health.NewChecker(slowReader{600 * time.Millisecond}, expected, c.Health.ReadyTimeout).Check(context.Background()).Ready)
 		}},
 		"health.probe_timeout": {"100ms", probeVerdict},
+		"health.listen_addr": {"localhost:9098", func(t *testing.T, c *config.Config) string {
+			s, err := httpapi.NewHealthServer(httpapi.Deps{Config: c})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return s.Addr
+		}},
+		"callers.allow_cidr": {"127.0.0.0/8", func(t *testing.T, c *config.Config) string {
+			return callerVerdict(t, c, "127.0.0.1:4000", "")
+		}},
+		// The pair is set together (a cross-field rule), so each key's
+		// proof holds the other at a value and varies only itself: an edge
+		// at 10.0.0.1 names an admitted caller in X-Real-IP.
+		"callers.trusted_proxy_header": {"X-Real-IP", func(t *testing.T, c *config.Config) string {
+			k := *c
+			k.Callers.AllowCIDR, k.Callers.TrustedProxyCIDR = []string{"127.0.0.0/8"}, []string{"10.0.0.0/8"}
+			return callerVerdict(t, &k, "10.0.0.1:4000", "127.0.0.1")
+		}},
+		"callers.trusted_proxy_cidr": {"10.0.0.0/8", func(t *testing.T, c *config.Config) string {
+			k := *c
+			k.Callers.AllowCIDR, k.Callers.TrustedProxyHeader = []string{"127.0.0.0/8"}, "X-Real-IP"
+			return callerVerdict(t, &k, "10.0.0.1:4000", "127.0.0.1")
+		}},
 		"log.level": {"debug", func(t *testing.T, c *config.Config) string {
 			var buf bytes.Buffer
 			logging.New(c.Log, &buf).Debug("probe")
@@ -145,7 +184,10 @@ func behaviours() map[string]behaviour {
 			return buf.String()[:1]
 		}},
 		"docs.enabled": {"false", func(t *testing.T, c *config.Config) string {
-			return fmt.Sprint(get(t, c, "/v1/openapi.json").Code)
+			// The document's routes are there or not: /openapi.json, the
+			// redirect to it, says which without marshalling the ~1 MB
+			// document (half a second under the race detector, TST-012).
+			return fmt.Sprint(get(t, c, "/openapi.json").Code)
 		}},
 		"endpoints.disabled": {"getMeta", func(t *testing.T, c *config.Config) string {
 			return fmt.Sprint(get(t, c, "/v1/meta").Code)
@@ -188,18 +230,35 @@ func behaviours() map[string]behaviour {
 		"pagination.default_limit": {"7", featureAsk("/v1/parking-options?at=1,2")},
 		"compose.per_part_limit":   {"3", featureAsk("/v1/places/pl-1/overview")},
 		"charging.status_max_age":  {"5m", chargingState},
+		"fuel.price_current":       {"1h", fuelWindow},
+		"fuel.price_fresh":         {"1h", fuelFresh},
+		"fuel.price_held":          {"24h", fuelHeld},
+		"refresh.wait":             {"300ms", refreshWait},
+		"refresh.answer_reserve": {"100ms", func(t *testing.T, c *config.Config) string {
+			s, err := accessstore.Open(context.Background(), c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer s.Close()
+			return s.AnswerReserve().String()
+		}},
+		"refresh.sources_file": {"../../test/live/registry.json", refreshSources},
+		"refresh.sources_json": {`{"schema":1,"sources":[{"id":"weather-de","status":"enabled","subject":{"type":"object"},"subject_key":{"cases":[{"match":{"at":"."},"emit":"{at}"}]}}]}`, refreshSources},
 		"compose.part_deadline": {"300ms", func(t *testing.T, c *config.Config) string {
 			return wire.FeatureSettings(c).PartDeadline.String()
 		}},
 		"roads.ended_retention_h": {"6", func(t *testing.T, c *config.Config) string {
 			return wire.FeatureSettings(c).EndedRetention.String()
 		}},
+		"roads.planned_families": {"alpha", func(t *testing.T, c *config.Config) string {
+			return fmt.Sprint(wire.FeatureSettings(c).PlannedWorks)
+		}},
 		"weather.max_warnings": {"7", func(t *testing.T, c *config.Config) string {
 			return fmt.Sprint(wire.FeatureSettings(c).MaxWarnings)
 		}},
 		"sources.disabled": {"alpha", func(t *testing.T, c *config.Config) string {
-			register := []access.Terms{{Family: "alpha", UseClasses: access.UseClasses, Reviewed: true}}
-			return fmt.Sprint(access.NewGate(register, access.Plan{UseClass: "consumer", Sources: []string{"alpha"}}, nil, c.Sources.Disabled).Allowed())
+			register := []access.Terms{{Family: "alpha", UseClasses: access.UseClasses}}
+			return fmt.Sprint(access.NewGate(register, access.Plan{UseClass: "consumer", Sources: []string{"alpha"}}, access.AudiencePublic, nil, c.Sources.Disabled).Allowed())
 		}},
 	}
 }
@@ -238,8 +297,26 @@ func probeVerdict(t *testing.T, c *config.Config) string {
 	defer slow.Close()
 	_, port, _ := net.SplitHostPort(slow.Listener.Addr().String())
 	probe := *c
-	probe.Server.ListenAddr = "localhost:" + port
+	probe.Health.ListenAddr = "localhost:" + port
 	return fmt.Sprint(httpapi.Probe(context.Background(), &probe) == nil)
+}
+
+// callerVerdict is the public listener's status for /v1/meta from peer, with
+// X-Real-IP set to realIP when it is not empty.
+func callerVerdict(t *testing.T, c *config.Config, peer, realIP string) string {
+	t.Helper()
+	h, err := httpapi.NewPublicHandler(httpapi.Deps{Config: c, ContractVersion: "0.1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/meta", nil)
+	r.RemoteAddr = peer
+	if realIP != "" {
+		r.Header.Set("X-Real-IP", realIP)
+	}
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	return fmt.Sprint(w.Code)
 }
 
 func TestEveryKeyChangesBehaviour(t *testing.T) {
@@ -274,6 +351,12 @@ func TestEveryKeyChangesBehaviour(t *testing.T) {
 			}
 			if f.Key == "admin.enabled" { // the console needs an access store
 				env = append(env, "VFAPI_ACCESS_URL=postgres://access:pw@db.invalid:6002/x", "VFAPI_AUTH_PEPPER="+strings.Repeat("e", 32))
+			}
+			if f.Key == "callers.trusted_proxy_header" { // set together with its ranges
+				env = append(env, "VFAPI_CALLERS_TRUSTED_PROXY_CIDR=10.0.0.0/8")
+			}
+			if f.Key == "callers.trusted_proxy_cidr" { // set together with its header
+				env = append(env, "VFAPI_CALLERS_TRUSTED_PROXY_HEADER=X-Real-IP")
 			}
 			if f.Key == "admin.rp_id" { // the id must cover the origin's host
 				env = append(env, "VFAPI_ADMIN_ORIGIN=https://console.example.test")

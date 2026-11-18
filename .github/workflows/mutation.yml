@@ -2,11 +2,12 @@
 # code of test/mutation/scope.tsv, with Gremlins scored by
 # internal/testkit/mutgate.
 #
-# On a pull request: the changed in-scope code only, failing below 80 % and
-# on zero mutants for changed in-scope code. The release pull request of a
-# minor version (X.Y.0), and a manual run, take the full run over every
-# in-scope mutant instead, failing below 70 % and on a stale equivalent
-# entry. The report lists the counts and every mutant not detected.
+# Once per release, never per pull request (owner 2026-11-18, as in
+# viafrei-database and viafrei-web): release.yml calls this workflow on the
+# tagged commit before anything is built, and a red run stops the publish.
+# It is the full run over every in-scope mutant, failing below 70 % and on a
+# stale equivalent entry; a manual run does the same on the chosen ref. The
+# report lists the counts and every mutant not detected.
 #
 # The full run is cut into four parallel shards (the viafrei-database
 # release split, mirrored): Mutation shard k mutates the scope roots at the
@@ -18,21 +19,27 @@
 name: Mutation
 
 on:
-  pull_request:
+  workflow_call:
+    inputs:
+      ref:
+        description: The commit to mutate (the release's tagged commit)
+        required: true
+        type: string
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: mutation-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: mutation-${{ inputs.ref || github.ref }}
+  cancel-in-progress: false
 
 env:
   GOTOOLCHAIN: local
 
 jobs:
-  # pr or full, read once: the shards run only for a full run.
+  # The mode, read once: always the full run (the pr mode of
+  # scripts/mutation.sh stays for a local run only).
   plan:
     name: Mutation plan
     runs-on: ubuntu-24.04
@@ -42,21 +49,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
       - id: mode
-        name: pr or full
-        env:
-          EVENT: ${{ github.event_name }}
-          HEAD_REF: ${{ github.head_ref }}
+        name: full
         run: |
-          mode="pr"
-          if [[ $EVENT == workflow_dispatch ]]; then
-            mode="full"
-          elif [[ $HEAD_REF == release-please--* ]] && jq -er '.["."] | test("^[0-9]+\\.[0-9]+\\.0$")' .release-please-manifest.json >/dev/null; then
-            mode="full"
-          fi
-          echo "mutation: $mode run"
-          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "mutation: full run"
+          echo "mode=full" >> "$GITHUB_OUTPUT"
 
   # One shard of the full run each; fail-fast is off, so one run reports
   # every failing shard. Exit 2 (red) on an empty shard or a bad K/N.
@@ -73,6 +72,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -101,6 +101,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0

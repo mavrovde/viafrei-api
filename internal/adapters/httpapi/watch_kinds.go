@@ -43,7 +43,12 @@ var watchConditionKeys = map[string][]string{
 // watchScopes are the scopes a watch of each other kind needs besides roads.
 var watchScopes = map[string]access.Scope{"station": "transit", "region": "transit", "weather": "weather", "charger": "energy"}
 
-var regionKey = regexp.MustCompile(`^[0-9]{2,12}$`)
+// regionKey is an official region key: it starts with its Land's key, 01 to
+// 16, and runs to at most 12 digits (#152). Every parameter that takes a Land
+// or a region key states the same rule in its pattern (state paths,
+// listMotorways' state, listTransitDisruptions' area); TestEveryLandParameterTakesTheSixteenLaender
+// walks them all.
+var regionKey = regexp.MustCompile(`^(0[1-9]|1[0-6])[0-9]{0,10}$`)
 
 // conditionBounds are the bounds the platform takes each numeric condition
 // value in (watch_situation's schema); a value outside is refused by name.
@@ -150,61 +155,94 @@ type watchRead struct {
 // watch states its condition's figures and credits none.
 func (s *server) readOtherKind(ctx context.Context, in *WatchInput, now, end time.Time) (watchRead, error) {
 	key := principalFrom(ctx).Key
-	c := in.cond
 	var r watchRead
 	if scope := watchScopes[in.Kind]; !key.Plan.Has(scope) {
 		return r, newProblem(ctx, SlugScopeDenied, "A "+in.Kind+" watch needs the scope "+string(scope)+".", 0)
 	}
 	switch in.Kind {
 	case "station":
-		b, err := s.features.Departures(ctx, key, transit.DepartureQuery{StationID: in.Key, From: now, Window: end.Sub(now), Limit: watchMaxDepartures})
-		if err != nil {
-			return r, s.featureProblem(ctx, err)
-		}
-		r.data.Condition = map[string]any{"delay_min": c.DelayMin}
-		r.data.Departures = []Departure{}
-		for _, d := range b.Items {
-			if d.Cancelled || d.DelayMin != nil && *d.DelayMin >= c.DelayMin {
-				r.data.Departures = append(r.data.Departures, departureRow(d))
-			}
-		}
-		r.meta = s.dataMeta(ctx, b.Families, b.At, b.Partial, partialDetail)
+		return s.readStationWatch(ctx, key, in, now, end)
 	case "region":
-		q := transit.DisruptionQuery{Area: in.Key, WindowMin: disruptionDefaultWindowMin, Limit: disruptionDefaultLimit, LateOverMin: c.DelayMin}
-		a, err := s.features.Disruptions(ctx, key, q)
-		if err != nil {
-			return r, s.featureProblem(ctx, err)
-		}
-		r.data.Condition = map[string]any{"late_share": c.LateShare, "delay_min": c.DelayMin, "min_trips": c.MinTrips}
-		env := disruptionEnvelope(s, ctx, a, q)
-		r.data.Punctuality = env.Data.Punctuality
-		if t := a.Trips; t != nil {
-			r.data.Trips = &WatchTrips{Observed: t.Observed, Late: t.Late, LateShare: math.Round(float64(t.Late)/float64(t.Observed)*1000) / 1000, ObservedAt: t.ObservedAt}
-		}
-		r.meta = env.Meta.DataMeta
-		r.meta.Attribution = []Attribution{}
+		return s.readRegionWatch(ctx, key, in)
 	case "weather":
-		a, err := s.features.WeatherCell(ctx, key, in.Key, in.at, *c.MinLevel)
-		if err != nil {
-			return r, s.featureProblem(ctx, err)
-		}
-		r.data.Condition = map[string]any{"min_level": *c.MinLevel}
-		r.data.Warnings = weatherWarnings(a.Warnings)
-		r.meta = s.dataMeta(ctx, nil, a.Meta.At, a.Meta.Partial, partialDetail)
-	case "charger":
-		a, err := s.features.ChargingSite(ctx, key, in.Key, s.cfg.Charging.StatusMaxAge)
-		if err != nil {
-			return r, s.featureProblem(ctx, err)
-		}
-		a.Items[0].DistanceM = 0
-		site := chargingSites(ctx, a, s.cfg.Charging.StatusMaxAge)[0]
-		r.data.Condition = map[string]any{}
-		if c.PointID != "" {
-			r.data.Condition["point_id"] = c.PointID
-		}
-		r.data.Site = &site
-		r.meta = s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail)
+		return s.readWeatherWatch(ctx, key, in)
+	default: // "charger": the schema's enum leaves no other kind here
+		return s.readChargerWatch(ctx, key, in)
 	}
+}
+
+// readStationWatch reads a station watch: the departures cancelled or at
+// least delay_min late, from now until end.
+func (s *server) readStationWatch(ctx context.Context, key access.Record, in *WatchInput, now, end time.Time) (watchRead, error) {
+	c := in.cond
+	var r watchRead
+	b, err := s.features.Departures(ctx, key, transit.DepartureQuery{StationID: in.Key, From: now, Window: end.Sub(now), Limit: watchMaxDepartures})
+	if err != nil {
+		return r, s.featureProblem(ctx, err)
+	}
+	r.data.Condition = map[string]any{"delay_min": c.DelayMin}
+	r.data.Departures = []Departure{}
+	for _, d := range b.Items {
+		if d.Cancelled || d.DelayMin != nil && *d.DelayMin >= c.DelayMin {
+			r.data.Departures = append(r.data.Departures, departureRow(d))
+		}
+	}
+	r.meta = s.dataMeta(ctx, b.Families, b.At, b.Partial, partialDetail)
+	return r, nil
+}
+
+// readRegionWatch reads a region watch: its punctuality and trips. It
+// credits no family.
+func (s *server) readRegionWatch(ctx context.Context, key access.Record, in *WatchInput) (watchRead, error) {
+	c := in.cond
+	var r watchRead
+	q := transit.DisruptionQuery{Area: in.Key, WindowMin: disruptionDefaultWindowMin, Limit: disruptionDefaultLimit, LateOverMin: c.DelayMin}
+	a, err := s.features.Disruptions(ctx, key, q)
+	if err != nil {
+		return r, s.featureProblem(ctx, err)
+	}
+	r.data.Condition = map[string]any{"late_share": c.LateShare, "delay_min": c.DelayMin, "min_trips": c.MinTrips}
+	env := disruptionEnvelope(s, ctx, a, q)
+	r.data.Punctuality = env.Data.Punctuality
+	if t := a.Trips; t != nil {
+		r.data.Trips = &WatchTrips{Observed: t.Observed, Late: t.Late, LateShare: math.Round(float64(t.Late)/float64(t.Observed)*1000) / 1000, ObservedAt: t.ObservedAt}
+	}
+	r.meta = env.Meta.DataMeta
+	r.meta.Attribution = []Attribution{}
+	return r, nil
+}
+
+// readWeatherWatch reads a weather watch: the cell's warnings at min_level
+// or above. It credits no family.
+func (s *server) readWeatherWatch(ctx context.Context, key access.Record, in *WatchInput) (watchRead, error) {
+	c := in.cond
+	var r watchRead
+	a, err := s.features.WeatherCell(ctx, key, in.Key, in.at, *c.MinLevel)
+	if err != nil {
+		return r, s.featureProblem(ctx, err)
+	}
+	r.data.Condition = map[string]any{"min_level": *c.MinLevel}
+	r.data.Warnings = weatherWarnings(a.Warnings)
+	r.meta = s.dataMeta(ctx, nil, a.Meta.At, a.Meta.Partial, partialDetail)
+	return r, nil
+}
+
+// readChargerWatch reads a charger watch: the site and its points.
+func (s *server) readChargerWatch(ctx context.Context, key access.Record, in *WatchInput) (watchRead, error) {
+	c := in.cond
+	var r watchRead
+	a, err := s.features.ChargingSite(ctx, key, in.Key, s.cfg.Charging.StatusMaxAge)
+	if err != nil {
+		return r, s.featureProblem(ctx, err)
+	}
+	a.Items[0].DistanceM = 0
+	site := chargingSites(ctx, a, s.cfg.Charging.StatusMaxAge)[0]
+	r.data.Condition = map[string]any{}
+	if c.PointID != "" {
+		r.data.Condition["point_id"] = c.PointID
+	}
+	r.data.Site = &site
+	r.meta = s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail)
 	return r, nil
 }
 

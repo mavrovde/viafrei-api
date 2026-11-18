@@ -488,7 +488,7 @@ func registerRoadSituation(api huma.API, s *server, op huma.Operation) {
 
 // StateConditionsInput is the input of listStateRoadConditions.
 type StateConditionsInput struct {
-	State string `path:"state" pattern:"^([0-9]{2}|de)$" example:"09" doc:"The Land's official code, two digits (09 Bayern), as listPlaces or describeLocation give it; de for the whole country (every situation held)."`
+	State string `path:"state" pattern:"^(0[1-9]|1[0-6]|de)$" example:"09" doc:"The Land's official code, 01 to 16 (09 Bayern), as listPlaces or describeLocation give it; de for the whole country (every situation held)."`
 	SituationFilters
 	SituationWindow
 	RoadClass []string `query:"road_class" enum:"motorway,federal,state,urban,other" doc:"Only situations on roads of these classes, comma-separated; motorway for a Land's motorways. Default: every class held."`

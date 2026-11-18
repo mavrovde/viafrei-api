@@ -9,6 +9,13 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [0.3.2](https://github.com/mavrovde/viafrei-api/compare/v0.3.1...v0.3.2) (2026-11-18)
+
+
+### Fixed
+
+* **places:** SectorWedges counts its arc steps with a range, so the release mutation run cannot loop without end ([#145](https://github.com/mavrovde/viafrei-api/issues/145)) ([316c594](https://github.com/mavrovde/viafrei-api/commit/316c59469660286d53b5f15cb8368d4a75b86bad))
+
 ## [0.3.1](https://github.com/mavrovde/viafrei-api/compare/v0.3.0...v0.3.1) (2026-11-18)
 
 

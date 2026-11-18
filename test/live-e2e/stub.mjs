@@ -48,7 +48,8 @@ function xml(res, body) {
 
 createServer(tls, (req, res) => {
   const url = new URL(req.url ?? "/", "https://provider.stub");
-  console.log(`stub ${req.method} ${url.pathname}`);
+  // Printable ASCII only: a path never forges a line of the log the run reads.
+  console.log(`stub ${req.method} ${url.pathname.replace(/[^\x21-\x7e]/g, "?")}`);
   let m;
   if (url.pathname.endsWith("/list.php")) {
     const lat = Number(url.searchParams.get("lat"));
@@ -63,7 +64,9 @@ createServer(tls, (req, res) => {
     return json(res, { ok: true, status: "ok", prices });
   }
   if ((m = /\/plan\/([0-9]{7})\/([0-9]{6})\/([0-9]{2})$/.exec(url.pathname))) {
-    const [, eva, date, hour] = m;
+    // The station number is echoed as a number, never as the request's text.
+    const eva = String(Number(m[1])).padStart(7, "0");
+    const [, , date, hour] = m;
     const at = berlin(new Date(Date.now() + 30 * 60 * 1000));
     const stop = at.date === date && at.hour === hour
       ? `<s id="stub-${date}${hour}-1"><tl c="ICE" n="1234" o="80"/><dp pt="${at.date}${at.hour}${at.minute}" pp="1" l="" ppth="Stubhausen|Teststadt"/></s>`
@@ -71,7 +74,7 @@ createServer(tls, (req, res) => {
     return xml(res, `<timetable station="Stub" eva="${eva}">${stop}</timetable>`);
   }
   if ((m = /\/fchg\/([0-9]{7})$/.exec(url.pathname))) {
-    return xml(res, `<timetable station="Stub" eva="${m[1]}"/>`);
+    return xml(res, `<timetable station="Stub" eva="${String(Number(m[1])).padStart(7, "0")}"/>`);
   }
   res.writeHead(404, { "content-type": "text/plain" });
   res.end("not stubbed\n");

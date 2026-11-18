@@ -74,7 +74,9 @@ services:
       args:
         FIXTURE_PROFILE: ${FIXTURE_PROFILE:-tiny}
         FIXTURE_SEED: ${FIXTURE_SEED:-1}
-    entrypoint: ["/bin/sh", "-ec", "cp /out/fixtures/seed.sql /out/fixtures/manifest.json /seed/"]
+    # Readable by db-seed, which runs as the database image's own user:
+    # fixturegen writes the manifest owner-only.
+    entrypoint: ["/bin/sh", "-ec", "install -m 0644 /out/fixtures/seed.sql /out/fixtures/manifest.json /seed/"]
     volumes:
       - seed:/seed
     network_mode: none
@@ -103,8 +105,10 @@ services:
         if [ "$$(psql -X -tA -c 'select exists (select 1 from contract.place)' "$$DATABASE_URL")" = t ]; then
           echo "fixtures already seeded"
         else
+          sum=$$(tr -d '\n' < /seed/manifest.json | sed -n 's/.*"checksum": *"\([^"]*\)".*/\1/p')
+          [ -n "$$sum" ] || { echo "/seed/manifest.json names no checksum" >&2; exit 1; }
           node /app/dist/cli.js test-fixtures seed /seed/seed.sql
-          echo "fixtures seeded: $$(tr -d '\n' < /seed/manifest.json | sed -n 's/.*"checksum": *"\([^"]*\)".*/\1/p')"
+          echo "fixtures seeded: $$sum"
         fi
     read_only: true
     cap_drop: [ALL]

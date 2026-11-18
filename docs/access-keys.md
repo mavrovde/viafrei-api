@@ -34,18 +34,19 @@ licence gate lets it receive, with their attribution. During the last
 ## Storage
 
 Keys, plans and audit records live in the API's own
-access store, schema `access` ([`db/access`](../db/access)). A key is stored
+access store, schema `access`. A key is stored
 as HMAC-SHA-256 of its secret under `auth.pepper`, which is held outside the
 store. The full key is printed once, at issue or rotation, and is not
 recoverable afterwards by anyone.
 
-The owner of the store applies the files once, in order, then sets the
-role's password:
+This repository holds no DDL. The `access` schema and the `api_access` role
+come with the platform's schema: the viafrei-database release that
+[`database.pin`](../database.pin) names, applied by that release's own
+migrator (`migrate`), as `compose.yaml`'s `db-migrate` service does. The
+owner of the database then lets the role log in with its password:
 
 ```sh
-psql "$OWNER_URL" -v ON_ERROR_STOP=1 -f db/access/0001_access.sql -f db/access/0002_access_role.sql -f db/access/0003_limits.sql \
-                                     -f db/access/0004_console.sql
-psql "$OWNER_URL" -c "alter role api_access password '…'"
+psql "$OWNER_URL" -c "alter role api_access login password '…'"
 ```
 
 The service then needs `VFAPI_ACCESS_URL` (the `api_access` role) and

@@ -20,8 +20,9 @@ nightly artifact is kept 90 days for the release evidence.
 `scripts/load-test.sh PROFILE [REPORT]` starts the stack with
 `test/load/compose.yaml` on top of `compose.yaml`. The override puts a fault
 proxy (Toxiproxy, pinned by digest) between the service and both of its
-stores: the storage route and the access-store route. It also creates the
-access-store role, issues two throwaway keys (one used throughout, one used
+stores: the storage route and the access-store route. Its `db-access`
+service lets the access store's role, which the pinned database release
+creates, log in with a throwaway password; the script then issues two throwaway keys (one used throughout, one used
 only while the access store is down, so it is not cached) and runs the
 runner, `go run ./internal/testkit/loadrun`. The stack is removed on exit.
 

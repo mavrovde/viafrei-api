@@ -1,8 +1,9 @@
 # The test stack of the load and fault scenarios (TST-007, issue #19):
 # compose.yaml plus this file, started by scripts/load-test.sh and by nothing
 # else. It adds a latency and fault proxy (Toxiproxy) between the service
-# and both of its stores, and an access store in the same throwaway
-# database, so storage and the access store can be slowed or cut apart.
+# and both of its stores, and opens the access store, which the platform's
+# schema holds in the same throwaway database, to the service, so storage
+# and the access store can be slowed or cut apart.
 #
 #   docker compose -f compose.yaml -f test/load/compose.yaml up --wait
 #
@@ -11,12 +12,24 @@
 # address. Nothing here holds real data or reaches beyond this machine.
 
 services:
-  db:
+  # The access store's schema and its role api_access come with the platform's
+  # schema, which db-migrate applies from the release database.pin names. This
+  # one lets the role log in with the run's password, once the database is at
+  # the head. It extends db-migrate, so it runs the same pinned image, as the
+  # same user, with the same restrictions.
+  db-access:
+    extends:
+      file: compose.yaml
+      service: db-migrate
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
     environment:
       API_ACCESS_PASSWORD: ${API_ACCESS_PASSWORD:?set API_ACCESS_PASSWORD (scripts/load-test.sh does)}
-    volumes:
-      - ./db/access:/access:ro
-      - ./test/load/initdb/40_access.sh:/docker-entrypoint-initdb.d/40_access.sh:ro
+    command:
+      - |
+        echo "alter role api_access login password :'pw';" | psql -X -q -v ON_ERROR_STOP=1 -v pw="$$API_ACCESS_PASSWORD" "$$DATABASE_URL"
+        echo "access store ready"
 
   toxiproxy:
     image: ghcr.io/shopify/toxiproxy:2.12.0@sha256:9378ed52a28bc50edc1350f936f518f31fa95f0d15917d6eb40b8e376d1a214e
@@ -35,6 +48,8 @@ services:
     depends_on:
       toxiproxy:
         condition: service_started
+      db-access:
+        condition: service_completed_successfully
     environment:
       # Storage and the access store, both through the fault proxy.
       VFAPI_DB_URL: postgres://api_reader:${API_READER_PASSWORD:?set API_READER_PASSWORD in .env}@toxiproxy:15432/test_contract?sslmode=disable

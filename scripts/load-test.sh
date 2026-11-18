@@ -102,4 +102,4 @@ go run ./internal/testkit/loadrun -profile "$profile" -report "$report" -api "$A
   -breaker-failures "$brk_failures" -breaker-open-for "$brk_open_for" -breaker-probes "$brk_probes" \
   -cached-api "$CACHED_URL" -health "$HEALTH_URL" -stale-if-error "$stale_for" \
   -max-age-parking "$max_age_parking" -max-age-energy "$max_age_energy" -versions-ttl "$versions_ttl" \
-  -compose-files compose.yaml,test/load/compose.yaml "${previous[@]}"
+  -compose-files compose.yaml,test/load/compose.yaml ${previous[@]+"${previous[@]}"}

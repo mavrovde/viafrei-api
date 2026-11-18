@@ -88,9 +88,11 @@ func newRunner(p profile, b map[string]budget, api, proxy, key, cold, place stri
 }
 
 // The request mix (benchmark-shaped): two near searches for each composed
-// answer.
+// answer. The charging search is centred where the stack's fixture set
+// (profile tiny, seed 1) has sites, so its answers carry the families'
+// freshness, which the clock-skew scenario reads.
 func (r *runner) charging() request {
-	return request{class: classNear, path: "/v1/charging-options?at=50.82,6.0&radius_m=20000"}
+	return request{class: classNear, path: "/v1/charging-options?at=47.61,7.83&radius_m=20000"}
 }
 
 func (r *runner) parking() request {
@@ -356,25 +358,39 @@ func (r *runner) reset(ctx context.Context) error {
 	return r.toxi(ctx, http.MethodPost, "/reset", nil)
 }
 
-// The tables the feature reads touch; a lock on them hangs every storage
-// read of the request mix, a lock on the parking ones only the parking part.
+// The read-contract views the feature reads touch; a lock on the tables
+// under them hangs every storage read of the request mix, a lock on those
+// under the parking ones only the parking part.
 var (
 	featureTables = []string{"contract.place", "contract.charging_site", "contract.charge_point", "contract.charge_point_state_observation", "contract.parking_facility", "contract.occupancy_observation"}
 	parkingTables = []string{"contract.parking_facility", "contract.occupancy_observation"}
 )
 
-// hold takes an exclusive lock on tables for d in a session of its own, so
-// every read of them hangs in storage until the service cancels it: the
-// hanging query of QAS-REL-01. It returns once the lock is granted; wait
-// blocks until the session has ended.
-func (r *runner) hold(ctx context.Context, tables []string, d time.Duration) (wait func() error, err error) {
+// baseTables is a query of the oids of the tables under views, followed
+// through views over views. A lock on a view locks every relation its
+// definition names, views included, and the read contract's views share
+// helper views (the source rules): a lock on the parking views would hang
+// the charging reads as well. The tables alone are locked instead.
+func baseTables(views []string) string {
+	return fmt.Sprintf(`with recursive r(rel) as (select unnest(array['%s']::regclass[])::oid`+
+		` union select d.refobjid from r join pg_rewrite w on w.ev_class = r.rel`+
+		` join pg_depend d on d.classid = 'pg_rewrite'::regclass and d.objid = w.oid and d.refclassid = 'pg_class'::regclass and d.refobjid <> r.rel)`+
+		` select r.rel from r join pg_class c on c.oid = r.rel where c.relkind in ('r', 'p')`, strings.Join(views, "', '"))
+}
+
+// hold takes an exclusive lock on the tables under views for d in a session
+// of its own, so every read of them hangs in storage until the service
+// cancels it: the hanging query of QAS-REL-01. It returns once every lock is
+// granted; wait blocks until the session has ended.
+func (r *runner) hold(ctx context.Context, views []string, d time.Duration) (wait func() error, err error) {
+	base := baseTables(views)
 	errc := make(chan error, 1)
 	go func() {
-		_, err := r.psql(ctx, fmt.Sprintf("begin; lock table %s in access exclusive mode; select pg_sleep(%.3f); commit;", strings.Join(tables, ", "), d.Seconds()))
+		_, err := r.psql(ctx, fmt.Sprintf("begin; do $$ begin execute 'lock table ' || (select string_agg(rel::regclass::text, ', ') from (%s) b(rel)) || ' in access exclusive mode'; end $$; select pg_sleep(%.3f); commit;", base, d.Seconds()))
 		errc <- err
 	}()
 	wait = func() error { return <-errc }
-	q := fmt.Sprintf("select count(*) from pg_locks where granted and mode = 'AccessExclusiveLock' and relation = '%s'::regclass", tables[0])
+	q := fmt.Sprintf("with b as (%s) select (count(*) = (select count(*) from b))::int from pg_locks where granted and mode = 'AccessExclusiveLock' and relation in (select rel from b)", base)
 	deadline := time.Now().Add(d)
 	for time.Now().Before(deadline) {
 		select {
@@ -389,7 +405,7 @@ func (r *runner) hold(ctx context.Context, tables []string, d time.Duration) (wa
 			return wait, err
 		}
 	}
-	return wait, fmt.Errorf("the lock on %s was not granted within %s", tables[0], d)
+	return wait, fmt.Errorf("the lock on the tables under %s was not granted within %s", strings.Join(views, ", "), d)
 }
 
 // awaitOK polls q until it is answered 2xx, at most within.

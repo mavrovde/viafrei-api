@@ -70,7 +70,10 @@ body=$(health /readyz) || fail "/readyz: $body"
 checks=$((checks + 1))
 
 body=$(get /v1/meta) || fail "/v1/meta: $body"
-want=$(tr -d '[:space:]' < db/contract/VERSION)
+# The read-contract version the service is built for (internal/dbcontract),
+# which the database release must publish for /readyz to pass.
+want=$(sed -n 's/^const ContractVersion = "\(.*\)"$/\1/p' internal/dbcontract/dbcontract.go)
+[[ $want =~ ^[0-9]+\.[0-9]+$ ]] || fail "internal/dbcontract/dbcontract.go declares no ContractVersion"
 got=$(jq -r .data.contractVersion <<<"$body")
 [[ $got == "$want" ]] || fail "/v1/meta contractVersion $got, want $want"
 [[ $(jq -r .data.apiVersion <<<"$body") != null ]] || fail "/v1/meta has no apiVersion: $body"

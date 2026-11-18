@@ -18,7 +18,7 @@ import (
 // licence envelope: its audience, its hold and the terms a key accepts (the
 // envelope's terms gate, else the register's version).
 //
-// With WithRegisterSnapshot, a register read within the snapshot's lifetime
+// With a snapshot (db.register_snapshot_ttl), a register read within the snapshot's lifetime
 // is answered from that read, without a storage read and so without a
 // second admission of the request (RATE-011).
 func (s *Store) Register(ctx context.Context) ([]access.Terms, error) {
@@ -54,21 +54,21 @@ type registerFlight struct {
 	err   error
 }
 
-// RegisterSnapshotTTL is how long the service answers the register from one
-// read before it reads it again (KeepRegister, off the request path);
-// RegisterStaleFor is how long a read still answers while the next ones fail. A
-// change of a family's terms or hold reaches answers within RegisterSnapshotTTL
-// plus one read, and never later than RegisterStaleFor.
-const (
-	RegisterSnapshotTTL = time.Second
-	RegisterStaleFor    = 5 * time.Second
-)
-
 // WithRegisterSnapshot answers Register from a read no older than staleFor,
-// which KeepRegister renews every ttl; ttl 0 reads storage every time.
+// which KeepRegister renews every ttl; ttl 0 reads storage every time
+// (db.register_snapshot_ttl and db.register_stale_for). A change of a
+// family's terms or hold reaches answers within ttl plus one read, and never
+// later than staleFor.
 func (s *Store) WithRegisterSnapshot(ttl, staleFor time.Duration) *Store {
 	s.reg.ttl, s.reg.staleFor = ttl, max(ttl, staleFor)
 	return s
+}
+
+// RegisterSnapshot reports how often the register is read again and how
+// long a read answers at most: the bound on a terms change or hold reaching
+// answers.
+func (s *Store) RegisterSnapshot() (ttl, staleFor time.Duration) {
+	return s.reg.ttl, s.reg.staleFor
 }
 
 // get answers the snapshot while it is younger than staleFor (KeepRegister
@@ -134,7 +134,7 @@ func (r *registerSnapshot) keep(ctx context.Context, now func() time.Time, read 
 	defer tick.Stop()
 	for {
 		if err := r.refresh(ctx, now, read); err != nil && ctx.Err() == nil {
-			log.Warn("store: the background register read failed; the snapshot answers until it is RegisterStaleFor old", "err", err)
+			log.Warn("store: the background register read failed; the snapshot answers until it is db.register_stale_for old", "err", err)
 		}
 		select {
 		case <-ctx.Done():

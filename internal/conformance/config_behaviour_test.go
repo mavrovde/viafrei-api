@@ -108,6 +108,14 @@ func behaviours() map[string]behaviour {
 		"db.max_conn_idle":     {"1m", poolConfig},
 		"db.cancel_grace":      {"400ms", poolConfig},
 		"db.application_name":  {"another-name", poolConfig},
+		"db.register_snapshot_ttl": {"3s", func(t *testing.T, c *config.Config) string {
+			ttl, _ := store.New(nil, c).RegisterSnapshot()
+			return ttl.String()
+		}},
+		"db.register_stale_for": {"20s", func(t *testing.T, c *config.Config) string {
+			_, staleFor := store.New(nil, c).RegisterSnapshot()
+			return staleFor.String()
+		}},
 		"db.statement_timeout_floor": {"980ms", func(t *testing.T, c *config.Config) string {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()

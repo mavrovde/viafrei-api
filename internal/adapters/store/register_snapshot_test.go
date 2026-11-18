@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
 
 // fakeRegister is a register read that counts its calls and answers fam,
@@ -266,4 +267,14 @@ func (s *syncBuffer) String() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.b.String()
+}
+
+// TestRegisterSnapshotFromConfig: New takes the snapshot's bounds from the
+// configuration, staleFor never shorter than ttl.
+func TestRegisterSnapshotFromConfig(t *testing.T) {
+	c := &config.Config{}
+	c.DB.RegisterSnapshotTTL, c.DB.RegisterStaleFor = 2*time.Second, time.Second
+	if ttl, staleFor := New(nil, c).RegisterSnapshot(); ttl != 2*time.Second || staleFor != 2*time.Second {
+		t.Fatalf("ttl %s staleFor %s", ttl, staleFor)
+	}
 }

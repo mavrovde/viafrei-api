@@ -90,6 +90,8 @@ type DB struct {
 	ApplicationName        string        `koanf:"application_name" default:"viafrei-api" validate:"required,max=63" desc:"application_name reported to the database."`
 	QueryExecMode          string        `koanf:"query_exec_mode" default:"cache_statement" validate:"oneof=cache_statement cache_describe describe_exec exec simple_protocol" desc:"How statements are sent: cache_statement prepares each statement once per connection and reuses it; the others are the driver's fallbacks for a pooler that cannot keep prepared statements."`
 	StatementCacheCapacity int           `koanf:"statement_cache_capacity" default:"128" validate:"min=1,max=4096" desc:"Prepared statements (or descriptions) cached per connection under cache_statement and cache_describe."`
+	RegisterSnapshotTTL    time.Duration `koanf:"register_snapshot_ttl" default:"1s" validate:"min=0s,max=10s" desc:"How often the source register (the licence terms and holds of every family) is read again off the request path; requests answer from the last read. A change of terms or a hold reaches answers within this plus one read. 0s reads it on every request."`
+	RegisterStaleFor       time.Duration `koanf:"register_stale_for" default:"5s" validate:"min=1s,max=60s" desc:"How long the last register read still answers while the next reads fail; past it a request reads the register itself, and fails if that fails. Never shorter than register_snapshot_ttl."`
 	SharedBudget           SharedBudget  `koanf:"shared_budget"`
 }
 

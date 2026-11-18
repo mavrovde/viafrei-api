@@ -136,6 +136,7 @@ func New(pool *pgxpool.Pool, cfg *config.Config) *Store {
 		nowFn:   time.Now,
 		pace:    realPace,
 		log:     slog.Default(),
+		reg:     registerSnapshot{ttl: cfg.DB.RegisterSnapshotTTL, staleFor: max(cfg.DB.RegisterSnapshotTTL, cfg.DB.RegisterStaleFor)},
 	}
 }
 

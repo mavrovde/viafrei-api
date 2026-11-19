@@ -357,13 +357,23 @@ func threshold(staleAfterS *int64) (time.Duration, bool) {
 
 // chargingSites is the statement of ChargingNear: the sites within the
 // radius ($4) of the position ($1, $2), or, by id, the one site $14.
+//
+// The sites kept are those the site's nearest walk keeps (site 2.6.39):
+// nearest first by the walk's own measure, the geography distance operator
+// (on the sphere), and sites at one distance by family, then origin key. A
+// rounded distance or the joined id would let two sites at one metre, or two
+// copies at one coordinate, fall either side of the limit in another order
+// than the site's. Kept, they are listed by the distance the answer reports,
+// then id, as before; the one past the limit ($7, to tell that there are
+// more) stays last.
 func chargingSites(byID bool) string {
 	q := `
 with here as (select st_setsrid(st_makepoint($2, $1), 4326)::geography g),
 sites as (
   select c.site_id, c.source_ref, c.name, c.operator_name, c.access,
          st_y(c.location) lat, st_x(c.location) lon,
-         round(st_distance(c.location::geography, here.g))::int dist
+         round(st_distance(c.location::geography, here.g))::int dist,
+         row_number() over (order by c.location::geography <-> here.g, c.source_ref, c.origin_key) rn
   from contract.charging_site c, here
   where c.withdrawn_at is null
     and c.source_ref = any($3)
@@ -374,7 +384,7 @@ sites as (
     and (not $12::boolean or exists (
           select 1 from contract.charge_point p
           where p.site_id = c.site_id and ` + pointFilter + ` and ` + permitted("p") + `))
-  order by dist, c.site_id
+  order by rn
   limit $7)
 select s.site_id, s.source_ref, s.name, s.operator_name, s.access, s.lat, s.lon, s.dist,
        p.point_id, p.current_kind, p.power_max_kw::float8, o.availability, o.observed_at, o.source_ref,
@@ -391,7 +401,7 @@ left join lateral (
   select min(o.observed_at) next_at
   from contract.charge_point_state_observation o
   where o.point_id = p.point_id and o.source_ref = any($3) and o.observed_at > $8 and ` + permitted("o") + `) nx on true
-order by s.dist, s.site_id, p.point_id`
+order by s.rn = $7, s.dist, s.site_id, p.point_id`
 	if byID {
 		q = strings.Replace(q, "st_dwithin(c.location::geography, here.g, $4) and $14::text = ''", "c.site_id = $14::text and $4::int >= 0", 1)
 	}

@@ -56,7 +56,27 @@ trap cleanup EXIT
 # well under a second on a loaded machine; 30 times the clean run did not.
 gremlins=(go run github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0)
 if [[ -n ${GREMLINS:-} ]]; then gremlins=("$GREMLINS"); fi
-mutate() { "${gremlins[@]}" unleash --silent --invert-logical --invert-loopctrl --timeout-coefficient 30 --output "$1" "$2"; }
+# A scope row that names its files mutates only those files. Gremlins mutates
+# every file of the package and the gate counts only the listed ones, so the
+# rest were run and thrown away: the 0.4.0 release ran 841 mutants of
+# internal/adapters/httpapi in 24.6 minutes for the 73 of auth.go, key.go and
+# limits.go. Gremlins matches -E against the path in the package.
+excludes() {
+  local root=$1 files f base
+  files=$(awk -F'\t' -v r="$root" '$0 !~ /^#/ && $1 == r { print $2; exit }' "$scope")
+  [[ -n $files && $files != '*' ]] || return 0
+  for f in "$root"/*.go; do
+    base=${f##*/}
+    [[ -e $f && $base != *_test.go ]] || continue
+    [[ ",$files," == *",$base,"* ]] && continue
+    printf '%s\n' -E "^${base//./\\.}\$"
+  done
+}
+mutate() {
+  local ex=() a
+  while IFS= read -r a; do ex+=("$a"); done < <(excludes "${2#./}")
+  "${gremlins[@]}" unleash --silent --invert-logical --invert-loopctrl --timeout-coefficient 30 ${ex[@]+"${ex[@]}"} --output "$1" "$2"
+}
 gate() { go run ./internal/testkit/mutgate -scope "$scope" -equivalent "$equivalent" "$@"; }
 
 case "$mode" in

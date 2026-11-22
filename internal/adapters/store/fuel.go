@@ -106,7 +106,7 @@ func (s *Store) FuelCoverage(ctx context.Context, q energy.FuelQuery, families [
 // fuelByID reads one filling station by its id ($1) with its address and,
 // per grade, its newest price reported in the held window ($3 seconds) up to
 // the instant $4; $2 the families. Withdrawn, it is not found.
-var fuelByID = `
+var fuelByID = opaque(`
 select s.station_id, s.name, s.brand, st_y(s.location), st_x(s.location), s.open_state, s.source_ref, s.whole_day, s.opening_times,
        s.street, s.house_number, s.postcode, s.city,
        coalesce(p.products, '{}'), coalesce(p.prices, '{}'), coalesce(p.observed, '{}')
@@ -119,12 +119,12 @@ left join lateral (
           from contract.fuel_price_observation o
          where o.station_id = s.station_id and o.price is not null
            and o.observed_at > $4::timestamptz - make_interval(secs => $3::int) and o.observed_at <= $4::timestamptz
-           and o.source_ref = any($2) and ` + permitted("o") + `
+           and o.source_ref = any($2) and `+permitted("o")+`
          order by o.product_code, o.observed_at desc) l) p on true
 where s.station_id = $1::text
   and s.withdrawn_at is null
   and s.source_ref = any($2)
-  and ` + permitted("s")
+  and `+permitted("s"), "text", "text[]", "integer", "timestamp with time zone")
 
 // FuelStation reads one filling station by its id (features.Fuel), or
 // energy.ErrNotFound.

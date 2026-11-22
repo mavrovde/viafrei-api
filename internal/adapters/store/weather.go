@@ -35,23 +35,23 @@ where w.withdrawn_at is null and w.message_status <> 'cancelled'
 // first, then the earliest start. $5 the level floor, $6 the mapped hazards
 // kept, $7 whether the unmapped ones are kept, $8 every mapped hazard, $9
 // the limit.
-const warningsPage = `
+var warningsPage = opaque(`
 select w.warning_id, w.source_ref, w.hazard, w.warning_level, w.level_label, w.issuer_name, w.headline,
        w.text_lang, w.valid_from, w.valid_to, coalesce(w.area_name, ''),
        w.warn_cell_id, w.event, w.identifier, w.published_at
-` + warningPlaced + `
+`+warningPlaced+`
   and w.valid_from < $10
   and w.warning_level >= $5
   and (w.hazard = any($6) or ($7 and not w.hazard = any($8)))
 order by w.warning_level desc, w.valid_from, w.warning_id
-limit $9`
+limit $9`, "text[]", "timestamp with time zone", "double precision", "double precision", "integer", "text[]", "boolean", "text[]", "bigint", "timestamp with time zone")
 
 // warningsHere reads every placed warning, whatever the floor and the
 // hazards keep: its level, whether it is in force, and its next start or
 // end after now.
-const warningsHere = `select w.warning_id, w.warning_level, w.valid_from <= $2,
+var warningsHere = opaque(`select w.warning_id, w.warning_level, w.valid_from <= $2,
   case when w.valid_from > $2 then w.valid_from else w.valid_to end
-` + warningPlaced
+`+warningPlaced, "text[]", "timestamp with time zone", "double precision", "double precision")
 
 // levelOf refuses a stored level outside 0 to 4 rather than re-grading it
 // (FR-WEATHER-002); the error names the warning.

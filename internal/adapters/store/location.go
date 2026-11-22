@@ -17,21 +17,21 @@ func statedM(col string) string {
 
 // nearestPlace reads the nearest place of the kind $3 within $4 metres of
 // ($1, $2), of the families $5.
-var nearestPlace = `select p.place_id, p.name, p.place_kind, st_y(p.location), st_x(p.location), p.region_code, p.source_ref,
-       ` + statedM("p.location") + `, p.official_key
+var nearestPlace = opaque(`select p.place_id, p.name, p.place_kind, st_y(p.location), st_x(p.location), p.region_code, p.source_ref,
+       `+statedM("p.location")+`, p.official_key
 from contract.place p
 where p.place_kind = $3 and p.withdrawn_at is null and p.location is not null
   and st_dwithin(p.location::geography, st_setsrid(st_makepoint($1, $2), 4326)::geography, $4)
-  and p.source_ref = any($5) and ` + permitted("p") + `
+  and p.source_ref = any($5) and `+permitted("p")+`
 order by p.location::geography <-> st_setsrid(st_makepoint($1, $2), 4326)::geography, p.place_id
-limit 1`
+limit 1`, "double precision", "double precision", "text", "double precision", "text[]")
 
 // addressSectors reads, for each wedge of $1 (WKT), whether it holds an
 // address of the families $2.
-var addressSectors = `select w.i::int, exists (select 1 from contract.address a
-  where a.source_ref = any($2) and ` + permitted("a") + ` and st_intersects(a.location::geography, st_geogfromtext(w.wkt)))
+var addressSectors = opaque(`select w.i::int, exists (select 1 from contract.address a
+  where a.source_ref = any($2) and `+permitted("a")+` and st_intersects(a.location::geography, st_geogfromtext(w.wkt)))
 from unnest($1::text[]) with ordinality as w(wkt, i)
-order by w.i`
+order by w.i`, "text[]", "text[]")
 
 // nearestAddressFamily reads the family of the nearest address of the
 // families $3 to ($1, $2), however far.
@@ -41,12 +41,12 @@ order by a.location <-> st_setsrid(st_makepoint($1, $2), 4326), a.address_id
 limit 1`
 
 // stateOf reads the Land whose region code begins the code $1.
-var stateOf = `select p.place_id, p.name, p.place_kind, st_y(p.location), st_x(p.location), p.region_code, p.source_ref, null::int, p.official_key
+var stateOf = opaque(`select p.place_id, p.name, p.place_kind, st_y(p.location), st_x(p.location), p.region_code, p.source_ref, null::int, p.official_key
 from contract.place p
 where p.place_kind = 'state' and p.withdrawn_at is null and p.location is not null and p.region_code = left($1, 2)
-  and p.source_ref = any($2) and ` + permitted("p") + `
+  and p.source_ref = any($2) and `+permitted("p")+`
 order by p.place_id
-limit 1`
+limit 1`, "text", "text[]")
 
 // nearestAddress reads the nearest address within $3 metres of ($1, $2).
 var nearestAddress = `select a.address_id, a.street, a.house_number, a.postcode, a.place_name, a.land_name,

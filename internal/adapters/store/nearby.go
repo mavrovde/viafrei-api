@@ -25,13 +25,13 @@ limit $7`
 
 // junctionsNear reads the junctions within $3 metres of ($1, $2), of the
 // families $4, nearest first, at most $5.
-var junctionsNear = `select j.junction_id, j.road_ref, j.number, j.name, st_y(j.location), st_x(j.location),
+var junctionsNear = opaque(`select j.junction_id, j.road_ref, j.number, j.name, st_y(j.location), st_x(j.location),
        round(st_distance(j.location::geography, st_setsrid(st_makepoint($1, $2), 4326)::geography))::int, j.source_ref
 from contract.junction j
 where j.name is not null and st_dwithin(j.location::geography, st_setsrid(st_makepoint($1, $2), 4326)::geography, $3)
-  and j.source_ref = any($4) and ` + permitted("j") + `
+  and j.source_ref = any($4) and `+permitted("j")+`
 order by 7, j.junction_id
-limit $5`
+limit $5`, "double precision", "double precision", "double precision", "text[]", "bigint")
 
 // junctionOverfetch is how many more junctions are read than shown, so the
 // rest areas the platform drops leave enough.

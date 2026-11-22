@@ -109,7 +109,11 @@ func (s *Store) ChargingNear(ctx context.Context, q energy.Query, families []str
 		// One statement: the sites (one more than the limit, to tell whether
 		// there are more), then their points. A failed query surfaces through
 		// CollectRows.
-		res, _ := tx.Query(ctx, chargingSites(q.SiteID != ""), q.At.Lat, q.At.Lon, families, q.RadiusM, accessCodes, q.MinKw, q.Limit+1, now,
+		read := chargingNear
+		if q.SiteID != "" {
+			read = chargingByID
+		}
+		res, _ := tx.Query(ctx, read, q.At.Lat, q.At.Lon, families, q.RadiusM, accessCodes, q.MinKw, q.Limit+1, now,
 			connector, f.MaxKw, opKey, pointFiltered, terms, q.SiteID)
 		return pgx.CollectRows(res, func(r pgx.CollectableRow) (row, error) {
 			var (
@@ -433,8 +437,15 @@ left join lateral (
   from contract.charge_point_state_observation o
   where o.point_id = p.point_id and o.source_ref = any($3) and o.observed_at > $8 and ` + permitted("o") + `) nx on true
 order by s.rn = $7, s.dist, s.site_id, p.point_id`
+	radius := "double precision"
 	if byID {
 		q = strings.Replace(q, "st_dwithin(c.location::geography, here.g, $4) and $14::text = ''", "c.site_id = $14::text and $4::int >= 0", 1)
+		radius = "integer"
 	}
-	return q
+	return opaque(q, "double precision", "double precision", "text[]", radius, "text[]", "double precision", "bigint",
+		"timestamp with time zone", "text", "double precision", "text", "boolean", "text[]", "text")
 }
+
+// chargingNear and chargingByID are the two charging reads, built once:
+// the sites in the ring and the one site asked by its id.
+var chargingNear, chargingByID = chargingSites(false), chargingSites(true)

@@ -230,12 +230,37 @@ func coverageOf(rows pgx.Rows) (map[string]ampel.Coverage, error) {
 	return out, err
 }
 
+// lampWarnings reads the weather warnings that have not ended under cond, the
+// scope's area condition over $3 onwards (of types), opaque: those in force
+// are the lamp's, and the earliest start or end after now of any is when the
+// scope changes.
+func lampWarnings(cond string, types ...string) string {
+	return opaque(`select w.source_ref, w.warning_level, w.valid_from <= $2,
+  case when w.valid_from > $2 then w.valid_from else w.valid_to end `+warningsPending+`
+  and `+cond+`
+order by w.warning_level desc, w.warning_id`, append([]string{"text[]", "timestamp with time zone"}, types...)...)
+}
+
+// The lamp's warnings by scope. On a road they are those on the location-code
+// points of the road's junctions, as the platform's motorway page and its
+// motorway status place a DWD warning on the points of the road, not on the
+// districts the road crosses; at a point those whose own area reaches within
+// the radius, as the platform's warnings at a point test the warning's area;
+// in a state those whose cell key names the state in its first two digits.
+var (
+	warningsOnRoad = lampWarnings(`exists (select 1 from contract.junction j
+               where `+fmt.Sprintf(canonicalRef, "j.road_ref")+` = $3 and `+permitted("j")+`
+                 and st_intersects(w.area, j.location))`, "text")
+	warningsNear    = lampWarnings(`w.area is not null and st_dwithin(w.area::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`, "double precision", "double precision", "double precision")
+	warningsInState = lampWarnings(`($3 = 'de' or (left(w.warn_cell_id, 1) in ('7', '8') and substr(w.warn_cell_id, 2, 2) = $3))`, "text")
+)
+
 // scope is one read of the lamp's scope, run in the page's snapshot.
 type scope struct {
 	messages string
 	args     []any
-	// warnings is the area condition of the weather warnings, over $3
-	// onwards of warningArgs.
+	// warnings reads the weather warnings of the scope (lampWarnings), its
+	// area condition over $3 onwards of warningArgs.
 	warnings    string
 	warningArgs []any
 	// states selects the codes of the states in scope, over stateArgs.
@@ -355,10 +380,7 @@ func (s *Store) read(ctx context.Context, list string, listArgs []any, limit int
 				// One read of the warnings that have not ended: those in
 				// force are the lamp's, and the earliest start or end after
 				// now of any is when the scope changes.
-				res, _ := tx.Query(ctx, `select w.source_ref, w.warning_level, w.valid_from <= $2,
-  case when w.valid_from > $2 then w.valid_from else w.valid_to end `+warningsPending+`
-  and `+sc.warnings+`
-order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, sc.warningArgs...)...)
+				res, _ := tx.Query(ctx, sc.warnings, append([]any{fams.Weather, now}, sc.warningArgs...)...)
 				// A read that found none is an empty list, never nil: nil
 				// means the warnings were not read.
 				out.Warnings = []roads.Warning{}
@@ -500,9 +522,7 @@ limit $11 offset $14`, args, q.Limit, fams, now, scope{
 		// road's junction points, as the platform's motorway page and its
 		// motorway status place a DWD warning on the location-code points
 		// of the road, not on the districts the road crosses.
-		warnings: `exists (select 1 from contract.junction j
-               where ` + fmt.Sprintf(canonicalRef, "j.road_ref") + ` = $3 and ` + permitted("j") + `
-                 and st_intersects(w.area, j.location))`,
+		warnings:    warningsOnRoad,
 		warningArgs: []any{q.Road},
 		states: statesOf(`select j.state_code from contract.junction j
 where ` + fmt.Sprintf(canonicalRef, "j.road_ref") + ` = $1 and ` + permitted("j")),
@@ -545,7 +565,7 @@ limit $14 offset $17`, args, q.Limit, fams, now, scope{
 		args: []any{fams.Roads, now, q.At.Lat, q.At.Lon, q.RadiusM},
 		// A warning is near when its own area reaches within the radius, as
 		// the platform's warnings at a point test the warning's area.
-		warnings:    `w.area is not null and st_dwithin(w.area::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`,
+		warnings:    warningsNear,
 		warningArgs: []any{q.At.Lat, q.At.Lon, q.RadiusM},
 		states: statesOf(`with here as (select st_setsrid(st_makepoint($2, $1), 4326) g),
 near as (select j.state_code from contract.junction j, here
@@ -587,7 +607,7 @@ limit $12 offset $15`, args, q.Limit, fams, now, scope{
 		// and coast cells are 8 or 7 and the Gemeinde key, so the Land is
 		// the key's first two digits, as the platform's warnings in an area
 		// read them.
-		warnings:    `($3 = 'de' or (left(w.warn_cell_id, 1) in ('7', '8') and substr(w.warn_cell_id, 2, 2) = $3))`,
+		warnings:    warningsInState,
 		warningArgs: []any{q.State},
 		states:      `select case when $1 = 'de' then (select coalesce(array_agg(r.region_code order by r.region_code), '{}') from contract.admin_region r where r.region_level = 'state') else array[$1::text] end`,
 		stateArgs:   []any{q.State},

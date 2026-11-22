@@ -260,9 +260,10 @@ type Tiers struct {
 
 // CriticalTier is the highest tier.
 type CriticalTier struct {
-	Reserved     int           `koanf:"reserved" default:"1" validate:"min=0,max=16" desc:"Permits kept for the critical tier that lower tiers cannot use (RATE-009)."`
-	QueueLen     int           `koanf:"queue_len" default:"32" validate:"min=0,max=1024" desc:"Critical requests that may wait for a permit; one more is shed."`
-	QueueMaxWait time.Duration `koanf:"queue_max_wait" default:"800ms" validate:"min=0s,max=2s" desc:"Longest time a critical request waits for a permit before it is shed. Less than deadline.request."`
+	Reserved       int           `koanf:"reserved" default:"1" validate:"min=0,max=16" desc:"Permits kept for the critical tier that lower tiers cannot use (RATE-009)."`
+	QueueLen       int           `koanf:"queue_len" default:"32" validate:"min=0,max=1024" desc:"Critical requests that may wait for a permit; one more is shed."`
+	QueueMaxWait   time.Duration `koanf:"queue_max_wait" default:"800ms" validate:"min=0s,max=2s" desc:"Longest time a critical request waits for a permit before it is shed. Less than deadline.request."`
+	PerKeyInflight int           `koanf:"per_key_inflight" default:"4" validate:"min=1,max=16" desc:"Permits one key of a critical-tier plan may hold at once, in place of tiers.per_key_inflight: a service key that carries many users' calls (the MCP server's) needs as many as its callers run at once. At most db.pool_max."`
 }
 
 // StandardTier is the middle tier.

@@ -58,6 +58,10 @@ type TierSettings struct {
 	MaxWait time.Duration
 	// MaxInflight is the most permits the tier may hold at once.
 	MaxInflight int
+	// PerKey is the most permits one key of the tier's callers may hold,
+	// in place of Settings.PerKey; 0 keeps Settings.PerKey. A caller's own
+	// tier decides it, not the tier a long wait promoted it to.
+	PerKey int
 }
 
 // Settings configure a controller.
@@ -278,13 +282,21 @@ func (c *Controller) effective(w *waiter, now time.Time) Tier {
 	return w.caller.Tier
 }
 
+// keyShare is the most permits one key of tier t may hold.
+func (c *Controller) keyShare(t Tier) int {
+	if n := c.s.Tiers[t].PerKey; n > 0 {
+		return n
+	}
+	return c.s.PerKey
+}
+
 // eligible reports whether w may take a free permit now.
 func (c *Controller) eligible(w *waiter, now time.Time) bool {
 	t := w.caller.Tier
 	if c.inflight[t] >= c.s.Tiers[t].MaxInflight {
 		return false
 	}
-	if w.caller.Key != "" && c.perKey[w.caller.Key] >= c.s.PerKey {
+	if w.caller.Key != "" && c.perKey[w.caller.Key] >= c.keyShare(t) {
 		return false
 	}
 	held := 0

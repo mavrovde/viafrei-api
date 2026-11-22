@@ -99,6 +99,7 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `tiers.critical.reserved` | `VFAPI_TIERS_CRITICAL_RESERVED` | int | `1` | 0 to 16 | Permits kept for the critical tier that lower tiers cannot use (RATE-009). |
 | `tiers.critical.queue_len` | `VFAPI_TIERS_CRITICAL_QUEUE_LEN` | int | `32` | 0 to 1024 | Critical requests that may wait for a permit; one more is shed. |
 | `tiers.critical.queue_max_wait` | `VFAPI_TIERS_CRITICAL_QUEUE_MAX_WAIT` | duration | `800ms` | 0s to 2s | Longest time a critical request waits for a permit before it is shed. Less than deadline.request. |
+| `tiers.critical.per_key_inflight` | `VFAPI_TIERS_CRITICAL_PER_KEY_INFLIGHT` | int | `4` | 1 to 16 | Permits one key of a critical-tier plan may hold at once, in place of tiers.per_key_inflight: a service key that carries many users' calls (the MCP server's) needs as many as its callers run at once. At most db.pool_max. |
 | `tiers.standard.reserved` | `VFAPI_TIERS_STANDARD_RESERVED` | int | `0` | 0 to 16 | Permits kept for the standard tier (and above) that the bulk tier cannot use. |
 | `tiers.standard.queue_len` | `VFAPI_TIERS_STANDARD_QUEUE_LEN` | int | `32` | 0 to 1024 | Standard requests that may wait for a permit; one more is shed. |
 | `tiers.standard.queue_max_wait` | `VFAPI_TIERS_STANDARD_QUEUE_MAX_WAIT` | duration | `400ms` | 0s to 2s | Longest time a standard request waits for a permit before it is shed. Less than deadline.request. |

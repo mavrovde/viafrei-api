@@ -15,6 +15,7 @@ func TestTheTiersStayInsideThePermitPool(t *testing.T) {
 		"VFAPI_TIERS_STANDARD_RESERVED=1",
 		"VFAPI_TIERS_BULK_MAX_INFLIGHT=3",
 		"VFAPI_TIERS_PER_KEY_INFLIGHT=3",
+		"VFAPI_TIERS_CRITICAL_PER_KEY_INFLIGHT=3",
 		"VFAPI_DEADLINE_REQUEST=1s",
 		"VFAPI_TIERS_CRITICAL_QUEUE_MAX_WAIT=1s",
 	}})
@@ -22,6 +23,7 @@ func TestTheTiersStayInsideThePermitPool(t *testing.T) {
 		"tiers.*.reserved: 3 reserved permits are more than db.pool_max 2",
 		"tiers.bulk.max_inflight: 3 is more than db.pool_max 2",
 		"tiers.per_key_inflight: 3 is more than db.pool_max 2",
+		"tiers.critical.per_key_inflight: 3 is more than db.pool_max 2",
 		"tiers.critical.queue_max_wait: 1s must be less than deadline.request 1s",
 	)
 }

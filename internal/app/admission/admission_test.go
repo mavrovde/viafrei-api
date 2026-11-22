@@ -366,3 +366,39 @@ func TestAReadWithoutACallerTakesNoCriticalSlot(t *testing.T) {
 		}
 	}
 }
+
+// A service key that carries many users' calls (the MCP server's, on a
+// critical-tier plan) holds as many permits as its tier's own share allows,
+// while a standard key keeps the general share: 16 parallel reads of the
+// critical key are all admitted at once, a standard key's fifth waits.
+func TestATiersOwnKeyShareAdmitsAServiceKeysConcurrency(t *testing.T) {
+	req.Covers(t, "RATE-016")
+	s := settings(16)
+	s.PerKey = 4
+	s.Tiers[admission.Critical].PerKey = 16
+	s.Tiers[admission.Standard].MaxWait = 20 * time.Millisecond
+	c := admission.New(s, newClock().now)
+	var held []func()
+	for range 16 {
+		held = append(held, acquire(t, c, as(admission.Critical, "mcp")))
+	}
+	if s := c.Snapshot(); s.Free != 0 || s.Inflight[admission.Critical] != 16 {
+		t.Fatalf("the service key's reads: %+v", s)
+	}
+	for _, r := range held {
+		r()
+	}
+	held = held[:0]
+	for range 4 {
+		held = append(held, acquire(t, c, as(admission.Standard, "site")))
+	}
+	if _, err := c.Acquire(as(admission.Standard, "site")); !errors.Is(err, admission.ErrOverloaded) {
+		t.Fatalf("a standard key's fifth read passed the general share: %v", err)
+	}
+	for _, r := range held {
+		r()
+	}
+	if s := c.Snapshot(); s.Free != 16 {
+		t.Fatalf("permits leaked: %+v", s)
+	}
+}

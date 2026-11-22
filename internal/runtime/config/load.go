@@ -403,6 +403,9 @@ func crossFieldTiers(c *Config) Errors {
 	if t.PerKeyInflight > c.DB.PoolMax {
 		out = append(out, fmt.Sprintf("tiers.per_key_inflight: %d is more than db.pool_max %d", t.PerKeyInflight, c.DB.PoolMax))
 	}
+	if t.Critical.PerKeyInflight > c.DB.PoolMax {
+		out = append(out, fmt.Sprintf("tiers.critical.per_key_inflight: %d is more than db.pool_max %d", t.Critical.PerKeyInflight, c.DB.PoolMax))
+	}
 	for _, w := range []struct {
 		key  string
 		wait time.Duration

@@ -209,6 +209,7 @@ type DrivingRule struct {
 	Text          string  `json:"text"`
 	LegalBasis    *string `json:"legalBasis" nullable:"true" doc:"The provision the rule rests on; null when none is recorded."`
 	LegalBasisURL *string `json:"sourceUrl" nullable:"true" doc:"Where the provision is published; null when none is recorded."`
+	SourceNote    *string `json:"basisNote" nullable:"true" doc:"The note on the provision, in the asked language (German when no English one is recorded), as the platform's driving rules state it; null when none is recorded."`
 	ReviewedOn    string  `json:"reviewedOn" format:"date" doc:"When the rule was last read against its source."`
 	ToVerify      *string `json:"unconfirmed" nullable:"true" doc:"What of the rule is not confirmed, to check with the source; null when all is."`
 }
@@ -300,7 +301,7 @@ func registerDrivingRules(api huma.API, s *server, op huma.Operation) {
 		}
 		rs := make([]DrivingRule, len(t.Rules))
 		for i, r := range t.Rules {
-			rs[i] = DrivingRule{ID: r.ID, Text: r.Text, LegalBasis: r.LegalBasis, LegalBasisURL: r.LegalBasisURL,
+			rs[i] = DrivingRule{ID: r.ID, Text: r.Text, LegalBasis: r.LegalBasis, LegalBasisURL: r.LegalBasisURL, SourceNote: r.LegalBasisNote,
 				ReviewedOn: r.ReviewedOn.Format(time.DateOnly), ToVerify: r.ToVerify}
 		}
 		return &DrivingRulesOutput{CacheControl: noStore, Body: DrivingRulesEnvelope{

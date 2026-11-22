@@ -1696,6 +1696,13 @@
       "DrivingRule": {
         "additionalProperties": false,
         "properties": {
+          "basisNote": {
+            "description": "The note on the provision, in the asked language (German when no English one is recorded), as the platform's driving rules state it; null when none is recorded.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "description": "The rule's key, stable across reviews.",
             "type": "string"
@@ -1735,6 +1742,7 @@
           "text",
           "legalBasis",
           "sourceUrl",
+          "basisNote",
           "reviewedOn",
           "unconfirmed"
         ],

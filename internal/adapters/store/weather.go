@@ -153,6 +153,7 @@ select t.topic_code, case when $2 = 'en' then coalesce(t.title_en, t.title) else
          'id', s.statement_id,
          'text', case when $2 = 'en' then coalesce(s.body_en, s.body) else s.body end,
          'basis', s.legal_basis, 'url', s.legal_basis_url, 'reviewed', s.reviewed_on,
+         'note', nullif(btrim(case when $2 = 'en' then coalesce(s.legal_basis_note_en, s.legal_basis_note) else s.legal_basis_note end), ''),
          'verify', nullif(btrim(case when $2 = 'en' then coalesce(s.to_verify_en, s.to_verify) else s.to_verify end), ''))
          order by s.position, s.statement_id) filter (where s.statement_id is not null), '[]')
 from contract.rule_topic t
@@ -169,6 +170,7 @@ group by t.topic_code, t.title, t.title_en, t.reviewed_on`, code, lang)
 					URL      *string `json:"url"`
 					Reviewed string  `json:"reviewed"`
 					Verify   *string `json:"verify"`
+					Note     *string `json:"note"`
 				}
 			)
 			if err := r.Scan(&v.Code, &v.Title, &v.ReviewedOn, &raw); err != nil {
@@ -180,7 +182,7 @@ group by t.topic_code, t.title, t.title_en, t.reviewed_on`, code, lang)
 				if err != nil {
 					return v, err
 				}
-				v.Rules[i] = rules.Rule{ID: x.ID, Text: x.Text, LegalBasis: x.Basis, LegalBasisURL: x.URL, ReviewedOn: on, ToVerify: x.Verify}
+				v.Rules[i] = rules.Rule{ID: x.ID, Text: x.Text, LegalBasis: x.Basis, LegalBasisURL: x.URL, LegalBasisNote: x.Note, ReviewedOn: on, ToVerify: x.Verify}
 			}
 			return v, nil
 		})

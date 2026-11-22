@@ -369,6 +369,22 @@ group by t.topic_code, t.reviewed_on order by t.topic_code limit 1`, &code, &rev
 	if topic.Code != code || topic.Title == "" || !topic.ReviewedOn.Equal(reviewed) || len(got) != n || strings.Join(got, "|") != bodies || withBasis != based {
 		t.Errorf("topic %s: %+v, want %d rules (%d with a basis): %s", code, topic, n, based, bodies)
 	}
+	// A rule's note on its provision is read in the asked language; a blank
+	// one is none.
+	first := topic.Rules[0].ID
+	change(t, `update contract.rule_statement set legal_basis_note = 'Hinweis', legal_basis_note_en = case when statement_id = $1 then 'Note' else '  ' end where topic_code = $2`, first, code)
+	t.Cleanup(func() {
+		change(t, `update contract.rule_statement set legal_basis_note = null, legal_basis_note_en = null where topic_code = $1`, code)
+	})
+	for lang, want := range map[string]string{"de": "Hinweis", "en": "Note"} {
+		noted, err := st.Topic(bounded(t), code, lang)
+		if err != nil || noted.Rules[0].LegalBasisNote == nil || *noted.Rules[0].LegalBasisNote != want {
+			t.Errorf("%s: the note %+v %v", lang, noted.Rules, err)
+		}
+		if len(noted.Rules) > 1 && lang == "en" && noted.Rules[1].LegalBasisNote != nil {
+			t.Errorf("a blank English note was read: %q", *noted.Rules[1].LegalBasisNote)
+		}
+	}
 	if _, err := st.Topic(bounded(t), "no_such_topic", "de"); !errors.Is(err, rules.ErrUnknownTopic) {
 		t.Errorf("an unknown topic: %v", err)
 	}

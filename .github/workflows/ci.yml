@@ -240,6 +240,8 @@ jobs:
         run: scripts/openapi-diff.sh "$BASE_REF" api/openapi.json
       - name: Breaking changes against the last released document (TEST-004)
         run: scripts/openapi-released.sh api/openapi.json
+      - name: Accepted-break record self-test (only the exact listed break passes)
+        run: bash scripts/openapi-diff.test.sh
       - name: Docs link rewrite self-test (a misspelt link fails the build)
         run: bash scripts/docs-html.test.sh
       - name: Docs build (the site release.yml publishes to GitHub Pages)

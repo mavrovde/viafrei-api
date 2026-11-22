@@ -115,7 +115,7 @@ func TestBootRefusesEveryViolationAtOnce(t *testing.T) {
 	_, err := config.Load(config.Options{
 		File: path,
 		Environ: []string{
-			"VFAPI_DB_POOL_MAX=17",
+			"VFAPI_DB_POOL_MAX=65",
 			"VFAPI_DEADLINE_REQUEST=3s",
 			"VFAPI_LOG_LEVEL=chatty",
 			"VFAPI_NO_SUCH_VARIABLE=1",
@@ -124,7 +124,7 @@ func TestBootRefusesEveryViolationAtOnce(t *testing.T) {
 	assertRefused(t, err,
 		"server.no_such_key: unknown key in the config file",
 		"VFAPI_NO_SUCH_VARIABLE: unknown environment variable",
-		"db.pool_max: above the maximum 16",
+		"db.pool_max: above the maximum 64",
 		"deadline.request: above the maximum 2s",
 		"log.level: not one of debug info warn error",
 	)

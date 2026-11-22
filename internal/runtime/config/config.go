@@ -81,7 +81,7 @@ type HTTP struct {
 // DB holds the storage settings of the read-only role.
 type DB struct {
 	URL                    Secret        `koanf:"url" secret:"true" desc:"Connection URL of the service's read-only role. Required to serve. Secret: environment or *_FILE only."`
-	PoolMax                int           `koanf:"pool_max" default:"4" validate:"min=1,max=16" desc:"Largest number of pooled connections."`
+	PoolMax                int           `koanf:"pool_max" default:"4" validate:"min=1,max=64" desc:"Largest number of pooled connections. At most the read-only role's connection limit, divided among the replicas."`
 	PoolMin                int           `koanf:"pool_min" default:"1" validate:"min=0,max=16" desc:"Connections kept open when idle. At most pool_max."`
 	ConnectTimeout         time.Duration `koanf:"connect_timeout" default:"2s" validate:"min=100ms,max=30s" desc:"Time allowed to open one connection."`
 	MaxConnLifetime        time.Duration `koanf:"max_conn_lifetime" default:"30m" validate:"min=1m,max=24h" desc:"A connection older than this is closed after use."`
@@ -255,7 +255,7 @@ type Tiers struct {
 	Critical       CriticalTier `koanf:"critical"`
 	Standard       StandardTier `koanf:"standard"`
 	Bulk           BulkTier     `koanf:"bulk"`
-	PerKeyInflight int          `koanf:"per_key_inflight" default:"4" validate:"min=1,max=16" desc:"Permits one key may hold at once (RATE-016). At most db.pool_max."`
+	PerKeyInflight int          `koanf:"per_key_inflight" default:"4" validate:"min=1,max=64" desc:"Permits one key may hold at once (RATE-016). At most db.pool_max."`
 }
 
 // CriticalTier is the highest tier.
@@ -263,7 +263,7 @@ type CriticalTier struct {
 	Reserved       int           `koanf:"reserved" default:"1" validate:"min=0,max=16" desc:"Permits kept for the critical tier that lower tiers cannot use (RATE-009)."`
 	QueueLen       int           `koanf:"queue_len" default:"32" validate:"min=0,max=1024" desc:"Critical requests that may wait for a permit; one more is shed."`
 	QueueMaxWait   time.Duration `koanf:"queue_max_wait" default:"800ms" validate:"min=0s,max=2s" desc:"Longest time a critical request waits for a permit before it is shed. Less than deadline.request."`
-	PerKeyInflight int           `koanf:"per_key_inflight" default:"4" validate:"min=1,max=16" desc:"Permits one key of a critical-tier plan may hold at once, in place of tiers.per_key_inflight: a service key that carries many users' calls (the MCP server's) needs as many as its callers run at once. At most db.pool_max."`
+	PerKeyInflight int           `koanf:"per_key_inflight" default:"0" validate:"min=0,max=64" desc:"Permits one key of a critical-tier plan may hold at once, in place of tiers.per_key_inflight: a service key that carries many users' calls (the MCP server's) needs as many as its callers run at once. 0 keeps tiers.per_key_inflight. A full such key must leave one tiers.per_key_inflight share for the other keys: at most db.pool_max minus tiers.per_key_inflight."`
 }
 
 // StandardTier is the middle tier.

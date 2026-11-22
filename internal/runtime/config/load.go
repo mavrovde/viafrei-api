@@ -403,8 +403,11 @@ func crossFieldTiers(c *Config) Errors {
 	if t.PerKeyInflight > c.DB.PoolMax {
 		out = append(out, fmt.Sprintf("tiers.per_key_inflight: %d is more than db.pool_max %d", t.PerKeyInflight, c.DB.PoolMax))
 	}
-	if t.Critical.PerKeyInflight > c.DB.PoolMax {
-		out = append(out, fmt.Sprintf("tiers.critical.per_key_inflight: %d is more than db.pool_max %d", t.Critical.PerKeyInflight, c.DB.PoolMax))
+	// A full service key leaves the other keys one general share, so no
+	// single key starves the site's.
+	if t.Critical.PerKeyInflight > 0 && t.Critical.PerKeyInflight+t.PerKeyInflight > c.DB.PoolMax {
+		out = append(out, fmt.Sprintf("tiers.critical.per_key_inflight: %d leaves less than one tiers.per_key_inflight share (%d) of db.pool_max %d to the other keys",
+			t.Critical.PerKeyInflight, t.PerKeyInflight, c.DB.PoolMax))
 	}
 	for _, w := range []struct {
 		key  string

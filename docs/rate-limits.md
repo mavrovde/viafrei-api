@@ -91,7 +91,15 @@ the queue of its plan's tier, `critical`, `standard` or `bulk`:
   average of storage time (`admission.ewma_alpha`), does not fit its tier's
   `queue_max_wait` or what is left of its deadline; a full queue
   (`tiers.*.queue_len`) refuses the next one (RATE-011);
-- no key holds more than `tiers.per_key_inflight` permits (RATE-016).
+- no key holds more than `tiers.per_key_inflight` permits (RATE-016). A key
+  of a critical-tier plan holds up to `tiers.critical.per_key_inflight`
+  instead, when it is set: a service key that carries many users' calls, such
+  as the MCP server's, needs as many permits as its callers run at once. A
+  full such key must leave one general share for the other keys, so the
+  configuration is refused unless the two shares fit in `db.pool_max`. The
+  MCP server's 16 beside the site's 16 is `db.pool_max` 32,
+  `tiers.per_key_inflight` 16, `tiers.critical.per_key_inflight` 16, and a
+  read-only role connection limit of 32 per replica.
 
 `Retry-After` on an `overloaded` refusal is the estimated time for the
 queues to drain, at least one second.

@@ -369,25 +369,38 @@ func TestAReadWithoutACallerTakesNoCriticalSlot(t *testing.T) {
 
 // A service key that carries many users' calls (the MCP server's, on a
 // critical-tier plan) holds as many permits as its tier's own share allows,
-// while a standard key keeps the general share: 16 parallel reads of the
-// critical key are all admitted at once, a standard key's fifth waits.
+// and a full one still leaves the site's standard key its general share: of
+// 32 permits, the MCP key's 16 parallel reads and the site key's 16 are all
+// admitted at once; each key's next read is over its share.
 func TestATiersOwnKeyShareAdmitsAServiceKeysConcurrency(t *testing.T) {
 	req.Covers(t, "RATE-016")
-	s := settings(16)
-	s.PerKey = 4
+	s := settings(32)
+	s.PerKey = 16
 	s.Tiers[admission.Critical].PerKey = 16
+	s.Tiers[admission.Critical].MaxWait = 20 * time.Millisecond
 	s.Tiers[admission.Standard].MaxWait = 20 * time.Millisecond
 	c := admission.New(s, newClock().now)
 	var held []func()
 	for range 16 {
 		held = append(held, acquire(t, c, as(admission.Critical, "mcp")))
 	}
-	if s := c.Snapshot(); s.Free != 0 || s.Inflight[admission.Critical] != 16 {
-		t.Fatalf("the service key's reads: %+v", s)
+	for range 16 {
+		held = append(held, acquire(t, c, as(admission.Standard, "site")))
+	}
+	if s := c.Snapshot(); s.Free != 0 || s.Inflight[admission.Critical] != 16 || s.Inflight[admission.Standard] != 16 {
+		t.Fatalf("the two keys' reads: %+v", s)
+	}
+	for _, k := range []context.Context{as(admission.Critical, "mcp"), as(admission.Standard, "site")} {
+		if _, err := c.Acquire(k); !errors.Is(err, admission.ErrOverloaded) {
+			t.Fatalf("a read over its key's share: %v", err)
+		}
 	}
 	for _, r := range held {
 		r()
 	}
+	// A standard key's share stays the general one with the critical share set.
+	s.PerKey = 4
+	c = admission.New(s, newClock().now)
 	held = held[:0]
 	for range 4 {
 		held = append(held, acquire(t, c, as(admission.Standard, "site")))
@@ -398,7 +411,7 @@ func TestATiersOwnKeyShareAdmitsAServiceKeysConcurrency(t *testing.T) {
 	for _, r := range held {
 		r()
 	}
-	if s := c.Snapshot(); s.Free != 16 {
+	if s := c.Snapshot(); s.Free != 32 {
 		t.Fatalf("permits leaked: %+v", s)
 	}
 }

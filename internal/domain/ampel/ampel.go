@@ -134,11 +134,13 @@ const (
 )
 
 // SightEntry is one group's sight; Land is the state of a group judged per
-// state, empty for any other.
+// state, empty for any other; Family the source family of a group judged
+// per family, empty for any other.
 type SightEntry struct {
-	Group string
-	State Sight
-	Land  string
+	Group  string
+	State  Sight
+	Land   string
+	Family string
 }
 
 // Reason is why a lamp: a signal and the colour it gives on its own, or a
@@ -219,7 +221,7 @@ func Of(signals []Signal, sight []SightEntry) Ampel {
 	}
 	for _, g := range sight {
 		if g.State != SightFresh {
-			amber = append(amber, Reason{Lamp: LampAmber, Sight: &SightEntry{Group: g.Group, State: g.State, Land: g.Land}})
+			amber = append(amber, Reason{Lamp: LampAmber, Sight: &SightEntry{Group: g.Group, State: g.State, Land: g.Land, Family: g.Family}})
 		}
 	}
 	if len(sight) == 0 && len(red) == 0 && len(amber) == 0 {

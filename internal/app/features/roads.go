@@ -44,6 +44,10 @@ type Conditions struct {
 	Road   *roads.Road
 	Lamp   roads.Lamp
 	Reason *roads.Reason
+	// Reasons are every reason of the lamp with its count, Sight the sight
+	// of every group the lamp read (roads.Account).
+	Reasons []roads.ReasonCount
+	Sight   []ampel.SightEntry
 	// Covering are, for a road the register does not hold, the roads
 	// families read that hold a situation on a road of its class; nil for a
 	// registered road or an area.
@@ -74,7 +78,7 @@ func sights(p roads.Page, fams roads.Families, partial, weatherRead bool, now ti
 		if !ok {
 			s = ampel.SightMissing
 		}
-		out = append(out, ampel.SightEntry{Group: roads.GroupRoads, State: s})
+		out = append(out, ampel.SightEntry{Group: roads.GroupRoads, State: s, Family: f})
 	}
 	if partial {
 		out = append(out, ampel.SightEntry{Group: roads.GroupRoads, State: ampel.SightMissing})
@@ -147,11 +151,11 @@ func (s *Service) conditions(ctx context.Context, key access.Record, ahead bool,
 	if err != nil {
 		return Conditions{}, err
 	}
-	lamp, reason := roads.LampOf(p.Messages, warningLevels(p), sights(p, fams, partial, weatherRead, now))
+	acc := roads.AccountOf(p.Messages, warningLevels(p), sights(p, fams, partial, weatherRead, now))
 	return Conditions{
 		Answer: Answer[roads.Situation]{Items: p.Items, HasMore: p.HasMore, Families: attributed, Partial: partial, At: now,
 			ChangesAt: p.ChangesAt(now)},
-		Lamp: lamp, Reason: reason, Read: fams, Covering: p.Covering,
+		Lamp: acc.Lamp, Reason: acc.Reason, Reasons: acc.Reasons, Sight: acc.Sight, Read: fams, Covering: p.Covering,
 	}, nil
 }
 

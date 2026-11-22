@@ -18,6 +18,49 @@
       "state": "10",
       "lamp": "amber",
       "lampReason": "warning",
+      "lampReasons": [
+        {
+          "reason": "warning",
+          "lamp": "amber",
+          "count": 1
+        },
+        {
+          "reason": "narrowing",
+          "lamp": "amber",
+          "count": 1
+        },
+        {
+          "reason": "limited_sight",
+          "lamp": "amber",
+          "count": 2
+        }
+      ],
+      "sight": [
+        {
+          "group": "roads",
+          "state": "fresh",
+          "family": "roads_alpha",
+          "land": null
+        },
+        {
+          "group": "roads",
+          "state": "missing",
+          "family": null,
+          "land": null
+        },
+        {
+          "group": "weather",
+          "state": "missing",
+          "family": null,
+          "land": null
+        },
+        {
+          "group": "messages",
+          "state": "fresh",
+          "family": null,
+          "land": "10"
+        }
+      ],
       "situations": [
         {
           "id": "datex:syn:ev-00011",

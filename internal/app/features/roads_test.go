@@ -321,6 +321,11 @@ func TestTheLampSeesStaleFamilies(t *testing.T) {
 		t.Errorf("a stale family: %v, %v", names(c.Families), err)
 	}
 	lit(t, "a stale roads family", c, roads.LampAmber, roads.ReasonLimitedSight)
+	if !slices.Contains(c.Sight, ampel.SightEntry{Group: roads.GroupRoads, State: ampel.SightStale, Family: "r1"}) ||
+		!slices.Contains(c.Sight, ampel.SightEntry{Group: roads.GroupRoads, State: ampel.SightFresh, Family: "r2"}) ||
+		len(c.Reasons) != 1 || c.Reasons[0] != (roads.ReasonCount{Reason: roads.ReasonLimitedSight, Lamp: roads.LampAmber, Count: 1}) {
+		t.Errorf("the account of a stale family: reasons %+v, sight %+v", c.Reasons, c.Sight)
+	}
 	f = &roadFake{}
 	if c, err = roadService(f).RoadConditions(context.Background(), consumer, roads.AreaQuery{State: "de"}); err != nil {
 		t.Fatal(err)

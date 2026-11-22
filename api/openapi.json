@@ -2567,6 +2567,102 @@
         ],
         "type": "object"
       },
+      "LampReason": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "description": "How many give it: situations or weather warnings, or, for limited_sight, the groups of sight that are not fresh.",
+            "examples": [
+              3
+            ],
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "lamp": {
+            "description": "The colour this reason gives on its own.",
+            "enum": [
+              "red",
+              "amber"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "description": "The reason, as lampReason names it. Open enumeration.",
+            "enum": [
+              "road_closed",
+              "ramp_closed",
+              "safety",
+              "bridge_closed",
+              "long_jam",
+              "jam",
+              "weather_warning",
+              "slippery",
+              "warning",
+              "narrowing",
+              "limited_sight"
+            ],
+            "examples": [
+              "narrowing"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "lamp",
+          "count"
+        ],
+        "type": "object"
+      },
+      "LampSight": {
+        "additionalProperties": false,
+        "properties": {
+          "family": {
+            "description": "The roads family judged; null for any other group and for the roads families the key may not read.",
+            "examples": [
+              "autobahn"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "group": {
+            "description": "The group: roads (one entry per roads family read, and one without a family for the roads families the key may not read), weather (the official weather warnings, judged as a whole) or messages (the traffic messages of one Land). Open enumeration.",
+            "examples": [
+              "roads"
+            ],
+            "type": "string"
+          },
+          "land": {
+            "description": "The Land of the traffic messages judged; null for any other group, and for messages when no Land is in scope.",
+            "examples": [
+              "09"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "description": "fresh: current; stale: past its freshness threshold; missing: no data, not readable with the key, or no source covers it. Any state but fresh is a limited_sight reason.",
+            "enum": [
+              "fresh",
+              "stale",
+              "missing"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "group",
+          "state",
+          "family",
+          "land"
+        ],
+        "type": "object"
+      },
       "Links": {
         "additionalProperties": false,
         "properties": {
@@ -3319,6 +3415,20 @@
               "null"
             ]
           },
+          "lampReasons": {
+            "description": "Every reason of the lamp with how many give it, in lampReason's order (lampReason is the first); empty for green.",
+            "items": {
+              "$ref": "#/components/schemas/LampReason"
+            },
+            "type": "array"
+          },
+          "sight": {
+            "description": "The sight of every group the lamp read; any group not fresh keeps the lamp from green (limited_sight).",
+            "items": {
+              "$ref": "#/components/schemas/LampSight"
+            },
+            "type": "array"
+          },
           "situations": {
             "description": "In the platform's motorway status order: jams, closures, the other reports, then roadworks; within each, by traffic type (queuing, stationary, heavy, slow), delay descending, headline, then the publisher's id.",
             "items": {
@@ -3331,6 +3441,8 @@
           "corridor",
           "lamp",
           "lampReason",
+          "lampReasons",
+          "sight",
           "coverage",
           "situations"
         ],
@@ -5934,6 +6046,20 @@
               "null"
             ]
           },
+          "lampReasons": {
+            "description": "Every reason of the lamp with how many give it, in lampReason's order (lampReason is the first); empty for green.",
+            "items": {
+              "$ref": "#/components/schemas/LampReason"
+            },
+            "type": "array"
+          },
+          "sight": {
+            "description": "The sight of every group the lamp read; any group not fresh keeps the lamp from green (limited_sight).",
+            "items": {
+              "$ref": "#/components/schemas/LampSight"
+            },
+            "type": "array"
+          },
           "situations": {
             "description": "What the platform's road status lists around a position: the closures, the roadworks and lane restrictions, and the jams, whatever kinds asks beyond them (a hazard, an accident or a weather report is not listed). Ordered by severity descending, then distance, then id; distanceM is rounded to 100 m, as the platform states it in tenths of a kilometre.",
             "items": {
@@ -5946,6 +6072,8 @@
           "area",
           "lamp",
           "lampReason",
+          "lampReasons",
+          "sight",
           "situations"
         ],
         "type": "object"
@@ -7064,6 +7192,20 @@
               "null"
             ]
           },
+          "lampReasons": {
+            "description": "Every reason of the lamp with how many give it, in lampReason's order (lampReason is the first); empty for green.",
+            "items": {
+              "$ref": "#/components/schemas/LampReason"
+            },
+            "type": "array"
+          },
+          "sight": {
+            "description": "The sight of every group the lamp read; any group not fresh keeps the lamp from green (limited_sight).",
+            "items": {
+              "$ref": "#/components/schemas/LampSight"
+            },
+            "type": "array"
+          },
           "situations": {
             "description": "Ordered by severity descending, then road, then id. A situation is in the Land of the nearest municipality centre (BKG, within 20 km) to its point; near a Land border that can be the neighbouring Land.",
             "items": {
@@ -7080,6 +7222,8 @@
           "state",
           "lamp",
           "lampReason",
+          "lampReasons",
+          "sight",
           "situations"
         ],
         "type": "object"
@@ -14332,6 +14476,72 @@
                         },
                         "lamp": "amber",
                         "lampReason": "weather_warning",
+                        "lampReasons": [
+                          {
+                            "reason": "weather_warning",
+                            "lamp": "amber",
+                            "count": 2
+                          },
+                          {
+                            "reason": "warning",
+                            "lamp": "amber",
+                            "count": 1
+                          },
+                          {
+                            "reason": "narrowing",
+                            "lamp": "amber",
+                            "count": 1
+                          },
+                          {
+                            "reason": "limited_sight",
+                            "lamp": "amber",
+                            "count": 2
+                          }
+                        ],
+                        "sight": [
+                          {
+                            "group": "roads",
+                            "state": "fresh",
+                            "family": "roads_alpha",
+                            "land": null
+                          },
+                          {
+                            "group": "roads",
+                            "state": "missing",
+                            "family": null,
+                            "land": null
+                          },
+                          {
+                            "group": "weather",
+                            "state": "missing",
+                            "family": null,
+                            "land": null
+                          },
+                          {
+                            "group": "messages",
+                            "state": "fresh",
+                            "family": null,
+                            "land": "06"
+                          },
+                          {
+                            "group": "messages",
+                            "state": "fresh",
+                            "family": null,
+                            "land": "07"
+                          },
+                          {
+                            "group": "messages",
+                            "state": "fresh",
+                            "family": null,
+                            "land": "08"
+                          },
+                          {
+                            "group": "messages",
+                            "state": "fresh",
+                            "family": null,
+                            "land": "10"
+                          }
+                        ],
                         "coverage": null,
                         "situations": [
                           {
@@ -19390,6 +19600,44 @@
                         },
                         "lamp": "amber",
                         "lampReason": "narrowing",
+                        "lampReasons": [
+                          {
+                            "reason": "narrowing",
+                            "lamp": "amber",
+                            "count": 1
+                          },
+                          {
+                            "reason": "limited_sight",
+                            "lamp": "amber",
+                            "count": 2
+                          }
+                        ],
+                        "sight": [
+                          {
+                            "group": "roads",
+                            "state": "fresh",
+                            "family": "roads_alpha",
+                            "land": null
+                          },
+                          {
+                            "group": "roads",
+                            "state": "missing",
+                            "family": null,
+                            "land": null
+                          },
+                          {
+                            "group": "weather",
+                            "state": "missing",
+                            "family": null,
+                            "land": null
+                          },
+                          {
+                            "group": "messages",
+                            "state": "fresh",
+                            "family": null,
+                            "land": "10"
+                          }
+                        ],
                         "situations": [
                           {
                             "id": "datex:syn:ev-00011",
@@ -21444,6 +21692,49 @@
                         "state": "10",
                         "lamp": "amber",
                         "lampReason": "warning",
+                        "lampReasons": [
+                          {
+                            "reason": "warning",
+                            "lamp": "amber",
+                            "count": 1
+                          },
+                          {
+                            "reason": "narrowing",
+                            "lamp": "amber",
+                            "count": 1
+                          },
+                          {
+                            "reason": "limited_sight",
+                            "lamp": "amber",
+                            "count": 2
+                          }
+                        ],
+                        "sight": [
+                          {
+                            "group": "roads",
+                            "state": "fresh",
+                            "family": "roads_alpha",
+                            "land": null
+                          },
+                          {
+                            "group": "roads",
+                            "state": "missing",
+                            "family": null,
+                            "land": null
+                          },
+                          {
+                            "group": "weather",
+                            "state": "missing",
+                            "family": null,
+                            "land": null
+                          },
+                          {
+                            "group": "messages",
+                            "state": "fresh",
+                            "family": null,
+                            "land": "10"
+                          }
+                        ],
                         "situations": [
                           {
                             "id": "datex:syn:ev-00011",

@@ -257,6 +257,13 @@ var Default = Rules{
 		{"data.lampReason", "from", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
 		{"data.corridor.states", "horizon_days", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
 		{"data.corridor.states", "from", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
+		{"data.lampReasons", "", "getMotorwayConditions", lampAccountReason},
+		{"data.sight", "", "getMotorwayConditions", lampAccountReason},
+		{"data.lampReasons", "", "listRoadConditions", lampAccountReason},
+		{"data.sight", "", "listRoadConditions", lampAccountReason},
+		{"data.lampReasons", "", "listStateRoadConditions", lampAccountReason},
+		{"data.sight", "", "listStateRoadConditions", lampAccountReason},
+		{"data.line", "", "listTransitDisruptions", lineCheckReason},
 		{"data[*].kilometres", "", "listMotorways", motorwayListReason},
 		{"data[*].sourceFamily", "", "listMotorways", motorwayListReason},
 		{"data.apiVersion", "", "getMeta", serviceMetaReason},
@@ -352,6 +359,13 @@ const zoneRowsReason = "API-only: the MCP driving rules state the verdict at a p
 // weatherLampReason is why the lamp and the truncation flag of the warnings
 // at a position are not compared: the /v1 contract keeps both (VER-001).
 const weatherLampReason = "API-only: the /v1 contract states the lamp over every warning at the position and whether the list was cut (VER-001); the platform's weather warnings check states neither, and no digest route the site reads serves a lamp for a position"
+
+// lampAccountReason is why a lamp's account is not compared.
+const lampAccountReason = "API-only: the /v1 contract states every reason of the lamp with its count and the sight of every group read; the platform's road status names one reason and no sight"
+
+// lineCheckReason is why the timetable's word on a line asked is not
+// compared.
+const lineCheckReason = "API-only until a bundle the MCP side produced carries it: the /v1 contract states whether the static timetable knows the line asked; no bundle recorded so far holds that fact"
 
 // roadsLampReason is why the lamp of the conditions near a position is not
 // compared: the /v1 contract keeps it (VER-001).

@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -119,8 +120,56 @@ func noteLamp(ctx context.Context, c features.Conditions) {
 	if c.Reason != nil {
 		reason = string(*c.Reason)
 	}
-	noteShown(ctx, "lamp "+string(c.Lamp)+" "+reason)
+	shown := "lamp " + string(c.Lamp) + " " + reason
+	for _, r := range c.Reasons {
+		shown += fmt.Sprintf(" %s=%d", r.Reason, r.Count)
+	}
+	for _, g := range c.Sight {
+		shown += " " + g.Group + ":" + g.Family + ":" + g.Land + "=" + string(g.State)
+	}
+	noteShown(ctx, shown)
 	noteChanges(ctx, c.ChangesAt)
+}
+
+// LampReason is one reason of a lamp and how many give it.
+type LampReason struct {
+	Reason string `json:"reason" enum:"road_closed,ramp_closed,safety,bridge_closed,long_jam,jam,weather_warning,slippery,warning,narrowing,limited_sight" example:"narrowing" doc:"The reason, as lampReason names it. Open enumeration."`
+	Lamp   string `json:"lamp" enum:"red,amber" doc:"The colour this reason gives on its own."`
+	Count  int    `json:"count" minimum:"1" example:"3" doc:"How many give it: situations or weather warnings, or, for limited_sight, the groups of sight that are not fresh."`
+}
+
+// LampSight is the sight of one group the lamp read.
+type LampSight struct {
+	Group  string  `json:"group" example:"roads" doc:"The group: roads (one entry per roads family read, and one without a family for the roads families the key may not read), weather (the official weather warnings, judged as a whole) or messages (the traffic messages of one Land). Open enumeration."`
+	State  string  `json:"state" enum:"fresh,stale,missing" doc:"fresh: current; stale: past its freshness threshold; missing: no data, not readable with the key, or no source covers it. Any state but fresh is a limited_sight reason."`
+	Family *string `json:"family" nullable:"true" example:"autobahn" doc:"The roads family judged; null for any other group and for the roads families the key may not read."`
+	Land   *string `json:"land" nullable:"true" example:"09" doc:"The Land of the traffic messages judged; null for any other group, and for messages when no Land is in scope."`
+}
+
+// lampReasons are the reasons of a conditions answer, empty for green.
+func lampReasons(c features.Conditions) []LampReason {
+	out := make([]LampReason, len(c.Reasons))
+	for i, r := range c.Reasons {
+		out[i] = LampReason{Reason: string(r.Reason), Lamp: string(r.Lamp), Count: r.Count}
+	}
+	return out
+}
+
+// lampSight is the sight of a conditions answer.
+func lampSight(c features.Conditions) []LampSight {
+	out := make([]LampSight, len(c.Sight))
+	for i, g := range c.Sight {
+		out[i] = LampSight{Group: g.Group, State: string(g.State), Family: optional(g.Family), Land: optional(g.Land)}
+	}
+	return out
+}
+
+// optional is s, or nil when empty.
+func optional(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 // noteChanges records the instant an answer changes with the clock alone,
@@ -241,11 +290,13 @@ type Corridor struct {
 
 // MotorwayData is the answer of getMotorwayConditions.
 type MotorwayData struct {
-	Corridor   Corridor        `json:"corridor"`
-	Lamp       string          `json:"lamp" enum:"green,amber,red" doc:"The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope as its record is read (the motorway operator's event, any other traffic message, a bridge's state) and every official weather warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a closed bridge; a jam with a delay of 30 minutes or more; a weather warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a weather warning of level 1 or 2; any other message (an accident without a closure, a restricted bridge, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the weather warnings not readable with the key or their source not current, or a state in scope whose traffic messages no current roads family the key may read covers. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is current, which is no guarantee that the road is free."`
-	LampReason *string         `json:"lampReason" nullable:"true" enum:"road_closed,ramp_closed,safety,bridge_closed,long_jam,jam,weather_warning,slippery,warning,narrowing,limited_sight" doc:"Why the lamp has its colour: the first of its reasons, a red one before any amber one, and inside a colour in the platform's order, which is this enumeration's order; null for green. slippery is never given while the read contract holds no road-weather forecast. Open enumeration."`
-	Coverage   *RoadCoverage   `json:"coverage" doc:"Null for a road the road register holds. For a road it does not hold (a federal or Land road, or a motorway it lacks), the answer is read from the situations whose reference names the road, none placed along a line and no state named; coverage then says what was read, as the platform's roadworks-ahead answer says it: an empty list is no sites on what the named families publish, never a road with no works."`
-	Situations []RoadSituation `json:"situations" doc:"In the platform's motorway status order: jams, closures, the other reports, then roadworks; within each, by traffic type (queuing, stationary, heavy, slow), delay descending, headline, then the publisher's id."`
+	Corridor    Corridor        `json:"corridor"`
+	Lamp        string          `json:"lamp" enum:"green,amber,red" doc:"The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope as its record is read (the motorway operator's event, any other traffic message, a bridge's state) and every official weather warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a closed bridge; a jam with a delay of 30 minutes or more; a weather warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a weather warning of level 1 or 2; any other message (an accident without a closure, a restricted bridge, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the weather warnings not readable with the key or their source not current, or a state in scope whose traffic messages no current roads family the key may read covers. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is current, which is no guarantee that the road is free."`
+	LampReason  *string         `json:"lampReason" nullable:"true" enum:"road_closed,ramp_closed,safety,bridge_closed,long_jam,jam,weather_warning,slippery,warning,narrowing,limited_sight" doc:"Why the lamp has its colour: the first of its reasons, a red one before any amber one, and inside a colour in the platform's order, which is this enumeration's order; null for green. slippery is never given while the read contract holds no road-weather forecast. Open enumeration."`
+	LampReasons []LampReason    `json:"lampReasons" doc:"Every reason of the lamp with how many give it, in lampReason's order (lampReason is the first); empty for green."`
+	Sight       []LampSight     `json:"sight" doc:"The sight of every group the lamp read; any group not fresh keeps the lamp from green (limited_sight)."`
+	Coverage    *RoadCoverage   `json:"coverage" doc:"Null for a road the road register holds. For a road it does not hold (a federal or Land road, or a motorway it lacks), the answer is read from the situations whose reference names the road, none placed along a line and no state named; coverage then says what was read, as the platform's roadworks-ahead answer says it: an empty list is no sites on what the named families publish, never a road with no works."`
+	Situations  []RoadSituation `json:"situations" doc:"In the platform's motorway status order: jams, closures, the other reports, then roadworks; within each, by traffic type (queuing, stationary, heavy, slow), delay descending, headline, then the publisher's id."`
 }
 
 // RoadCoverage is what a conditions answer about a road the road register
@@ -314,11 +365,13 @@ func registerMotorwayConditions(api huma.API, s *server, op huma.Operation) {
 		noteLamp(ctx, c)
 		return &MotorwayOutput{CacheControl: noStore, Body: MotorwayEnvelope{
 			Data: MotorwayData{
-				Corridor:   Corridor{Road: c.Road.Ref, RoadType: string(c.Road.Class), Direction: string(q.Direction), States: append([]string{}, c.Road.States...)},
-				Lamp:       string(c.Lamp),
-				LampReason: lampReason(c.Reason),
-				Coverage:   roadCoverage(c),
-				Situations: roadSituations(c.Items),
+				Corridor:    Corridor{Road: c.Road.Ref, RoadType: string(c.Road.Class), Direction: string(q.Direction), States: append([]string{}, c.Road.States...)},
+				Lamp:        string(c.Lamp),
+				LampReason:  lampReason(c.Reason),
+				LampReasons: lampReasons(c),
+				Sight:       lampSight(c),
+				Coverage:    roadCoverage(c),
+				Situations:  roadSituations(c.Items),
 			},
 			Meta: MotorwayMeta{
 				DataMeta: s.dataMeta(ctx, c.Families, c.At, c.Partial, partialDetail),
@@ -365,10 +418,12 @@ type Area struct {
 // states none, and the /v1 contract keeps both (VER-001), so the parity
 // harness leaves them out (parity.Default).
 type RoadConditionsData struct {
-	Area       Area            `json:"area"`
-	Lamp       string          `json:"lamp" enum:"green,amber,red" doc:"The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope as its record is read (the motorway operator's event, any other traffic message, a bridge's state) and every official weather warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a closed bridge; a jam with a delay of 30 minutes or more; a weather warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a weather warning of level 1 or 2; any other message (an accident without a closure, a restricted bridge, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the weather warnings not readable with the key or their source not current, or a state in scope whose traffic messages no current roads family the key may read covers. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is current, which is no guarantee that the road is free."`
-	LampReason *string         `json:"lampReason" nullable:"true" enum:"road_closed,ramp_closed,safety,bridge_closed,long_jam,jam,weather_warning,slippery,warning,narrowing,limited_sight" doc:"Why the lamp has its colour: the first of its reasons, a red one before any amber one, and inside a colour in the platform's order, which is this enumeration's order; null for green. slippery is never given while the read contract holds no road-weather forecast. Open enumeration."`
-	Situations []RoadSituation `json:"situations" doc:"What the platform's road status lists around a position: the closures, the roadworks and lane restrictions, and the jams, whatever kinds asks beyond them (a hazard, an accident or a weather report is not listed). Ordered by severity descending, then distance, then id; distanceM is rounded to 100 m, as the platform states it in tenths of a kilometre."`
+	Area        Area            `json:"area"`
+	Lamp        string          `json:"lamp" enum:"green,amber,red" doc:"The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope as its record is read (the motorway operator's event, any other traffic message, a bridge's state) and every official weather warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a closed bridge; a jam with a delay of 30 minutes or more; a weather warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a weather warning of level 1 or 2; any other message (an accident without a closure, a restricted bridge, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the weather warnings not readable with the key or their source not current, or a state in scope whose traffic messages no current roads family the key may read covers. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is current, which is no guarantee that the road is free."`
+	LampReason  *string         `json:"lampReason" nullable:"true" enum:"road_closed,ramp_closed,safety,bridge_closed,long_jam,jam,weather_warning,slippery,warning,narrowing,limited_sight" doc:"Why the lamp has its colour: the first of its reasons, a red one before any amber one, and inside a colour in the platform's order, which is this enumeration's order; null for green. slippery is never given while the read contract holds no road-weather forecast. Open enumeration."`
+	LampReasons []LampReason    `json:"lampReasons" doc:"Every reason of the lamp with how many give it, in lampReason's order (lampReason is the first); empty for green."`
+	Sight       []LampSight     `json:"sight" doc:"The sight of every group the lamp read; any group not fresh keeps the lamp from green (limited_sight)."`
+	Situations  []RoadSituation `json:"situations" doc:"What the platform's road status lists around a position: the closures, the roadworks and lane restrictions, and the jams, whatever kinds asks beyond them (a hazard, an accident or a weather report is not listed). Ordered by severity descending, then distance, then id; distanceM is rounded to 100 m, as the platform states it in tenths of a kilometre."`
 }
 
 // RoadConditionsQuery is meta.query of listRoadConditions.
@@ -428,10 +483,12 @@ func registerRoadConditions(api huma.API, s *server, op huma.Operation) {
 		}
 		return &RoadConditionsOutput{CacheControl: noStore, Body: RoadConditionsEnvelope{
 			Data: RoadConditionsData{
-				Area:       Area{At: position(q.At), RadiusM: q.RadiusM},
-				Lamp:       string(c.Lamp),
-				LampReason: lampReason(c.Reason),
-				Situations: listed,
+				Area:        Area{At: position(q.At), RadiusM: q.RadiusM},
+				Lamp:        string(c.Lamp),
+				LampReason:  lampReason(c.Reason),
+				LampReasons: lampReasons(c),
+				Sight:       lampSight(c),
+				Situations:  listed,
 			},
 			Meta: RoadConditionsMeta{
 				DataMeta: s.dataMeta(ctx, c.Families, c.At, c.Partial, partialDetail),
@@ -500,10 +557,12 @@ func (in *StateConditionsInput) Resolve(huma.Context) []error { return in.check(
 
 // StateConditionsData is the answer of listStateRoadConditions.
 type StateConditionsData struct {
-	State      string          `json:"state" doc:"The Land's code."`
-	Lamp       string          `json:"lamp" enum:"green,amber,red" doc:"The lamp over every situation of the Land and every official weather warning in force in its areas, by the rules of listRoadConditions."`
-	LampReason *string         `json:"lampReason" nullable:"true" doc:"Why the lamp has its colour, as in listRoadConditions; null for green."`
-	Situations []RoadSituation `json:"situations" doc:"Ordered by severity descending, then road, then id. A situation is in the Land of the nearest municipality centre (BKG, within 20 km) to its point; near a Land border that can be the neighbouring Land."`
+	State       string          `json:"state" doc:"The Land's code."`
+	Lamp        string          `json:"lamp" enum:"green,amber,red" doc:"The lamp over every situation of the Land and every official weather warning in force in its areas, by the rules of listRoadConditions."`
+	LampReason  *string         `json:"lampReason" nullable:"true" doc:"Why the lamp has its colour, as in listRoadConditions; null for green."`
+	LampReasons []LampReason    `json:"lampReasons" doc:"Every reason of the lamp with how many give it, in lampReason's order (lampReason is the first); empty for green."`
+	Sight       []LampSight     `json:"sight" doc:"The sight of every group the lamp read; any group not fresh keeps the lamp from green (limited_sight)."`
+	Situations  []RoadSituation `json:"situations" doc:"Ordered by severity descending, then road, then id. A situation is in the Land of the nearest municipality centre (BKG, within 20 km) to its point; near a Land border that can be the neighbouring Land."`
 }
 
 // StateConditionsQuery is meta.query of listStateRoadConditions.
@@ -550,7 +609,8 @@ func registerStateConditions(api huma.API, s *server, op huma.Operation) {
 		}
 		noteLamp(ctx, c)
 		out := &StateConditionsOutput{CacheControl: noStore}
-		out.Body.Data = StateConditionsData{State: q.State, Lamp: string(c.Lamp), LampReason: lampReason(c.Reason), Situations: roadSituations(c.Items)}
+		out.Body.Data = StateConditionsData{State: q.State, Lamp: string(c.Lamp), LampReason: lampReason(c.Reason),
+			LampReasons: lampReasons(c), Sight: lampSight(c), Situations: roadSituations(c.Items)}
 		out.Body.Meta.DataMeta = s.dataMeta(ctx, c.Families, c.At, c.Partial, partialDetail)
 		out.Body.Meta.Page = Page{Limit: q.Limit, HasMore: c.HasMore}
 		out.Body.Meta.Query = StateConditionsQuery{State: q.State, FilterQuery: filterQuery(q.Filter), RoadClasses: types}

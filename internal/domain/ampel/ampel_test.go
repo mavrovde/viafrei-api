@@ -671,3 +671,12 @@ func TestTheFoldIsJavaScripts(t *testing.T) {
 		t.Errorf("dotted capital I lower-cases to i and a combining dot, as in JavaScript: %q", w)
 	}
 }
+
+// A group judged per family names its family in the reason it gives.
+func TestASightReasonKeepsItsFamily(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004")
+	a := ampel.Of(nil, []ampel.SightEntry{{Group: "roads", State: ampel.SightStale, Family: "r1"}})
+	if len(a.Reasons) != 1 || a.Reasons[0].Sight == nil || a.Reasons[0].Sight.Family != "r1" || a.Reasons[0].Sight.State != ampel.SightStale {
+		t.Errorf("reasons %+v", a.Reasons)
+	}
+}

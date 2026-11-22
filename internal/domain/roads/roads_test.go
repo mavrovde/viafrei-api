@@ -223,6 +223,30 @@ func TestTheLampRule(t *testing.T) {
 	}
 }
 
+// TestTheLampAccountsForEveryReason: every reason of the lamp is named once,
+// in the lamp's order, with how many give it; the first is the lamp's
+// reason; green has none; the sight is the sight given, its families kept.
+func TestTheLampAccountsForEveryReason(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004")
+	sight := []ampel.SightEntry{{Group: roads.GroupRoads, State: ampel.SightStale, Family: "r1"}, {Group: roads.GroupRoads, State: ampel.SightMissing},
+		{Group: ampel.GroupWeather, State: ampel.SightFresh}}
+	works := msg(roads.KindRoadworks, "Baustelle")
+	jam := func(d *int) roads.Message { m := msg(roads.KindJam, "Stau"); m.DelayMin = d; return m }
+	a := roads.AccountOf([]roads.Message{works, jam(nil), msg(roads.KindClosure, "gesperrt"), works, jam(delay(45))}, []int{1}, sight)
+	want := []roads.ReasonCount{{roads.ReasonRoadClosed, roads.LampRed, 1}, {roads.ReasonLongJam, roads.LampRed, 1}, {roads.ReasonJam, roads.LampAmber, 1},
+		{roads.ReasonWeatherWarning, roads.LampAmber, 1}, {roads.ReasonNarrowing, roads.LampAmber, 2}, {roads.ReasonLimitedSight, roads.LampAmber, 2}}
+	if a.Lamp != roads.LampRed || a.Reason == nil || *a.Reason != roads.ReasonRoadClosed || !slices.Equal(a.Reasons, want) || !slices.Equal(a.Sight, sight) {
+		t.Errorf("account %+v, want reasons %+v", a, want)
+	}
+	sight[0].State = ampel.SightFresh
+	if a.Sight[0].State != ampel.SightStale {
+		t.Error("the account keeps its own copy of the sight")
+	}
+	if g := roads.AccountOf(nil, nil, []ampel.SightEntry{{Group: ampel.GroupWeather, State: ampel.SightFresh}}); g.Lamp != roads.LampGreen || g.Reason != nil || len(g.Reasons) != 0 {
+		t.Errorf("green: %+v", g)
+	}
+}
+
 // TestARecordIsMapped: the three stored record codes map one to one; any
 // other is a traffic message.
 func TestARecordIsMapped(t *testing.T) {

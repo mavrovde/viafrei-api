@@ -5361,6 +5361,10 @@
             ],
             "type": "string"
           },
+          "kreis": {
+            "description": "The Kreis the place lies in, in German, as the platform's place search states it: kreisfreie Stadt for a town that is one, else Kreis and the district's name (kreisfreie Stadt and the name for a place in one; the name alone when it says Kreis or Region itself). Absent when none can be named, as for a district, a Land, a city-state and a stop.",
+            "type": "string"
+          },
           "location": {
             "$ref": "#/components/schemas/Position"
           },

@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"slices"
 
 	"github.com/jackc/pgx/v5"
 
@@ -76,6 +77,16 @@ where ($3::text = '' or f.kind = $3::text)
 order by f.rank, f.prominence desc nulls last, dist nulls last, f.name, f.id
 limit $7`
 
+// kreisNames are the names of the districts of the five-digit keys $1 that
+// a family of $2 holds, as the platform names a place's Kreis: the open
+// district rows of places.KreisFamily.
+var kreisNames = `
+select p.official_key, min(p.name)
+from contract.place p
+where p.place_kind = 'district' and p.official_key = any($1) and p.withdrawn_at is null
+  and p.source_ref = '` + places.KreisFamily + `' and p.source_ref = any($2) and ` + permitted("p") + `
+group by p.official_key`
+
 // Places reads the places of families, the stops of stops and the motorway
 // places of roads that answer q
 // (features.Places), one more than the limit, to tell whether more answer.
@@ -86,7 +97,7 @@ func (s *Store) Places(ctx context.Context, q places.Query, families, stops, roa
 	}
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]places.Place, error) {
 		rows, _ := tx.Query(ctx, placesPage, families, transit.Fold(q.Text), string(q.Kind), lat, lon, q.RadiusM, q.Limit+1, stops, roads, places.RoadForm(q.Text))
-		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.Place, error) {
+		ps, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.Place, error) {
 			var (
 				v    places.Place
 				kind string
@@ -95,6 +106,10 @@ func (s *Store) Places(ctx context.Context, q places.Query, families, stops, roa
 			v.Kind = places.MapKind(kind)
 			return v, err
 		})
+		if err != nil {
+			return nil, err
+		}
+		return ps, nameKreise(ctx, tx, ps, families)
 	})
 	if err != nil {
 		return nil, false, err
@@ -103,4 +118,30 @@ func (s *Store) Places(ctx context.Context, q places.Query, families, stops, roa
 		return out[:q.Limit], true, nil
 	}
 	return out, false, nil
+}
+
+// nameKreise sets each place's Kreis (places.KreisOf), reading the district
+// names its keys need in one statement, none when no place needs one.
+func nameKreise(ctx context.Context, tx pgx.Tx, ps []places.Place, families []string) error {
+	var keys []string
+	for _, p := range ps {
+		if k := places.KreisKey(p.Kind, p.OfficialKey); k != nil && !slices.Contains(keys, *k) {
+			keys = append(keys, *k)
+		}
+	}
+	names := map[string]string{}
+	if len(keys) > 0 {
+		rows, _ := tx.Query(ctx, kreisNames, keys, families)
+		var key, name string
+		if _, err := pgx.ForEachRow(rows, []any{&key, &name}, func() error { names[key] = name; return nil }); err != nil {
+			return err
+		}
+	}
+	for i := range ps {
+		ps[i].Kreis = places.KreisOf(ps[i].Kind, ps[i].OfficialKey, names)
+		if k := places.KreisKey(ps[i].Kind, ps[i].OfficialKey); k != nil && ps[i].Kreis != nil {
+			ps[i].KreisFamily = places.KreisFamily
+		}
+	}
+	return nil
 }

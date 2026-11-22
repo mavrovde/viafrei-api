@@ -51,6 +51,10 @@ type Place struct {
 	// NameEn is the place's English name where it differs from Name; nil
 	// else.
 	NameEn *string
+	// Kreis is the Kreis it lies in, in German (KreisOf); nil when none can
+	// be named. KreisFamily is the family that named it, empty when none did.
+	Kreis       *string
+	KreisFamily string
 	// DistanceM is the distance from the asked position; nil without one.
 	DistanceM *int
 	Family    string

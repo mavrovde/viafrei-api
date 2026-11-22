@@ -26,6 +26,12 @@ func TestPlacesAreGatedAndAttributed(t *testing.T) {
 	if a, err := service(&fake{}, nil).Places(context.Background(), key("commercial", []access.Scope{"places"}, "pl"), places.Query{Text: "nn", Limit: 1}); err != nil || len(a.Families) != 0 {
 		t.Errorf("empty: %+v %v", a.Families, err)
 	}
+	// The family that names a place's Kreis is credited, once.
+	f = &fake{place: places.Place{ID: "x", Family: "pl", KreisFamily: "st"}}
+	if a, err := service(f, nil).Places(context.Background(), key("commercial", []access.Scope{"places"}, "pl", "st"), places.Query{Text: "nn", Limit: 1}); err != nil ||
+		!slices.Equal(names(a.Families), []string{"pl", "st"}) && !slices.Equal(names(a.Families), []string{"st", "pl"}) {
+		t.Errorf("the Kreis family: %+v %v", a.Families, err)
+	}
 	// The stops a key may read answer a name too, without the transit scope.
 	f = &fake{place: places.Place{ID: "x", Family: "st"}}
 	if _, err := service(f, nil).Places(context.Background(), key("commercial", []access.Scope{"places"}, "pl", "st"), places.Query{Text: "nn", Limit: 1}); err != nil || !slices.Equal(f.gotStops, []string{"st"}) {

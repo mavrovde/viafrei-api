@@ -209,6 +209,9 @@ func (s *Service) Places(ctx context.Context, key access.Record, q places.Query)
 	var contributed []string
 	for _, p := range ps {
 		contributed = append(contributed, p.Family)
+		if p.KreisFamily != "" && !slices.Contains(contributed, p.KreisFamily) {
+			contributed = append(contributed, p.KreisFamily)
+		}
 	}
 	if err := gate.Check(contributed); err != nil {
 		return Answer[places.Place]{}, err

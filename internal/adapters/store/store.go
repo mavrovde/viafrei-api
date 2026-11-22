@@ -51,6 +51,7 @@ type Store struct {
 	breaker *breaker.Breaker
 	reg     registerSnapshot
 	roads   roadSnapshot
+	holders feedingSnapshot
 	lands   junctionLands
 
 	// landsRead, when set (tests), is called before each road's junction
@@ -144,6 +145,7 @@ func New(pool *pgxpool.Pool, cfg *config.Config) *Store {
 		log:     slog.Default(),
 		reg:     registerSnapshot{ttl: cfg.DB.RegisterSnapshotTTL, staleFor: max(cfg.DB.RegisterSnapshotTTL, cfg.DB.RegisterStaleFor)},
 		roads:   roadSnapshot{ttl: cfg.DB.RoadSnapshotTTL, staleFor: max(cfg.DB.RoadSnapshotTTL, cfg.DB.RoadStaleFor)},
+		holders: feedingSnapshot{ttl: cfg.DB.FeedingSnapshotTTL, staleFor: max(cfg.DB.FeedingSnapshotTTL, cfg.DB.FeedingStaleFor)},
 	}
 }
 

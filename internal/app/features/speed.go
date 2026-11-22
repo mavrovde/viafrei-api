@@ -6,6 +6,7 @@ import (
 	_ "time/tzdata" // the Berlin day never depends on the host
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 )
 
@@ -34,7 +35,7 @@ var berlin, _ = time.LoadLocation("Europe/Berlin")
 func (s *Service) SpeedCameras(ctx context.Context, key access.Record, q roads.SpeedQuery) (SpeedAnswer, error) {
 	n := s.now().In(berlin)
 	q.Today = time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, time.UTC)
-	v, meta, err := listed(ctx, s, key, "roads", func(permitted []string) (roads.SpeedCameras, []string, error) {
+	v, meta, err := listed(ctx, s, key, "roads", provenance.DatasetSpeedCameras, func(permitted []string) (roads.SpeedCameras, []string, error) {
 		v, err := s.repos.Speed.SpeedCameras(ctx, q, permitted)
 		var contributed []string
 		for _, c := range append(v.Official, v.OSM...) {

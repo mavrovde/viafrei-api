@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 )
@@ -77,7 +78,14 @@ func (s *Service) WeatherRisk(ctx context.Context, key access.Record, q weather.
 	if err := gate.Check(contributed); err != nil {
 		return WeatherRisk{}, err
 	}
-	fams, stale, turns, err := s.sight(ctx, permitted, contributed, now)
+	// The lamp's sight and credit are those of the families that hold rows of the
+	// warnings, not of road weather, whose credit and note belong to an
+	// answer that states its readings.
+	warned, err := s.consultedIn(ctx, provenance.DatasetWarnings, permitted)
+	if err != nil {
+		return WeatherRisk{}, err
+	}
+	fams, stale, turns, err := s.sight(ctx, warned, contributed, now)
 	if err != nil {
 		return WeatherRisk{}, err
 	}
@@ -148,7 +156,7 @@ func (s *Service) LowEmissionZones(ctx context.Context, key access.Record, q rul
 	if q.At == nil {
 		return ZonesAnswer{City: city}, nil
 	}
-	v, meta, err := listed(ctx, s, key, "roads", func(permitted []string) ([]rules.Zone, []string, error) {
+	v, meta, err := listed(ctx, s, key, "roads", provenance.DatasetZones, func(permitted []string) ([]rules.Zone, []string, error) {
 		zs, err := s.repos.Rules.Zones(ctx, q, permitted, s.now())
 		var fams []string
 		for _, z := range zs {

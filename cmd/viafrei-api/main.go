@@ -114,6 +114,7 @@ func serve(environ []string, stderr io.Writer) int {
 	st.WithAdmission(adm).WithSharedBudget(wire.SharedBudget(cfg)).WithLogger(log).WithBreaker(wire.Breaker(cfg, log))
 	go st.KeepRegister(ctx)
 	go st.KeepRoads(ctx)
+	go st.KeepFeeding(ctx)
 	addresses := ratelimit.NewIPLimiter(wire.AddressSettings(cfg), nil)
 	go addresses.Run(ctx)
 	at := wire.AnswerClock(cfg, log)

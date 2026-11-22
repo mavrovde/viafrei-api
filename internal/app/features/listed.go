@@ -9,10 +9,13 @@ import (
 
 // listed answers one read of one domain for key: the gate, the read over the
 // permitted families, the post-check of the families that contributed, and
-// their provenance (or the consulted families' when none did).
-func listed[T any](ctx context.Context, s *Service, key access.Record, domain string,
+// their provenance, or, when none did, that of the permitted families that
+// hold rows of dataset (consultedIn), as the platform's tool credits its own
+// sources. An empty dataset credits every permitted family of the domain:
+// the answers whose views the snapshot does not read (provenance.Dataset).
+func listed[T any](ctx context.Context, s *Service, key access.Record, domain string, dataset provenance.Dataset,
 	read func(permitted []string) (T, []string, error)) (T, Answer[struct{}], error) {
-	return listedCredits(ctx, s, key, domain, false, read)
+	return listedCredits(ctx, s, key, domain, dataset, false, read)
 }
 
 // listedOwn is listed for a search that credits only the families whose
@@ -20,10 +23,10 @@ func listed[T any](ctx context.Context, s *Service, key access.Record, domain st
 // platform's search of the same domain does.
 func listedOwn[T any](ctx context.Context, s *Service, key access.Record, domain string,
 	read func(permitted []string) (T, []string, error)) (T, Answer[struct{}], error) {
-	return listedCredits(ctx, s, key, domain, true, read)
+	return listedCredits(ctx, s, key, domain, "", true, read)
 }
 
-func listedCredits[T any](ctx context.Context, s *Service, key access.Record, domain string, own bool,
+func listedCredits[T any](ctx context.Context, s *Service, key access.Record, domain string, dataset provenance.Dataset, own bool,
 	read func(permitted []string) (T, []string, error)) (T, Answer[struct{}], error) {
 	var zero T
 	reg, gate, err := s.gate(ctx, key)
@@ -45,7 +48,13 @@ func listedCredits[T any](ctx context.Context, s *Service, key access.Record, do
 	if own {
 		fams, err = s.creditsOf(ctx, contributed)
 	} else {
-		fams, err = s.provenanceOf(ctx, contributed, permitted)
+		consulted := permitted
+		if len(contributed) == 0 && dataset != "" {
+			if consulted, err = s.consultedIn(ctx, dataset, permitted); err != nil {
+				return zero, Answer[struct{}]{}, err
+			}
+		}
+		fams, err = s.provenanceOf(ctx, contributed, consulted)
 	}
 	if err != nil {
 		return zero, Answer[struct{}]{}, err

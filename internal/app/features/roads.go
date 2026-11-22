@@ -8,6 +8,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/ampel"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 )
 
@@ -141,10 +142,19 @@ func (s *Service) conditions(ctx context.Context, key access.Record, ahead bool,
 	// the platform credits the DWD on every road status.
 	consulted := slices.Clone(contributed[:len(p.Items)])
 	if len(consulted) == 0 {
-		consulted = slices.Clone(permitted)
+		if consulted, err = s.consultedIn(ctx, provenance.DatasetRoadEvents, permitted); err != nil {
+			return Conditions{}, err
+		}
 	}
 	consulted = append(consulted, contributed[len(p.Items):]...)
-	consulted = append(consulted, weather...)
+	// The weather families whose warnings the lamp reads, not those of road
+	// weather (a road-weather station's note and credit belong to an
+	// answer that states its readings).
+	warned, err := s.consultedIn(ctx, provenance.DatasetWarnings, weather)
+	if err != nil {
+		return Conditions{}, err
+	}
+	consulted = append(consulted, warned...)
 	// A Land's answer credits the families that placed its situations in
 	// the Land, as the platform's Land form credits BKG.
 	consulted = append(consulted, p.Placed...)

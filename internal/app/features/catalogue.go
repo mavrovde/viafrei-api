@@ -33,7 +33,7 @@ type MotorwaysAnswer struct {
 // it may read, each motorway with the lamp its own conditions answer states.
 func (s *Service) Motorways(ctx context.Context, key access.Record, q roads.CatalogueQuery) (MotorwaysAnswer, error) {
 	var counted []string
-	v, meta, err := listed(ctx, s, key, "roads", func(permitted []string) ([]roads.Motorway, []string, error) {
+	v, meta, err := listed(ctx, s, key, "roads", "", func(permitted []string) ([]roads.Motorway, []string, error) {
 		// An answer credits what the site's motorway index credits: the
 		// families whose situations its counts state (on any motorway, a
 		// count of none included) and the register of the motorways it

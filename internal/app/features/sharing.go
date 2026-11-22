@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 )
 
@@ -43,7 +44,7 @@ type SharingAnswer struct {
 // platform's sharing search answers it, at the answer's instant.
 func (s *Service) Sharing(ctx context.Context, key access.Record, q transit.SharingQuery) (SharingAnswer, error) {
 	q.Now = s.now()
-	v, meta, err := listed(ctx, s, key, "transit", func(permitted []string) (SharingAnswer, []string, error) {
+	v, meta, err := listed(ctx, s, key, "transit", provenance.DatasetSharing, func(permitted []string) (SharingAnswer, []string, error) {
 		var a SharingAnswer
 		stations, err := s.repos.Sharing.SharingStations(ctx, q, permitted)
 		if err != nil {

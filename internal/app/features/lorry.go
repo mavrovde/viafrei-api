@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 )
 
@@ -21,7 +22,7 @@ type LorryAnswer struct {
 // LorryRules answers "where may a lorry, or a long lorry, go" for key, from
 // the roads families it may read.
 func (s *Service) LorryRules(ctx context.Context, key access.Record, q roads.LorryQuery) (LorryAnswer, error) {
-	v, meta, err := listed(ctx, s, key, "roads", func(permitted []string) ([]roads.LorryRule, []string, error) {
+	v, meta, err := listed(ctx, s, key, "roads", provenance.DatasetLorry, func(permitted []string) ([]roads.LorryRule, []string, error) {
 		rs, err := s.repos.Lorry.LorryRules(ctx, q, permitted)
 		var fams []string
 		for _, r := range rs {

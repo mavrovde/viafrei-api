@@ -55,7 +55,28 @@ type fake struct {
 	termsErr                             error
 	gotTerms                             []string
 	notes                                map[string][]provenance.Note
-	next                                 *time.Time // the earliest future report both reads return
+	next                                 *time.Time                      // the earliest future report both reads return
+	feeding                              map[provenance.Dataset][]string // the families of each dataset; nil holds every family
+	feedErr                              error
+	feedErrOn                            provenance.Dataset // the dataset feedErr fails; empty fails every one
+	gotFeeding                           []provenance.Dataset
+}
+
+func (f *fake) Feeding(_ context.Context, d provenance.Dataset, fams []string) ([]string, error) {
+	f.gotFeeding = append(f.gotFeeding, d)
+	if f.feedErr != nil && (f.feedErrOn == "" || f.feedErrOn == d) {
+		return nil, f.feedErr
+	}
+	if f.feeding == nil {
+		return slices.Clone(fams), nil
+	}
+	out := []string{}
+	for _, x := range fams {
+		if slices.Contains(f.feeding[d], x) {
+			out = append(out, x)
+		}
+	}
+	return out, nil
 }
 
 func (f *fake) Register(context.Context) ([]access.Terms, error) {

@@ -23,6 +23,9 @@ type Register interface {
 	// Provenance returns the attribution, notes in lang and freshness of
 	// the given families only.
 	Provenance(ctx context.Context, families []string, lang string) ([]provenance.Family, error)
+	// Feeding returns which of families hold rows in dataset: those an
+	// answer of that dataset consulted.
+	Feeding(ctx context.Context, dataset provenance.Dataset, families []string) ([]string, error)
 	// TermsTexts returns the texts of the given terms gates, every
 	// language.
 	TermsTexts(ctx context.Context, gates []string) ([]access.TermsText, error)
@@ -186,6 +189,12 @@ func (s *Service) provenanceOf(ctx context.Context, contributed, consulted []str
 	fams = slices.Clone(fams)
 	slices.Sort(fams)
 	return s.repos.Register.Provenance(ctx, slices.Compact(fams), s.lang(ctx))
+}
+
+// consultedIn narrows the families an answer was permitted to those that
+// hold rows of dataset, which an empty answer credits.
+func (s *Service) consultedIn(ctx context.Context, dataset provenance.Dataset, permitted []string) ([]string, error) {
+	return s.repos.Register.Feeding(ctx, dataset, permitted)
 }
 
 // creditsOf reads the provenance of the families that contributed, and of

@@ -449,3 +449,47 @@ where w.withdrawn_at is null and w.message_status <> 'cancelled' and w.area is n
 		t.Fatalf("%d warnings, %d under no region code: the fixture no longer plants the case", len(all), unfiled)
 	}
 }
+
+// TestWarningsAtListTheNextDayAhead plants, at a point inside the area of a
+// fixture warning, two copies of it far after the fixture's window: one
+// starting 23 hours after the asked instant and one starting 25 hours after.
+// The answer lists the first beside those in force and not the second, as
+// the platform's weather check lists the warnings of now and the next 24
+// hours; the lamp reads neither, as neither is in force.
+func TestWarningsAtListTheNextDayAhead(t *testing.T) {
+	req.Covers(t, "FR-WEATHER-001")
+	st := seeded(t)
+	fams := families(t, st, "weather")
+	at := time.Date(2104, 6, 1, 12, 0, 0, 0, time.UTC)
+	var p geo.Point
+	owner(t, `select st_y(st_pointonsurface(area)), st_x(st_pointonsurface(area)) from contract.weather_warning
+where withdrawn_at is null and message_status <> 'cancelled' and area is not null and display_class <> 'withhold' and audience = 'public'
+order by warning_id limit 1`, &p.Lat, &p.Lon)
+	if n := change(t, `insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
+    valid_from, valid_to, published_at, region_code, source_ref, recorded_at, withdrawn_at, area, warn_cell_id, area_name)
+  select v.id, w.hazard, 4, w.level_label, w.message_status, w.issuer_name, w.headline, w.text_lang,
+    $1::timestamptz + v.after, $1::timestamptz + v.after + interval '6 hours', null, w.region_code, w.source_ref, $1::timestamptz, null, w.area, w.warn_cell_id, w.area_name
+  from (select * from contract.weather_warning
+        where withdrawn_at is null and message_status <> 'cancelled' and area is not null and display_class <> 'withhold' and audience = 'public'
+        order by warning_id limit 1) w,
+       (values ('dwd:990041', interval '23 hours'), ('dwd:990042', interval '25 hours')) v(id, after)`, at); n != 2 {
+		t.Fatalf("%d warnings planted", n)
+	}
+	t.Cleanup(func() {
+		change(t, `delete from contract.weather_warning where warning_id in ('dwd:990041', 'dwd:990042')`)
+	})
+	sc, err := st.WarningsAt(bounded(t), weather.Query{Limit: maxWarnings, At: p, MinLevel: 1}, fams, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := warningIDs(sc.Warnings)
+	if !slices.Contains(ids, "dwd:990041") || slices.Contains(ids, "dwd:990042") {
+		t.Errorf("listed %v, want dwd:990041 (starts within a day) and not dwd:990042", ids)
+	}
+	if len(sc.Levels) != 0 {
+		t.Errorf("lamp levels %v, want none in force", sc.Levels)
+	}
+	if want := at.Add(23 * time.Hour); sc.NextChange == nil || !sc.NextChange.Equal(want) {
+		t.Errorf("next change %v, want %v", sc.NextChange, want)
+	}
+}

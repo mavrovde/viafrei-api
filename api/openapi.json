@@ -8467,6 +8467,10 @@
           "id": {
             "type": "string"
           },
+          "inForce": {
+            "description": "Whether the warning is in force at the answer's instant; false for one that starts within the next 24 hours, which is listed beside those in force as the platform lists it (the lamp reads only those in force).",
+            "type": "boolean"
+          },
           "issuer": {
             "description": "The issuing service.",
             "type": "string"
@@ -8503,6 +8507,7 @@
           "headline",
           "textLanguage",
           "validity",
+          "inForce",
           "area",
           "sourceFamily"
         ],
@@ -25695,7 +25700,7 @@
     },
     "/v1/weather-risk": {
       "get": {
-        "description": "Every official weather warning in force now whose area contains the position, with the issuer's level and wording unchanged, as the platform's weather warnings check states them, and the lamp over every warning in force there, whatever min_level and hazards keep (API-only: the check states no lamp). MCP counterpart: weather warnings check. Needs the scope weather.",
+        "description": "Every official weather warning in force now, or starting within the next 24 hours (inForce false), whose area contains the position, with the issuer's level and wording unchanged, as the platform's weather warnings check states them, and the lamp over every warning in force there, whatever min_level and hazards keep (API-only: the check states no lamp). MCP counterpart: weather warnings check. Needs the scope weather.",
         "operationId": "getWeatherRisk",
         "parameters": [
           {
@@ -25792,6 +25797,7 @@
                               "until": "2026-03-30T11:04:42Z",
                               "untilLocal": "2026-03-30T13:04:42+02:00"
                             },
+                            "inForce": true,
                             "area": {
                               "name": "Warngebiet 05002",
                               "geometry": null

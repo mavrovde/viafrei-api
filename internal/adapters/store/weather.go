@@ -30,18 +30,16 @@ where w.withdrawn_at is null and w.message_status <> 'cancelled'
   and w.area is not null and w.area && st_setsrid(st_makepoint($4, $3), 4326)
   and st_intersects(w.area::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography)`
 
-// warningScope is the condition of the lamp's scope: a placed warning
-// (warningPlaced) in force at now.
-const warningScope = warningPlaced + `
-  and w.valid_from <= $2`
-
-// warningsPage reads the warnings of the scope the floor and the hazards
-// keep, worst first. $5 the level floor, $6 the mapped hazards kept, $7
-// whether the unmapped ones are kept, $8 every mapped hazard, $9 the limit.
+// warningsPage reads the placed warnings in force at now or starting before
+// $10 (now and the look-ahead) that the floor and the hazards keep, worst
+// first, then the earliest start. $5 the level floor, $6 the mapped hazards
+// kept, $7 whether the unmapped ones are kept, $8 every mapped hazard, $9
+// the limit.
 const warningsPage = `
 select w.warning_id, w.source_ref, w.hazard, w.warning_level, w.level_label, w.issuer_name, w.headline,
        w.text_lang, w.valid_from, w.valid_to, coalesce(w.area_name, '')
-` + warningScope + `
+` + warningPlaced + `
+  and w.valid_from < $10
   and w.warning_level >= $5
   and (w.hazard = any($6) or ($7 and not w.hazard = any($8)))
 order by w.warning_level desc, w.valid_from, w.warning_id
@@ -83,8 +81,8 @@ func scanWarning(r pgx.CollectableRow) (weather.Warning, error) {
 	return v, errors.Join(err, lerr)
 }
 
-// WarningsAt reads, in one snapshot, the warnings in the scope
-// (warningScope) at or above the level floor, of the asked hazards; level
+// WarningsAt reads, in one snapshot, the placed warnings in force or
+// starting within weather.LookAhead, at or above the level floor, of the asked hazards; level
 // descending, then start, then id; at most q.Limit, and whether
 // more answer. It also reads every placed warning (warningPlaced), whatever
 // the floor and the hazards keep: the level of each one in force, for the
@@ -105,7 +103,7 @@ func (s *Store) WarningsAt(ctx context.Context, q weather.Query, families []stri
 	// nothing the caller holds is written after a read past its deadline.
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (weather.Scope, error) {
 		var out weather.Scope
-		rows, _ := tx.Query(ctx, warningsPage, families, now, q.At.Lat, q.At.Lon, int(q.MinLevel), hazards, other, every, q.Limit+1)
+		rows, _ := tx.Query(ctx, warningsPage, families, now, q.At.Lat, q.At.Lon, int(q.MinLevel), hazards, other, every, q.Limit+1, now.Add(weather.LookAhead))
 		var err error
 		if out.Warnings, err = pgx.CollectRows(rows, scanWarning); err != nil {
 			return out, err

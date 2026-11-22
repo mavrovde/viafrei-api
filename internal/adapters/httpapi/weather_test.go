@@ -118,6 +118,23 @@ func TestWeatherRiskAnswer(t *testing.T) {
 	if hz, _ := q["hazards"].([]any); hz == nil || len(hz) != 0 {
 		t.Errorf("an empty hazard list is [] in meta.query: %v", q)
 	}
+
+	// A warning is in force from its start, at the answer's instant
+	// included; one starting later is listed as not yet in force.
+	f = everyAnswer()
+	f.risk = riskAnswer()
+	f.risk.Items = append(f.risk.Items, weather.Warning{ID: "w-3", Family: "src-alpha-weather", Hazard: "wind", Level: 2, LevelName: "Markante Wetterwarnung",
+		Issuer: "Wetterdienst", Headline: "Sturmböen", TextLanguage: "de", From: fixedNow.Add(2 * time.Hour), AreaName: "Kreis A"})
+	data, _ = decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/weather-risk?at=52.52,13.405", bearer))["data"].(map[string]any)
+	ws, _ = data["warnings"].([]any)
+	var inForce []any
+	for _, x := range ws {
+		m, _ := x.(map[string]any)
+		inForce = append(inForce, m["inForce"])
+	}
+	if !slices.Equal(inForce, []any{true, true, false}) {
+		t.Errorf("inForce %v, want true, true, false", inForce)
+	}
 }
 
 func TestDrivingRulesAnswer(t *testing.T) {

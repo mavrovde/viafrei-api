@@ -31,6 +31,7 @@
             "until": "2026-03-30T11:04:42Z",
             "untilLocal": "2026-03-30T13:04:42+02:00"
           },
+          "inForce": true,
           "area": {
             "name": "Warngebiet 05002",
             "geometry": null

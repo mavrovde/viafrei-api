@@ -33,6 +33,7 @@ type WeatherWarning struct {
 	Headline     string      `json:"headline" doc:"The official wording, in textLanguage."`
 	TextLanguage string      `json:"textLanguage" doc:"The language of headline (BCP 47)."`
 	Validity     TimeWindow  `json:"validity"`
+	InForce      bool        `json:"inForce" doc:"Whether the warning is in force at the answer's instant; false for one that starts within the next 24 hours, which is listed beside those in force as the platform lists it (the lamp reads only those in force)."`
 	Area         WarningArea `json:"area"`
 	SourceFamily string      `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
 }
@@ -100,7 +101,7 @@ type WeatherRiskOutput struct {
 
 func registerWeatherRisk(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "The official weather warnings at a position"
-	op.Description = "Every official weather warning in force now whose area contains the position, with the issuer's level and wording unchanged, as the platform's weather warnings check states them, and the lamp over every warning in force there, whatever min_level and hazards keep (API-only: the check states no lamp). MCP counterpart: weather warnings check. Needs the scope weather."
+	op.Description = "Every official weather warning in force now, or starting within the next 24 hours (inForce false), whose area contains the position, with the issuer's level and wording unchanged, as the platform's weather warnings check states them, and the lamp over every warning in force there, whatever min_level and hazards keep (API-only: the check states no lamp). MCP counterpart: weather warnings check. Needs the scope weather."
 	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, in *WeatherRiskInput) (*WeatherRiskOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
@@ -118,7 +119,7 @@ func registerWeatherRisk(api huma.API, s *server, op huma.Operation) {
 			return nil, s.featureProblem(ctx, err)
 		}
 		noteWeatherLamp(ctx, a)
-		ws := weatherWarnings(a.Items)
+		ws := weatherWarnings(a.Items, a.At)
 		return &WeatherRiskOutput{CacheControl: noStore, Body: WeatherRiskEnvelope{
 			Data: WeatherRiskData{Lamp: string(a.Lamp), Warnings: ws, Truncated: a.HasMore, RoadWeather: []RoadWeatherObservation{}},
 			Meta: WeatherRiskMeta{
@@ -318,13 +319,13 @@ func rulesMeta(m DataMeta, caveat string) DataMeta {
 }
 
 // weatherWarnings are the answers of the warnings.
-func weatherWarnings(items []weather.Warning) []WeatherWarning {
+func weatherWarnings(items []weather.Warning, at time.Time) []WeatherWarning {
 	ws := make([]WeatherWarning, len(items))
 	for i, w := range items {
 		ws[i] = WeatherWarning{
 			ID: w.ID, Hazard: string(w.Hazard), Level: int(w.Level), LevelName: w.LevelName, Issuer: w.Issuer,
 			Headline: w.Headline, TextLanguage: w.TextLanguage, Validity: timeWindow(w.From, w.Until),
-			Area: WarningArea{Name: w.AreaName}, SourceFamily: w.Family,
+			InForce: !w.From.After(at), Area: WarningArea{Name: w.AreaName}, SourceFamily: w.Family,
 		}
 	}
 	return ws

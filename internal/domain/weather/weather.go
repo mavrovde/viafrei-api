@@ -66,7 +66,15 @@ type Warning struct {
 	AreaName string
 }
 
-// Query asks for the warnings in force at a position.
+// LookAhead is how far ahead the warnings at a position are listed: a
+// warning starting within it is listed beside those in force, as the
+// platform's weather check lists the warnings of now and the next 24 hours
+// (an upcoming warning is safety information). The lamp reads only those in
+// force.
+const LookAhead = 24 * time.Hour
+
+// Query asks for the warnings in force at a position, or starting within
+// LookAhead.
 type Query struct {
 	At       geo.Point
 	MinLevel Level

@@ -222,7 +222,7 @@ func (s *server) readWeatherWatch(ctx context.Context, key access.Record, in *Wa
 		return r, s.featureProblem(ctx, err)
 	}
 	r.data.Condition = map[string]any{"min_level": *c.MinLevel}
-	r.data.Warnings = weatherWarnings(a.Warnings)
+	r.data.Warnings = weatherWarnings(a.Warnings, a.Meta.At)
 	r.meta = s.dataMeta(ctx, nil, a.Meta.At, a.Meta.Partial, partialDetail)
 	return r, nil
 }

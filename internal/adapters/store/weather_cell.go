@@ -38,7 +38,8 @@ var warnCellNamed = `select exists (select 1 from contract.weather_warning w
 // newest start: the platform's weather watch read.
 var cellWarnings = `
 select w.warning_id, w.source_ref, w.hazard, w.warning_level, w.level_label, w.issuer_name, w.headline,
-       w.text_lang, w.valid_from, w.valid_to, coalesce(w.area_name, '')
+       w.text_lang, w.valid_from, w.valid_to, coalesce(w.area_name, ''),
+       w.warn_cell_id, w.event, w.identifier, w.published_at
 from contract.weather_warning w
 where (w.warn_cell_id = $2 or w.area_name = $2)
   and w.source_ref = any($1) and ` + permitted("w") + `

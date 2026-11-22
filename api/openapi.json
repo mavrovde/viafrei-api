@@ -8498,10 +8498,10 @@
             "type": "string"
           },
           "level": {
-            "description": "The official level, 1 (minor) to 4 (extreme), as issued; never re-graded.",
+            "description": "The official level, 1 (minor) to 4 (extreme), or 0 for an advance notice (Vorabinformation Unwetter), as issued; never re-graded. A level-0 notice does not light the lamp.",
             "format": "int64",
             "maximum": 4,
-            "minimum": 1,
+            "minimum": 0,
             "type": "integer"
           },
           "levelName": {
@@ -25766,11 +25766,11 @@
             "in": "query",
             "name": "min_level",
             "schema": {
-              "default": 1,
+              "default": 0,
               "description": "Only warnings at or above this official level.",
               "format": "int64",
               "maximum": 4,
-              "minimum": 1,
+              "minimum": 0,
               "type": "integer"
             }
           },
@@ -25898,7 +25898,7 @@
                             "lat": 49.6,
                             "lon": 7.5
                           },
-                          "minLevel": 1,
+                          "minLevel": 0,
                           "hazards": []
                         }
                       },

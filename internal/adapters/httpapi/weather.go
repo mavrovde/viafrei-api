@@ -19,7 +19,7 @@ import (
 // WeatherRiskInput is the input of getWeatherRisk.
 type WeatherRiskInput struct {
 	AtPosition
-	MinLevel int      `query:"min_level" minimum:"1" maximum:"4" default:"1" doc:"Only warnings at or above this official level."`
+	MinLevel int      `query:"min_level" minimum:"0" maximum:"4" default:"0" doc:"Only warnings at or above this official level."`
 	Hazards  []string `query:"hazards" enum:"thunderstorm,wind,rain,snow,ice,fog,heat,frost,uv,flood,other" doc:"Only these hazards, comma-separated; other keeps the hazards that cannot be mapped. Default: every hazard."`
 }
 
@@ -27,7 +27,7 @@ type WeatherRiskInput struct {
 type WeatherWarning struct {
 	ID             string      `json:"id"`
 	Hazard         string      `json:"hazard" enum:"thunderstorm,wind,rain,snow,ice,fog,heat,frost,uv,flood,other" doc:"What it warns of. Open enumeration; treat an unknown value as other."`
-	Level          int         `json:"level" minimum:"1" maximum:"4" doc:"The official level, 1 (minor) to 4 (extreme), as issued; never re-graded."`
+	Level          int         `json:"level" minimum:"0" maximum:"4" doc:"The official level, 1 (minor) to 4 (extreme), or 0 for an advance notice (Vorabinformation Unwetter), as issued; never re-graded. A level-0 notice does not light the lamp."`
 	LevelName      string      `json:"levelName" doc:"The issuer's name of the level, as issued."`
 	Issuer         string      `json:"issuer" doc:"The issuing service."`
 	Headline       string      `json:"headline" doc:"The official wording, in textLanguage."`

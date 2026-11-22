@@ -25,12 +25,14 @@ func TestMapHazardKeepsTheKnownAndFoldsTheRest(t *testing.T) {
 
 func TestCheckLevelRefusesRatherThanRegrades(t *testing.T) {
 	req.Covers(t, "FR-WEATHER-002")
-	for raw := 1; raw <= 4; raw++ {
+	// 0 is the advance notice (Vorabinformation), listed as the platform
+	// lists it.
+	for raw := 0; raw <= 4; raw++ {
 		if l, err := weather.CheckLevel(raw); err != nil || int(l) != raw {
 			t.Errorf("%d: %d %v", raw, l, err)
 		}
 	}
-	for _, raw := range []int{-1, 0, 5, 99} {
+	for _, raw := range []int{-1, 5, 99} {
 		if l, err := weather.CheckLevel(raw); !errors.Is(err, weather.ErrLevel) || l != 0 {
 			t.Errorf("%d: %d %v, want ErrLevel", raw, l, err)
 		}
@@ -65,6 +67,8 @@ func TestLampOf(t *testing.T) {
 		want           weather.Lamp
 	}{
 		{nil, false, false, weather.LampGreen},
+		// An advance notice (level 0) is listed, and is no warning.
+		{[]weather.Level{0}, false, false, weather.LampGreen},
 		{[]weather.Level{1, 1}, false, false, weather.LampAmber},
 		{[]weather.Level{1, 2}, false, false, weather.LampAmber},
 		{[]weather.Level{2, 3}, false, false, weather.LampRed},

@@ -41,9 +41,14 @@ const (
 	MaxLevel Level = 4
 )
 
-// CheckLevel refuses a stored level outside 1 to 4 rather than grading it.
+// NoticeLevel is the level of the issuer's advance notice (the DWD's
+// Vorabinformation Unwetter, level 0): listed as the platform lists it,
+// and no warning level, so the lamp does not light for it.
+const NoticeLevel Level = 0
+
+// CheckLevel refuses a stored level outside 0 to 4 rather than grading it.
 func CheckLevel(raw int) (Level, error) {
-	if raw < int(MinLevel) || raw > int(MaxLevel) {
+	if raw < int(NoticeLevel) || raw > int(MaxLevel) {
 		return 0, ErrLevel
 	}
 	return Level(raw), nil

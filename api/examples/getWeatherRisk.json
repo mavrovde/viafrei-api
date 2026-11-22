@@ -90,7 +90,7 @@
           "lat": 49.6,
           "lon": 7.5
         },
-        "minLevel": 1,
+        "minLevel": 0,
         "hazards": []
       }
     },

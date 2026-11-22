@@ -116,7 +116,7 @@ func TestWeatherRiskAnswer(t *testing.T) {
 	body = decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/weather-risk?at=52.52,13.405", bearer))
 	data, _ = body["data"].(map[string]any)
 	q, _ = meta(t, body)["query"].(map[string]any)
-	if ws, _ := data["warnings"].([]any); data["lamp"] != "amber" || data["truncated"] != false || ws == nil || len(ws) != 0 || f.gotRisk.MinLevel != 1 || f.gotRisk.Hazards != nil {
+	if ws, _ := data["warnings"].([]any); data["lamp"] != "amber" || data["truncated"] != false || ws == nil || len(ws) != 0 || f.gotRisk.MinLevel != 0 || f.gotRisk.Hazards != nil {
 		t.Errorf("defaults: data %v, asked %+v", data, f.gotRisk)
 	}
 	if hz, _ := q["hazards"].([]any); hz == nil || len(hz) != 0 {
@@ -207,7 +207,7 @@ func TestWeatherAndRulesRefusals(t *testing.T) {
 	assertProblem(t, do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: rules.ErrUnknownTopic}, nil), http.MethodGet, "/v1/driving-rules?topic=nope", bearer), 404, "not-found")
 	h := featureHandler(t, config.Defaults(), everyAnswer(), nil)
 	for _, target := range []string{
-		"/v1/weather-risk", "/v1/weather-risk?at=91,13", "/v1/weather-risk?at=52,13&min_level=5", "/v1/weather-risk?at=52,13&min_level=0",
+		"/v1/weather-risk", "/v1/weather-risk?at=91,13", "/v1/weather-risk?at=52,13&min_level=5", "/v1/weather-risk?at=52,13&min_level=-1",
 		"/v1/weather-risk?at=52,13&hazards=tornado", "/v1/driving-rules", "/v1/driving-rules?topic=Winter", "/v1/driving-rules?topic=1x",
 	} {
 		assertProblem(t, do(t, h, http.MethodGet, target, bearer), 400, "invalid-parameter")

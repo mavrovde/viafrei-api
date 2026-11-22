@@ -53,7 +53,7 @@ const warningsHere = `select w.warning_id, w.warning_level, w.valid_from <= $2,
   case when w.valid_from > $2 then w.valid_from else w.valid_to end
 ` + warningPlaced
 
-// levelOf refuses a stored level outside 1 to 4 rather than re-grading it
+// levelOf refuses a stored level outside 0 to 4 rather than re-grading it
 // (FR-WEATHER-002); the error names the warning.
 func levelOf(id string, raw int) (weather.Level, error) {
 	lvl, err := weather.CheckLevel(raw)

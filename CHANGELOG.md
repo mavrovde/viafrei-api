@@ -9,6 +9,29 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [0.4.0](https://github.com/mavrovde/viafrei-api/compare/v0.3.2...v0.4.0) (2026-11-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* data.warnings[].level in GET /v1/watch and GET /v1/weather-risk may now be 0, a DWD advance notice (Vorabinformation Unwetter); a client must accept levels 0 to 4.
+
+### Added
+
+* the MCP line's answers: fixed clock, filled credits, weather advance notices, road counts, charging circle and a service key's admission share ([#166](https://github.com/mavrovde/viafrei-api/issues/166)) ([9ab56d6](https://github.com/mavrovde/viafrei-api/commit/9ab56d69dce6ddb772826fe10feb3c4c5c647c03))
+
+
+### Fixed
+
+* **energy:** the nearest charging sites kept at the limit are the site's, by the sphere distance, then family and origin key ([#161](https://github.com/mavrovde/viafrei-api/issues/161)) ([fe2b53d](https://github.com/mavrovde/viafrei-api/commit/fe2b53d3f88b0fc771362fb427dd7d4121ad2656))
+* **params:** NaN and the infinities are refused wherever a float is parsed, with a 400 naming the parameter ([#158](https://github.com/mavrovde/viafrei-api/issues/158)) ([15f0cf8](https://github.com/mavrovde/viafrei-api/commit/15f0cf8c3bcdc665b3563a46c3db714e60ccdaf3))
+* **states:** every Land or region key parameter takes the sixteen Länder, 01 to 16 ([#159](https://github.com/mavrovde/viafrei-api/issues/159)) ([6e3ab15](https://github.com/mavrovde/viafrei-api/commit/6e3ab15de5a0e3ef01113f990cdc1206e1e86fe7))
+
+
+### Build and CI
+
+* CodeQL init and analyze 4.39.3 together, Sonar scan action 8.4.1 ([#157](https://github.com/mavrovde/viafrei-api/issues/157)) ([8e66828](https://github.com/mavrovde/viafrei-api/commit/8e668281ce853aa3c8fbf9cc0dc92f8e7a351428))
+
 ## [0.3.2](https://github.com/mavrovde/viafrei-api/compare/v0.3.1...v0.3.2) (2026-11-18)
 
 

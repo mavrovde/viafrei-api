@@ -40,6 +40,9 @@ type fake struct {
 	provCalls                            int
 	provErrOnCall                        int
 	sites                                []energy.Site
+	inRadius                             int
+	inRadiusErr                          error
+	gotInRadius                          *energy.Query
 	parks                                []parking.Site
 	place                                places.Place
 	gotFamilies, gotListed, gotOccupancy []string
@@ -55,7 +58,30 @@ type fake struct {
 	termsErr                             error
 	gotTerms                             []string
 	notes                                map[string][]provenance.Note
-	next                                 *time.Time // the earliest future report both reads return
+	texts                                map[string]string
+	readAt                               *time.Time
+	next                                 *time.Time                      // the earliest future report both reads return
+	feeding                              map[provenance.Dataset][]string // the families of each dataset; nil holds every family
+	feedErr                              error
+	feedErrOn                            provenance.Dataset // the dataset feedErr fails; empty fails every one
+	gotFeeding                           []provenance.Dataset
+}
+
+func (f *fake) Feeding(_ context.Context, d provenance.Dataset, fams []string) ([]string, error) {
+	f.gotFeeding = append(f.gotFeeding, d)
+	if f.feedErr != nil && (f.feedErrOn == "" || f.feedErrOn == d) {
+		return nil, f.feedErr
+	}
+	if f.feeding == nil {
+		return slices.Clone(fams), nil
+	}
+	out := []string{}
+	for _, x := range fams {
+		if slices.Contains(f.feeding[d], x) {
+			out = append(out, x)
+		}
+	}
+	return out, nil
 }
 
 func (f *fake) Register(context.Context) ([]access.Terms, error) {
@@ -84,7 +110,7 @@ func (f *fake) Provenance(_ context.Context, fams []string, lang string) ([]prov
 	}
 	out := make([]provenance.Family, len(fams))
 	for i, s := range fams {
-		out[i] = provenance.Family{Source: access.Source{Family: s}, Notes: f.notes[s]}
+		out[i] = provenance.Family{Source: access.Source{Family: s, AttributionText: f.texts[s]}, Notes: f.notes[s], ReadAt: f.readAt}
 	}
 	return out, nil
 }
@@ -96,6 +122,11 @@ func (f *fake) ChargingNear(ctx context.Context, _ energy.Query, fams []string, 
 		return nil, false, nil, ctx.Err()
 	}
 	return slices.Clone(f.sites), true, f.next, f.chErr
+}
+
+func (f *fake) ChargingInRadius(_ context.Context, q energy.Query, fams []string) (int, error) {
+	f.gotInRadius = &q
+	return f.inRadius, f.inRadiusErr
 }
 
 func (f *fake) ParkingNear(_ context.Context, _ parking.Query, listed, occ []string, at time.Time) ([]parking.Site, bool, *time.Time, error) {
@@ -164,6 +195,53 @@ func TestChargingIsGatedAndAttributed(t *testing.T) {
 	a, err = service(f, nil).Charging(context.Background(), key("consumer", allScopes, everything...), energy.Query{})
 	if err != nil || a.Partial || len(a.Families) != 0 {
 		t.Errorf("an empty answer credits none, as the platform's charging search: %v, %v, %v", names(a.Families), a.Partial, err)
+	}
+}
+
+// Every answer states its credits as the platform prints them: the year of
+// retrieval of the answer's clock, and a dated condition with the day its
+// family was read; one with no read is refused, never stated undated.
+func TestAnswersFillTheRegisterPlaceholders(t *testing.T) {
+	req.Covers(t, "LIC-002")
+	read := time.Date(2026, 3, 1, 8, 0, 0, 0, time.UTC)
+	f := &fake{sites: []energy.Site{site("e1")}, texts: map[string]string{"e1": "© Stadt ({Jahr})"},
+		notes: map[string][]provenance.Note{"e1": {{Kind: provenance.Condition, Text: "read on {date}"}}}, readAt: &read}
+	a, err := service(f, nil).Charging(context.Background(), key("commercial", allScopes, everything...), energy.Query{})
+	if err != nil || len(a.Families) != 1 || a.Families[0].Source.AttributionText != "© Stadt ("+now.In(berlinZone).Format("2006")+")" ||
+		a.Families[0].Notes[0].Text != "read on 2026-03-01" || a.Families[0].FilledUntil.IsZero() {
+		t.Fatalf("credited %+v, %v", a.Families, err)
+	}
+	f.readAt = nil
+	if _, err := service(f, nil).Charging(context.Background(), key("commercial", allScopes, everything...), energy.Query{}); !errors.Is(err, provenance.ErrUndated) {
+		t.Errorf("an undated condition: %v", err)
+	}
+	f = &fake{sites: []energy.Site{site("e1")}, provErr: errStore}
+	if _, err := service(f, nil).Charging(context.Background(), key("commercial", allScopes, everything...), energy.Query{}); !errors.Is(err, errStore) {
+		t.Errorf("a failed register read: %v", err)
+	}
+}
+
+var berlinZone, _ = time.LoadLocation("Europe/Berlin")
+
+// An empty charging answer states the sites of its circle, every filter
+// dropped, counted over the families the key may read; one that lists a site
+// states none and counts nothing. A failed count is the answer's error.
+func TestAnEmptyChargingAnswerCountsTheSitesOfItsCircle(t *testing.T) {
+	req.Covers(t, "FR-ENERGY-004")
+	ctx := context.Background()
+	q := energy.Query{RadiusM: 3000, MinKw: 150}
+	f := &fake{inRadius: 12}
+	a, err := service(f, nil).Charging(ctx, key("commercial", allScopes, everything...), q)
+	if err != nil || a.InRadius == nil || *a.InRadius != 12 || f.gotInRadius == nil || f.gotInRadius.RadiusM != 3000 || !slices.Equal(f.gotFamilies, []string{"e1"}) {
+		t.Errorf("empty: in radius %v, asked %+v over %v, %v", a.InRadius, f.gotInRadius, f.gotFamilies, err)
+	}
+	f = &fake{sites: []energy.Site{site("e1")}}
+	if a, err = service(f, nil).Charging(ctx, key("commercial", allScopes, everything...), q); err != nil || a.InRadius != nil || f.gotInRadius != nil {
+		t.Errorf("a site listed: in radius %v, asked %v, %v", a.InRadius, f.gotInRadius, err)
+	}
+	f = &fake{inRadiusErr: errStore}
+	if _, err = service(f, nil).Charging(ctx, key("commercial", allScopes, everything...), q); !errors.Is(err, errStore) {
+		t.Errorf("a failed count: %v", err)
 	}
 }
 

@@ -180,7 +180,7 @@ func registerWatch(api huma.API, s *server, op huma.Operation) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
-		now := s.now()
+		now := s.at()
 		end := now.Add(time.Duration(float64(time.Hour) * watchDefaultHours))
 		if in.Hours != 0 {
 			end = now.Add(time.Duration(in.Hours * float64(time.Hour)))
@@ -247,7 +247,7 @@ func registerWatch(api huma.API, s *server, op huma.Operation) {
 			if events != nil {
 				cond["events"] = events
 			}
-			c, err := s.features.MotorwayConditions(ctx, principalFrom(ctx).Key, roads.CorridorQuery{Road: in.Key, Direction: roads.DirectionBoth, Filter: filter, Limit: 100})
+			c, err := s.features.MotorwayConditions(ctx, principalFrom(ctx).Key, roads.CorridorQuery{Road: in.Key, Direction: roads.DirectionBoth, Filter: filter, Limit: 100, AnyMotorway: true})
 			if err != nil {
 				return nil, s.featureProblem(ctx, err)
 			}

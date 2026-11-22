@@ -444,6 +444,31 @@ func SourceSight(f provenance.Freshness) ampel.Sight {
 // is never a guarantee that the road is free. The reason names the first of
 // the lamp's reasons; nil for green.
 func LampOf(messages []Message, levels []int, sight []ampel.SightEntry) (Lamp, *Reason) {
+	a := AccountOf(messages, levels, sight)
+	return a.Lamp, a.Reason
+}
+
+// ReasonCount is one reason of a lamp, the colour it gives and how many
+// signals or groups of limited sight give it.
+type ReasonCount struct {
+	Reason Reason
+	Lamp   Lamp
+	Count  int
+}
+
+// Account is a lamp with everything it rests on: its first reason (nil for
+// green), every reason in the lamp's order (red before amber, the order of
+// Reasons inside a colour) with its count, and the sight of every group
+// read, as given.
+type Account struct {
+	Lamp    Lamp
+	Reason  *Reason
+	Reasons []ReasonCount
+	Sight   []ampel.SightEntry
+}
+
+// AccountOf is LampOf with every reason and the sight it judged.
+func AccountOf(messages []Message, levels []int, sight []ampel.SightEntry) Account {
 	signals := make([]ampel.Signal, 0, len(messages)+len(levels))
 	for _, m := range messages {
 		if s, ok := m.Signal(); ok {
@@ -455,11 +480,20 @@ func LampOf(messages []Message, levels []int, sight []ampel.SightEntry) (Lamp, *
 	}
 	ampel.SortSignals(signals)
 	a := ampel.Of(signals, sight)
-	if a.Lamp == ampel.LampGreen {
-		return LampGreen, nil
+	out := Account{Lamp: Lamp(a.Lamp), Sight: slices.Clone(sight)}
+	for _, r := range a.Reasons {
+		name := ReasonOf(r)
+		if i := slices.IndexFunc(out.Reasons, func(c ReasonCount) bool { return c.Reason == name }); i >= 0 {
+			out.Reasons[i].Count++
+			continue
+		}
+		out.Reasons = append(out.Reasons, ReasonCount{Reason: name, Lamp: Lamp(r.Lamp), Count: 1})
 	}
-	r := ReasonOf(a.Reasons[0])
-	return Lamp(a.Lamp), &r
+	if len(out.Reasons) > 0 {
+		first := out.Reasons[0].Reason
+		out.Reason = &first
+	}
+	return out
 }
 
 // Families are the source families a conditions question reads: the roads
@@ -481,6 +515,10 @@ type Warning struct {
 type Page struct {
 	Items   []Situation
 	HasMore bool
+	// Counts are, by family, how many situations the list's filters keep,
+	// before the limit (the platform's counts per publisher); a family
+	// with none is absent.
+	Counts map[string]int
 	// Messages is the lamp's view of every situation in the scope, whatever
 	// the list's filters keep.
 	Messages []Message
@@ -616,6 +654,10 @@ type CorridorQuery struct {
 	Unregistered bool
 	// Class is the class of an unregistered road (ClassOf).
 	Class Class
+	// AnyMotorway reads a motorway the register lacks as an unregistered
+	// road rather than refusing it: a watch takes any valid road number, as
+	// the platform's watch does, and reports what names the road.
+	AnyMotorway bool
 	// Direction keeps the situations on this carriageway, on both, and
 	// those whose direction is unknown; DirectionBoth keeps every one.
 	Direction Direction

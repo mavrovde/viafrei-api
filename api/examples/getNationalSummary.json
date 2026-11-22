@@ -244,7 +244,8 @@
           "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms/afir_alpha"
+          "termsUrl": "https://alpha.example/terms/afir_alpha",
+          "sourceUrl": "https://alpha.example/terms/afir_alpha"
         },
         {
           "family": "dwd_alpha",
@@ -255,7 +256,8 @@
           "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms/dwd_alpha"
+          "termsUrl": "https://alpha.example/terms/dwd_alpha",
+          "sourceUrl": "https://alpha.example/terms/dwd_alpha"
         },
         {
           "family": "openstation_siri_fm",
@@ -266,7 +268,8 @@
           "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms/openstation_siri_fm"
+          "termsUrl": "https://alpha.example/terms/openstation_siri_fm",
+          "sourceUrl": "https://alpha.example/terms/openstation_siri_fm"
         },
         {
           "family": "park_alpha",
@@ -277,7 +280,8 @@
           "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms/park_alpha"
+          "termsUrl": "https://alpha.example/terms/park_alpha",
+          "sourceUrl": "https://alpha.example/terms/park_alpha"
         },
         {
           "family": "roads_alpha",
@@ -288,7 +292,8 @@
           "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms/roads_alpha"
+          "termsUrl": "https://alpha.example/terms/roads_alpha",
+          "sourceUrl": "https://alpha.example/terms/roads_alpha"
         },
         {
           "family": "tankerkoenig_gamma",
@@ -299,7 +304,8 @@
           "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://gamma.example/terms/tankerkoenig_gamma"
+          "termsUrl": "https://gamma.example/terms/tankerkoenig_gamma",
+          "sourceUrl": "https://gamma.example/terms/tankerkoenig_gamma"
         }
       ],
       "notes": {

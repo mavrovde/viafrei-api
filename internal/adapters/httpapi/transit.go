@@ -143,7 +143,7 @@ func registerDepartures(api huma.API, s *server, op huma.Operation) {
 		}
 		from := in.From
 		if from.IsZero() {
-			from = s.now()
+			from = s.at()
 		}
 		minutes, limit := in.DurationMin, in.Limit
 		if minutes == 0 {
@@ -219,6 +219,7 @@ type StationsInput struct {
 	At      string `query:"at" pattern:"^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$" example:"50.943,6.959" doc:"A position: lat,lon in decimal degrees (WGS 84). With q, the name search within radius_m of it. At least one of q and at."`
 	RadiusM int    `query:"radius_m" minimum:"1" maximum:"50000" doc:"Search radius around at, in metres. Default: geo.default_radius_m. Ignored without at."`
 	Limit   int    `query:"limit" minimum:"1" maximum:"60" doc:"Most stations to return. Default: pagination.default_limit."`
+	Area    string `query:"area" pattern:"^(0[1-9]|1[0-6])([0-9]{3})?$" example:"05315" doc:"Only the stations of an area: its official region code, two digits a Land (01 to 16), five a Kreis or kreisfreie Stadt, as listPlaces or describeLocation give it. It narrows q, code or at, and is no search of its own; a station whose district is unknown is left out."`
 	point   *geo.Point
 }
 
@@ -259,6 +260,7 @@ type StationsQuery struct {
 	Code    *string   `json:"code" nullable:"true" doc:"The station code asked; null for none."`
 	At      *Position `json:"at" doc:"The position searched around; null for none."`
 	RadiusM *int      `json:"radiusM" nullable:"true" doc:"The radius around at; null without at."`
+	Area    *string   `json:"area" nullable:"true" example:"05315" doc:"The area the stations were kept to; null for none."`
 }
 
 // StationsMeta is the meta member of listStations.
@@ -283,14 +285,17 @@ type StationsOutput struct {
 
 func registerStations(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "Find stations by name or near a position"
-	op.Description = "The stations whose name contains q, those that start with it first, then by name; or the stations within the radius of at, nearest first; or, with both, the stations named so within the radius, nearest first. Ties go by name, then id. It answers a search field's suggestions as the user types (limit 8) as well as a full search. Needs the scope transit."
+	op.Description = "The stations whose name contains q, those that start with it first, then by name; or the stations within the radius of at, nearest first; or, with both, the stations named so within the radius, nearest first. Ties go by name, then id. area keeps any of these to one Land or Kreis. It answers a search field's suggestions as the user types (limit 8) as well as a full search. Needs the scope transit."
 	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, in *StationsInput) (*StationsOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
-		q := transit.Query{Text: in.Q, Code: in.Code, At: in.point, Limit: s.limit(in.Limit)}
+		q := transit.Query{Text: in.Q, Code: in.Code, At: in.point, Limit: s.limit(in.Limit), Area: in.Area}
 		query := StationsQuery{}
+		if in.Area != "" {
+			query.Area = &in.Area
+		}
 		if in.Q != "" {
 			query.Q = &in.Q
 		}

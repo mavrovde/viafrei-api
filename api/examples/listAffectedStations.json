@@ -82,7 +82,8 @@
           "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms/openstation_siri_fm"
+          "termsUrl": "https://alpha.example/terms/openstation_siri_fm",
+          "sourceUrl": "https://alpha.example/terms/openstation_siri_fm"
         }
       ],
       "notes": {

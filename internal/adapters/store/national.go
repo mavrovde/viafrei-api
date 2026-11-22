@@ -63,7 +63,7 @@ where f.source_ref = any($1) and ` + permitted("f") + ` and $2::timestamptz is n
 group by 2, 4
 order by 1, 2, 4`,
 	"weather": `
-select 'warnings', w.warning_level::text, null::text, w.source_ref, count(*)::int, count(distinct w.region_code)::int, null::float8, null::float8
+select 'warnings', w.warning_level::text, null::text, w.source_ref, count(*)::int, count(distinct w.warn_cell_id)::int, null::float8, null::float8
 from contract.weather_warning w
 where w.withdrawn_at is null and w.message_status <> 'cancelled' and w.source_ref = any($1) and ` + permitted("w") + `
   and w.valid_from <= $2 and (w.valid_to is null or w.valid_to > $2)

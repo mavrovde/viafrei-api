@@ -52,7 +52,8 @@ func riskAnswer() features.WeatherRisk {
 	return features.WeatherRisk{
 		Answer: features.Answer[weather.Warning]{Items: []weather.Warning{
 			{ID: "w-1", Family: "src-alpha-weather", Hazard: "snow", Level: 3, LevelName: "Unwetter", Issuer: "Wetterdienst",
-				Headline: "Schneefall", TextLanguage: "de", From: fixedNow.Add(-time.Hour), Until: tp(fixedNow.Add(26 * time.Hour)), AreaName: "Kreis A"},
+				Headline: "Schneefall", TextLanguage: "de", From: fixedNow.Add(-time.Hour), Until: tp(fixedNow.Add(26 * time.Hour)), AreaName: "Kreis A",
+				CellID: sp("814626000"), Event: sp("FROST"), Identifier: sp("2.49.0.0.276.0.DWD.PVW.1"), Published: tp(fixedNow.Add(-2 * time.Hour))},
 			{ID: "w-2", Family: "src-alpha-weather", Hazard: weather.Other, Level: 1, LevelName: "Wetterwarnung", Issuer: "Wetterdienst",
 				Headline: "Hinweis", TextLanguage: "de", From: fixedNow, AreaName: "Kreis A"},
 		}, HasMore: true, Families: []provenance.Family{weatherFamily}, At: fixedNow},
@@ -90,15 +91,18 @@ func TestWeatherRiskAnswer(t *testing.T) {
 		v0["fromLocal"] != "2026-03-29T01:30:00+01:00" || v0["untilLocal"] != "2026-03-30T05:30:00+02:00" {
 		t.Errorf("first warning %v", w0)
 	}
-	if area, _ := w0["area"].(map[string]any); len(area) != 2 || area["name"] != "Kreis A" || area["geometry"] != nil {
+	if area, _ := w0["area"].(map[string]any); len(area) != 3 || area["name"] != "Kreis A" || area["geometry"] != nil || area["cellId"] != "814626000" {
 		t.Errorf("area %v", w0["area"])
+	}
+	if w0["event"] != "FROST" || w0["identifier"] != "2.49.0.0.276.0.DWD.PVW.1" || w0["published"] != "2026-03-28T23:30:00Z" || w0["publishedLocal"] != "2026-03-29T00:30:00+01:00" {
+		t.Errorf("issued %v %v %v %v", w0["event"], w0["identifier"], w0["published"], w0["publishedLocal"])
 	}
 	if rw, ok := data["roadWeather"].([]any); !ok || len(rw) != 0 {
 		t.Errorf("roadWeather %v", data["roadWeather"])
 	}
 	w1, _ := ws[1].(map[string]any)
 	v1, _ := w1["validity"].(map[string]any)
-	if w1["hazard"] != "other" || v1["until"] != nil {
+	if w1["hazard"] != "other" || v1["until"] != nil || w1["event"] != nil || w1["published"] != nil || w1["publishedLocal"] != nil {
 		t.Errorf("second warning %v", w1)
 	}
 	q, _ := meta(t, body)["query"].(map[string]any)
@@ -112,11 +116,28 @@ func TestWeatherRiskAnswer(t *testing.T) {
 	body = decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/weather-risk?at=52.52,13.405", bearer))
 	data, _ = body["data"].(map[string]any)
 	q, _ = meta(t, body)["query"].(map[string]any)
-	if ws, _ := data["warnings"].([]any); data["lamp"] != "amber" || data["truncated"] != false || ws == nil || len(ws) != 0 || f.gotRisk.MinLevel != 1 || f.gotRisk.Hazards != nil {
+	if ws, _ := data["warnings"].([]any); data["lamp"] != "amber" || data["truncated"] != false || ws == nil || len(ws) != 0 || f.gotRisk.MinLevel != 0 || f.gotRisk.Hazards != nil {
 		t.Errorf("defaults: data %v, asked %+v", data, f.gotRisk)
 	}
 	if hz, _ := q["hazards"].([]any); hz == nil || len(hz) != 0 {
 		t.Errorf("an empty hazard list is [] in meta.query: %v", q)
+	}
+
+	// A warning is in force from its start, at the answer's instant
+	// included; one starting later is listed as not yet in force.
+	f = everyAnswer()
+	f.risk = riskAnswer()
+	f.risk.Items = append(f.risk.Items, weather.Warning{ID: "w-3", Family: "src-alpha-weather", Hazard: "wind", Level: 2, LevelName: "Markante Wetterwarnung",
+		Issuer: "Wetterdienst", Headline: "Sturmböen", TextLanguage: "de", From: fixedNow.Add(2 * time.Hour), AreaName: "Kreis A"})
+	data, _ = decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/weather-risk?at=52.52,13.405", bearer))["data"].(map[string]any)
+	ws, _ = data["warnings"].([]any)
+	var inForce []any
+	for _, x := range ws {
+		m, _ := x.(map[string]any)
+		inForce = append(inForce, m["inForce"])
+	}
+	if !slices.Equal(inForce, []any{true, true, false}) {
+		t.Errorf("inForce %v, want true, true, false", inForce)
 	}
 }
 
@@ -186,7 +207,7 @@ func TestWeatherAndRulesRefusals(t *testing.T) {
 	assertProblem(t, do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: rules.ErrUnknownTopic}, nil), http.MethodGet, "/v1/driving-rules?topic=nope", bearer), 404, "not-found")
 	h := featureHandler(t, config.Defaults(), everyAnswer(), nil)
 	for _, target := range []string{
-		"/v1/weather-risk", "/v1/weather-risk?at=91,13", "/v1/weather-risk?at=52,13&min_level=5", "/v1/weather-risk?at=52,13&min_level=0",
+		"/v1/weather-risk", "/v1/weather-risk?at=91,13", "/v1/weather-risk?at=52,13&min_level=5", "/v1/weather-risk?at=52,13&min_level=-1",
 		"/v1/weather-risk?at=52,13&hazards=tornado", "/v1/driving-rules", "/v1/driving-rules?topic=Winter", "/v1/driving-rules?topic=1x",
 	} {
 		assertProblem(t, do(t, h, http.MethodGet, target, bearer), 400, "invalid-parameter")

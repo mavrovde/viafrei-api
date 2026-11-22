@@ -25,6 +25,7 @@
         "licenceUrl": "https://licences.example/dl-de-by-2-0",
         "shareAlike": false,
         "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html",
+        "sourceUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html",
         "dataAsOf": null,
         "status": "grey"
       },
@@ -37,6 +38,7 @@
         "licenceUrl": "https://licences.example/cc-by-4-0",
         "shareAlike": false,
         "termsUrl": "https://download.geonames.org/export/dump/",
+        "sourceUrl": "https://download.geonames.org/export/dump/",
         "dataAsOf": null,
         "status": "grey"
       },
@@ -49,6 +51,7 @@
         "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
         "shareAlike": true,
         "termsUrl": "https://www.openstreetmap.org/copyright",
+        "sourceUrl": "https://www.openstreetmap.org/copyright",
         "dataAsOf": null,
         "status": "grey"
       }
@@ -91,7 +94,8 @@
           "licenceUrl": "https://licences.example/dl-de-by-2-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+          "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html",
+          "sourceUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
         },
         {
           "family": "geonames",
@@ -102,7 +106,8 @@
           "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://download.geonames.org/export/dump/"
+          "termsUrl": "https://download.geonames.org/export/dump/",
+          "sourceUrl": "https://download.geonames.org/export/dump/"
         },
         {
           "family": "osm",
@@ -113,7 +118,8 @@
           "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
           "shareAlike": true,
           "shareAlikeOffer": "https://viafrei.de/impressum",
-          "termsUrl": "https://www.openstreetmap.org/copyright"
+          "termsUrl": "https://www.openstreetmap.org/copyright",
+          "sourceUrl": "https://www.openstreetmap.org/copyright"
         }
       ],
       "notes": {

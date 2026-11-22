@@ -232,6 +232,8 @@ var Default = Rules{
 		{"data.access", "", "getChargingSite", "the MCP capability has no access concept: no charging source of the platform publishes who may use a site"},
 		{"data.chargePoints[*].current", "", "getChargingSite", "the MCP capability states no current per point"},
 		{"meta.freshness", "", "", "API-only: the per-family freshness block of the read contract (ENV-003)"},
+		{"meta.attribution[*].sourceUrl", "", "", sourceURLReason},
+		{"data[*].sourceUrl", "", "listSources", sourceURLReason},
 		{"meta.warnings", "", "", "API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got"},
 		{"meta.page.hasMore", "min_kw", "", "the MCP capability states no count of the sites a power filter keeps, so it cannot say whether there are more"},
 		{"meta.asOf", "", "", "each side defines it differently: the API the oldest family dataAsOf (ENV-004), MCP the newest current status or its clock"},
@@ -257,6 +259,16 @@ var Default = Rules{
 		{"data.lampReason", "from", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
 		{"data.corridor.states", "horizon_days", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
 		{"data.corridor.states", "from", "getMotorwayConditions", siteReason("/internal/motorway/:road")},
+		{"data.lampReasons", "", "getMotorwayConditions", lampAccountReason},
+		{"data.sight", "", "getMotorwayConditions", lampAccountReason},
+		{"data.lampReasons", "", "listRoadConditions", lampAccountReason},
+		{"data.sight", "", "listRoadConditions", lampAccountReason},
+		{"data.lampReasons", "", "listStateRoadConditions", lampAccountReason},
+		{"data.sight", "", "listStateRoadConditions", lampAccountReason},
+		{"data.counts", "", "getMotorwayConditions", familyCountsReason},
+		{"data.counts", "", "listRoadConditions", familyCountsReason},
+		{"data.counts", "", "listStateRoadConditions", familyCountsReason},
+		{"data.line", "", "listTransitDisruptions", lineCheckReason},
 		{"data[*].kilometres", "", "listMotorways", motorwayListReason},
 		{"data[*].sourceFamily", "", "listMotorways", motorwayListReason},
 		{"data.apiVersion", "", "getMeta", serviceMetaReason},
@@ -352,6 +364,20 @@ const zoneRowsReason = "API-only: the MCP driving rules state the verdict at a p
 // weatherLampReason is why the lamp and the truncation flag of the warnings
 // at a position are not compared: the /v1 contract keeps both (VER-001).
 const weatherLampReason = "API-only: the /v1 contract states the lamp over every warning at the position and whether the list was cut (VER-001); the platform's weather warnings check states neither, and no digest route the site reads serves a lamp for a position"
+
+// lampAccountReason is why a lamp's account is not compared.
+// familyCountsReason is why a roads answer's counts per family are not
+// compared.
+const familyCountsReason = "API-only until the platform's fold is in the read contract: the /v1 contract counts the situations the filters keep by source family, before the limit; the platform's road status states its counts in its head sentence, by its folded lines, which the producer does not project"
+
+const lampAccountReason = "API-only: the /v1 contract states every reason of the lamp with its count and the sight of every group read; the platform's road status names one reason and no sight"
+
+// sourceURLReason is why the source page of a credit is not compared yet.
+const sourceURLReason = "Not compared until a bundle the MCP side produced carries it: the credit's source page (the register's page for the family) is new in the /v1 contract, and no bundle recorded so far holds that fact; remove this exclusion with the first bundle that does"
+
+// lineCheckReason is why the timetable's word on a line asked is not
+// compared.
+const lineCheckReason = "API-only until a bundle the MCP side produced carries it: the /v1 contract states whether the static timetable knows the line asked; no bundle recorded so far holds that fact"
 
 // roadsLampReason is why the lamp of the conditions near a position is not
 // compared: the /v1 contract keeps it (VER-001).

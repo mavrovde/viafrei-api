@@ -60,7 +60,8 @@
           "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://www.bast.de/DE/Publikationen/Daten/Verkehrstechnik/Lang-Lkw.html"
+          "termsUrl": "https://www.bast.de/DE/Publikationen/Daten/Verkehrstechnik/Lang-Lkw.html",
+          "sourceUrl": "https://www.bast.de/DE/Publikationen/Daten/Verkehrstechnik/Lang-Lkw.html"
         }
       ],
       "notes": {

@@ -145,14 +145,15 @@ type storedMessage struct {
 
 // warningsPending is the condition of a weather warning the lamp reads or
 // will read: a published, not cancelled warning of the given families that
-// has not ended at now, placed in an area. $1 families, $2 now. Those whose
-// valid_from is at or before now are in force; the others start later.
+// has not ended at now. $1 families, $2 now. Those whose valid_from is at or
+// before now are in force; the others start later. Each scope places it by
+// the warning's own area or its warn cell, as the platform places a DWD
+// warning, never by the region code it is filed under: the code is often
+// null, and a join on it answered "no warning" where the area holds one.
 const warningsPending = `from contract.weather_warning w
-join contract.admin_region r on r.region_code = w.region_code
 where w.withdrawn_at is null and w.message_status <> 'cancelled'
   and w.source_ref = any($1)
   and w.display_class <> 'withhold' and (w.audience = 'public' or ` + ownKeyOn + `)
-  and r.display_class <> 'withhold' and (r.audience = 'public' or ` + ownKeyOn + `)
   and (w.valid_to is null or w.valid_to > $2)`
 
 // sourcesSelect reads the freshness of the given families and the newest
@@ -255,7 +256,28 @@ where exists (select 1 from contract.traffic_event e
                 and (e.valid_to is null or e.valid_to > $3)
                 and ` + eventPermitted + `)`
 
+// counted is a listed situation and, by family, how many situations the
+// list's filters keep before the limit.
+type counted struct {
+	situation roads.Situation
+	counts    map[string]int
+}
+
+// scanCounted reads a listed situation and the counts by family.
+func scanCounted(r pgx.CollectableRow) (counted, error) {
+	var c counted
+	s, err := scanSituationWith(r, &c.counts)
+	c.situation = s
+	return c, err
+}
+
+// scanSituation reads one situation.
 func scanSituation(r pgx.CollectableRow) (roads.Situation, error) {
+	return scanSituationWith(r)
+}
+
+// scanSituationWith reads one situation, then the extra columns into extra.
+func scanSituationWith(r pgx.CollectableRow, extra ...any) (roads.Situation, error) {
 	var (
 		v                                      roads.Situation
 		kind, severity, class, direction       string
@@ -266,10 +288,10 @@ func scanSituation(r pgx.CollectableRow) (roads.Situation, error) {
 		headline, lang                         string
 		lanesClosed, lanesTotal, delay, length *int
 	)
-	err := r.Scan(&v.ID, &v.Family, &kind, &severity, &road, &class,
+	err := r.Scan(append([]any{&v.ID, &v.Family, &kind, &severity, &road, &class,
 		&direction, &v.Towards, &lat, &lon, &from, &until,
 		&lanesClosed, &lanesTotal, &delay, &length, &headline, &v.Description,
-		&lang, &updated, &v.AtKm, &v.DistanceM)
+		&lang, &updated, &v.AtKm, &v.DistanceM}, extra...)...)
 	s := &v
 	s.Kind, s.Severity, s.Class, s.Direction = roads.MapKind(kind), roads.MapSeverity(severity), roads.MapClass(class), roads.MapDirection(direction)
 	if road != nil {
@@ -311,7 +333,13 @@ func (s *Store) read(ctx context.Context, list string, listArgs []any, limit int
 		for _, step := range []func() error{
 			func() (err error) {
 				res, _ := tx.Query(ctx, list, listArgs...)
-				out.Items, err = pgx.CollectRows(res, scanSituation)
+				rows, err := pgx.CollectRows(res, scanCounted)
+				// Every row carries the counts of the whole filtered set, the
+				// families past the limit too; none listed is none counted.
+				out.Items, out.Counts = make([]roads.Situation, len(rows)), map[string]int{}
+				for i, r := range rows {
+					out.Items[i], out.Counts = r.situation, r.counts
+				}
 				return err
 			},
 			func() error { return tx.QueryRow(ctx, sc.messages, sc.args...).Scan(&stored, &out.NextChange) },
@@ -449,7 +477,8 @@ placed as (
 select `+situationColumns+`,
        case when e.share is null or e.road_km is null then null
             else round((e.share * e.road_km)::numeric, 1)::float8 end km,
-       null::int
+       null::int,
+       (select jsonb_object_agg(c.source_ref, c.n) from (select source_ref, count(*)::int n from answering group by source_ref) c)
 from placed e
 order by case when e.event_kind = 'jam' then 0 when e.event_kind = 'closure' then 1
               when e.event_kind = 'roadworks' then 3 else 2 end,
@@ -499,15 +528,18 @@ answering as (
     and e.location is not null
     and st_dwithin(e.location::geography, here.g, $10)
     and (e.road_class = any($11) or ($12 and not e.road_class = any($13))))
-select `+situationColumns+`, null::float8, e.dist
+select `+situationColumns+`, null::float8, e.dist,
+       (select jsonb_object_agg(c.source_ref, c.n) from (select source_ref, count(*)::int n from answering group by source_ref) c)
 from answering e
 order by coalesce(array_position($6::text[], e.severity), 0) desc, e.dist, e.event_id
 limit $14`, args, q.Limit, fams, now, scope{
 		messages: messagesSelect + `
   and e.location is not null
   and st_dwithin(e.location::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`,
-		args:        []any{fams.Roads, now, q.At.Lat, q.At.Lon, q.RadiusM},
-		warnings:    `st_dwithin(r.boundary::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`,
+		args: []any{fams.Roads, now, q.At.Lat, q.At.Lon, q.RadiusM},
+		// A warning is near when its own area reaches within the radius, as
+		// the platform's warnings at a point test the warning's area.
+		warnings:    `w.area is not null and st_dwithin(w.area::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`,
 		warningArgs: []any{q.At.Lat, q.At.Lon, q.RadiusM},
 		states: statesOf(`with here as (select st_setsrid(st_makepoint($2, $1), 4326) g),
 near as (select j.state_code from contract.junction j, here
@@ -537,14 +569,19 @@ with answering as (
   where `+situationFilter(13)+`
     and ($8 = 'de' or e.state_code = $8)
     and (e.road_class = any($9) or ($10 and not e.road_class = any($11))))
-select `+situationColumns+`, null::float8, null::int
+select `+situationColumns+`, null::float8, null::int,
+       (select jsonb_object_agg(c.source_ref, c.n) from (select source_ref, count(*)::int n from answering group by source_ref) c)
 from answering e
 order by coalesce(array_position($6::text[], e.severity), 0) desc, e.road_ref, e.event_id
 limit $12`, args, q.Limit, fams, now, scope{
 		messages: messagesSelect + `
   and ($3 = 'de' or e.state_code = $3)`,
-		args:        []any{fams.Roads, now, q.State},
-		warnings:    `($3 = 'de' or r.region_code like $3 || '%')`,
+		args: []any{fams.Roads, now, q.State},
+		// A Land's warnings are those of its warn cells: the DWD's Gemeinde
+		// and coast cells are 8 or 7 and the Gemeinde key, so the Land is
+		// the key's first two digits, as the platform's warnings in an area
+		// read them.
+		warnings:    `($3 = 'de' or (left(w.warn_cell_id, 1) in ('7', '8') and substr(w.warn_cell_id, 2, 2) = $3))`,
 		warningArgs: []any{q.State},
 		states:      `select case when $1 = 'de' then (select coalesce(array_agg(r.region_code order by r.region_code), '{}') from contract.admin_region r where r.region_level = 'state') else array[$1::text] end`,
 		stateArgs:   []any{q.State},

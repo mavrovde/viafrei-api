@@ -114,8 +114,10 @@ func serve(environ []string, stderr io.Writer) int {
 	st.WithAdmission(adm).WithSharedBudget(wire.SharedBudget(cfg)).WithLogger(log).WithBreaker(wire.Breaker(cfg, log))
 	go st.KeepRegister(ctx)
 	go st.KeepRoads(ctx)
+	go st.KeepFeeding(ctx)
 	addresses := ratelimit.NewIPLimiter(wire.AddressSettings(cfg), nil)
 	go addresses.Run(ctx)
+	at := wire.AnswerClock(cfg, log)
 
 	deps := httpapi.Deps{
 		Config:          cfg,
@@ -126,7 +128,8 @@ func serve(environ []string, stderr io.Writer) int {
 		ContractVersion: dbcontract.ContractVersion,
 		Sources:         st,
 		Features: features.New(features.Repositories{Register: st, Charging: st, Parking: st, Places: st, Roads: st, Weather: st, Rules: st, Transit: st, Fuel: st, Hydrogen: st, Speed: st, Sharing: st, Addresses: st, Pois: st, Locations: st, Disruptions: st, Nearby: st, Lorry: st, Catalogue: st, National: st, Affected: st, Coverage: st, States: st, TrainBoards: st, Bays: st},
-			wire.FeatureSettings(cfg), time.Now),
+			wire.FeatureSettings(cfg), at),
+		At:        at,
 		Addresses: addresses,
 		Versions:  st,
 	}

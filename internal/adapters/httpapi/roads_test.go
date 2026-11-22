@@ -6,12 +6,14 @@ import (
 	"net/http"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/ampel"
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
@@ -60,6 +62,34 @@ func conditionsAnswer() features.Conditions {
 		Answer: features.Answer[roads.Situation]{Items: []roads.Situation{closure(), bare}, HasMore: true, Families: []provenance.Family{roadFamily}, At: fixedNow},
 		Road:   &roads.Road{Ref: "A8", Class: roads.ClassMotorway, States: []string{"DE-BW", "DE-BY"}},
 		Lamp:   roads.LampRed, Reason: &reason,
+		Reasons: []roads.ReasonCount{{Reason: roads.ReasonRoadClosed, Lamp: roads.LampRed, Count: 1}, {Reason: roads.ReasonLimitedSight, Lamp: roads.LampAmber, Count: 2}},
+		Sight: []ampel.SightEntry{{Group: roads.GroupRoads, State: ampel.SightStale, Family: "src-alpha-roads"}, {Group: roads.GroupRoads, State: ampel.SightMissing},
+			{Group: ampel.GroupWeather, State: ampel.SightFresh}, {Group: ampel.GroupMessages, State: ampel.SightFresh, Land: "08"}},
+	}
+}
+
+// TestEveryConditionsAnswerAccountsForItsLamp: the three conditions answers
+// list every reason of the lamp with its count and the sight of every group
+// read; a green lamp lists no reason.
+func TestEveryConditionsAnswerAccountsForItsLamp(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004", "ENV-040")
+	f := everyAnswer()
+	h := featureHandler(t, config.Defaults(), f, nil)
+	reasons := `"lampReasons":[{"reason":"road_closed","lamp":"red","count":1},{"reason":"limited_sight","lamp":"amber","count":2}]`
+	sight := `"sight":[{"group":"roads","state":"stale","family":"src-alpha-roads","land":null},{"group":"roads","state":"missing","family":null,"land":null},` +
+		`{"group":"weather","state":"fresh","family":null,"land":null},{"group":"messages","state":"fresh","family":null,"land":"08"}]`
+	urls := []string{"/v1/motorways/A8/conditions", "/v1/road-conditions?at=48.7,9.1", "/v1/states/08/road-conditions"}
+	for _, u := range urls {
+		w := do(t, h, http.MethodGet, u, bearer)
+		if body := w.Body.String(); w.Code != http.StatusOK || !strings.Contains(body, reasons) || !strings.Contains(body, sight) {
+			t.Errorf("%s: %d %s", u, w.Code, body)
+		}
+	}
+	f.conditions = features.Conditions{Answer: features.Answer[roads.Situation]{At: fixedNow}, Road: &roads.Road{Ref: "A8", Class: roads.ClassMotorway}, Lamp: roads.LampGreen}
+	for _, u := range urls {
+		if body := do(t, h, http.MethodGet, u, bearer).Body.String(); !strings.Contains(body, `"lampReasons":[]`) || !strings.Contains(body, `"sight":[]`) {
+			t.Errorf("%s green: %s", u, body)
+		}
 	}
 }
 
@@ -130,6 +160,9 @@ func TestMotorwayConditionsGreenWithoutSituations(t *testing.T) {
 	if sits, _ := data["situations"].([]any); len(sits) != 0 {
 		t.Errorf("situations %v", sits)
 	}
+	if cs, ok := data["counts"].([]any); !ok || len(cs) != 0 {
+		t.Errorf("counts of an empty answer %v", data["counts"])
+	}
 	if f.gotRoad.MinSeverity != roads.SeverityInfo || f.gotRoad.Kinds != nil {
 		t.Errorf("defaults %+v", f.gotRoad)
 	}
@@ -154,6 +187,25 @@ func TestRoadConditionsAnswer(t *testing.T) {
 	if area["radiusM"] != 5000.0 || s1["distanceM"] != 800.0 {
 		t.Errorf("data %v", data)
 	}
+	// The counts per family, in family order, past the limit too.
+	f.conditions.Counts = map[string]int{"src-b": 7, "src-a": 2}
+	for _, path := range []string{"/v1/road-conditions?at=48.1,11.6", "/v1/states/09/road-conditions", "/v1/motorways/A8/conditions"} {
+		if path == "/v1/motorways/A8/conditions" {
+			f.conditions.Road = &roads.Road{Ref: "A8", Class: roads.ClassMotorway}
+		}
+		d, _ := decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, path, bearer))["data"].(map[string]any)
+		cs, _ := d["counts"].([]any)
+		if len(cs) != 2 {
+			t.Errorf("%s: counts %v, data %v", path, d["counts"], d)
+			continue
+		}
+		c0, _ := cs[0].(map[string]any)
+		c1, _ := cs[1].(map[string]any)
+		if c0["sourceFamily"] != "src-a" || c0["situations"] != 2.0 || c1["sourceFamily"] != "src-b" || c1["situations"] != 7.0 {
+			t.Errorf("%s: counts %v", path, d["counts"])
+		}
+	}
+	f.conditions.Counts, f.conditions.Road = nil, nil
 	q, _ := meta(t, body)["query"].(map[string]any)
 	if types, _ := q["roadClasses"].([]any); len(types) != 2 {
 		t.Errorf("query %v", q)

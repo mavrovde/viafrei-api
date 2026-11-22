@@ -18,7 +18,7 @@ type Coverage interface {
 // (the platform's gazetteer and addresses resources), from the places
 // families it may read.
 func (s *Service) PlacesCoverage(ctx context.Context, key access.Record) (places.Coverage, Answer[struct{}], error) {
-	return listed(ctx, s, key, "places", func(permitted []string) (places.Coverage, []string, error) {
+	return listed(ctx, s, key, "places", "", func(permitted []string) (places.Coverage, []string, error) {
 		c, err := s.repos.Coverage.PlacesCoverage(ctx, permitted)
 		return c, c.Families(), err
 	})

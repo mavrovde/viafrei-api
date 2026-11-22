@@ -1,0 +1,77 @@
+{
+  "title": "The service alerts of a line, and whether the timetable knows it",
+  "request": "/v1/transit-disruptions?line=RE%2045",
+  "attribution": "Service alerts and punctuality come from the source families of the transit domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "transit"
+    ],
+    "sources": [
+      "delfi_sa_alpha",
+      "delfi_static"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": {
+      "alerts": [],
+      "alertsTotal": 0,
+      "alertsChecked": true,
+      "duplicatesOmitted": 0,
+      "punctuality": null,
+      "windowMin": 60,
+      "line": {
+        "key": "RE45",
+        "checked": true,
+        "inTimetable": true
+      }
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": "2026-03-29T12:00:00Z",
+      "freshness": [
+        {
+          "family": "delfi_static",
+          "dataAsOf": "2026-03-29T12:00:00Z",
+          "ageS": 43200,
+          "staleAfterS": 259200,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "delfi_static",
+          "domain": "transit",
+          "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+          "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://www.opendata-oepnv.de",
+          "sourceUrl": "https://www.opendata-oepnv.de"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ],
+      "page": {
+        "limit": 6,
+        "hasMore": false
+      }
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/transit-disruptions"
+    }
+  }
+}

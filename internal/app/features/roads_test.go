@@ -30,6 +30,7 @@ type roadFake struct {
 	road             roads.Road
 	roadErr, readErr error
 	sits             []roads.Situation
+	counts           map[string]int
 	msgs             []roads.Message
 	warns            []roads.Warning
 	stale, missing   []string
@@ -65,7 +66,7 @@ func (f *roadFake) Road(_ context.Context, ref string) (roads.Road, error) {
 // when a weather family was given, and the coverage only of the roads
 // families given, as the store reads them.
 func (f *roadFake) page(fams roads.Families, more bool) roads.Page {
-	p := roads.Page{Items: f.sits, HasMore: more, Messages: f.msgs, States: []string{"01"},
+	p := roads.Page{Items: f.sits, HasMore: more, Counts: f.counts, Messages: f.msgs, States: []string{"01"},
 		Coverage: map[string]ampel.Coverage{}, Confirmations: map[string]ampel.Confirmation{}, Placed: f.placed}
 	if f.states != nil {
 		p.States = f.states
@@ -208,9 +209,15 @@ func TestAnUnregisteredRoadIsAnsweredWithWhatWasRead(t *testing.T) {
 	if _, err := roadService(f).MotorwayConditions(ctx, key("commercial", roadsScope, "r1"), roads.CorridorQuery{Road: "A999", Limit: 5}); !errors.Is(err, roads.ErrUnknownRoad) || f.readCalls != 0 {
 		t.Errorf("unknown motorway: %v, %d reads", err, f.readCalls)
 	}
+	// A watch reads it as any other road the register lacks.
+	f = &roadFake{roadErr: roads.ErrUnknownRoad, covering: []string{"r1"}}
+	c, err := roadService(f).MotorwayConditions(ctx, key("commercial", roadsScope, "r1"), roads.CorridorQuery{Road: "A999", Limit: 5, AnyMotorway: true})
+	if err != nil || !f.gotRoad.Unregistered || f.gotRoad.Class != roads.ClassMotorway || c.Road == nil || c.Road.Ref != "A999" || len(c.Families) != 0 {
+		t.Errorf("unknown motorway, watched: %+v, asked %+v, %v", c, f.gotRoad, err)
+	}
 	// A registered road names no coverage.
 	f = &roadFake{road: roads.Road{Ref: "A8", Class: roads.ClassMotorway}, covering: []string{"r1"}}
-	c, err := roadService(f).MotorwayConditions(ctx, key("commercial", roadsScope, "r1"), roads.CorridorQuery{Road: "A8", Limit: 5})
+	c, err = roadService(f).MotorwayConditions(ctx, key("commercial", roadsScope, "r1"), roads.CorridorQuery{Road: "A8", Limit: 5})
 	if err != nil || c.Covering != nil || f.gotRoad.Unregistered {
 		t.Errorf("registered road: covering %v, unregistered %v, %v", c.Covering, f.gotRoad.Unregistered, err)
 	}
@@ -321,6 +328,11 @@ func TestTheLampSeesStaleFamilies(t *testing.T) {
 		t.Errorf("a stale family: %v, %v", names(c.Families), err)
 	}
 	lit(t, "a stale roads family", c, roads.LampAmber, roads.ReasonLimitedSight)
+	if !slices.Contains(c.Sight, ampel.SightEntry{Group: roads.GroupRoads, State: ampel.SightStale, Family: "r1"}) ||
+		!slices.Contains(c.Sight, ampel.SightEntry{Group: roads.GroupRoads, State: ampel.SightFresh, Family: "r2"}) ||
+		len(c.Reasons) != 1 || c.Reasons[0] != (roads.ReasonCount{Reason: roads.ReasonLimitedSight, Lamp: roads.LampAmber, Count: 1}) {
+		t.Errorf("the account of a stale family: reasons %+v, sight %+v", c.Reasons, c.Sight)
+	}
 	f = &roadFake{}
 	if c, err = roadService(f).RoadConditions(context.Background(), consumer, roads.AreaQuery{State: "de"}); err != nil {
 		t.Fatal(err)
@@ -358,7 +370,10 @@ func TestTheLampReadsTheWeatherWarnings(t *testing.T) {
 	} {
 		f := &roadFake{warns: []roads.Warning{{Family: "w2", Level: c.level}}}
 		got, err := roadService(f).RoadConditions(ctx, consumer, roads.AreaQuery{State: "de"})
-		if err != nil || !slices.Equal(names(got.Families), []string{"w1", "w2"}) || !slices.Equal(f.gotFams.Weather, []string{"w1", "w2"}) {
+		// A warning is no situation: with none, every roads family is
+		// credited beside the weather families, as the platform credits
+		// a road status that found only a warning.
+		if err != nil || !slices.Equal(names(got.Families), []string{"r1", "r2", "w1", "w2"}) || !slices.Equal(f.gotFams.Weather, []string{"w1", "w2"}) {
 			t.Errorf("level %d: attributed %v, asked %v, %v", c.level, names(got.Families), f.gotFams, err)
 		}
 		lit(t, "a weather warning", got, c.lamp, c.reason)

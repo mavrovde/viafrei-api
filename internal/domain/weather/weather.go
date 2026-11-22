@@ -41,9 +41,14 @@ const (
 	MaxLevel Level = 4
 )
 
-// CheckLevel refuses a stored level outside 1 to 4 rather than grading it.
+// NoticeLevel is the level of the issuer's advance notice (the DWD's
+// Vorabinformation Unwetter, level 0): listed as the platform lists it,
+// and no warning level, so the lamp does not light for it.
+const NoticeLevel Level = 0
+
+// CheckLevel refuses a stored level outside 0 to 4 rather than grading it.
 func CheckLevel(raw int) (Level, error) {
-	if raw < int(MinLevel) || raw > int(MaxLevel) {
+	if raw < int(NoticeLevel) || raw > int(MaxLevel) {
 		return 0, ErrLevel
 	}
 	return Level(raw), nil
@@ -64,9 +69,15 @@ type Warning struct {
 	// Until is nil when the warning is open-ended.
 	Until    *time.Time
 	AreaName string
+	// CellID is the issuer's warning cell (the DWD warn cell id), Event the
+	// issuer's event name and Identifier its message identifier, each as
+	// issued; Published is when it was issued. Each is nil when not given.
+	CellID, Event, Identifier *string
+	Published                 *time.Time
 }
 
-// Query asks for the warnings in force at a position.
+// Query asks for the warnings in force at a position, or starting within
+// LookAhead.
 type Query struct {
 	At       geo.Point
 	MinLevel Level
@@ -77,6 +88,11 @@ type Query struct {
 	// Warnings come worst first, so the limit never hides the warning that
 	// decides the lamp, and the lamp reads every warning in force.
 	Limit int
+	// LookAhead is how far ahead a warning starting later is listed beside
+	// those in force (weather.lookahead), as the platform's weather check
+	// lists the warnings of now and the next 24 hours: an upcoming warning
+	// is safety information. The lamp reads only those in force.
+	LookAhead time.Duration
 }
 
 // KnownHazards returns the mapped hazards the query keeps, and whether it

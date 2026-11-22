@@ -360,6 +360,17 @@
               "null"
             ]
           },
+          "sourceUrl": {
+            "description": "Where the data comes from: the page the source register names for the family (its publisher's dataset or offer page), as a credit line links it; null when none is recorded.",
+            "examples": [
+              "https://mobilithek.info/offers/858688352316981248"
+            ],
+            "format": "uri",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "termsUrl": {
             "description": "The terms a client must follow or accept, when any.",
             "format": "uri",
@@ -369,7 +380,7 @@
             ]
           },
           "text": {
-            "description": "The attribution notice clients displaying the data must show.",
+            "description": "The attribution notice clients displaying the data must show, as stated: the year of retrieval it names is the answer's Europe/Berlin year.",
             "type": "string"
           }
         },
@@ -382,7 +393,8 @@
           "licenceUrl",
           "shareAlike",
           "shareAlikeOffer",
-          "termsUrl"
+          "termsUrl",
+          "sourceUrl"
         ],
         "type": "object"
       },
@@ -661,6 +673,11 @@
             "description": "When the service produced this body.",
             "format": "date-time",
             "type": "string"
+          },
+          "inRadius": {
+            "description": "Only when data is empty: how many charging sites the key may read within the radius, every filter dropped (the platform's \"I know N charging sites in that circle\").",
+            "format": "int64",
+            "type": "integer"
           },
           "language": {
             "description": "The language of the texts in data (BCP 47).",
@@ -1400,6 +1417,36 @@
             "format": "int64",
             "type": "integer"
           },
+          "line": {
+            "additionalProperties": false,
+            "description": "What the static timetable says of the line asked; null without line.",
+            "properties": {
+              "checked": {
+                "description": "Whether a timetable the key may read was there to ask: inTimetable false means no such line only when this is true, and that it could not be told when false.",
+                "type": "boolean"
+              },
+              "inTimetable": {
+                "description": "Whether a line of this name is in the timetable; the timetable's family is then credited in meta.attribution.",
+                "type": "boolean"
+              },
+              "key": {
+                "description": "The line as compared: the name asked, upper case, white space removed.",
+                "examples": [
+                  "RE1"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "checked",
+              "inTimetable"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "punctuality": {
             "additionalProperties": false,
             "description": "The area's punctuality; null without an area or when the source counted no trip in it.",
@@ -1496,7 +1543,8 @@
           "alertsChecked",
           "duplicatesOmitted",
           "punctuality",
-          "windowMin"
+          "windowMin",
+          "line"
         ],
         "type": "object"
       },
@@ -1823,6 +1871,26 @@
           "count",
           "stations",
           "sourceFamily"
+        ],
+        "type": "object"
+      },
+      "FamilyCount": {
+        "additionalProperties": false,
+        "properties": {
+          "situations": {
+            "description": "How many of its situations the filters keep, the listed and those past the limit.",
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "sourceFamily": {
+            "description": "The source family; its attribution is in meta.attribution.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceFamily",
+          "situations"
         ],
         "type": "object"
       },
@@ -2536,6 +2604,102 @@
         ],
         "type": "object"
       },
+      "LampReason": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "description": "How many give it: situations or weather warnings, or, for limited_sight, the groups of sight that are not fresh.",
+            "examples": [
+              3
+            ],
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "lamp": {
+            "description": "The colour this reason gives on its own.",
+            "enum": [
+              "red",
+              "amber"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "description": "The reason, as lampReason names it. Open enumeration.",
+            "enum": [
+              "road_closed",
+              "ramp_closed",
+              "safety",
+              "bridge_closed",
+              "long_jam",
+              "jam",
+              "weather_warning",
+              "slippery",
+              "warning",
+              "narrowing",
+              "limited_sight"
+            ],
+            "examples": [
+              "narrowing"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "lamp",
+          "count"
+        ],
+        "type": "object"
+      },
+      "LampSight": {
+        "additionalProperties": false,
+        "properties": {
+          "family": {
+            "description": "The roads family judged; null for any other group and for the roads families the key may not read.",
+            "examples": [
+              "autobahn"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "group": {
+            "description": "The group: roads (one entry per roads family read, and one without a family for the roads families the key may not read), weather (the official weather warnings, judged as a whole) or messages (the traffic messages of one Land). Open enumeration.",
+            "examples": [
+              "roads"
+            ],
+            "type": "string"
+          },
+          "land": {
+            "description": "The Land of the traffic messages judged; null for any other group, and for messages when no Land is in scope.",
+            "examples": [
+              "09"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "description": "fresh: current; stale: past its freshness threshold; missing: no data, not readable with the key, or no source covers it. Any state but fresh is a limited_sight reason.",
+            "enum": [
+              "fresh",
+              "stale",
+              "missing"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "group",
+          "state",
+          "family",
+          "land"
+        ],
+        "type": "object"
+      },
       "Links": {
         "additionalProperties": false,
         "properties": {
@@ -3221,6 +3385,13 @@
           "corridor": {
             "$ref": "#/components/schemas/Corridor"
           },
+          "counts": {
+            "description": "How many situations the filters keep, by source family, before limit and cursor (the platform's counts per publisher), in family order; empty when none.",
+            "items": {
+              "$ref": "#/components/schemas/FamilyCount"
+            },
+            "type": "array"
+          },
           "coverage": {
             "additionalProperties": false,
             "description": "Null for a road the road register holds. For a road it does not hold (a federal or Land road, or a motorway it lacks), the answer is read from the situations whose reference names the road, none placed along a line and no state named; coverage then says what was read, as the platform's roadworks-ahead answer says it: an empty list is no sites on what the named families publish, never a road with no works.",
@@ -3288,6 +3459,20 @@
               "null"
             ]
           },
+          "lampReasons": {
+            "description": "Every reason of the lamp with how many give it, in lampReason's order (lampReason is the first); empty for green.",
+            "items": {
+              "$ref": "#/components/schemas/LampReason"
+            },
+            "type": "array"
+          },
+          "sight": {
+            "description": "The sight of every group the lamp read; any group not fresh keeps the lamp from green (limited_sight).",
+            "items": {
+              "$ref": "#/components/schemas/LampSight"
+            },
+            "type": "array"
+          },
           "situations": {
             "description": "In the platform's motorway status order: jams, closures, the other reports, then roadworks; within each, by traffic type (queuing, stationary, heavy, slow), delay descending, headline, then the publisher's id.",
             "items": {
@@ -3300,6 +3485,9 @@
           "corridor",
           "lamp",
           "lampReason",
+          "lampReasons",
+          "sight",
+          "counts",
           "coverage",
           "situations"
         ],
@@ -4137,7 +4325,7 @@
         "additionalProperties": false,
         "properties": {
           "condition": {
-            "description": "Conditions the data may only be used under; show them with the data.",
+            "description": "Conditions the data may only be used under; show them with the data. A dated condition names the Europe/Berlin day its data was read.",
             "items": {
               "type": "string"
             },
@@ -5873,6 +6061,13 @@
           "area": {
             "$ref": "#/components/schemas/Area"
           },
+          "counts": {
+            "description": "How many situations the filters keep, by source family, before limit and cursor (the platform's counts per publisher), in family order; empty when none.",
+            "items": {
+              "$ref": "#/components/schemas/FamilyCount"
+            },
+            "type": "array"
+          },
           "lamp": {
             "description": "The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope as its record is read (the motorway operator's event, any other traffic message, a bridge's state) and every official weather warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a closed bridge; a jam with a delay of 30 minutes or more; a weather warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a weather warning of level 1 or 2; any other message (an accident without a closure, a restricted bridge, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the weather warnings not readable with the key or their source not current, or a state in scope whose traffic messages no current roads family the key may read covers. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is current, which is no guarantee that the road is free.",
             "enum": [
@@ -5903,6 +6098,20 @@
               "null"
             ]
           },
+          "lampReasons": {
+            "description": "Every reason of the lamp with how many give it, in lampReason's order (lampReason is the first); empty for green.",
+            "items": {
+              "$ref": "#/components/schemas/LampReason"
+            },
+            "type": "array"
+          },
+          "sight": {
+            "description": "The sight of every group the lamp read; any group not fresh keeps the lamp from green (limited_sight).",
+            "items": {
+              "$ref": "#/components/schemas/LampSight"
+            },
+            "type": "array"
+          },
           "situations": {
             "description": "What the platform's road status lists around a position: the closures, the roadworks and lane restrictions, and the jams, whatever kinds asks beyond them (a hazard, an accident or a weather report is not listed). Ordered by severity descending, then distance, then id; distanceM is rounded to 100 m, as the platform states it in tenths of a kilometre.",
             "items": {
@@ -5913,8 +6122,11 @@
         },
         "required": [
           "area",
+          "counts",
           "lamp",
           "lampReason",
+          "lampReasons",
+          "sight",
           "situations"
         ],
         "type": "object"
@@ -6674,6 +6886,13 @@
           "shareAlike": {
             "type": "boolean"
           },
+          "sourceUrl": {
+            "description": "The page the source register names for the family; null when none is recorded.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "staleAfterS": {
             "description": "Its design threshold; absent for a source with no fixed interval.",
             "format": "int64",
@@ -6704,6 +6923,7 @@
           "licenceUrl",
           "shareAlike",
           "termsUrl",
+          "sourceUrl",
           "dataAsOf",
           "status"
         ],
@@ -7017,6 +7237,13 @@
       "StateConditionsData": {
         "additionalProperties": false,
         "properties": {
+          "counts": {
+            "description": "How many situations the filters keep, by source family, before limit and cursor (the platform's counts per publisher), in family order; empty when none.",
+            "items": {
+              "$ref": "#/components/schemas/FamilyCount"
+            },
+            "type": "array"
+          },
           "lamp": {
             "description": "The lamp over every situation of the Land and every official weather warning in force in its areas, by the rules of listRoadConditions.",
             "enum": [
@@ -7033,6 +7260,20 @@
               "null"
             ]
           },
+          "lampReasons": {
+            "description": "Every reason of the lamp with how many give it, in lampReason's order (lampReason is the first); empty for green.",
+            "items": {
+              "$ref": "#/components/schemas/LampReason"
+            },
+            "type": "array"
+          },
+          "sight": {
+            "description": "The sight of every group the lamp read; any group not fresh keeps the lamp from green (limited_sight).",
+            "items": {
+              "$ref": "#/components/schemas/LampSight"
+            },
+            "type": "array"
+          },
           "situations": {
             "description": "Ordered by severity descending, then road, then id. A situation is in the Land of the nearest municipality centre (BKG, within 20 km) to its point; near a Land border that can be the neighbouring Land.",
             "items": {
@@ -7046,9 +7287,12 @@
           }
         },
         "required": [
+          "counts",
           "state",
           "lamp",
           "lampReason",
+          "lampReasons",
+          "sight",
           "situations"
         ],
         "type": "object"
@@ -7499,6 +7743,16 @@
       "StationsQuery": {
         "additionalProperties": false,
         "properties": {
+          "area": {
+            "description": "The area the stations were kept to; null for none.",
+            "examples": [
+              "05315"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "at": {
             "additionalProperties": false,
             "description": "The position searched around; null for none.",
@@ -7554,7 +7808,8 @@
           "q",
           "code",
           "at",
-          "radiusM"
+          "radiusM",
+          "area"
         ],
         "type": "object"
       },
@@ -7874,6 +8129,13 @@
       "WarningArea": {
         "additionalProperties": false,
         "properties": {
+          "cellId": {
+            "description": "The issuer's warning cell of the area (the DWD warn cell id), as issued; null when not given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "geometry": {
             "additionalProperties": false,
             "description": "The outline of the area as a GeoJSON geometry; null while the service does not serve area outlines.",
@@ -7908,6 +8170,7 @@
         },
         "required": [
           "name",
+          "cellId",
           "geometry"
         ],
         "type": "object"
@@ -8237,6 +8500,13 @@
           "area": {
             "$ref": "#/components/schemas/WarningArea"
           },
+          "event": {
+            "description": "The issuer's event name, as issued (the DWD's EVENT, e.g. FROST); null when not given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "hazard": {
             "description": "What it warns of. Open enumeration; treat an unknown value as other.",
             "enum": [
@@ -8261,20 +8531,47 @@
           "id": {
             "type": "string"
           },
+          "identifier": {
+            "description": "The issuer's message identifier, as issued; null when not given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "inForce": {
+            "description": "Whether the warning is in force at the answer's instant; false for one that starts within weather.lookahead (24 hours by default), which is listed beside those in force as the platform lists it (the lamp reads only those in force).",
+            "type": "boolean"
+          },
           "issuer": {
             "description": "The issuing service.",
             "type": "string"
           },
           "level": {
-            "description": "The official level, 1 (minor) to 4 (extreme), as issued; never re-graded.",
+            "description": "The official level, 1 (minor) to 4 (extreme), or 0 for an advance notice (Vorabinformation Unwetter), as issued; never re-graded. A level-0 notice does not light the lamp.",
             "format": "int64",
             "maximum": 4,
-            "minimum": 1,
+            "minimum": 0,
             "type": "integer"
           },
           "levelName": {
             "description": "The issuer's name of the level, as issued.",
             "type": "string"
+          },
+          "published": {
+            "description": "When the issuer published the warning (its sent time); null when not given.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publishedLocal": {
+            "description": "published in Europe/Berlin time; null when published is.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "sourceFamily": {
             "description": "The source family of the item; its attribution is in meta.attribution.",
@@ -8297,6 +8594,11 @@
           "headline",
           "textLanguage",
           "validity",
+          "inForce",
+          "event",
+          "identifier",
+          "published",
+          "publishedLocal",
           "area",
           "sourceFamily"
         ],
@@ -8768,7 +9070,8 @@
                             "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
                             "shareAlike": true,
                             "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://www.openstreetmap.org/copyright"
+                            "termsUrl": "https://www.openstreetmap.org/copyright",
+                            "sourceUrl": "https://www.openstreetmap.org/copyright"
                           }
                         ],
                         "notes": {
@@ -9151,7 +9454,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/openstation_siri_fm"
+                            "termsUrl": "https://alpha.example/terms/openstation_siri_fm",
+                            "sourceUrl": "https://alpha.example/terms/openstation_siri_fm"
                           }
                         ],
                         "notes": {
@@ -9716,7 +10020,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/afir_alpha"
+                            "termsUrl": "https://alpha.example/terms/afir_alpha",
+                            "sourceUrl": "https://alpha.example/terms/afir_alpha"
                           }
                         ],
                         "notes": {
@@ -10123,7 +10428,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/afir_alpha"
+                            "termsUrl": "https://alpha.example/terms/afir_alpha",
+                            "sourceUrl": "https://alpha.example/terms/afir_alpha"
                           }
                         ],
                         "notes": {
@@ -10474,7 +10780,7 @@
                             "text": "Synthetic statement 1 about winter_tyres, for tests only.",
                             "legalBasis": "§ 0 synthetic",
                             "sourceUrl": "https://law.example/winter_tyres",
-                            "reviewedOn": "2026-11-17",
+                            "reviewedOn": "2026-02-01",
                             "unconfirmed": null
                           },
                           {
@@ -10482,7 +10788,7 @@
                             "text": "Synthetic statement 2 about winter_tyres, for tests only.",
                             "legalBasis": "§ 0 synthetic",
                             "sourceUrl": "https://law.example/winter_tyres",
-                            "reviewedOn": "2026-11-17",
+                            "reviewedOn": "2026-02-01",
                             "unconfirmed": null
                           },
                           {
@@ -10490,11 +10796,11 @@
                             "text": "Synthetic statement 3 about winter_tyres, for tests only.",
                             "legalBasis": "§ 0 synthetic",
                             "sourceUrl": "https://law.example/winter_tyres",
-                            "reviewedOn": "2026-11-17",
+                            "reviewedOn": "2026-02-01",
                             "unconfirmed": null
                           }
                         ],
-                        "reviewedOn": "2026-11-17",
+                        "reviewedOn": "2026-02-01",
                         "disclaimer": "Informational, not legal advice."
                       },
                       "meta": {
@@ -10521,7 +10827,8 @@
                             "licenceUrl": "https://viafrei.de",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://viafrei.de"
+                            "termsUrl": "https://viafrei.de",
+                            "sourceUrl": "https://viafrei.de"
                           }
                         ],
                         "notes": {
@@ -10992,7 +11299,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://gamma.example/terms/tankerkoenig_gamma"
+                            "termsUrl": "https://gamma.example/terms/tankerkoenig_gamma",
+                            "sourceUrl": "https://gamma.example/terms/tankerkoenig_gamma"
                           }
                         ],
                         "notes": {
@@ -11392,7 +11700,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://gamma.example/terms/tankerkoenig_gamma"
+                            "termsUrl": "https://gamma.example/terms/tankerkoenig_gamma",
+                            "sourceUrl": "https://gamma.example/terms/tankerkoenig_gamma"
                           }
                         ],
                         "notes": {
@@ -11910,7 +12219,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/afir_alpha"
+                            "termsUrl": "https://alpha.example/terms/afir_alpha",
+                            "sourceUrl": "https://alpha.example/terms/afir_alpha"
                           },
                           {
                             "family": "dwd_alpha",
@@ -11921,7 +12231,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/dwd_alpha"
+                            "termsUrl": "https://alpha.example/terms/dwd_alpha",
+                            "sourceUrl": "https://alpha.example/terms/dwd_alpha"
                           },
                           {
                             "family": "openstation_siri_fm",
@@ -11932,7 +12243,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/openstation_siri_fm"
+                            "termsUrl": "https://alpha.example/terms/openstation_siri_fm",
+                            "sourceUrl": "https://alpha.example/terms/openstation_siri_fm"
                           },
                           {
                             "family": "park_alpha",
@@ -11943,7 +12255,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/park_alpha"
+                            "termsUrl": "https://alpha.example/terms/park_alpha",
+                            "sourceUrl": "https://alpha.example/terms/park_alpha"
                           },
                           {
                             "family": "roads_alpha",
@@ -11954,7 +12267,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/roads_alpha"
+                            "termsUrl": "https://alpha.example/terms/roads_alpha",
+                            "sourceUrl": "https://alpha.example/terms/roads_alpha"
                           },
                           {
                             "family": "tankerkoenig_gamma",
@@ -11965,7 +12279,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://gamma.example/terms/tankerkoenig_gamma"
+                            "termsUrl": "https://gamma.example/terms/tankerkoenig_gamma",
+                            "sourceUrl": "https://gamma.example/terms/tankerkoenig_gamma"
                           }
                         ],
                         "notes": {
@@ -12334,7 +12649,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/afir_alpha"
+                            "termsUrl": "https://alpha.example/terms/afir_alpha",
+                            "sourceUrl": "https://alpha.example/terms/afir_alpha"
                           }
                         ],
                         "notes": {
@@ -12664,7 +12980,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/afir_alpha"
+                            "termsUrl": "https://alpha.example/terms/afir_alpha",
+                            "sourceUrl": null
                           },
                           {
                             "family": "geonames",
@@ -12675,7 +12992,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://download.geonames.org/export/dump/"
+                            "termsUrl": "https://download.geonames.org/export/dump/",
+                            "sourceUrl": null
                           },
                           {
                             "family": "park_alpha",
@@ -12686,7 +13004,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/park_alpha"
+                            "termsUrl": "https://alpha.example/terms/park_alpha",
+                            "sourceUrl": null
                           }
                         ]
                       },
@@ -12914,7 +13233,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://download.geonames.org/export/dump/"
+                            "termsUrl": "https://download.geonames.org/export/dump/",
+                            "sourceUrl": "https://download.geonames.org/export/dump/"
                           },
                           {
                             "family": "osm",
@@ -12925,7 +13245,8 @@
                             "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
                             "shareAlike": true,
                             "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://www.openstreetmap.org/copyright"
+                            "termsUrl": "https://www.openstreetmap.org/copyright",
+                            "sourceUrl": "https://www.openstreetmap.org/copyright"
                           }
                         ],
                         "notes": {
@@ -13346,7 +13667,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://www.bast.de/DE/Publikationen/Daten/Verkehrstechnik/Lang-Lkw.html"
+                            "termsUrl": "https://www.bast.de/DE/Publikationen/Daten/Verkehrstechnik/Lang-Lkw.html",
+                            "sourceUrl": "https://www.bast.de/DE/Publikationen/Daten/Verkehrstechnik/Lang-Lkw.html"
                           }
                         ],
                         "notes": {
@@ -13842,7 +14164,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/roads_alpha"
+                            "termsUrl": "https://alpha.example/terms/roads_alpha",
+                            "sourceUrl": "https://alpha.example/terms/roads_alpha"
                           }
                         ],
                         "notes": {
@@ -14290,6 +14613,78 @@
                         },
                         "lamp": "amber",
                         "lampReason": "weather_warning",
+                        "lampReasons": [
+                          {
+                            "reason": "weather_warning",
+                            "lamp": "amber",
+                            "count": 2
+                          },
+                          {
+                            "reason": "warning",
+                            "lamp": "amber",
+                            "count": 1
+                          },
+                          {
+                            "reason": "narrowing",
+                            "lamp": "amber",
+                            "count": 1
+                          },
+                          {
+                            "reason": "limited_sight",
+                            "lamp": "amber",
+                            "count": 2
+                          }
+                        ],
+                        "sight": [
+                          {
+                            "group": "roads",
+                            "state": "fresh",
+                            "family": "roads_alpha",
+                            "land": null
+                          },
+                          {
+                            "group": "roads",
+                            "state": "missing",
+                            "family": null,
+                            "land": null
+                          },
+                          {
+                            "group": "weather",
+                            "state": "missing",
+                            "family": null,
+                            "land": null
+                          },
+                          {
+                            "group": "messages",
+                            "state": "fresh",
+                            "family": null,
+                            "land": "06"
+                          },
+                          {
+                            "group": "messages",
+                            "state": "fresh",
+                            "family": null,
+                            "land": "07"
+                          },
+                          {
+                            "group": "messages",
+                            "state": "fresh",
+                            "family": null,
+                            "land": "08"
+                          },
+                          {
+                            "group": "messages",
+                            "state": "fresh",
+                            "family": null,
+                            "land": "10"
+                          }
+                        ],
+                        "counts": [
+                          {
+                            "sourceFamily": "roads_alpha",
+                            "situations": 8
+                          }
+                        ],
                         "coverage": null,
                         "situations": [
                           {
@@ -14383,7 +14778,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://eta.example/terms/dwd_eta"
+                            "termsUrl": "https://eta.example/terms/dwd_eta",
+                            "sourceUrl": "https://eta.example/terms/dwd_eta"
                           },
                           {
                             "family": "roads_alpha",
@@ -14394,7 +14790,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/roads_alpha"
+                            "termsUrl": "https://alpha.example/terms/roads_alpha",
+                            "sourceUrl": "https://alpha.example/terms/roads_alpha"
                           }
                         ],
                         "notes": {
@@ -14853,7 +15250,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/park_alpha"
+                            "termsUrl": "https://alpha.example/terms/park_alpha",
+                            "sourceUrl": "https://alpha.example/terms/park_alpha"
                           }
                         ],
                         "notes": {
@@ -15283,7 +15681,8 @@
                             "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
                             "shareAlike": true,
                             "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://www.openstreetmap.org/copyright"
+                            "termsUrl": "https://www.openstreetmap.org/copyright",
+                            "sourceUrl": "https://www.openstreetmap.org/copyright"
                           }
                         ],
                         "notes": {
@@ -15759,7 +16158,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/dortmund_parksensoren_bays"
+                            "termsUrl": "https://alpha.example/terms/dortmund_parksensoren_bays",
+                            "sourceUrl": "https://alpha.example/terms/dortmund_parksensoren_bays"
                           },
                           {
                             "family": "frankfurt_behindertenparkplaetze",
@@ -15770,7 +16170,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://www.govdata.de/daten/-/details/wfs-parken-in-der-stadt-frankfurt-am-main"
+                            "termsUrl": "https://www.govdata.de/daten/-/details/wfs-parken-in-der-stadt-frankfurt-am-main",
+                            "sourceUrl": "https://www.govdata.de/daten/-/details/wfs-parken-in-der-stadt-frankfurt-am-main"
                           }
                         ],
                         "notes": {
@@ -16236,7 +16637,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/park_alpha"
+                            "termsUrl": "https://alpha.example/terms/park_alpha",
+                            "sourceUrl": "https://alpha.example/terms/park_alpha"
                           }
                         ],
                         "notes": {
@@ -16663,7 +17065,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://download.geonames.org/export/dump/"
+                            "termsUrl": "https://download.geonames.org/export/dump/",
+                            "sourceUrl": "https://download.geonames.org/export/dump/"
                           }
                         ],
                         "notes": {
@@ -17147,7 +17550,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html",
+                            "sourceUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
                           },
                           {
                             "family": "geonames",
@@ -17158,7 +17562,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://download.geonames.org/export/dump/"
+                            "termsUrl": "https://download.geonames.org/export/dump/",
+                            "sourceUrl": "https://download.geonames.org/export/dump/"
                           },
                           {
                             "family": "osm",
@@ -17169,7 +17574,8 @@
                             "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
                             "shareAlike": true,
                             "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://www.openstreetmap.org/copyright"
+                            "termsUrl": "https://www.openstreetmap.org/copyright",
+                            "sourceUrl": "https://www.openstreetmap.org/copyright"
                           }
                         ],
                         "notes": {
@@ -17584,7 +17990,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://download.geonames.org/export/dump/"
+                            "termsUrl": "https://download.geonames.org/export/dump/",
+                            "sourceUrl": "https://download.geonames.org/export/dump/"
                           }
                         ],
                         "notes": {
@@ -18044,7 +18451,8 @@
                             "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
                             "shareAlike": true,
                             "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://www.openstreetmap.org/copyright"
+                            "termsUrl": "https://www.openstreetmap.org/copyright",
+                            "sourceUrl": "https://www.openstreetmap.org/copyright"
                           }
                         ],
                         "notes": {
@@ -19346,8 +19754,52 @@
                           },
                           "radiusM": 25000
                         },
+                        "counts": [
+                          {
+                            "sourceFamily": "roads_alpha",
+                            "situations": 1
+                          }
+                        ],
                         "lamp": "amber",
                         "lampReason": "narrowing",
+                        "lampReasons": [
+                          {
+                            "reason": "narrowing",
+                            "lamp": "amber",
+                            "count": 1
+                          },
+                          {
+                            "reason": "limited_sight",
+                            "lamp": "amber",
+                            "count": 2
+                          }
+                        ],
+                        "sight": [
+                          {
+                            "group": "roads",
+                            "state": "fresh",
+                            "family": "roads_alpha",
+                            "land": null
+                          },
+                          {
+                            "group": "roads",
+                            "state": "missing",
+                            "family": null,
+                            "land": null
+                          },
+                          {
+                            "group": "weather",
+                            "state": "missing",
+                            "family": null,
+                            "land": null
+                          },
+                          {
+                            "group": "messages",
+                            "state": "fresh",
+                            "family": null,
+                            "land": "10"
+                          }
+                        ],
                         "situations": [
                           {
                             "id": "datex:syn:ev-00011",
@@ -19412,7 +19864,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://eta.example/terms/dwd_eta"
+                            "termsUrl": "https://eta.example/terms/dwd_eta",
+                            "sourceUrl": "https://eta.example/terms/dwd_eta"
                           },
                           {
                             "family": "roads_alpha",
@@ -19423,7 +19876,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/roads_alpha"
+                            "termsUrl": "https://alpha.example/terms/roads_alpha",
+                            "sourceUrl": "https://alpha.example/terms/roads_alpha"
                           }
                         ],
                         "notes": {
@@ -19806,7 +20260,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/roads_alpha"
+                            "termsUrl": "https://alpha.example/terms/roads_alpha",
+                            "sourceUrl": "https://alpha.example/terms/roads_alpha"
                           }
                         ],
                         "notes": {
@@ -20191,7 +20646,8 @@
                             "licenceUrl": "https://licences.example/cc0-1-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://www.nextbike.de"
+                            "termsUrl": "https://www.nextbike.de",
+                            "sourceUrl": "https://www.nextbike.de"
                           }
                         ],
                         "notes": {
@@ -20522,6 +20978,7 @@
                           "licenceUrl": "https://licences.example/dl-de-by-2-0",
                           "shareAlike": false,
                           "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html",
+                          "sourceUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html",
                           "dataAsOf": null,
                           "status": "grey"
                         },
@@ -20534,6 +20991,7 @@
                           "licenceUrl": "https://licences.example/cc-by-4-0",
                           "shareAlike": false,
                           "termsUrl": "https://download.geonames.org/export/dump/",
+                          "sourceUrl": "https://download.geonames.org/export/dump/",
                           "dataAsOf": null,
                           "status": "grey"
                         },
@@ -20546,6 +21004,7 @@
                           "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
                           "shareAlike": true,
                           "termsUrl": "https://www.openstreetmap.org/copyright",
+                          "sourceUrl": "https://www.openstreetmap.org/copyright",
                           "dataAsOf": null,
                           "status": "grey"
                         }
@@ -20588,7 +21047,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html",
+                            "sourceUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
                           },
                           {
                             "family": "geonames",
@@ -20599,7 +21059,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://download.geonames.org/export/dump/"
+                            "termsUrl": "https://download.geonames.org/export/dump/",
+                            "sourceUrl": "https://download.geonames.org/export/dump/"
                           },
                           {
                             "family": "osm",
@@ -20610,7 +21071,8 @@
                             "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
                             "shareAlike": true,
                             "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://www.openstreetmap.org/copyright"
+                            "termsUrl": "https://www.openstreetmap.org/copyright",
+                            "sourceUrl": "https://www.openstreetmap.org/copyright"
                           }
                         ],
                         "notes": {
@@ -20967,7 +21429,8 @@
                             "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
                             "shareAlike": true,
                             "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://www.openstreetmap.org/copyright"
+                            "termsUrl": "https://www.openstreetmap.org/copyright",
+                            "sourceUrl": "https://www.openstreetmap.org/copyright"
                           }
                         ],
                         "notes": {
@@ -21399,9 +21862,58 @@
                     "summary": "A Land's motorway situations",
                     "value": {
                       "data": {
+                        "counts": [
+                          {
+                            "sourceFamily": "roads_alpha",
+                            "situations": 3
+                          }
+                        ],
                         "state": "10",
                         "lamp": "amber",
                         "lampReason": "warning",
+                        "lampReasons": [
+                          {
+                            "reason": "warning",
+                            "lamp": "amber",
+                            "count": 1
+                          },
+                          {
+                            "reason": "narrowing",
+                            "lamp": "amber",
+                            "count": 1
+                          },
+                          {
+                            "reason": "limited_sight",
+                            "lamp": "amber",
+                            "count": 2
+                          }
+                        ],
+                        "sight": [
+                          {
+                            "group": "roads",
+                            "state": "fresh",
+                            "family": "roads_alpha",
+                            "land": null
+                          },
+                          {
+                            "group": "roads",
+                            "state": "missing",
+                            "family": null,
+                            "land": null
+                          },
+                          {
+                            "group": "weather",
+                            "state": "missing",
+                            "family": null,
+                            "land": null
+                          },
+                          {
+                            "group": "messages",
+                            "state": "fresh",
+                            "family": null,
+                            "land": "10"
+                          }
+                        ],
                         "situations": [
                           {
                             "id": "datex:syn:ev-00011",
@@ -21523,7 +22035,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html",
+                            "sourceUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
                           },
                           {
                             "family": "roads_alpha",
@@ -21534,7 +22047,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/roads_alpha"
+                            "termsUrl": "https://alpha.example/terms/roads_alpha",
+                            "sourceUrl": "https://alpha.example/terms/roads_alpha"
                           }
                         ],
                         "notes": {
@@ -21914,7 +22428,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/delfi_sa_alpha"
+                            "termsUrl": "https://alpha.example/terms/delfi_sa_alpha",
+                            "sourceUrl": "https://alpha.example/terms/delfi_sa_alpha"
                           }
                         ],
                         "notes": {
@@ -22272,7 +22787,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://eta.example/terms/dwd_eta"
+                            "termsUrl": "https://eta.example/terms/dwd_eta",
+                            "sourceUrl": "https://eta.example/terms/dwd_eta"
                           }
                         ],
                         "notes": {
@@ -22548,7 +23064,7 @@
     },
     "/v1/stations": {
       "get": {
-        "description": "The stations whose name contains q, those that start with it first, then by name; or the stations within the radius of at, nearest first; or, with both, the stations named so within the radius, nearest first. Ties go by name, then id. It answers a search field's suggestions as the user types (limit 8) as well as a full search. Needs the scope transit.",
+        "description": "The stations whose name contains q, those that start with it first, then by name; or the stations within the radius of at, nearest first; or, with both, the stations named so within the radius, nearest first. Ties go by name, then id. area keeps any of these to one Land or Kreis. It answers a search field's suggestions as the user types (limit 8) as well as a full search. Needs the scope transit.",
         "operationId": "listStations",
         "parameters": [
           {
@@ -22622,6 +23138,20 @@
             }
           },
           {
+            "description": "Only the stations of an area: its official region code, two digits a Land (01 to 16), five a Kreis or kreisfreie Stadt, as listPlaces or describeLocation give it. It narrows q, code or at, and is no search of its own; a station whose district is unknown is left out.",
+            "explode": false,
+            "in": "query",
+            "name": "area",
+            "schema": {
+              "description": "Only the stations of an area: its official region code, two digits a Land (01 to 16), five a Kreis or kreisfreie Stadt, as listPlaces or describeLocation give it. It narrows q, code or at, and is no search of its own; a station whose district is unknown is left out.",
+              "examples": [
+                "05315"
+              ],
+              "pattern": "^(0[1-9]|1[0-6])([0-9]{3})?$",
+              "type": "string"
+            }
+          },
+          {
             "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
             "example": "en",
             "in": "query",
@@ -22640,6 +23170,115 @@
             "content": {
               "application/json": {
                 "examples": {
+                  "area": {
+                    "summary": "Stations of a name within one Kreis",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "1:de:01002:1",
+                          "name": "Namüningen Mitte",
+                          "location": {
+                            "lat": 49.167002,
+                            "lon": 7.862458
+                          },
+                          "stopCode": "de:01002:1",
+                          "eva": null,
+                          "evaNumbers": [],
+                          "districtCode": "01002",
+                          "modes": [],
+                          "distanceM": null,
+                          "sourceFamily": "delfi_static"
+                        },
+                        {
+                          "id": "1:de:01002:2",
+                          "name": "Schömpingbach Mitte",
+                          "location": {
+                            "lat": 48.366697,
+                            "lon": 7.522947
+                          },
+                          "stopCode": "de:01002:2",
+                          "eva": null,
+                          "evaNumbers": [],
+                          "districtCode": "01002",
+                          "modes": [],
+                          "distanceM": null,
+                          "sourceFamily": "delfi_static"
+                        }
+                      ],
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": null,
+                        "freshness": [
+                          {
+                            "family": "bkg_gvisys",
+                            "dataAsOf": null,
+                            "ageS": null,
+                            "staleAfterS": 9007199254740991,
+                            "stale": false
+                          },
+                          {
+                            "family": "delfi_static",
+                            "dataAsOf": "2026-03-29T12:00:00Z",
+                            "ageS": 43200,
+                            "staleAfterS": 259200,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "bkg_gvisys",
+                            "domain": "places",
+                            "publisher": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
+                            "text": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
+                            "licence": "dl-de/by-2-0",
+                            "licenceUrl": "https://licences.example/dl-de-by-2-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html",
+                            "sourceUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+                          },
+                          {
+                            "family": "delfi_static",
+                            "domain": "transit",
+                            "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://www.opendata-oepnv.de",
+                            "sourceUrl": "https://www.opendata-oepnv.de"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 8,
+                          "hasMore": false
+                        },
+                        "query": {
+                          "q": "Mitte",
+                          "code": null,
+                          "at": null,
+                          "radiusM": null,
+                          "area": "01002"
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/stations"
+                      }
+                    }
+                  },
                   "example": {
                     "summary": "The stations a typed name finds, umlauts and ß as typed",
                     "value": {
@@ -22710,7 +23349,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html",
+                            "sourceUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
                           },
                           {
                             "family": "delfi_static",
@@ -22721,7 +23361,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://www.opendata-oepnv.de"
+                            "termsUrl": "https://www.opendata-oepnv.de",
+                            "sourceUrl": "https://www.opendata-oepnv.de"
                           }
                         ],
                         "notes": {
@@ -22742,7 +23383,8 @@
                           "q": "Schömpingbach",
                           "code": null,
                           "at": null,
-                          "radiusM": null
+                          "radiusM": null,
+                          "area": null
                         }
                       },
                       "links": {
@@ -23157,7 +23799,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://www.opendata-oepnv.de"
+                            "termsUrl": "https://www.opendata-oepnv.de",
+                            "sourceUrl": "https://www.opendata-oepnv.de"
                           }
                         ],
                         "notes": {
@@ -23566,7 +24209,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://www.opendata-oepnv.de"
+                            "termsUrl": "https://www.opendata-oepnv.de",
+                            "sourceUrl": "https://www.opendata-oepnv.de"
                           },
                           {
                             "family": "openstation_siri_fm",
@@ -23577,7 +24221,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/openstation_siri_fm"
+                            "termsUrl": "https://alpha.example/terms/openstation_siri_fm",
+                            "sourceUrl": "https://alpha.example/terms/openstation_siri_fm"
                           }
                         ],
                         "notes": {
@@ -23943,7 +24588,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://developers.deutschebahn.com"
+                            "termsUrl": "https://developers.deutschebahn.com",
+                            "sourceUrl": "https://developers.deutschebahn.com"
                           }
                         ],
                         "notes": {
@@ -24316,7 +24962,8 @@
                         "alertsChecked": true,
                         "duplicatesOmitted": 0,
                         "punctuality": null,
-                        "windowMin": 60
+                        "windowMin": 60,
+                        "line": null
                       },
                       "meta": {
                         "requestId": "example-request-0001",
@@ -24342,7 +24989,72 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/delfi_sa_alpha"
+                            "termsUrl": "https://alpha.example/terms/delfi_sa_alpha",
+                            "sourceUrl": "https://alpha.example/terms/delfi_sa_alpha"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 6,
+                          "hasMore": false
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/transit-disruptions"
+                      }
+                    }
+                  },
+                  "line": {
+                    "summary": "The service alerts of a line, and whether the timetable knows it",
+                    "value": {
+                      "data": {
+                        "alerts": [],
+                        "alertsTotal": 0,
+                        "alertsChecked": true,
+                        "duplicatesOmitted": 0,
+                        "punctuality": null,
+                        "windowMin": 60,
+                        "line": {
+                          "key": "RE45",
+                          "checked": true,
+                          "inTimetable": true
+                        }
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T12:00:00Z",
+                        "freshness": [
+                          {
+                            "family": "delfi_static",
+                            "dataAsOf": "2026-03-29T12:00:00Z",
+                            "ageS": 43200,
+                            "staleAfterS": 259200,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "delfi_static",
+                            "domain": "transit",
+                            "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://www.opendata-oepnv.de",
+                            "sourceUrl": "https://www.opendata-oepnv.de"
                           }
                         ],
                         "notes": {
@@ -24820,7 +25532,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/roads_alpha"
+                            "termsUrl": "https://alpha.example/terms/roads_alpha",
+                            "sourceUrl": "https://alpha.example/terms/roads_alpha"
                           }
                         ],
                         "notes": {
@@ -25096,7 +25809,7 @@
     },
     "/v1/weather-risk": {
       "get": {
-        "description": "Every official weather warning in force now whose area contains the position, with the issuer's level and wording unchanged, as the platform's weather warnings check states them, and the lamp over every warning in force there, whatever min_level and hazards keep (API-only: the check states no lamp). MCP counterpart: weather warnings check. Needs the scope weather.",
+        "description": "Every official weather warning in force now, or starting within the next 24 hours (inForce false), whose area contains the position, with the issuer's level and wording unchanged, as the platform's weather warnings check states them, and the lamp over every warning in force there, whatever min_level and hazards keep (API-only: the check states no lamp). MCP counterpart: weather warnings check. Needs the scope weather.",
         "operationId": "getWeatherRisk",
         "parameters": [
           {
@@ -25120,11 +25833,11 @@
             "in": "query",
             "name": "min_level",
             "schema": {
-              "default": 1,
+              "default": 0,
               "description": "Only warnings at or above this official level.",
               "format": "int64",
               "maximum": 4,
-              "minimum": 1,
+              "minimum": 0,
               "type": "integer"
             }
           },
@@ -25193,8 +25906,14 @@
                               "until": "2026-03-30T11:04:42Z",
                               "untilLocal": "2026-03-30T13:04:42+02:00"
                             },
+                            "inForce": true,
+                            "event": "UV-INDEX",
+                            "identifier": "dwd:100008",
+                            "published": "2026-03-29T08:34:42Z",
+                            "publishedLocal": "2026-03-29T10:34:42+02:00",
                             "area": {
                               "name": "Warngebiet 05002",
+                              "cellId": "805002000",
                               "geometry": null
                             },
                             "sourceFamily": "dwd_eta"
@@ -25227,7 +25946,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://eta.example/terms/dwd_eta"
+                            "termsUrl": "https://eta.example/terms/dwd_eta",
+                            "sourceUrl": "https://eta.example/terms/dwd_eta"
                           }
                         ],
                         "notes": {
@@ -25245,7 +25965,7 @@
                             "lat": 49.6,
                             "lon": 7.5
                           },
-                          "minLevel": 1,
+                          "minLevel": 0,
                           "hazards": []
                         }
                       },

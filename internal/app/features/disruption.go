@@ -44,6 +44,10 @@ func (s *Service) Disruptions(ctx context.Context, key access.Record, q transit.
 		if v.Trips != nil {
 			contributed = append(contributed, v.Trips.Family)
 		}
+		// The timetable that knows the line is credited for saying so.
+		if v.Line != nil {
+			contributed = append(contributed, v.Line.Families...)
+		}
 		return v, contributed, err
 	})
 	return DisruptionAnswer{Disruptions: v, Meta: meta}, err

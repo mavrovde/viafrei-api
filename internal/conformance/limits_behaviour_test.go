@@ -146,6 +146,7 @@ func limitBehaviours() map[string]behaviour {
 		"tiers.bulk.queue_max_wait":          {"100ms", admissionSettings},
 		"tiers.bulk.max_inflight":            {"2", admissionSettings},
 		"tiers.per_key_inflight":             {"2", admissionSettings},
+		"tiers.critical.per_key_inflight":    {"2", admissionSettings},
 		"admission.aging_after":              {"1s", admissionSettings},
 		"admission.ewma_alpha":               {"0.5", admissionSettings},
 		"admission.shed_status":              {"503", keyed},

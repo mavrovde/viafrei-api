@@ -211,11 +211,11 @@ func TestEveryStatementFaultFailsTheRead(t *testing.T) {
 			return err
 		},
 		"Disruptions": func(ctx context.Context, s *store.Store) error {
-			_, err := s.Disruptions(ctx, transit.DisruptionQuery{Area: "09", Limit: 5, Now: now, LateOverMin: 5}, every)
+			_, err := s.Disruptions(ctx, transit.DisruptionQuery{Area: "09", Line: "RE45", Limit: 5, Now: now, LateOverMin: 5}, every)
 			return err
 		},
 		"WarningsAt": func(ctx context.Context, s *store.Store) error {
-			_, err := s.WarningsAt(ctx, weather.Query{At: berlin, MinLevel: 1, Limit: 5}, every, now)
+			_, err := s.WarningsAt(ctx, weather.Query{LookAhead: lookAhead, At: berlin, MinLevel: 1, Limit: 5}, every, now)
 			return err
 		},
 		"WarmRoads": func(ctx context.Context, s *store.Store) error { return s.WarmRoads(ctx) },

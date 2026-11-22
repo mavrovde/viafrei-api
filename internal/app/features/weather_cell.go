@@ -8,6 +8,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 )
 
@@ -49,7 +50,7 @@ func (s *Service) WeatherCell(ctx context.Context, key access.Record, target str
 			}
 		}
 	}
-	v, meta, err := listed(ctx, s, key, "weather", func(permitted []string) (weather.Cell, []string, error) {
+	v, meta, err := listed(ctx, s, key, "weather", provenance.DatasetWarnings, func(permitted []string) (weather.Cell, []string, error) {
 		c, err := s.repos.Weather.CellWarnings(ctx, q, permitted, s.now())
 		if errors.Is(err, weather.ErrNoCell) && q.At != nil && at == nil {
 			// no cell held at the place: a cell held under the name given

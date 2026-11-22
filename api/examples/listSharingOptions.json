@@ -47,7 +47,8 @@
           "licenceUrl": "https://licences.example/cc0-1-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://www.nextbike.de"
+          "termsUrl": "https://www.nextbike.de",
+          "sourceUrl": "https://www.nextbike.de"
         }
       ],
       "notes": {

@@ -83,6 +83,9 @@ func TestDisruptionsCreditWhatTheAnswerRead(t *testing.T) {
 		"alert":      {transit.Disruptions{Alerts: []transit.Alert{{ID: "a:1", Family: "f1"}}, PunctualityRead: []string{"f2"}}, []string{"f1", "f2"}},
 		// Nothing listed and no punctuality read: no family is credited.
 		"nothing": {transit.Disruptions{}, nil},
+		// The timetable that knows the line asked is credited for saying so; one that does not, is not.
+		"line known":   {transit.Disruptions{Line: &transit.LineCheck{Checked: true, InTimetable: true, Families: []string{"f1"}}}, []string{"f1"}},
+		"line unknown": {transit.Disruptions{Line: &transit.LineCheck{Checked: true}}, nil},
 	} {
 		a, err := disruptionService(&disruptionFake{v: c.v}).Disruptions(context.Background(), k, transit.DisruptionQuery{Line: "RE45", Limit: 6})
 		if err != nil {

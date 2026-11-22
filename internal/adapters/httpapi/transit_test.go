@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,7 +23,8 @@ func (f *fakeFeatures) Stations(_ context.Context, key access.Record, q transit.
 }
 
 var transitFamily = provenance.Family{
-	Source:     access.Source{Family: "src-alpha-transit", Domain: "transit", Publisher: "P", AttributionText: "T", Licence: "L", LicenceURL: "https://licences.example/t"},
+	Source: access.Source{Family: "src-alpha-transit", Domain: "transit", Publisher: "P", AttributionText: "T", Licence: "L", LicenceURL: "https://licences.example/t",
+		SourceURL: sp("https://data.example/t")},
 	StaleAfter: 24 * time.Hour, DataAsOf: tp(fixedNow.Add(-time.Hour)),
 }
 
@@ -76,6 +78,17 @@ func TestStationsAnswer(t *testing.T) {
 	if v, has := q["at"]; !has || v != nil || q["radiusM"] != nil || q["q"] != "Köln" {
 		t.Errorf("a name alone: query %v", q)
 	}
+	if v, has := q["area"]; !has || v != nil || f.gotStation.Area != "" {
+		t.Errorf("no area: query %v, asked %+v", q, f.gotStation)
+	}
+
+	// A name within an area: the area is asked and echoed.
+	f = everyAnswer()
+	body = decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/stations?q=hbf&area=05315", bearer))
+	q, _ = meta(t, body)["query"].(map[string]any)
+	if g := f.gotStation; g.Text != "hbf" || g.Area != "05315" || q["area"] != "05315" {
+		t.Errorf("a name in an area: asked %+v, query %v", g, q)
+	}
 
 	// A position alone: the default radius.
 	f = everyAnswer()
@@ -91,6 +104,9 @@ func TestStationsAnswer(t *testing.T) {
 	if g := f.gotStation; g.Code != "8000207" || g.At != nil || q["code"] != "8000207" {
 		t.Errorf("a code alone: asked %+v, query %v", g, q)
 	}
+	if w := do(t, featureHandler(t, config.Defaults(), everyAnswer(), nil), http.MethodGet, "/v1/stations?q=koeln", bearer); !strings.Contains(w.Body.String(), `"termsUrl":null,"sourceUrl":"https://data.example/t"`) {
+		t.Errorf("the attribution links the family's source: %s", w.Body)
+	}
 	if !slices.Contains(featureScopes().Key.Plan.Scopes, "transit") {
 		t.Fatal("the rig's key has no transit scope")
 	}
@@ -102,6 +118,8 @@ func TestStationsRefusals(t *testing.T) {
 	for _, target := range []string{
 		"/v1/stations", "/v1/stations?q=k", "/v1/stations?at=91,13", "/v1/stations?at=52,13&limit=61",
 		"/v1/stations?q=koeln&radius_m=0", "/v1/stations?at=52",
+		// area narrows a search and is none of its own; a Land or a Kreis key only
+		"/v1/stations?area=05315", "/v1/stations?q=koeln&area=053", "/v1/stations?q=koeln&area=17", "/v1/stations?q=koeln&area=05315000",
 	} {
 		assertProblem(t, do(t, h, http.MethodGet, target, bearer), 400, "invalid-parameter")
 	}

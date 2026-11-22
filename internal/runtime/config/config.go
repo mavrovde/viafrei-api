@@ -54,6 +54,7 @@ type Config struct {
 	Cache      Cache      `koanf:"cache"`
 	Admin      Admin      `koanf:"admin"`
 	Callers    Callers    `koanf:"callers"`
+	Clock      Clock      `koanf:"clock"`
 }
 
 // Server holds the public HTTP listener settings.
@@ -94,6 +95,8 @@ type DB struct {
 	RegisterStaleFor       time.Duration `koanf:"register_stale_for" default:"5s" validate:"min=1s,max=60s" desc:"How long the last register read still answers while the next reads fail; past it a request reads the register itself, and fails if that fails. Never shorter than register_snapshot_ttl."`
 	RoadSnapshotTTL        time.Duration `koanf:"road_snapshot_ttl" default:"5m" validate:"min=0s,max=1h" desc:"How often every motorway's length, Länder and line (derived per read from the BASt location code list, milliseconds a road), and the Länder of its junctions (one read a road), are read again off the request path; the motorway list, its Land filter, one motorway's exits and the parking along a motorway answer from the last read. A reloaded location code list or road register reaches answers within this plus one read. 0s reads them on every request."`
 	RoadStaleFor           time.Duration `koanf:"road_stale_for" default:"1h" validate:"min=1s,max=24h" desc:"How long the last read of the motorways' length, Länder and line, and of their junctions' Länder, still answers while the next reads fail; past it a request reads them itself (the junction Länder inside its own read), and fails if that fails. Never shorter than road_snapshot_ttl."`
+	FeedingSnapshotTTL     time.Duration `koanf:"feeding_snapshot_ttl" default:"10m" validate:"min=0s,max=1h" desc:"How often the families holding rows in each dataset an answer reads (fuel stations, zones, lorry rules, speed cameras, weather warnings, service alerts, sharing, road events) are read again, off the request path. An empty answer credits these, as the platform's tools credit their own sources, not every family of the domain. 0s reads them on every empty answer."`
+	FeedingStaleFor        time.Duration `koanf:"feeding_stale_for" default:"1h" validate:"min=1s,max=24h" desc:"How long the last read of the families of each dataset still answers while the next reads fail; past it a request reads them itself."`
 	SharedBudget           SharedBudget  `koanf:"shared_budget"`
 }
 
@@ -199,7 +202,8 @@ type Roads struct {
 
 // Weather holds the settings of the weather answers.
 type Weather struct {
-	MaxWarnings int `koanf:"max_warnings" default:"100" validate:"min=1,max=500" desc:"Most warnings one weather answer lists, worst first; truncated says when more answer. The lamp reads every warning in force at the position, whatever this keeps."`
+	MaxWarnings int           `koanf:"max_warnings" default:"100" validate:"min=1,max=500" desc:"Most warnings one weather answer lists, worst first; truncated says when more answer. The lamp reads every warning in force at the position, whatever this keeps."`
+	LookAhead   time.Duration `koanf:"lookahead" default:"24h" validate:"min=0s,max=72h" desc:"How far ahead the warnings at a position are listed beside those in force (inForce false), as the platform's weather check lists the next 24 hours; 0 lists only those in force. The lamp reads only those in force."`
 }
 
 // Charging holds the settings of charging answers.
@@ -256,9 +260,10 @@ type Tiers struct {
 
 // CriticalTier is the highest tier.
 type CriticalTier struct {
-	Reserved     int           `koanf:"reserved" default:"1" validate:"min=0,max=16" desc:"Permits kept for the critical tier that lower tiers cannot use (RATE-009)."`
-	QueueLen     int           `koanf:"queue_len" default:"32" validate:"min=0,max=1024" desc:"Critical requests that may wait for a permit; one more is shed."`
-	QueueMaxWait time.Duration `koanf:"queue_max_wait" default:"800ms" validate:"min=0s,max=2s" desc:"Longest time a critical request waits for a permit before it is shed. Less than deadline.request."`
+	Reserved       int           `koanf:"reserved" default:"1" validate:"min=0,max=16" desc:"Permits kept for the critical tier that lower tiers cannot use (RATE-009)."`
+	QueueLen       int           `koanf:"queue_len" default:"32" validate:"min=0,max=1024" desc:"Critical requests that may wait for a permit; one more is shed."`
+	QueueMaxWait   time.Duration `koanf:"queue_max_wait" default:"800ms" validate:"min=0s,max=2s" desc:"Longest time a critical request waits for a permit before it is shed. Less than deadline.request."`
+	PerKeyInflight int           `koanf:"per_key_inflight" default:"0" validate:"min=0,max=16" desc:"Permits one key of a critical-tier plan may hold at once, in place of tiers.per_key_inflight; 0 keeps tiers.per_key_inflight: a service key that carries many users' calls (the MCP server's) needs as many as its callers run at once. At most db.pool_max."`
 }
 
 // StandardTier is the middle tier.

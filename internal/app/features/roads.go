@@ -8,6 +8,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/ampel"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/roads"
 )
 
@@ -44,10 +45,17 @@ type Conditions struct {
 	Road   *roads.Road
 	Lamp   roads.Lamp
 	Reason *roads.Reason
+	// Reasons are every reason of the lamp with its count, Sight the sight
+	// of every group the lamp read (roads.Account).
+	Reasons []roads.ReasonCount
+	Sight   []ampel.SightEntry
 	// Covering are, for a road the register does not hold, the roads
 	// families read that hold a situation on a road of its class; nil for a
 	// registered road or an area.
 	Covering []string
+	// Counts are, by family, how many situations the filters keep, before
+	// the limit (roads.Page.Counts).
+	Counts map[string]int
 	// Read are every family the lamp read, whether or not it contributed
 	// (Families names only those): a new version of any of them, or of its
 	// confirmation, may change the lamp.
@@ -74,7 +82,7 @@ func sights(p roads.Page, fams roads.Families, partial, weatherRead bool, now ti
 		if !ok {
 			s = ampel.SightMissing
 		}
-		out = append(out, ampel.SightEntry{Group: roads.GroupRoads, State: s})
+		out = append(out, ampel.SightEntry{Group: roads.GroupRoads, State: s, Family: f})
 	}
 	if partial {
 		out = append(out, ampel.SightEntry{Group: roads.GroupRoads, State: ampel.SightMissing})
@@ -129,29 +137,42 @@ func (s *Service) conditions(ctx context.Context, key access.Record, ahead bool,
 	if err := gate.Check(contributed); err != nil {
 		return Conditions{}, err
 	}
-	// The attribution: the families that contributed a situation or a
-	// warning, or every permitted roads family when none did; and every
-	// weather family the lamp read, whose warnings (or their absence) the
-	// lamp states, as the platform credits the DWD on every road status.
-	consulted := slices.Clone(contributed)
+	// The attribution: the families that contributed a situation, or every
+	// permitted roads family when none did (a warning found is no
+	// situation: the roads answer is still the roads families' "nothing
+	// here"); the families of the warnings found; and every weather family
+	// the lamp read, whose warnings (or their absence) the lamp states, as
+	// the platform credits the DWD on every road status.
+	consulted := slices.Clone(contributed[:len(p.Items)])
 	if len(consulted) == 0 {
-		consulted = slices.Clone(permitted)
+		if consulted, err = s.consultedIn(ctx, provenance.DatasetRoadEvents, permitted); err != nil {
+			return Conditions{}, err
+		}
 	}
-	consulted = append(consulted, weather...)
+	consulted = append(consulted, contributed[len(p.Items):]...)
+	// The weather families whose warnings the lamp reads, not those of road
+	// weather (a road-weather station's note and credit belong to an
+	// answer that states its readings).
+	warned, err := s.consultedIn(ctx, provenance.DatasetWarnings, weather)
+	if err != nil {
+		return Conditions{}, err
+	}
+	consulted = append(consulted, warned...)
 	// A Land's answer credits the families that placed its situations in
 	// the Land, as the platform's Land form credits BKG.
 	consulted = append(consulted, p.Placed...)
 	slices.Sort(consulted)
 	consulted = slices.Compact(consulted)
-	attributed, err := s.repos.Register.Provenance(ctx, consulted, s.lang(ctx))
+	attributed, err := s.attributed(ctx, consulted)
 	if err != nil {
 		return Conditions{}, err
 	}
-	lamp, reason := roads.LampOf(p.Messages, warningLevels(p), sights(p, fams, partial, weatherRead, now))
+	acc := roads.AccountOf(p.Messages, warningLevels(p), sights(p, fams, partial, weatherRead, now))
 	return Conditions{
 		Answer: Answer[roads.Situation]{Items: p.Items, HasMore: p.HasMore, Families: attributed, Partial: partial, At: now,
 			ChangesAt: p.ChangesAt(now)},
-		Lamp: lamp, Reason: reason, Read: fams, Covering: p.Covering,
+		Lamp: acc.Lamp, Reason: acc.Reason, Reasons: acc.Reasons, Sight: acc.Sight, Read: fams, Covering: p.Covering,
+		Counts: p.Counts,
 	}, nil
 }
 
@@ -192,14 +213,15 @@ func warningLevels(p roads.Page) []int {
 // MotorwayConditions answers "what is happening on this road" for key
 // (FR-ROAD-003, FR-ROAD-004). The road is resolved first. A motorway the
 // register does not hold is unknown (roads.ErrUnknownRoad), as the
-// platform's roadworks-ahead answer refuses it (G6). Any other road it does
+// platform's roadworks-ahead answer refuses it (G6), unless q.AnyMotorway
+// (a watch) reads it as any other unheld road. Any other road it does
 // not hold (a federal, Land or city road) is answered as that answer answers
 // it: from the situations whose reference names it, with the families that
 // hold any situation on a road of its class (Covering), and crediting only
 // the families that contributed one, so an empty list credits none.
 func (s *Service) MotorwayConditions(ctx context.Context, key access.Record, q roads.CorridorQuery) (Conditions, error) {
 	road, err := s.repos.Roads.Road(ctx, q.Road)
-	if errors.Is(err, roads.ErrUnknownRoad) && roads.ClassOf(q.Road) != roads.ClassMotorway {
+	if errors.Is(err, roads.ErrUnknownRoad) && (q.AnyMotorway || roads.ClassOf(q.Road) != roads.ClassMotorway) {
 		road, err = roads.Road{Ref: q.Road, Class: roads.ClassOf(q.Road), States: []string{}}, nil
 		q.Unregistered, q.Class = true, road.Class
 	}
@@ -256,7 +278,7 @@ func (s *Service) RoadSituation(ctx context.Context, key access.Record, id strin
 	if err := gate.Check([]string{sit.Family}); err != nil {
 		return Answer[roads.Situation]{}, err
 	}
-	fams, err := s.repos.Register.Provenance(ctx, []string{sit.Family}, s.lang(ctx))
+	fams, err := s.attributed(ctx, []string{sit.Family})
 	if err != nil {
 		return Answer[roads.Situation]{}, err
 	}

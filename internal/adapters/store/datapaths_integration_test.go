@@ -125,7 +125,8 @@ func plantWarning(n, level int) string {
 }
 
 // At a point more warnings answer than the limit: the page says so. A
-// stored level outside 1 to 4 in force there is refused, not re-graded.
+// level-0 advance notice is listed (the table holds no level outside 0 to
+// 4; levelOf refuses one, TestLevelOf).
 func TestWarningsAtMoreThanTheLimitAndABadLevel(t *testing.T) {
 	var fams []string
 	owner(t, `select array_agg(source_ref order by source_ref) from contract.source`, &fams)
@@ -134,14 +135,17 @@ func TestWarningsAtMoreThanTheLimitAndABadLevel(t *testing.T) {
 	st, cp := private(t, plantWarning(1, 2), plantWarning(2, 3))
 	var at geo.Point
 	ownerOf(t, cp, where, &at.Lat, &at.Lon)
-	got, err := st.WarningsAt(bounded(t), weather.Query{At: at, MinLevel: 1, Limit: 1}, fams, time.Now())
+	got, err := st.WarningsAt(bounded(t), weather.Query{LookAhead: lookAhead, At: at, MinLevel: 1, Limit: 1}, fams, time.Now())
 	if err != nil || len(got.Warnings) != 1 || !got.HasMore {
 		t.Fatalf("%+v %v", got, err)
 	}
+	// A level-0 advance notice is listed at floor 0, as the platform lists
+	// it, and lights no lamp.
 	st, cp = private(t, plantWarning(1, 0))
 	ownerOf(t, cp, where, &at.Lat, &at.Lon)
-	if _, err := st.WarningsAt(bounded(t), weather.Query{At: at, MinLevel: 1, Limit: 5}, fams, time.Now()); err == nil || !strings.Contains(err.Error(), "level 0") {
-		t.Fatalf("a level-0 warning in force: %v", err)
+	if sc, err := st.WarningsAt(bounded(t), weather.Query{LookAhead: lookAhead, At: at, MinLevel: 0, Limit: 5}, fams, time.Now()); err != nil ||
+		len(sc.Warnings) != 1 || sc.Warnings[0].Level != 0 || weather.LampOf(sc.Levels, false, false) != weather.LampGreen {
+		t.Fatalf("a level-0 notice in force: %+v %v", sc, err)
 	}
 }
 

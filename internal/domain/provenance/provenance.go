@@ -10,6 +10,25 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 )
 
+// Dataset names what one kind of answer reads: the families that hold its
+// rows are the families such an answer consulted, which an empty answer
+// credits (its notes included), as the platform's tools credit their own
+// sources. A domain is wider: an empty fuel answer credits no charging
+// family, a road lamp no road-weather family.
+type Dataset string
+
+// The datasets an answer's credit is narrowed to.
+const (
+	DatasetFuel         Dataset = "fuel"
+	DatasetZones        Dataset = "zones"
+	DatasetLorry        Dataset = "lorry"
+	DatasetSpeedCameras Dataset = "speed_cameras"
+	DatasetWarnings     Dataset = "warnings"
+	DatasetAlerts       Dataset = "alerts"
+	DatasetSharing      Dataset = "sharing"
+	DatasetRoadEvents   Dataset = "events"
+)
+
 // NoteKind is the kind of a licence note.
 type NoteKind string
 
@@ -53,6 +72,14 @@ type Family struct {
 	// family has published none. An answer's ETag is built from it.
 	Version string
 	Notes   []Note
+	// ReadAt is when the family's data was last read and found current (a
+	// new or a confirmed file); nil when it never was. A dated note states
+	// its day (Filled).
+	ReadAt *time.Time
+	// FilledUntil is when a text Filled gave the family stops being true:
+	// the next Europe/Berlin new year for a filled year; zero when nothing
+	// was filled.
+	FilledUntil time.Time
 }
 
 // Freshness is one entry of meta.freshness (ENV-003).

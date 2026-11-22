@@ -36,12 +36,13 @@ type Attribution struct {
 	Family          string  `json:"family" doc:"The source family id."`
 	Domain          string  `json:"domain" doc:"The domain the family answers for."`
 	Publisher       string  `json:"publisher" doc:"The publisher, as its licence asks to be named."`
-	Text            string  `json:"text" doc:"The attribution notice clients displaying the data must show."`
+	Text            string  `json:"text" doc:"The attribution notice clients displaying the data must show, as stated: the year of retrieval it names is the answer's Europe/Berlin year."`
 	Licence         string  `json:"licence" doc:"The licence's name."`
 	LicenceURL      string  `json:"licenceUrl" format:"uri" doc:"The licence's canonical URL."`
 	ShareAlike      bool    `json:"shareAlike" doc:"True for share-alike data."`
 	ShareAlikeOffer *string `json:"shareAlikeOffer" nullable:"true" format:"uri" doc:"Where the derived database is offered under the same licence; set when shareAlike."`
 	TermsURL        *string `json:"termsUrl" nullable:"true" format:"uri" doc:"The terms a client must follow or accept, when any."`
+	SourceURL       *string `json:"sourceUrl" nullable:"true" format:"uri" example:"https://mobilithek.info/offers/858688352316981248" doc:"Where the data comes from: the page the source register names for the family (its publisher's dataset or offer page), as a credit line links it; null when none is recorded."`
 }
 
 // KeyData describes the presenting key. It never carries the secret or its

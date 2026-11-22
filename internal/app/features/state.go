@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 )
@@ -22,7 +23,7 @@ type States interface {
 // StateWarnings answers "which official warnings are in force in this Land"
 // as the platform's Land page lists them (domain weather).
 func (s *Service) StateWarnings(ctx context.Context, key access.Record, land string) ([]weather.StateWarning, Answer[struct{}], error) {
-	return listed(ctx, s, key, "weather", func(permitted []string) ([]weather.StateWarning, []string, error) {
+	return listed(ctx, s, key, "weather", provenance.DatasetWarnings, func(permitted []string) ([]weather.StateWarning, []string, error) {
 		v, err := s.repos.States.StateWarnings(ctx, land, permitted, s.now())
 		var contributed []string
 		for _, w := range v {
@@ -45,7 +46,7 @@ type StateAlertsAnswer struct {
 // messages naming most lines first; at most limit.
 func (s *Service) StateAlerts(ctx context.Context, key access.Record, land string, limit int) (StateAlertsAnswer, error) {
 	total := 0
-	v, meta, err := listed(ctx, s, key, "transit", func(permitted []string) ([]transit.StateAlert, []string, error) {
+	v, meta, err := listed(ctx, s, key, "transit", provenance.DatasetAlerts, func(permitted []string) ([]transit.StateAlert, []string, error) {
 		rows, err := s.repos.States.StateAlerts(ctx, land, permitted, s.now())
 		v := transit.StateAlertsOf(rows, land)
 		total = len(v)

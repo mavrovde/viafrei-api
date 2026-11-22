@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
@@ -173,4 +174,27 @@ func TestAnEditedRuleEndsADrivingRulesAnswer(t *testing.T) {
 	r.clock.add(2 * time.Second)
 	r.versions.change(func(v *fakeVersions) { v.rulesRef = "u2" })
 	answersAnew(t, r, rulesURL, etag, "an edited rule")
+}
+
+// TestAFilledYearEndsAStoredAnswerAtTheNewYear: an answer whose credit
+// states the year of retrieval is the stored one until the next Berlin new
+// year (the family's FilledUntil) and never served stale past it, so no
+// answer says the old year after midnight.
+func TestAFilledYearEndsAStoredAnswerAtTheNewYear(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005", "LIC-002")
+	r := newWeatherRig(t, config.Defaults())
+	a := r.features.risk
+	fam := a.Families[0]
+	fam.FilledUntil = fixedNow.Add(20 * time.Second)
+	a.Families = []provenance.Family{fam}
+	r.features.risk = a
+	first := r.road(t, weatherURL, "")
+	if cc := first.Header().Get("Cache-Control"); cc != "private, max-age=20" {
+		t.Fatalf("the max-age reaches past the new year: %q", cc)
+	}
+	r.clock.add(20 * time.Second)
+	r.failStorage(errFake)
+	if w := r.road(t, weatherURL, ""); w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("at the new year, storage down: %d %s", w.Code, w.Body)
+	}
 }

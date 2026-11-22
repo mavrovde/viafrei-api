@@ -57,7 +57,8 @@
           "licenceUrl": "https://licences.example/dl-de-by-2-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://eta.example/terms/dwd_eta"
+          "termsUrl": "https://eta.example/terms/dwd_eta",
+          "sourceUrl": "https://eta.example/terms/dwd_eta"
         }
       ],
       "notes": {

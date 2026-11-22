@@ -51,6 +51,7 @@ func FeatureSettings(cfg *config.Config) features.Settings {
 		EndedRetention: time.Duration(cfg.Roads.EndedRetentionH) * time.Hour,
 		PlannedWorks:   cfg.Roads.PlannedFamilies,
 		MaxWarnings:    cfg.Weather.MaxWarnings,
+		LookAhead:      cfg.Weather.LookAhead,
 		Disabled:       cfg.Sources.Disabled,
 		IsTimeout:      store.IsDeadline,
 	}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/energy"
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 )
 
 // Fuel is the filling-station port.
@@ -56,6 +57,14 @@ func (s *Service) FuelStations(ctx context.Context, key access.Record, q energy.
 	if err := gate.Check(contributed); err != nil {
 		return FuelStations{}, err
 	}
+	if len(contributed) == 0 {
+		// An empty answer credits the families of filling stations, not
+		// every energy family (charging, hydrogen), as the platform's fuel
+		// search credits its own sources.
+		if permitted, err = s.consultedIn(ctx, provenance.DatasetFuel, permitted); err != nil {
+			return FuelStations{}, err
+		}
+	}
 	fams, err := s.provenanceOf(ctx, contributed, permitted)
 	if err != nil {
 		return FuelStations{}, err
@@ -87,7 +96,7 @@ func (s *Service) FuelStation(ctx context.Context, key access.Record, id string,
 	if err := gate.Check([]string{st.Family}); err != nil {
 		return energy.FuelStationPage{}, Answer[struct{}]{}, err
 	}
-	fams, err := s.repos.Register.Provenance(ctx, []string{st.Family}, s.lang(ctx))
+	fams, err := s.attributed(ctx, []string{st.Family})
 	if err != nil {
 		return energy.FuelStationPage{}, Answer[struct{}]{}, err
 	}

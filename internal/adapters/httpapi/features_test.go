@@ -201,7 +201,10 @@ func featureScopes() auth.Principal {
 func featureHandler(t *testing.T, cfg *config.Config, f httpapi.Features, log *bytes.Buffer) http.Handler {
 	t.Helper()
 	d := httpapi.Deps{
-		Config: cfg, Build: buildinfo.Info{Version: "t", Commit: "c"}, ContractVersion: "0.1", Now: func() time.Time { return fixedNow },
+		Config: cfg, Build: buildinfo.Info{Version: "t", Commit: "c"}, ContractVersion: "0.1",
+		// The wall clock is a day off the answers' clock, so every instant an
+		// answer states proves it was computed at At (clock.fixed_now, #165).
+		Now: func() time.Time { return fixedNow.Add(24 * time.Hour) }, At: func() time.Time { return fixedNow },
 		Auth: &fakeAuth{p: featureScopes()}, Sources: &fakeSources{register: fixtureRegister},
 	}
 	if f != nil {
@@ -730,6 +733,15 @@ func TestChargingFilters(t *testing.T) {
 			t.Errorf("answer lacks %s: %s", s, body)
 		}
 	}
+	if strings.Contains(body, `"inRadius"`) {
+		t.Errorf("an answer without inRadius states it: %s", body)
+	}
+	n := 7
+	f.charging.InRadius = &n
+	if body = do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&min_kw=350", bearer).Body.String(); !strings.Contains(body, `"inRadius":7`) {
+		t.Errorf("an empty answer lacks its circle's count: %s", body)
+	}
+	f.charging.InRadius = nil
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&min_kw=150&max_kw=50", bearer), 400, "invalid-parameter")
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&operator=GmbH", bearer), 400, "invalid-parameter")
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&conditions=cheap", bearer), 400, "invalid-parameter")

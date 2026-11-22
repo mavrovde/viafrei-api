@@ -61,6 +61,22 @@ type Disruptions struct {
 	// Trips are the area's observed trips counted against the query's
 	// LateOverMin; nil when the query asks for none or none was observed.
 	Trips *TripCount
+	// Line is what the static timetable says of the line asked; nil when
+	// the query names none.
+	Line *LineCheck
+}
+
+// LineCheck is whether the static timetable knows a line of the asked
+// name (folded as FoldLine folds it), so an empty alert list can be told
+// from a line that does not exist.
+type LineCheck struct {
+	// Checked is whether a timetable of the families was there to ask:
+	// InTimetable false means no such line only when this is true.
+	Checked bool
+	// InTimetable is whether a line of the name is in it.
+	InTimetable bool
+	// Families are the timetable families that hold a line of the name.
+	Families []string
 }
 
 // TripCount is how many distinct trips were observed at the stops of an area

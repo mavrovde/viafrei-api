@@ -86,6 +86,7 @@ var nullableObjects = []struct{ schema, member string }{
 	{"RefreshData", "queue"},
 	{"HydrogenData", "nearest"},
 	{"DisruptionData", "punctuality"},
+	{"DisruptionData", "line"},
 	{"SpeedCamera", "location"},
 	{"LocationZone", "plaque"},
 	{"LocationData", "address"},
@@ -156,7 +157,7 @@ func staleAfterS(fr provenance.Freshness) int64 {
 
 // Notes are the verbatim licence notes of the contributing families.
 type Notes struct {
-	Condition []string `json:"condition" doc:"Conditions the data may only be used under; show them with the data."`
+	Condition []string `json:"condition" doc:"Conditions the data may only be used under; show them with the data. A dated condition names the Europe/Berlin day its data was read."`
 	Purpose   []string `json:"purpose" doc:"Purposes the data may only be used for; show them with the data."`
 }
 
@@ -186,7 +187,7 @@ func attribution(r access.Source) Attribution {
 	return Attribution{
 		Family: r.Family, Domain: r.Domain, Publisher: r.Publisher, Text: r.AttributionText,
 		Licence: r.Licence, LicenceURL: r.LicenceURL, ShareAlike: r.ShareAlike,
-		ShareAlikeOffer: r.ShareAlikeOffer, TermsURL: r.TermsURL,
+		ShareAlikeOffer: r.ShareAlikeOffer, TermsURL: r.TermsURL, SourceURL: r.SourceURL,
 	}
 }
 
@@ -207,6 +208,12 @@ func (s *server) dataMeta(ctx context.Context, fams []provenance.Family, at time
 		fs = append(fs, fr)
 		m.Freshness = append(m.Freshness, FreshnessEntry{Family: fr.Family, DataAsOf: fr.DataAsOf, AgeS: fr.AgeS, StaleAfterS: staleAfterS(fr), Stale: fr.Stale})
 		m.Attribution = append(m.Attribution, attribution(f.Source))
+		if !f.FilledUntil.IsZero() {
+			// A filled year is wrong from the next new year on: no stored
+			// answer states it past then, nor validates one that does not.
+			noteBound(ctx, f.FilledUntil)
+			noteShown(ctx, "filled "+f.Source.Family+" until "+f.FilledUntil.Format(time.RFC3339))
+		}
 	}
 	m.AsOf = provenance.AsOf(fs)
 	m.Notes = Notes{Condition: provenance.Notes(fams, provenance.Condition), Purpose: provenance.Notes(fams, provenance.Purpose)}
@@ -437,9 +444,10 @@ type ChargingDropped struct {
 // ChargingMeta is the meta member of listChargingOptions.
 type ChargingMeta struct {
 	DataMeta
-	Page    Page             `json:"page"`
-	Query   ChargingQuery    `json:"query"`
-	Dropped *ChargingDropped `json:"dropped,omitempty" doc:"With only_available: the examined sites left out."`
+	Page     Page             `json:"page"`
+	Query    ChargingQuery    `json:"query"`
+	Dropped  *ChargingDropped `json:"dropped,omitempty" doc:"With only_available: the examined sites left out."`
+	InRadius *int             `json:"inRadius,omitempty" doc:"Only when data is empty: how many charging sites the key may read within the radius, every filter dropped (the platform's \"I know N charging sites in that circle\")."`
 }
 
 // ChargingEnvelope is the enveloped answer of listChargingOptions.
@@ -530,7 +538,8 @@ func registerCharging(api huma.API, s *server, op huma.Operation) {
 				Query: ChargingQuery{NearQuery: NearQuery{At: position(q.At), RadiusM: q.RadiusM}, MinKw: q.MinKw, Access: string(q.Access),
 					MaxKw: positive(q.Filter.MaxKw), Connector: q.Filter.Connector, Operator: q.Filter.OperatorKey, Conditions: q.Filter.Terms,
 					OnlyAvailable: q.Filter.OnlyAvailable},
-				Dropped: chargingDropped(a.Dropped),
+				Dropped:  chargingDropped(a.Dropped),
+				InRadius: a.InRadius,
 			},
 			Links: s.selfLink(ctx),
 		}}, nil
@@ -991,7 +1000,7 @@ func registerOverview(api huma.API, s *server, op huma.Operation) {
 			noteDegraded(ctx)
 		}
 		meta := OverviewMeta{
-			DataMeta: s.dataMeta(ctx, o.Families, s.now(), len(details) > 0, strings.Join(details, " ")),
+			DataMeta: s.dataMeta(ctx, o.Families, s.at(), len(details) > 0, strings.Join(details, " ")),
 			Parts:    []PartStatus{},
 			Query:    OverviewQuery{PlaceID: q.PlaceID, RadiusM: q.RadiusM, PerPartLimit: q.PerPartLimit},
 			Terms:    terms,

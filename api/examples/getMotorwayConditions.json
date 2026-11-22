@@ -29,6 +29,78 @@
       },
       "lamp": "amber",
       "lampReason": "weather_warning",
+      "lampReasons": [
+        {
+          "reason": "weather_warning",
+          "lamp": "amber",
+          "count": 2
+        },
+        {
+          "reason": "warning",
+          "lamp": "amber",
+          "count": 1
+        },
+        {
+          "reason": "narrowing",
+          "lamp": "amber",
+          "count": 1
+        },
+        {
+          "reason": "limited_sight",
+          "lamp": "amber",
+          "count": 2
+        }
+      ],
+      "sight": [
+        {
+          "group": "roads",
+          "state": "fresh",
+          "family": "roads_alpha",
+          "land": null
+        },
+        {
+          "group": "roads",
+          "state": "missing",
+          "family": null,
+          "land": null
+        },
+        {
+          "group": "weather",
+          "state": "missing",
+          "family": null,
+          "land": null
+        },
+        {
+          "group": "messages",
+          "state": "fresh",
+          "family": null,
+          "land": "06"
+        },
+        {
+          "group": "messages",
+          "state": "fresh",
+          "family": null,
+          "land": "07"
+        },
+        {
+          "group": "messages",
+          "state": "fresh",
+          "family": null,
+          "land": "08"
+        },
+        {
+          "group": "messages",
+          "state": "fresh",
+          "family": null,
+          "land": "10"
+        }
+      ],
+      "counts": [
+        {
+          "sourceFamily": "roads_alpha",
+          "situations": 8
+        }
+      ],
       "coverage": null,
       "situations": [
         {
@@ -122,7 +194,8 @@
           "licenceUrl": "https://licences.example/dl-de-by-2-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://eta.example/terms/dwd_eta"
+          "termsUrl": "https://eta.example/terms/dwd_eta",
+          "sourceUrl": "https://eta.example/terms/dwd_eta"
         },
         {
           "family": "roads_alpha",
@@ -133,7 +206,8 @@
           "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms/roads_alpha"
+          "termsUrl": "https://alpha.example/terms/roads_alpha",
+          "sourceUrl": "https://alpha.example/terms/roads_alpha"
         }
       ],
       "notes": {

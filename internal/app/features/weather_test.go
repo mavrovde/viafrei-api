@@ -227,6 +227,7 @@ func TestWeatherRiskRefusals(t *testing.T) {
 		"read":       {&wxFake{readErr: errStore}, full, errStore},
 		"post-check": {&wxFake{warnings: []weather.Warning{{Family: "w2"}}}, full, features.ErrGateViolation},
 		"provenance": {&wxFake{fake: &fake{provErr: errStore}}, full, errStore},
+		"feeding":    {&wxFake{fake: &fake{feedErr: errStore}}, full, errStore},
 	} {
 		if _, err := wxService(c.f).WeatherRisk(context.Background(), c.k, weather.Query{}); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)

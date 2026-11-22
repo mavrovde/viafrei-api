@@ -47,7 +47,7 @@ func AdmissionSettings(cfg *config.Config) admission.Settings {
 	return admission.Settings{
 		Permits: permits,
 		Tiers: [3]admission.TierSettings{
-			admission.Critical: {Reserved: t.Critical.Reserved, QueueLen: t.Critical.QueueLen, MaxWait: t.Critical.QueueMaxWait, MaxInflight: permits},
+			admission.Critical: {Reserved: t.Critical.Reserved, QueueLen: t.Critical.QueueLen, MaxWait: t.Critical.QueueMaxWait, MaxInflight: permits, PerKey: t.Critical.PerKeyInflight},
 			admission.Standard: {Reserved: t.Standard.Reserved, QueueLen: t.Standard.QueueLen, MaxWait: t.Standard.QueueMaxWait, MaxInflight: permits},
 			admission.Bulk:     {Reserved: t.Bulk.Reserved, QueueLen: t.Bulk.QueueLen, MaxWait: t.Bulk.QueueMaxWait, MaxInflight: t.Bulk.MaxInflight},
 		},

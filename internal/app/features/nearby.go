@@ -100,7 +100,7 @@ func (s *Service) Nearby(ctx context.Context, key access.Record, q NearbyQuery) 
 		return out, ErrNoPart
 	}
 	slices.Sort(families)
-	fams, err := s.repos.Register.Provenance(ctx, slices.Compact(families), s.lang(ctx))
+	fams, err := s.attributed(ctx, slices.Compact(families))
 	out.Meta = Answer[struct{}]{Families: fams, Partial: partial, At: s.now()}
 	return out, err
 }
@@ -160,7 +160,7 @@ func (s *Service) nearbyNeeds(ctx context.Context, key access.Record, q NearbyQu
 	}
 	nq := q.At
 	nq.Needs = needs
-	found, m, err := listed(ctx, s, key, "places", func(permitted []string) (map[string][]places.NeedPlace, []string, error) {
+	found, m, err := listed(ctx, s, key, "places", "", func(permitted []string) (map[string][]places.NeedPlace, []string, error) {
 		found, err := s.repos.Nearby.NeedPlaces(ctx, nq, permitted)
 		var contributed []string
 		for _, ps := range found {

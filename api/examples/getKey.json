@@ -41,7 +41,8 @@
           "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms/afir_alpha"
+          "termsUrl": "https://alpha.example/terms/afir_alpha",
+          "sourceUrl": null
         },
         {
           "family": "geonames",
@@ -52,7 +53,8 @@
           "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://download.geonames.org/export/dump/"
+          "termsUrl": "https://download.geonames.org/export/dump/",
+          "sourceUrl": null
         },
         {
           "family": "park_alpha",
@@ -63,7 +65,8 @@
           "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms/park_alpha"
+          "termsUrl": "https://alpha.example/terms/park_alpha",
+          "sourceUrl": null
         }
       ]
     },

@@ -231,14 +231,15 @@ type entry struct {
 	unversioned bool
 }
 
-// current reports whether e still answers at now under versions: every
-// family has the version it was read at, the register is the one it was read
-// under, and the clock has not reached the instant it changes.
-func (e *entry) current(versions provenance.Versions, now time.Time) bool {
+// current reports whether e still answers at at, on the answers' clock,
+// under versions: every family has the version it was read at, the register
+// is the one it was read under, and the clock has not reached the instant it
+// changes.
+func (e *entry) current(versions provenance.Versions, at time.Time) bool {
 	if e.unversioned || versions.Register != e.register {
 		return false
 	}
-	if !e.until.IsZero() && !now.Before(e.until) {
+	if !e.until.IsZero() && !at.Before(e.until) {
 		return false
 	}
 	for _, f := range slices.Concat(e.families, e.read) {
@@ -522,7 +523,7 @@ func (s *server) cache(ctx huma.Context, next func(huma.Context)) {
 	inm := ctx.Header("If-None-Match")
 	vs, versioned := s.versions.get(ctx.Context())
 	now := s.now()
-	if e := s.results.get(key, now); e != nil && versioned && e.current(vs, now) {
+	if e := s.results.get(key, now); e != nil && versioned && e.current(vs, s.at()) {
 		if etagMatch(inm, e.etag) {
 			s.sendNotModified(ctx, e)
 			return
@@ -655,9 +656,11 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 	e.bound = note.bound
 	e.sight = s.readFamilies(e, note.sight, func(f string) string { return sightVersion(vs, f) })
 	e.read = s.readFamilies(e, note.read, func(f string) string { return vs.Families[f] })
-	now := s.now()
-	if !e.until.IsZero() && e.until.Sub(now) < e.maxAge {
-		e.maxAge = max(e.until.Sub(now), 0)
+	// until is on the answers' clock, built and expires on the wall clock
+	// (they differ only under clock.fixed_now).
+	now, at := s.now(), s.at()
+	if !e.until.IsZero() && e.until.Sub(at) < e.maxAge {
+		e.maxAge = max(e.until.Sub(at), 0)
 	}
 	h := sha256.New()
 	h.Write([]byte(key))

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -122,6 +123,14 @@ func behaviours() map[string]behaviour {
 		}},
 		"db.road_stale_for": {"3h", func(t *testing.T, c *config.Config) string {
 			_, staleFor := store.New(nil, c).RoadSnapshot()
+			return staleFor.String()
+		}},
+		"db.feeding_snapshot_ttl": {"20m", func(t *testing.T, c *config.Config) string {
+			ttl, _ := store.New(nil, c).FeedingSnapshot()
+			return ttl.String()
+		}},
+		"db.feeding_stale_for": {"3h", func(t *testing.T, c *config.Config) string {
+			_, staleFor := store.New(nil, c).FeedingSnapshot()
 			return staleFor.String()
 		}},
 		"db.statement_timeout_floor": {"980ms", func(t *testing.T, c *config.Config) string {
@@ -256,6 +265,19 @@ func behaviours() map[string]behaviour {
 		"weather.max_warnings": {"7", func(t *testing.T, c *config.Config) string {
 			return fmt.Sprint(wire.FeatureSettings(c).MaxWarnings)
 		}},
+		"weather.lookahead": {"6h0m0s", func(t *testing.T, c *config.Config) string {
+			return wire.FeatureSettings(c).LookAhead.String()
+		}},
+		"clock.fixed_now": {"2001-02-03T04:05:06Z", func(t *testing.T, c *config.Config) string {
+			h, err := httpapi.NewHandler(httpapi.Deps{Config: c, ContractVersion: "0.1", At: wire.AnswerClock(c, slog.New(slog.DiscardHandler))})
+			if err != nil {
+				t.Fatal(err)
+			}
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/meta", nil))
+			_, at, _ := strings.Cut(w.Body.String(), `"generatedAt":"`)
+			return at[:20]
+		}},
 		"sources.disabled": {"alpha", func(t *testing.T, c *config.Config) string {
 			register := []access.Terms{{Family: "alpha", UseClasses: access.UseClasses}}
 			return fmt.Sprint(access.NewGate(register, access.Plan{UseClass: "consumer", Sources: []string{"alpha"}}, access.AudiencePublic, nil, c.Sources.Disabled).Allowed())
@@ -357,6 +379,9 @@ func TestEveryKeyChangesBehaviour(t *testing.T) {
 			}
 			if f.Key == "callers.trusted_proxy_cidr" { // set together with its header
 				env = append(env, "VFAPI_CALLERS_TRUSTED_PROXY_HEADER=X-Real-IP")
+			}
+			if f.Key == "clock.fixed_now" { // a fixed clock only on a test instance
+				env = append(env, "VFAPI_AUTH_ENVIRONMENT=test")
 			}
 			if f.Key == "admin.rp_id" { // the id must cover the origin's host
 				env = append(env, "VFAPI_ADMIN_ORIGIN=https://console.example.test")

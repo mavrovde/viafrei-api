@@ -74,7 +74,7 @@ func registerTrainBoard(api huma.API, s *server, op huma.Operation) {
 		data := TrainBoardData{EVA: in.EVA, Departures: []TrainBoardDeparture{}}
 		if a.AsOf != nil {
 			at := a.AsOf.UTC()
-			age := int(s.now().Sub(at) / time.Second)
+			age := int(s.at().Sub(at) / time.Second)
 			data.FetchedAt, data.AgeSeconds = &at, &age
 		}
 		if b := a.Board; b != nil {

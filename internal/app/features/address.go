@@ -23,7 +23,7 @@ type AddressAnswer struct {
 // Addresses answers "where is Street 12, Town" for key as the platform's
 // address search answers it.
 func (s *Service) Addresses(ctx context.Context, key access.Record, q places.AddressQuery) (AddressAnswer, error) {
-	v, meta, err := listed(ctx, s, key, "places", func(permitted []string) ([]places.Address, []string, error) {
+	v, meta, err := listed(ctx, s, key, "places", "", func(permitted []string) ([]places.Address, []string, error) {
 		v, err := s.repos.Addresses.Addresses(ctx, q, permitted)
 		var contributed []string
 		for _, a := range v {

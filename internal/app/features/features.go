@@ -23,6 +23,9 @@ type Register interface {
 	// Provenance returns the attribution, notes in lang and freshness of
 	// the given families only.
 	Provenance(ctx context.Context, families []string, lang string) ([]provenance.Family, error)
+	// Feeding returns which of families hold rows in dataset: those an
+	// answer of that dataset consulted.
+	Feeding(ctx context.Context, dataset provenance.Dataset, families []string) ([]string, error)
 	// TermsTexts returns the texts of the given terms gates, every
 	// language.
 	TermsTexts(ctx context.Context, gates []string) ([]access.TermsText, error)
@@ -36,6 +39,9 @@ type Charging interface {
 	// Availability reports are read from the given families only and never
 	// after now.
 	ChargingNear(ctx context.Context, q energy.Query, families []string, now time.Time) ([]energy.Site, bool, *time.Time, error)
+	// ChargingInRadius counts the sites of the given families within q's
+	// radius of q's position, every filter of q dropped.
+	ChargingInRadius(ctx context.Context, q energy.Query, families []string) (int, error)
 }
 
 // Parking is the port to the parking store.
@@ -101,6 +107,9 @@ type Settings struct {
 	PlannedWorks []string
 	// MaxWarnings is the most warnings a weather answer lists.
 	MaxWarnings int
+	// LookAhead is how far ahead a weather answer lists the warnings
+	// starting later (weather.lookahead).
+	LookAhead time.Duration
 	// Disabled are the families the licence gate always denies.
 	Disabled []string
 	// IsTimeout reports whether a repository error means the time ran out.
@@ -149,6 +158,9 @@ type Answer[T any] struct {
 	ChangesAt *time.Time
 	// Dropped counts the sites an only-available charging answer left out.
 	Dropped *energy.Dropped
+	// InRadius is, for a charging answer that lists no site, how many sites
+	// the key may read within the radius, every filter dropped; nil otherwise.
+	InRadius *int
 }
 
 // ErrGateViolation wraps access.ErrForbiddenItem: storage returned an item
@@ -182,7 +194,13 @@ func (s *Service) provenanceOf(ctx context.Context, contributed, consulted []str
 	}
 	fams = slices.Clone(fams)
 	slices.Sort(fams)
-	return s.repos.Register.Provenance(ctx, slices.Compact(fams), s.lang(ctx))
+	return s.attributed(ctx, slices.Compact(fams))
+}
+
+// consultedIn narrows the families an answer was permitted to those that
+// hold rows of dataset, which an empty answer credits.
+func (s *Service) consultedIn(ctx context.Context, dataset provenance.Dataset, permitted []string) ([]string, error) {
+	return s.repos.Register.Feeding(ctx, dataset, permitted)
 }
 
 // creditsOf reads the provenance of the families that contributed, and of
@@ -205,7 +223,7 @@ func (s *Service) sight(ctx context.Context, permitted, contributed []string, no
 	consulted := slices.Clone(permitted)
 	slices.Sort(consulted)
 	consulted = slices.Compact(consulted)
-	all, err := s.repos.Register.Provenance(ctx, consulted, s.lang(ctx))
+	all, err := s.attributed(ctx, consulted)
 	if err != nil {
 		return nil, false, nil, err
 	}
@@ -243,7 +261,22 @@ func (s *Service) Charging(ctx context.Context, key access.Record, q energy.Quer
 	if err != nil {
 		return Answer[energy.Site]{}, err
 	}
-	return s.charging(ctx, reg, gate, q)
+	permitted, partial, err := gate.Answer(access.Answering(reg, "energy"))
+	if err != nil {
+		return Answer[energy.Site]{}, err
+	}
+	a, err := s.chargingOf(ctx, gate, permitted, partial, q)
+	if err != nil || len(a.Items) > 0 {
+		return a, err
+	}
+	// An empty answer states the sites of the circle without its filters,
+	// as the platform's charging search says how many it knows there.
+	n, err := s.repos.Charging.ChargingInRadius(ctx, q, permitted)
+	if err != nil {
+		return Answer[energy.Site]{}, err
+	}
+	a.InRadius = &n
+	return a, nil
 }
 
 // charging answers Charging under a register and gate already read.
@@ -252,6 +285,11 @@ func (s *Service) charging(ctx context.Context, reg []access.Terms, gate access.
 	if err != nil {
 		return Answer[energy.Site]{}, err
 	}
+	return s.chargingOf(ctx, gate, permitted, partial, q)
+}
+
+// chargingOf answers Charging over the families the gate permitted.
+func (s *Service) chargingOf(ctx context.Context, gate access.Gate, permitted []string, partial bool, q energy.Query) (Answer[energy.Site], error) {
 	now := s.now()
 	read := q
 	if q.Filter.OnlyAvailable {
@@ -482,7 +520,7 @@ func (s *Service) parking(ctx context.Context, reg []access.Terms, gate access.G
 		// found: the platform credits their register on every road search.
 		credited = append(slices.Clone(credited), CorridorFamily)
 	}
-	fams, err := s.repos.Register.Provenance(ctx, slices.Compact(slices.Sorted(slices.Values(credited))), s.lang(ctx))
+	fams, err := s.attributed(ctx, slices.Compact(slices.Sorted(slices.Values(credited))))
 	if err != nil {
 		return Answer[parking.Site]{}, err
 	}

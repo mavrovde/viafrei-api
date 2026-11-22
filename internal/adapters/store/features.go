@@ -28,7 +28,7 @@ func (s *Store) Provenance(ctx context.Context, families []string, lang string) 
 		// rows.Err as well).
 		rows, _ := tx.Query(ctx, `
 select s.source_ref, s.domain, p.display_name, s.attribution_text, l.licence_name, l.licence_url,
-       l.share_alike, s.share_alike_offer_url, s.terms_url, s.stale_after_s, f.data_as_of,
+       l.share_alike, s.share_alike_offer_url, s.terms_url, p.website, s.stale_after_s, f.data_as_of, f.confirmed_at,
        `+familyVersion+`,
        array(select n.note_kind from contract.source_note n
              where n.source_ref = s.source_ref and n.lang = $2 order by n.note_kind, n.body),
@@ -48,7 +48,7 @@ order by s.source_ref`, families, lang)
 				kinds, texts []string
 			)
 			err := r.Scan(&v.Family, &v.Domain, &v.Publisher, &v.AttributionText, &v.Licence, &v.LicenceURL,
-				&v.ShareAlike, &v.ShareAlikeOffer, &v.TermsURL, &staleAfter, &f.DataAsOf, &f.Version, &kinds, &texts)
+				&v.ShareAlike, &v.ShareAlikeOffer, &v.TermsURL, &v.SourceURL, &staleAfter, &f.DataAsOf, &f.ReadAt, &f.Version, &kinds, &texts)
 			f.Source = v
 			f.StaleAfter, f.NeverStale = threshold(staleAfter)
 			for i := range min(len(kinds), len(texts)) {
@@ -153,6 +153,23 @@ func (s *Store) ChargingNear(ctx context.Context, q energy.Query, families []str
 		next = &t
 	}
 	return sites, more, next, err
+}
+
+// ChargingInRadius counts the sites of families within q's radius of q's
+// position, every filter of q dropped: the list's own sites, the rules every
+// read keeps (withdrawn, permitted) included.
+func (s *Store) ChargingInRadius(ctx context.Context, q energy.Query, families []string) (int, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (int, error) {
+		var n int
+		err := tx.QueryRow(ctx, `select count(*)::int
+from contract.charging_site c
+where c.withdrawn_at is null
+  and (c.source_ref = any($3)) is true
+  and `+permitted("c")+`
+  and st_dwithin(c.location::geography, st_setsrid(st_makepoint($2, $1), 4326)::geography, $4)`,
+			q.At.Lat, q.At.Lon, families, q.RadiusM).Scan(&n)
+		return n, err
+	})
 }
 
 // earliest returns the earlier of a and b, either of which may be nil.
@@ -363,20 +380,25 @@ func threshold(staleAfterS *int64) (time.Duration, bool) {
 // (on the sphere), and sites at one distance by family, then origin key. A
 // rounded distance or the joined id would let two sites at one metre, or two
 // copies at one coordinate, fall either side of the limit in another order
-// than the site's. Kept, they are listed by the distance the answer reports,
+// than the site's. As the site's read (2.6.39), the index walks nearest first
+// and keeps the limit's rows with every tie of the last distance; only those
+// are ranked, never every site of the ring. The family test is written "is
+// true", as the site's (2.6.35): a generic plan of the cached statement may
+// not take it as an index condition and read every site of the families
+// before the ring. Kept, they are listed by the distance the answer reports,
 // then id, as before; the one past the limit ($7, to tell that there are
 // more) stays last.
 func chargingSites(byID bool) string {
 	q := `
 with here as (select st_setsrid(st_makepoint($2, $1), 4326)::geography g),
-sites as (
-  select c.site_id, c.source_ref, c.name, c.operator_name, c.access,
+near as (
+  select c.site_id, c.source_ref, c.name, c.operator_name, c.access, c.origin_key,
          st_y(c.location) lat, st_x(c.location) lon,
          round(st_distance(c.location::geography, here.g))::int dist,
-         row_number() over (order by c.location::geography <-> here.g, c.source_ref, c.origin_key) rn
+         c.location::geography <-> here.g d
   from contract.charging_site c, here
   where c.withdrawn_at is null
-    and c.source_ref = any($3)
+    and (c.source_ref = any($3)) is true
     and ` + permitted("c") + `
     and st_dwithin(c.location::geography, here.g, $4) and $14::text = ''
     and ($5::text[] is null or c.access = any($5))
@@ -384,6 +406,12 @@ sites as (
     and (not $12::boolean or exists (
           select 1 from contract.charge_point p
           where p.site_id = c.site_id and ` + pointFilter + ` and ` + permitted("p") + `))
+  order by c.location::geography <-> here.g
+  fetch first $7 rows with ties),
+sites as (
+  select n.site_id, n.source_ref, n.name, n.operator_name, n.access, n.lat, n.lon, n.dist,
+         row_number() over (order by n.d, n.source_ref, n.origin_key) rn
+  from near n
   order by rn
   limit $7)
 select s.site_id, s.source_ref, s.name, s.operator_name, s.access, s.lat, s.lon, s.dist,

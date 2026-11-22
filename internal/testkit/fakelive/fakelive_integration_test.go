@@ -188,3 +188,17 @@ func TestARefresherThatLosesItsLoginOrRoleFails(t *testing.T) {
 		})
 	}
 }
+
+// A stop that cut the wait reads whether the listener still answers: a lost
+// one is the fake's error, a live one is none.
+func TestAStopReadsWhetherTheListenerWasLost(t *testing.T) {
+	_, owner := fresh(t)
+	f := &Fake{}
+	if err := f.heard(owner); err != nil {
+		t.Fatalf("a live listener: %v", err)
+	}
+	_ = owner.Close(context.Background())
+	if err := f.heard(owner); err == nil || !strings.Contains(err.Error(), "fakelive: the listener was lost") {
+		t.Fatalf("a closed listener: %v", err)
+	}
+}

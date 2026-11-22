@@ -74,7 +74,7 @@ func TestRunSettlesUntilInterrupted(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		time.Sleep(300 * time.Millisecond) // the loop hears the loss before it is interrupted
+		// Interrupted at once: the fake reads the loss when its wait is cut.
 		lstop()
 		if got := <-code; got != 1 {
 			t.Fatalf("lost listener: %d %q", got, stderr.String())

@@ -3,6 +3,7 @@
 package store_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -43,5 +44,13 @@ func TestPlacesListTheMotorwayPlacesOfTheRoadsFamilies(t *testing.T) {
 	}
 	if ps, _, err := st.Places(bounded(t), places.Query{Text: "A999", Kind: places.KindMotorway, Limit: 5}, fams, nil, roads); err != nil || len(ps) != 0 {
 		t.Errorf("an unknown motorway %+v, %v", ps, err)
+	}
+	// A keyed place carries its own official key, a motorway none.
+	var name, key string
+	owner(t, `select name, official_key from contract.place where official_key ~ '^[0-9]{8}$' and withdrawn_at is null and location is not null
+and display_class <> 'withhold' and audience = 'public' order by prominence desc nulls last, place_id limit 1`, &name, &key)
+	ps, _, err = st.Places(bounded(t), places.Query{Text: name, Limit: 50}, fams, nil, roads)
+	if err != nil || !slices.ContainsFunc(ps, func(p places.Place) bool { return p.OfficialKey != nil && *p.OfficialKey == key }) {
+		t.Errorf("%s keyed %s: %+v, %v", name, key, ps, err)
 	}
 }

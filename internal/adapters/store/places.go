@@ -21,7 +21,8 @@ import (
 // station_area), as the platform's place search finds the timetable's
 // stops; a whole name before the start of one, the start before a part,
 // then the more prominent, then the nearer. The distance is on the sphere,
-// as the platform's place search measures it. The folded text holds
+// as the platform's place search measures it. A place carries its official
+// key (a stop and a motorway none). The folded text holds
 // letters and digits only, so it carries no LIKE wildcard.
 var placesPage = `
 with here as (
@@ -33,7 +34,7 @@ hit as (
   where a.search_fold like '%' || $2 || '%' and ` + permitted("a") + `
   group by a.place_id),
 found as (
-  select p.place_id id, p.name, p.place_kind kind, p.location, p.region_code, p.source_ref, hit.rank, p.prominence
+  select p.place_id id, p.name, p.place_kind kind, p.location, p.region_code, p.source_ref, hit.rank, p.prominence, p.official_key
   from contract.place p
   join hit on hit.place_id = p.place_id
   where p.withdrawn_at is null
@@ -42,7 +43,7 @@ found as (
     and ` + permitted("p") + `
   union all
   select s.stop_place_id, s.name, 'station_area', s.location, s.region_code, s.source_ref,
-         case when s.search_fold = $2 then 0 when s.search_fold like $2 || '%' then 1 else 2 end, null
+         case when s.search_fold = $2 then 0 when s.search_fold like $2 || '%' then 1 else 2 end, null, null
   from contract.stop_place s
   where s.search_fold like '%' || $2 || '%'
     and s.withdrawn_at is null
@@ -50,7 +51,7 @@ found as (
     and s.source_ref = any($8)
     and ` + permitted("s") + `
   union all
-  select r.road_ref, r.road_ref, 'motorway', pt.location, null, r.source_ref, 0, null
+  select r.road_ref, r.road_ref, 'motorway', pt.location, null, r.source_ref, 0, null, null
   from contract.road r
   cross join lateral (
     select coalesce((select j.location from contract.junction j
@@ -63,7 +64,8 @@ found as (
     and r.source_ref = any($9)
     and ` + permitted("r") + `)
 select f.id, f.name, f.kind, st_y(f.location), st_x(f.location), f.region_code, f.source_ref,
-       case when here.g is null then null else round(st_distance(f.location::geography, here.g, false))::int end dist
+       case when here.g is null then null else round(st_distance(f.location::geography, here.g, false))::int end dist,
+       f.official_key
 from found f
 cross join here
 where ($3::text = '' or f.kind = $3::text)
@@ -86,7 +88,7 @@ func (s *Store) Places(ctx context.Context, q places.Query, families, stops, roa
 				v    places.Place
 				kind string
 			)
-			err := r.Scan(&v.ID, &v.Name, &kind, &v.Location.Lat, &v.Location.Lon, &v.RegionCode, &v.Family, &v.DistanceM)
+			err := r.Scan(&v.ID, &v.Name, &kind, &v.Location.Lat, &v.Location.Lon, &v.RegionCode, &v.Family, &v.DistanceM, &v.OfficialKey)
 			v.Kind = places.MapKind(kind)
 			return v, err
 		})

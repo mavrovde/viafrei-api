@@ -5271,6 +5271,10 @@
       "PlaceItem": {
         "additionalProperties": false,
         "properties": {
+          "ags": {
+            "description": "The place's own official key when it is an AGS (Amtlicher Gemeindeschlüssel): a Gemeinde's eight digits, a district's five, a Land's two. Absent when the place has none, as a stop and a motorway have none.",
+            "type": "string"
+          },
           "distanceM": {
             "description": "Distance from at in metres. Present when at is.",
             "format": "int64",

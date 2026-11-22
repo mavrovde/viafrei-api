@@ -4,6 +4,7 @@ package places
 
 import (
 	"errors"
+	"regexp"
 	"slices"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
@@ -50,6 +51,20 @@ type Place struct {
 	// DistanceM is the distance from the asked position; nil without one.
 	DistanceM *int
 	Family    string
+}
+
+// agsForm is the form of an official key that is an AGS, as the platform
+// tells one (a fixture's "HE" is not).
+var agsForm = regexp.MustCompile(`^[0-9]{2,12}$`)
+
+// AGS is the place's official key when it is an AGS (Amtlicher
+// Gemeindeschlüssel, or the leading part a Land or a district carries), as
+// the platform states a place's key; nil else.
+func (p Place) AGS() *string {
+	if p.OfficialKey == nil || !agsForm.MatchString(*p.OfficialKey) {
+		return nil
+	}
+	return p.OfficialKey
 }
 
 // Query asks for the places that answer a name: Text as typed (folded as

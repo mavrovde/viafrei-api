@@ -63,26 +63,28 @@ func (s *Store) FuelNear(ctx context.Context, q energy.FuelQuery, families []str
 // nearest one with a price for the grade $5 (null: any grade) within $6
 // metres; and, for a grade, the stations within $3 with no price for it
 // reported in the $7 seconds before the instant $8. As the platform's
-// coverage read, by no filter but the grade.
+// coverage read, by no filter but the grade. Each price check is a probe of
+// one station's observations, as the price read's: the observations are a
+// time series, and a check not tied to the station would scan it whole.
 var fuelCoverage = `
 with here as (select st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography g),
 held as (
   select s.station_id, s.location::geography loc
   from contract.fuel_station s
-  where s.withdrawn_at is null and s.source_ref = any($4) and ` + permitted("s") + `),
-priced as (
-  select o.station_id, o.observed_at
-  from contract.fuel_price_observation o
-  where o.price is not null and ($5::text is null or o.product_code = $5::text)
-    and o.source_ref = any($4) and ` + permitted("o") + `)
+  where s.withdrawn_at is null and s.source_ref = any($4) and ` + permitted("s") + `)
 select
   (select count(*)::int from held, here where st_dwithin(held.loc, here.g, $3)),
   (select min(st_distance(held.loc, here.g)) from held, here
-    where st_dwithin(held.loc, here.g, $6) and exists (select 1 from priced p where p.station_id = held.station_id)),
+    where st_dwithin(held.loc, here.g, $6)
+      and exists (select 1 from contract.fuel_price_observation o
+                   where o.station_id = held.station_id and o.price is not null and ($5::text is null or o.product_code = $5::text)
+                     and o.source_ref = any($4) and ` + permitted("o") + `)),
   case when $5::text is null then 0 else
   (select count(*)::int from held, here where st_dwithin(held.loc, here.g, $3)
-     and not exists (select 1 from priced p where p.station_id = held.station_id
-                       and p.observed_at > $8::timestamptz - make_interval(secs => $7::int))) end`
+     and not exists (select 1 from contract.fuel_price_observation o
+                      where o.station_id = held.station_id and o.price is not null and o.product_code = $5::text
+                        and o.observed_at > $8::timestamptz - make_interval(secs => $7::int)
+                        and o.source_ref = any($4) and ` + permitted("o") + `)) end`
 
 // FuelCoverage reads what the families hold around q's position
 // (features.Fuel).

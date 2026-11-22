@@ -142,6 +142,12 @@ func ExamplePlants(out io.Writer, profile string, seed uint64, contractVersion s
 		}
 	}
 	g.w.end()
+	// The generated statements leave their review day to the column's
+	// default, the day the fixture is loaded, so a recorded driving-rules
+	// example would drift with the calendar. The examples state the topics'
+	// own review day instead; the generated rows (and the parity bundles
+	// recorded on their hash) stay as they are.
+	g.w.write("update contract.rule_statement set reviewed_on = " + date(time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)) + ";\n")
 	if _, err := g.w.close(); err != nil {
 		return fmt.Errorf("fixtures: write: %w", err)
 	}

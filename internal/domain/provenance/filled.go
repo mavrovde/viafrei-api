@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"time"
+	_ "time/tzdata" // Europe/Berlin without the host's zoneinfo
 )
 
 // The placeholders a register text carries for what only the answer knows.

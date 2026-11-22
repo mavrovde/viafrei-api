@@ -229,7 +229,13 @@ type Situation struct {
 	Description *string
 	// TextLanguage is the language of Headline and Description.
 	TextLanguage string
-	UpdatedAt    time.Time
+	// Subtitle is the publisher's second line (on Autobahn GmbH messages
+	// the carriageway's direction), in TextLanguage; nil when not published.
+	Subtitle *string
+	// Blocked is whether the publisher states the carriageway is blocked;
+	// false when it does not say.
+	Blocked   bool
+	UpdatedAt time.Time
 	// AtKm is the situation's position along its road in kilometres, one
 	// decimal, projected onto the road's line; nil where it cannot be
 	// placed on the road.

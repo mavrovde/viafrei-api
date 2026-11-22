@@ -6420,6 +6420,10 @@
       "RoadSituation": {
         "additionalProperties": false,
         "properties": {
+          "blocked": {
+            "description": "Whether the publisher states the carriageway is blocked; false when it does not say.",
+            "type": "boolean"
+          },
           "delayMin": {
             "description": "The published delay in minutes; null when not published.",
             "format": "int64",
@@ -6626,6 +6630,13 @@
             "description": "The source family of the item; its attribution is in meta.attribution.",
             "type": "string"
           },
+          "subtitle": {
+            "description": "The publisher's second line, in textLanguage (on Autobahn GmbH messages the carriageway's direction); null when not published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "textLanguage": {
             "description": "The language of headline and description (BCP 47).",
             "type": "string"
@@ -6660,6 +6671,8 @@
           "headline",
           "description",
           "textLanguage",
+          "subtitle",
+          "blocked",
           "updatedAt",
           "updatedAtLocal",
           "position",

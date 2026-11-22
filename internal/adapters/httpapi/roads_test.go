@@ -49,6 +49,7 @@ func closure() roads.Situation {
 		Location: &geo.Point{Lat: 48.1000004, Lon: 11.5999996}, From: fixedNow.Add(-time.Hour), Until: tp(fixedNow.Add(26 * time.Hour)),
 		LanesClosed: ip(2), LanesTotal: ip(2), DelayMin: ip(25), LengthM: ip(1200),
 		Headline: "Vollsperrung", Description: sp("Bergung"), TextLanguage: "de", UpdatedAt: fixedNow.Add(-2 * time.Minute), AtKm: fp(41.3),
+		Subtitle: sp("Richtung Salzburg"), Blocked: true,
 	}
 }
 
@@ -125,6 +126,12 @@ func TestMotorwayConditionsAnswer(t *testing.T) {
 		val["fromLocal"] != "2026-03-29T01:30:00+01:00" || val["untilLocal"] != "2026-03-30T05:30:00+02:00" ||
 		lanes["closed"] != 2.0 || loc["lat"] != 48.1 || s0["updatedAtLocal"] != "2026-03-29T03:28:00+02:00" || s0["sourceFamily"] != "src-alpha-roads" {
 		t.Errorf("first situation %v", s0)
+	}
+	if s0["subtitle"] != "Richtung Salzburg" || s0["blocked"] != true {
+		t.Errorf("first situation's subtitle and block: %v %v", s0["subtitle"], s0["blocked"])
+	}
+	if v, has := s1["subtitle"]; !has || v != nil || s1["blocked"] != false {
+		t.Errorf("bare situation's subtitle and block: %v %v", s1["subtitle"], s1["blocked"])
 	}
 	if _, has := s0["distanceM"]; has {
 		t.Error("a corridor situation carries a distance")

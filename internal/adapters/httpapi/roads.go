@@ -75,6 +75,8 @@ type RoadSituation struct {
 	Headline       string        `json:"headline" doc:"Plain text, in textLanguage."`
 	Description    *string       `json:"description" nullable:"true" doc:"Plain text, in textLanguage; null when not published."`
 	TextLanguage   string        `json:"textLanguage" doc:"The language of headline and description (BCP 47)."`
+	Subtitle       *string       `json:"subtitle" nullable:"true" doc:"The publisher's second line, in textLanguage (on Autobahn GmbH messages the carriageway's direction); null when not published."`
+	Blocked        bool          `json:"blocked" doc:"Whether the publisher states the carriageway is blocked; false when it does not say."`
 	UpdatedAt      time.Time     `json:"updatedAt" doc:"When the situation last changed."`
 	UpdatedAtLocal string        `json:"updatedAtLocal" format:"date-time" doc:"updatedAt in Europe/Berlin time."`
 	Position       *RoadPosition `json:"position" doc:"Chainage along the road; null when the situation cannot be placed on its road, and on answers that are not about one road."`
@@ -87,7 +89,8 @@ func roadSituation(v roads.Situation) RoadSituation {
 		ID: v.ID, Kind: string(v.Kind), Severity: string(v.Severity), Road: v.Road, RoadType: string(v.Class),
 		Direction: string(v.Direction), DirectionText: v.Towards, Validity: timeWindow(v.From, v.Until),
 		DelayMin: v.DelayMin, LengthM: v.LengthM, Headline: v.Headline, Description: v.Description,
-		TextLanguage: v.TextLanguage, UpdatedAt: v.UpdatedAt.UTC(), UpdatedAtLocal: local(v.UpdatedAt),
+		TextLanguage: v.TextLanguage, Subtitle: v.Subtitle, Blocked: v.Blocked,
+		UpdatedAt: v.UpdatedAt.UTC(), UpdatedAtLocal: local(v.UpdatedAt),
 		DistanceM: v.DistanceM, SourceFamily: v.Family,
 	}
 	if v.AtKm != nil {

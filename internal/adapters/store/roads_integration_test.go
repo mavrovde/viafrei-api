@@ -981,3 +981,27 @@ func sum(counts map[string]int) int {
 	}
 	return n
 }
+
+// A situation states the publisher's second line and whether the
+// carriageway is blocked; a blocked flag not published is false. Both are
+// Autobahn GmbH facts in the read contract.
+func TestASituationStatesItsSubtitleAndBlock(t *testing.T) {
+	req.Covers(t, "FR-ROAD-002")
+	said, unsaid := "autobahn:ev-said", "autobahn:ev-unsaid"
+	st, _ := private(t, `insert into contract.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from,
+    headline, source_ref, origin_key, recorded_at, changed_at, subtitle, is_blocked)
+  select v.id, 'jam', 'A101', 'motorway', e.location, '2102-01-01T00:00:00Z',
+    'Stau', 'autobahn', v.origin, '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z', v.subtitle, v.blocked
+  from contract.traffic_event e,
+    (values ('`+said+`', 'ev-said', 'Richtung Nord', true), ('`+unsaid+`', 'ev-unsaid', null, null)) v(id, origin, subtitle, blocked)
+  where e.event_id = '`+fixtures.PlantedEvent("ev-u-kind")+`'`)
+	fams := append(families(t, st, "roads"), "autobahn")
+	s, err := st.Situation(bounded(t), said, fams, time.Time{})
+	if err != nil || s.Subtitle == nil || *s.Subtitle != "Richtung Nord" || !s.Blocked {
+		t.Fatalf("published: %+v, %v", s, err)
+	}
+	s, err = st.Situation(bounded(t), unsaid, fams, time.Time{})
+	if err != nil || s.Subtitle != nil || s.Blocked {
+		t.Fatalf("not published: %+v, %v", s, err)
+	}
+}

@@ -67,7 +67,7 @@ const roadDelayMin = `floor(e.delay_s / 60.0 + 0.5)::int`
 const situationColumns = `e.event_id, e.source_ref, e.event_kind, e.severity, e.road_ref, e.road_class,
        e.direction, e.direction_label, st_y(e.location), st_x(e.location), e.valid_from, e.valid_to,
        e.lanes_closed, e.lanes_total, ` + roadDelayMin + `, e.affected_length_m, e.headline, e.description,
-       e.text_lang, e.changed_at`
+       e.text_lang, e.changed_at, e.subtitle, coalesce(e.is_blocked, false)`
 
 // situationFilter is the condition every list read applies: an active,
 // published situation of the given families whose validity overlaps the
@@ -321,7 +321,7 @@ func scanSituationWith(r pgx.CollectableRow, extra ...any) (roads.Situation, err
 	err := r.Scan(append([]any{&v.ID, &v.Family, &kind, &severity, &road, &class,
 		&direction, &v.Towards, &lat, &lon, &from, &until,
 		&lanesClosed, &lanesTotal, &delay, &length, &headline, &v.Description,
-		&lang, &updated, &v.AtKm, &v.DistanceM}, extra...)...)
+		&lang, &updated, &v.Subtitle, &v.Blocked, &v.AtKm, &v.DistanceM}, extra...)...)
 	s := &v
 	s.Kind, s.Severity, s.Class, s.Direction = roads.MapKind(kind), roads.MapSeverity(severity), roads.MapClass(class), roads.MapDirection(direction)
 	if road != nil {

@@ -363,20 +363,25 @@ func threshold(staleAfterS *int64) (time.Duration, bool) {
 // (on the sphere), and sites at one distance by family, then origin key. A
 // rounded distance or the joined id would let two sites at one metre, or two
 // copies at one coordinate, fall either side of the limit in another order
-// than the site's. Kept, they are listed by the distance the answer reports,
+// than the site's. As the site's read (2.6.39), the index walks nearest first
+// and keeps the limit's rows with every tie of the last distance; only those
+// are ranked, never every site of the ring. The family test is written "is
+// true", as the site's (2.6.35): a generic plan of the cached statement may
+// not take it as an index condition and read every site of the families
+// before the ring. Kept, they are listed by the distance the answer reports,
 // then id, as before; the one past the limit ($7, to tell that there are
 // more) stays last.
 func chargingSites(byID bool) string {
 	q := `
 with here as (select st_setsrid(st_makepoint($2, $1), 4326)::geography g),
-sites as (
-  select c.site_id, c.source_ref, c.name, c.operator_name, c.access,
+near as (
+  select c.site_id, c.source_ref, c.name, c.operator_name, c.access, c.origin_key,
          st_y(c.location) lat, st_x(c.location) lon,
          round(st_distance(c.location::geography, here.g))::int dist,
-         row_number() over (order by c.location::geography <-> here.g, c.source_ref, c.origin_key) rn
+         c.location::geography <-> here.g d
   from contract.charging_site c, here
   where c.withdrawn_at is null
-    and c.source_ref = any($3)
+    and (c.source_ref = any($3)) is true
     and ` + permitted("c") + `
     and st_dwithin(c.location::geography, here.g, $4) and $14::text = ''
     and ($5::text[] is null or c.access = any($5))
@@ -384,6 +389,12 @@ sites as (
     and (not $12::boolean or exists (
           select 1 from contract.charge_point p
           where p.site_id = c.site_id and ` + pointFilter + ` and ` + permitted("p") + `))
+  order by c.location::geography <-> here.g
+  fetch first $7 rows with ties),
+sites as (
+  select n.site_id, n.source_ref, n.name, n.operator_name, n.access, n.lat, n.lon, n.dist,
+         row_number() over (order by n.d, n.source_ref, n.origin_key) rn
+  from near n
   order by rn
   limit $7)
 select s.site_id, s.source_ref, s.name, s.operator_name, s.access, s.lat, s.lon, s.dist,

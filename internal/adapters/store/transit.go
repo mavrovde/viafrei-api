@@ -47,7 +47,9 @@ func (s *Store) Station(ctx context.Context, id string, families []string) (tran
 // stationsPage reads the stations of the given families that answer a
 // search: $1 families; $2, $3 the position's latitude and longitude, both
 // null for none; $4 the folded text, empty for none; $5 the radius; $6 the
-// limit; $7 a station code, empty for none. A station stored with no position is left out: an answer places
+// limit; $7 a station code, empty for none; $8 railway stations only; $9 an
+// official region key the district code starts with, empty for any (a
+// station with no district then left out). A station stored with no position is left out: an answer places
 // every station it lists. The folded text holds letters and digits only, so
 // it carries no LIKE wildcard.
 var stationsPage = `
@@ -67,6 +69,7 @@ where s.withdrawn_at is null
   and (here.g is null or st_dwithin(s.location::geography, here.g, $5))
   and ($7::text = '' or s.eva_no = $7::text or s.national_stop_code = $7::text)
   and (not $8::bool or s.eva_no is not null)
+  and ($9::text = '' or s.region_code like $9::text || '%')
 order by case when here.g is null and not s.search_fold like $4::text || '%' then 1 else 0 end,
          dist, s.name, s.stop_place_id
 limit $6`
@@ -79,7 +82,7 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 		lat, lon = &q.At.Lat, &q.At.Lon
 	}
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.Station, error) {
-		rows, _ := tx.Query(ctx, stationsPage, families, lat, lon, transit.Fold(q.Text), q.RadiusM, q.Limit+1, q.Code, q.Railway)
+		rows, _ := tx.Query(ctx, stationsPage, families, lat, lon, transit.Fold(q.Text), q.RadiusM, q.Limit+1, q.Code, q.Railway, q.Area)
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.Station, error) {
 			var (
 				v     transit.Station

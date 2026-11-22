@@ -7530,6 +7530,16 @@
       "StationsQuery": {
         "additionalProperties": false,
         "properties": {
+          "area": {
+            "description": "The area the stations were kept to; null for none.",
+            "examples": [
+              "05315"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "at": {
             "additionalProperties": false,
             "description": "The position searched around; null for none.",
@@ -7585,7 +7595,8 @@
           "q",
           "code",
           "at",
-          "radiusM"
+          "radiusM",
+          "area"
         ],
         "type": "object"
       },
@@ -10505,7 +10516,7 @@
                             "text": "Synthetic statement 1 about winter_tyres, for tests only.",
                             "legalBasis": "§ 0 synthetic",
                             "sourceUrl": "https://law.example/winter_tyres",
-                            "reviewedOn": "2026-02-01",
+                            "reviewedOn": "2026-11-17",
                             "unconfirmed": null
                           },
                           {
@@ -10513,7 +10524,7 @@
                             "text": "Synthetic statement 2 about winter_tyres, for tests only.",
                             "legalBasis": "§ 0 synthetic",
                             "sourceUrl": "https://law.example/winter_tyres",
-                            "reviewedOn": "2026-02-01",
+                            "reviewedOn": "2026-11-17",
                             "unconfirmed": null
                           },
                           {
@@ -10521,11 +10532,11 @@
                             "text": "Synthetic statement 3 about winter_tyres, for tests only.",
                             "legalBasis": "§ 0 synthetic",
                             "sourceUrl": "https://law.example/winter_tyres",
-                            "reviewedOn": "2026-02-01",
+                            "reviewedOn": "2026-11-17",
                             "unconfirmed": null
                           }
                         ],
-                        "reviewedOn": "2026-02-01",
+                        "reviewedOn": "2026-11-17",
                         "disclaimer": "Informational, not legal advice."
                       },
                       "meta": {
@@ -22579,7 +22590,7 @@
     },
     "/v1/stations": {
       "get": {
-        "description": "The stations whose name contains q, those that start with it first, then by name; or the stations within the radius of at, nearest first; or, with both, the stations named so within the radius, nearest first. Ties go by name, then id. It answers a search field's suggestions as the user types (limit 8) as well as a full search. Needs the scope transit.",
+        "description": "The stations whose name contains q, those that start with it first, then by name; or the stations within the radius of at, nearest first; or, with both, the stations named so within the radius, nearest first. Ties go by name, then id. area keeps any of these to one Land or Kreis. It answers a search field's suggestions as the user types (limit 8) as well as a full search. Needs the scope transit.",
         "operationId": "listStations",
         "parameters": [
           {
@@ -22653,6 +22664,20 @@
             }
           },
           {
+            "description": "Only the stations of an area: its official region code, two digits a Land (01 to 16), five a Kreis or kreisfreie Stadt, as listPlaces or describeLocation give it. It narrows q, code or at, and is no search of its own; a station whose district is unknown is left out.",
+            "explode": false,
+            "in": "query",
+            "name": "area",
+            "schema": {
+              "description": "Only the stations of an area: its official region code, two digits a Land (01 to 16), five a Kreis or kreisfreie Stadt, as listPlaces or describeLocation give it. It narrows q, code or at, and is no search of its own; a station whose district is unknown is left out.",
+              "examples": [
+                "05315"
+              ],
+              "pattern": "^(0[1-9]|1[0-6])([0-9]{3})?$",
+              "type": "string"
+            }
+          },
+          {
             "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
             "example": "en",
             "in": "query",
@@ -22671,6 +22696,113 @@
             "content": {
               "application/json": {
                 "examples": {
+                  "area": {
+                    "summary": "Stations of a name within one Kreis",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "1:de:01002:1",
+                          "name": "Namüningen Mitte",
+                          "location": {
+                            "lat": 49.167002,
+                            "lon": 7.862458
+                          },
+                          "stopCode": "de:01002:1",
+                          "eva": null,
+                          "evaNumbers": [],
+                          "districtCode": "01002",
+                          "modes": [],
+                          "distanceM": null,
+                          "sourceFamily": "delfi_static"
+                        },
+                        {
+                          "id": "1:de:01002:2",
+                          "name": "Schömpingbach Mitte",
+                          "location": {
+                            "lat": 48.366697,
+                            "lon": 7.522947
+                          },
+                          "stopCode": "de:01002:2",
+                          "eva": null,
+                          "evaNumbers": [],
+                          "districtCode": "01002",
+                          "modes": [],
+                          "distanceM": null,
+                          "sourceFamily": "delfi_static"
+                        }
+                      ],
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": null,
+                        "freshness": [
+                          {
+                            "family": "bkg_gvisys",
+                            "dataAsOf": null,
+                            "ageS": null,
+                            "staleAfterS": 9007199254740991,
+                            "stale": false
+                          },
+                          {
+                            "family": "delfi_static",
+                            "dataAsOf": "2026-03-29T12:00:00Z",
+                            "ageS": 43200,
+                            "staleAfterS": 259200,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "bkg_gvisys",
+                            "domain": "places",
+                            "publisher": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
+                            "text": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
+                            "licence": "dl-de/by-2-0",
+                            "licenceUrl": "https://licences.example/dl-de-by-2-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+                          },
+                          {
+                            "family": "delfi_static",
+                            "domain": "transit",
+                            "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://www.opendata-oepnv.de"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 8,
+                          "hasMore": false
+                        },
+                        "query": {
+                          "q": "Mitte",
+                          "code": null,
+                          "at": null,
+                          "radiusM": null,
+                          "area": "01002"
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/stations"
+                      }
+                    }
+                  },
                   "example": {
                     "summary": "The stations a typed name finds, umlauts and ß as typed",
                     "value": {
@@ -22773,7 +22905,8 @@
                           "q": "Schömpingbach",
                           "code": null,
                           "at": null,
-                          "radiusM": null
+                          "radiusM": null,
+                          "area": null
                         }
                       },
                       "links": {

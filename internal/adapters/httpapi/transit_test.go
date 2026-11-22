@@ -76,6 +76,17 @@ func TestStationsAnswer(t *testing.T) {
 	if v, has := q["at"]; !has || v != nil || q["radiusM"] != nil || q["q"] != "Köln" {
 		t.Errorf("a name alone: query %v", q)
 	}
+	if v, has := q["area"]; !has || v != nil || f.gotStation.Area != "" {
+		t.Errorf("no area: query %v, asked %+v", q, f.gotStation)
+	}
+
+	// A name within an area: the area is asked and echoed.
+	f = everyAnswer()
+	body = decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/stations?q=hbf&area=05315", bearer))
+	q, _ = meta(t, body)["query"].(map[string]any)
+	if g := f.gotStation; g.Text != "hbf" || g.Area != "05315" || q["area"] != "05315" {
+		t.Errorf("a name in an area: asked %+v, query %v", g, q)
+	}
 
 	// A position alone: the default radius.
 	f = everyAnswer()
@@ -102,6 +113,8 @@ func TestStationsRefusals(t *testing.T) {
 	for _, target := range []string{
 		"/v1/stations", "/v1/stations?q=k", "/v1/stations?at=91,13", "/v1/stations?at=52,13&limit=61",
 		"/v1/stations?q=koeln&radius_m=0", "/v1/stations?at=52",
+		// area narrows a search and is none of its own; a Land or a Kreis key only
+		"/v1/stations?area=05315", "/v1/stations?q=koeln&area=053", "/v1/stations?q=koeln&area=17", "/v1/stations?q=koeln&area=05315000",
 	} {
 		assertProblem(t, do(t, h, http.MethodGet, target, bearer), 400, "invalid-parameter")
 	}

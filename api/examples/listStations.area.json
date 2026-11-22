@@ -1,0 +1,121 @@
+{
+  "title": "Stations of a name within one Kreis",
+  "request": "/v1/stations?q=Mitte\u0026area=01002\u0026limit=8",
+  "attribution": "Stations come from the source families of the transit domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "transit"
+    ],
+    "sources": [
+      "delfi_static",
+      "delfi_rt_tu",
+      "mobilithek_connect_gtfs"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": [
+      {
+        "id": "1:de:01002:1",
+        "name": "Namüningen Mitte",
+        "location": {
+          "lat": 49.167002,
+          "lon": 7.862458
+        },
+        "stopCode": "de:01002:1",
+        "eva": null,
+        "evaNumbers": [],
+        "districtCode": "01002",
+        "modes": [],
+        "distanceM": null,
+        "sourceFamily": "delfi_static"
+      },
+      {
+        "id": "1:de:01002:2",
+        "name": "Schömpingbach Mitte",
+        "location": {
+          "lat": 48.366697,
+          "lon": 7.522947
+        },
+        "stopCode": "de:01002:2",
+        "eva": null,
+        "evaNumbers": [],
+        "districtCode": "01002",
+        "modes": [],
+        "distanceM": null,
+        "sourceFamily": "delfi_static"
+      }
+    ],
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": null,
+      "freshness": [
+        {
+          "family": "bkg_gvisys",
+          "dataAsOf": null,
+          "ageS": null,
+          "staleAfterS": 9007199254740991,
+          "stale": false
+        },
+        {
+          "family": "delfi_static",
+          "dataAsOf": "2026-03-29T12:00:00Z",
+          "ageS": 43200,
+          "staleAfterS": 259200,
+          "stale": false
+        }
+      ],
+      "attribution": [
+        {
+          "family": "bkg_gvisys",
+          "domain": "places",
+          "publisher": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
+          "text": "Verwaltungseinheiten: © BKG (2026) dl-de/by-2-0, Datenquellen: https://sgx.geodatenzentrum.de/web_public/gdz/datenquellen/datenquellen_gn250.pdf (Daten verändert)",
+          "licence": "dl-de/by-2-0",
+          "licenceUrl": "https://licences.example/dl-de-by-2-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+        },
+        {
+          "family": "delfi_static",
+          "domain": "transit",
+          "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+          "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://www.opendata-oepnv.de"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ],
+      "page": {
+        "limit": 8,
+        "hasMore": false
+      },
+      "query": {
+        "q": "Mitte",
+        "code": null,
+        "at": null,
+        "radiusM": null,
+        "area": "01002"
+      }
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/stations"
+    }
+  }
+}

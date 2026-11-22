@@ -1144,19 +1144,16 @@ func (g *gen) weather() {
 
 func (g *gen) rules() {
 	topics := []string{"lorry_sunday_ban", "holiday_ban", "speed_limits", "winter_tyres", "emission_zones", "emergency_corridor"}
-	// One review date for topic and statements: the seed puts the day it runs
-	// on a statement without one, and an answer must not move with the calendar.
-	reviewed := date(time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC))
 	g.w.begin("rule_topic", "topic_code", "title", "title_en", "reviewed_on")
 	for _, t := range topics {
-		g.w.row(str("syn_"+t), str("Synthetisches Regelthema "+t), str("Synthetic rule topic "+t), reviewed)
+		g.w.row(str("syn_"+t), str("Synthetisches Regelthema "+t), str("Synthetic rule topic "+t), date(time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)))
 	}
-	g.w.begin("rule_statement", "statement_id", "topic_code", "position", "body", "legal_basis", "legal_basis_url", "reviewed_on")
+	g.w.begin("rule_statement", "statement_id", "topic_code", "position", "body", "legal_basis", "legal_basis_url")
 	for _, t := range topics {
 		for i := range 3 {
 			g.w.row(str(fmt.Sprintf("syn_%s.%d", t, i+1)), str("syn_"+t), num(i+1),
 				str(fmt.Sprintf("Synthetic statement %d about %s, for tests only.", i+1, t)),
-				str("§ 0 synthetic"), str("https://law.example/"+t), reviewed)
+				str("§ 0 synthetic"), str("https://law.example/"+t))
 			g.counted("", "viafrei_rules")
 		}
 	}

@@ -80,6 +80,9 @@ type Query struct {
 	// register (an EVA number): what the platform's nearby search lists as
 	// a station.
 	Railway bool
+	// Area is an official region key (two digits a Land, five a Kreis) the
+	// station's district code must start with; empty for any.
+	Area string
 }
 
 // Fold is the search form of a text, the form contract.stop_place keeps in

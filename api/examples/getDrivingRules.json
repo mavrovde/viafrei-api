@@ -22,7 +22,7 @@
           "text": "Synthetic statement 1 about winter_tyres, for tests only.",
           "legalBasis": "§ 0 synthetic",
           "sourceUrl": "https://law.example/winter_tyres",
-          "reviewedOn": "2026-02-01",
+          "reviewedOn": "2026-11-17",
           "unconfirmed": null
         },
         {
@@ -30,7 +30,7 @@
           "text": "Synthetic statement 2 about winter_tyres, for tests only.",
           "legalBasis": "§ 0 synthetic",
           "sourceUrl": "https://law.example/winter_tyres",
-          "reviewedOn": "2026-02-01",
+          "reviewedOn": "2026-11-17",
           "unconfirmed": null
         },
         {
@@ -38,11 +38,11 @@
           "text": "Synthetic statement 3 about winter_tyres, for tests only.",
           "legalBasis": "§ 0 synthetic",
           "sourceUrl": "https://law.example/winter_tyres",
-          "reviewedOn": "2026-02-01",
+          "reviewedOn": "2026-11-17",
           "unconfirmed": null
         }
       ],
-      "reviewedOn": "2026-02-01",
+      "reviewedOn": "2026-11-17",
       "disclaimer": "Informational, not legal advice."
     },
     "meta": {

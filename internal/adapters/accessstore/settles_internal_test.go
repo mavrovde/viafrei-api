@@ -154,6 +154,42 @@ func TestSettlesOpensALostConnectionAgain(t *testing.T) {
 	}
 }
 
+// The ask that starts the listener is registered before the listener runs:
+// its first connection already finds the ask, so the poke the listen sends
+// every ask reaches it however the goroutines are scheduled. The start is
+// held until the loop has connected, the order a loaded host can give.
+func TestTheFirstAskIsRegisteredBeforeTheListenerStarts(t *testing.T) {
+	var h *settles
+	seen := make(chan int, 1)
+	h = newSettles(func(context.Context) (listenConn, error) {
+		h.mu.Lock()
+		n := len(h.waiters)
+		h.mu.Unlock()
+		select {
+		case seen <- n:
+		default:
+		}
+		return nil, errors.New("no connection")
+	}, time.Hour)
+	connected := make(chan int, 1)
+	h.start = func(loop func()) {
+		go loop()
+		n := <-seen
+		connected <- n
+	}
+	defer h.close()
+	h.add("7")
+	seen = connected
+	select {
+	case n := <-seen:
+		if n != 1 {
+			t.Fatalf("the listener's first connection found %d asks, want the one that started it", n)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the listener never connected")
+	}
+}
+
 func TestSettlesCloseWithoutAWait(t *testing.T) {
 	h := newSettles((&connector{}).connect, time.Millisecond)
 	h.close()

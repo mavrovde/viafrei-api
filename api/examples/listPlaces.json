@@ -24,7 +24,8 @@
           "lon": 7.01625
         },
         "sourceFamily": "geonames",
-        "districtCode": "01"
+        "districtCode": "01",
+        "ags": "01"
       }
     ],
     "meta": {

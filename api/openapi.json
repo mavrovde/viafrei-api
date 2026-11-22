@@ -10710,6 +10710,7 @@
                             "text": "Synthetic statement 1 about winter_tyres, for tests only.",
                             "legalBasis": "§ 0 synthetic",
                             "sourceUrl": "https://law.example/winter_tyres",
+                            "basisNote": null,
                             "reviewedOn": "2026-02-01",
                             "unconfirmed": null
                           },
@@ -10718,6 +10719,7 @@
                             "text": "Synthetic statement 2 about winter_tyres, for tests only.",
                             "legalBasis": "§ 0 synthetic",
                             "sourceUrl": "https://law.example/winter_tyres",
+                            "basisNote": null,
                             "reviewedOn": "2026-02-01",
                             "unconfirmed": null
                           },
@@ -10726,6 +10728,7 @@
                             "text": "Synthetic statement 3 about winter_tyres, for tests only.",
                             "legalBasis": "§ 0 synthetic",
                             "sourceUrl": "https://law.example/winter_tyres",
+                            "basisNote": null,
                             "reviewedOn": "2026-02-01",
                             "unconfirmed": null
                           }
@@ -11195,7 +11198,10 @@
                           "matched": 1,
                           "droppedClosed": 0,
                           "droppedUnknown": 0,
-                          "droppedNotWholeDay": 0
+                          "droppedNotWholeDay": 0,
+                          "areaCoverage": "held",
+                          "stationsInRadius": 1,
+                          "stationsWithoutCurrentPrice": 0
                         }
                       },
                       "links": {
@@ -14113,6 +14119,20 @@
                             "situations": 8
                           }
                         ],
+                        "sourceStamps": [
+                          {
+                            "family": "dwd_eta",
+                            "lastCheckedAt": "2026-03-29T23:57:30Z",
+                            "unchangedSince": "2026-03-29T23:57:30Z",
+                            "possiblyStale": false
+                          },
+                          {
+                            "family": "roads_alpha",
+                            "lastCheckedAt": "2026-03-29T23:57:30Z",
+                            "unchangedSince": "2026-03-29T23:57:30Z",
+                            "possiblyStale": false
+                          }
+                        ],
                         "coverage": null,
                         "situations": [
                           {
@@ -14587,7 +14607,14 @@
                             "observedAt": "2026-03-29T15:37:54Z"
                           },
                           "termsRequired": false,
-                          "sourceFamily": "park_alpha"
+                          "sourceFamily": "park_alpha",
+                          "amenities": {
+                            "present": [
+                              "toilet",
+                              "shower"
+                            ],
+                            "absent": []
+                          }
                         }
                       ],
                       "meta": {
@@ -15782,7 +15809,14 @@
                             "observedAt": "2026-03-29T19:53:27Z"
                           },
                           "termsRequired": false,
-                          "sourceFamily": "park_alpha"
+                          "sourceFamily": "park_alpha",
+                          "amenities": {
+                            "present": [
+                              "toilet",
+                              "shower"
+                            ],
+                            "absent": []
+                          }
                         }
                       ],
                       "meta": {
@@ -16146,7 +16180,8 @@
                             "lon": 7.01625
                           },
                           "sourceFamily": "geonames",
-                          "districtCode": "01"
+                          "districtCode": "01",
+                          "ags": "01"
                         }
                       ],
                       "meta": {
@@ -18545,6 +18580,20 @@
                             "situations": 1
                           }
                         ],
+                        "sourceStamps": [
+                          {
+                            "family": "dwd_eta",
+                            "lastCheckedAt": "2026-03-29T23:57:30Z",
+                            "unchangedSince": "2026-03-29T23:57:30Z",
+                            "possiblyStale": false
+                          },
+                          {
+                            "family": "roads_alpha",
+                            "lastCheckedAt": "2026-03-29T23:57:30Z",
+                            "unchangedSince": "2026-03-29T23:57:30Z",
+                            "possiblyStale": false
+                          }
+                        ],
                         "lamp": "amber",
                         "lampReason": "narrowing",
                         "lampReasons": [
@@ -18677,7 +18726,8 @@
                         ],
                         "page": {
                           "limit": 2,
-                          "hasMore": false
+                          "hasMore": false,
+                          "nextCursor": null
                         },
                         "query": {
                           "at": {
@@ -20372,6 +20422,14 @@
                             "situations": 3
                           }
                         ],
+                        "sourceStamps": [
+                          {
+                            "family": "roads_alpha",
+                            "lastCheckedAt": "2026-03-29T23:57:30Z",
+                            "unchangedSince": "2026-03-29T23:57:30Z",
+                            "possiblyStale": false
+                          }
+                        ],
                         "state": "10",
                         "lamp": "amber",
                         "lampReason": "warning",
@@ -20567,7 +20625,8 @@
                         ],
                         "page": {
                           "limit": 3,
-                          "hasMore": false
+                          "hasMore": false,
+                          "nextCursor": null
                         },
                         "query": {
                           "state": "10",
@@ -22010,7 +22069,12 @@
                             "lat": 47.403474,
                             "lon": 14.561662
                           },
-                          "stopCode": "de:04002:2"
+                          "stopCode": "de:04002:2",
+                          "stopIds": [
+                            "1:de:04002:2",
+                            "1:de:04002:2:1",
+                            "1:de:04002:2:2"
+                          ]
                         },
                         "window": {
                           "from": "2026-03-30T00:00:00Z",

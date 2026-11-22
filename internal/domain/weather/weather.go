@@ -64,6 +64,11 @@ type Warning struct {
 	// Until is nil when the warning is open-ended.
 	Until    *time.Time
 	AreaName string
+	// CellID is the issuer's warning cell (the DWD warn cell id), Event the
+	// issuer's event name and Identifier its message identifier, each as
+	// issued; Published is when it was issued. Each is nil when not given.
+	CellID, Event, Identifier *string
+	Published                 *time.Time
 }
 
 // Query asks for the warnings in force at a position, or starting within

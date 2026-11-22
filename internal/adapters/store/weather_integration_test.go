@@ -496,3 +496,35 @@ order by warning_id limit 1`, &p.Lat, &p.Lon)
 
 // lookAhead is the default weather.lookahead the store tests read with.
 const lookAhead = 24 * time.Hour
+
+// TestWarningsAtStateTheirCellEventAndIssue: each warning listed at a point
+// of its area states the view's warn cell, event, identifier and
+// publication instant.
+func TestWarningsAtStateTheirCellEventAndIssue(t *testing.T) {
+	req.Covers(t, "FR-WEATHER-001")
+	st := seeded(t)
+	fams := families(t, st, "weather")
+	var (
+		p    geo.Point
+		from time.Time
+	)
+	owner(t, `select st_y(st_pointonsurface(area)), st_x(st_pointonsurface(area)), valid_from from contract.weather_warning
+where withdrawn_at is null and message_status <> 'cancelled' and area is not null and display_class <> 'withhold' and audience = 'public'
+order by warning_id limit 1`, &p.Lat, &p.Lon, &from)
+	sc, err := st.WarningsAt(bounded(t), weather.Query{LookAhead: lookAhead, Limit: maxWarnings, At: p, MinLevel: 1}, fams, from)
+	if err != nil || len(sc.Warnings) == 0 {
+		t.Fatalf("%v %v", sc.Warnings, err)
+	}
+	for _, w := range sc.Warnings {
+		var (
+			cell, event, ident *string
+			published          *time.Time
+		)
+		owner(t, `select warn_cell_id, event, identifier, published_at from contract.weather_warning where warning_id = '`+w.ID+`'`, &cell, &event, &ident, &published)
+		eq := func(a, b *string) bool { return (a == nil) == (b == nil) && (a == nil || *a == *b) }
+		if !eq(w.CellID, cell) || !eq(w.Event, event) || !eq(w.Identifier, ident) ||
+			(published == nil) != (w.Published == nil) || (published != nil && !published.Equal(*w.Published)) {
+			t.Errorf("%s: %v %v %v %v, the view's %v %v %v %v", w.ID, w.CellID, w.Event, w.Identifier, w.Published, cell, event, ident, published)
+		}
+	}
+}

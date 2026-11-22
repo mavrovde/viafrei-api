@@ -37,7 +37,8 @@ where w.withdrawn_at is null and w.message_status <> 'cancelled'
 // the limit.
 const warningsPage = `
 select w.warning_id, w.source_ref, w.hazard, w.warning_level, w.level_label, w.issuer_name, w.headline,
-       w.text_lang, w.valid_from, w.valid_to, coalesce(w.area_name, '')
+       w.text_lang, w.valid_from, w.valid_to, coalesce(w.area_name, ''),
+       w.warn_cell_id, w.event, w.identifier, w.published_at
 ` + warningPlaced + `
   and w.valid_from < $10
   and w.warning_level >= $5
@@ -70,8 +71,12 @@ func scanWarning(r pgx.CollectableRow) (weather.Warning, error) {
 		until  *time.Time
 	)
 	err := r.Scan(&v.ID, &v.Family, &hazard, &level, &v.LevelName, &v.Issuer, &v.Headline,
-		&v.TextLanguage, &v.From, &until, &v.AreaName)
+		&v.TextLanguage, &v.From, &until, &v.AreaName, &v.CellID, &v.Event, &v.Identifier, &v.Published)
 	v.Hazard, v.From = weather.MapHazard(hazard), v.From.UTC()
+	if v.Published != nil {
+		p := v.Published.UTC()
+		v.Published = &p
+	}
 	if until != nil {
 		u := until.UTC()
 		v.Until = &u

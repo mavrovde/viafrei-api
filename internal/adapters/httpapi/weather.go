@@ -25,22 +25,27 @@ type WeatherRiskInput struct {
 
 // WeatherWarning is one official weather warning, in the issuer's words.
 type WeatherWarning struct {
-	ID           string      `json:"id"`
-	Hazard       string      `json:"hazard" enum:"thunderstorm,wind,rain,snow,ice,fog,heat,frost,uv,flood,other" doc:"What it warns of. Open enumeration; treat an unknown value as other."`
-	Level        int         `json:"level" minimum:"1" maximum:"4" doc:"The official level, 1 (minor) to 4 (extreme), as issued; never re-graded."`
-	LevelName    string      `json:"levelName" doc:"The issuer's name of the level, as issued."`
-	Issuer       string      `json:"issuer" doc:"The issuing service."`
-	Headline     string      `json:"headline" doc:"The official wording, in textLanguage."`
-	TextLanguage string      `json:"textLanguage" doc:"The language of headline (BCP 47)."`
-	Validity     TimeWindow  `json:"validity"`
-	InForce      bool        `json:"inForce" doc:"Whether the warning is in force at the answer's instant; false for one that starts within the next 24 hours, which is listed beside those in force as the platform lists it (the lamp reads only those in force)."`
-	Area         WarningArea `json:"area"`
-	SourceFamily string      `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
+	ID             string      `json:"id"`
+	Hazard         string      `json:"hazard" enum:"thunderstorm,wind,rain,snow,ice,fog,heat,frost,uv,flood,other" doc:"What it warns of. Open enumeration; treat an unknown value as other."`
+	Level          int         `json:"level" minimum:"1" maximum:"4" doc:"The official level, 1 (minor) to 4 (extreme), as issued; never re-graded."`
+	LevelName      string      `json:"levelName" doc:"The issuer's name of the level, as issued."`
+	Issuer         string      `json:"issuer" doc:"The issuing service."`
+	Headline       string      `json:"headline" doc:"The official wording, in textLanguage."`
+	TextLanguage   string      `json:"textLanguage" doc:"The language of headline (BCP 47)."`
+	Validity       TimeWindow  `json:"validity"`
+	InForce        bool        `json:"inForce" doc:"Whether the warning is in force at the answer's instant; false for one that starts within weather.lookahead (24 hours by default), which is listed beside those in force as the platform lists it (the lamp reads only those in force)."`
+	Event          *string     `json:"event" nullable:"true" doc:"The issuer's event name, as issued (the DWD's EVENT, e.g. FROST); null when not given."`
+	Identifier     *string     `json:"identifier" nullable:"true" doc:"The issuer's message identifier, as issued; null when not given."`
+	Published      *time.Time  `json:"published" nullable:"true" format:"date-time" doc:"When the issuer published the warning (its sent time); null when not given."`
+	PublishedLocal *string     `json:"publishedLocal" nullable:"true" format:"date-time" doc:"published in Europe/Berlin time; null when published is."`
+	Area           WarningArea `json:"area"`
+	SourceFamily   string      `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
 }
 
 // WarningArea is the area a warning is issued for.
 type WarningArea struct {
 	Name     string           `json:"name" doc:"The name of the warning area that contains the position."`
+	CellID   *string          `json:"cellId" nullable:"true" doc:"The issuer's warning cell of the area (the DWD warn cell id), as issued; null when not given."`
 	Geometry *GeoJSONGeometry `json:"geometry" doc:"The outline of the area as a GeoJSON geometry; null while the service does not serve area outlines."`
 }
 
@@ -325,7 +330,12 @@ func weatherWarnings(items []weather.Warning, at time.Time) []WeatherWarning {
 		ws[i] = WeatherWarning{
 			ID: w.ID, Hazard: string(w.Hazard), Level: int(w.Level), LevelName: w.LevelName, Issuer: w.Issuer,
 			Headline: w.Headline, TextLanguage: w.TextLanguage, Validity: timeWindow(w.From, w.Until),
-			InForce: !w.From.After(at), Area: WarningArea{Name: w.AreaName}, SourceFamily: w.Family,
+			InForce: !w.From.After(at), Area: WarningArea{Name: w.AreaName, CellID: w.CellID}, SourceFamily: w.Family,
+			Event: w.Event, Identifier: w.Identifier,
+		}
+		if w.Published != nil {
+			p, l := w.Published.UTC(), local(*w.Published)
+			ws[i].Published, ws[i].PublishedLocal = &p, &l
 		}
 	}
 	return ws

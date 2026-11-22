@@ -8080,6 +8080,13 @@
       "WarningArea": {
         "additionalProperties": false,
         "properties": {
+          "cellId": {
+            "description": "The issuer's warning cell of the area (the DWD warn cell id), as issued; null when not given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "geometry": {
             "additionalProperties": false,
             "description": "The outline of the area as a GeoJSON geometry; null while the service does not serve area outlines.",
@@ -8114,6 +8121,7 @@
         },
         "required": [
           "name",
+          "cellId",
           "geometry"
         ],
         "type": "object"
@@ -8443,6 +8451,13 @@
           "area": {
             "$ref": "#/components/schemas/WarningArea"
           },
+          "event": {
+            "description": "The issuer's event name, as issued (the DWD's EVENT, e.g. FROST); null when not given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "hazard": {
             "description": "What it warns of. Open enumeration; treat an unknown value as other.",
             "enum": [
@@ -8467,8 +8482,15 @@
           "id": {
             "type": "string"
           },
+          "identifier": {
+            "description": "The issuer's message identifier, as issued; null when not given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "inForce": {
-            "description": "Whether the warning is in force at the answer's instant; false for one that starts within the next 24 hours, which is listed beside those in force as the platform lists it (the lamp reads only those in force).",
+            "description": "Whether the warning is in force at the answer's instant; false for one that starts within weather.lookahead (24 hours by default), which is listed beside those in force as the platform lists it (the lamp reads only those in force).",
             "type": "boolean"
           },
           "issuer": {
@@ -8485,6 +8507,22 @@
           "levelName": {
             "description": "The issuer's name of the level, as issued.",
             "type": "string"
+          },
+          "published": {
+            "description": "When the issuer published the warning (its sent time); null when not given.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publishedLocal": {
+            "description": "published in Europe/Berlin time; null when published is.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "sourceFamily": {
             "description": "The source family of the item; its attribution is in meta.attribution.",
@@ -8508,6 +8546,10 @@
           "textLanguage",
           "validity",
           "inForce",
+          "event",
+          "identifier",
+          "published",
+          "publishedLocal",
           "area",
           "sourceFamily"
         ],
@@ -25798,8 +25840,13 @@
                               "untilLocal": "2026-03-30T13:04:42+02:00"
                             },
                             "inForce": true,
+                            "event": "UV-INDEX",
+                            "identifier": "dwd:100008",
+                            "published": "2026-03-29T08:34:42Z",
+                            "publishedLocal": "2026-03-29T10:34:42+02:00",
                             "area": {
                               "name": "Warngebiet 05002",
+                              "cellId": "805002000",
                               "geometry": null
                             },
                             "sourceFamily": "dwd_eta"

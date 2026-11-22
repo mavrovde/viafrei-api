@@ -194,11 +194,11 @@ func TestARefresherThatLosesItsLoginOrRoleFails(t *testing.T) {
 func TestAStopReadsWhetherTheListenerWasLost(t *testing.T) {
 	_, owner := fresh(t)
 	f := &Fake{}
-	if err := f.heard(owner); err != nil {
+	if err := f.heard(context.Background(), owner); err != nil {
 		t.Fatalf("a live listener: %v", err)
 	}
 	_ = owner.Close(context.Background())
-	if err := f.heard(owner); err == nil || !strings.Contains(err.Error(), "fakelive: the listener was lost") {
+	if err := f.heard(context.Background(), owner); err == nil || !strings.Contains(err.Error(), "fakelive: the listener was lost") {
 		t.Fatalf("a closed listener: %v", err)
 	}
 }

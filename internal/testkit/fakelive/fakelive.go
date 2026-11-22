@@ -192,7 +192,7 @@ func (f *Fake) loop(ctx context.Context, listener *pgx.Conn) {
 		if _, err := listener.WaitForNotification(ctx); err != nil {
 			f.fail(err)
 			if ctx.Err() != nil {
-				f.fail(f.heard(listener))
+				f.fail(f.heard(ctx, listener))
 			}
 			return
 		}
@@ -200,11 +200,10 @@ func (f *Fake) loop(ctx context.Context, listener *pgx.Conn) {
 }
 
 // heard is the loss of the listener a stop interrupted the wait on: the
-// connection can have been lost before the stop, and only a read tells.
-func (f *Fake) heard(listener *pgx.Conn) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	if err := listener.Ping(ctx); err != nil {
+// connection can have been lost before the stop, and only a read tells. The
+// ping runs past the stop's cancel; a lost backend fails the read at once.
+func (f *Fake) heard(ctx context.Context, listener *pgx.Conn) error {
+	if err := listener.Ping(context.WithoutCancel(ctx)); err != nil {
 		return fmt.Errorf("fakelive: the listener was lost: %w", err)
 	}
 	return nil

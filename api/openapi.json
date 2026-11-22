@@ -4672,6 +4672,30 @@
         ],
         "type": "object"
       },
+      "ParkingAmenities": {
+        "additionalProperties": false,
+        "properties": {
+          "absent": {
+            "description": "Stated absent.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "present": {
+            "description": "Stated present.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "present",
+          "absent"
+        ],
+        "type": "object"
+      },
       "ParkingBay": {
         "additionalProperties": false,
         "properties": {
@@ -4899,6 +4923,10 @@
       "ParkingListing": {
         "additionalProperties": false,
         "properties": {
+          "amenities": {
+            "$ref": "#/components/schemas/ParkingAmenities",
+            "description": "The amenities the site's own publisher states it has and states it lacks; an amenity in neither is unknown, never absent."
+          },
           "distanceM": {
             "description": "Distance from the asked position, in metres; null along a motorway (no point was asked) and for a site whose terms need accepting (a Toll Collect site), which the platform names without a distance.",
             "format": "int64",
@@ -5005,7 +5033,8 @@
           "distanceM",
           "occupancy",
           "termsRequired",
-          "sourceFamily"
+          "sourceFamily",
+          "amenities"
         ],
         "type": "object"
       },
@@ -5137,6 +5166,10 @@
       "ParkingSite": {
         "additionalProperties": false,
         "properties": {
+          "amenities": {
+            "$ref": "#/components/schemas/ParkingAmenities",
+            "description": "The amenities the site's own publisher states it has and states it lacks; an amenity in neither is unknown, never absent."
+          },
           "distanceM": {
             "description": "Distance from the asked position, in metres.",
             "format": "int64",
@@ -5240,7 +5273,8 @@
           "distanceM",
           "occupancy",
           "termsRequired",
-          "sourceFamily"
+          "sourceFamily",
+          "amenities"
         ],
         "type": "object"
       },

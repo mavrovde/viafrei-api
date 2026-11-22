@@ -1,6 +1,7 @@
 package parking_test
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -56,5 +57,18 @@ func TestFilterKindAnswersARestAreaUnfiltered(t *testing.T) {
 		if got := parking.FilterKind(k); got != want {
 			t.Errorf("FilterKind(%q) = %q, want %q", k, got, want)
 		}
+	}
+}
+
+// The stated amenities are the vocabulary's, in the platform's order, once;
+// one stated both ways is present (storedAmenitiesOf).
+func TestStatedOfReadsAsThePlatform(t *testing.T) {
+	req.Covers(t, "FR-PARK-003")
+	s := parking.StatedOf([]string{"shower", "sauna", "toilet", "shower"}, []string{"wifi", "toilet", "accessible_toilet"})
+	if !slices.Equal(s.Present, []string{"toilet", "shower"}) || !slices.Equal(s.Absent, []string{"accessible_toilet", "wifi"}) {
+		t.Errorf("%+v", s)
+	}
+	if n := parking.StatedOf(nil, nil); n.Present == nil || n.Absent == nil || len(n.Present)+len(n.Absent) != 0 {
+		t.Errorf("none %+v", n)
 	}
 }

@@ -87,6 +87,35 @@ type Site struct {
 	// its occupancy is given; the occupancy is then withheld.
 	TermsRequired bool
 	Occupancy     *Occupancy
+	// Amenities are the amenities the site's own publisher states.
+	Amenities Stated
+}
+
+// Stated are the amenities a site's own publisher states it has and states
+// it lacks; an amenity in neither is unknown.
+type Stated struct {
+	Present []string
+	Absent  []string
+}
+
+// amenityOrder is the order the platform states amenities in.
+var amenityOrder = []string{"toilet", "accessible_toilet", "shower", "restaurant", "snack", "cafe", "shop", "fuel", "charging", "drinking_water", "picnic", "playground", "wifi", "security"}
+
+// StatedOf is the stated amenities from the stored lists, as the platform
+// reads them: only the vocabulary's, in its order, once, and an amenity
+// stated both present and absent only as present.
+func StatedOf(present, absent []string) Stated {
+	keep := func(v []string, skip []string) []string {
+		out := []string{}
+		for _, a := range amenityOrder {
+			if slices.Contains(v, a) && !slices.Contains(skip, a) {
+				out = append(out, a)
+			}
+		}
+		return out
+	}
+	p := keep(present, nil)
+	return Stated{Present: p, Absent: keep(absent, p)}
 }
 
 // Withheld returns the site as it is listed before its terms are accepted

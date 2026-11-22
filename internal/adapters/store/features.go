@@ -286,7 +286,8 @@ where f.withdrawn_at is null
 select f.facility_id, f.source_ref, f.name, f.operator_name, f.parking_kind,
        st_y(f.location), st_x(f.location),
        `+parkingDistance(q)+`,
-       o.free_spaces, o.total_spaces, o.occupancy_status, o.observed_at, o.source_ref
+       o.free_spaces, o.total_spaces, o.occupancy_status, o.observed_at, o.source_ref,
+       f.amenities, f.amenities_absent
 from contract.parking_facility f
 cross join here
 left join lateral (
@@ -313,10 +314,12 @@ limit $11`, parkingArgs(q, line, q.At.Lat, q.At.Lon, listed, occupancy, q.Radius
 				state       *string
 				observed    *time.Time
 				family      *string
+				has, lacks  []string
 			)
 			err := r.Scan(&v.ID, &v.Family, &v.Name, &v.Operator, &kind, &v.Location.Lat, &v.Location.Lon, &v.DistanceM,
-				&free, &total, &state, &observed, &family)
+				&free, &total, &state, &observed, &family, &has, &lacks)
 			v.Kind = parking.MapKind(kind)
+			v.Amenities = parking.StatedOf(has, lacks)
 			if state != nil {
 				v.Occupancy = &parking.Occupancy{Free: free, Total: total, State: parking.MapState(*state), ObservedAt: observed.UTC(), Family: *family}
 			}

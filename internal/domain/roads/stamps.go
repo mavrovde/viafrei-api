@@ -9,7 +9,7 @@ import (
 )
 
 // StampIntervals is how many of its own cycles a source's Stand may age
-// before the platform's road answers mark it possibly out of date (its feed
+// before the platform's road answers mark it possibly out of date (its source
 // alarms' freshnessIntervals).
 const StampIntervals = 3
 
@@ -60,7 +60,7 @@ func Stamps(fams []provenance.Family, confirmations map[string]ampel.Confirmatio
 }
 
 // PossiblyStale says whether the Stand is older than StampIntervals of the
-// source's own cycle at now, as the platform judges a feed (more than the
+// source's own cycle at now, as the platform judges a source (more than the
 // limit, the limit itself still current). A source with no stated cycle is
 // never judged: nothing may invent a cadence.
 func (s Stamp) PossiblyStale(now time.Time) bool {

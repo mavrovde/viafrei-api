@@ -363,7 +363,10 @@ func TestTheLampReadsTheWeatherWarnings(t *testing.T) {
 	} {
 		f := &roadFake{warns: []roads.Warning{{Family: "w2", Level: c.level}}}
 		got, err := roadService(f).RoadConditions(ctx, consumer, roads.AreaQuery{State: "de"})
-		if err != nil || !slices.Equal(names(got.Families), []string{"w1", "w2"}) || !slices.Equal(f.gotFams.Weather, []string{"w1", "w2"}) {
+		// A warning is no situation: with none, every roads family is
+		// credited beside the weather families, as the platform credits
+		// a road status that found only a warning.
+		if err != nil || !slices.Equal(names(got.Families), []string{"r1", "r2", "w1", "w2"}) || !slices.Equal(f.gotFams.Weather, []string{"w1", "w2"}) {
 			t.Errorf("level %d: attributed %v, asked %v, %v", c.level, names(got.Families), f.gotFams, err)
 		}
 		lit(t, "a weather warning", got, c.lamp, c.reason)

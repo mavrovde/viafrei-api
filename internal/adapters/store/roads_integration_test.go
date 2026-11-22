@@ -852,3 +852,87 @@ select count(*) from ins`, &n)
 		t.Errorf("lamp warnings %v, want %v", lamps["A101"].Warnings, want)
 	}
 }
+
+// TestALampPlacesAWarningFiledUnderNoRegion plants, far after the fixture's
+// window, two warnings of one weather family in force that the DWD filed
+// under no region code: one whose own area holds a junction point of road
+// "A101" and whose warn cell is a Gemeinde of that junction's Land, one far
+// off in another Land's cell. Every lamp scope places the first by its area
+// or its cell: the road, a point near the junction, the Land and the
+// country; only the country also holds the second. A read joining the
+// warning's region code (the code is often null) answered "no warning" for
+// each.
+func TestALampPlacesAWarningFiledUnderNoRegion(t *testing.T) {
+	req.Covers(t, "FR-ROAD-004", "FR-ROAD-006", "FR-WEATHER-001")
+	st := seeded(t)
+	var family, land string
+	var lat, lon float64
+	owner(t, `select w.source_ref, j.state_code, st_y(j.location), st_x(j.location)
+from contract.weather_warning w, contract.junction j
+where w.warning_id = 'dwd:900001' and j.road_ref = 'A101' order by j.junction_id limit 1`, &family, &land, &lat, &lon)
+	other := "16"
+	if land == other {
+		other = "15"
+	}
+	var n int
+	owner(t, `with ins as (
+  insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
+    valid_from, valid_to, published_at, region_code, source_ref, recorded_at, withdrawn_at, area, warn_cell_id)
+  select v.id, 'fog', v.level, 'Stufe', 'actual', 'Deutscher Wetterdienst', 'Nebel', 'de',
+    '2104-01-01T00:00:00Z', '2104-01-02T00:00:00Z', null, null, '`+family+`', '2104-01-01T00:00:00Z', null,
+    st_buffer(st_setsrid(st_makepoint(`+fmt.Sprint(lon)+` + v.shift, `+fmt.Sprint(lat)+`), 4326), 0.01), v.cell
+  from (values ('dwd:990011', 3, 0.0, '8`+land+`9990001'), ('dwd:990012', 2, 3.0, '8`+other+`9990001')) v(id, level, shift, cell)
+  returning 1)
+select count(*) from ins`, &n)
+	t.Cleanup(func() {
+		change(t, `delete from contract.weather_warning where warning_id in ('dwd:990011', 'dwd:990012')`)
+	})
+	if n != 2 {
+		t.Fatalf("%d warnings planted", n)
+	}
+	fams, at := roads.Families{Roads: families(t, st, "roads"), Weather: []string{family}}, time.Date(2104, 1, 1, 12, 0, 0, 0, time.UTC)
+	filter := roads.Filter{MinSeverity: roads.SeverityInfo}
+	here := []roads.Warning{{Family: family, Level: 3}}
+	both := []roads.Warning{{Family: family, Level: 3}, {Family: family, Level: 2}}
+	for _, c := range []struct {
+		name string
+		read func() (roads.Page, error)
+		want []roads.Warning
+	}{
+		{"road", func() (roads.Page, error) {
+			return st.SituationsOnRoad(bounded(t), roads.CorridorQuery{Road: "A101", Direction: roads.DirectionBoth, Filter: filter, Limit: 1}, fams, at)
+		}, here},
+		{"point", func() (roads.Page, error) {
+			return st.SituationsNear(bounded(t), roads.AreaQuery{At: geo.Point{Lat: lat, Lon: lon}, RadiusM: 2000, Filter: filter, Limit: 1}, fams, at)
+		}, here},
+		{"land", func() (roads.Page, error) {
+			return st.SituationsNear(bounded(t), roads.AreaQuery{State: land, Filter: filter, Limit: 1}, fams, at)
+		}, here},
+		{"country", func() (roads.Page, error) {
+			return st.SituationsNear(bounded(t), roads.AreaQuery{State: "de", Filter: filter, Limit: 1}, fams, at)
+		}, both},
+	} {
+		p, err := c.read()
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if !slices.Equal(p.Warnings, c.want) {
+			t.Errorf("%s: warnings %v, want %v", c.name, p.Warnings, c.want)
+		}
+	}
+	// The national picture counts the areas by warn cell, so a warning
+	// filed under no region still counts its area.
+	rows, err := st.National(bounded(t), "weather", []string{family}, at, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	areas := 0
+	for _, r := range rows {
+		if r.M != nil {
+			areas += *r.M
+		}
+	}
+	if areas != 2 {
+		t.Errorf("national areas %d, want 2: %+v", areas, rows)
+	}
+}

@@ -385,3 +385,67 @@ func TestWeatherAndRulesReadsReportStorageFaults(t *testing.T) {
 		t.Errorf("Topic on an ended context: %v", err)
 	}
 }
+
+// TestWarningsAtPlaceEveryWarningByItsArea reads, for each published, not
+// cancelled warning of the fixture in force at its start, the warnings at a
+// point inside its own area at that instant: the warning is listed whether
+// or not the DWD filed it under a region code (a copy of one is planted
+// under none), as the platform's warnings at a point test the warning's area
+// alone.
+func TestWarningsAtPlaceEveryWarningByItsArea(t *testing.T) {
+	req.Covers(t, "FR-WEATHER-001")
+	st := seeded(t)
+	fams := families(t, st, "weather")
+	type placed struct {
+		id       string
+		at       geo.Point
+		from     time.Time
+		noRegion bool
+	}
+	// A copy of the first warning in a cell of no known Kreis: the read
+	// contract derives its region code from the cell, so it has none.
+	if n := change(t, `insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
+    valid_from, valid_to, published_at, region_code, source_ref, recorded_at, withdrawn_at, area, warn_cell_id, area_name)
+  select 'dwd:990021', hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
+    valid_from, valid_to, published_at, null, source_ref, recorded_at, null, area, '809999999', area_name
+  from contract.weather_warning
+  where withdrawn_at is null and message_status <> 'cancelled' and area is not null and region_code is not null
+  order by warning_id limit 1`); n != 1 {
+		t.Fatalf("%d warnings planted", n)
+	}
+	t.Cleanup(func() { change(t, `delete from contract.weather_warning where warning_id = 'dwd:990021'`) })
+	var ids []string
+	var lats, lons []float64
+	var froms []time.Time
+	var unfiledIDs []bool
+	owner(t, `select coalesce(array_agg(w.warning_id order by w.warning_id), '{}'),
+       coalesce(array_agg(st_y(st_pointonsurface(w.area)) order by w.warning_id), '{}'),
+       coalesce(array_agg(st_x(st_pointonsurface(w.area)) order by w.warning_id), '{}'),
+       coalesce(array_agg(w.valid_from order by w.warning_id), '{}'),
+       coalesce(array_agg(not exists (select 1 from contract.admin_region r where r.region_code = w.region_code) order by w.warning_id), '{}')
+from contract.weather_warning w
+where w.withdrawn_at is null and w.message_status <> 'cancelled' and w.area is not null
+  and w.source_ref in ('`+strings.Join(fams, "','")+`')
+  and w.display_class <> 'withhold' and w.audience = 'public' and (w.valid_to is null or w.valid_to > w.valid_from)`,
+		&ids, &lats, &lons, &froms, &unfiledIDs)
+	all := make([]placed, len(ids))
+	for i := range ids {
+		all[i] = placed{id: ids[i], at: geo.Point{Lat: lats[i], Lon: lons[i]}, from: froms[i], noRegion: unfiledIDs[i]}
+	}
+	unfiled := 0
+	for _, w := range all {
+		if w.noRegion {
+			unfiled++
+		}
+		sc, err := st.WarningsAt(bounded(t), weather.Query{Limit: maxWarnings, At: w.at, MinLevel: 1}, fams, w.from)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Contains(warningIDs(sc.Warnings), w.id) {
+			t.Errorf("%s (no region code: %v): not read at a point of its own area, got %v", w.id, w.noRegion, warningIDs(sc.Warnings))
+		}
+	}
+	if len(all) == 0 || unfiled == 0 {
+		t.Fatalf("%d warnings, %d under no region code: the fixture no longer plants the case", len(all), unfiled)
+	}
+}

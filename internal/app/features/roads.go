@@ -133,14 +133,17 @@ func (s *Service) conditions(ctx context.Context, key access.Record, ahead bool,
 	if err := gate.Check(contributed); err != nil {
 		return Conditions{}, err
 	}
-	// The attribution: the families that contributed a situation or a
-	// warning, or every permitted roads family when none did; and every
-	// weather family the lamp read, whose warnings (or their absence) the
-	// lamp states, as the platform credits the DWD on every road status.
-	consulted := slices.Clone(contributed)
+	// The attribution: the families that contributed a situation, or every
+	// permitted roads family when none did (a warning found is no
+	// situation: the roads answer is still the roads families' "nothing
+	// here"); the families of the warnings found; and every weather family
+	// the lamp read, whose warnings (or their absence) the lamp states, as
+	// the platform credits the DWD on every road status.
+	consulted := slices.Clone(contributed[:len(p.Items)])
 	if len(consulted) == 0 {
 		consulted = slices.Clone(permitted)
 	}
+	consulted = append(consulted, contributed[len(p.Items):]...)
 	consulted = append(consulted, weather...)
 	// A Land's answer credits the families that placed its situations in
 	// the Land, as the platform's Land form credits BKG.

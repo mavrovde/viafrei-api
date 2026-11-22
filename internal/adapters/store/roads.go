@@ -145,14 +145,15 @@ type storedMessage struct {
 
 // warningsPending is the condition of a weather warning the lamp reads or
 // will read: a published, not cancelled warning of the given families that
-// has not ended at now, placed in an area. $1 families, $2 now. Those whose
-// valid_from is at or before now are in force; the others start later.
+// has not ended at now. $1 families, $2 now. Those whose valid_from is at or
+// before now are in force; the others start later. Each scope places it by
+// the warning's own area or its warn cell, as the platform places a DWD
+// warning, never by the region code it is filed under: the code is often
+// null, and a join on it answered "no warning" where the area holds one.
 const warningsPending = `from contract.weather_warning w
-join contract.admin_region r on r.region_code = w.region_code
 where w.withdrawn_at is null and w.message_status <> 'cancelled'
   and w.source_ref = any($1)
   and w.display_class <> 'withhold' and (w.audience = 'public' or ` + ownKeyOn + `)
-  and r.display_class <> 'withhold' and (r.audience = 'public' or ` + ownKeyOn + `)
   and (w.valid_to is null or w.valid_to > $2)`
 
 // sourcesSelect reads the freshness of the given families and the newest
@@ -506,8 +507,10 @@ limit $14`, args, q.Limit, fams, now, scope{
 		messages: messagesSelect + `
   and e.location is not null
   and st_dwithin(e.location::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`,
-		args:        []any{fams.Roads, now, q.At.Lat, q.At.Lon, q.RadiusM},
-		warnings:    `st_dwithin(r.boundary::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`,
+		args: []any{fams.Roads, now, q.At.Lat, q.At.Lon, q.RadiusM},
+		// A warning is near when its own area reaches within the radius, as
+		// the platform's warnings at a point test the warning's area.
+		warnings:    `w.area is not null and st_dwithin(w.area::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`,
 		warningArgs: []any{q.At.Lat, q.At.Lon, q.RadiusM},
 		states: statesOf(`with here as (select st_setsrid(st_makepoint($2, $1), 4326) g),
 near as (select j.state_code from contract.junction j, here
@@ -543,8 +546,12 @@ order by coalesce(array_position($6::text[], e.severity), 0) desc, e.road_ref, e
 limit $12`, args, q.Limit, fams, now, scope{
 		messages: messagesSelect + `
   and ($3 = 'de' or e.state_code = $3)`,
-		args:        []any{fams.Roads, now, q.State},
-		warnings:    `($3 = 'de' or r.region_code like $3 || '%')`,
+		args: []any{fams.Roads, now, q.State},
+		// A Land's warnings are those of its warn cells: the DWD's Gemeinde
+		// and coast cells are 8 or 7 and the Gemeinde key, so the Land is
+		// the key's first two digits, as the platform's warnings in an area
+		// read them.
+		warnings:    `($3 = 'de' or (left(w.warn_cell_id, 1) in ('7', '8') and substr(w.warn_cell_id, 2, 2) = $3))`,
 		warningArgs: []any{q.State},
 		states:      `select case when $1 = 'de' then (select coalesce(array_agg(r.region_code order by r.region_code), '{}') from contract.admin_region r where r.region_level = 'state') else array[$1::text] end`,
 		stateArgs:   []any{q.State},

@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"reflect"
 	"slices"
@@ -210,8 +211,17 @@ func TestRoadConditionsAnswer(t *testing.T) {
 	if types, _ := q["roadClasses"].([]any); len(types) != 2 {
 		t.Errorf("query %v", q)
 	}
+	// A page with more continues by its cursor, an area's and a Land's alike.
+	f.conditions.HasMore = true
+	for _, path := range []string{"/v1/road-conditions?at=48.1,11.6&limit=2&cursor=4", "/v1/states/09/road-conditions?limit=2&cursor=4"} {
+		page, _ := meta(t, decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, path, bearer)))["page"].(map[string]any)
+		if f.gotArea.Offset != 4 || f.gotArea.Limit != 2 || page["hasMore"] != true || page["nextCursor"] != fmt.Sprint(4+len(f.conditions.Items)) {
+			t.Errorf("%s: asked %+v, page %v", path, f.gotArea, page)
+		}
+	}
+	f.conditions.HasMore = false
 	do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/road-conditions?at=48.1,11.6", bearer)
-	if f.gotArea.Classes != nil || f.gotArea.RadiusM != 2000 || f.gotArea.Limit != 20 {
+	if f.gotArea.Classes != nil || f.gotArea.RadiusM != 2000 || f.gotArea.Limit != 20 || f.gotArea.Offset != 0 {
 		t.Errorf("defaults %+v", f.gotArea)
 	}
 }

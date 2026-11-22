@@ -350,10 +350,11 @@ type CursorPage struct {
 	NextCursor *string `json:"nextCursor" nullable:"true" doc:"The cursor of the next page; null on the last."`
 }
 
-func cursorPage(q roads.CorridorQuery, more bool, n int) CursorPage {
-	out := CursorPage{Page: Page{Limit: q.Limit, HasMore: more}}
+// cursorPage is the page of n situations read past offset, limit at most.
+func cursorPage(limit, offset int, more bool, n int) CursorPage {
+	out := CursorPage{Page: Page{Limit: limit, HasMore: more}}
 	if more {
-		next := strconv.Itoa(q.Offset + n)
+		next := strconv.Itoa(offset + n)
 		out.NextCursor = &next
 	}
 	return out
@@ -407,7 +408,7 @@ func registerMotorwayConditions(api huma.API, s *server, op huma.Operation) {
 			},
 			Meta: MotorwayMeta{
 				DataMeta: s.dataMeta(ctx, c.Families, c.At, c.Partial, partialDetail),
-				Page:     cursorPage(q, c.HasMore, len(c.Items)),
+				Page:     cursorPage(q.Limit, q.Offset, c.HasMore, len(c.Items)),
 				Query:    MotorwayQuery{Road: c.Road.Ref, Direction: string(q.Direction), FilterQuery: filterQuery(q.Filter)},
 			},
 			Links: s.selfLink(ctx),
@@ -432,10 +433,14 @@ type RoadConditionsInput struct {
 	SituationFilters
 	SituationWindow
 	RoadClass []string `query:"road_class" enum:"motorway,federal,state,urban,other" doc:"Only situations on roads of these classes, comma-separated; other keeps the classes that cannot be mapped. Default: every class held."`
+	Cursor    string   `query:"cursor" pattern:"^[0-9]{1,4}$" doc:"The meta.page.nextCursor of the page before; omit for the first page."`
+	offset    int
 }
 
-// Resolve reads the position and refuses a window that cannot be read.
+// Resolve reads the position and the cursor and refuses a window that
+// cannot be read.
 func (in *RoadConditionsInput) Resolve(ctx huma.Context) []error {
+	in.offset, _ = strconv.Atoi(in.Cursor)
 	return append(in.AtPosition.Resolve(ctx), in.check()...)
 }
 
@@ -470,7 +475,7 @@ type RoadConditionsQuery struct {
 // RoadConditionsMeta is the meta member of listRoadConditions.
 type RoadConditionsMeta struct {
 	DataMeta
-	Page  Page                `json:"page"`
+	Page  CursorPage          `json:"page"`
 	Query RoadConditionsQuery `json:"query"`
 }
 
@@ -497,7 +502,7 @@ func registerRoadConditions(api huma.API, s *server, op huma.Operation) {
 		}
 		f := in.filter()
 		f.Listed = roads.AreaKinds
-		q := roads.AreaQuery{At: in.point, RadiusM: s.radius(in.RadiusM), Filter: s.windowed(ctx, f, in.SituationWindow), Limit: s.limit(in.Limit)}
+		q := roads.AreaQuery{At: in.point, RadiusM: s.radius(in.RadiusM), Filter: s.windowed(ctx, f, in.SituationWindow), Limit: s.limit(in.Limit), Offset: in.offset}
 		types := []string{}
 		for _, c := range in.RoadClass {
 			q.Classes = append(q.Classes, roads.Class(c))
@@ -528,7 +533,7 @@ func registerRoadConditions(api huma.API, s *server, op huma.Operation) {
 			},
 			Meta: RoadConditionsMeta{
 				DataMeta: s.dataMeta(ctx, c.Families, c.At, c.Partial, partialDetail),
-				Page:     Page{Limit: q.Limit, HasMore: c.HasMore},
+				Page:     cursorPage(q.Limit, q.Offset, c.HasMore, len(c.Items)),
 				Query:    RoadConditionsQuery{NearQuery: NearQuery{At: position(q.At), RadiusM: q.RadiusM}, FilterQuery: filterQuery(q.Filter), RoadClasses: types},
 			},
 			Links: s.selfLink(ctx),
@@ -586,10 +591,15 @@ type StateConditionsInput struct {
 	SituationWindow
 	RoadClass []string `query:"road_class" enum:"motorway,federal,state,urban,other" doc:"Only situations on roads of these classes, comma-separated; motorway for a Land's motorways. Default: every class held."`
 	Limit     int      `query:"limit" minimum:"1" maximum:"100" doc:"Most situations to return. Default: pagination.default_limit."`
+	Cursor    string   `query:"cursor" pattern:"^[0-9]{1,4}$" doc:"The meta.page.nextCursor of the page before; omit for the first page."`
+	offset    int
 }
 
-// Resolve refuses a window that cannot be read.
-func (in *StateConditionsInput) Resolve(huma.Context) []error { return in.check() }
+// Resolve reads the cursor and refuses a window that cannot be read.
+func (in *StateConditionsInput) Resolve(huma.Context) []error {
+	in.offset, _ = strconv.Atoi(in.Cursor)
+	return in.check()
+}
 
 // StateConditionsData is the answer of listStateRoadConditions.
 type StateConditionsData struct {
@@ -615,7 +625,7 @@ type StateConditionsEnvelope struct {
 	Data StateConditionsData `json:"data"`
 	Meta struct {
 		DataMeta
-		Page  Page                 `json:"page"`
+		Page  CursorPage           `json:"page"`
 		Query StateConditionsQuery `json:"query"`
 	} `json:"meta"`
 	Links Links `json:"links"`
@@ -635,7 +645,7 @@ func registerStateConditions(api huma.API, s *server, op huma.Operation) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
-		q := roads.AreaQuery{State: in.State, Filter: s.windowed(ctx, in.filter(), in.SituationWindow), Limit: s.limit(in.Limit)}
+		q := roads.AreaQuery{State: in.State, Filter: s.windowed(ctx, in.filter(), in.SituationWindow), Limit: s.limit(in.Limit), Offset: in.offset}
 		types := []string{}
 		for _, c := range in.RoadClass {
 			q.Classes = append(q.Classes, roads.Class(c))
@@ -650,7 +660,7 @@ func registerStateConditions(api huma.API, s *server, op huma.Operation) {
 		out.Body.Data = StateConditionsData{State: q.State, Lamp: string(c.Lamp), LampReason: lampReason(c.Reason),
 			LampReasons: lampReasons(c), Sight: lampSight(c), Counts: familyCounts(c.Counts), Stamps: sourceStamps(c.Stamps, c.At), Situations: roadSituations(c.Items)}
 		out.Body.Meta.DataMeta = s.dataMeta(ctx, c.Families, c.At, c.Partial, partialDetail)
-		out.Body.Meta.Page = Page{Limit: q.Limit, HasMore: c.HasMore}
+		out.Body.Meta.Page = cursorPage(q.Limit, q.Offset, c.HasMore, len(c.Items))
 		out.Body.Meta.Query = StateConditionsQuery{State: q.State, FilterQuery: filterQuery(q.Filter), RoadClasses: types}
 		out.Body.Links = s.selfLink(ctx)
 		return out, nil

@@ -511,7 +511,8 @@ where ` + fmt.Sprintf(canonicalRef, "j.road_ref") + ` = $1 and ` + permitted("j"
 }
 
 // SituationsNear reads the active situations within the radius of a
-// position, by severity descending, then distance, then id; and, for the
+// position, by severity descending, then distance, then id, past q's
+// offset; and, for the
 // lamp, the view of every situation in the scope (the radius), the weather
 // warnings in force in an area within the radius, and the states of the
 // junctions within the radius, else of the junction nearest the position.
@@ -523,7 +524,7 @@ func (s *Store) SituationsNear(ctx context.Context, q roads.AreaQuery, fams road
 	args := append(filterArgs(q.Filter, fams.Roads, now), q.At.Lat, q.At.Lon, q.RadiusM,
 		codes(classes), other, codes(roads.Classes[:len(roads.Classes)-1]), q.Limit+1)
 	start, end := q.Window(now)
-	args = append(args, start, end)
+	args = append(args, start, end, q.Offset)
 	return s.read(ctx, `
 with here as (select st_setsrid(st_makepoint($9, $8), 4326)::geography g),
 answering as (
@@ -537,7 +538,7 @@ select `+situationColumns+`, null::float8, e.dist,
        (select jsonb_object_agg(c.source_ref, c.n) from (select source_ref, count(*)::int n from answering group by source_ref) c)
 from answering e
 order by coalesce(array_position($6::text[], e.severity), 0) desc, e.dist, e.event_id
-limit $14`, args, q.Limit, fams, now, scope{
+limit $14 offset $17`, args, q.Limit, fams, now, scope{
 		messages: messagesSelect + `
   and e.location is not null
   and st_dwithin(e.location::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`,
@@ -559,14 +560,14 @@ where not exists (select 1 from near)`),
 
 // situationsInState reads the active situations of one Land (the Land of
 // the nearest Gemeinde to each situation's point, contract.traffic_event's
-// state_code; de: every situation), by severity descending, then road and id; the lamp's scope is
+// state_code; de: every situation), by severity descending, then road and id, past q's offset; the lamp's scope is
 // the Land: its situations, the weather warnings of its areas and the Land.
 func (s *Store) situationsInState(ctx context.Context, q roads.AreaQuery, fams roads.Families, now time.Time) (roads.Page, error) {
 	classes, other := q.KnownClasses()
 	args := append(filterArgs(q.Filter, fams.Roads, now), q.State,
 		codes(classes), other, codes(roads.Classes[:len(roads.Classes)-1]), q.Limit+1)
 	start, end := q.Window(now)
-	args = append(args, start, end)
+	args = append(args, start, end, q.Offset)
 	return s.read(ctx, `
 with answering as (
   select `+eventRow+`
@@ -578,7 +579,7 @@ select `+situationColumns+`, null::float8, null::int,
        (select jsonb_object_agg(c.source_ref, c.n) from (select source_ref, count(*)::int n from answering group by source_ref) c)
 from answering e
 order by coalesce(array_position($6::text[], e.severity), 0) desc, e.road_ref, e.event_id
-limit $12`, args, q.Limit, fams, now, scope{
+limit $12 offset $15`, args, q.Limit, fams, now, scope{
 		messages: messagesSelect + `
   and ($3 = 'de' or e.state_code = $3)`,
 		args: []any{fams.Roads, now, q.State},

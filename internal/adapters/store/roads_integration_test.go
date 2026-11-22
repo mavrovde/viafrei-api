@@ -316,6 +316,11 @@ where e.withdrawn_at is null and e.source_ref in (`+quoted(fams)+`) and e.locati
 	if near, err := st.SituationsNear(bounded(t), roads.AreaQuery{At: at, RadiusM: wide, Filter: q.Filter, Limit: 1}, onRoads(fams), now); err != nil || sum(near.Counts) != want {
 		t.Errorf("an area page of one counts %v, want %d in all: %v", near.Counts, want, err)
 	}
+	// A page past an offset goes on where the page before ended.
+	if next, err := st.SituationsNear(bounded(t), roads.AreaQuery{At: at, RadiusM: wide, Filter: q.Filter, Limit: 1, Offset: 1}, onRoads(fams), now); err != nil ||
+		len(next.Items) != 1 || next.Items[0].ID != sits[1].ID || next.HasMore != (want > 2) {
+		t.Errorf("the second page of one: %+v, want %s: %v", next.Items, sits[1].ID, err)
+	}
 	if np.Placed != nil {
 		t.Errorf("an area that is no Land credits no placement: %v", np.Placed)
 	}
@@ -323,9 +328,15 @@ where e.withdrawn_at is null and e.source_ref in (`+quoted(fams)+`) and e.locati
 	var land string
 	owner(t, `select state_code from contract.traffic_event e where e.withdrawn_at is null and e.state_code is not null
   and e.source_ref in (`+quoted(fams)+`) order by state_code limit 1`, &land)
-	if lp, err := st.SituationsNear(bounded(t), roads.AreaQuery{State: land, Filter: q.Filter, Limit: 100}, onRoads(fams), now); err != nil ||
-		!slices.Equal(lp.Placed, []string{"bkg_gvisys"}) {
+	lp, err := st.SituationsNear(bounded(t), roads.AreaQuery{State: land, Filter: q.Filter, Limit: 100}, onRoads(fams), now)
+	if err != nil || !slices.Equal(lp.Placed, []string{"bkg_gvisys"}) {
 		t.Errorf("Land %s placed by %v: %v", land, lp.Placed, err)
+	}
+	if len(lp.Items) > 1 {
+		if next, err := st.SituationsNear(bounded(t), roads.AreaQuery{State: land, Filter: q.Filter, Limit: 1, Offset: 1}, onRoads(fams), now); err != nil ||
+			len(next.Items) != 1 || next.Items[0].ID != lp.Items[1].ID {
+			t.Errorf("Land %s, the second page of one: %+v, want %s: %v", land, next.Items, lp.Items[1].ID, err)
+		}
 	}
 	found := false
 	for i, s := range sits {

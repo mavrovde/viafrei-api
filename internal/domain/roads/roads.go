@@ -686,6 +686,9 @@ type AreaQuery struct {
 	Classes []Class
 	Filter
 	Limit int
+	// Offset is how many situations of the order the page skips (the
+	// cursor of the page before).
+	Offset int
 }
 
 // KnownClasses returns the mapped classes the query keeps, and whether it

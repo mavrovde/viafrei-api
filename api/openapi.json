@@ -6314,7 +6314,7 @@
             "$ref": "#/components/schemas/Notes"
           },
           "page": {
-            "$ref": "#/components/schemas/Page"
+            "$ref": "#/components/schemas/CursorPage"
           },
           "query": {
             "$ref": "#/components/schemas/RoadConditionsQuery"
@@ -7521,7 +7521,7 @@
             "$ref": "#/components/schemas/Notes"
           },
           "page": {
-            "$ref": "#/components/schemas/Page"
+            "$ref": "#/components/schemas/CursorPage"
           },
           "query": {
             "$ref": "#/components/schemas/StateConditionsQuery"
@@ -18479,6 +18479,17 @@
             }
           },
           {
+            "description": "The meta.page.nextCursor of the page before; omit for the first page.",
+            "explode": false,
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "description": "The meta.page.nextCursor of the page before; omit for the first page.",
+              "pattern": "^[0-9]{1,4}$",
+              "type": "string"
+            }
+          },
+          {
             "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
             "example": "en",
             "in": "query",
@@ -20299,6 +20310,17 @@
               "maximum": 100,
               "minimum": 1,
               "type": "integer"
+            }
+          },
+          {
+            "description": "The meta.page.nextCursor of the page before; omit for the first page.",
+            "explode": false,
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "description": "The meta.page.nextCursor of the page before; omit for the first page.",
+              "pattern": "^[0-9]{1,4}$",
+              "type": "string"
             }
           },
           {

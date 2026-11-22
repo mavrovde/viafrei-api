@@ -155,6 +155,23 @@ func (s *Store) ChargingNear(ctx context.Context, q energy.Query, families []str
 	return sites, more, next, err
 }
 
+// ChargingInRadius counts the sites of families within q's radius of q's
+// position, every filter of q dropped: the list's own sites, the rules every
+// read keeps (withdrawn, permitted) included.
+func (s *Store) ChargingInRadius(ctx context.Context, q energy.Query, families []string) (int, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (int, error) {
+		var n int
+		err := tx.QueryRow(ctx, `select count(*)::int
+from contract.charging_site c
+where c.withdrawn_at is null
+  and (c.source_ref = any($3)) is true
+  and `+permitted("c")+`
+  and st_dwithin(c.location::geography, st_setsrid(st_makepoint($2, $1), 4326)::geography, $4)`,
+			q.At.Lat, q.At.Lon, families, q.RadiusM).Scan(&n)
+		return n, err
+	})
+}
+
 // earliest returns the earlier of a and b, either of which may be nil.
 func earliest(a, b *time.Time) *time.Time {
 	if a == nil || (b != nil && b.Before(*a)) {

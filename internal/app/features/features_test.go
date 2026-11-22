@@ -40,6 +40,9 @@ type fake struct {
 	provCalls                            int
 	provErrOnCall                        int
 	sites                                []energy.Site
+	inRadius                             int
+	inRadiusErr                          error
+	gotInRadius                          *energy.Query
 	parks                                []parking.Site
 	place                                places.Place
 	gotFamilies, gotListed, gotOccupancy []string
@@ -119,6 +122,11 @@ func (f *fake) ChargingNear(ctx context.Context, _ energy.Query, fams []string, 
 	return slices.Clone(f.sites), true, f.next, f.chErr
 }
 
+func (f *fake) ChargingInRadius(_ context.Context, q energy.Query, fams []string) (int, error) {
+	f.gotInRadius = &q
+	return f.inRadius, f.inRadiusErr
+}
+
 func (f *fake) ParkingNear(_ context.Context, _ parking.Query, listed, occ []string, at time.Time) ([]parking.Site, bool, *time.Time, error) {
 	f.gotListed, f.gotOccupancy, f.gotNow = listed, occ, at
 	return slices.Clone(f.parks), false, f.next, f.pkErr
@@ -185,6 +193,28 @@ func TestChargingIsGatedAndAttributed(t *testing.T) {
 	a, err = service(f, nil).Charging(context.Background(), key("consumer", allScopes, everything...), energy.Query{})
 	if err != nil || a.Partial || len(a.Families) != 0 {
 		t.Errorf("an empty answer credits none, as the platform's charging search: %v, %v, %v", names(a.Families), a.Partial, err)
+	}
+}
+
+// An empty charging answer states the sites of its circle, every filter
+// dropped, counted over the families the key may read; one that lists a site
+// states none and counts nothing. A failed count is the answer's error.
+func TestAnEmptyChargingAnswerCountsTheSitesOfItsCircle(t *testing.T) {
+	req.Covers(t, "FR-ENERGY-004")
+	ctx := context.Background()
+	q := energy.Query{RadiusM: 3000, MinKw: 150}
+	f := &fake{inRadius: 12}
+	a, err := service(f, nil).Charging(ctx, key("commercial", allScopes, everything...), q)
+	if err != nil || a.InRadius == nil || *a.InRadius != 12 || f.gotInRadius == nil || f.gotInRadius.RadiusM != 3000 || !slices.Equal(f.gotFamilies, []string{"e1"}) {
+		t.Errorf("empty: in radius %v, asked %+v over %v, %v", a.InRadius, f.gotInRadius, f.gotFamilies, err)
+	}
+	f = &fake{sites: []energy.Site{site("e1")}}
+	if a, err = service(f, nil).Charging(ctx, key("commercial", allScopes, everything...), q); err != nil || a.InRadius != nil || f.gotInRadius != nil {
+		t.Errorf("a site listed: in radius %v, asked %v, %v", a.InRadius, f.gotInRadius, err)
+	}
+	f = &fake{inRadiusErr: errStore}
+	if _, err = service(f, nil).Charging(ctx, key("commercial", allScopes, everything...), q); !errors.Is(err, errStore) {
+		t.Errorf("a failed count: %v", err)
 	}
 }
 

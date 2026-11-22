@@ -438,9 +438,10 @@ type ChargingDropped struct {
 // ChargingMeta is the meta member of listChargingOptions.
 type ChargingMeta struct {
 	DataMeta
-	Page    Page             `json:"page"`
-	Query   ChargingQuery    `json:"query"`
-	Dropped *ChargingDropped `json:"dropped,omitempty" doc:"With only_available: the examined sites left out."`
+	Page     Page             `json:"page"`
+	Query    ChargingQuery    `json:"query"`
+	Dropped  *ChargingDropped `json:"dropped,omitempty" doc:"With only_available: the examined sites left out."`
+	InRadius *int             `json:"inRadius,omitempty" doc:"Only when data is empty: how many charging sites the key may read within the radius, every filter dropped (the platform's \"I know N charging sites in that circle\")."`
 }
 
 // ChargingEnvelope is the enveloped answer of listChargingOptions.
@@ -531,7 +532,8 @@ func registerCharging(api huma.API, s *server, op huma.Operation) {
 				Query: ChargingQuery{NearQuery: NearQuery{At: position(q.At), RadiusM: q.RadiusM}, MinKw: q.MinKw, Access: string(q.Access),
 					MaxKw: positive(q.Filter.MaxKw), Connector: q.Filter.Connector, Operator: q.Filter.OperatorKey, Conditions: q.Filter.Terms,
 					OnlyAvailable: q.Filter.OnlyAvailable},
-				Dropped: chargingDropped(a.Dropped),
+				Dropped:  chargingDropped(a.Dropped),
+				InRadius: a.InRadius,
 			},
 			Links: s.selfLink(ctx),
 		}}, nil

@@ -5,6 +5,7 @@ package store_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -217,6 +218,29 @@ where o.availability = 'other' order by o.observed_at limit 1`, &id, &fam, &at.L
 	sites, more, _, err := st.ChargingNear(bounded(t), q, fams, unknown)
 	if err != nil || len(sites) == 0 {
 		t.Fatalf("read %d sites: %v", len(sites), err)
+	}
+	// The circle's count is the list's sites, every filter dropped: a filter
+	// no site passes leaves the count as it is; no family counts none, and a
+	// circle of 0 m on a site counts it.
+	var inCircle int
+	owner(t, `select count(*) from contract.charging_site c where c.withdrawn_at is null and c.source_ref in (`+quoted(fams)+`)
+  and c.display_class <> 'withhold' and c.audience = 'public'
+  and st_dwithin(c.location::geography, st_setsrid(st_makepoint(`+fmt.Sprint(at.Lon)+`, `+fmt.Sprint(at.Lat)+`), 4326)::geography, `+fmt.Sprint(everywhere)+`)`, &inCircle)
+	strict := q
+	strict.MinKw, strict.Filter.Connector = 100_000, "none"
+	if n, err := st.ChargingInRadius(bounded(t), strict, fams); err != nil || n != inCircle || n < len(sites) {
+		t.Errorf("in radius %d, want %d (listed %d): %v", n, inCircle, len(sites), err)
+	}
+	if n, err := st.ChargingInRadius(bounded(t), q, []string{fam}); err != nil || n == 0 || n > inCircle {
+		t.Errorf("one family: %d of %d, %v", n, inCircle, err)
+	}
+	if n, err := st.ChargingInRadius(bounded(t), q, []string{}); err != nil || n != 0 {
+		t.Errorf("no family: %d, %v", n, err)
+	}
+	small := q
+	small.RadiusM = 0
+	if n, err := st.ChargingInRadius(bounded(t), small, fams); err != nil || n == 0 || n > inCircle {
+		t.Errorf("a circle of 0 m on a site: %d of %d, %v", n, inCircle, err)
 	}
 	if sites[0].ID != id || sites[0].DistanceM != 0 || sites[0].Family != fam || more {
 		t.Errorf("nearest %+v, more %v", sites[0], more)

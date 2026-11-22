@@ -733,6 +733,15 @@ func TestChargingFilters(t *testing.T) {
 			t.Errorf("answer lacks %s: %s", s, body)
 		}
 	}
+	if strings.Contains(body, `"inRadius"`) {
+		t.Errorf("an answer without inRadius states it: %s", body)
+	}
+	n := 7
+	f.charging.InRadius = &n
+	if body = do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&min_kw=350", bearer).Body.String(); !strings.Contains(body, `"inRadius":7`) {
+		t.Errorf("an empty answer lacks its circle's count: %s", body)
+	}
+	f.charging.InRadius = nil
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&min_kw=150&max_kw=50", bearer), 400, "invalid-parameter")
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&operator=GmbH", bearer), 400, "invalid-parameter")
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/charging-options?at=52.52,13.405&conditions=cheap", bearer), 400, "invalid-parameter")

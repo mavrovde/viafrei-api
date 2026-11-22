@@ -39,6 +39,9 @@ type Charging interface {
 	// Availability reports are read from the given families only and never
 	// after now.
 	ChargingNear(ctx context.Context, q energy.Query, families []string, now time.Time) ([]energy.Site, bool, *time.Time, error)
+	// ChargingInRadius counts the sites of the given families within q's
+	// radius of q's position, every filter of q dropped.
+	ChargingInRadius(ctx context.Context, q energy.Query, families []string) (int, error)
 }
 
 // Parking is the port to the parking store.
@@ -155,6 +158,9 @@ type Answer[T any] struct {
 	ChangesAt *time.Time
 	// Dropped counts the sites an only-available charging answer left out.
 	Dropped *energy.Dropped
+	// InRadius is, for a charging answer that lists no site, how many sites
+	// the key may read within the radius, every filter dropped; nil otherwise.
+	InRadius *int
 }
 
 // ErrGateViolation wraps access.ErrForbiddenItem: storage returned an item
@@ -255,7 +261,22 @@ func (s *Service) Charging(ctx context.Context, key access.Record, q energy.Quer
 	if err != nil {
 		return Answer[energy.Site]{}, err
 	}
-	return s.charging(ctx, reg, gate, q)
+	permitted, partial, err := gate.Answer(access.Answering(reg, "energy"))
+	if err != nil {
+		return Answer[energy.Site]{}, err
+	}
+	a, err := s.chargingOf(ctx, gate, permitted, partial, q)
+	if err != nil || len(a.Items) > 0 {
+		return a, err
+	}
+	// An empty answer states the sites of the circle without its filters,
+	// as the platform's charging search says how many it knows there.
+	n, err := s.repos.Charging.ChargingInRadius(ctx, q, permitted)
+	if err != nil {
+		return Answer[energy.Site]{}, err
+	}
+	a.InRadius = &n
+	return a, nil
 }
 
 // charging answers Charging under a register and gate already read.
@@ -264,6 +285,11 @@ func (s *Service) charging(ctx context.Context, reg []access.Terms, gate access.
 	if err != nil {
 		return Answer[energy.Site]{}, err
 	}
+	return s.chargingOf(ctx, gate, permitted, partial, q)
+}
+
+// chargingOf answers Charging over the families the gate permitted.
+func (s *Service) chargingOf(ctx context.Context, gate access.Gate, permitted []string, partial bool, q energy.Query) (Answer[energy.Site], error) {
 	now := s.now()
 	read := q
 	if q.Filter.OnlyAvailable {

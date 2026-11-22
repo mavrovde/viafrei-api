@@ -674,6 +674,11 @@
             "format": "date-time",
             "type": "string"
           },
+          "inRadius": {
+            "description": "Only when data is empty: how many charging sites the key may read within the radius, every filter dropped (the platform's \"I know N charging sites in that circle\").",
+            "format": "int64",
+            "type": "integer"
+          },
           "language": {
             "description": "The language of the texts in data (BCP 47).",
             "type": "string"

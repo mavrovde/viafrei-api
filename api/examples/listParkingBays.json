@@ -113,7 +113,8 @@
           "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms/dortmund_parksensoren_bays"
+          "termsUrl": "https://alpha.example/terms/dortmund_parksensoren_bays",
+          "sourceUrl": "https://alpha.example/terms/dortmund_parksensoren_bays"
         },
         {
           "family": "frankfurt_behindertenparkplaetze",
@@ -124,7 +125,8 @@
           "licenceUrl": "https://licences.example/dl-de-by-2-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://www.govdata.de/daten/-/details/wfs-parken-in-der-stadt-frankfurt-am-main"
+          "termsUrl": "https://www.govdata.de/daten/-/details/wfs-parken-in-der-stadt-frankfurt-am-main",
+          "sourceUrl": "https://www.govdata.de/daten/-/details/wfs-parken-in-der-stadt-frankfurt-am-main"
         }
       ],
       "notes": {

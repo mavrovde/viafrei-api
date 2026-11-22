@@ -136,6 +136,14 @@ where source_ref = 'afir_alpha_stale'`, &staleAfterS, &asOf)
 		t.Errorf("stale family %+v", stale)
 	}
 	// A family with no fixed interval (stale_after_s NULL) is never stale.
+	// The source page is the one the read contract names for the family.
+	for _, f := range got {
+		var website *string
+		owner(t, `select p.website from contract.source s join contract.publisher p using (publisher_id) where s.source_ref = '`+f.Source.Family+`'`, &website)
+		if (website == nil) != (f.Source.SourceURL == nil) || website != nil && *website != *f.Source.SourceURL {
+			t.Errorf("%s: source page %v, want %v", f.Source.Family, f.Source.SourceURL, website)
+		}
+	}
 	if !never.NeverStale || never.Assess(end).Stale || never.Assess(end).StaleAfterS != nil {
 		t.Errorf("a family with no interval %+v", never)
 	}

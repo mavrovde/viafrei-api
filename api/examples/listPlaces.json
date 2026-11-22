@@ -51,7 +51,8 @@
           "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://download.geonames.org/export/dump/"
+          "termsUrl": "https://download.geonames.org/export/dump/",
+          "sourceUrl": "https://download.geonames.org/export/dump/"
         }
       ],
       "notes": {

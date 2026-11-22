@@ -360,6 +360,17 @@
               "null"
             ]
           },
+          "sourceUrl": {
+            "description": "Where the data comes from: the page the source register names for the family (its publisher's dataset or offer page), as a credit line links it; null when none is recorded.",
+            "examples": [
+              "https://mobilithek.info/offers/858688352316981248"
+            ],
+            "format": "uri",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "termsUrl": {
             "description": "The terms a client must follow or accept, when any.",
             "format": "uri",
@@ -382,7 +393,8 @@
           "licenceUrl",
           "shareAlike",
           "shareAlikeOffer",
-          "termsUrl"
+          "termsUrl",
+          "sourceUrl"
         ],
         "type": "object"
       },
@@ -6833,6 +6845,13 @@
           "shareAlike": {
             "type": "boolean"
           },
+          "sourceUrl": {
+            "description": "The page the source register names for the family; null when none is recorded.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "staleAfterS": {
             "description": "Its design threshold; absent for a source with no fixed interval.",
             "format": "int64",
@@ -6863,6 +6882,7 @@
           "licenceUrl",
           "shareAlike",
           "termsUrl",
+          "sourceUrl",
           "dataAsOf",
           "status"
         ],
@@ -8954,7 +8974,8 @@
                             "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
                             "shareAlike": true,
                             "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://www.openstreetmap.org/copyright"
+                            "termsUrl": "https://www.openstreetmap.org/copyright",
+                            "sourceUrl": "https://www.openstreetmap.org/copyright"
                           }
                         ],
                         "notes": {
@@ -9337,7 +9358,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/openstation_siri_fm"
+                            "termsUrl": "https://alpha.example/terms/openstation_siri_fm",
+                            "sourceUrl": "https://alpha.example/terms/openstation_siri_fm"
                           }
                         ],
                         "notes": {
@@ -9902,7 +9924,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/afir_alpha"
+                            "termsUrl": "https://alpha.example/terms/afir_alpha",
+                            "sourceUrl": "https://alpha.example/terms/afir_alpha"
                           }
                         ],
                         "notes": {
@@ -10309,7 +10332,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/afir_alpha"
+                            "termsUrl": "https://alpha.example/terms/afir_alpha",
+                            "sourceUrl": "https://alpha.example/terms/afir_alpha"
                           }
                         ],
                         "notes": {
@@ -10707,7 +10731,8 @@
                             "licenceUrl": "https://viafrei.de",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://viafrei.de"
+                            "termsUrl": "https://viafrei.de",
+                            "sourceUrl": "https://viafrei.de"
                           }
                         ],
                         "notes": {
@@ -11178,7 +11203,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://gamma.example/terms/tankerkoenig_gamma"
+                            "termsUrl": "https://gamma.example/terms/tankerkoenig_gamma",
+                            "sourceUrl": "https://gamma.example/terms/tankerkoenig_gamma"
                           }
                         ],
                         "notes": {
@@ -11578,7 +11604,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://gamma.example/terms/tankerkoenig_gamma"
+                            "termsUrl": "https://gamma.example/terms/tankerkoenig_gamma",
+                            "sourceUrl": "https://gamma.example/terms/tankerkoenig_gamma"
                           }
                         ],
                         "notes": {
@@ -12096,7 +12123,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/afir_alpha"
+                            "termsUrl": "https://alpha.example/terms/afir_alpha",
+                            "sourceUrl": "https://alpha.example/terms/afir_alpha"
                           },
                           {
                             "family": "dwd_alpha",
@@ -12107,7 +12135,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/dwd_alpha"
+                            "termsUrl": "https://alpha.example/terms/dwd_alpha",
+                            "sourceUrl": "https://alpha.example/terms/dwd_alpha"
                           },
                           {
                             "family": "openstation_siri_fm",
@@ -12118,7 +12147,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/openstation_siri_fm"
+                            "termsUrl": "https://alpha.example/terms/openstation_siri_fm",
+                            "sourceUrl": "https://alpha.example/terms/openstation_siri_fm"
                           },
                           {
                             "family": "park_alpha",
@@ -12129,7 +12159,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/park_alpha"
+                            "termsUrl": "https://alpha.example/terms/park_alpha",
+                            "sourceUrl": "https://alpha.example/terms/park_alpha"
                           },
                           {
                             "family": "roads_alpha",
@@ -12140,7 +12171,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/roads_alpha"
+                            "termsUrl": "https://alpha.example/terms/roads_alpha",
+                            "sourceUrl": "https://alpha.example/terms/roads_alpha"
                           },
                           {
                             "family": "tankerkoenig_gamma",
@@ -12151,7 +12183,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://gamma.example/terms/tankerkoenig_gamma"
+                            "termsUrl": "https://gamma.example/terms/tankerkoenig_gamma",
+                            "sourceUrl": "https://gamma.example/terms/tankerkoenig_gamma"
                           }
                         ],
                         "notes": {
@@ -12520,7 +12553,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/afir_alpha"
+                            "termsUrl": "https://alpha.example/terms/afir_alpha",
+                            "sourceUrl": "https://alpha.example/terms/afir_alpha"
                           }
                         ],
                         "notes": {
@@ -12850,7 +12884,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/afir_alpha"
+                            "termsUrl": "https://alpha.example/terms/afir_alpha",
+                            "sourceUrl": null
                           },
                           {
                             "family": "geonames",
@@ -12861,7 +12896,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://download.geonames.org/export/dump/"
+                            "termsUrl": "https://download.geonames.org/export/dump/",
+                            "sourceUrl": null
                           },
                           {
                             "family": "park_alpha",
@@ -12872,7 +12908,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/park_alpha"
+                            "termsUrl": "https://alpha.example/terms/park_alpha",
+                            "sourceUrl": null
                           }
                         ]
                       },
@@ -13100,7 +13137,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://download.geonames.org/export/dump/"
+                            "termsUrl": "https://download.geonames.org/export/dump/",
+                            "sourceUrl": "https://download.geonames.org/export/dump/"
                           },
                           {
                             "family": "osm",
@@ -13111,7 +13149,8 @@
                             "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
                             "shareAlike": true,
                             "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://www.openstreetmap.org/copyright"
+                            "termsUrl": "https://www.openstreetmap.org/copyright",
+                            "sourceUrl": "https://www.openstreetmap.org/copyright"
                           }
                         ],
                         "notes": {
@@ -13532,7 +13571,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://www.bast.de/DE/Publikationen/Daten/Verkehrstechnik/Lang-Lkw.html"
+                            "termsUrl": "https://www.bast.de/DE/Publikationen/Daten/Verkehrstechnik/Lang-Lkw.html",
+                            "sourceUrl": "https://www.bast.de/DE/Publikationen/Daten/Verkehrstechnik/Lang-Lkw.html"
                           }
                         ],
                         "notes": {
@@ -14028,7 +14068,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/roads_alpha"
+                            "termsUrl": "https://alpha.example/terms/roads_alpha",
+                            "sourceUrl": "https://alpha.example/terms/roads_alpha"
                           }
                         ],
                         "notes": {
@@ -14635,7 +14676,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://eta.example/terms/dwd_eta"
+                            "termsUrl": "https://eta.example/terms/dwd_eta",
+                            "sourceUrl": "https://eta.example/terms/dwd_eta"
                           },
                           {
                             "family": "roads_alpha",
@@ -14646,7 +14688,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/roads_alpha"
+                            "termsUrl": "https://alpha.example/terms/roads_alpha",
+                            "sourceUrl": "https://alpha.example/terms/roads_alpha"
                           }
                         ],
                         "notes": {
@@ -15105,7 +15148,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/park_alpha"
+                            "termsUrl": "https://alpha.example/terms/park_alpha",
+                            "sourceUrl": "https://alpha.example/terms/park_alpha"
                           }
                         ],
                         "notes": {
@@ -15535,7 +15579,8 @@
                             "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
                             "shareAlike": true,
                             "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://www.openstreetmap.org/copyright"
+                            "termsUrl": "https://www.openstreetmap.org/copyright",
+                            "sourceUrl": "https://www.openstreetmap.org/copyright"
                           }
                         ],
                         "notes": {
@@ -16011,7 +16056,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/dortmund_parksensoren_bays"
+                            "termsUrl": "https://alpha.example/terms/dortmund_parksensoren_bays",
+                            "sourceUrl": "https://alpha.example/terms/dortmund_parksensoren_bays"
                           },
                           {
                             "family": "frankfurt_behindertenparkplaetze",
@@ -16022,7 +16068,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://www.govdata.de/daten/-/details/wfs-parken-in-der-stadt-frankfurt-am-main"
+                            "termsUrl": "https://www.govdata.de/daten/-/details/wfs-parken-in-der-stadt-frankfurt-am-main",
+                            "sourceUrl": "https://www.govdata.de/daten/-/details/wfs-parken-in-der-stadt-frankfurt-am-main"
                           }
                         ],
                         "notes": {
@@ -16488,7 +16535,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/park_alpha"
+                            "termsUrl": "https://alpha.example/terms/park_alpha",
+                            "sourceUrl": "https://alpha.example/terms/park_alpha"
                           }
                         ],
                         "notes": {
@@ -16915,7 +16963,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://download.geonames.org/export/dump/"
+                            "termsUrl": "https://download.geonames.org/export/dump/",
+                            "sourceUrl": "https://download.geonames.org/export/dump/"
                           }
                         ],
                         "notes": {
@@ -17399,7 +17448,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html",
+                            "sourceUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
                           },
                           {
                             "family": "geonames",
@@ -17410,7 +17460,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://download.geonames.org/export/dump/"
+                            "termsUrl": "https://download.geonames.org/export/dump/",
+                            "sourceUrl": "https://download.geonames.org/export/dump/"
                           },
                           {
                             "family": "osm",
@@ -17421,7 +17472,8 @@
                             "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
                             "shareAlike": true,
                             "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://www.openstreetmap.org/copyright"
+                            "termsUrl": "https://www.openstreetmap.org/copyright",
+                            "sourceUrl": "https://www.openstreetmap.org/copyright"
                           }
                         ],
                         "notes": {
@@ -17836,7 +17888,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://download.geonames.org/export/dump/"
+                            "termsUrl": "https://download.geonames.org/export/dump/",
+                            "sourceUrl": "https://download.geonames.org/export/dump/"
                           }
                         ],
                         "notes": {
@@ -18296,7 +18349,8 @@
                             "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
                             "shareAlike": true,
                             "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://www.openstreetmap.org/copyright"
+                            "termsUrl": "https://www.openstreetmap.org/copyright",
+                            "sourceUrl": "https://www.openstreetmap.org/copyright"
                           }
                         ],
                         "notes": {
@@ -19702,7 +19756,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://eta.example/terms/dwd_eta"
+                            "termsUrl": "https://eta.example/terms/dwd_eta",
+                            "sourceUrl": "https://eta.example/terms/dwd_eta"
                           },
                           {
                             "family": "roads_alpha",
@@ -19713,7 +19768,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/roads_alpha"
+                            "termsUrl": "https://alpha.example/terms/roads_alpha",
+                            "sourceUrl": "https://alpha.example/terms/roads_alpha"
                           }
                         ],
                         "notes": {
@@ -20096,7 +20152,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/roads_alpha"
+                            "termsUrl": "https://alpha.example/terms/roads_alpha",
+                            "sourceUrl": "https://alpha.example/terms/roads_alpha"
                           }
                         ],
                         "notes": {
@@ -20481,7 +20538,8 @@
                             "licenceUrl": "https://licences.example/cc0-1-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://www.nextbike.de"
+                            "termsUrl": "https://www.nextbike.de",
+                            "sourceUrl": "https://www.nextbike.de"
                           }
                         ],
                         "notes": {
@@ -20812,6 +20870,7 @@
                           "licenceUrl": "https://licences.example/dl-de-by-2-0",
                           "shareAlike": false,
                           "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html",
+                          "sourceUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html",
                           "dataAsOf": null,
                           "status": "grey"
                         },
@@ -20824,6 +20883,7 @@
                           "licenceUrl": "https://licences.example/cc-by-4-0",
                           "shareAlike": false,
                           "termsUrl": "https://download.geonames.org/export/dump/",
+                          "sourceUrl": "https://download.geonames.org/export/dump/",
                           "dataAsOf": null,
                           "status": "grey"
                         },
@@ -20836,6 +20896,7 @@
                           "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
                           "shareAlike": true,
                           "termsUrl": "https://www.openstreetmap.org/copyright",
+                          "sourceUrl": "https://www.openstreetmap.org/copyright",
                           "dataAsOf": null,
                           "status": "grey"
                         }
@@ -20878,7 +20939,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html",
+                            "sourceUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
                           },
                           {
                             "family": "geonames",
@@ -20889,7 +20951,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://download.geonames.org/export/dump/"
+                            "termsUrl": "https://download.geonames.org/export/dump/",
+                            "sourceUrl": "https://download.geonames.org/export/dump/"
                           },
                           {
                             "family": "osm",
@@ -20900,7 +20963,8 @@
                             "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
                             "shareAlike": true,
                             "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://www.openstreetmap.org/copyright"
+                            "termsUrl": "https://www.openstreetmap.org/copyright",
+                            "sourceUrl": "https://www.openstreetmap.org/copyright"
                           }
                         ],
                         "notes": {
@@ -21257,7 +21321,8 @@
                             "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
                             "shareAlike": true,
                             "shareAlikeOffer": "https://viafrei.de/impressum",
-                            "termsUrl": "https://www.openstreetmap.org/copyright"
+                            "termsUrl": "https://www.openstreetmap.org/copyright",
+                            "sourceUrl": "https://www.openstreetmap.org/copyright"
                           }
                         ],
                         "notes": {
@@ -21856,7 +21921,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html",
+                            "sourceUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
                           },
                           {
                             "family": "roads_alpha",
@@ -21867,7 +21933,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/roads_alpha"
+                            "termsUrl": "https://alpha.example/terms/roads_alpha",
+                            "sourceUrl": "https://alpha.example/terms/roads_alpha"
                           }
                         ],
                         "notes": {
@@ -22247,7 +22314,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/delfi_sa_alpha"
+                            "termsUrl": "https://alpha.example/terms/delfi_sa_alpha",
+                            "sourceUrl": "https://alpha.example/terms/delfi_sa_alpha"
                           }
                         ],
                         "notes": {
@@ -22605,7 +22673,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://eta.example/terms/dwd_eta"
+                            "termsUrl": "https://eta.example/terms/dwd_eta",
+                            "sourceUrl": "https://eta.example/terms/dwd_eta"
                           }
                         ],
                         "notes": {
@@ -23053,7 +23122,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html",
+                            "sourceUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
                           },
                           {
                             "family": "delfi_static",
@@ -23064,7 +23134,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://www.opendata-oepnv.de"
+                            "termsUrl": "https://www.opendata-oepnv.de",
+                            "sourceUrl": "https://www.opendata-oepnv.de"
                           }
                         ],
                         "notes": {
@@ -23164,7 +23235,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+                            "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html",
+                            "sourceUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
                           },
                           {
                             "family": "delfi_static",
@@ -23175,7 +23247,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://www.opendata-oepnv.de"
+                            "termsUrl": "https://www.opendata-oepnv.de",
+                            "sourceUrl": "https://www.opendata-oepnv.de"
                           }
                         ],
                         "notes": {
@@ -23612,7 +23685,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://www.opendata-oepnv.de"
+                            "termsUrl": "https://www.opendata-oepnv.de",
+                            "sourceUrl": "https://www.opendata-oepnv.de"
                           }
                         ],
                         "notes": {
@@ -24021,7 +24095,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://www.opendata-oepnv.de"
+                            "termsUrl": "https://www.opendata-oepnv.de",
+                            "sourceUrl": "https://www.opendata-oepnv.de"
                           },
                           {
                             "family": "openstation_siri_fm",
@@ -24032,7 +24107,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/openstation_siri_fm"
+                            "termsUrl": "https://alpha.example/terms/openstation_siri_fm",
+                            "sourceUrl": "https://alpha.example/terms/openstation_siri_fm"
                           }
                         ],
                         "notes": {
@@ -24398,7 +24474,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://developers.deutschebahn.com"
+                            "termsUrl": "https://developers.deutschebahn.com",
+                            "sourceUrl": "https://developers.deutschebahn.com"
                           }
                         ],
                         "notes": {
@@ -24798,7 +24875,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/delfi_sa_alpha"
+                            "termsUrl": "https://alpha.example/terms/delfi_sa_alpha",
+                            "sourceUrl": "https://alpha.example/terms/delfi_sa_alpha"
                           }
                         ],
                         "notes": {
@@ -24861,7 +24939,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://www.opendata-oepnv.de"
+                            "termsUrl": "https://www.opendata-oepnv.de",
+                            "sourceUrl": "https://www.opendata-oepnv.de"
                           }
                         ],
                         "notes": {
@@ -25339,7 +25418,8 @@
                             "licenceUrl": "https://licences.example/cc-by-4-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://alpha.example/terms/roads_alpha"
+                            "termsUrl": "https://alpha.example/terms/roads_alpha",
+                            "sourceUrl": "https://alpha.example/terms/roads_alpha"
                           }
                         ],
                         "notes": {
@@ -25746,7 +25826,8 @@
                             "licenceUrl": "https://licences.example/dl-de-by-2-0",
                             "shareAlike": false,
                             "shareAlikeOffer": null,
-                            "termsUrl": "https://eta.example/terms/dwd_eta"
+                            "termsUrl": "https://eta.example/terms/dwd_eta",
+                            "sourceUrl": "https://eta.example/terms/dwd_eta"
                           }
                         ],
                         "notes": {

@@ -187,7 +187,7 @@ func attribution(r access.Source) Attribution {
 	return Attribution{
 		Family: r.Family, Domain: r.Domain, Publisher: r.Publisher, Text: r.AttributionText,
 		Licence: r.Licence, LicenceURL: r.LicenceURL, ShareAlike: r.ShareAlike,
-		ShareAlikeOffer: r.ShareAlikeOffer, TermsURL: r.TermsURL,
+		ShareAlikeOffer: r.ShareAlikeOffer, TermsURL: r.TermsURL, SourceURL: r.SourceURL,
 	}
 }
 

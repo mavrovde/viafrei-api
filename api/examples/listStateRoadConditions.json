@@ -182,7 +182,8 @@
           "licenceUrl": "https://licences.example/dl-de-by-2-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
+          "termsUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html",
+          "sourceUrl": "https://gdz.bkg.bund.de/index.php/default/open-data/geographische-namen-1-250-000-gn250.html"
         },
         {
           "family": "roads_alpha",
@@ -193,7 +194,8 @@
           "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms/roads_alpha"
+          "termsUrl": "https://alpha.example/terms/roads_alpha",
+          "sourceUrl": "https://alpha.example/terms/roads_alpha"
         }
       ],
       "notes": {

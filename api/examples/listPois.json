@@ -57,7 +57,8 @@
           "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
           "shareAlike": true,
           "shareAlikeOffer": "https://viafrei.de/impressum",
-          "termsUrl": "https://www.openstreetmap.org/copyright"
+          "termsUrl": "https://www.openstreetmap.org/copyright",
+          "sourceUrl": "https://www.openstreetmap.org/copyright"
         }
       ],
       "notes": {

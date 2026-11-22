@@ -69,7 +69,8 @@
           "licenceUrl": "https://viafrei.de",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://viafrei.de"
+          "termsUrl": "https://viafrei.de",
+          "sourceUrl": "https://viafrei.de"
         }
       ],
       "notes": {

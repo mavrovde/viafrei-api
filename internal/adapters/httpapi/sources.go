@@ -22,6 +22,7 @@ type SourceRow struct {
 	LicenceURL      string     `json:"licenceUrl" format:"uri"`
 	ShareAlike      bool       `json:"shareAlike"`
 	TermsURL        *string    `json:"termsUrl" nullable:"true"`
+	SourceURL       *string    `json:"sourceUrl" nullable:"true" doc:"The page the source register names for the family; null when none is recorded."`
 	DataAsOf        *time.Time `json:"dataAsOf" nullable:"true" doc:"The instant up to which the source's data was last known current; null when never."`
 	StaleAfterS     *int64     `json:"staleAfterS,omitempty" doc:"Its design threshold; absent for a source with no fixed interval."`
 	Status          string     `json:"status" enum:"green,red,grey" doc:"green: inside its freshness window (or no fixed interval and some data); red: stale; grey: never known current."`
@@ -55,7 +56,7 @@ func registerSources(api huma.API, s *server, op huma.Operation) {
 		out := make([]SourceRow, 0, len(fams))
 		for _, f := range fams {
 			r := SourceRow{Family: f.Source.Family, Domain: f.Source.Domain, Publisher: f.Source.Publisher, AttributionText: f.Source.AttributionText,
-				Licence: f.Source.Licence, LicenceURL: f.Source.LicenceURL, ShareAlike: f.Source.ShareAlike, TermsURL: f.Source.TermsURL,
+				Licence: f.Source.Licence, LicenceURL: f.Source.LicenceURL, ShareAlike: f.Source.ShareAlike, TermsURL: f.Source.TermsURL, SourceURL: f.Source.SourceURL,
 				DataAsOf: f.DataAsOf, Status: "grey"}
 			if !f.NeverStale {
 				sec := int64(f.StaleAfter / time.Second)

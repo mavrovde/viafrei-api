@@ -205,6 +205,9 @@ type Source struct {
 	ShareAlike      bool
 	ShareAlikeOffer *string
 	TermsURL        *string
+	// SourceURL is the page the source register names for the family (its
+	// publisher's dataset or offer page); nil when none is recorded.
+	SourceURL *string
 }
 
 // Answering returns the families of the register that answer for domain:

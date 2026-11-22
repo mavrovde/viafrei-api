@@ -80,7 +80,8 @@
           "licenceUrl": "https://licences.example/cc-by-4-0",
           "shareAlike": false,
           "shareAlikeOffer": null,
-          "termsUrl": "https://alpha.example/terms/afir_alpha"
+          "termsUrl": "https://alpha.example/terms/afir_alpha",
+          "sourceUrl": "https://alpha.example/terms/afir_alpha"
         }
       ],
       "notes": {

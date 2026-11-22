@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,7 +23,8 @@ func (f *fakeFeatures) Stations(_ context.Context, key access.Record, q transit.
 }
 
 var transitFamily = provenance.Family{
-	Source:     access.Source{Family: "src-alpha-transit", Domain: "transit", Publisher: "P", AttributionText: "T", Licence: "L", LicenceURL: "https://licences.example/t"},
+	Source: access.Source{Family: "src-alpha-transit", Domain: "transit", Publisher: "P", AttributionText: "T", Licence: "L", LicenceURL: "https://licences.example/t",
+		SourceURL: sp("https://data.example/t")},
 	StaleAfter: 24 * time.Hour, DataAsOf: tp(fixedNow.Add(-time.Hour)),
 }
 
@@ -101,6 +103,9 @@ func TestStationsAnswer(t *testing.T) {
 	q, _ = meta(t, body)["query"].(map[string]any)
 	if g := f.gotStation; g.Code != "8000207" || g.At != nil || q["code"] != "8000207" {
 		t.Errorf("a code alone: asked %+v, query %v", g, q)
+	}
+	if w := do(t, featureHandler(t, config.Defaults(), everyAnswer(), nil), http.MethodGet, "/v1/stations?q=koeln", bearer); !strings.Contains(w.Body.String(), `"termsUrl":null,"sourceUrl":"https://data.example/t"`) {
+		t.Errorf("the attribution links the family's source: %s", w.Body)
 	}
 	if !slices.Contains(featureScopes().Key.Plan.Scopes, "transit") {
 		t.Fatal("the rig's key has no transit scope")

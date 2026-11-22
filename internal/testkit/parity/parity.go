@@ -232,6 +232,8 @@ var Default = Rules{
 		{"data.access", "", "getChargingSite", "the MCP capability has no access concept: no charging source of the platform publishes who may use a site"},
 		{"data.chargePoints[*].current", "", "getChargingSite", "the MCP capability states no current per point"},
 		{"meta.freshness", "", "", "API-only: the per-family freshness block of the read contract (ENV-003)"},
+		{"meta.attribution[*].sourceUrl", "", "", sourceURLReason},
+		{"data[*].sourceUrl", "", "listSources", sourceURLReason},
 		{"meta.warnings", "", "", "API-only: the warnings follow from API keys and licence classes, which the MCP capability has not got"},
 		{"meta.page.hasMore", "min_kw", "", "the MCP capability states no count of the sites a power filter keeps, so it cannot say whether there are more"},
 		{"meta.asOf", "", "", "each side defines it differently: the API the oldest family dataAsOf (ENV-004), MCP the newest current status or its clock"},
@@ -362,6 +364,9 @@ const weatherLampReason = "API-only: the /v1 contract states the lamp over every
 
 // lampAccountReason is why a lamp's account is not compared.
 const lampAccountReason = "API-only: the /v1 contract states every reason of the lamp with its count and the sight of every group read; the platform's road status names one reason and no sight"
+
+// sourceURLReason is why the source page of a credit is not compared yet.
+const sourceURLReason = "Not compared until a bundle the MCP side produced carries it: the credit's source page (the register's page for the family) is new in the /v1 contract, and no bundle recorded so far holds that fact; remove this exclusion with the first bundle that does"
 
 // lineCheckReason is why the timetable's word on a line asked is not
 // compared.

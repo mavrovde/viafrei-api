@@ -380,7 +380,7 @@
             ]
           },
           "text": {
-            "description": "The attribution notice clients displaying the data must show.",
+            "description": "The attribution notice clients displaying the data must show, as stated: the year of retrieval it names is the answer's Europe/Berlin year.",
             "type": "string"
           }
         },
@@ -4325,7 +4325,7 @@
         "additionalProperties": false,
         "properties": {
           "condition": {
-            "description": "Conditions the data may only be used under; show them with the data.",
+            "description": "Conditions the data may only be used under; show them with the data. A dated condition names the Europe/Berlin day its data was read.",
             "items": {
               "type": "string"
             },

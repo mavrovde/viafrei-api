@@ -194,7 +194,7 @@ func (s *Service) provenanceOf(ctx context.Context, contributed, consulted []str
 	}
 	fams = slices.Clone(fams)
 	slices.Sort(fams)
-	return s.repos.Register.Provenance(ctx, slices.Compact(fams), s.lang(ctx))
+	return s.attributed(ctx, slices.Compact(fams))
 }
 
 // consultedIn narrows the families an answer was permitted to those that
@@ -223,7 +223,7 @@ func (s *Service) sight(ctx context.Context, permitted, contributed []string, no
 	consulted := slices.Clone(permitted)
 	slices.Sort(consulted)
 	consulted = slices.Compact(consulted)
-	all, err := s.repos.Register.Provenance(ctx, consulted, s.lang(ctx))
+	all, err := s.attributed(ctx, consulted)
 	if err != nil {
 		return nil, false, nil, err
 	}
@@ -520,7 +520,7 @@ func (s *Service) parking(ctx context.Context, reg []access.Terms, gate access.G
 		// found: the platform credits their register on every road search.
 		credited = append(slices.Clone(credited), CorridorFamily)
 	}
-	fams, err := s.repos.Register.Provenance(ctx, slices.Compact(slices.Sorted(slices.Values(credited))), s.lang(ctx))
+	fams, err := s.attributed(ctx, slices.Compact(slices.Sorted(slices.Values(credited))))
 	if err != nil {
 		return Answer[parking.Site]{}, err
 	}

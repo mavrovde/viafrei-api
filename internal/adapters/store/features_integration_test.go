@@ -131,8 +131,13 @@ func TestProvenanceReadsTheGivenFamiliesInOneLanguage(t *testing.T) {
 	stale, gamma, never, delta := got[0], got[1], got[2], got[3]
 	var staleAfterS int64
 	var asOf time.Time
-	owner(t, `select s.stale_after_s, f.data_as_of from contract.source s join contract.source_freshness f using (source_ref)
-where source_ref = 'afir_alpha_stale'`, &staleAfterS, &asOf)
+	var readAt *time.Time
+	owner(t, `select s.stale_after_s, f.data_as_of, f.confirmed_at from contract.source s join contract.source_freshness f using (source_ref)
+where source_ref = 'afir_alpha_stale'`, &staleAfterS, &asOf, &readAt)
+	// The read is the family's newest confirmation, which a dated note states.
+	if readAt == nil || stale.ReadAt == nil || !stale.ReadAt.Equal(*readAt) {
+		t.Errorf("read at %v, want %v", stale.ReadAt, readAt)
+	}
 	if stale.StaleAfter != time.Duration(staleAfterS)*time.Second || stale.NeverStale || stale.DataAsOf == nil || !stale.DataAsOf.Equal(asOf) || !stale.Assess(end).Stale {
 		t.Errorf("stale family %+v", stale)
 	}

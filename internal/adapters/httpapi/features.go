@@ -157,7 +157,7 @@ func staleAfterS(fr provenance.Freshness) int64 {
 
 // Notes are the verbatim licence notes of the contributing families.
 type Notes struct {
-	Condition []string `json:"condition" doc:"Conditions the data may only be used under; show them with the data."`
+	Condition []string `json:"condition" doc:"Conditions the data may only be used under; show them with the data. A dated condition names the Europe/Berlin day its data was read."`
 	Purpose   []string `json:"purpose" doc:"Purposes the data may only be used for; show them with the data."`
 }
 
@@ -208,6 +208,12 @@ func (s *server) dataMeta(ctx context.Context, fams []provenance.Family, at time
 		fs = append(fs, fr)
 		m.Freshness = append(m.Freshness, FreshnessEntry{Family: fr.Family, DataAsOf: fr.DataAsOf, AgeS: fr.AgeS, StaleAfterS: staleAfterS(fr), Stale: fr.Stale})
 		m.Attribution = append(m.Attribution, attribution(f.Source))
+		if !f.FilledUntil.IsZero() {
+			// A filled year is wrong from the next new year on: no stored
+			// answer states it past then, nor validates one that does not.
+			noteBound(ctx, f.FilledUntil)
+			noteShown(ctx, "filled "+f.Source.Family+" until "+f.FilledUntil.Format(time.RFC3339))
+		}
 	}
 	m.AsOf = provenance.AsOf(fs)
 	m.Notes = Notes{Condition: provenance.Notes(fams, provenance.Condition), Purpose: provenance.Notes(fams, provenance.Purpose)}

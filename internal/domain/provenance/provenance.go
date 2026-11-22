@@ -72,6 +72,14 @@ type Family struct {
 	// family has published none. An answer's ETag is built from it.
 	Version string
 	Notes   []Note
+	// ReadAt is when the family's data was last read and found current (a
+	// new or a confirmed file); nil when it never was. A dated note states
+	// its day (Filled).
+	ReadAt *time.Time
+	// FilledUntil is when a text Filled gave the family stops being true:
+	// the next Europe/Berlin new year for a filled year; zero when nothing
+	// was filled.
+	FilledUntil time.Time
 }
 
 // Freshness is one entry of meta.freshness (ENV-003).

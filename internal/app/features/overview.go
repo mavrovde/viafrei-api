@@ -126,7 +126,7 @@ func (s *Service) Overview(ctx context.Context, key access.Record, q OverviewQue
 		return out, ErrNoPart
 	}
 	slices.Sort(families)
-	fams, err := s.repos.Register.Provenance(ctx, slices.Compact(families), s.lang(ctx))
+	fams, err := s.attributed(ctx, slices.Compact(families))
 	// The place's family passed the gate check above, so it is never one a
 	// part withheld: only the parts' withheld families lose their conditions.
 	out.Families = withholdConditions(fams, hidden)

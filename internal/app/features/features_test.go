@@ -58,6 +58,8 @@ type fake struct {
 	termsErr                             error
 	gotTerms                             []string
 	notes                                map[string][]provenance.Note
+	texts                                map[string]string
+	readAt                               *time.Time
 	next                                 *time.Time                      // the earliest future report both reads return
 	feeding                              map[provenance.Dataset][]string // the families of each dataset; nil holds every family
 	feedErr                              error
@@ -108,7 +110,7 @@ func (f *fake) Provenance(_ context.Context, fams []string, lang string) ([]prov
 	}
 	out := make([]provenance.Family, len(fams))
 	for i, s := range fams {
-		out[i] = provenance.Family{Source: access.Source{Family: s}, Notes: f.notes[s]}
+		out[i] = provenance.Family{Source: access.Source{Family: s, AttributionText: f.texts[s]}, Notes: f.notes[s], ReadAt: f.readAt}
 	}
 	return out, nil
 }
@@ -195,6 +197,31 @@ func TestChargingIsGatedAndAttributed(t *testing.T) {
 		t.Errorf("an empty answer credits none, as the platform's charging search: %v, %v, %v", names(a.Families), a.Partial, err)
 	}
 }
+
+// Every answer states its credits as the platform prints them: the year of
+// retrieval of the answer's clock, and a dated condition with the day its
+// family was read; one with no read is refused, never stated undated.
+func TestAnswersFillTheRegisterPlaceholders(t *testing.T) {
+	req.Covers(t, "LIC-002")
+	read := time.Date(2026, 3, 1, 8, 0, 0, 0, time.UTC)
+	f := &fake{sites: []energy.Site{site("e1")}, texts: map[string]string{"e1": "© Stadt ({Jahr})"},
+		notes: map[string][]provenance.Note{"e1": {{Kind: provenance.Condition, Text: "read on {date}"}}}, readAt: &read}
+	a, err := service(f, nil).Charging(context.Background(), key("commercial", allScopes, everything...), energy.Query{})
+	if err != nil || len(a.Families) != 1 || a.Families[0].Source.AttributionText != "© Stadt ("+now.In(berlinZone).Format("2006")+")" ||
+		a.Families[0].Notes[0].Text != "read on 2026-03-01" || a.Families[0].FilledUntil.IsZero() {
+		t.Fatalf("credited %+v, %v", a.Families, err)
+	}
+	f.readAt = nil
+	if _, err := service(f, nil).Charging(context.Background(), key("commercial", allScopes, everything...), energy.Query{}); !errors.Is(err, provenance.ErrUndated) {
+		t.Errorf("an undated condition: %v", err)
+	}
+	f = &fake{sites: []energy.Site{site("e1")}, provErr: errStore}
+	if _, err := service(f, nil).Charging(context.Background(), key("commercial", allScopes, everything...), energy.Query{}); !errors.Is(err, errStore) {
+		t.Errorf("a failed register read: %v", err)
+	}
+}
+
+var berlinZone, _ = time.LoadLocation("Europe/Berlin")
 
 // An empty charging answer states the sites of its circle, every filter
 // dropped, counted over the families the key may read; one that lists a site

@@ -1,6 +1,10 @@
 package features
 
-import "context"
+import (
+	"context"
+
+	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
+)
 
 // Languages are the languages an answer's texts can be asked in: German,
 // the platform's own, and English.
@@ -27,4 +31,16 @@ func (s *Service) lang(ctx context.Context) string {
 		return l
 	}
 	return s.set.Language
+}
+
+// attributed is the provenance of families as the answer made now in its
+// language states it: the register's texts with their placeholders filled
+// (provenance.Filled), the year of retrieval and the day a dated condition's
+// data was read.
+func (s *Service) attributed(ctx context.Context, families []string) ([]provenance.Family, error) {
+	fams, err := s.repos.Register.Provenance(ctx, families, s.lang(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return provenance.Filled(fams, s.now(), s.lang(ctx))
 }

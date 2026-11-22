@@ -36,7 +36,7 @@ type Attribution struct {
 	Family          string  `json:"family" doc:"The source family id."`
 	Domain          string  `json:"domain" doc:"The domain the family answers for."`
 	Publisher       string  `json:"publisher" doc:"The publisher, as its licence asks to be named."`
-	Text            string  `json:"text" doc:"The attribution notice clients displaying the data must show."`
+	Text            string  `json:"text" doc:"The attribution notice clients displaying the data must show, as stated: the year of retrieval it names is the answer's Europe/Berlin year."`
 	Licence         string  `json:"licence" doc:"The licence's name."`
 	LicenceURL      string  `json:"licenceUrl" format:"uri" doc:"The licence's canonical URL."`
 	ShareAlike      bool    `json:"shareAlike" doc:"True for share-alike data."`

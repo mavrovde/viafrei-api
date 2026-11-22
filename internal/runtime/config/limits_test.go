@@ -66,3 +66,15 @@ func TestTheSharedBudgetLeavesASlotAndEndsInsideTheDeadline(t *testing.T) {
 		t.Errorf("a reserve is not checked while the budget is off: %v", err)
 	}
 }
+
+// A small pool boots with the defaults: the critical tier's key share is
+// unset (0, the general share), so only a share set above the pool is refused.
+func TestASmallPoolBootsWithTheDefaultKeyShares(t *testing.T) {
+	req.Covers(t, "CFG-004", "RATE-016")
+	c, err := config.Load(config.Options{Environ: []string{"VFAPI_DB_POOL_MAX=1", "VFAPI_TIERS_CRITICAL_RESERVED=0", "VFAPI_TIERS_PER_KEY_INFLIGHT=1"}})
+	if err != nil || c.Tiers.Critical.PerKeyInflight != 0 {
+		t.Fatalf("a pool of one with the defaults: %v", err)
+	}
+	_, err = config.Load(config.Options{Environ: []string{"VFAPI_DB_POOL_MAX=1", "VFAPI_TIERS_CRITICAL_RESERVED=0", "VFAPI_TIERS_PER_KEY_INFLIGHT=1", "VFAPI_TIERS_CRITICAL_PER_KEY_INFLIGHT=2"}})
+	assertRefused(t, err, "tiers.critical.per_key_inflight: 2 is more than db.pool_max 1")
+}

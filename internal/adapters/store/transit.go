@@ -108,7 +108,8 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 // (planned departure), $4 the families. A call is one a passenger can board
 // (contract.departure.boarding) of a trip that calls somewhere outside the
 // station after it: a trip's last call at the station is an arrival. The
-// destination is the trip's headsign, else the name of its last stop.
+// destination is the trip's headsign, else the name of its last stop. The
+// delay is read in seconds and stated in minutes by transit.DelayMinOf.
 var boardCalls = `
 select d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transport_mode, d.route_type,
        d.train_number, d.train_category, nullif(btrim(j.destination_label), ''),
@@ -118,7 +119,7 @@ select d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transport_mod
                   where lc.journey_id = d.journey_id
                   order by lc.call_order desc limit 1)),
        d.planned_departure_at, d.platform, d.planned_platform, d.platform_changed, d.realtime, d.realtime_source,
-       d.cancelled, d.delay_min, d.expected_departure_at, d.no_forecast, d.source_ref, d.source_refs
+       d.cancelled, d.delay_s, d.expected_departure_at, d.no_forecast, d.source_ref, d.source_refs
 from contract.departure d
 left join contract.journey j on j.journey_id = d.journey_id
 where d.stop_place_id = $1
@@ -139,13 +140,15 @@ func (s *Store) Departures(ctx context.Context, q transit.DepartureQuery, famili
 		rows, _ := tx.Query(ctx, boardCalls, q.StationID, q.From, q.From.Add(q.Window), families)
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.Departure, error) {
 			var (
-				v    transit.Departure
-				mode string
+				v      transit.Departure
+				mode   string
+				delayS *int
 			)
 			err := r.Scan(&v.JourneyID, &v.StopPointID, &v.CallOrder, &v.Line, &mode, &v.RouteType, &v.TrainNumber,
 				&v.Category, &v.Headsign, &v.Destination, &v.PlannedAt, &v.Platform, &v.PlannedPlatform,
-				&v.PlatformChanged, &v.Live, &v.Source, &v.Cancelled, &v.DelayMin, &v.ExpectedAt, &v.NoForecast,
+				&v.PlatformChanged, &v.Live, &v.Source, &v.Cancelled, &delayS, &v.ExpectedAt, &v.NoForecast,
 				&v.Family, &v.Families)
+			v.DelayMin = transit.DelayMinOf(delayS)
 			v.Mode = transit.MapMode(mode)
 			return v, err
 		})

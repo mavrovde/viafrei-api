@@ -59,9 +59,14 @@ limit 1`, ref)
 // situationColumns are the columns every situation read selects, in the
 // order scanSituation reads them, followed by its two question-dependent
 // columns: the position along the road and the distance.
+// roadDelayMin is a situation's delay in whole minutes as the platform
+// states it, Math.round(delay_s / 60): half a minute rounds up. The
+// contract's delay_min truncates (100 s is 1 there, 2 on the platform).
+const roadDelayMin = `floor(e.delay_s / 60.0 + 0.5)::int`
+
 const situationColumns = `e.event_id, e.source_ref, e.event_kind, e.severity, e.road_ref, e.road_class,
        e.direction, e.direction_label, st_y(e.location), st_x(e.location), e.valid_from, e.valid_to,
-       e.lanes_closed, e.lanes_total, e.delay_min, e.affected_length_m, e.headline, e.description,
+       e.lanes_closed, e.lanes_total, ` + roadDelayMin + `, e.affected_length_m, e.headline, e.description,
        e.text_lang, e.changed_at`
 
 // situationFilter is the condition every list read applies: an active,
@@ -118,7 +123,7 @@ const messagesSelect = `select ` + messagesAgg + `,
 const messagesAgg = `jsonb_agg(distinct jsonb_build_object('r', e.record_class, 'k', e.event_kind, 'h', e.headline,
                                          's', e.subtitle, 't', e.description, 'p', e.place_text,
                                          'b', coalesce(e.is_blocked, false), 'y', e.traffic_type,
-                                         'ds', e.delay_s, 'd', e.delay_min)) filter (where e.valid_from <= $2)`
+                                         'ds', e.delay_s, 'd', ` + roadDelayMin + `)) filter (where e.valid_from <= $2)`
 
 // messagesFrom reads the situations of the families $1 that have not ended
 // at $2.
@@ -484,7 +489,7 @@ order by case when e.event_kind = 'jam' then 0 when e.event_kind = 'closure' the
               when e.event_kind = 'roadworks' then 3 else 2 end,
          case e.traffic_type when 'QUEUING_TRAFFIC' then 0 when 'STATIONARY_TRAFFIC' then 1
               when 'HEAVY_TRAFFIC' then 2 when 'SLOW_TRAFFIC' then 3 else 4 end,
-         e.delay_min desc nulls last, e.headline, e.origin_key, e.event_id
+         e.delay_s desc nulls last, e.headline, e.origin_key, e.event_id
 limit $11 offset $14`, args, q.Limit, fams, now, scope{
 		covering: sc.covering, coveringArgs: sc.coveringArgs,
 		messages: messagesSelect + `

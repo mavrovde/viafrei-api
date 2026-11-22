@@ -183,6 +183,14 @@ func TestDeparturesAndAnUnknownStation(t *testing.T) {
 	if err != nil || len(ds) == 0 {
 		t.Fatalf("%+v %v", ds, err)
 	}
+	// Each delay is its seconds in the platform's minutes.
+	for _, d := range ds {
+		var s *int
+		owner(t, fmt.Sprintf(`select d.delay_s from contract.departure d where d.journey_id = %s and d.stop_point_id = %s and d.call_order = %d`, quoted([]string{d.JourneyID}), quoted([]string{d.StopPointID}), d.CallOrder), &s)
+		if w := transit.DelayMinOf(s); (w == nil) != (d.DelayMin == nil) || w != nil && *w != *d.DelayMin {
+			t.Errorf("%s: %v min from %v s", d.JourneyID, d.DelayMin, s)
+		}
+	}
 }
 
 // A hydrogen read for a lorry or a car asks for that vehicle's refill codes.

@@ -50,26 +50,45 @@ func TestTheDocumentSharesItsRepeatedHeaders(t *testing.T) {
 
 // Every place a schema can refer to another counts as reaching it: items,
 // additional properties, oneOf, anyOf, allOf and not, from a parameter, a
-// request body, an answer body or an answer header.
+// request body, an answer body or an answer header, of any method, and from
+// the shared headers, parameters, bodies and answers; a schema that refers
+// to itself is walked once.
 func TestReachedSchemasFollowsEveryReference(t *testing.T) {
 	ref := func(n string) *huma.Schema { return &huma.Schema{Ref: "#/components/schemas/" + n} }
 	reg := huma.NewMapRegistry("#/components/schemas/", huma.DefaultSchemaNamer)
 	m := reg.Map()
 	m["Body"] = &huma.Schema{Properties: map[string]*huma.Schema{"list": {Items: ref("Item")}, "bag": {AdditionalProperties: ref("Bag")}}}
 	m["Item"] = &huma.Schema{OneOf: []*huma.Schema{ref("One")}, AnyOf: []*huma.Schema{ref("Any")}, AllOf: []*huma.Schema{ref("All")}, Not: ref("Not")}
-	for _, n := range []string{"Bag", "One", "Any", "All", "Not", "Param", "Request", "Header", "Lost"} {
+	m["Tree"] = &huma.Schema{Properties: map[string]*huma.Schema{"child": ref("Tree")}}
+	leaves := []string{"Bag", "One", "Any", "All", "Not", "Param", "PathParam", "Request", "Header", "Options", "Trace",
+		"SharedHeader", "SharedParam", "SharedBody", "SharedAnswer", "Lost"}
+	for _, n := range leaves {
 		m[n] = &huma.Schema{Type: huma.TypeString}
 	}
-	o := &huma.OpenAPI{Components: &huma.Components{Schemas: reg}, Paths: map[string]*huma.PathItem{"/x": {Post: &huma.Operation{
-		Parameters:  []*huma.Param{{Schema: ref("Param")}},
-		RequestBody: &huma.RequestBody{Content: map[string]*huma.MediaType{"application/json": {Schema: ref("Request")}}},
-		Responses: map[string]*huma.Response{"200": {
-			Content: map[string]*huma.MediaType{"application/json": {Schema: ref("Body")}},
-			Headers: map[string]*huma.Param{"X": {Schema: ref("Header")}},
-		}},
-	}}}}
+	answer := func(n string) map[string]*huma.Response {
+		return map[string]*huma.Response{"200": {Content: map[string]*huma.MediaType{"application/json": {Schema: ref(n)}}}}
+	}
+	o := &huma.OpenAPI{Components: &huma.Components{Schemas: reg,
+		Headers:       map[string]*huma.Header{"H": {Schema: ref("SharedHeader")}},
+		Parameters:    map[string]*huma.Param{"P": {Schema: ref("SharedParam")}},
+		RequestBodies: map[string]*huma.RequestBody{"B": {Content: map[string]*huma.MediaType{"application/json": {Schema: ref("SharedBody")}}}},
+		Responses:     map[string]*huma.Response{"R": {Content: map[string]*huma.MediaType{"application/json": {Schema: ref("SharedAnswer")}}}},
+	}, Paths: map[string]*huma.PathItem{"/x": {
+		Parameters: []*huma.Param{{Schema: ref("PathParam")}},
+		Post: &huma.Operation{
+			Parameters:  []*huma.Param{{Schema: ref("Param")}},
+			RequestBody: &huma.RequestBody{Content: map[string]*huma.MediaType{"application/json": {Schema: ref("Request")}}},
+			Responses: map[string]*huma.Response{"200": {
+				Content: map[string]*huma.MediaType{"application/json": {Schema: ref("Body")}},
+				Headers: map[string]*huma.Param{"X": {Schema: ref("Header")}},
+			}},
+		},
+		Options: &huma.Operation{Responses: answer("Options")},
+		Trace:   &huma.Operation{Responses: answer("Trace")},
+		Get:     &huma.Operation{Responses: answer("Tree")},
+	}}}
 	got := reachedSchemas(o)
-	for _, n := range []string{"Body", "Item", "Bag", "One", "Any", "All", "Not", "Param", "Request", "Header"} {
+	for _, n := range append([]string{"Body", "Item", "Tree"}, leaves[:len(leaves)-1]...) {
 		if !got[n] {
 			t.Errorf("%s not reached", n)
 		}

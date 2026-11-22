@@ -196,24 +196,48 @@ func reachedSchemas(o *huma.OpenAPI) map[string]bool {
 			walk(m.Schema)
 		}
 	}
+	params := func(ps []*huma.Param) {
+		for _, p := range ps {
+			walk(p.Schema)
+		}
+	}
+	body := func(b *huma.RequestBody) {
+		if b != nil {
+			content(b.Content)
+		}
+	}
+	response := func(r *huma.Response) {
+		content(r.Content)
+		for _, h := range r.Headers {
+			walk(h.Schema)
+		}
+	}
 	for _, item := range o.Paths {
-		for _, op := range []*huma.Operation{item.Get, item.Head, item.Post, item.Put, item.Patch, item.Delete} {
+		params(item.Parameters)
+		for _, op := range []*huma.Operation{item.Get, item.Put, item.Post, item.Delete, item.Options, item.Head, item.Patch, item.Trace} {
 			if op == nil {
 				continue
 			}
-			for _, p := range op.Parameters {
-				walk(p.Schema)
-			}
-			if op.RequestBody != nil {
-				content(op.RequestBody.Content)
-			}
+			params(op.Parameters)
+			body(op.RequestBody)
 			for _, r := range op.Responses {
-				content(r.Content)
-				for _, h := range r.Headers {
-					walk(h.Schema)
-				}
+				response(r)
 			}
 		}
+	}
+	// The shared definitions answers refer to (the shared headers among
+	// them): huma counts every reference of the document, these too.
+	for _, h := range o.Components.Headers {
+		walk(h.Schema)
+	}
+	for _, p := range o.Components.Parameters {
+		walk(p.Schema)
+	}
+	for _, b := range o.Components.RequestBodies {
+		body(b)
+	}
+	for _, r := range o.Components.Responses {
+		response(r)
 	}
 	return reached
 }

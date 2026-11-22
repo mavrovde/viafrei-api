@@ -168,8 +168,9 @@ func Load(raw []byte) (*Document, error) {
 					if h.Ref == "" {
 						continue
 					}
-					shared, ok := doc.Components.Headers[strings.TrimPrefix(h.Ref, headerPrefix)]
-					if !ok || !strings.HasPrefix(h.Ref, headerPrefix) {
+					def, isHeader := strings.CutPrefix(h.Ref, headerPrefix)
+					shared, ok := doc.Components.Headers[def]
+					if !isHeader || !ok {
 						return nil, fmt.Errorf("oascheck: %s %s: %s header %s refers to %q, which the document does not define", m, path, status, name, h.Ref)
 					}
 					r.Headers[name] = shared

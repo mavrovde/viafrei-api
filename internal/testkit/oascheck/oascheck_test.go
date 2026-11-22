@@ -96,7 +96,9 @@ func TestLoadFailsClosed(t *testing.T) {
 		"a body with no example":    `{"openapi":"3.1.0","paths":{"/x":{"post":{"operationId":"x","requestBody":{"content":{"application/json":{}}},"responses":{"200":{}}}}},"components":{"schemas":{"Problem":{}}}}`,
 		"a header to no definition": `{"openapi":"3.1.0","paths":{"/x":{"get":{"operationId":"x","responses":{"200":{"headers":{"X-N":{"$ref":"#/components/headers/X-N"}}}}}}},"components":{"schemas":{"Problem":{}}}}`,
 		"a header to a schema":      `{"openapi":"3.1.0","paths":{"/x":{"get":{"operationId":"x","responses":{"200":{"headers":{"X-N":{"$ref":"#/components/schemas/X-N"}}}}}}},"components":{"schemas":{"Problem":{}},"headers":{"X-N":{"schema":{"type":"integer"}}}}}`,
-		"bad pattern":               `{"openapi":"3.1.0","paths":{"/x":{"get":{"operationId":"x","parameters":[{"name":"q","in":"query","schema":{"type":"string","pattern":"("}}],"responses":{"200":{}}}}},"components":{"schemas":{"Problem":{}}}}`,
+		// A bare name that a shared header has: only the reference's path refuses it.
+		"a header to a bare name": `{"openapi":"3.1.0","paths":{"/x":{"get":{"operationId":"x","responses":{"200":{"headers":{"X-N":{"$ref":"X-N"}}}}}}},"components":{"schemas":{"Problem":{}},"headers":{"X-N":{"schema":{"type":"integer"}}}}}`,
+		"bad pattern":             `{"openapi":"3.1.0","paths":{"/x":{"get":{"operationId":"x","parameters":[{"name":"q","in":"query","schema":{"type":"string","pattern":"("}}],"responses":{"200":{}}}}},"components":{"schemas":{"Problem":{}}}}`,
 	} {
 		if _, err := Load([]byte(src)); err == nil {
 			t.Errorf("%s: loaded", name)

@@ -160,6 +160,9 @@ func TestMotorwayConditionsGreenWithoutSituations(t *testing.T) {
 	if sits, _ := data["situations"].([]any); len(sits) != 0 {
 		t.Errorf("situations %v", sits)
 	}
+	if cs, ok := data["counts"].([]any); !ok || len(cs) != 0 {
+		t.Errorf("counts of an empty answer %v", data["counts"])
+	}
 	if f.gotRoad.MinSeverity != roads.SeverityInfo || f.gotRoad.Kinds != nil {
 		t.Errorf("defaults %+v", f.gotRoad)
 	}
@@ -184,6 +187,25 @@ func TestRoadConditionsAnswer(t *testing.T) {
 	if area["radiusM"] != 5000.0 || s1["distanceM"] != 800.0 {
 		t.Errorf("data %v", data)
 	}
+	// The counts per family, in family order, past the limit too.
+	f.conditions.Counts = map[string]int{"src-b": 7, "src-a": 2}
+	for _, path := range []string{"/v1/road-conditions?at=48.1,11.6", "/v1/states/09/road-conditions", "/v1/motorways/A8/conditions"} {
+		if path == "/v1/motorways/A8/conditions" {
+			f.conditions.Road = &roads.Road{Ref: "A8", Class: roads.ClassMotorway}
+		}
+		d, _ := decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, path, bearer))["data"].(map[string]any)
+		cs, _ := d["counts"].([]any)
+		if len(cs) != 2 {
+			t.Errorf("%s: counts %v, data %v", path, d["counts"], d)
+			continue
+		}
+		c0, _ := cs[0].(map[string]any)
+		c1, _ := cs[1].(map[string]any)
+		if c0["sourceFamily"] != "src-a" || c0["situations"] != 2.0 || c1["sourceFamily"] != "src-b" || c1["situations"] != 7.0 {
+			t.Errorf("%s: counts %v", path, d["counts"])
+		}
+	}
+	f.conditions.Counts, f.conditions.Road = nil, nil
 	q, _ := meta(t, body)["query"].(map[string]any)
 	if types, _ := q["roadClasses"].([]any); len(types) != 2 {
 		t.Errorf("query %v", q)

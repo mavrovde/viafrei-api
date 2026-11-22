@@ -53,6 +53,9 @@ type Conditions struct {
 	// families read that hold a situation on a road of its class; nil for a
 	// registered road or an area.
 	Covering []string
+	// Counts are, by family, how many situations the filters keep, before
+	// the limit (roads.Page.Counts).
+	Counts map[string]int
 	// Read are every family the lamp read, whether or not it contributed
 	// (Families names only those): a new version of any of them, or of its
 	// confirmation, may change the lamp.
@@ -169,6 +172,7 @@ func (s *Service) conditions(ctx context.Context, key access.Record, ahead bool,
 		Answer: Answer[roads.Situation]{Items: p.Items, HasMore: p.HasMore, Families: attributed, Partial: partial, At: now,
 			ChangesAt: p.ChangesAt(now)},
 		Lamp: acc.Lamp, Reason: acc.Reason, Reasons: acc.Reasons, Sight: acc.Sight, Read: fams, Covering: p.Covering,
+		Counts: p.Counts,
 	}, nil
 }
 

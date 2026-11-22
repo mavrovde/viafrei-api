@@ -30,6 +30,7 @@ type roadFake struct {
 	road             roads.Road
 	roadErr, readErr error
 	sits             []roads.Situation
+	counts           map[string]int
 	msgs             []roads.Message
 	warns            []roads.Warning
 	stale, missing   []string
@@ -65,7 +66,7 @@ func (f *roadFake) Road(_ context.Context, ref string) (roads.Road, error) {
 // when a weather family was given, and the coverage only of the roads
 // families given, as the store reads them.
 func (f *roadFake) page(fams roads.Families, more bool) roads.Page {
-	p := roads.Page{Items: f.sits, HasMore: more, Messages: f.msgs, States: []string{"01"},
+	p := roads.Page{Items: f.sits, HasMore: more, Counts: f.counts, Messages: f.msgs, States: []string{"01"},
 		Coverage: map[string]ampel.Coverage{}, Confirmations: map[string]ampel.Confirmation{}, Placed: f.placed}
 	if f.states != nil {
 		p.States = f.states

@@ -265,6 +265,9 @@ var Default = Rules{
 		{"data.sight", "", "listRoadConditions", lampAccountReason},
 		{"data.lampReasons", "", "listStateRoadConditions", lampAccountReason},
 		{"data.sight", "", "listStateRoadConditions", lampAccountReason},
+		{"data.counts", "", "getMotorwayConditions", familyCountsReason},
+		{"data.counts", "", "listRoadConditions", familyCountsReason},
+		{"data.counts", "", "listStateRoadConditions", familyCountsReason},
 		{"data.line", "", "listTransitDisruptions", lineCheckReason},
 		{"data[*].kilometres", "", "listMotorways", motorwayListReason},
 		{"data[*].sourceFamily", "", "listMotorways", motorwayListReason},
@@ -363,6 +366,10 @@ const zoneRowsReason = "API-only: the MCP driving rules state the verdict at a p
 const weatherLampReason = "API-only: the /v1 contract states the lamp over every warning at the position and whether the list was cut (VER-001); the platform's weather warnings check states neither, and no digest route the site reads serves a lamp for a position"
 
 // lampAccountReason is why a lamp's account is not compared.
+// familyCountsReason is why a roads answer's counts per family are not
+// compared.
+const familyCountsReason = "API-only until the platform's fold is in the read contract: the /v1 contract counts the situations the filters keep by source family, before the limit; the platform's road status states its counts in its head sentence, by its folded lines, which the producer does not project"
+
 const lampAccountReason = "API-only: the /v1 contract states every reason of the lamp with its count and the sight of every group read; the platform's road status names one reason and no sight"
 
 // sourceURLReason is why the source page of a credit is not compared yet.

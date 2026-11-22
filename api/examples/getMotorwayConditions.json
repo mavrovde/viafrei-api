@@ -95,6 +95,12 @@
           "land": "10"
         }
       ],
+      "counts": [
+        {
+          "sourceFamily": "roads_alpha",
+          "situations": 8
+        }
+      ],
       "coverage": null,
       "situations": [
         {

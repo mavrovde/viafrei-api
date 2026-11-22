@@ -170,6 +170,15 @@ func TestSituationsOnRoadFollowTheRoad(t *testing.T) {
 	if err != nil || len(one.Items) != 1 || !one.HasMore || len(one.Messages) != len(msgs) || one.Warnings != nil {
 		t.Errorf("a page of one: %d, more %v, messages %v, warnings %v, %v", len(one.Items), one.HasMore, one.Messages, one.Warnings, err)
 	}
+	// The counts are the whole filtered set's by family, those past the
+	// limit too: a page of one counts what the full page lists.
+	all := map[string]int{}
+	for _, s := range sits {
+		all[s.Family]++
+	}
+	if len(all) == 0 || !maps.Equal(one.Counts, all) || !maps.Equal(p.Counts, all) {
+		t.Errorf("counts: a page of one %v, the full page %v, listed %v", one.Counts, p.Counts, all)
+	}
 
 	// Filters: kind other (with the unmapped kinds).
 	otherID, _, otherAt := otherSituation(t)
@@ -303,6 +312,9 @@ where e.withdrawn_at is null and e.source_ref in (`+quoted(fams)+`) and e.locati
   and st_dwithin(e.location::geography, st_setsrid(st_makepoint(`+fmt.Sprint(at.Lon)+`, `+fmt.Sprint(at.Lat)+`), 4326)::geography, `+fmt.Sprint(wide)+`)`, &want)
 	if err != nil || want < 2 || len(sits) != want || len(np.Messages) == 0 {
 		t.Fatalf("read %d of %d (at least 2 are needed to see an order): %v", len(sits), want, err)
+	}
+	if near, err := st.SituationsNear(bounded(t), roads.AreaQuery{At: at, RadiusM: wide, Filter: q.Filter, Limit: 1}, onRoads(fams), now); err != nil || sum(near.Counts) != want {
+		t.Errorf("an area page of one counts %v, want %d in all: %v", near.Counts, want, err)
 	}
 	if np.Placed != nil {
 		t.Errorf("an area that is no Land credits no placement: %v", np.Placed)
@@ -791,9 +803,12 @@ func TestAnUnregisteredRoadIsReadByItsReference(t *testing.T) {
 	if !slices.Equal(p.Covering, []string{family}) {
 		t.Errorf("covering %v, want [%s]", p.Covering, family)
 	}
+	if !maps.Equal(p.Counts, map[string]int{family: 1}) {
+		t.Errorf("L1025 counts %v", p.Counts)
+	}
 	q.Road, q.Class = "B6", roads.ClassFederal
 	p, err = st.SituationsOnRoad(bounded(t), q, fams, now)
-	if err != nil || len(p.Items) != 0 || p.Covering == nil || len(p.Covering) != 0 {
+	if err != nil || len(p.Items) != 0 || p.Covering == nil || len(p.Covering) != 0 || len(p.Counts) != 0 {
 		t.Errorf("B6: %+v, covering %#v, %v", p.Items, p.Covering, err)
 	}
 	// A registered road names no coverage.
@@ -935,4 +950,13 @@ select count(*) from ins`, &n)
 	if areas != 2 {
 		t.Errorf("national areas %d, want 2: %+v", areas, rows)
 	}
+}
+
+// sum is the total of counts.
+func sum(counts map[string]int) int {
+	n := 0
+	for _, c := range counts {
+		n += c
+	}
+	return n
 }

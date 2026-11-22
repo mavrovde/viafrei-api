@@ -256,7 +256,28 @@ where exists (select 1 from contract.traffic_event e
                 and (e.valid_to is null or e.valid_to > $3)
                 and ` + eventPermitted + `)`
 
+// counted is a listed situation and, by family, how many situations the
+// list's filters keep before the limit.
+type counted struct {
+	situation roads.Situation
+	counts    map[string]int
+}
+
+// scanCounted reads a listed situation and the counts by family.
+func scanCounted(r pgx.CollectableRow) (counted, error) {
+	var c counted
+	s, err := scanSituationWith(r, &c.counts)
+	c.situation = s
+	return c, err
+}
+
+// scanSituation reads one situation.
 func scanSituation(r pgx.CollectableRow) (roads.Situation, error) {
+	return scanSituationWith(r)
+}
+
+// scanSituationWith reads one situation, then the extra columns into extra.
+func scanSituationWith(r pgx.CollectableRow, extra ...any) (roads.Situation, error) {
 	var (
 		v                                      roads.Situation
 		kind, severity, class, direction       string
@@ -267,10 +288,10 @@ func scanSituation(r pgx.CollectableRow) (roads.Situation, error) {
 		headline, lang                         string
 		lanesClosed, lanesTotal, delay, length *int
 	)
-	err := r.Scan(&v.ID, &v.Family, &kind, &severity, &road, &class,
+	err := r.Scan(append([]any{&v.ID, &v.Family, &kind, &severity, &road, &class,
 		&direction, &v.Towards, &lat, &lon, &from, &until,
 		&lanesClosed, &lanesTotal, &delay, &length, &headline, &v.Description,
-		&lang, &updated, &v.AtKm, &v.DistanceM)
+		&lang, &updated, &v.AtKm, &v.DistanceM}, extra...)...)
 	s := &v
 	s.Kind, s.Severity, s.Class, s.Direction = roads.MapKind(kind), roads.MapSeverity(severity), roads.MapClass(class), roads.MapDirection(direction)
 	if road != nil {
@@ -312,7 +333,13 @@ func (s *Store) read(ctx context.Context, list string, listArgs []any, limit int
 		for _, step := range []func() error{
 			func() (err error) {
 				res, _ := tx.Query(ctx, list, listArgs...)
-				out.Items, err = pgx.CollectRows(res, scanSituation)
+				rows, err := pgx.CollectRows(res, scanCounted)
+				// Every row carries the counts of the whole filtered set, the
+				// families past the limit too; none listed is none counted.
+				out.Items, out.Counts = make([]roads.Situation, len(rows)), map[string]int{}
+				for i, r := range rows {
+					out.Items[i], out.Counts = r.situation, r.counts
+				}
 				return err
 			},
 			func() error { return tx.QueryRow(ctx, sc.messages, sc.args...).Scan(&stored, &out.NextChange) },
@@ -450,7 +477,8 @@ placed as (
 select `+situationColumns+`,
        case when e.share is null or e.road_km is null then null
             else round((e.share * e.road_km)::numeric, 1)::float8 end km,
-       null::int
+       null::int,
+       (select jsonb_object_agg(c.source_ref, c.n) from (select source_ref, count(*)::int n from answering group by source_ref) c)
 from placed e
 order by case when e.event_kind = 'jam' then 0 when e.event_kind = 'closure' then 1
               when e.event_kind = 'roadworks' then 3 else 2 end,
@@ -500,7 +528,8 @@ answering as (
     and e.location is not null
     and st_dwithin(e.location::geography, here.g, $10)
     and (e.road_class = any($11) or ($12 and not e.road_class = any($13))))
-select `+situationColumns+`, null::float8, e.dist
+select `+situationColumns+`, null::float8, e.dist,
+       (select jsonb_object_agg(c.source_ref, c.n) from (select source_ref, count(*)::int n from answering group by source_ref) c)
 from answering e
 order by coalesce(array_position($6::text[], e.severity), 0) desc, e.dist, e.event_id
 limit $14`, args, q.Limit, fams, now, scope{
@@ -540,7 +569,8 @@ with answering as (
   where `+situationFilter(13)+`
     and ($8 = 'de' or e.state_code = $8)
     and (e.road_class = any($9) or ($10 and not e.road_class = any($11))))
-select `+situationColumns+`, null::float8, null::int
+select `+situationColumns+`, null::float8, null::int,
+       (select jsonb_object_agg(c.source_ref, c.n) from (select source_ref, count(*)::int n from answering group by source_ref) c)
 from answering e
 order by coalesce(array_position($6::text[], e.severity), 0) desc, e.road_ref, e.event_id
 limit $12`, args, q.Limit, fams, now, scope{

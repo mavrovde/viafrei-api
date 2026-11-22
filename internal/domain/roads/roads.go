@@ -515,6 +515,10 @@ type Warning struct {
 type Page struct {
 	Items   []Situation
 	HasMore bool
+	// Counts are, by family, how many situations the list's filters keep,
+	// before the limit (the platform's counts per publisher); a family
+	// with none is absent.
+	Counts map[string]int
 	// Messages is the lamp's view of every situation in the scope, whatever
 	// the list's filters keep.
 	Messages []Message

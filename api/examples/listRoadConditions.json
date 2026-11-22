@@ -23,6 +23,12 @@
         },
         "radiusM": 25000
       },
+      "counts": [
+        {
+          "sourceFamily": "roads_alpha",
+          "situations": 1
+        }
+      ],
       "lamp": "amber",
       "lampReason": "narrowing",
       "lampReasons": [

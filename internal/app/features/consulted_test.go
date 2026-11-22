@@ -90,3 +90,13 @@ func TestAWeatherAnswerCreditsOnlyTheWarningFamilies(t *testing.T) {
 		t.Errorf("credited %v, %v", names(a.Families), err)
 	}
 }
+
+// A roads answer carries the store's counts per family as they are.
+func TestARoadsAnswerCarriesTheCountsPerFamily(t *testing.T) {
+	req.Covers(t, "FR-ROAD-006")
+	f := &roadFake{counts: map[string]int{"r1": 4}}
+	got, err := roadService(f).RoadConditions(context.Background(), key("consumer", weatherScope, "r1"), roads.AreaQuery{State: "de"})
+	if err != nil || len(got.Counts) != 1 || got.Counts["r1"] != 4 {
+		t.Errorf("counts %v, %v", got.Counts, err)
+	}
+}

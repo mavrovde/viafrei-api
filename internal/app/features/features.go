@@ -101,6 +101,9 @@ type Settings struct {
 	PlannedWorks []string
 	// MaxWarnings is the most warnings a weather answer lists.
 	MaxWarnings int
+	// LookAhead is how far ahead a weather answer lists the warnings
+	// starting later (weather.lookahead).
+	LookAhead time.Duration
 	// Disabled are the families the licence gate always denies.
 	Disabled []string
 	// IsTimeout reports whether a repository error means the time ran out.

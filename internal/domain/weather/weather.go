@@ -66,13 +66,6 @@ type Warning struct {
 	AreaName string
 }
 
-// LookAhead is how far ahead the warnings at a position are listed: a
-// warning starting within it is listed beside those in force, as the
-// platform's weather check lists the warnings of now and the next 24 hours
-// (an upcoming warning is safety information). The lamp reads only those in
-// force.
-const LookAhead = 24 * time.Hour
-
 // Query asks for the warnings in force at a position, or starting within
 // LookAhead.
 type Query struct {
@@ -85,6 +78,11 @@ type Query struct {
 	// Warnings come worst first, so the limit never hides the warning that
 	// decides the lamp, and the lamp reads every warning in force.
 	Limit int
+	// LookAhead is how far ahead a warning starting later is listed beside
+	// those in force (weather.lookahead), as the platform's weather check
+	// lists the warnings of now and the next 24 hours: an upcoming warning
+	// is safety information. The lamp reads only those in force.
+	LookAhead time.Duration
 }
 
 // KnownHazards returns the mapped hazards the query keeps, and whether it

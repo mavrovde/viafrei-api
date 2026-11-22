@@ -65,7 +65,7 @@ func (s *Service) WeatherRisk(ctx context.Context, key access.Record, q weather.
 		return WeatherRisk{}, err
 	}
 	now := s.now()
-	q.Limit = s.set.MaxWarnings
+	q.Limit, q.LookAhead = s.set.MaxWarnings, s.set.LookAhead
 	sc, err := s.repos.Weather.WarningsAt(ctx, q, permitted, now)
 	if err != nil {
 		return WeatherRisk{}, err

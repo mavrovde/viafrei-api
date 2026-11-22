@@ -82,7 +82,7 @@ func scanWarning(r pgx.CollectableRow) (weather.Warning, error) {
 }
 
 // WarningsAt reads, in one snapshot, the placed warnings in force or
-// starting within weather.LookAhead, at or above the level floor, of the asked hazards; level
+// starting within q.LookAhead, at or above the level floor, of the asked hazards; level
 // descending, then start, then id; at most q.Limit, and whether
 // more answer. It also reads every placed warning (warningPlaced), whatever
 // the floor and the hazards keep: the level of each one in force, for the
@@ -103,7 +103,7 @@ func (s *Store) WarningsAt(ctx context.Context, q weather.Query, families []stri
 	// nothing the caller holds is written after a read past its deadline.
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (weather.Scope, error) {
 		var out weather.Scope
-		rows, _ := tx.Query(ctx, warningsPage, families, now, q.At.Lat, q.At.Lon, int(q.MinLevel), hazards, other, every, q.Limit+1, now.Add(weather.LookAhead))
+		rows, _ := tx.Query(ctx, warningsPage, families, now, q.At.Lat, q.At.Lon, int(q.MinLevel), hazards, other, every, q.Limit+1, now.Add(q.LookAhead))
 		var err error
 		if out.Warnings, err = pgx.CollectRows(rows, scanWarning); err != nil {
 			return out, err

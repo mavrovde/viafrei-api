@@ -257,6 +257,9 @@ func behaviours() map[string]behaviour {
 		"weather.max_warnings": {"7", func(t *testing.T, c *config.Config) string {
 			return fmt.Sprint(wire.FeatureSettings(c).MaxWarnings)
 		}},
+		"weather.lookahead": {"6h0m0s", func(t *testing.T, c *config.Config) string {
+			return wire.FeatureSettings(c).LookAhead.String()
+		}},
 		"clock.fixed_now": {"2001-02-03T04:05:06Z", func(t *testing.T, c *config.Config) string {
 			h, err := httpapi.NewHandler(httpapi.Deps{Config: c, ContractVersion: "0.1", At: wire.AnswerClock(c, slog.New(slog.DiscardHandler))})
 			if err != nil {

@@ -200,7 +200,8 @@ type Roads struct {
 
 // Weather holds the settings of the weather answers.
 type Weather struct {
-	MaxWarnings int `koanf:"max_warnings" default:"100" validate:"min=1,max=500" desc:"Most warnings one weather answer lists, worst first; truncated says when more answer. The lamp reads every warning in force at the position, whatever this keeps."`
+	MaxWarnings int           `koanf:"max_warnings" default:"100" validate:"min=1,max=500" desc:"Most warnings one weather answer lists, worst first; truncated says when more answer. The lamp reads every warning in force at the position, whatever this keeps."`
+	LookAhead   time.Duration `koanf:"lookahead" default:"24h" validate:"min=0s,max=72h" desc:"How far ahead the warnings at a position are listed beside those in force (inForce false), as the platform's weather check lists the next 24 hours; 0 lists only those in force. The lamp reads only those in force."`
 }
 
 // Charging holds the settings of charging answers.

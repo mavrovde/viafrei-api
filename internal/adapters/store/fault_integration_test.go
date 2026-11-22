@@ -215,7 +215,7 @@ func TestEveryStatementFaultFailsTheRead(t *testing.T) {
 			return err
 		},
 		"WarningsAt": func(ctx context.Context, s *store.Store) error {
-			_, err := s.WarningsAt(ctx, weather.Query{At: berlin, MinLevel: 1, Limit: 5}, every, now)
+			_, err := s.WarningsAt(ctx, weather.Query{LookAhead: lookAhead, At: berlin, MinLevel: 1, Limit: 5}, every, now)
 			return err
 		},
 		"WarmRoads": func(ctx context.Context, s *store.Store) error { return s.WarmRoads(ctx) },

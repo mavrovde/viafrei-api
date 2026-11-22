@@ -218,6 +218,17 @@ func exclusionPattern(p string) *regexp.Regexp {
 	return re.(*regexp.Regexp)
 }
 
+// unprojectedReason is why a member the 0.5.0 parity units added is not
+// compared yet: the MCP tool states it, but the pinned bundles predate it
+// and the platform's producer does not project it. The exclusion goes when
+// the producer states it and a bundle answered with it is pinned; Parse
+// refuses that bundle until then, so the removal cannot be missed.
+const unprojectedReason = "a 0.5.0 parity member the MCP tool states and the pinned bundles predate: the platform's producer does not project it yet"
+
+// roadsCursorReason is why a road conditions page's cursor is not compared:
+// the platform's road status lists every message at once and has no cursor.
+const roadsCursorReason = "API-only: the platform's road status lists every message at once and has no cursor"
+
 // Default is the projection rule set of this format.
 var Default = Rules{
 	ID:               "viafrei.parity.rules/5",
@@ -326,6 +337,18 @@ var Default = Rules{
 		{"meta.attribution[*].shareAlikeOffer", "", "", attributionReason},
 		{"meta.attribution[*].termsUrl", "", "", attributionReason},
 		{"meta.attribution[*].text", "", "", attributionReason},
+		{"data.sourceStamps", "", "getMotorwayConditions", unprojectedReason},
+		{"data.sourceStamps", "", "listRoadConditions", unprojectedReason},
+		{"data.sourceStamps", "", "listStateRoadConditions", unprojectedReason},
+		{"data.rules[*].basisNote", "", "getDrivingRules", unprojectedReason},
+		{"data[*].amenities", "", "listParkingOptions", unprojectedReason},
+		{"data[*].amenities", "", "listMotorwayParking", unprojectedReason},
+		{"data.parking.sites[*].amenities", "", "getPlaceOverview", unprojectedReason},
+		{"data[*].ags", "", "listPlaces", unprojectedReason},
+		{"data[*].nameEn", "", "listPlaces", unprojectedReason},
+		{"data.station.stopIds", "", "listStationDepartures", unprojectedReason},
+		{"meta.page.nextCursor", "", "listRoadConditions", roadsCursorReason},
+		{"meta.page.nextCursor", "", "listStateRoadConditions", roadsCursorReason},
 	},
 	// The fixture's condition and purpose notes are synthetic register texts
 	// and the platform states its own register's (attributionReason): which

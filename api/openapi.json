@@ -484,13 +484,21 @@
               "string",
               "null"
             ]
+          },
+          "stopIds": {
+            "description": "The stops the board reads: the station first, then each of its stop points (its platforms), as the platform's departure board states them.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           }
         },
         "required": [
           "id",
           "name",
           "location",
-          "stopCode"
+          "stopCode",
+          "stopIds"
         ],
         "type": "object"
       },

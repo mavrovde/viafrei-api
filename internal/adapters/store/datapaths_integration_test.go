@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -182,6 +183,14 @@ func TestDeparturesAndAnUnknownStation(t *testing.T) {
 	ds, err := st.Departures(bounded(t), transit.DepartureQuery{StationID: station, From: at, Window: time.Minute, Limit: 5}, fams)
 	if err != nil || len(ds) == 0 {
 		t.Fatalf("%+v %v", ds, err)
+	}
+	// The station's family is the station, then its stop points; a call's
+	// stop point is one of them.
+	var points []string
+	owner(t, fmt.Sprintf(`select coalesce(array_agg(stop_point_id order by stop_point_id), '{}') from contract.stop_point where stop_place_id = %s`, quoted([]string{station})), &points)
+	sp, err := st.Station(bounded(t), station, fams)
+	if err != nil || !slices.Equal(sp.StopIDs, transit.FamilyOf(station, points)) || !slices.Contains(sp.StopIDs, ds[0].StopPointID) {
+		t.Errorf("%s: the family %v of %v (call at %s): %v", station, sp.StopIDs, points, ds[0].StopPointID, err)
 	}
 	// Each delay is its seconds in the platform's minutes.
 	for _, d := range ds {

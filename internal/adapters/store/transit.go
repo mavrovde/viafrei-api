@@ -15,10 +15,15 @@ import (
 // The public-transport repositories (anti-corruption layer).
 
 // stationByID reads one station: $1 the id, $2 the families. A station
-// stored with no position is placed at 0,0 nowhere: the board names it.
+// stored with no position is placed at 0,0 nowhere: the board names it. It
+// reads the station's stop points too (contract.stop_point of the stop
+// place), the family the platform's departure board reads.
 var stationByID = `
 select s.stop_place_id, s.name, coalesce(st_y(s.location), 0), coalesce(st_x(s.location), 0), s.national_stop_code,
-       s.region_code, coalesce(s.modes, '{}'), s.source_ref
+       s.region_code, coalesce(s.modes, '{}'), s.source_ref,
+       array(select p.stop_point_id from contract.stop_point p
+              where p.stop_place_id = s.stop_place_id and p.source_ref = any($2) and ` + permitted("p") + `
+              order by p.stop_point_id)
 from contract.stop_place s
 where s.stop_place_id = $1 and s.withdrawn_at is null and s.source_ref = any($2) and ` + permitted("s")
 
@@ -26,11 +31,13 @@ where s.stop_place_id = $1 and s.withdrawn_at is null and s.source_ref = any($2)
 func (s *Store) Station(ctx context.Context, id string, families []string) (transit.Station, error) {
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (transit.Station, error) {
 		var (
-			v     transit.Station
-			modes []string
+			v      transit.Station
+			modes  []string
+			points []string
 		)
 		err := tx.QueryRow(ctx, stationByID, id, families).Scan(&v.ID, &v.Name, &v.Location.Lat, &v.Location.Lon,
-			&v.NationalCode, &v.RegionCode, &modes, &v.Family)
+			&v.NationalCode, &v.RegionCode, &modes, &v.Family, &points)
+		v.StopIDs = transit.FamilyOf(v.ID, points)
 		if errors.Is(err, pgx.ErrNoRows) {
 			// No such station is an answer, not a failure of storage.
 			return transit.Station{}, nil

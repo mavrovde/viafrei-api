@@ -63,6 +63,9 @@ type Station struct {
 	// under the part's own number (G2).
 	EVA        *string
 	EVANumbers []string
+	// StopIDs are the stops a board of the station reads: the station
+	// first, then its stop points (FamilyOf); nil when not read.
+	StopIDs []string
 }
 
 // Query is a station search: by name (Text), near a position (At), or both.
@@ -119,3 +122,17 @@ func strip(r rune) string {
 
 // ErrNotFound is returned for a station id no permitted family holds.
 var ErrNotFound = errors.New("transit: no such station")
+
+// FamilyOf is the family a station's board reads, as the platform's
+// departure board states stop.stopIds: the station, then each of its stop
+// points once, in their order (a stop that is its own stop point is listed
+// once).
+func FamilyOf(station string, points []string) []string {
+	out := []string{station}
+	for _, p := range points {
+		if !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+	}
+	return out
+}

@@ -201,7 +201,10 @@ func featureScopes() auth.Principal {
 func featureHandler(t *testing.T, cfg *config.Config, f httpapi.Features, log *bytes.Buffer) http.Handler {
 	t.Helper()
 	d := httpapi.Deps{
-		Config: cfg, Build: buildinfo.Info{Version: "t", Commit: "c"}, ContractVersion: "0.1", Now: func() time.Time { return fixedNow },
+		Config: cfg, Build: buildinfo.Info{Version: "t", Commit: "c"}, ContractVersion: "0.1",
+		// The wall clock is a day off the answers' clock, so every instant an
+		// answer states proves it was computed at At (clock.fixed_now, #165).
+		Now: func() time.Time { return fixedNow.Add(24 * time.Hour) }, At: func() time.Time { return fixedNow },
 		Auth: &fakeAuth{p: featureScopes()}, Sources: &fakeSources{register: fixtureRegister},
 	}
 	if f != nil {

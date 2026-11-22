@@ -54,6 +54,7 @@ type Config struct {
 	Cache      Cache      `koanf:"cache"`
 	Admin      Admin      `koanf:"admin"`
 	Callers    Callers    `koanf:"callers"`
+	Clock      Clock      `koanf:"clock"`
 }
 
 // Server holds the public HTTP listener settings.

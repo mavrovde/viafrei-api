@@ -25,7 +25,7 @@ const defaultLanguage = "en"
 func (s *server) envelopeMeta(ctx context.Context) ResponseMeta {
 	return ResponseMeta{
 		RequestID:   RequestIDFrom(ctx),
-		GeneratedAt: s.now().UTC().Truncate(time.Second),
+		GeneratedAt: s.at().UTC().Truncate(time.Second),
 		Language:    defaultLanguage,
 	}
 }

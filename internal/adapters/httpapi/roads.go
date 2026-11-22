@@ -178,7 +178,7 @@ func (s *server) windowed(ctx context.Context, f roads.Filter, w SituationWindow
 	if !w.asked() {
 		return f
 	}
-	now := s.now()
+	now := s.at()
 	f.From, f.Until, _ = roads.DayWindow(now, w.HorizonDays, w.From, w.To)
 	f.Ahead = true
 	noteChangesAt(ctx, now)

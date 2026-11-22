@@ -48,7 +48,12 @@ type Deps struct {
 	Logger          *slog.Logger
 	Build           buildinfo.Info
 	ContractVersion string
-	Now             func() time.Time
+	// Now is the wall clock of deadlines, caching and the access log
+	// (time.Now when nil).
+	Now func() time.Time
+	// At is the clock the answers are computed at: what is in force, ages,
+	// freshness and the generated time (#165). Nil means Now.
+	At func() time.Time
 	// Auth checks keys; nil switches keyed operations off.
 	Auth Authenticator
 	// Sources reads the source register for the licence gate.
@@ -77,6 +82,7 @@ type server struct {
 	build           buildinfo.Info
 	contractVersion string
 	now             func() time.Time
+	at              func() time.Time
 	auth            Authenticator
 	sources         SourceReader
 	features        Features
@@ -268,6 +274,7 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 		build:           d.Build,
 		contractVersion: d.ContractVersion,
 		now:             d.Now,
+		at:              d.At,
 		auth:            d.Auth,
 		sources:         d.Sources,
 		features:        d.Features,
@@ -277,6 +284,9 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 	}
 	if s.now == nil {
 		s.now = time.Now
+	}
+	if s.at == nil {
+		s.at = s.now
 	}
 	s.results = newResultCache(d.Config.Cache)
 	s.versions = &versionCache{reader: d.Versions, ttl: d.Config.Cache.VersionsTTL, now: s.now}

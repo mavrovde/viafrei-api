@@ -76,7 +76,7 @@ func TestSendWritesHeadersThenStatus(t *testing.T) {
 }
 
 func TestAnAnswerReadTwiceFromOneFamilyCountsItOnce(t *testing.T) {
-	s := &server{cfg: config.Defaults(), now: time.Now}
+	s := &server{cfg: config.Defaults(), now: time.Now, at: time.Now}
 	f := provenance.Family{Source: access.Source{Family: "f", Domain: "energy"}, Version: "1"}
 	vs := provenance.Versions{Families: map[string]string{"f": "1"}, Register: "r"}
 	e := s.newEntry(context.Background(), "k", &cacheNote{fams: []provenance.Family{f, f}}, vs, true, &bufferedContext{header: http.Header{}})
@@ -87,7 +87,7 @@ func TestAnAnswerReadTwiceFromOneFamilyCountsItOnce(t *testing.T) {
 
 func TestAnEntryIsTaggedWithTheVersionsReadBeforeIt(t *testing.T) {
 	req.Covers(t, "NFR-PERF-005")
-	s := &server{cfg: config.Defaults(), now: time.Now}
+	s := &server{cfg: config.Defaults(), now: time.Now, at: time.Now}
 	// The operation read newer data (version 2) than the versions read
 	// before it (version 1): the entry carries 1, so the next check, which
 	// reads 2, finds it not current.
@@ -132,7 +132,7 @@ func TestAFreeMinAnswerEndsWhenAKeptReportAges(t *testing.T) {
 func TestAFamilyWithNoFixedIntervalStatesTheThresholdNoAgePasses(t *testing.T) {
 	req.Covers(t, "ENV-003")
 	now := time.Date(2026, 3, 29, 1, 30, 0, 0, time.UTC)
-	s := &server{cfg: config.Defaults(), now: func() time.Time { return now }}
+	s := &server{cfg: config.Defaults(), now: func() time.Time { return now }, at: func() time.Time { return now }}
 	old := now.Add(-400 * 24 * time.Hour)
 	fams := []provenance.Family{
 		{Source: access.Source{Family: "ref"}, NeverStale: true, DataAsOf: &old},

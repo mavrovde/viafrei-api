@@ -288,6 +288,10 @@ func newValidator() *validator.Validate {
 	_ = v.RegisterValidation("key_prefix", func(fl validator.FieldLevel) bool {
 		return keyPrefixPattern.MatchString(fl.Field().String())
 	})
+	_ = v.RegisterValidation("rfc3339", func(fl validator.FieldLevel) bool {
+		_, err := time.Parse(time.RFC3339, fl.Field().String())
+		return err == nil
+	})
 	return v
 }
 
@@ -366,6 +370,7 @@ func crossField(c *Config) Errors {
 	out = append(out, crossFieldBudget(c)...)
 	out = append(out, crossFieldAdmin(c)...)
 	out = append(out, crossFieldCallers(c)...)
+	out = append(out, crossFieldClock(c)...)
 	return append(out, crossFieldTiers(c)...)
 }
 

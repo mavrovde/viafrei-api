@@ -180,7 +180,7 @@ func registerWatch(api huma.API, s *server, op huma.Operation) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
-		now := s.now()
+		now := s.at()
 		end := now.Add(time.Duration(float64(time.Hour) * watchDefaultHours))
 		if in.Hours != 0 {
 			end = now.Add(time.Duration(in.Hours * float64(time.Hour)))

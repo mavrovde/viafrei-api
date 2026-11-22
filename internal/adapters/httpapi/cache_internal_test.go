@@ -400,7 +400,7 @@ func TestWithWarning(t *testing.T) {
 func TestAStoredAnswerWithNoWarningsIsNotServedStale(t *testing.T) {
 	req.Covers(t, "PROT-047")
 	now := time.Unix(0, 0)
-	s := &server{cfg: config.Defaults(), now: func() time.Time { return now }, results: newResultCache(config.Defaults().Cache), versions: &versionCache{read: true}}
+	s := &server{cfg: config.Defaults(), now: func() time.Time { return now }, at: func() time.Time { return now }, results: newResultCache(config.Defaults().Cache), versions: &versionCache{read: true}}
 	s.results.put(&entry{key: "k", body: []byte(`{}`), built: now, stale: time.Minute, keep: now.Add(time.Minute)})
 	// Without the served_stale warning nothing may be sent; the request is
 	// never touched.
@@ -412,7 +412,7 @@ func TestAStoredAnswerWithNoWarningsIsNotServedStale(t *testing.T) {
 func TestNoStaleAnswerBeforeARegisterWasRead(t *testing.T) {
 	req.Covers(t, "NFR-RES-004", "SEC-030")
 	now := time.Unix(0, 0)
-	s := &server{cfg: config.Defaults(), now: func() time.Time { return now }, results: newResultCache(config.Defaults().Cache), versions: &versionCache{}}
+	s := &server{cfg: config.Defaults(), now: func() time.Time { return now }, at: func() time.Time { return now }, results: newResultCache(config.Defaults().Cache), versions: &versionCache{}}
 	s.results.put(&entry{key: "k", body: []byte(`{"meta":{"warnings":[]}}`), built: now, stale: time.Minute, keep: now.Add(time.Minute)})
 	// Nothing to hold the answer's register to: it is not served, and the
 	// request is never touched.

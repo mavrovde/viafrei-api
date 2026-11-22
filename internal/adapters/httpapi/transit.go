@@ -143,7 +143,7 @@ func registerDepartures(api huma.API, s *server, op huma.Operation) {
 		}
 		from := in.From
 		if from.IsZero() {
-			from = s.now()
+			from = s.at()
 		}
 		minutes, limit := in.DurationMin, in.Limit
 		if minutes == 0 {

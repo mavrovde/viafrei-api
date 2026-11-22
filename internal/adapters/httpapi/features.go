@@ -991,7 +991,7 @@ func registerOverview(api huma.API, s *server, op huma.Operation) {
 			noteDegraded(ctx)
 		}
 		meta := OverviewMeta{
-			DataMeta: s.dataMeta(ctx, o.Families, s.now(), len(details) > 0, strings.Join(details, " ")),
+			DataMeta: s.dataMeta(ctx, o.Families, s.at(), len(details) > 0, strings.Join(details, " ")),
 			Parts:    []PartStatus{},
 			Query:    OverviewQuery{PlaceID: q.PlaceID, RadiusM: q.RadiusM, PerPartLimit: q.PerPartLimit},
 			Terms:    terms,

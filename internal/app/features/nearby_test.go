@@ -38,6 +38,10 @@ func (f *nbFake) FuelNear(_ context.Context, q energy.FuelQuery, _ []string) ([]
 	return nil, nil
 }
 
+func (f *nbFake) FuelCoverage(context.Context, energy.FuelQuery, []string, time.Time) (energy.FuelCoverage, error) {
+	return energy.FuelCoverage{}, nil
+}
+
 func (f *nbFake) Stations(context.Context, transit.Query, []string) ([]transit.Station, bool, error) {
 	return []transit.Station{{ID: "s1", Family: "t1"}}, false, nil
 }

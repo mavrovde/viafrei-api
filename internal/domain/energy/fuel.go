@@ -21,6 +21,45 @@ var Fuels = []string{"e5", "e10", "diesel"}
 // before its filters: the platform's scan.
 const MaxFuelScan = 200
 
+// MaxFuelRadiusM is the provider's ceiling on a fuel search's radius: the
+// circle in which a coverage read looks for the nearest priced station.
+const MaxFuelRadiusM = 25000
+
+// The coverage states of a fuel area, as the platform's fuel surfaces name
+// them: no station held within the radius and none priced within the
+// ceiling; none held within the radius but one priced within the ceiling;
+// a station held within the radius.
+const (
+	CoverageUnknown      = "unknown"
+	CoveragePricedBeyond = "priced_beyond"
+	CoverageHeld         = "held"
+)
+
+// FuelCoverage is what we hold around a fuel search's position, whatever its
+// filters but the grade: the stations within the radius, priced or not; the
+// metres to the nearest station with a price for the grade (any grade when
+// none was asked) within MaxFuelRadiusM, nil for none; and the stations
+// within the radius with no price for the grade reported within the fresh
+// window (zero when no grade was asked).
+type FuelCoverage struct {
+	StationsInRadius int
+	NearestPricedM   *float64
+	WithoutCurrent   int
+}
+
+// State is the coverage state, the platform's one classification: held
+// when a station is held within the radius, else priced_beyond when one is
+// priced within the ceiling, else unknown.
+func (c FuelCoverage) State() string {
+	switch {
+	case c.StationsInRadius > 0:
+		return CoverageHeld
+	case c.NearestPricedM != nil:
+		return CoveragePricedBeyond
+	}
+	return CoverageUnknown
+}
+
 // FuelSorts are the orders of a fuel answer.
 var FuelSorts = []string{"distance", "price", "name"}
 
@@ -109,6 +148,13 @@ type FuelQuery struct {
 	Limit    int
 	// Window is how long a reported price is current.
 	Window time.Duration
+	// Coverage asks for the coverage read (FuelCoverage) where the
+	// platform reads it: on every answer ordered by price (its cheapest-fuel
+	// search), else on an empty one (its filling-station search). Its
+	// stations without a current price are counted over Fresh, the price
+	// cache window.
+	Coverage bool
+	Fresh    time.Duration
 }
 
 // FuelAnswer is the stations shown and how many the open filter left out.

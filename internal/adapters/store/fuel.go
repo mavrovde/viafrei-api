@@ -58,6 +58,49 @@ func (s *Store) FuelNear(ctx context.Context, q energy.FuelQuery, families []str
 	})
 }
 
+// fuelCoverage reads what the families $4 hold around the position $1, $2
+// (longitude, latitude): the stations within $3 metres; the metres to the
+// nearest one with a price for the grade $5 (null: any grade) within $6
+// metres; and, for a grade, the stations within $3 with no price for it
+// reported in the $7 seconds before the instant $8. As the platform's
+// coverage read, by no filter but the grade.
+var fuelCoverage = `
+with here as (select st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography g),
+held as (
+  select s.station_id, s.location::geography loc
+  from contract.fuel_station s
+  where s.withdrawn_at is null and s.source_ref = any($4) and ` + permitted("s") + `),
+priced as (
+  select o.station_id, o.observed_at
+  from contract.fuel_price_observation o
+  where o.price is not null and ($5::text is null or o.product_code = $5::text)
+    and o.source_ref = any($4) and ` + permitted("o") + `)
+select
+  (select count(*)::int from held, here where st_dwithin(held.loc, here.g, $3)),
+  (select min(st_distance(held.loc, here.g)) from held, here
+    where st_dwithin(held.loc, here.g, $6) and exists (select 1 from priced p where p.station_id = held.station_id)),
+  case when $5::text is null then 0 else
+  (select count(*)::int from held, here where st_dwithin(held.loc, here.g, $3)
+     and not exists (select 1 from priced p where p.station_id = held.station_id
+                       and p.observed_at > $8::timestamptz - make_interval(secs => $7::int))) end`
+
+// FuelCoverage reads what the families hold around q's position
+// (features.Fuel).
+func (s *Store) FuelCoverage(ctx context.Context, q energy.FuelQuery, families []string, now time.Time) (energy.FuelCoverage, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (energy.FuelCoverage, error) {
+		var (
+			c     energy.FuelCoverage
+			grade *string
+		)
+		if q.Fuel != "" {
+			grade = &q.Fuel
+		}
+		err := tx.QueryRow(ctx, fuelCoverage, q.At.Lon, q.At.Lat, q.RadiusM, families, grade, energy.MaxFuelRadiusM,
+			int(q.Fresh/time.Second), now).Scan(&c.StationsInRadius, &c.NearestPricedM, &c.WithoutCurrent)
+		return c, err
+	})
+}
+
 // fuelByID reads one filling station by its id ($1) with its address and,
 // per grade, its newest price reported in the held window ($3 seconds) up to
 // the instant $4; $2 the families. Withdrawn, it is not found.

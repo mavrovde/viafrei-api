@@ -2145,6 +2145,15 @@
       "FuelQueryMeta": {
         "additionalProperties": false,
         "properties": {
+          "areaCoverage": {
+            "description": "What we hold around the position, by no filter but the grade: held = a station within the radius, priced or not; priced_beyond = none within the radius, but one with a price for the grade (any grade when none was asked) within 25 km; unknown = neither. Read on every answer under sort=price, else on an empty one; held when stations are listed.",
+            "enum": [
+              "held",
+              "priced_beyond",
+              "unknown"
+            ],
+            "type": "string"
+          },
           "at": {
             "$ref": "#/components/schemas/Position"
           },
@@ -2168,6 +2177,11 @@
             "format": "int64",
             "type": "integer"
           },
+          "nearestPricedKm": {
+            "description": "On an empty answer, the kilometres to the nearest station with a price for the grade (any grade when none was asked) within 25 km, to the metre. Absent when there is none.",
+            "format": "double",
+            "type": "number"
+          },
           "openAt": {
             "description": "The instant open_at named.",
             "format": "date-time",
@@ -2179,6 +2193,16 @@
           },
           "sort": {
             "type": "string"
+          },
+          "stationsInRadius": {
+            "description": "The stations we hold within the radius, priced or not, whatever the filters but the grade. Present where areaCoverage was read.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "stationsWithoutCurrentPrice": {
+            "description": "Under sort=price, the stations we hold within the radius with no price for the grade reported within the price cache window (fuel.price_fresh); else the listed stations without such a price (for the grade asked, else for any grade).",
+            "format": "int64",
+            "type": "integer"
           }
         },
         "required": [
@@ -2188,7 +2212,9 @@
           "matched",
           "droppedClosed",
           "droppedUnknown",
-          "droppedNotWholeDay"
+          "droppedNotWholeDay",
+          "areaCoverage",
+          "stationsWithoutCurrentPrice"
         ],
         "type": "object"
       },

@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"math"
 	"slices"
 	"time"
 
@@ -84,6 +85,10 @@ type FuelQueryMeta struct {
 	DroppedUnknown     int        `json:"droppedUnknown" doc:"Stations open_now left out as of unknown state, or open_at as of unknown or unreadable hours."`
 	DroppedNotWholeDay int        `json:"droppedNotWholeDay" doc:"Stations whole_day left out."`
 	OpenAt             *time.Time `json:"openAt,omitempty" doc:"The instant open_at named."`
+	AreaCoverage       string     `json:"areaCoverage" enum:"held,priced_beyond,unknown" doc:"What we hold around the position, by no filter but the grade: held = a station within the radius, priced or not; priced_beyond = none within the radius, but one with a price for the grade (any grade when none was asked) within 25 km; unknown = neither. Read on every answer under sort=price, else on an empty one; held when stations are listed."`
+	StationsInRadius   *int       `json:"stationsInRadius,omitempty" doc:"The stations we hold within the radius, priced or not, whatever the filters but the grade. Present where areaCoverage was read."`
+	NearestPricedKm    *float64   `json:"nearestPricedKm,omitempty" doc:"On an empty answer, the kilometres to the nearest station with a price for the grade (any grade when none was asked) within 25 km, to the metre. Absent when there is none."`
+	WithoutCurrent     int        `json:"stationsWithoutCurrentPrice" doc:"Under sort=price, the stations we hold within the radius with no price for the grade reported within the price cache window (fuel.price_fresh); else the listed stations without such a price (for the grade asked, else for any grade)."`
 }
 
 // FuelMeta is the meta member of listFuelOptions.
@@ -116,7 +121,8 @@ func registerFuel(api huma.API, s *server, op huma.Operation) {
 			return nil, err
 		}
 		q := energy.FuelQuery{At: in.point, RadiusM: in.RadiusM, Fuel: in.Fuel, Brand: in.Brand, Name: in.Name,
-			OpenNow: in.OpenNow, OpenAt: in.OpenAt, WholeDay: in.WholeDay, Sort: in.Sort, Limit: in.Limit, Window: s.cfg.Fuel.PriceCurrent}
+			OpenNow: in.OpenNow, OpenAt: in.OpenAt, WholeDay: in.WholeDay, Sort: in.Sort, Limit: in.Limit, Window: s.cfg.Fuel.PriceCurrent,
+			Coverage: true, Fresh: s.cfg.Fuel.PriceFresh}
 		if q.RadiusM == 0 {
 			q.RadiusM = fuelDefaultRadiusM
 		}
@@ -134,17 +140,44 @@ func registerFuel(api huma.API, s *server, op huma.Operation) {
 		if q.Sort == "price" {
 			data = cheapest(a, data, q.Fuel)
 		}
+		query := FuelQueryMeta{At: position(q.At), RadiusM: q.RadiusM, Sort: q.Sort, Matched: a.Matched,
+			DroppedClosed: a.DroppedClosed, DroppedUnknown: a.DroppedUnknown, DroppedNotWholeDay: a.DroppedNotWholeDay, OpenAt: a.OpenAt}
+		fuelCoverage(&query, a.Coverage, data, q.Fuel)
 		return &FuelOutput{CacheControl: noStore, Body: FuelEnvelope{
 			Data: data,
 			Meta: FuelMeta{
 				DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
 				Page:     Page{Limit: q.Limit, HasMore: a.HasMore},
-				Query: FuelQueryMeta{At: position(q.At), RadiusM: q.RadiusM, Sort: q.Sort, Matched: a.Matched,
-					DroppedClosed: a.DroppedClosed, DroppedUnknown: a.DroppedUnknown, DroppedNotWholeDay: a.DroppedNotWholeDay, OpenAt: a.OpenAt},
+				Query:    query,
 			},
 			Links: s.selfLink(ctx),
 		}}, nil
 	})
+}
+
+// fuelCoverage states the coverage of a fuel answer in its meta.query, as
+// the platform's fuel searches state it: the read's state and stations
+// where it was read (held, unread, when stations are listed), the nearest
+// priced station on an empty answer, and the stations without a current
+// price, the read's under sort=price, else the listed ones'.
+func fuelCoverage(m *FuelQueryMeta, c *energy.FuelCoverage, data []FuelStation, fuel string) {
+	m.AreaCoverage = energy.CoverageHeld
+	for _, st := range data {
+		if !slices.ContainsFunc(st.Prices, func(p FuelPrice) bool { return p.Current && (fuel == "" || p.Fuel == fuel) }) {
+			m.WithoutCurrent++
+		}
+	}
+	if c == nil {
+		return
+	}
+	m.AreaCoverage, m.StationsInRadius = c.State(), &c.StationsInRadius
+	if m.Sort == "price" {
+		m.WithoutCurrent = c.WithoutCurrent
+	}
+	if len(data) == 0 && c.NearestPricedM != nil {
+		km := math.Round(*c.NearestPricedM) / 1000
+		m.NearestPricedKm = &km
+	}
 }
 
 // fuelStations are the stations of a fuel answer, each price current when

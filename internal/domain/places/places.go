@@ -48,6 +48,9 @@ type Place struct {
 	// OfficialKey is the place's own official key (a Gemeinde's eight
 	// digits); nil when not recorded.
 	OfficialKey *string
+	// NameEn is the place's English name where it differs from Name; nil
+	// else.
+	NameEn *string
 	// DistanceM is the distance from the asked position; nil without one.
 	DistanceM *int
 	Family    string

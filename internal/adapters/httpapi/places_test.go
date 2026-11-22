@@ -25,7 +25,7 @@ func TestPlacesAnswer(t *testing.T) {
 	f := everyAnswer()
 	fam := provenance.Family{Source: access.Source{Family: "src-zeta-places", Domain: "places", Publisher: "P", AttributionText: "T", Licence: "L", LicenceURL: "https://licences.example/p"}, StaleAfter: time.Hour}
 	f.places = features.Answer[places.Place]{Items: []places.Place{
-		{ID: "p1", Name: "Neustadt", Kind: "municipality", Location: geo.Point{Lat: 53.5, Lon: 10.1}, RegionCode: sp("01055"), DistanceM: ip(1200), OfficialKey: sp("01055033"), Family: "src-zeta-places"},
+		{ID: "p1", Name: "Neustadt", Kind: "municipality", Location: geo.Point{Lat: 53.5, Lon: 10.1}, RegionCode: sp("01055"), DistanceM: ip(1200), OfficialKey: sp("01055033"), NameEn: sp("Newtown"), Family: "src-zeta-places"},
 	}, HasMore: true, Families: []provenance.Family{fam}, At: fixedNow}
 	h := featureHandler(t, config.Defaults(), f, nil)
 	w := do(t, h, http.MethodGet, "/v1/places?q=neustadt&kind=municipality&at=53.55,10&radius_m=50000&limit=1", bearer)
@@ -42,7 +42,7 @@ func TestPlacesAnswer(t *testing.T) {
 	}
 	p0, _ := data[0].(map[string]any)
 	q, _ := meta(t, body)["query"].(map[string]any)
-	if p0["id"] != "p1" || p0["districtCode"] != "01055" || p0["distanceM"] != 1200.0 || p0["ags"] != "01055033" || q["kind"] != "municipality" || q["radiusM"] != 50000.0 {
+	if p0["id"] != "p1" || p0["districtCode"] != "01055" || p0["distanceM"] != 1200.0 || p0["ags"] != "01055033" || p0["nameEn"] != "Newtown" || q["kind"] != "municipality" || q["radiusM"] != 50000.0 {
 		t.Errorf("place %v, query %v", p0, q)
 	}
 	// A name alone: no position, no radius, the default limit.

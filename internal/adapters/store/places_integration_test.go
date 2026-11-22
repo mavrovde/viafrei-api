@@ -53,4 +53,21 @@ and display_class <> 'withhold' and audience = 'public' order by prominence desc
 	if err != nil || !slices.ContainsFunc(ps, func(p places.Place) bool { return p.OfficialKey != nil && *p.OfficialKey == key }) {
 		t.Errorf("%s keyed %s: %+v, %v", name, key, ps, err)
 	}
+	// A place with an English alias other than its name states it, as the
+	// platform's nameEn; the others none.
+	var id, en string
+	owner(t, `select p.place_id, p.name, a.label from contract.place p join contract.place_alias a on a.place_id = p.place_id
+where a.lang = 'en' and a.label <> p.name and p.withdrawn_at is null and p.location is not null
+  and p.display_class <> 'withhold' and p.audience = 'public' and a.display_class <> 'withhold' and a.audience = 'public'
+order by p.place_id limit 1`, &id, &name, &en)
+	ps, _, err = st.Places(bounded(t), places.Query{Text: name, Limit: 50}, fams, nil, roads)
+	i := slices.IndexFunc(ps, func(p places.Place) bool { return p.ID == id })
+	if err != nil || i < 0 || ps[i].NameEn == nil || *ps[i].NameEn != en {
+		t.Errorf("%s (en %s): %+v, %v", name, en, ps, err)
+	}
+	for _, p := range ps {
+		if p.NameEn != nil && *p.NameEn == p.Name {
+			t.Errorf("%s states its own name as English", p.ID)
+		}
+	}
 }

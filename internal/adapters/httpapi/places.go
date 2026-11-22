@@ -42,6 +42,7 @@ type PlaceItem struct {
 	PlaceSummary
 	DistrictCode *string `json:"districtCode" nullable:"true" doc:"The official key of the district or Land the place lies in; null when not recorded."`
 	DistanceM    *int    `json:"distanceM,omitempty" doc:"Distance from at in metres. Present when at is."`
+	NameEn       *string `json:"nameEn,omitempty" doc:"The place's English name where it differs from name (Munich for München), as the platform's place search states it. Absent else."`
 	AGS          *string `json:"ags,omitempty" doc:"The place's own official key when it is an AGS (Amtlicher Gemeindeschlüssel): a Gemeinde's eight digits, a district's five, a Land's two. Absent when the place has none, as a stop and a motorway have none."`
 }
 
@@ -106,7 +107,7 @@ func registerPlaces(api huma.API, s *server, op huma.Operation) {
 		for i, p := range a.Items {
 			data[i] = PlaceItem{
 				PlaceSummary: PlaceSummary{ID: p.ID, Name: p.Name, Kind: string(p.Kind), Location: position(p.Location), SourceFamily: p.Family},
-				DistrictCode: p.RegionCode, DistanceM: p.DistanceM, AGS: p.AGS(),
+				DistrictCode: p.RegionCode, DistanceM: p.DistanceM, AGS: p.AGS(), NameEn: p.NameEn,
 			}
 		}
 		return &PlacesOutput{CacheControl: noStore, Body: PlacesEnvelope{

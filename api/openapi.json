@@ -5359,6 +5359,10 @@
           "name": {
             "type": "string"
           },
+          "nameEn": {
+            "description": "The place's English name where it differs from name (Munich for München), as the platform's place search states it. Absent else.",
+            "type": "string"
+          },
           "sourceFamily": {
             "type": "string"
           }

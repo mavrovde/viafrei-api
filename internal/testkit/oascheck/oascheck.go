@@ -78,8 +78,12 @@ type param struct {
 }
 
 type schemaHolder struct {
+	Ref    string       `json:"$ref"`
 	Schema *huma.Schema `json:"schema"`
 }
+
+// headerPrefix is the prefix of a reference to a shared header definition.
+const headerPrefix = "#/components/headers/"
 
 type response struct {
 	Headers map[string]schemaHolder `json:"headers"`
@@ -119,6 +123,7 @@ func Load(raw []byte) (*Document, error) {
 		Paths      map[string]map[string]json.RawMessage `json:"paths"`
 		Components struct {
 			Schemas map[string]*huma.Schema `json:"schemas"`
+			Headers map[string]schemaHolder `json:"headers"`
 		} `json:"components"`
 	}
 	if err := json.Unmarshal(raw, &doc); err != nil {
@@ -155,6 +160,20 @@ func Load(raw []byte) (*Document, error) {
 			}
 			if op.OperationID == "" || len(op.Responses) == 0 {
 				return nil, fmt.Errorf("oascheck: %s %s has no operation id or no response", m, path)
+			}
+			// A header that refers to a shared definition is checked
+			// against that definition; a reference to none is an error.
+			for status, r := range op.Responses {
+				for name, h := range r.Headers {
+					if h.Ref == "" {
+						continue
+					}
+					shared, ok := doc.Components.Headers[strings.TrimPrefix(h.Ref, headerPrefix)]
+					if !ok || !strings.HasPrefix(h.Ref, headerPrefix) {
+						return nil, fmt.Errorf("oascheck: %s %s: %s header %s refers to %q, which the document does not define", m, path, status, name, h.Ref)
+					}
+					r.Headers[name] = shared
+				}
 			}
 			o := &Operation{ID: op.OperationID, Method: strings.ToUpper(m), Path: path, params: op.Parameters, responses: op.Responses}
 			if op.RequestBody != nil {

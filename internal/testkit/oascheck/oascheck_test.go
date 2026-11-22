@@ -86,15 +86,17 @@ const thing = `{"id":"t1","sizeM":3}`
 func TestLoadFailsClosed(t *testing.T) {
 	req.Covers(t, "TST-011", "TST-015")
 	for name, src := range map[string]string{
-		"not JSON":               `{`,
-		"not OpenAPI 3":          `{"openapi":"2.0"}`,
-		"no Problem":             `{"openapi":"3.1.0","paths":{}}`,
-		"broken operation":       `{"openapi":"3.1.0","paths":{"/x":{"get":5}},"components":{"schemas":{"Problem":{}}}}`,
-		"no operation id":        `{"openapi":"3.1.0","paths":{"/x":{"get":{"responses":{"200":{}}}}},"components":{"schemas":{"Problem":{}}}}`,
-		"no response":            `{"openapi":"3.1.0","paths":{"/x":{"get":{"operationId":"x"}}},"components":{"schemas":{"Problem":{}}}}`,
-		"no operation":           `{"openapi":"3.1.0","paths":{"/x":{"parameters":[]}},"components":{"schemas":{"Problem":{}}}}`,
-		"a body with no example": `{"openapi":"3.1.0","paths":{"/x":{"post":{"operationId":"x","requestBody":{"content":{"application/json":{}}},"responses":{"200":{}}}}},"components":{"schemas":{"Problem":{}}}}`,
-		"bad pattern":            `{"openapi":"3.1.0","paths":{"/x":{"get":{"operationId":"x","parameters":[{"name":"q","in":"query","schema":{"type":"string","pattern":"("}}],"responses":{"200":{}}}}},"components":{"schemas":{"Problem":{}}}}`,
+		"not JSON":                  `{`,
+		"not OpenAPI 3":             `{"openapi":"2.0"}`,
+		"no Problem":                `{"openapi":"3.1.0","paths":{}}`,
+		"broken operation":          `{"openapi":"3.1.0","paths":{"/x":{"get":5}},"components":{"schemas":{"Problem":{}}}}`,
+		"no operation id":           `{"openapi":"3.1.0","paths":{"/x":{"get":{"responses":{"200":{}}}}},"components":{"schemas":{"Problem":{}}}}`,
+		"no response":               `{"openapi":"3.1.0","paths":{"/x":{"get":{"operationId":"x"}}},"components":{"schemas":{"Problem":{}}}}`,
+		"no operation":              `{"openapi":"3.1.0","paths":{"/x":{"parameters":[]}},"components":{"schemas":{"Problem":{}}}}`,
+		"a body with no example":    `{"openapi":"3.1.0","paths":{"/x":{"post":{"operationId":"x","requestBody":{"content":{"application/json":{}}},"responses":{"200":{}}}}},"components":{"schemas":{"Problem":{}}}}`,
+		"a header to no definition": `{"openapi":"3.1.0","paths":{"/x":{"get":{"operationId":"x","responses":{"200":{"headers":{"X-N":{"$ref":"#/components/headers/X-N"}}}}}}},"components":{"schemas":{"Problem":{}}}}`,
+		"a header to a schema":      `{"openapi":"3.1.0","paths":{"/x":{"get":{"operationId":"x","responses":{"200":{"headers":{"X-N":{"$ref":"#/components/schemas/X-N"}}}}}}},"components":{"schemas":{"Problem":{}},"headers":{"X-N":{"schema":{"type":"integer"}}}}}`,
+		"bad pattern":               `{"openapi":"3.1.0","paths":{"/x":{"get":{"operationId":"x","parameters":[{"name":"q","in":"query","schema":{"type":"string","pattern":"("}}],"responses":{"200":{}}}}},"components":{"schemas":{"Problem":{}}}}`,
 	} {
 		if _, err := Load([]byte(src)); err == nil {
 			t.Errorf("%s: loaded", name)
@@ -369,5 +371,17 @@ func TestValidOfTakesTheMinimum(t *testing.T) {
 	low := 3.0
 	if v, ok := validOf(param{Schema: &huma.Schema{Type: huma.TypeInteger, Minimum: &low}}); v != "3" || !ok {
 		t.Fatalf("validOf = %q %v", v, ok)
+	}
+}
+
+// A header that refers to a shared definition is checked against it.
+func TestASharedHeaderIsCheckedAgainstItsDefinition(t *testing.T) {
+	req.Covers(t, "TEST-003")
+	d := load(t, `{"openapi":"3.1.0","paths":{"/x":{"get":{"operationId":"x","responses":{"200":{"headers":{"X-N":{"$ref":"#/components/headers/X-N"}}}}}}},"components":{"schemas":{"Problem":{}},"headers":{"X-N":{"schema":{"type":"integer"}}}}}`)
+	if err := d.Check("GET", "/x", 200, hdr("X-N", "2"), nil); err != nil {
+		t.Fatalf("a valid shared header failed: %v", err)
+	}
+	if err := d.Check("GET", "/x", 200, hdr("X-N", "two"), nil); err == nil {
+		t.Fatal("a shared header off its definition passed")
 	}
 }

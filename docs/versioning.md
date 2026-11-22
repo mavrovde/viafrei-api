@@ -42,7 +42,15 @@ So that additive changes do not break you:
 
 Every pull request runs a breaking-change diff of the OpenAPI document
 against the default branch and against the last released document; a
-breaking change inside `/v1` fails it.
+breaking change inside `/v1` fails it. The one exception is a fix of a defect
+that contradicts the specification and that the diff reports as breaking: it
+is listed, line by line as the diff states it, in `api/oasdiff-accepted.txt`,
+and its commit names it in a `BREAKING CHANGE:` footer, so the changelog
+announces it.
+
+| Accepted | Why |
+|---|---|
+| `data.warnings[].level` minimum 1 → 0 in `GET /v1/watch` and `GET /v1/weather-risk` (0.4.0) | The DWD's level-0 advance notices (Vorabinformation Unwetter) are warnings of the specification's levels 0 to 4, which the platform lists; the API left them out. A client reading `level` must accept 0. |
 
 ## Deprecation and sunset
 

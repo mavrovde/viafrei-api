@@ -1,0 +1,2 @@
+GET /v1/watch the `data/warnings/items/level` response property's min was decreased from `1.00` to `0.00` for the response status `200`
+GET /v1/weather-risk the `data/warnings/items/level` response property's min was decreased from `1.00` to `0.00` for the response status `200`

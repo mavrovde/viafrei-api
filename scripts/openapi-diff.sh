@@ -15,13 +15,22 @@
 #   TEST-004); oasdiff's own level for it is info.
 # Every other check, including any change to an enum a client sends, keeps
 # oasdiff's own level.
+#
+# api/oasdiff-accepted.txt lists the breaking changes accepted as a fix of a
+# defect that contradicts the specification (docs/versioning.md): each line is
+# one error exactly as oasdiff states it, METHOD PATH and message. A line that
+# no longer matches accepts nothing; a new break is refused until it is listed
+# there and its commit names it in a BREAKING CHANGE footer.
 set -euo pipefail
 
 OASDIFF="go run github.com/oasdiff/oasdiff@v1.34.0"
 base=${1:-}
 file=${2:?usage: openapi-diff.sh BASE_REF FILE}
-levels="$(cd "$(dirname "$0")/.." && pwd)/api/oasdiff-levels.txt"
+root="$(cd "$(dirname "$0")/.." && pwd)"
+levels="$root/api/oasdiff-levels.txt"
+accepted="$root/api/oasdiff-accepted.txt"
 [[ -s $levels ]] || { echo "FAIL: $levels is missing or empty" >&2; exit 2; }
+[[ -f $accepted ]] || { echo "FAIL: $accepted is missing" >&2; exit 2; }
 
 if [[ -z $base || $base =~ ^0+$ ]]; then
   base=$(git rev-parse HEAD^)
@@ -42,5 +51,5 @@ git show "$base:$file" > "$tmp/base.json"
 ops=$(jq '[.paths[] | keys[]] | length' "$file")
 echo "comparing $file ($ops operations) with $base"
 $OASDIFF changelog --severity-levels "$levels" "$tmp/base.json" "$file"
-$OASDIFF breaking --fail-on ERR --severity-levels "$levels" "$tmp/base.json" "$file"
+$OASDIFF breaking --fail-on ERR --severity-levels "$levels" --err-ignore "$accepted" "$tmp/base.json" "$file"
 echo "no breaking change"

@@ -3550,6 +3550,13 @@
               "$ref": "#/components/schemas/RoadSituation"
             },
             "type": "array"
+          },
+          "sourceStamps": {
+            "description": "The Stand of every attributed source family, as the platform's road status states each source's beside its credit, in family order: when it was last checked, when its data last changed, and whether it is possibly out of date. A family with neither instant has none.",
+            "items": {
+              "$ref": "#/components/schemas/SourceStamp"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -3559,6 +3566,7 @@
           "lampReasons",
           "sight",
           "counts",
+          "sourceStamps",
           "coverage",
           "situations"
         ],
@@ -6193,11 +6201,19 @@
               "$ref": "#/components/schemas/RoadSituation"
             },
             "type": "array"
+          },
+          "sourceStamps": {
+            "description": "The Stand of every attributed source family, as the platform's road status states each source's beside its credit, in family order: when it was last checked, when its data last changed, and whether it is possibly out of date. A family with neither instant has none.",
+            "items": {
+              "$ref": "#/components/schemas/SourceStamp"
+            },
+            "type": "array"
           }
         },
         "required": [
           "area",
           "counts",
+          "sourceStamps",
           "lamp",
           "lampReason",
           "lampReasons",
@@ -7004,6 +7020,39 @@
         ],
         "type": "object"
       },
+      "SourceStamp": {
+        "additionalProperties": false,
+        "properties": {
+          "family": {
+            "description": "The source family; its attribution is in meta.attribution.",
+            "type": "string"
+          },
+          "lastCheckedAt": {
+            "description": "When the family was last checked: its newest confirmation, or its data's instant when that is newer or it was never confirmed.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "possiblyStale": {
+            "description": "True when checkedAt is more than three of the family's own cycles before the answer's instant, as the platform judges a source; never for a family whose cycle no register states.",
+            "type": "boolean"
+          },
+          "unchangedSince": {
+            "description": "The instant of the family's data (meta.freshness dataAsOf); null when unknown.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "family",
+          "lastCheckedAt",
+          "unchangedSince",
+          "possiblyStale"
+        ],
+        "type": "object"
+      },
       "SourcesEnvelope": {
         "additionalProperties": false,
         "properties": {
@@ -7356,6 +7405,13 @@
             },
             "type": "array"
           },
+          "sourceStamps": {
+            "description": "The Stand of every attributed source family, as the platform's road status states each source's beside its credit, in family order: when it was last checked, when its data last changed, and whether it is possibly out of date. A family with neither instant has none.",
+            "items": {
+              "$ref": "#/components/schemas/SourceStamp"
+            },
+            "type": "array"
+          },
           "state": {
             "description": "The Land's code.",
             "type": "string"
@@ -7363,6 +7419,7 @@
         },
         "required": [
           "counts",
+          "sourceStamps",
           "state",
           "lamp",
           "lampReason",

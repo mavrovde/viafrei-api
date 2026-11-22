@@ -381,3 +381,33 @@ func TestAnUnregisteredRoadAnswersItsCoverage(t *testing.T) {
 		t.Errorf("registered road: status %d, coverage %v", w.Code, data["coverage"])
 	}
 }
+
+// Every road status form states each attributed source's Stand, judged at
+// the answer's instant.
+func TestRoadAnswersStateTheSourcesStand(t *testing.T) {
+	req.Covers(t, "FR-ROAD-002")
+	f := everyAnswer()
+	iv := 60.0
+	changed := fixedNow.Add(-time.Hour)
+	f.conditions.Stamps = []roads.Stamp{
+		{Family: "src-a", CheckedAt: fixedNow.Add(-time.Minute), UnchangedSince: &changed, IntervalS: &iv},
+		{Family: "src-b", CheckedAt: fixedNow.Add(-10 * time.Minute), IntervalS: &iv},
+	}
+	for _, path := range []string{"/v1/motorways/A8/conditions", "/v1/road-conditions?at=48.1,11.6", "/v1/states/09/road-conditions"} {
+		if path != "/v1/motorways/A8/conditions" {
+			f.conditions.Road = nil
+		}
+		w := do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, path, bearer)
+		d, _ := decode(t, w)["data"].(map[string]any)
+		st, _ := d["sourceStamps"].([]any)
+		if len(st) != 2 {
+			t.Fatalf("%s: %d %v", path, w.Code, d["sourceStamps"])
+		}
+		a, _ := st[0].(map[string]any)
+		b, _ := st[1].(map[string]any)
+		if a["family"] != "src-a" || a["lastCheckedAt"] != "2026-03-29T01:29:00Z" || a["unchangedSince"] != "2026-03-29T00:30:00Z" || a["possiblyStale"] != false ||
+			b["unchangedSince"] != nil || b["possiblyStale"] != true {
+			t.Errorf("%s: %v", path, st)
+		}
+	}
+}

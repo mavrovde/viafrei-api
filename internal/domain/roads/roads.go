@@ -556,7 +556,8 @@ type Page struct {
 // changes with the clock alone: a situation or a warning of the scope
 // starting or ending (NextChange), a family read turning stale (the first
 // whole second past its threshold, as Assess counts it), or a family's
-// confirmation lapsing (ampel.LapsesAt). Nil when nothing in it changes
+// confirmation lapsing (ampel.LapsesAt), or a family's Stand turning
+// possibly out of date (Stamp.LapsesAt). Nil when nothing in it changes
 // with the clock; until then, only a new version of a family read, of its
 // confirmation or of the lamp's reference rows changes it.
 func (p Page) ChangesAt(now time.Time) *time.Time {
@@ -574,6 +575,10 @@ func (p Page) ChangesAt(now time.Time) *time.Time {
 	}
 	for _, c := range p.Confirmations {
 		consider(ampel.LapsesAt(&c))
+	}
+	// A source's Stand turning possibly out of date (Stamp.LapsesAt).
+	for _, s := range Stamps(p.Sources, p.Confirmations) {
+		consider(s.LapsesAt())
 	}
 	return out
 }

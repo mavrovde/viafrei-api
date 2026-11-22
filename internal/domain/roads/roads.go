@@ -650,6 +650,10 @@ type CorridorQuery struct {
 	Unregistered bool
 	// Class is the class of an unregistered road (ClassOf).
 	Class Class
+	// AnyMotorway reads a motorway the register lacks as an unregistered
+	// road rather than refusing it: a watch takes any valid road number, as
+	// the platform's watch does, and reports what names the road.
+	AnyMotorway bool
 	// Direction keeps the situations on this carriageway, on both, and
 	// those whose direction is unknown; DirectionBoth keeps every one.
 	Direction Direction

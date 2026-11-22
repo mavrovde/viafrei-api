@@ -208,9 +208,15 @@ func TestAnUnregisteredRoadIsAnsweredWithWhatWasRead(t *testing.T) {
 	if _, err := roadService(f).MotorwayConditions(ctx, key("commercial", roadsScope, "r1"), roads.CorridorQuery{Road: "A999", Limit: 5}); !errors.Is(err, roads.ErrUnknownRoad) || f.readCalls != 0 {
 		t.Errorf("unknown motorway: %v, %d reads", err, f.readCalls)
 	}
+	// A watch reads it as any other road the register lacks.
+	f = &roadFake{roadErr: roads.ErrUnknownRoad, covering: []string{"r1"}}
+	c, err := roadService(f).MotorwayConditions(ctx, key("commercial", roadsScope, "r1"), roads.CorridorQuery{Road: "A999", Limit: 5, AnyMotorway: true})
+	if err != nil || !f.gotRoad.Unregistered || f.gotRoad.Class != roads.ClassMotorway || c.Road == nil || c.Road.Ref != "A999" || len(c.Families) != 0 {
+		t.Errorf("unknown motorway, watched: %+v, asked %+v, %v", c, f.gotRoad, err)
+	}
 	// A registered road names no coverage.
 	f = &roadFake{road: roads.Road{Ref: "A8", Class: roads.ClassMotorway}, covering: []string{"r1"}}
-	c, err := roadService(f).MotorwayConditions(ctx, key("commercial", roadsScope, "r1"), roads.CorridorQuery{Road: "A8", Limit: 5})
+	c, err = roadService(f).MotorwayConditions(ctx, key("commercial", roadsScope, "r1"), roads.CorridorQuery{Road: "A8", Limit: 5})
 	if err != nil || c.Covering != nil || f.gotRoad.Unregistered {
 		t.Errorf("registered road: covering %v, unregistered %v, %v", c.Covering, f.gotRoad.Unregistered, err)
 	}

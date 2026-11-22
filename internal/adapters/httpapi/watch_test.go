@@ -185,6 +185,10 @@ func TestWatchARoadOrAPlace(t *testing.T) {
 			t.Errorf("%v: %d %v", q, code, d)
 		}
 	}
+	// A watch takes any valid motorway number, held in the register or not.
+	if _, _ = watch(t, h, url.Values{"kind": {"road"}, "target": {"A8"}}); f.gotRoad.Road != "A8" || !f.gotRoad.AnyMotorway {
+		t.Errorf("a road watch reads any motorway: %+v", f.gotRoad)
+	}
 	if _, d := watch(t, h, url.Values{"kind": {"road"}, "target": {"B27"}, "request": {"Stau"}}); d["note"] == nil {
 		t.Errorf("a jam off a motorway is noted: %v", d)
 	}

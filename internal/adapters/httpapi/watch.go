@@ -247,7 +247,7 @@ func registerWatch(api huma.API, s *server, op huma.Operation) {
 			if events != nil {
 				cond["events"] = events
 			}
-			c, err := s.features.MotorwayConditions(ctx, principalFrom(ctx).Key, roads.CorridorQuery{Road: in.Key, Direction: roads.DirectionBoth, Filter: filter, Limit: 100})
+			c, err := s.features.MotorwayConditions(ctx, principalFrom(ctx).Key, roads.CorridorQuery{Road: in.Key, Direction: roads.DirectionBoth, Filter: filter, Limit: 100, AnyMotorway: true})
 			if err != nil {
 				return nil, s.featureProblem(ctx, err)
 			}

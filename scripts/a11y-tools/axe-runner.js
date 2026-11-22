@@ -24,7 +24,8 @@
 //     background, an opacity below 1, a filter or a blend mode, its border
 //     at the text, or a background colour that is not readable as sRGB. fgColor and bgColor
 //     are null, and undeterminedBy says which.
-// - messageKey: why axe could not decide, when it says.
+// - messageKey: why axe could not decide, when it says. color-contrast runs
+//   with ignoreLength, so a one-character text keeps axe's real reason.
 //
 // The run function is stringified by pa11y and evaluated in the page, so it
 // may use nothing from this module's scope. scripts/a11y-tools/
@@ -40,6 +41,19 @@ const run = async options => {
   const rules = {};
   for (const id of options.rules || []) rules[id] = {enabled: true};
   for (const id of options.ignore || []) rules[id] = {enabled: false};
+  // axe gives a one-character text whose colours fail or cannot be compared
+  // the reason "shortTextContent" in place of its own (#177: a scrolled-out
+  // digit of a Redoc sample, partly obscured like any longer token beside
+  // it), so docs-a11y.sh could not decide it by measurement. ignoreLength
+  // judges such text like any other: the colours axe compares still decide
+  // it, and one it cannot compare keeps the reason it has. A check option
+  // replaces the check's options whole, so the loaded axe's own defaults are
+  // carried; an axe without them is refused rather than run on guesses.
+  const check = window.axe._audit && window.axe._audit.checks && window.axe._audit.checks['color-contrast'];
+  if (!check || !check.options) {
+    throw new Error('docs a11y runner: axe has no color-contrast check options to extend');
+  }
+  window.axe.configure({checks: [{id: 'color-contrast', options: Object.assign({}, check.options, {ignoreLength: true})}]});
   const {violations = [], incomplete = []} = await window.axe.run(window.document, {
     runOnly: {type: 'tags', values: ['wcag2a', 'wcag21a', 'wcag2aa', 'wcag21aa', 'best-practice']},
     rules

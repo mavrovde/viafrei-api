@@ -82,6 +82,8 @@ const page = (results, elements = {}) => {
     innerHeight: 800,
     getComputedStyle: (e, pseudo) => (pseudo ? e.pseudo[pseudo] || {content: 'none'} : e.style),
     axe: {
+      _audit: {checks: {'color-contrast': {options: {ignoreLength: false, contrastRatio: {normal: {expected: 4.5}}}}}},
+      configure: spec => calls.push({configure: spec}),
       run: async (context, options) => {
         calls.push({context, options});
         return results;
@@ -95,6 +97,25 @@ const node = (target, data) => ({target, any: data === undefined ? undefined : [
 const contrast = (...nodes) => ({id: 'color-contrast', impact: 'serious', help: 'h', helpUrl: 'u', nodes});
 const opts = {standard: 'WCAG2AA'};
 
+test('color-contrast runs with ignoreLength over the loaded axe defaults, before axe runs', async () => {
+  const calls = page({});
+  await runner.run(opts);
+  assert.deepEqual(calls[0], {
+    configure: {checks: [{id: 'color-contrast', options: {ignoreLength: true, contrastRatio: {normal: {expected: 4.5}}}}]}
+  });
+  assert.equal(globalThis.window.axe._audit.checks['color-contrast'].options.ignoreLength, false);
+  assert.equal(calls[1].context, globalThis.window.document);
+});
+
+test('an axe without color-contrast check options is refused before it runs', async () => {
+  for (const audit of [undefined, {}, {checks: {}}, {checks: {'color-contrast': {}}}]) {
+    const calls = page({});
+    globalThis.window.axe._audit = audit;
+    await assert.rejects(runner.run(opts), /axe has no color-contrast check options to extend/);
+    assert.deepEqual(calls, []);
+  }
+});
+
 test('a standard other than WCAG2AA is refused', async () => {
   page({});
   await assert.rejects(runner.run({standard: 'WCAG2A'}), /standard WCAG2A is not WCAG2AA/);
@@ -103,8 +124,8 @@ test('a standard other than WCAG2AA is refused', async () => {
 test('axe runs on the document with the WCAG 2.0/2.1 A/AA tags, best practices and the named rules', async () => {
   const calls = page({});
   assert.deepEqual(await runner.run({standard: 'WCAG2AA', rules: ['target-size'], ignore: ['region']}), []);
-  assert.equal(calls[0].context, globalThis.window.document);
-  assert.deepEqual(calls[0].options, {
+  assert.equal(calls[1].context, globalThis.window.document);
+  assert.deepEqual(calls[1].options, {
     runOnly: {type: 'tags', values: ['wcag2a', 'wcag21a', 'wcag2aa', 'wcag21aa', 'best-practice']},
     rules: {'target-size': {enabled: true}, region: {enabled: false}}
   });

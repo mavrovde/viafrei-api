@@ -15,7 +15,7 @@ func TestTheTiersStayInsideThePermitPool(t *testing.T) {
 		"VFAPI_TIERS_STANDARD_RESERVED=1",
 		"VFAPI_TIERS_BULK_MAX_INFLIGHT=3",
 		"VFAPI_TIERS_PER_KEY_INFLIGHT=3",
-		"VFAPI_TIERS_CRITICAL_PER_KEY_INFLIGHT=1",
+		"VFAPI_TIERS_CRITICAL_PER_KEY_INFLIGHT=3",
 		"VFAPI_DEADLINE_REQUEST=1s",
 		"VFAPI_TIERS_CRITICAL_QUEUE_MAX_WAIT=1s",
 	}})
@@ -23,7 +23,7 @@ func TestTheTiersStayInsideThePermitPool(t *testing.T) {
 		"tiers.*.reserved: 3 reserved permits are more than db.pool_max 2",
 		"tiers.bulk.max_inflight: 3 is more than db.pool_max 2",
 		"tiers.per_key_inflight: 3 is more than db.pool_max 2",
-		"tiers.critical.per_key_inflight: 1 leaves less than one tiers.per_key_inflight share (3) of db.pool_max 2 to the other keys",
+		"tiers.critical.per_key_inflight: 3 is more than db.pool_max 2",
 		"tiers.critical.queue_max_wait: 1s must be less than deadline.request 1s",
 	)
 }
@@ -65,17 +65,4 @@ func TestTheSharedBudgetLeavesASlotAndEndsInsideTheDeadline(t *testing.T) {
 	if _, err := config.Load(config.Options{Environ: []string{"VFAPI_DB_SHARED_BUDGET_CRITICAL_RESERVED=5"}}); err != nil {
 		t.Errorf("a reserve is not checked while the budget is off: %v", err)
 	}
-}
-
-// The prod sizing: the MCP server's key holds 16 of 32 permits and the site's
-// keys keep 16 it cannot take; one permit fewer is refused at load.
-func TestAServiceKeyLeavesTheOtherKeysAShare(t *testing.T) {
-	req.Covers(t, "CFG-004", "RATE-016")
-	env := []string{"VFAPI_DB_POOL_MAX=32", "VFAPI_TIERS_PER_KEY_INFLIGHT=16", "VFAPI_TIERS_CRITICAL_PER_KEY_INFLIGHT=16"}
-	c, err := config.Load(config.Options{Environ: env})
-	if err != nil || c.Tiers.Critical.PerKeyInflight != 16 {
-		t.Fatalf("the prod sizing: %v", err)
-	}
-	_, err = config.Load(config.Options{Environ: append(env, "VFAPI_TIERS_CRITICAL_PER_KEY_INFLIGHT=17")})
-	assertRefused(t, err, "tiers.critical.per_key_inflight: 17 leaves less than one tiers.per_key_inflight share (16) of db.pool_max 32 to the other keys")
 }

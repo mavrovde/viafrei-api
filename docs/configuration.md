@@ -22,7 +22,7 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `http.compress_min_bytes` | `VFAPI_HTTP_COMPRESS_MIN_BYTES` | int | `1024` | 0 to 1048576 | Smallest answer body, in bytes, that is compressed (br or gzip, as the client accepts); 0 compresses every body. |
 | `http.compress_level` | `VFAPI_HTTP_COMPRESS_LEVEL` | int | `5` | 1 to 9 | Compression level of br and gzip, from 1 (fastest) to 9 (smallest). |
 | `db.url` | `VFAPI_DB_URL` or `VFAPI_DB_URL_FILE` | secret | secret, no default | — | Connection URL of the service's read-only role. Required to serve. Secret: environment or *_FILE only. |
-| `db.pool_max` | `VFAPI_DB_POOL_MAX` | int | `4` | 1 to 64 | Largest number of pooled connections. At most the read-only role's connection limit, divided among the replicas. |
+| `db.pool_max` | `VFAPI_DB_POOL_MAX` | int | `4` | 1 to 16 | Largest number of pooled connections. |
 | `db.pool_min` | `VFAPI_DB_POOL_MIN` | int | `1` | 0 to 16 | Connections kept open when idle. At most pool_max. |
 | `db.connect_timeout` | `VFAPI_DB_CONNECT_TIMEOUT` | duration | `2s` | 100ms to 30s | Time allowed to open one connection. |
 | `db.max_conn_lifetime` | `VFAPI_DB_MAX_CONN_LIFETIME` | duration | `30m` | 1m to 24h | A connection older than this is closed after use. |
@@ -99,7 +99,7 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `tiers.critical.reserved` | `VFAPI_TIERS_CRITICAL_RESERVED` | int | `1` | 0 to 16 | Permits kept for the critical tier that lower tiers cannot use (RATE-009). |
 | `tiers.critical.queue_len` | `VFAPI_TIERS_CRITICAL_QUEUE_LEN` | int | `32` | 0 to 1024 | Critical requests that may wait for a permit; one more is shed. |
 | `tiers.critical.queue_max_wait` | `VFAPI_TIERS_CRITICAL_QUEUE_MAX_WAIT` | duration | `800ms` | 0s to 2s | Longest time a critical request waits for a permit before it is shed. Less than deadline.request. |
-| `tiers.critical.per_key_inflight` | `VFAPI_TIERS_CRITICAL_PER_KEY_INFLIGHT` | int | `0` | 0 to 64 | Permits one key of a critical-tier plan may hold at once, in place of tiers.per_key_inflight: a service key that carries many users' calls (the MCP server's) needs as many as its callers run at once. 0 keeps tiers.per_key_inflight. A full such key must leave one tiers.per_key_inflight share for the other keys: at most db.pool_max minus tiers.per_key_inflight. |
+| `tiers.critical.per_key_inflight` | `VFAPI_TIERS_CRITICAL_PER_KEY_INFLIGHT` | int | `4` | 1 to 16 | Permits one key of a critical-tier plan may hold at once, in place of tiers.per_key_inflight: a service key that carries many users' calls (the MCP server's) needs as many as its callers run at once. At most db.pool_max. |
 | `tiers.standard.reserved` | `VFAPI_TIERS_STANDARD_RESERVED` | int | `0` | 0 to 16 | Permits kept for the standard tier (and above) that the bulk tier cannot use. |
 | `tiers.standard.queue_len` | `VFAPI_TIERS_STANDARD_QUEUE_LEN` | int | `32` | 0 to 1024 | Standard requests that may wait for a permit; one more is shed. |
 | `tiers.standard.queue_max_wait` | `VFAPI_TIERS_STANDARD_QUEUE_MAX_WAIT` | duration | `400ms` | 0s to 2s | Longest time a standard request waits for a permit before it is shed. Less than deadline.request. |
@@ -107,7 +107,7 @@ Cross-field rules: `db.pool_min` ≤ `db.pool_max`; `deadline.reserve` < `deadli
 | `tiers.bulk.queue_len` | `VFAPI_TIERS_BULK_QUEUE_LEN` | int | `4` | 0 to 1024 | Bulk requests that may wait for a permit; one more is shed. |
 | `tiers.bulk.queue_max_wait` | `VFAPI_TIERS_BULK_QUEUE_MAX_WAIT` | duration | `200ms` | 0s to 2s | Longest time a bulk request waits for a permit before it is shed. Less than deadline.request. |
 | `tiers.bulk.max_inflight` | `VFAPI_TIERS_BULK_MAX_INFLIGHT` | int | `1` | 0 to 16 | Permits the bulk tier may hold at once, however many are free (RATE-009). 0 keeps bulk out of storage. At most db.pool_max. |
-| `tiers.per_key_inflight` | `VFAPI_TIERS_PER_KEY_INFLIGHT` | int | `4` | 1 to 64 | Permits one key may hold at once (RATE-016). At most db.pool_max. |
+| `tiers.per_key_inflight` | `VFAPI_TIERS_PER_KEY_INFLIGHT` | int | `4` | 1 to 16 | Permits one key may hold at once (RATE-016). At most db.pool_max. |
 | `admission.aging_after` | `VFAPI_ADMISSION_AGING_AFTER` | duration | `500ms` | 0s to 2s | A waiter older than this is promoted one tier, so no tier starves (RATE-010). 0s promotes every waiter at once. |
 | `admission.ewma_alpha` | `VFAPI_ADMISSION_EWMA_ALPHA` | float | `0.2` | 0.01 to 1 | Weight of the newest storage service time in the moving average the wait estimate uses (RATE-011). |
 | `admission.shed_status` | `VFAPI_ADMISSION_SHED_STATUS` | int | `429` | one of 429, 503 | HTTP status of an overloaded refusal: 429 or 503. The problem type is overloaded either way, with Retry-After. |

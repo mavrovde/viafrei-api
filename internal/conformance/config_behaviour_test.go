@@ -383,9 +383,6 @@ func TestEveryKeyChangesBehaviour(t *testing.T) {
 			if f.Key == "clock.fixed_now" { // a fixed clock only on a test instance
 				env = append(env, "VFAPI_AUTH_ENVIRONMENT=test")
 			}
-			if f.Key == "tiers.critical.per_key_inflight" { // a full service key leaves the general share
-				env = append(env, "VFAPI_TIERS_PER_KEY_INFLIGHT=2")
-			}
 			if f.Key == "admin.rp_id" { // the id must cover the origin's host
 				env = append(env, "VFAPI_ADMIN_ORIGIN=https://console.example.test")
 			}

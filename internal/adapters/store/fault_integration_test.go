@@ -211,7 +211,7 @@ func TestEveryStatementFaultFailsTheRead(t *testing.T) {
 			return err
 		},
 		"Disruptions": func(ctx context.Context, s *store.Store) error {
-			_, err := s.Disruptions(ctx, transit.DisruptionQuery{Area: "09", Limit: 5, Now: now, LateOverMin: 5}, every)
+			_, err := s.Disruptions(ctx, transit.DisruptionQuery{Area: "09", Line: "RE45", Limit: 5, Now: now, LateOverMin: 5}, every)
 			return err
 		},
 		"WarningsAt": func(ctx context.Context, s *store.Store) error {

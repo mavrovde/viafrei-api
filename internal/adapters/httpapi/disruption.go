@@ -77,6 +77,15 @@ type DisruptionData struct {
 	DuplicatesOmitted int                    `json:"duplicatesOmitted" doc:"Alerts of the secondary publication left out as duplicates of an alert of the primary publication in force."`
 	Punctuality       *DisruptionPunctuality `json:"punctuality" doc:"The area's punctuality; null without an area or when the source counted no trip in it."`
 	WindowMin         int                    `json:"windowMin" doc:"The window asked for, in minutes."`
+	Line              *DisruptionLine        `json:"line" doc:"What the static timetable says of the line asked; null without line."`
+}
+
+// DisruptionLine is whether the static timetable knows the line asked, so
+// no alerts for a line can be told from no such line.
+type DisruptionLine struct {
+	Key         string `json:"key" example:"RE1" doc:"The line as compared: the name asked, upper case, white space removed."`
+	Checked     bool   `json:"checked" doc:"Whether a timetable the key may read was there to ask: inTimetable false means no such line only when this is true, and that it could not be told when false."`
+	InTimetable bool   `json:"inTimetable" doc:"Whether a line of this name is in the timetable; the timetable's family is then credited in meta.attribution."`
 }
 
 // DisruptionEnvelope is the enveloped answer of listTransitDisruptions.
@@ -126,6 +135,9 @@ func disruptionEnvelope(s *server, ctx context.Context, a features.DisruptionAns
 		}
 		data.Alerts[i] = DisruptionAlert{ID: v.ID, Header: v.Header, URL: v.URL,
 			ActiveFrom: utc(v.ActiveFrom), ActiveTo: utc(v.ActiveTo), Lines: lines, PlacedBy: v.PlacedBy, SourceFamily: v.Family}
+	}
+	if l := a.Line; l != nil {
+		data.Line = &DisruptionLine{Key: q.Line, Checked: l.Checked, InTimetable: l.InTimetable}
 	}
 	if p := a.Punctuality; p != nil {
 		data.Punctuality = &DisruptionPunctuality{AreaLevel: p.AreaLevel, AreaCode: p.AreaCode, AreaName: p.AreaName, WindowMin: punctualityWindowMin,

@@ -90,6 +90,13 @@ var areaTrips = `select count(distinct t.trip_ref)::int, (count(distinct t.trip_
 from contract.transit_trip_delay t
 where starts_with(t.area_code, $1) and t.source_ref = any($3) and ` + permitted("t")
 
+// lineInTimetable reads whether a line of the families $2 may be read at all
+// (a timetable to ask), and the families whose line of the folded name $1
+// is in their timetable.
+var lineInTimetable = `select exists (select 1 from contract.transit_line l where l.source_ref = any($2) and ` + permitted("l") + `),
+       coalesce((select array_agg(distinct l.source_ref order by l.source_ref) from contract.transit_line l
+                  where upper(regexp_replace(l.line_name, '\s+', '', 'g')) = $1::text and l.source_ref = any($2) and ` + permitted("l") + `), '{}')`
+
 // punctualityFamily is the family contract.transit_punctuality is of (its
 // source_ref): the DELFI Trip Updates.
 const punctualityFamily = "delfi_rt_tu"
@@ -114,6 +121,14 @@ func (s *Store) Disruptions(ctx context.Context, q transit.DisruptionQuery, fami
 			return out, err
 		}
 		out.Alerts = alerts
+		if q.Line != "" {
+			var l transit.LineCheck
+			if err := tx.QueryRow(ctx, lineInTimetable, q.Line, families).Scan(&l.Checked, &l.Families); err != nil {
+				return out, err
+			}
+			l.InTimetable = len(l.Families) > 0
+			out.Line = &l
+		}
 		if q.Area == "" {
 			return out, nil
 		}

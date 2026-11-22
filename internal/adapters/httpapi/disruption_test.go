@@ -44,10 +44,18 @@ func TestDisruptionsAnswer(t *testing.T) {
 			t.Errorf("answer lacks %s: %s", want, body)
 		}
 	}
-	f.disruption = features.DisruptionAnswer{Meta: features.Answer[struct{}]{At: fixedNow}}
-	w = do(t, h, http.MethodGet, "/v1/transit-disruptions?line=S1&window_min=120", bearer)
-	if body = w.Body.String(); w.Code != http.StatusOK || !strings.Contains(body, `"punctuality":null`) || f.gotDisrupt.Limit != 6 || f.gotDisrupt.WindowMin != 120 {
+	if !strings.Contains(body, `"line":null`) {
+		t.Errorf("a line the timetable was not asked about is null: %s", body)
+	}
+	f.disruption = features.DisruptionAnswer{Disruptions: transit.Disruptions{Line: &transit.LineCheck{Checked: true}}, Meta: features.Answer[struct{}]{At: fixedNow}}
+	w = do(t, h, http.MethodGet, "/v1/transit-disruptions?line=S%201&window_min=120", bearer)
+	if body = w.Body.String(); w.Code != http.StatusOK || !strings.Contains(body, `"punctuality":null`) || f.gotDisrupt.Limit != 6 || f.gotDisrupt.WindowMin != 120 ||
+		!strings.Contains(body, `"line":{"key":"S1","checked":true,"inTimetable":false}`) {
 		t.Errorf("line only: %d %s %+v", w.Code, body, f.gotDisrupt)
+	}
+	f.disruption.Line = &transit.LineCheck{Checked: true, InTimetable: true, Families: []string{"src-alpha-transit"}}
+	if body = do(t, h, http.MethodGet, "/v1/transit-disruptions?line=re1", bearer).Body.String(); !strings.Contains(body, `"line":{"key":"RE1","checked":true,"inTimetable":true}`) {
+		t.Errorf("a line in the timetable: %s", body)
 	}
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/transit-disruptions", bearer), 400, "invalid-parameter")
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/transit-disruptions?area=05315&window_min=121", bearer), 400, "invalid-parameter")

@@ -1400,6 +1400,36 @@
             "format": "int64",
             "type": "integer"
           },
+          "line": {
+            "additionalProperties": false,
+            "description": "What the static timetable says of the line asked; null without line.",
+            "properties": {
+              "checked": {
+                "description": "Whether a timetable the key may read was there to ask: inTimetable false means no such line only when this is true, and that it could not be told when false.",
+                "type": "boolean"
+              },
+              "inTimetable": {
+                "description": "Whether a line of this name is in the timetable; the timetable's family is then credited in meta.attribution.",
+                "type": "boolean"
+              },
+              "key": {
+                "description": "The line as compared: the name asked, upper case, white space removed.",
+                "examples": [
+                  "RE1"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "checked",
+              "inTimetable"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "punctuality": {
             "additionalProperties": false,
             "description": "The area's punctuality; null without an area or when the source counted no trip in it.",
@@ -1496,7 +1526,8 @@
           "alertsChecked",
           "duplicatesOmitted",
           "punctuality",
-          "windowMin"
+          "windowMin",
+          "line"
         ],
         "type": "object"
       },
@@ -10474,7 +10505,7 @@
                             "text": "Synthetic statement 1 about winter_tyres, for tests only.",
                             "legalBasis": "§ 0 synthetic",
                             "sourceUrl": "https://law.example/winter_tyres",
-                            "reviewedOn": "2026-11-17",
+                            "reviewedOn": "2026-02-01",
                             "unconfirmed": null
                           },
                           {
@@ -10482,7 +10513,7 @@
                             "text": "Synthetic statement 2 about winter_tyres, for tests only.",
                             "legalBasis": "§ 0 synthetic",
                             "sourceUrl": "https://law.example/winter_tyres",
-                            "reviewedOn": "2026-11-17",
+                            "reviewedOn": "2026-02-01",
                             "unconfirmed": null
                           },
                           {
@@ -10490,11 +10521,11 @@
                             "text": "Synthetic statement 3 about winter_tyres, for tests only.",
                             "legalBasis": "§ 0 synthetic",
                             "sourceUrl": "https://law.example/winter_tyres",
-                            "reviewedOn": "2026-11-17",
+                            "reviewedOn": "2026-02-01",
                             "unconfirmed": null
                           }
                         ],
-                        "reviewedOn": "2026-11-17",
+                        "reviewedOn": "2026-02-01",
                         "disclaimer": "Informational, not legal advice."
                       },
                       "meta": {
@@ -24316,7 +24347,8 @@
                         "alertsChecked": true,
                         "duplicatesOmitted": 0,
                         "punctuality": null,
-                        "windowMin": 60
+                        "windowMin": 60,
+                        "line": null
                       },
                       "meta": {
                         "requestId": "example-request-0001",
@@ -24343,6 +24375,69 @@
                             "shareAlike": false,
                             "shareAlikeOffer": null,
                             "termsUrl": "https://alpha.example/terms/delfi_sa_alpha"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ],
+                        "page": {
+                          "limit": 6,
+                          "hasMore": false
+                        }
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/transit-disruptions"
+                      }
+                    }
+                  },
+                  "line": {
+                    "summary": "The service alerts of a line, and whether the timetable knows it",
+                    "value": {
+                      "data": {
+                        "alerts": [],
+                        "alertsTotal": 0,
+                        "alertsChecked": true,
+                        "duplicatesOmitted": 0,
+                        "punctuality": null,
+                        "windowMin": 60,
+                        "line": {
+                          "key": "RE45",
+                          "checked": true,
+                          "inTimetable": true
+                        }
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T12:00:00Z",
+                        "freshness": [
+                          {
+                            "family": "delfi_static",
+                            "dataAsOf": "2026-03-29T12:00:00Z",
+                            "ageS": 43200,
+                            "staleAfterS": 259200,
+                            "stale": false
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "delfi_static",
+                            "domain": "transit",
+                            "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://www.opendata-oepnv.de"
                           }
                         ],
                         "notes": {

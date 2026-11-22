@@ -33,7 +33,8 @@
       "alertsChecked": true,
       "duplicatesOmitted": 0,
       "punctuality": null,
-      "windowMin": 60
+      "windowMin": 60,
+      "line": null
     },
     "meta": {
       "requestId": "example-request-0001",

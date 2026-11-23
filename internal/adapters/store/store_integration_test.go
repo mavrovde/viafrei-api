@@ -40,6 +40,9 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	code := m.Run()
+	if code == 0 && !parityHeld() {
+		code = 1
+	}
 	db.Stop()
 	os.Exit(code)
 }

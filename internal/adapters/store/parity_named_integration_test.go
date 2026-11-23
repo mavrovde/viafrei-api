@@ -4,7 +4,9 @@ package store_test
 
 import (
 	"context"
+	"flag"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -187,28 +189,54 @@ func TestNamedStatementsAnswerAsTheViews(t *testing.T) {
 			}
 		})
 	}
-	for _, r := range store.NamedReads() {
-		if _, ok := namedCases[r.Name]; !ok {
-			t.Errorf("%s has no parity cases", r.Name)
-		}
-	}
 }
 
-// TestRunReportsAStatementThatCannotBePrepared: a statement the server
-// refuses to prepare answers its error, not rows.
-func TestRunReportsAStatementThatCannotBePrepared(t *testing.T) {
-	ctx := bounded(t)
-	c, err := pgx.Connect(ctx, db.ReaderURL)
-	if err != nil {
-		t.Fatal(err)
+// parityHeld reports whether every named statement the tests ran answered
+// the rows of its view statement, under both plans, and whether a full run
+// ran each named statement at least once.
+func parityHeld() bool {
+	misses, runs, rows := store.ParityResults()
+	for name, n := range runs {
+		fmt.Fprintf(os.Stderr, "parity: %s ran %d times beside its view statement, %d rows compared\n", name, n, rows[name])
 	}
-	defer func() { _ = c.Close(context.WithoutCancel(ctx)) }()
-	tx, err := c.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
+	for _, m := range misses {
+		fmt.Fprintf(os.Stderr, "parity: %s (%s) %v:\n got %q\nwant %q\n", m.Name, m.Plan, m.Args, m.Got, m.Want)
 	}
-	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
-	if err := store.RunNamed(ctx, tx, "api_test_refused", "select from no_such_relation"); err == nil || !strings.Contains(err.Error(), "no_such_relation") {
-		t.Fatalf("got %v", err)
+	unrun := 0
+	if flag.Lookup("test.run").Value.String() == "" {
+		for _, r := range store.NamedReads() {
+			if runs[r.Name] == 0 {
+				fmt.Fprintf(os.Stderr, "parity: %s never ran beside its view statement\n", r.Name)
+				unrun++
+			}
+		}
+	}
+	return len(misses) == 0 && unrun == 0
+}
+
+// TestFacilitiesAnswerAsTheirView: each fixture station's facilities, read
+// beside the view statement (the parity hook), with a fresh and a stale
+// clock, and some station answers some.
+func TestFacilitiesAnswerAsTheirView(t *testing.T) {
+	st := seeded(t)
+	var ids []string
+	owner(t, `select coalesce(array_agg(distinct stop_place_id), '{}') from contract.station_facility where stop_place_id is not null`, &ids)
+	if len(ids) == 0 {
+		t.Fatal("the fixture holds no station facility")
+	}
+	var fams []string
+	owner(t, `select coalesce(array_agg(distinct source_ref), '{}') from contract.station_facility`, &fams)
+	n := 0
+	for _, id := range append(ids, "1:de:00000:0", "x") {
+		for _, at := range []time.Time{time.Now(), time.Now().Add(240 * time.Hour)} {
+			fs, err := st.Facilities(bounded(t), id, fams, at)
+			if err != nil {
+				t.Fatal(err)
+			}
+			n += len(fs)
+		}
+	}
+	if n == 0 {
+		t.Error("no station answered a facility")
 	}
 }

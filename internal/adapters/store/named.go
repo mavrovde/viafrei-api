@@ -27,7 +27,7 @@ var (
 	// namedStmts is every named statement, by name: a name is taken once.
 	namedStmts = map[string]stmt{}
 	// paramUse is a parameter and the cast at its use.
-	paramUse = regexp.MustCompile(`\$([0-9]+)(::[a-z][a-z0-9_]*(?: precision)?(?:\[\])?)?`)
+	paramUse = regexp.MustCompile(`\$([0-9]+)(::[a-z][a-z0-9_]*(?: precision| with time zone| without time zone)?(?:\[\])?)?`)
 )
 
 // named registers the statement name with sql, whose parameters $1..$n take
@@ -80,6 +80,9 @@ func namedList() []stmt {
 // A statement that cannot be prepared answers rows that carry the error, as
 // a query that fails does, so a caller reads one error either way.
 func run(ctx context.Context, tx pgx.Tx, s stmt, args ...any) (pgx.Rows, error) {
+	if beside != nil {
+		beside(ctx, tx, s, args)
+	}
 	if _, err := tx.Conn().Prepare(ctx, s.Name, s.SQL); err != nil {
 		return failedRows{err: err}, err
 	}
@@ -99,3 +102,39 @@ func (r failedRows) Values() ([]any, error)                     { return nil, r.
 func (failedRows) RawValues() [][]byte                          { return nil }
 func (failedRows) Conn() *pgx.Conn                              { return nil }
 func (failedRows) TypeMap() *pgtype.Map                         { return nil }
+
+// beside, when set (by the integration tests), runs before each named
+// statement in its transaction: the parity check of the statement against
+// the view statement it replaced, with the same arguments.
+var beside func(ctx context.Context, tx pgx.Tx, s stmt, args []any)
+
+// namedOpaque is named over opaque(sql, types...): every parameter is read
+// through a subquery, so a custom plan sees no more than the generic one and
+// the plan cache settles on the generic plan after its custom ones.
+func namedOpaque(name, sql string, types ...string) stmt {
+	return named(name, opaque(sql, types...), types...)
+}
+
+// runRow is run for a statement that answers one row.
+func runRow(ctx context.Context, tx pgx.Tx, s stmt, args ...any) pgx.Row {
+	rows, _ := run(ctx, tx, s, args...)
+	return oneRow{rows}
+}
+
+// oneRow is the first row of rows, as pgx.Row: no row is pgx.ErrNoRows.
+type oneRow struct{ rows pgx.Rows }
+
+func (r oneRow) Scan(dest ...any) error {
+	defer r.rows.Close()
+	if !r.rows.Next() {
+		if err := r.rows.Err(); err != nil {
+			return err
+		}
+		return pgx.ErrNoRows
+	}
+	if err := r.rows.Scan(dest...); err != nil {
+		return err
+	}
+	r.rows.Close()
+	return r.rows.Err()
+}

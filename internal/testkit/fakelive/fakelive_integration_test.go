@@ -202,3 +202,32 @@ func TestAStopReadsWhetherTheListenerWasLost(t *testing.T) {
 		t.Fatalf("a closed listener: %v", err)
 	}
 }
+
+// A request an asker is being linked to is claimed all the same: the link's
+// key check (live.refresh_askers) holds a key-share lock on the request, and
+// a claim that skipped the row it locks waited on with nothing left to wake
+// it (CI: twelve askers of one subject, no claim in 5 s).
+func TestARequestBeingLinkedIsClaimed(t *testing.T) {
+	db, owner := fresh(t)
+	ask(t, owner, "09162000")
+	ctx, cancel := context.WithTimeout(context.Background(), bound)
+	defer cancel()
+	linking, err := db.Owner(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = linking.Close(context.Background()) }()
+	tx, err := linking.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	if _, err := tx.Exec(ctx, `select 1 from live.refresh_requests where subject_key = 'ags:09162000' for key share`); err != nil {
+		t.Fatal(err)
+	}
+	f := start(t, db.OwnerURL, `{"sources":{"fuel-prices-de":{"default":{"state":"refreshed"}}}}`)
+	until(t, func() bool { return f.Claims() == 1 })
+	if err := f.Stop(); err != nil {
+		t.Fatal(err)
+	}
+}

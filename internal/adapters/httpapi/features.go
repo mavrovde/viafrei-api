@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"slices"
 	"strconv"
@@ -115,16 +116,130 @@ func amendNullableObjects(api huma.API) {
 			}
 		}
 	}
+	inlined := []string{}
 	for _, n := range nullableObjects {
 		// Every operation of the catalogue is always registered, so the
 		// schema exists. The referenced object is written inline, typed
 		// object or null.
 		s := reg[n.schema]
 		ref := s.Properties[n.member]
-		inline := *reg[strings.TrimPrefix(ref.Ref, schemaPrefix)]
+		name := strings.TrimPrefix(ref.Ref, schemaPrefix)
+		inline := *reg[name]
 		inline.Nullable, inline.Description = true, ref.Description
 		s.Properties[n.member] = &inline
+		inlined = append(inlined, name)
 	}
+	// An inlined object that no operation reaches by reference any more
+	// leaves components.schemas. Left registered, it makes huma marshal the
+	// whole document twice, once to find the unused schemas and once
+	// without them: most of what the first /v1/openapi.json costs (TST-012).
+	reached := reachedSchemas(api.OpenAPI())
+	for _, name := range inlined {
+		if !reached[name] {
+			delete(reg, name)
+		}
+	}
+}
+
+// everySchemaReached refuses a document whose components.schemas holds a
+// schema no operation reaches: huma would marshal the whole document twice
+// on every first /v1/openapi.json to leave it out (TST-012).
+func everySchemaReached(o *huma.OpenAPI) error {
+	reached := reachedSchemas(o)
+	var unreached []string
+	for name := range o.Components.Schemas.Map() {
+		if !reached[name] {
+			unreached = append(unreached, name)
+		}
+	}
+	if len(unreached) > 0 {
+		slices.Sort(unreached)
+		return fmt.Errorf("httpapi: no operation reaches the schemas %v; huma would marshal the document twice to leave them out", unreached)
+	}
+	return nil
+}
+
+// reachedSchemas is the set of components.schemas names the operations
+// reach by reference, directly or through other schemas.
+func reachedSchemas(o *huma.OpenAPI) map[string]bool {
+	reg := o.Components.Schemas.Map()
+	reached := map[string]bool{}
+	var walk func(s *huma.Schema)
+	walk = func(s *huma.Schema) {
+		if s == nil {
+			return
+		}
+		if s.Ref != "" {
+			name := strings.TrimPrefix(s.Ref, schemaPrefix)
+			if !reached[name] {
+				reached[name] = true
+				walk(reg[name])
+			}
+			return
+		}
+		for _, p := range s.Properties {
+			walk(p)
+		}
+		walk(s.Items)
+		if a, ok := s.AdditionalProperties.(*huma.Schema); ok {
+			walk(a)
+		}
+		for _, l := range [][]*huma.Schema{s.OneOf, s.AnyOf, s.AllOf} {
+			for _, x := range l {
+				walk(x)
+			}
+		}
+		walk(s.Not)
+	}
+	content := func(c map[string]*huma.MediaType) {
+		for _, m := range c {
+			walk(m.Schema)
+		}
+	}
+	params := func(ps []*huma.Param) {
+		for _, p := range ps {
+			walk(p.Schema)
+		}
+	}
+	body := func(b *huma.RequestBody) {
+		if b != nil {
+			content(b.Content)
+		}
+	}
+	response := func(r *huma.Response) {
+		content(r.Content)
+		for _, h := range r.Headers {
+			walk(h.Schema)
+		}
+	}
+	for _, item := range o.Paths {
+		params(item.Parameters)
+		for _, op := range []*huma.Operation{item.Get, item.Put, item.Post, item.Delete, item.Options, item.Head, item.Patch, item.Trace} {
+			if op == nil {
+				continue
+			}
+			params(op.Parameters)
+			body(op.RequestBody)
+			for _, r := range op.Responses {
+				response(r)
+			}
+		}
+	}
+	// The shared definitions answers refer to (the shared headers among
+	// them): huma counts every reference of the document, these too.
+	for _, h := range o.Components.Headers {
+		walk(h.Schema)
+	}
+	for _, p := range o.Components.Parameters {
+		walk(p.Schema)
+	}
+	for _, b := range o.Components.RequestBodies {
+		body(b)
+	}
+	for _, r := range o.Components.Responses {
+		response(r)
+	}
+	return reached
 }
 
 func position(p geo.Point) Position {

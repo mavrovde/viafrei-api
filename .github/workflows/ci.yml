@@ -42,6 +42,8 @@ jobs:
         run: shellcheck --version && shellcheck scripts/*.sh
       - name: Self-test of the previous-figures fetch (TST-021)
         run: bash scripts/load-previous.test.sh
+      - name: Self-test of the fuzz job matrix (TST-016)
+        run: bash scripts/fuzz.test.sh
 
   test:
     name: Unit and handler tests

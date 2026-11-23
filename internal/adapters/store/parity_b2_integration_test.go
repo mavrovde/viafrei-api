@@ -7,6 +7,18 @@ package store_test
 
 func init() {
 	for name, sql := range map[string]string{
+		"api_sharing_stations_near": `with fam as (select array_agg(distinct source_feed) f from public.gbfs_stations),
+pt as (select st_x(geom::geometry) lon, st_y(geom::geometry) lat from public.gbfs_stations where geom is not null union all values (13.405::float8, 52.52::float8)),
+t as (select max(observed_at) + interval '1 minute' t from public.gbfs_station_status union all select now())
+select pt.lon, pt.lat, v.r, v.l, t.t, v.fs from pt, fam, t,
+  lateral (values (1000::float8, 80, fam.f), (20000, 2, fam.f), (1000, 80, '{}'::text[])) v(r, l, fs)`,
+		"api_sharing_vehicles_near": `with fam as (select array_agg(distinct source_feed) f from public.gbfs_vehicles),
+pt as (select st_x(geom::geometry) lon, st_y(geom::geometry) lat from public.gbfs_vehicles where geom is not null union all values (13.405::float8, 52.52::float8))
+select pt.lon, pt.lat, v.r, v.l, v.fs from pt, fam,
+  lateral (values (1000::float8, 200, fam.f), (20000, 2, fam.f), (1000, 200, '{}'::text[])) v(r, l, fs)`,
+		"api_sharing_nearest": `with fam as (select array_agg(distinct source_feed) f from public.gbfs_stations)
+select pt.lon, pt.lat, 100000::float8, v.fs from (select st_x(geom::geometry) lon, st_y(geom::geometry) lat from public.gbfs_stations where geom is not null
+  union all values (13.405::float8, 52.52::float8), (6.0, 47.0)) pt, fam, lateral (values (fam.f), ('{}'::text[])) v(fs)`,
 		"api_hydrogen_near": `with fam as (select array_agg(distinct source_feed) f from public.hydrogen_stations),
 pt as (select st_x(geom::geometry) lon, st_y(geom::geometry) lat from public.hydrogen_stations where geom is not null
        union all values (13.405::float8, 52.52::float8))

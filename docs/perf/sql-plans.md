@@ -42,6 +42,9 @@ each Land's probe into the first entry of its range.
 | api_lorry_rules | 13 ms mean | 6-127 ms | 0 / 10 (custom by design: the road, the point and the layer decide the plan) | each lorry table's `*_geom_open` area index on its own geography |
 | api_poi_match | 608 ms mean, up to 2.1 s | 150-970 ms | 0 / 10 (custom by design) | bitmap AND of `osm_pois_geom` and the name and brand trigram indexes; the brand match is `lower(brand)`, which no index holds (db item: a trigram index on `lower(brand)`) |
 | api_train_board | under 1 ms | not measured: the board table is empty on prod | - | - |
+| api_sharing_stations_near | 50 ms mean | 0.7-7 ms | 5 / 5 | index scan of `gbfs_stations_geom_open`, each count by the status key |
+| api_sharing_vehicles_near | 58 ms mean | 0.3-4 ms | 5 / 5 | index scan of `gbfs_vehicles_geom` |
+| api_sharing_nearest | 46 ms mean | 5-33 ms | 5 / 5 | nearest-neighbour scan of `gbfs_stations_geom_open` |
 
 The view cast the area to `geometry(MultiPolygon,4326)`, an expression no
 index holds, so the box test read every warning's area; the statements test

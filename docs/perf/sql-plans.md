@@ -38,7 +38,7 @@ equal buffers mean the same plan, and a difference in time is the host.
 | api_stations_page_NN (near) | 52/112 | 3/5 | 10 117 | (as above) | per shape | site nearby |
 | api_stations_page_NN (near, railway) | 126/571 | 3/5 | 35 170 | (as above) | per shape | site nearby |
 | api_stations_page_NN (code) | 454/588 | 4/5 | 14 192 | 6 464 (per shape, before) | per shape, code narrowed by the stops' id index and the EVA register | station page by code |
-| api_board_calls | not re-probed | — | — | 18.8/23.5 | mechanical | station board |
+| api_board_calls | 122/200 (three stations, one to three hours) | 4/5 | 58 684 | over 60 s (a live window; 19 ms only on a day with no calls) | the trip's other calls and its last stop read on the stop times' trip key: the view statement hashed every scheduled call of the network | station board |
 | api_station_facilities | 214/356 | 3/5 | 5 863 | 981/1 433 | only the refs of the station's DHID | station lifts |
 | api_affected_alerts | 22/27 | 3/5 | 1 100 | 5.7/15 | mechanical (same buffers) | station disruptions |
 | api_affected_lifts | 72/129 | 3/5 | 9 248 | 72/146 | mechanical | station lifts |

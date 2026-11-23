@@ -122,3 +122,12 @@ func TestOneRowAnswersTheScanError(t *testing.T) {
 		t.Fatalf("Scan = %v, want %v", err, want)
 	}
 }
+
+// TestDeparturesOfTripsKeepTheRelation: the trip keys are put before the
+// departure relation's own columns, which stay as they are.
+func TestDeparturesOfTripsKeepTheRelation(t *testing.T) {
+	if !strings.HasPrefix(relDeparture, "\n SELECT ") ||
+		departuresOfTrips != "\n SELECT t.gtfs_feed_key AS board_feed, t.id AS board_trip, t.headsign AS board_headsign,"+relDeparture[len("\n SELECT"):] {
+		t.Fatal("the departure relation no longer begins with its select list")
+	}
+}

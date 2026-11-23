@@ -273,3 +273,33 @@ func TestEveryStationShapeAnswersAsTheView(t *testing.T) {
 		}
 	}
 }
+
+// TestEveryBoardAnswersAsTheView: the board of each fixture station that
+// departs, over the days its calls depart on, read beside the view
+// statement (the parity hook); some board answers departures.
+func TestEveryBoardAnswersAsTheView(t *testing.T) {
+	st := seeded(t)
+	var ids, fams []string
+	var from, to time.Time
+	owner(t, `select coalesce(array_agg(distinct stop_place_id), '{}'), coalesce(array_agg(distinct source_ref), '{}'),
+  min(planned_departure_at), max(planned_departure_at) from contract.departure where planned_departure_at is not null`, &ids, &fams, &from, &to)
+	if len(ids) == 0 {
+		t.Fatal("the fixture holds no departure")
+	}
+	n := 0
+	for _, id := range ids {
+		for _, w := range []struct {
+			at  time.Time
+			win time.Duration
+		}{{from, to.Sub(from) + time.Minute}, {from.Add(to.Sub(from) / 2), 3 * time.Hour}} {
+			ds, err := st.Departures(bounded(t), transit.DepartureQuery{StationID: id, From: w.at, Window: w.win, Limit: 500}, fams)
+			if err != nil {
+				t.Fatal(err)
+			}
+			n += len(ds)
+		}
+	}
+	if n == 0 {
+		t.Error("no board answered a departure")
+	}
+}

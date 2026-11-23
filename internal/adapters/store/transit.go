@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -179,32 +180,42 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 // boardCalls reads the departing calls of a station in a window: $1 the
 // station (a stop place), $2 and $3 the window's first and end instant
 // (planned departure), $4 the families. A call is one a passenger can board
-// (contract.departure.boarding) of a trip that calls somewhere outside the
+// (the platform's boarding flag) of a trip that calls somewhere outside the
 // station after it: a trip's last call at the station is an arrival. The
 // destination is the trip's headsign, else the name of its last stop. The
 // delay is read in seconds and stated in minutes by transit.DelayMinOf.
 var boardCalls = namedOpaque("api_board_calls", `
 select d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transport_mode, d.route_type,
-       d.train_number, d.train_category, nullif(btrim(j.destination_label), ''),
-       coalesce(nullif(btrim(j.destination_label), ''),
-                (select lp.name from (`+relScheduledCall+`) lc
-                   join (`+relStopPoint+`) lp on lp.stop_point_id = lc.stop_point_id
-                  where lc.journey_id = d.journey_id
-                  order by lc.call_order desc limit 1)),
+       d.train_number, d.train_category, nullif(btrim(d.board_headsign), ''),
+       coalesce(nullif(btrim(d.board_headsign), ''),
+                (select nullif(btrim(ls.name), '') from stop_times lc
+                   join stops ls on ls.gtfs_feed_key = lc.gtfs_feed_key and ls.id = lc.stop_id
+                  where lc.gtfs_feed_key = d.board_feed and lc.trip_id = d.board_trip and lc.deleted_at is null
+                    and ls.deleted_at is null and coalesce(ls.location_type::integer, 0) = 0
+                  order by lc.stop_sequence desc limit 1)),
        d.planned_departure_at, d.platform, d.planned_platform, d.platform_changed, d.realtime, d.realtime_source,
        d.cancelled, d.delay_s, d.expected_departure_at, d.no_forecast, d.source_ref, d.source_refs
-from (`+relDeparture+`) d
-left join (`+relJourney+`) j on j.journey_id = d.journey_id
-where d.stop_place_id = $1
-  and d.planned_departure_at >= $2 and d.planned_departure_at < $3
+from (`+departuresOfTrips+`) d
+where d.stop_place_id = $1::text
+  and d.planned_departure_at >= $2::timestamp with time zone and d.planned_departure_at < $3::timestamp with time zone
   and d.boarding
-  and d.source_ref = any($4)
+  and d.source_ref = any($4::text[])
   and `+permitted("d")+`
-  and exists (select 1 from (`+relScheduledCall+`) nx
-                join (`+relStopPoint+`) np on np.stop_point_id = nx.stop_point_id
-               where nx.journey_id = d.journey_id and nx.call_order > d.call_order
-                 and np.stop_place_id <> $1)
+  and exists (select 1 from stop_times nx
+                join stops np on np.gtfs_feed_key = nx.gtfs_feed_key and np.id = nx.stop_id
+               where nx.gtfs_feed_key = d.board_feed and nx.trip_id = d.board_trip and nx.stop_sequence > d.call_order
+                 and nx.deleted_at is null and np.deleted_at is null and coalesce(np.location_type::integer, 0) = 0
+                 and (np.gtfs_feed_key || ':') || coalesce(np.parent_id, np.id) <> $1::text)
 order by d.planned_departure_at, d.journey_id, d.call_order`, "text", "timestamp with time zone", "timestamp with time zone", "text[]")
+
+// departuresOfTrips is the platform's departure relation with the trip's
+// feed, id and headsign beside it (board_feed, board_trip,
+// board_headsign), so the board reads the trip's other calls on the stop
+// times' trip key, not on a journey id no index holds: on prod the view
+// statement hashed every scheduled call of the network for each board and
+// ran past 60 s.
+var departuresOfTrips = "\n SELECT t.gtfs_feed_key AS board_feed, t.id AS board_trip, t.headsign AS board_headsign," +
+	strings.TrimPrefix(relDeparture, "\n SELECT")
 
 // Departures reads the departing calls of q's station in q's window
 // (features.Transit); the board's rules are transit.Board's.

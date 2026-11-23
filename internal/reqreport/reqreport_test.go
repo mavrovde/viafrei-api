@@ -214,7 +214,7 @@ func TestReportsCarryTheRun(t *testing.T) {
 	req.Covers(t, "TEST-002")
 	ts := results(t, line("output", "TestA", "    a_test.go:9: REQ-ID: AAA-001\\n", 0)+line("pass", "TestA", "", 0.25))
 	r := Check(catalogue(t), []string{"AAA-001", "AAA-002"}, 1, ts)
-	m := Meta{Version: "9.9.9", Commit: "abc123", Generated: "2026-11-02T00:00:00Z"}
+	m := Meta{Version: "9.9.9", Scope: "test/requirements/scope/0.2.0.txt", Commit: "abc123", Generated: "2026-11-02T00:00:00Z"}
 	var rep, comp bytes.Buffer
 	if err := WriteRequirementReport(&rep, r, m); err != nil {
 		t.Fatal(err)
@@ -227,7 +227,7 @@ func TestReportsCarryTheRun(t *testing.T) {
 			t.Errorf("requirement report lacks %q:\n%s", want, rep.String())
 		}
 	}
-	for _, want := range []string{"## 1. Summary", "Verdict from the automated gates: not ready", "| unit | 1 | 1 | 0 | 0 | 0 |", "1 of 2", "manual accessibility pass", "## 10. Approval"} {
+	for _, want := range []string{"# Test completion report: 9.9.9\n", "- Release: 9.9.9\n", "scope file `test/requirements/scope/0.2.0.txt`", "## 1. Summary", "Verdict from the automated gates: not ready", "| unit | 1 | 1 | 0 | 0 | 0 |", "1 of 2", "manual accessibility pass", "## 10. Approval"} {
 		if !strings.Contains(comp.String(), want) {
 			t.Errorf("completion draft lacks %q:\n%s", want, comp.String())
 		}

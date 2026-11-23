@@ -9,7 +9,8 @@ import (
 
 // Meta describes the run a report belongs to.
 type Meta struct {
-	Version   string // the API version or the milestone, e.g. 0.2.0
+	Version   string // the release the run is for, e.g. 1.0.0, or "unreleased (after 1.0.0)"
+	Scope     string // the scope file the in-scope rows were read from
 	Commit    string
 	Generated string // RFC 3339 instant, UTC
 }
@@ -66,9 +67,9 @@ func WriteCompletionDraft(w io.Writer, r *Report, m Meta) error {
 	}
 	fmt.Fprintf(&b, "# Test completion report: %s\n\n", m.Version)
 	fmt.Fprintf(&b, "Draft written by CI (`cmd/reqreport`) at %s for commit `%s`; the maintainers complete the sections marked *to complete*.\n\n", m.Generated, m.Commit)
-	fmt.Fprintf(&b, "## 1. Summary\n- Release / milestone: %s\n- Specification revision: *to complete* (wiki commit the catalogue was generated from)\n- Image digest: *to complete*\n- Verdict from the automated gates: %s\n\n", m.Version, verdict)
-	fmt.Fprintf(&b, "## 2. Scope\n- In-scope requirements: %d, listed in the requirement report\n- Out of scope, with reason: every other catalogue row (%d); the scope file of the milestone lists what this milestone covers\n\n",
-		len(r.Scope), len(r.Catalogue)-len(r.Scope))
+	fmt.Fprintf(&b, "## 1. Summary\n- Release: %s\n- Specification revision: *to complete* (wiki commit the catalogue was generated from)\n- Image digest: *to complete*\n- Verdict from the automated gates: %s\n\n", m.Version, verdict)
+	fmt.Fprintf(&b, "## 2. Scope\n- In-scope requirements: %d, listed in the requirement report, from the requirement milestone's scope file `%s`\n- Out of scope, with reason: every other catalogue row (%d); the scope file of the milestone lists what this milestone covers\n\n",
+		len(r.Scope), m.Scope, len(r.Catalogue)-len(r.Scope))
 	b.WriteString("## 3. Results by level\n| Level | Executed | Passed | Failed | Skipped | Quarantined |\n|---|---|---|---|---|---|\n")
 	for _, l := range levels(r.Tests) {
 		c := countLevel(r.Tests, l)

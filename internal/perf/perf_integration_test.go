@@ -125,7 +125,9 @@ type statement struct {
 	args []any
 }
 
-// capture records every read statement the store sends.
+// capture records every read statement the store sends: the text of each
+// statement sent as text (seen, which a plan test replays), and a count of
+// each, of a named statement under its name.
 type capture struct {
 	mu    sync.Mutex
 	seen  map[string]statement
@@ -135,13 +137,16 @@ type capture struct {
 func (c *capture) TraceQueryStart(ctx context.Context, _ *pgx.Conn, d pgx.TraceQueryStartData) context.Context {
 	sql := strings.TrimSpace(d.SQL)
 	lower := strings.ToLower(sql)
-	if !strings.HasPrefix(lower, "select") && !strings.HasPrefix(lower, "with") {
+	text := strings.HasPrefix(lower, "select") || strings.HasPrefix(lower, "with")
+	if !text && !strings.HasPrefix(sql, "api_") {
 		return ctx
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if _, ok := c.seen[sql]; !ok {
+	if _, ok := c.seen[sql]; !ok && text {
 		c.seen[sql] = statement{sql: sql, args: slices.Clone(d.Args)}
+	}
+	if c.count[sql] == nil {
 		c.count[sql] = &atomic.Int64{}
 	}
 	c.count[sql].Add(1)
@@ -150,7 +155,7 @@ func (c *capture) TraceQueryStart(ctx context.Context, _ *pgx.Conn, d pgx.TraceQ
 
 func (c *capture) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEndData) {}
 
-// reads counts the statements sent that mention relation.
+// reads counts the statements sent that mention relation, or are named it.
 func (c *capture) reads(relation string) int64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -769,7 +774,8 @@ func TestIdenticalConcurrentRequestsReadStorageOnce(t *testing.T) {
 	r := open(t)
 	h := r.handler(t, true)
 	target := r.targetsOf("listChargingOptions")[1]
-	before := r.sql.reads("contract.charging_site")
+	// The charging list's read: the named statement over the charging sites.
+	before := r.sql.reads("api_charging_near")
 	start := make(chan struct{})
 	var wg sync.WaitGroup
 	codes := make([]int, 50)
@@ -786,7 +792,7 @@ func TestIdenticalConcurrentRequestsReadStorageOnce(t *testing.T) {
 			t.Fatalf("answers %v", codes)
 		}
 	}
-	if n := r.sql.reads("contract.charging_site") - before; n != 1 {
+	if n := r.sql.reads("api_charging_near") - before; n != 1 {
 		t.Fatalf("%d storage reads for 50 identical concurrent requests, want 1", n)
 	}
 }

@@ -23,6 +23,7 @@ func legacySpeedCellOf(point string) string {
 	return `(select g.cell from cut_gemeinde g order by g.at <-> ` + point + `, g.cell limit 1)`
 }
 
+//nolint:misspell // materialized is the SQL keyword
 var legacySpeedOSM = `
 with cut_gemeinde as materialized (
   select p.official_key as cell, p.location::geography as at

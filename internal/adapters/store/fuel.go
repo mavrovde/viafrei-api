@@ -68,6 +68,8 @@ func (s *Store) FuelNear(ctx context.Context, q energy.FuelQuery, families []str
 // coverage read, by no filter but the grade. Each price check is a probe of
 // one station's observations, as the price read's: the observations are a
 // time series, and a check not tied to the station would scan it whole.
+//
+//nolint:misspell // materialized is the SQL keyword
 var fuelCoverage = named("api_fuel_coverage", `
 with here as (select st_setsrid(st_makepoint((select $1::float8), (select $2::float8)), 4326)::geography g),
 fam as (`+ruledFamilies("(select $4::text[])")+`),

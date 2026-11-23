@@ -16,10 +16,10 @@ import (
 // until each is ported to the platform's tables; the list only shrinks, and
 // a file that reads none any more fails until it leaves the list.
 var viewsPending = map[string]bool{
-	"address.go": true, "bays.go": true, "catalogue.go": true, "coverage.go": true, "disruption.go": true,
+	"address.go": true, "bays.go": true, "coverage.go": true, "disruption.go": true,
 	"features.go": true, "freshness.go": true, "fuel.go": true, "hydrogen.go": true,
 	"lorry.go": true, "national.go": true,
-	"poi.go": true, "register.go": true, "roads.go": true, "sharing.go": true,
+	"poi.go": true, "register.go": true, "sharing.go": true,
 	"speed.go": true, "store.go": true, "trainboard.go": true, "transit.go": true,
 	"weather_cell.go": true, "weather.go": true,
 }

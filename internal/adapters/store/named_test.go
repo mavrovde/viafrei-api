@@ -19,8 +19,23 @@ var refusedReads = map[string]*regexp.Regexp{
 	"an internal setting": regexp.MustCompile(`(?i)\b(subscription_var|runtime_config|source_schedule|control\.[a-z_]+)\b`),
 }
 
+// allowedReads are the forms of a refused name a statement may read, cut
+// from its text before refusedReads is applied: a named field of a provider
+// payload (a jsonb path of literal keys, never the payload whole), whether
+// one is stored (is [not] null), the comparison of two payloads' hashes, and
+// the platform's data status (the freshness the read contract publishes).
+var allowedReads = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)\b(?:[a-z_][a-z0-9_]*\.)?(?:raw|payload)(?:\s*(?:->>?|#>>?)\s*'[^']*')+`),
+	regexp.MustCompile(`(?i)\b(?:[a-z_][a-z0-9_]*\.)?(?:raw|payload)\s+is\s+(?:not\s+)?null\b`),
+	regexp.MustCompile(`(?i)\b[a-z_][a-z0-9_]*\.raw_hash\s*=\s*[a-z_][a-z0-9_]*\.raw_hash\b`),
+	regexp.MustCompile(`(?i)\bcontrol\.data_status\b`),
+}
+
 // refusals names what of refusedReads the text sql reads.
 func refusals(sql string) []string {
+	for _, re := range allowedReads {
+		sql = re.ReplaceAllString(sql, " ")
+	}
 	var out []string
 	for kind, re := range refusedReads {
 		if re.MatchString(sql) {
@@ -47,23 +62,35 @@ func TestNamedStatementsReadNoRefusedColumn(t *testing.T) {
 // passes.
 func TestRefusalsCatchEachKind(t *testing.T) {
 	for sql, want := range map[string]string{
-		"select * from t":                   "every column",
-		"select distinct * from t":          "every column",
-		"select t.* from t":                 "every column",
-		"select a from contract.place":      "a contract view",
-		"select e.raw from autobahn_events": "a raw payload",
-		"select payload from road_events":   "a raw payload",
-		"select operator_tokens from s":     "a contact column",
-		"select service_phone from s":       "a contact column",
-		"select subscription_var from c":    "an internal setting",
-		"select k from control.budgets":     "an internal setting",
+		"select * from t":                      "every column",
+		"select distinct * from t":             "every column",
+		"select t.* from t":                    "every column",
+		"select a from contract.place":         "a contract view",
+		"select e.raw from autobahn_events":    "a raw payload",
+		"select payload from road_events":      "a raw payload",
+		"select raw from autobahn_events":      "a raw payload",
+		"select e.raw->>'a', e.raw from e":     "a raw payload",
+		"select coalesce(e.raw, r.raw) from e": "a raw payload",
+		"select e.raw_hash from e":             "a raw payload",
+		"select k from control.data_status_x":  "an internal setting",
+		"select operator_tokens from s":        "a contact column",
+		"select service_phone from s":          "a contact column",
+		"select subscription_var from c":       "an internal setting",
+		"select k from control.budgets":        "an internal setting",
 	} {
 		if got := refusals(sql); len(got) != 1 || got[0] != want {
 			t.Errorf("%q: %v, want %s", sql, got, want)
 		}
 	}
-	if got := refusals("select count(*), p.name from gazetteer_places p"); len(got) != 0 {
-		t.Errorf("a plain read refused: %v", got)
+	for _, sql := range []string{
+		"select count(*), p.name from gazetteer_places p",
+		"select e.raw->>'isBlocked', e.raw -> 'description', r.raw->'a'->>'b', raw #>> '{a,b}' from e",
+		"select 1 from e, r where e.raw is null and r.raw is not null and r.raw_hash = e.raw_hash",
+		"select d.key from control.data_status d",
+	} {
+		if got := refusals(sql); len(got) != 0 {
+			t.Errorf("%q refused: %v", sql, got)
+		}
 	}
 }
 

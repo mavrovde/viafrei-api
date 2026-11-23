@@ -43,7 +43,21 @@ prepared and executed with the same arguments), beside the
 | api_road_lamp_warnings | measured 20 s, every run cancelled at the statement timeout (ten roads, custom plans only) | 49 ms p50, 59 ms max | 5 / 5 | per road its points by `tmc_locations_road_number`, each point's open warnings through `weather_warnings_live_area_geom`, then the warning by `weather_warnings_pkey` | motorway.sql.ts |
 | api_states_road | measured 14.5 ms p50, 63 ms max | 7.2 ms p50, 16 ms max | 5 / 5 | the road's points by `tmc_locations_road_number`, each point's Land by `contract_junction_land` | road-pages.sql.ts |
 | api_states_near | measured 8.5 ms p50, 38 ms max | 7.9 ms p50, 11 ms max | 5 / 5 | `tmc_locations_contract_junction_location` within the radius, the nearest point when none | road-pages.sql.ts |
-| api_states_state | measured 0.2 ms p50, 2.4 ms max (custom plans only) | 0.2 ms p50, 0.5 ms max | 5 / 5 | the Länder of `ags_regions` for de, else the code itself | road-pages.sql.ts |
+| api_states_state | measured 0.2 ms p50, 2.4 ms max (custom plans only) | 0.2 ms p50, 0.5 ms max | 5 / 5 | the Länder of the region register for de, else the code itself | road-pages.sql.ts |
+| api_road_situations | measured 59 ms p50, 129 ms max | 37 ms p50, 78 ms max | 5 / 5 | the road by its reference and its one shape, not every road's; the situations without a Land lookup | road-pages.sql.ts |
+| api_area_situations | measured 143 ms p50, 180 ms max (custom plans only) | 76 ms p50, 193 ms max | 5 / 5 | no Land lookup for the situations near the point | road-pages.sql.ts |
+| api_state_situations | measured 2221 ms p50, 2883 ms max | 2175 ms p50, 2547 ms max | 5 / 5 | every open situation's Land by `contract_junction_land`, as before: the Land is the filter; on a par, still the slowest | road-pages.sql.ts |
+| api_road_messages | measured 42 ms p50, 88 ms max | 46 ms p50, 82 ms max | 5 / 5 | on a par | road-pages.sql.ts |
+| api_area_messages | measured 55 ms p50, 98 ms max (custom plans only) | 45 ms p50, 77 ms max | 5 / 5 | no Land lookup | road-pages.sql.ts |
+| api_state_messages | measured 1872 ms p50, 2545 ms max | 1686 ms p50, 1923 ms max | 5 / 5 | the Land lookup of every open situation, as before | road-pages.sql.ts |
+| api_state_placed | measured 1303 ms p50, 1441 ms max (custom plans only) | 1220 ms p50, 1506 ms max | 5 / 5 | the same | road-pages.sql.ts |
+| api_situation | measured 18 ms p50, 52 ms max | 11 ms p50, 26 ms max | 5 / 5 | `road_events_contract_event_id` for a traffic message; no Land lookup | road-pages.sql.ts |
+| api_road_covering | measured 47 ms p50, 247 ms max (custom plans only) | 56 ms p50, 251 ms max | 5 / 5 | on a par | road-pages.sql.ts |
+| api_road_lamp_messages | measured 206 ms p50, 395 ms max (ten roads) | 150 ms p50, 262 ms max | 5 / 5 | no Land lookup | motorway.sql.ts |
+| api_road_sources | measured 4.9 ms p50, 11 ms max | 3.4 ms p50, 4.2 ms max | 5 / 5 | the registered families by their key, the data status row of each (read as the owner until the API role's grant, database 0337) | road-pages.sql.ts |
+| api_motorway_families | measured 369 ms p50, 446 ms max | 307 ms p50, 459 ms max | 5 / 5 | the register by its key, not the road view's shapes | motorway.sql.ts |
+| api_motorways | measured 389 ms p50, 532 ms max | 399 ms p50, 616 ms max | 5 / 5 | on a par: the situations in force grouped by road | motorway.sql.ts |
+| api_motorways_live_land | measured 643 ms p50, 1104 ms max | 538 ms p50, 708 ms max | 5 / 5 | a road's junction Land by `contract_junction_land`, only for the roads in question | motorway.sql.ts |
 | api_road_shapes | 2.4 s (the road list's shape read); measured 481 ms p50, 1.3 s max | 264 ms p50, 445 ms max | no parameters | `autobahn_roads_pkey`, `contract_road_shape` once a road | road-pages.sql.ts |
 
 The state and road rows were measured with the view statement run first in

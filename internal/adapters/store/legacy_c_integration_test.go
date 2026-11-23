@@ -3,6 +3,7 @@
 package store
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
@@ -201,4 +202,68 @@ where not exists (select 1 from near)) j`,
 	} {
 		legacyReads[name] = sql
 	}
+}
+
+// legacyOpaque is a parameter as opaqueNamed reads it.
+var legacyOpaque = regexp.MustCompile(`\(\(select (\$[0-9]+)::[a-z0-9_ \[\]]+\)::[a-z0-9_ \[\]]+\)`)
+
+// legacyEvents is the named statement name as the view statement read it:
+// its parameters plain, its situations the read contract's.
+func legacyEvents(name string) string {
+	sql := legacyOpaque.ReplaceAllString(namedStmts[name].SQL, "$1")
+	sql = strings.ReplaceAll(sql, trafficEvents(true), "contract.traffic_event")
+	return strings.ReplaceAll(sql, trafficEvents(false), "contract.traffic_event")
+}
+
+func init() {
+	for _, name := range []string{"api_area_situations", "api_state_situations", "api_road_messages", "api_area_messages",
+		"api_state_messages", "api_state_placed", "api_situation", "api_road_covering", "api_road_lamp_messages"} {
+		legacyReads[name] = legacyEvents(name)
+	}
+	onRoad := legacyEvents("api_road_situations")
+	legacyReads["api_road_situations"] = onRoad[:strings.Index(onRoad, "with road as (")] + `with road as (
+  select k.road_ref from contract.road k
+  where upper(replace(k.road_ref, ' ', '')) = $8 and ` + permitted("k") + ` order by k.road_ref limit 1),
+parts as (
+  select r.road_ref, d.path[1] n, d.geom g, st_length(d.geom::geography) len, r.length_km::float8 km
+  from contract.road r, st_dump(r.geometry) d
+  where r.road_ref = (select road_ref from road)),
+` + onRoad[strings.Index(onRoad, "line as ("):]
+	legacyReads["api_road_sources"] = `select s.source_ref, s.stale_after_s, f.data_as_of,
+       f.source_ref is not null, f.confirmed_at, f.confirm_interval_s::float8, coalesce(f.updates_paused, false)
+from contract.source s
+left join contract.source_freshness f using (source_ref)
+where s.source_ref = any($1)
+order by s.source_ref`
+	legacyReads["api_motorway_families"] = `
+select coalesce(array_agg(distinct e.source_ref order by e.source_ref), '{}')
+from contract.traffic_event e
+join contract.road r on r.road_ref = e.road_ref and ` + permitted("r") + `
+where e.source_ref = any($1) and ` + eventPermitted + `
+  and e.withdrawn_at is null and e.valid_from <= $2 and (e.valid_to is null or e.valid_to > $2)`
+	motorways := func(inLand string) string {
+		return `
+with es as (
+  select e.road_ref, count(*)::int as n, array_agg(distinct e.source_ref order by e.source_ref) as sources
+  from contract.traffic_event e
+  where e.source_ref = any($1) and ` + eventPermitted + `
+    and e.withdrawn_at is null and e.valid_from <= $5 and (e.valid_to is null or e.valid_to > $5)
+  group by e.road_ref)
+select r.road_ref, r.name,
+       (select count(*) from contract.junction j where j.road_ref = r.road_ref)::int,
+       coalesce(es.n, 0),
+       r.source_ref,
+       coalesce(es.sources, '{}'),
+       array(select distinct j.source_ref from contract.junction j where j.road_ref = r.road_ref order by 1)
+from contract.road r
+left join es on es.road_ref = r.road_ref
+where ` + permitted("r") + `
+  and ($2::text = '' or r.road_ref = any($6::text[])` + inLand + `)
+  and ($3::text = '' or r.road_ref = $3::text)
+order by length(r.road_ref), r.road_ref
+limit $4`
+	}
+	legacyReads["api_motorways"] = motorways(``)
+	legacyReads["api_motorways_live_land"] = motorways(`
+       or exists (select 1 from contract.junction j where j.road_ref = r.road_ref and j.state_code = $2::text)`)
 }

@@ -43,10 +43,9 @@ func (s *Store) Motorways(ctx context.Context, q roads.CatalogueQuery, families 
 			inState = append(inState, ref)
 		}
 	}
-	junctionInState := `
-       or exists (select 1 from contract.junction j where j.road_ref = r.road_ref and j.state_code = $2::text)`
+	list := motorwaysLiveLand
 	if lands != nil {
-		junctionInState = ``
+		list = motorways
 	}
 	// One road's exits name each junction's Land: from the junction Länder,
 	// else live.
@@ -57,40 +56,15 @@ func (s *Store) Motorways(ctx context.Context, q roads.CatalogueQuery, families 
 	}
 	var counted []string
 	ms, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]roads.Motorway, error) {
-		res, _ := tx.Query(ctx, `
-select coalesce(array_agg(distinct e.source_ref order by e.source_ref), '{}')
-from contract.traffic_event e
-join contract.road r on r.road_ref = e.road_ref and `+permitted("r")+`
-where e.source_ref = any($1) and `+eventPermitted+`
-  and e.withdrawn_at is null and e.valid_from <= $2 and (e.valid_to is null or e.valid_to > $2)`, families, now)
+		res, _ := run(ctx, tx, motorwayFamilies, families, now)
 		c, err := pgx.CollectExactlyOneRow(res, pgx.RowTo[[]string])
 		if err != nil {
 			return nil, err
 		}
 		counted = c
 		// The situations in force are read once and grouped by road, not
-		// twice per road: each read of contract.traffic_event plans and scans
-		// the whole view.
-		res, _ = tx.Query(ctx, `
-with es as (
-  select e.road_ref, count(*)::int as n, array_agg(distinct e.source_ref order by e.source_ref) as sources
-  from contract.traffic_event e
-  where e.source_ref = any($1) and `+eventPermitted+`
-    and e.withdrawn_at is null and e.valid_from <= $5 and (e.valid_to is null or e.valid_to > $5)
-  group by e.road_ref)
-select r.road_ref, r.name,
-       (select count(*) from contract.junction j where j.road_ref = r.road_ref)::int,
-       coalesce(es.n, 0),
-       r.source_ref,
-       coalesce(es.sources, '{}'),
-       array(select distinct j.source_ref from contract.junction j where j.road_ref = r.road_ref order by 1)
-from contract.road r
-left join es on es.road_ref = r.road_ref
-where `+permitted("r")+`
-  and ($2::text = '' or r.road_ref = any($6::text[])`+junctionInState+`)
-  and ($3::text = '' or r.road_ref = $3::text)
-order by length(r.road_ref), r.road_ref
-limit $4`, families, q.State, q.Road, q.Limit, now, inState)
+		// twice per road (motorwaysOf).
+		res, _ = run(ctx, tx, list, families, q.State, q.Road, q.Limit, now, inState)
 		ms, err := pgx.CollectRows(res, func(r pgx.CollectableRow) (roads.Motorway, error) {
 			var m roads.Motorway
 			err := r.Scan(&m.Road, &m.Name, &m.Junctions, &m.Situations, &m.Family, &m.Sources, &m.Registers)
@@ -115,6 +89,62 @@ limit $4`, families, q.State, q.Road, q.Limit, now, inState)
 	})
 	return ms, counted, err
 }
+
+// motorwayFamilies reads the families of the situations in force at $2 on
+// a road of the register, of the families $1.
+var motorwayFamilies = opaqueNamed("api_motorway_families", `
+select coalesce(array_agg(distinct e.source_ref order by e.source_ref), '{}')
+from `+trafficEvents(false)+` e
+join autobahn_roads r on r.road = e.road_ref
+where e.source_ref = any($1) and `+eventPermitted+`
+  and e.withdrawn_at is null and e.valid_from <= $2 and (e.valid_to is null or e.valid_to > $2)`, "text[]", "timestamptz")
+
+// motorwaysOf reads the roads of the register, by length of reference then
+// reference, at most $4: each with its number of junctions, its situations
+// in force at $5 of the families $1 (counted and their families, read once
+// and grouped by road), its family and the registers of its junctions. $2 a
+// Land (” every road): the roads $6 in it, and with liveLand those with a
+// junction in it; $3 one road (” every road).
+func motorwaysOf(name string, liveLand bool) stmt {
+	inLand := ``
+	if liveLand {
+		inLand = `
+       or exists (select 1 from tmc_locations t where t.road_number = r.road and ` + motorwayJunctions + `
+                  and contract_junction_land(t.geom) = $2::text)`
+	}
+	return opaqueNamed(name, `
+with es as (
+  select e.road_ref, count(*)::int as n, array_agg(distinct e.source_ref order by e.source_ref) as sources
+  from `+trafficEvents(false)+` e
+  where e.source_ref = any($1) and `+eventPermitted+`
+    and e.withdrawn_at is null and e.valid_from <= $5 and (e.valid_to is null or e.valid_to > $5)
+  group by e.road_ref)
+select r.road, r.road, jc.n, coalesce(es.n, 0), 'autobahn', coalesce(es.sources, '{}'),
+       case when jc.n > 0 then array['bast_lcl'] else '{}'::text[] end
+from autobahn_roads r
+cross join lateral (select count(*)::int n from tmc_locations t where t.road_number = r.road and `+motorwayJunctions+`) jc
+left join es on es.road_ref = r.road
+where ($2::text = '' or r.road = any($6::text[])`+inLand+`)
+  and ($3::text = '' or r.road = $3::text)
+order by length(r.road), r.road
+limit $4`, "text[]", "text", "text", "int8", "timestamptz", "text[]")
+}
+
+var (
+	// motorways are the roads while the junction Länder are current: the
+	// roads in a Land are those of $6.
+	motorways = motorwaysOf("api_motorways", false)
+	// motorwaysLiveLand are the roads when they are not: a road with a
+	// junction in the Land is in it too.
+	motorwaysLiveLand = motorwaysOf("api_motorways_live_land", true)
+)
+
+// roadLampMessages is the lamp's view of the situations on each road of $3
+// (canonical references), of the families $1 at $2 (messagesSelect).
+var roadLampMessages = opaqueNamed("api_road_lamp_messages", `select `+fmt.Sprintf(canonicalRef, "e.road_ref")+`, `+messagesAgg+`
+`+messagesFrom(false)+`
+  and `+fmt.Sprintf(canonicalRef, "e.road_ref")+` = any($3)
+group by 1`, "text[]", "timestamptz", "text[]")
 
 // motorwayJunctions are the LCL's German motorway points with a name, the
 // junctions of a motorway page, aliased t.
@@ -193,10 +223,7 @@ func (s *Store) RoadLamps(ctx context.Context, refs []string, fams roads.Familie
 		// The reads in order; the first that fails ends the snapshot.
 		for _, step := range []func() error{
 			func() error {
-				res, _ := tx.Query(ctx, `select `+fmt.Sprintf(canonicalRef, "e.road_ref")+`, `+messagesAgg+`
-`+messagesFrom+`
-  and `+fmt.Sprintf(canonicalRef, "e.road_ref")+` = any($3)
-group by 1`, fams.Roads, now, refs)
+				res, _ := run(ctx, tx, roadLampMessages, fams.Roads, now, refs)
 				var (
 					ref    string
 					stored []storedMessage
@@ -225,7 +252,7 @@ group by 1`, fams.Roads, now, refs)
 				return err
 			},
 			func() (err error) {
-				res, _ := tx.Query(ctx, sourcesSelect, append(slices.Clone(fams.Roads), fams.Weather...))
+				res, _ := run(ctx, tx, sourcesSelect, append(slices.Clone(fams.Roads), fams.Weather...))
 				sources, err = sourcesOf(res, confirmations)
 				return err
 			},

@@ -182,7 +182,17 @@ type Exclusion struct {
 // in a case of operation asking request.
 func (r Rules) Excludes(operation, request, name string) bool {
 	for _, e := range r.Excluded {
-		if exclusionPattern(e.Pattern).MatchString(name) && (e.Asked == "" || Asks(request, e.Asked)) && (e.Operation == "" || e.Operation == operation) {
+		// The operation and the pattern's literal start are compared first:
+		// Excludes is asked for every fact against every exclusion, and the
+		// pattern alone made loading the pinned bundle take 2 s under -race
+		// (TST-012). The start before a [*] is a part every match begins with.
+		if e.Operation != "" && e.Operation != operation {
+			continue
+		}
+		if start, _, _ := strings.Cut(e.Pattern, "[*]"); !strings.HasPrefix(name, start) {
+			continue
+		}
+		if exclusionPattern(e.Pattern).MatchString(name) && (e.Asked == "" || Asks(request, e.Asked)) {
 			return true
 		}
 	}

@@ -14,7 +14,7 @@ import (
 // plantSite is one charging site of family ref, origin key, at lat, lon:
 // a row the fixture's own charging sites are planted the same way as.
 func plantSite(ref, key string, lat, lon string) string {
-	return `insert into contract.charging_site (site_id, name, operator_name, location, source_ref, origin_key, recorded_at, changed_at, withdrawn_at)
+	return `insert into vf_seed.charging_site (site_id, name, operator_name, location, source_ref, origin_key, recorded_at, changed_at, withdrawn_at)
 values ('` + ref + `:` + key + `', 'Testladen ` + key + `', 'Test Strom', st_setsrid(st_makepoint(` + lon + `, ` + lat + `), 4326), '` + ref + `', '` + key + `', now(), now(), null)`
 }
 

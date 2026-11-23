@@ -1,6 +1,8 @@
 # Reasoned exceptions to the scope lint. One line per exception:
 # rule (vocabulary, denylist or column), the path, the matched word, the reason.
 # An entry that matches no finding fails the lint, so none outlives its cause.
+# A denylist or vocabulary entry whose path ends in a slash and whose word is
+# "-" covers that rule's findings in every file under that directory.
 column	api/openapi.json	contractVersion	the version of the read contract itself is public by design (FR-SVC-003); the contract is the published interface, not storage
 column	api/openapi.json	licenceUrl	member name of the attribution object fixed by Spec: Data Licensing and Attribution, section 2; the licence vocabulary, not a storage name
 column	api/openapi.json	shareAlike	member name of the attribution object fixed by Spec: Data Licensing and Attribution, section 2; the licence vocabulary, not a storage name
@@ -52,3 +54,6 @@ vocabulary	live-ingestor.pin	ingest	the live refresher's published image name, w
 vocabulary	internal/release/livepin/livepin.go	ingest	the live pin's file name and the live refresher's published image name, written once as constants; a product name of another repository, not the API's vocabulary
 vocabulary	docs/RELEASING.md	ingest	the live pin's file name in the release checklist (make live-e2e); a product name of another repository, not the API's vocabulary
 column	api/openapi.json	stopIds	member name of a board station, the stops the departure board reads (the station, then its stop points) exactly as the platform board states stop.stopIds (FR-TRANSIT-002); the board vocabulary, not the alert view storage name
+denylist	internal/adapters/store/	-	owner decision 2026-11-23: the store reads the platform's tables directly, so its statements and their tests name them; nowhere else
+denylist	internal/testkit/baseseed/	-	the test seed writes the platform's tables the store reads
+vocabulary	internal/testkit/baseseed/	-	the platform's table and column names the test seed writes carry these words, and the ids it builds are the platform's

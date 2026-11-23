@@ -203,7 +203,7 @@ func (db *DB) seedTemplate(ctx context.Context, maint *pgx.Conn, name, rows stri
 	if _, err := maint.Exec(ctx, "create database "+ident(build)+" template "+ident(Database)); err != nil {
 		return fmt.Errorf("pgtest: create %s: %w", build, err)
 	}
-	if err := SeedWith(ctx, db.Pin, db.urlOf(db.imageURL, build), rows, runImage); err != nil {
+	if err := SeedWith(ctx, db.urlOf(db.OwnerURL, build), rows); err != nil {
 		return err
 	}
 	// A copy carries the template's statistics: gathered here once, a copy's

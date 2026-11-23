@@ -252,7 +252,7 @@ func private(t *testing.T, rows ...string) (*store.Store, *pgtest.DB) {
 // A Land's coverage names its own families, those current only, and the
 // families it carries.
 func TestStateCoverageReadsEveryRole(t *testing.T) {
-	st, _ := private(t, `insert into contract.message_coverage (state_code, source_ref, coverage_role, current_only)
+	st, _ := private(t, `insert into vf_seed.message_coverage (state_code, source_ref, coverage_role, current_only)
 		select '09', s.source_ref, case when s.n = 1 then 'own' else 'carried' end, s.n = 1
 		from (select source_ref, row_number() over (order by source_ref) n from contract.source
 		      where source_ref not in (select source_ref from contract.message_coverage where state_code = '09')) s
@@ -267,7 +267,7 @@ func TestStateCoverageReadsEveryRole(t *testing.T) {
 
 // An alert placed on a station's stops counts against that station.
 func TestAffectedStationsCountAnAlertOnTheirStops(t *testing.T) {
-	st, cp := private(t, `insert into contract.service_alert (alert_id, header, source_ref, recorded_at, changed_at, active_periods, placed_by, stop_ids)
+	st, cp := private(t, `insert into vf_seed.service_alert (alert_id, header, source_ref, recorded_at, changed_at, active_periods, placed_by, stop_ids)
 		select a.alert_id || '-stop', a.header, a.source_ref, now(), now(), '[]', 'stop',
 		       array[(select stop_place_id from contract.stop_place where withdrawn_at is null order by stop_place_id limit 1)]
 		from contract.service_alert a order by a.alert_id limit 1`)

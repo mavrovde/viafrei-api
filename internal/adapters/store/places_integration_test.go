@@ -79,7 +79,7 @@ order by p.place_id limit 1`, &id, &name, &en)
 where p.place_kind = 'municipality' and p.official_key ~ '^[0-9]{5}[0-9]{2}[1-9]$' and p.withdrawn_at is null and p.location is not null
   and p.display_class <> 'withhold' and p.audience = 'public'
 order by p.place_id limit 1`, &id, &name)
-	change(t, `insert into contract.place (place_id, place_kind, name, location, region_code, official_key, prominence, source_ref, origin_key,
+	change(t, `insert into vf_seed.place (place_id, place_kind, name, location, region_code, official_key, prominence, source_ref, origin_key,
     recorded_at, changed_at, withdrawn_at, source_refs, display_class, audience)
   select k.id, 'district', k.name, p.location, p.region_code, left(p.official_key, 5), 0, $2, 'o-' || k.id,
     p.recorded_at, p.changed_at, k.gone, array[$2::text], 'open', 'public'

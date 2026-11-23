@@ -45,7 +45,7 @@ services:
   # gives the API's read-only role its password. It runs on every start and
   # changes nothing on a database already at the head.
   db-migrate:
-    image: ghcr.io/mavrovde/viafrei-database:0.3.3@sha256:cbb13410895dbb483b9b17b4f38d56d8a718b8c8cc53e7a803f3a0f127d4b290
+    image: ghcr.io/mavrovde/viafrei-database:0.4.5@sha256:7fccaa6cdabe472f805065dcd9e2d34fe9e3ea664bc28c4b4a87d39c639ae630
     depends_on:
       db:
         condition: service_healthy
@@ -83,12 +83,13 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
 
-  # The release's test seed writes the set into the platform's tables, once:
+  # The API's test seed (internal/testkit/baseseed) writes the set into the
+  # platform's tables, once, with the release's psql:
   # a database whose contract already lists a place is left as it is
   # (`make reset` starts over). Not the source register: the migrations
   # write that themselves. The image must equal db-migrate's.
   db-seed:
-    image: ghcr.io/mavrovde/viafrei-database:0.3.3@sha256:cbb13410895dbb483b9b17b4f38d56d8a718b8c8cc53e7a803f3a0f127d4b290
+    image: ghcr.io/mavrovde/viafrei-database:0.4.5@sha256:7fccaa6cdabe472f805065dcd9e2d34fe9e3ea664bc28c4b4a87d39c639ae630
     depends_on:
       db-migrate:
         condition: service_completed_successfully
@@ -99,6 +100,7 @@ services:
       VF_TEST_FIXTURES: "1"
     volumes:
       - seed:/seed:ro
+      - ./internal/testkit/baseseed/base_seed.sql:/baseseed/base_seed.sql:ro
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
@@ -107,7 +109,8 @@ services:
         else
           sum=$$(tr -d '\n' < /seed/manifest.json | sed -n 's/.*"checksum": *"\([^"]*\)".*/\1/p')
           [ -n "$$sum" ] || { echo "/seed/manifest.json names no checksum" >&2; exit 1; }
-          node /app/dist/cli.js test-fixtures seed /seed/seed.sql
+          { cat /baseseed/base_seed.sql; echo "select vf_test.contract_seed_begin('seed.sql');"; sed 's/^insert into contract\./insert into vf_seed./' /seed/seed.sql; echo "select vf_test.contract_seed_end();"; } |
+            psql -X -q -1 -v ON_ERROR_STOP=1 "$$DATABASE_URL" > /dev/null
           echo "fixtures seeded: $$sum"
         fi
     read_only: true

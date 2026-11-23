@@ -233,8 +233,8 @@ func (g *gen) src(domain string, families ...string) string {
 // ------------------------------------------------------------- provenance
 
 // The rows are written in the read contract's columns and loaded through the
-// pinned database image's seed (test-fixtures seed), which writes the
-// platform's own tables and reads every row back through the contract view.
+// test seed (internal/testkit/baseseed), which writes the platform's own
+// tables and reads every row back through the contract view while one exists.
 // So a row gives only what the platform stores: a value the view derives (a
 // licence category, a domain, an envelope, a search fold) is the platform's,
 // and every identifier has the form the view builds it in.

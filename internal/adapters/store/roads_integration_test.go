@@ -420,7 +420,7 @@ func TestTheLampReadsTheScopeNotTheFilters(t *testing.T) {
 	})
 	var n int
 	owner(t, `with ins as (
-  insert into contract.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from, headline, source_ref,
+  insert into vf_seed.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from, headline, source_ref,
     origin_key, published_at, recorded_at, changed_at)
   select '`+fixtures.PlantedEvent("")+`' || v.id, v.kind, v.ref, 'motorway', e.location, '2102-01-01T00:00:00Z', v.headline, e.source_ref,
     v.id, '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z'
@@ -554,7 +554,7 @@ func TestAReadIsOneSnapshot(t *testing.T) {
 			return err
 		}
 		defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
-		if _, err := conn.Exec(ctx, `insert into contract.rule_topic (topic_code, title, title_en, reviewed_on) values ('snapshot_probe', 'Probe', 'Probe', '2026-01-01')`); err != nil {
+		if _, err := conn.Exec(ctx, `insert into vf_seed.rule_topic (topic_code, title, title_en, reviewed_on) values ('snapshot_probe', 'Probe', 'Probe', '2026-01-01')`); err != nil {
 			return err
 		}
 		return tx.QueryRow(ctx, "select count(*) from contract.rule_topic").Scan(&after)
@@ -590,7 +590,7 @@ func TestTheLampReadsItsRecordsAndItsSight(t *testing.T) {
 	change(t, `update contract.junction set state_code = case when road_ref <> 'A101' then '97'
   when right(junction_id, 1) in ('0', '2', '4', '6', '8') then '98' else '99' end`)
 	var n int
-	owner(t, `with ins as (insert into contract.message_coverage (state_code, source_ref, coverage_role, current_only)
+	owner(t, `with ins as (insert into vf_seed.message_coverage (state_code, source_ref, coverage_role, current_only)
 values ('98', '`+fams[0]+`', 'own', true), ('98', '`+fams[1]+`', 'carried', false), ('98', '`+weather[0]+`', 'carried', false)
 returning 1) select count(*) from ins`, &n)
 	t.Cleanup(func() { change(t, `delete from contract.message_coverage where state_code = '98'`) })
@@ -612,7 +612,7 @@ returning 1) select count(*) from ins`, &n)
 		change(t, `delete from contract.traffic_event where event_id in ('autobahn:ev-lamp-operator', 'autobahn:ev-lamp-later', $1)`, message)
 	})
 	owner(t, `with ins as (
-  insert into contract.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from,
+  insert into vf_seed.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from,
     headline, description, source_ref, origin_key, published_at, recorded_at, changed_at, subtitle, is_blocked, traffic_type, delay_s)
   select v.id, v.kind, 'A101', 'motorway', e.location, '2102-01-01T00:00:00Z',
     v.headline, v.description, coalesce(v.family, e.source_ref), v.origin,
@@ -720,7 +720,7 @@ func TestTheLampReadsWhenItsScopeNextChanges(t *testing.T) {
 		change(t, `delete from contract.traffic_event where event_id like $1`, fixtures.PlantedEvent("ev-next-%"))
 	})
 	owner(t, `with ins as (
-  insert into contract.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from, valid_to,
+  insert into vf_seed.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from, valid_to,
     headline, source_ref, origin_key, published_at, recorded_at, changed_at, withdrawn_at)
   select '`+fixtures.PlantedEvent("")+`' || v.id, 'jam', 'A101', 'motorway', e.location, v.since::timestamptz, v.until::timestamptz,
     v.headline, e.source_ref, v.id, '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z', v.withdrawn::timestamptz
@@ -807,7 +807,7 @@ func TestAnUnregisteredRoadIsReadByItsReference(t *testing.T) {
 	// road no other test asks for, in 2102; a second run plants it once.
 	var family string
 	owner(t, `select source_ref from contract.traffic_event where event_id = '`+fixtures.PlantedEvent("ev-u-kind")+`'`, &family)
-	change(t, `insert into contract.traffic_event (event_id, event_kind, road_ref, road_class, valid_from, headline, source_ref,
+	change(t, `insert into vf_seed.traffic_event (event_id, event_kind, road_ref, road_class, valid_from, headline, source_ref,
     origin_key, published_at, recorded_at, changed_at)
   select $1, 'other', 'L 1025', 'state', '2102-01-01T00:00:00Z', 'Baustelle', $2,
     'ev-land-l', '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z'
@@ -855,7 +855,7 @@ from contract.weather_warning w, contract.junction j
 where w.warning_id = 'dwd:900001' and j.road_ref = 'A101' order by j.junction_id limit 1`, &region, &family, &lat, &lon)
 	var n int
 	owner(t, `with ins as (
-  insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
+  insert into vf_seed.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
     valid_from, valid_to, published_at, region_code, source_ref, recorded_at, withdrawn_at, area)
   select v.id, 'fog', v.level, 'Stufe', 'actual', 'Deutscher Wetterdienst', 'Nebel', 'de',
     '2104-01-01T00:00:00Z', '2104-01-02T00:00:00Z', null, '`+region+`', '`+family+`', '2104-01-01T00:00:00Z', null,
@@ -912,7 +912,7 @@ where w.warning_id = 'dwd:900001' and j.road_ref = 'A101' order by j.junction_id
 	}
 	var n int
 	owner(t, `with ins as (
-  insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
+  insert into vf_seed.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
     valid_from, valid_to, published_at, region_code, source_ref, recorded_at, withdrawn_at, area, warn_cell_id)
   select v.id, 'fog', v.level, 'Stufe', 'actual', 'Deutscher Wetterdienst', 'Nebel', 'de',
     '2104-01-01T00:00:00Z', '2104-01-02T00:00:00Z', null, null, '`+family+`', '2104-01-01T00:00:00Z', null,
@@ -988,7 +988,7 @@ func sum(counts map[string]int) int {
 func TestASituationStatesItsSubtitleAndBlock(t *testing.T) {
 	req.Covers(t, "FR-ROAD-002")
 	said, unsaid := "autobahn:ev-said", "autobahn:ev-unsaid"
-	st, _ := private(t, `insert into contract.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from,
+	st, _ := private(t, `insert into vf_seed.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from,
     headline, source_ref, origin_key, recorded_at, changed_at, subtitle, is_blocked)
   select v.id, 'jam', 'A101', 'motorway', e.location, '2102-01-01T00:00:00Z',
     'Stau', 'autobahn', v.origin, '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z', v.subtitle, v.blocked

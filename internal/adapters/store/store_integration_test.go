@@ -87,7 +87,7 @@ func TestReaderRoleCannotWrite(t *testing.T) {
 	}
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
 
-	if _, err := conn.Exec(ctx, "insert into contract.publisher (publisher_id, display_name) values ('x', 'x')"); sqlState(err) != "25006" {
+	if _, err := conn.Exec(ctx, "insert into public.gazetteer_places (name) values ('x')"); sqlState(err) != "25006" {
 		t.Errorf("a default session must be read-only (25006), got %v", err)
 	}
 	// Even a session that switches itself to read-write holds no write grant.
@@ -95,7 +95,7 @@ func TestReaderRoleCannotWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tx.Exec(ctx, "insert into contract.publisher (publisher_id, display_name) values ('x', 'x')"); sqlState(err) != "42501" {
+	if _, err := tx.Exec(ctx, "insert into public.gazetteer_places (name) values ('x')"); sqlState(err) != "42501" {
 		t.Errorf("an insert must be refused by privilege (42501), got %v", err)
 	}
 	_ = tx.Rollback(ctx)

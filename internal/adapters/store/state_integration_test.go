@@ -48,7 +48,7 @@ func TestStateWarningsCountAsTheLandPage(t *testing.T) {
 // secondary's row first by id, the primary's naming another Land too.
 func plantMessage(t *testing.T) {
 	t.Helper()
-	n := plant(t, `insert into contract.service_alert (alert_id, header, active_periods, line_names, district_codes, state_codes, placed_by, dedupe_key,
+	n := plant(t, `insert into vf_seed.service_alert (alert_id, header, active_periods, line_names, district_codes, state_codes, placed_by, dedupe_key,
   source_ref, recorded_at, changed_at, primary_source)
 values ('delfi_rt_sa:pm-1', 'Gleisarbeiten', '[]', '{U 3}', '{09162,08111}', '{09,08}', 'stop', 'pm-key', 'delfi_rt_sa', '2026-03-28T00:00:00Z', '2026-03-28T00:00:00Z', true),
        ('delfi_siri_sx:pm-0', 'Gleisarbeiten (SX)', '[]', '{U 6}', '{09162}', '{09}', 'stop', 'pm-key', 'delfi_siri_sx', '2026-03-28T00:00:00Z', '2026-03-28T00:00:00Z', false)`)
@@ -56,14 +56,14 @@ values ('delfi_rt_sa:pm-1', 'Gleisarbeiten', '[]', '{U 3}', '{09162,08111}', '{0
 		t.Fatalf("planted %d of 2", n)
 	}
 	// a primary alert whose only period ends an hour into the first day
-	plant(t, `insert into contract.service_alert (alert_id, header, active_periods, district_codes, state_codes, placed_by, dedupe_key, source_ref)
+	plant(t, `insert into vf_seed.service_alert (alert_id, header, active_periods, district_codes, state_codes, placed_by, dedupe_key, source_ref)
 values ('delfi_rt_sa:pm-2', 'Signalstörung', '[{"start":"2026-03-28T00:00:00Z","end":"2026-03-28T13:00:00Z"}]', '{09162}', '{09}', 'stop', 'pm-key-2', 'delfi_rt_sa')`)
 	// both publications checked two days after the fixture's first day, so
 	// alive from then back three cadences and at any earlier instant
 	for _, src := range []string{"delfi_rt_sa", "delfi_siri_sx"} {
 		// the seed's platform sources have no publication of their own to check
-		plant(t, `insert into contract.publisher (publisher_id, display_name) values ('`+src+`', '`+src+`')`)
-		plant(t, `insert into contract.source_freshness (source_ref, data_as_of, confirmed_at, confirm_interval_s)
+		plant(t, `insert into vf_seed.publisher (publisher_id, display_name) values ('`+src+`', '`+src+`')`)
+		plant(t, `insert into vf_seed.source_freshness (source_ref, data_as_of, confirmed_at, confirm_interval_s)
 values ('`+src+`', '2026-03-30T11:59:00Z', '2026-03-30T11:59:00Z', 300)`)
 	}
 	// the read contract takes no delete and no other test of the package

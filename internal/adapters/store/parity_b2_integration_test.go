@@ -19,6 +19,8 @@ select pt.lon, pt.lat, v.r, v.l, v.fs from pt, fam,
 		"api_sharing_nearest": `with fam as (select array_agg(distinct source_feed) f from public.gbfs_stations)
 select pt.lon, pt.lat, 100000::float8, v.fs from (select st_x(geom::geometry) lon, st_y(geom::geometry) lat from public.gbfs_stations where geom is not null
   union all values (13.405::float8, 52.52::float8), (6.0, 47.0)) pt, fam, lateral (values (fam.f), ('{}'::text[])) v(fs)`,
+		"api_speed_official": speedCases,
+		"api_speed_osm":      speedCases,
 		"api_hydrogen_near": `with fam as (select array_agg(distinct source_feed) f from public.hydrogen_stations),
 pt as (select st_x(geom::geometry) lon, st_y(geom::geometry) lat from public.hydrogen_stations where geom is not null
        union all values (13.405::float8, 52.52::float8))
@@ -55,3 +57,13 @@ select e.eva, v.fs from (select distinct eva from domains.train_board_departures
 		namedCases[name] = casesOf(sql)
 	}
 }
+
+// speedCases are a point at every camera and in Berlin, under two radii,
+// the day of the newest announced check and today, every family and none.
+const speedCases = `with fam as (select array_agg(distinct f) f from (select source_feed f from public.speed_enforcement union select source_feed from public.hh_cameras
+       union select source_id from public.osm_speed_cameras) x),
+pt as (select st_x(geom::geometry) lon, st_y(geom::geometry) lat from public.speed_enforcement where geom is not null
+       union select st_x(geom::geometry), st_y(geom::geometry) from public.osm_speed_cameras union values (13.405::float8, 52.52::float8)),
+d as (select coalesce(max(valid_from), current_date) d from public.speed_enforcement union select current_date)
+select pt.lon, pt.lat, v.r, d.d, v.fs, v.l from pt, fam, d,
+  lateral (values (2000::float8, fam.f, 50), (20000, fam.f, 3), (2000, '{}'::text[], 50)) v(r, fs, l)`

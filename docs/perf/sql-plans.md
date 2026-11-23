@@ -45,6 +45,8 @@ each Land's probe into the first entry of its range.
 | api_sharing_stations_near | 50 ms mean | 0.7-7 ms | 5 / 5 | index scan of `gbfs_stations_geom_open`, each count by the status key |
 | api_sharing_vehicles_near | 58 ms mean | 0.3-4 ms | 5 / 5 | index scan of `gbfs_vehicles_geom` |
 | api_sharing_nearest | 46 ms mean | 5-33 ms | 5 / 5 | nearest-neighbour scan of `gbfs_stations_geom_open` |
+| api_speed_official | 5 ms mean | 0.7-6 ms | 5 / 5 | the official cameras' area indexes |
+| api_speed_osm | 139 ms mean, up to 320 ms | 89-177 ms | 5 / 5 | the Gemeinde cut (BKG points within 80 km) is read on the points' surface, which no index holds, as before |
 
 The view cast the area to `geometry(MultiPolygon,4326)`, an expression no
 index holds, so the box test read every warning's area; the statements test

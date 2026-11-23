@@ -167,6 +167,7 @@ func TestNamedStatementsAnswerAsTheViews(t *testing.T) {
 						t.Errorf("own %s %v:\n got %q\nwant %q", own, args, got, want)
 					}
 					matched += len(want)
+					store.NoteParity(r.Name, len(want))
 					if _, err := tx.Exec(ctx, "set local plan_cache_mode = force_generic_plan"); err != nil {
 						t.Fatal(err)
 					}

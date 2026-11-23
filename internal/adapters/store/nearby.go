@@ -26,6 +26,8 @@ var needPlaces = func() map[string]stmt {
 // needStatement is the statement of the need with its kinds: the nearest
 // $5 through the GiST's nearest-neighbour scan (needNearest) bound the
 // distance, and the places within it are ordered by distance and id.
+//
+//nolint:misspell // materialized is the SQL keyword
 func needStatement(need string, kinds []string) stmt {
 	lits := make([]string, len(kinds))
 	for i, k := range kinds {

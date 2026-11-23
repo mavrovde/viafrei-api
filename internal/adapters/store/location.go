@@ -42,13 +42,15 @@ where a.source_ref = any($3) and ` + permitted("a") + `
 order by a.location <-> st_setsrid(st_makepoint($1, $2), 4326), a.address_id
 limit 1`
 
-// stateOf reads the Land whose region code begins the code $1.
-var stateOf = opaque(`select p.place_id, p.name, p.place_kind, st_y(p.location), st_x(p.location), p.region_code, p.source_ref, null::int, p.official_key
+// stateOf reads the Land whose region code begins the code $1. It is sent
+// as written, not opaque: on prod its generic plan ran 1591 ms a call against
+// 410 ms for the plan made for the asked code.
+var stateOf = `select p.place_id, p.name, p.place_kind, st_y(p.location), st_x(p.location), p.region_code, p.source_ref, null::int, p.official_key
 from contract.place p
 where p.place_kind = 'state' and p.withdrawn_at is null and p.location is not null and p.region_code = left($1, 2)
-  and p.source_ref = any($2) and `+permitted("p")+`
+  and p.source_ref = any($2) and ` + permitted("p") + `
 order by p.place_id
-limit 1`, "text", "text[]")
+limit 1`
 
 // nearestAddress reads the nearest address within $3 metres of ($1, $2).
 var nearestAddress = `select a.address_id, a.street, a.house_number, a.postcode, a.place_name, a.land_name,

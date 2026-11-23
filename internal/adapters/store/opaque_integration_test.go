@@ -21,8 +21,8 @@ func TestEveryOpaqueReadDeclaresTheTypesPostgresInfers(t *testing.T) {
 	}
 	defer func() { _ = conn.Close(ctx) }()
 	reads := store.OpaqueReads()
-	if len(reads) != 20 {
-		t.Fatalf("%d opaque reads, want the 20 the package rewrites", len(reads))
+	if len(reads) != 17 {
+		t.Fatalf("%d opaque reads, want the 17 the package rewrites", len(reads))
 	}
 	for i, r := range reads {
 		for j, text := range []string{r.SQL, r.Sent} {

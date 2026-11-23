@@ -58,8 +58,10 @@ func (s *Store) Station(ctx context.Context, id string, families []string) (tran
 // official region key the district code starts with, empty for any (a
 // station with no district then left out). A station stored with no position is left out: an answer places
 // every station it lists. The folded text holds letters and digits only, so
-// it carries no LIKE wildcard.
-var stationsPage = opaque(`
+// it carries no LIKE wildcard. It is sent as written, not opaque: each
+// optional filter is decided by its argument, and on prod the generic plan
+// that cannot see them ran past 5 s where the asked plan took 7 ms.
+var stationsPage = `
 with here as (
   select case when $2::float8 is null then null
               else st_setsrid(st_makepoint($3::float8, $2::float8), 4326)::geography end g)
@@ -71,7 +73,7 @@ from contract.stop_place s, here
 where s.withdrawn_at is null
   and s.location is not null
   and s.source_ref = any($1)
-  and `+permitted("s")+`
+  and ` + permitted("s") + `
   and ($4::text = '' or s.search_fold like '%' || $4::text || '%')
   and (here.g is null or st_dwithin(s.location::geography, here.g, $5))
   and ($7::text = '' or s.eva_no = $7::text or s.national_stop_code = $7::text)
@@ -79,7 +81,7 @@ where s.withdrawn_at is null
   and ($9::text = '' or s.region_code like $9::text || '%')
 order by case when here.g is null and not s.search_fold like $4::text || '%' then 1 else 0 end,
          dist, s.name, s.stop_place_id
-limit $6`, "text[]", "double precision", "double precision", "text", "double precision", "bigint", "text", "boolean", "text")
+limit $6`
 
 // Stations reads the stations that answer q (features.Transit), one more
 // than the limit, to tell whether more answer.

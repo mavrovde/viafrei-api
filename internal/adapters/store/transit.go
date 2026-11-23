@@ -315,6 +315,8 @@ group by 1`, "text[]")
 // them: per station, minute and line the sources are folded (the most
 // cancelled, and as late the most cancelled or late less the most
 // cancelled), then summed per station; with the families read.
+//
+//nolint:misspell // materialized is the SQL keyword
 var affectedCalls = namedOpaque("api_affected_calls", `
 with d as (
   select d.station_ifopt, d.aimed_minute, d.line_key, d.cancelled, d.late, d.source_ref
@@ -325,9 +327,11 @@ with d as (
   from d group by 1, 2, 3
 ), s as (
   select station_ifopt, sum(c)::int as c, sum(l)::int as l from f group by 1 having sum(c) + sum(l) > 0
+), srcs as materialized (
+  select station_ifopt, array_agg(distinct source_ref order by source_ref) as refs from d group by 1
 )
-select s.station_ifopt, s.c, s.l, (select array_agg(distinct d.source_ref order by d.source_ref) from d where d.station_ifopt = s.station_ifopt)
-from s`, "text[]")
+select s.station_ifopt, s.c, s.l, x.refs
+from s join srcs x on x.station_ifopt = s.station_ifopt`, "text[]")
 
 // affectedPlaces are the stations of the families ($1) with these ids or
 // IFOPTs ($2), each with the ref it was named by.

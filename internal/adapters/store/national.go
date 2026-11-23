@@ -9,23 +9,48 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/national"
 )
 
+// sourceRules are the sources whose rows a reader may see, by the
+// platform's source rules (the first pattern a source matches, by priority;
+// no pattern = open and public): not excluded, not withheld, public or an
+// own key. A charging site or point carries its source's rule, so the rule
+// is matched once per source, not once per row as the relations do (most
+// of the charging summary's seconds on prod). A site is one row of its
+// source and id, and a point's site is its source and site id: the ids the
+// relations join, source || ':' || id, are the same pairs, a source name
+// holding no colon.
+const sourceRules = `
+select src.feed
+from (select distinct x.source_feed as feed from charging_sites x where x.deleted_at is null
+      union select distinct y.source_feed from charging_points y where y.deleted_at is null) src
+left join lateral (
+  select k.excluded, k.display_class, k.audience from contract_source_rules k
+  where src.feed ~ k.pattern order by k.priority limit 1) k on true
+where not coalesce(k.excluded, false) and coalesce(k.display_class, 'open') <> 'withhold'
+  and (coalesce(k.audience, 'public') = 'public' or ` + ownKeyOn + `)`
+
 // The national picture, one statement per domain: $1 the families, $2 the
 // instant; the energy statement's $3 is the fuel price window in seconds.
 // Each row is section, key, name, family, n, m, low, mid.
+//
+//nolint:misspell // materialized is the SQL keyword
 var nationalSQL = map[string]stmt{
 	"roads": namedOpaque("api_national_roads", `
+with e as materialized (
+  select e.event_kind, e.state_code, e.source_ref
+  from (`+relTrafficEvent+`) e
+  where `+nationalInForce+`)
 select 'situations', e.event_kind, null::text, e.source_ref, count(*)::int, null::int, null::float8, null::float8
-from (`+relTrafficEvent+`) e
-where `+nationalInForce+`
+from e
 group by 2, 4
 union all
 select 'states', e.state_code, null, e.source_ref, count(*)::int, null, null, null
-from (`+relTrafficEvent+`) e
-where `+nationalInForce+` and e.state_code is not null
+from e
+where e.state_code is not null
 group by 2, 4
 order by 1, 2, 4`, "text[]", "timestamp with time zone"),
 	"energy": namedOpaque("api_national_energy", `
-with latest as (
+with rules as materialized (`+sourceRules+`),
+latest as (
   select distinct on (o.station_id, o.product_code) o.product_code, o.price, o.source_ref
   from (`+relFuelPriceObservation+`) o
   join (`+relFuelStation+`) s on s.station_id = o.station_id and s.withdrawn_at is null and s.source_ref = any($1) and `+permitted("s")+`
@@ -37,10 +62,18 @@ select 'fuel', l.product_code, null::text, l.source_ref, count(*)::int, null::in
 from latest l
 group by 2, 4
 union all
-select 'charging', c.source_ref, null, c.source_ref, count(distinct c.site_id)::int, count(p.point_id)::int, null, null
-from (`+relChargingSite+`) c
-left join (`+relChargePoint+`) p on p.site_id = c.site_id and `+permitted("p")+`
-where c.withdrawn_at is null and c.source_ref = any($1) and `+permitted("c")+`
+select 'charging', c.source_feed, null, c.source_feed, count(*)::int, coalesce(sum(p.n), 0)::int, null, null
+from charging_sites c
+join rules r on r.feed = c.source_feed
+left join (
+  select p.source_feed, p.site_id, count(*) filter (where p.evse_id is not null or p.point_key is not null) as n
+  from charging_points p
+  join rules r on r.feed = p.source_feed
+  where p.deleted_at is null and p.site_id is not null
+    and coalesce(p.confidentiality, 'noRestriction') = 'noRestriction'
+  group by 1, 2) p on p.source_feed = c.source_feed and p.site_id = c.site_id
+where c.deleted_at is null and c.geom is not null and c.closed_at is null and c.source_feed = any($1)
+  and coalesce(c.confidentiality, 'noRestriction') = 'noRestriction' and not coalesce(c.access_private, false)
 group by 2, 4
 order by 1, 2, 4`, "text[]", "timestamp with time zone", "integer"),
 	"parking": namedOpaque("api_national_parking", `

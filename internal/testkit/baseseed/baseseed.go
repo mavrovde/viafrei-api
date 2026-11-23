@@ -38,3 +38,11 @@ func Script(name, rows string) string {
 // install in a database that rows are planted into later; installing it
 // again changes nothing.
 func Triggers() string { return triggers }
+
+//go:embed grants_0336.sql
+var grants string
+
+// Grants is the reader's SELECT on the platform's relations the store reads
+// (viafrei-database migration 0336), for a test database migrated by a
+// release before it.
+func Grants() string { return grants }

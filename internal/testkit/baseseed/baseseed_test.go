@@ -36,3 +36,11 @@ func TestScriptSendsTheFixtureSetToTheStagingTables(t *testing.T) {
 		t.Fatalf("not moved: %s", s[strings.Index(s, "contract_seed_begin"):])
 	}
 }
+
+// TestGrantsGiveTheReaderSelect: the grants are the reader's, and select only.
+func TestGrantsGiveTheReaderSelect(t *testing.T) {
+	g := baseseed.Grants()
+	if !strings.Contains(g, "grant select on public.gazetteer_places to api_reader;") || strings.Contains(strings.ToLower(g), "grant insert") {
+		t.Fatal("not the reader's select grants")
+	}
+}

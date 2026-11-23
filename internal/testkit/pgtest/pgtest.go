@@ -330,7 +330,7 @@ func passwords(ctx context.Context, ownerURL, readerPassword, accessPassword str
 		}
 	}
 	// The seed's staging tables and triggers, so every copy can plant rows.
-	if _, err := conn.Exec(ctx, baseseed.Triggers()); err != nil {
+	if _, err := conn.Exec(ctx, baseseed.Triggers()+"\n"+baseseed.Grants()); err != nil {
 		return fmt.Errorf("install the test seed: %w", err)
 	}
 	return nil

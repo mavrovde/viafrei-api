@@ -55,5 +55,6 @@ vocabulary	internal/release/livepin/livepin.go	ingest	the live pin's file name a
 vocabulary	docs/RELEASING.md	ingest	the live pin's file name in the release checklist (make live-e2e); a product name of another repository, not the API's vocabulary
 column	api/openapi.json	stopIds	member name of a board station, the stops the departure board reads (the station, then its stop points) exactly as the platform board states stop.stopIds (FR-TRANSIT-002); the board vocabulary, not the alert view storage name
 denylist	internal/adapters/store/	-	owner decision 2026-11-23: the store reads the platform's tables directly, so its statements and their tests name them; nowhere else
+vocabulary	internal/adapters/store/	-	owner decision 2026-11-23: the store's statements name the platform's tables and columns, which carry these words
 denylist	internal/testkit/baseseed/	-	the test seed writes the platform's tables the store reads
 vocabulary	internal/testkit/baseseed/	-	the platform's table and column names the test seed writes carry these words, and the ids it builds are the platform's

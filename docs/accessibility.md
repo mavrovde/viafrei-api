@@ -115,10 +115,9 @@ guide pages wrap, so no page scrolls sideways at 320 px. A third runner,
 the first stop a skip link to the main landmark, a visible focus on each
 kind of focusable element, heading names, a header cell in every table, no
 text cut off (also at the WCAG 1.4.12 text spacing), and, in a second load
-of every page at 320 px wide, no sideways scrolling. Since #20 the reference stands
-at four distinct failures, all `heading-order`: Redoc's headings skip a
-level between an operation and its parameters, which its theme cannot
-change.
+of every page at 320 px wide, no sideways scrolling. The reference stands at no
+failures: its `heading-order` count in `scripts/docs-a11y-baseline.json` is
+0, and the run measures 0.
 
 A raise that is deliberate (a Redoc upgrade that brings a new failure we
 accept) is declared, with its reason, by a line in the message of a commit

@@ -21,7 +21,6 @@ var viewsPending = map[string]bool{
 	"location.go": true, "lookup.go": true, "lorry.go": true, "national.go": true, "nearby.go": true,
 	"poi.go": true, "register.go": true, "roads.go": true, "roadshape.go": true, "sharing.go": true,
 	"speed.go": true, "state.go": true, "store.go": true, "trainboard.go": true, "transit.go": true,
-	"weather_cell.go": true, "weather.go": true,
 }
 
 var contractRead = regexp.MustCompile(`(?i)\bcontract\.[a-z_]`)

@@ -254,7 +254,7 @@ func fuzzTargetFindings(files map[string]string) []string {
 		out = append(out, "fuzz-nightly.yml has no run step")
 	}
 	for _, m := range runs {
-		if !strings.HasPrefix(m[1], "scripts/fuzz.sh ") && !strings.HasPrefix(m[1], "make compose-test ") && !strings.HasPrefix(m[1], "cat fuzz-report.md ") {
+		if !strings.HasPrefix(m[1], "scripts/fuzz.sh ") && !strings.HasPrefix(m[1], "make compose-test ") && !strings.HasPrefix(m[1], "cat fuzz-nightly/fuzz-report.md ") {
 			out = append(out, "fuzz-nightly.yml runs "+m[1]+", which is neither the fuzz script nor the compose smoke")
 		}
 	}

@@ -18,9 +18,9 @@ import (
 var viewsPending = map[string]bool{
 	"address.go": true, "bays.go": true, "catalogue.go": true, "coverage.go": true, "disruption.go": true,
 	"features.go": true, "freshness.go": true, "fuel.go": true, "hydrogen.go": true,
-	"location.go": true, "lookup.go": true, "lorry.go": true, "national.go": true, "nearby.go": true,
-	"poi.go": true, "register.go": true, "roads.go": true, "roadshape.go": true, "sharing.go": true,
-	"speed.go": true, "state.go": true, "store.go": true, "trainboard.go": true, "transit.go": true,
+	"lorry.go": true, "national.go": true,
+	"poi.go": true, "register.go": true, "roads.go": true, "sharing.go": true,
+	"speed.go": true, "store.go": true, "trainboard.go": true, "transit.go": true,
 	"weather_cell.go": true, "weather.go": true,
 }
 

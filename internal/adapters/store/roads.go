@@ -28,15 +28,22 @@ func codes[T ~string](list []T) []string {
 	return out
 }
 
+// roadByRef reads the motorway of the Autobahn register whose reference,
+// upper case without spaces, is $1, with the length and the Länder of the
+// shape the platform draws for it (contract_road_shape), drawn for that
+// road alone.
+var roadByRef = named("api_road", `
+select r.road, 'motorway', l.length_km::numeric(6,1)::float8, l.states
+from autobahn_roads r
+left join lateral contract_road_shape(r.road) l(line, length_km, states) on true
+where upper(replace(r.road, ' ', '')) = (select $1::text)
+order by r.road
+limit 1`, "text")
+
 // Road reads one road by its canonical reference.
 func (s *Store) Road(ctx context.Context, ref string) (roads.Road, error) {
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]roads.Road, error) {
-		rows, _ := tx.Query(ctx, `
-select road_ref, road_class, length_km::float8, states
-from contract.road r
-where upper(replace(road_ref, ' ', '')) = $1 and `+permitted("r")+`
-order by road_ref
-limit 1`, ref)
+		rows, _ := run(ctx, tx, roadByRef, ref)
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (roads.Road, error) {
 			var (
 				v          roads.Road
@@ -171,19 +178,42 @@ where s.source_ref = any($1)
 order by s.source_ref`
 
 // coverageSelect reads which of the given families cover the traffic
-// messages of the given states. $1 states, $2 families.
-const coverageSelect = `select state_code, source_ref, coverage_role, current_only
-from contract.message_coverage
-where state_code = any($1) and source_ref = any($2)
-  and display_class <> 'withhold' and (audience = 'public' or ` + ownKeyOn + `)
-order by state_code, source_ref`
+// messages of the given states. $1 states, $2 families. Coverage is the
+// platform's own measure of the families, open to every key.
+var coverageSelect = named("api_road_coverage", `
+select m.state_code, m.source_ref, m.coverage_role, m.current_only
+from message_coverage_sources m
+where m.state_code = any((select $1::text[])::text[]) and m.source_ref = any((select $2::text[])::text[])
+order by m.state_code, m.source_ref`, "text[]", "text[]")
 
-// statesOf aggregates the distinct, known state codes of the junctions a
-// query selects (column state_code) into a sorted array, empty when none.
-func statesOf(junctions string) string {
-	return `select coalesce(array_agg(distinct state_code order by state_code) filter (where state_code is not null), '{}')
-from (` + junctions + `) j`
+// statesOf is the statement name of the sorted Länder, as one array, of the
+// junctions the select junctions yields (one Land code a row, state_code).
+func statesOf(name, junctions string, types ...string) stmt {
+	return named(name, `select coalesce(array_agg(distinct state_code order by state_code) filter (where state_code is not null), '{}')
+from (`+junctions+`) j`, types...)
 }
+
+// The Länder of a scope. On a road those of its junctions (a motorway
+// point's reference is A and digits, as written, its canonical form); near a
+// point those of the junctions within $3 metres of ($2, $1), else that of the
+// nearest junction; in a state the state itself, or for de every Land of
+// the region register. A junction's Land is the platform's
+// (contract_junction_land: the Land of the nearest municipality).
+var (
+	statesOnRoad = statesOf("api_states_road", `select contract_junction_land(t.geom) state_code from tmc_locations t
+where t.road_number = (select $1::text) and `+motorwayJunctions, "text")
+	statesNear = statesOf("api_states_near", `with here as (select st_setsrid(st_makepoint((select $2::float8), (select $1::float8)), 4326) g),
+near as (select contract_junction_land(t.geom) state_code from tmc_locations t, here
+         where st_dwithin(t.geom::geometry(Point,4326)::geography, here.g::geography, (select $3::float8)) and `+motorwayJunctions+`)
+select state_code from near
+union all
+select (select contract_junction_land(t.geom) from tmc_locations t, here where `+motorwayJunctions+`
+        order by t.geom::geometry(Point,4326) <-> here.g, t.cid || ':' || t.tabcd || ':' || t.lcd limit 1)
+where not exists (select 1 from near)`, "float8", "float8", "float8")
+	statesInState = named("api_states_state", `select case when (select $1::text) = 'de'
+  then (select coalesce(array_agg(a.ags order by a.ags), '{}') from ags_regions a where a.level = 'land')
+  else array[(select $1::text)] end`, "text")
+)
 
 // sourcesOf collects the rows of sourcesSelect: the freshness of every
 // family, and into confirmations the newest confirmation of each that has a
@@ -230,15 +260,23 @@ func coverageOf(rows pgx.Rows) (map[string]ampel.Coverage, error) {
 	return out, err
 }
 
-// lampWarnings reads the weather warnings that have not ended under cond, the
-// scope's area condition over $3 onwards (of types), opaque: those in force
-// are the lamp's, and the earliest start or end after now of any is when the
-// scope changes.
-func lampWarnings(cond string, types ...string) string {
-	return opaque(`select w.source_ref, w.warning_level, w.valid_from <= $2,
-  case when w.valid_from > $2 then w.valid_from else w.valid_to end `+warningsPending+`
+// lampWarnings is the statement name of the weather warnings that have not
+// ended under cond, the scope's area condition over $3 onwards (of types):
+// those in force are the lamp's, and the earliest start or end after now of
+// any is when the scope changes. A warning is published (begun or not, not
+// deleted), not withdrawn and not cancelled, of the families $1, and has not
+// ended at $2.
+func lampWarnings(name, cond string, types ...string) stmt {
+	return named(name, `
+select w.source_feed, w.level::int, w.valid_from <= (select $2::timestamptz),
+  case when w.valid_from > (select $2::timestamptz) then w.valid_from else w.valid_to end
+from weather_warnings w
+where w.deleted_at is null and w.valid_from is not null and w.closed_at is null
+  and coalesce(w.closed_reason, '') <> 'withdrawn'
+  and w.source_feed = any((select $1::text[])::text[])
+  and (w.valid_to is null or w.valid_to > (select $2::timestamptz))
   and `+cond+`
-order by w.warning_level desc, w.warning_id`, append([]string{"text[]", "timestamp with time zone"}, types...)...)
+order by w.level::int desc, 'dwd:' || w.id`, append([]string{"text[]", "timestamptz"}, types...)...)
 }
 
 // The lamp's warnings by scope. On a road they are those on the location-code
@@ -247,12 +285,19 @@ order by w.warning_level desc, w.warning_id`, append([]string{"text[]", "timesta
 // districts the road crosses; at a point those whose own area reaches within
 // the radius, as the platform's warnings at a point test the warning's area;
 // in a state those whose cell key names the state in its first two digits.
+// A road's points are read by the road's own reference (a motorway point's
+// reference is A and digits, as written, so it is its canonical form), and
+// each point finds the open warnings on it through their area's GiST.
 var (
-	warningsOnRoad = lampWarnings(`exists (select 1 from contract.junction j
-               where `+fmt.Sprintf(canonicalRef, "j.road_ref")+` = $3 and `+permitted("j")+`
-                 and st_intersects(w.area, j.location))`, "text")
-	warningsNear    = lampWarnings(`w.area is not null and st_dwithin(w.area::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`, "double precision", "double precision", "double precision")
-	warningsInState = lampWarnings(`($3 = 'de' or (left(w.warn_cell_id, 1) in ('7', '8') and substr(w.warn_cell_id, 2, 2) = $3))`, "text")
+	warningsOnRoad = lampWarnings("api_lamp_warnings_road", `w.id in (select o.id from tmc_locations t
+               join weather_warnings o on st_intersects(o.area::geometry, t.geom::geometry(Point,4326))
+                 and o.closed_at is null and o.deleted_at is null
+               where t.road_number = (select $3::text) and `+motorwayJunctions+`)`, "text")
+	warningsNear = lampWarnings("api_lamp_warnings_near", `w.area is not null
+  and st_dwithin(w.area, st_setsrid(st_makepoint((select $4::float8), (select $3::float8)), 4326)::geography, (select $5::float8))`,
+		"float8", "float8", "float8")
+	warningsInState = lampWarnings("api_lamp_warnings_state", `((select $3::text) = 'de'
+  or (left(w.warncell_id, 1) in ('7', '8') and substr(w.warncell_id, 2, 2) = (select $3::text)))`, "text")
 )
 
 // scope is one read of the lamp's scope, run in the page's snapshot.
@@ -261,10 +306,10 @@ type scope struct {
 	args     []any
 	// warnings reads the weather warnings of the scope (lampWarnings), its
 	// area condition over $3 onwards of warningArgs.
-	warnings    string
+	warnings    stmt
 	warningArgs []any
 	// states selects the codes of the states in scope, over stateArgs.
-	states    string
+	states    stmt
 	stateArgs []any
 	// placed selects the families that placed the scope's situations in a
 	// Land, over args; empty when the scope is no Land.
@@ -380,7 +425,7 @@ func (s *Store) read(ctx context.Context, list string, listArgs []any, limit int
 				// One read of the warnings that have not ended: those in
 				// force are the lamp's, and the earliest start or end after
 				// now of any is when the scope changes.
-				res, _ := tx.Query(ctx, sc.warnings, append([]any{fams.Weather, now}, sc.warningArgs...)...)
+				res, _ := run(ctx, tx, sc.warnings, append([]any{fams.Weather, now}, sc.warningArgs...)...)
 				// A read that found none is an empty list, never nil: nil
 				// means the warnings were not read.
 				out.Warnings = []roads.Warning{}
@@ -403,7 +448,11 @@ func (s *Store) read(ctx context.Context, list string, listArgs []any, limit int
 				out.Sources, err = sourcesOf(res, out.Confirmations)
 				return err
 			},
-			func() error { return tx.QueryRow(ctx, sc.states, sc.stateArgs...).Scan(&out.States) },
+			func() (err error) {
+				res, _ := run(ctx, tx, sc.states, sc.stateArgs...)
+				out.States, err = pgx.CollectExactlyOneRow(res, pgx.RowTo[[]string])
+				return err
+			},
 			func() error {
 				if sc.placed == "" {
 					return nil
@@ -417,7 +466,7 @@ func (s *Store) read(ctx context.Context, list string, listArgs []any, limit int
 				return tx.QueryRow(ctx, sc.covering, sc.coveringArgs...).Scan(&out.Covering)
 			},
 			func() (err error) {
-				res, _ := tx.Query(ctx, coverageSelect, out.States, fams.Roads)
+				res, _ := run(ctx, tx, coverageSelect, out.States, fams.Roads)
 				out.Coverage, err = coverageOf(res)
 				return err
 			},
@@ -524,9 +573,8 @@ limit $11 offset $14`, args, q.Limit, fams, now, scope{
 		// of the road, not on the districts the road crosses.
 		warnings:    warningsOnRoad,
 		warningArgs: []any{q.Road},
-		states: statesOf(`select j.state_code from contract.junction j
-where ` + fmt.Sprintf(canonicalRef, "j.road_ref") + ` = $1 and ` + permitted("j")),
-		stateArgs: []any{q.Road},
+		states:      statesOnRoad,
+		stateArgs:   []any{q.Road},
 	})
 }
 
@@ -567,14 +615,8 @@ limit $14 offset $17`, args, q.Limit, fams, now, scope{
 		// the platform's warnings at a point test the warning's area.
 		warnings:    warningsNear,
 		warningArgs: []any{q.At.Lat, q.At.Lon, q.RadiusM},
-		states: statesOf(`with here as (select st_setsrid(st_makepoint($2, $1), 4326) g),
-near as (select j.state_code from contract.junction j, here
-         where st_dwithin(j.location::geography, here.g::geography, $3) and ` + permitted("j") + `)
-select state_code from near
-union all
-select (select j.state_code from contract.junction j, here where ` + permitted("j") + ` order by j.location <-> here.g, j.junction_id limit 1)
-where not exists (select 1 from near)`),
-		stateArgs: []any{q.At.Lat, q.At.Lon, q.RadiusM},
+		states:      statesNear,
+		stateArgs:   []any{q.At.Lat, q.At.Lon, q.RadiusM},
 	})
 }
 
@@ -609,7 +651,7 @@ limit $12 offset $15`, args, q.Limit, fams, now, scope{
 		// read them.
 		warnings:    warningsInState,
 		warningArgs: []any{q.State},
-		states:      `select case when $1 = 'de' then (select coalesce(array_agg(r.region_code order by r.region_code), '{}') from contract.admin_region r where r.region_level = 'state') else array[$1::text] end`,
+		states:      statesInState,
 		stateArgs:   []any{q.State},
 		// The Land form places every situation of the scope by its nearest
 		// municipality: the families that placed them are credited.

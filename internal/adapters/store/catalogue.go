@@ -51,9 +51,9 @@ func (s *Store) Motorways(ctx context.Context, q roads.CatalogueQuery, families 
 	// One road's exits name each junction's Land: from the junction Länder,
 	// else live.
 	road, warm := lands[q.Road]
-	exitState := `j.state_code`
+	exits := motorwayExits
 	if warm {
-		exitState = `null::text`
+		exits = motorwayExitsWarm
 	}
 	var counted []string
 	ms, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]roads.Motorway, error) {
@@ -102,11 +102,7 @@ limit $4`, families, q.State, q.Road, q.Limit, now, inState)
 		if err != nil || q.Road == "" || len(ms) == 0 {
 			return ms, err
 		}
-		res, _ = tx.Query(ctx, `
-select j.junction_id, j.name, j.junction_kind, j.number, `+exitState+`, st_y(j.location), st_x(j.location)
-from contract.junction j
-where j.road_ref = $1 and `+permitted("j")+`
-order by nullif(regexp_replace(coalesce(j.number, ''), '[^0-9].*$', ''), '')::int nulls last, j.number, j.junction_id`, q.Road)
+		res, _ = run(ctx, tx, exits, q.Road)
 		ms[0].Exits, err = pgx.CollectRows(res, func(r pgx.CollectableRow) (roads.Junction, error) {
 			var j roads.Junction
 			err := r.Scan(&j.ID, &j.Name, &j.Kind, &j.Number, &j.State, &j.Lat, &j.Lon)
@@ -119,6 +115,63 @@ order by nullif(regexp_replace(coalesce(j.number, ''), '[^0-9].*$', ''), '')::in
 	})
 	return ms, counted, err
 }
+
+// motorwayJunctions are the LCL's German motorway points with a name, the
+// junctions of a motorway page, aliased t.
+const motorwayJunctions = `t.cid = 58 and t.tabcd = 1 and t.tcd = 1 and t.road_number ~ '^A[1-9][0-9]{0,2}$'
+  and t.geom is not null and t.name is not null`
+
+// exitsOf reads the junctions of the road $1, each with its Land (state),
+// by number (its leading digits, then as written) and id.
+func exitsOf(name, state string) stmt {
+	return named(name, `
+select t.cid || ':' || t.tabcd || ':' || t.lcd, t.name,
+       case t.stcd when 1 then 'interchange' when 2 then 'triangle' else 'junction' end, t.junction_no, `+state+`,
+       st_y(t.geom::geometry(Point,4326)), st_x(t.geom::geometry(Point,4326))
+from tmc_locations t
+where `+motorwayJunctions+` and t.road_number = (select $1::text)
+order by nullif(regexp_replace(coalesce(t.junction_no, ''), '[^0-9].*$', ''), '')::int nulls last, t.junction_no, 1`, "text")
+}
+
+var (
+	// motorwayExits are the road's junctions with the Land of each, the
+	// platform's (contract_junction_land: the Land of the nearest
+	// municipality).
+	motorwayExits = exitsOf("api_motorway_exits", `contract_junction_land(t.geom)`)
+	// motorwayExitsWarm are the road's junctions without their Land, which
+	// the junction Länder read answers.
+	motorwayExitsWarm = exitsOf("api_motorway_exits_warm", `null::text`)
+)
+
+// roadStates reads, for each road reference of $1 (upper case without
+// spaces), the Länder its junctions lie in, sorted, of the roads with a
+// junction. A motorway point's reference is A and digits, as written, so it
+// is its canonical form, and the points are read by it.
+var roadStates = named("api_road_states", `
+select q.ref, coalesce(array_agg(distinct l.code order by l.code) filter (where l.code is not null), '{}')
+from unnest((select $1::text[])::text[]) q(ref)
+join tmc_locations t on t.road_number = q.ref and `+motorwayJunctions+`
+cross join lateral (select contract_junction_land(t.geom) code) l
+group by q.ref`, "text[]")
+
+// roadLampWarnings reads, for each road reference of $3, the weather
+// warnings of the families $1 in force at $2 whose own area holds one of the
+// road's junction points, as SituationsOnRoad places them (lampWarnings),
+// worst first, then by id.
+var roadLampWarnings = named("api_road_lamp_warnings", `
+select q.ref, w.source_feed, w.level::int
+from unnest((select $3::text[])::text[]) q(ref)
+cross join lateral (
+  select w.source_feed, w.level, w.id from weather_warnings w
+  where w.deleted_at is null and w.valid_from is not null and w.closed_at is null
+    and coalesce(w.closed_reason, '') <> 'withdrawn'
+    and w.source_feed = any((select $1::text[])::text[])
+    and (w.valid_to is null or w.valid_to > (select $2::timestamptz)) and w.valid_from <= (select $2::timestamptz)
+    and w.id in (select o.id from tmc_locations t
+                 join weather_warnings o on st_intersects(o.area::geometry, t.geom::geometry(Point,4326))
+                   and o.closed_at is null and o.deleted_at is null
+                 where t.road_number = q.ref and `+motorwayJunctions+`)) w
+order by q.ref, w.level desc, 'dwd:' || w.id`, "text[]", "timestamptz", "text[]")
 
 // RoadLamps reads, in one snapshot, what the lamp of each road (a stored
 // road reference) states over the whole road in both directions, as
@@ -160,14 +213,7 @@ group by 1`, fams.Roads, now, refs)
 				}
 				// A warning is on a road when its own area holds one of the
 				// road's junction points, as SituationsOnRoad places it.
-				res, _ := tx.Query(ctx, `select q.ref, w.source_ref, w.warning_level
-from unnest($3::text[]) q(ref)
-cross join lateral (select w.source_ref, w.warning_level, w.warning_id `+warningsPending+`
-  and w.valid_from <= $2
-  and exists (select 1 from contract.junction j
-              where `+fmt.Sprintf(canonicalRef, "j.road_ref")+` = q.ref and `+permitted("j")+`
-                and st_intersects(w.area, j.location))) w
-order by q.ref, w.warning_level desc, w.warning_id`, fams.Weather, now, refs)
+				res, _ := run(ctx, tx, roadLampWarnings, fams.Weather, now, refs)
 				var (
 					ref string
 					w   roads.Warning
@@ -184,10 +230,7 @@ order by q.ref, w.warning_level desc, w.warning_id`, fams.Weather, now, refs)
 				return err
 			},
 			func() error {
-				res, _ := tx.Query(ctx, `select q.ref, coalesce(array_agg(distinct j.state_code order by j.state_code) filter (where j.state_code is not null), '{}')
-from unnest($1::text[]) q(ref)
-join contract.junction j on `+fmt.Sprintf(canonicalRef, "j.road_ref")+` = q.ref and `+permitted("j")+`
-group by q.ref`, refs)
+				res, _ := run(ctx, tx, roadStates, refs)
 				var (
 					ref string
 					in  []string
@@ -204,7 +247,7 @@ group by q.ref`, refs)
 					all = append(all, in...)
 				}
 				slices.Sort(all)
-				res, _ := tx.Query(ctx, coverageSelect, slices.Compact(all), fams.Roads)
+				res, _ := run(ctx, tx, coverageSelect, slices.Compact(all), fams.Roads)
 				coverage, err = coverageOf(res)
 				return err
 			},

@@ -30,14 +30,25 @@ func refusals(sql string) []string {
 	return out
 }
 
+// withoutTrafficEvents is sql without the traffic events relation, read
+// whole or around its rule match.
+func withoutTrafficEvents(sql string) string {
+	before, after, _ := strings.Cut(relTrafficEvent, rulesPerEvent)
+	for _, part := range []string{relTrafficEvent, before, after} {
+		sql = strings.ReplaceAll(sql, part, "")
+	}
+	return sql
+}
+
 // TestNamedStatementsReadNoRefusedColumn: no named statement reads a whole
 // row, a contract view or a column the platform keeps from the API.
 //
-// The traffic events relation alone reads the Autobahn payload, to derive
-// an event's fields from it as the platform does; it never answers it.
+// The traffic events relation alone (and its form with the rules matched
+// per family) reads the Autobahn payload, to derive an event's fields from
+// it as the platform does; it never answers it.
 func TestNamedStatementsReadNoRefusedColumn(t *testing.T) {
 	for _, s := range namedList() {
-		if r := refusals(strings.ReplaceAll(s.SQL, relTrafficEvent, "")); len(r) > 0 {
+		if r := refusals(withoutTrafficEvents(s.SQL)); len(r) > 0 {
 			t.Errorf("%s reads %s", s.Name, strings.Join(r, ", "))
 		}
 		if !strings.HasPrefix(s.Name, "api_") {

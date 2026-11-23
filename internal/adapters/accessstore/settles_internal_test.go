@@ -105,10 +105,16 @@ func TestSettlesListensPokesAndForgets(t *testing.T) {
 	c := newFakeConn()
 	k := &connector{conns: []*fakeConn{c}, failFirst: true}
 	h := newSettles(k.connect, time.Millisecond)
+	// Both asks are registered before the listener runs: the listen pokes
+	// the asks it finds, and an ask that comes later reads after it is
+	// registered, so it needs no such poke.
+	var loop func()
+	h.start = func(l func()) { loop = l }
 	defer h.close()
 
 	p := h.add("7")
 	q := h.add("8")
+	go loop()
 	execd(t, c, listenSQL)
 	poked(t, p, "listening")
 	poked(t, q, "listening")
@@ -179,9 +185,8 @@ func TestTheFirstAskIsRegisteredBeforeTheListenerStarts(t *testing.T) {
 	}
 	defer h.close()
 	h.add("7")
-	seen = connected
 	select {
-	case n := <-seen:
+	case n := <-connected:
 		if n != 1 {
 			t.Fatalf("the listener's first connection found %d asks, want the one that started it", n)
 		}

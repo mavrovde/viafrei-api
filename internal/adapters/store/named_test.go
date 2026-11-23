@@ -108,3 +108,17 @@ func TestFailedRowsCarryTheError(t *testing.T) {
 		t.Fatal("failed rows answer more than their error")
 	}
 }
+
+// someRows hold a row that cannot be scanned.
+type someRows struct{ failedRows }
+
+func (someRows) Next() bool { return true }
+
+// TestOneRowAnswersTheScanError: a row that cannot be scanned answers the
+// scan's error, not a missing row.
+func TestOneRowAnswersTheScanError(t *testing.T) {
+	want := errors.New("cannot scan")
+	if err := (oneRow{someRows{failedRows{err: want}}}).Scan(); !errors.Is(err, want) {
+		t.Fatalf("Scan = %v, want %v", err, want)
+	}
+}

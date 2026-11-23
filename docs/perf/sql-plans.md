@@ -42,7 +42,7 @@ equal buffers mean the same plan, and a difference in time is the host.
 | api_station_facilities | 214/356 | 3/5 | 5 863 | 981/1 433 | only the refs of the station's DHID | station lifts |
 | api_affected_alerts | 22/27 | 3/5 | 1 100 | 5.7/15 | mechanical (same buffers) | station disruptions |
 | api_affected_lifts | 72/129 | 3/5 | 9 248 | 72/146 | mechanical | station lifts |
-| api_affected_calls | 2 495/4 663 | 3/5 | 110 562 | 7 293/11 597 | fresh feeds read once; sources per station aggregated once | station disruptions |
+| api_affected_calls | 2 495/4 663 | 3/5 | 110 562 | 7 293/11 597 | recently checked sources read once; sources per station aggregated once | station disruptions |
 | api_affected_places | 430/1 263 | 3/5 | 16 786 | 5 668/6 873 | refs found through the stops' indexes | station disruptions |
 | api_service_alerts | 42/112 | 3/5 | 352 | — | mechanical | region alerts |
 | api_alerts_summary | 21/49 | 3/5 | 369 | — | mechanical | region alerts |
@@ -71,7 +71,7 @@ listed by their lanes below this table when they merge.
 | Per-row source rules over large tables | charging, traffic events, every relation with a source-rule join | match the rules once per source (done for the energy summary; the same form fits the others) |
 | A correlated subquery over a CTE per output row | affected stations (was 3 million row checks) | aggregate once, join |
 | Sorts of concatenated ids spilling to disk (work_mem 32 MB) | energy summary | join on the key columns, aggregate before the join |
-| An index the platform drops | SIRI departures: `(stop_ref, COALESCE(expected_dep, aimed_dep))` is to go | every SIRI read bounds `aimed_dep` and is served by `(stop_ref, aimed_dep)`; none relies on the coalesce index |
+| An index the platform drops | real-time departures: `(stop_ref, COALESCE(expected_dep, aimed_dep))` is to go | every real-time departure read bounds `aimed_dep` and is served by `(stop_ref, aimed_dep)`; none relies on the coalesce index |
 | Statistics drift after a large load | all | auto mode re-plans when the generic plan's cost rises above the custom plans'; the probes above are the baseline to compare against |
 
 ## Database items (for a viafrei-database release)
@@ -80,8 +80,8 @@ listed by their lanes below this table when they merge.
   search reads every place.
 - Texts under three characters cannot use the trigram index: a prefix
   btree on the folded name (`text_pattern_ops`) serves them.
-- The `_next` SIRI index drop is coordinated: no API statement needs it.
-- `db_stations.eva_no` has no index (8 800 rows, a scan of about 1 ms; not
+- The drop of the real-time departures' coalesce index is coordinated: no API statement needs it.
+- The DB station register's EVA number has no index (8 800 rows, a scan of about 1 ms; not
   needed now).
 
 ## UI load
@@ -104,11 +104,11 @@ server allows 300.
 | Pool | Role | Size | Who |
 |-|-|-|-|
 | interactive | api_reader | 20 | people and AI clients (the tiers' permits) |
-| crawlers | api_reader (own pool, own application name) | 8 | verified search and AI crawlers, paced; a crawler wave waits in its pool and never takes an interactive permit |
+| bots | api_reader (own pool, own application name) | 8 | verified search and AI bots, paced; a wave of bot requests waits in its pool and never takes an interactive permit |
 | access store | api_access | 2 | keys, metering |
 
 That needs the reader role's connection limit raised from 16 to 32 (a
-database release) and `db.pool_max` with a crawler pool beside it (an API
+database release) and `db.pool_max` with a bot pool beside it (an API
 release). Three busy backends on average leave the interactive pool room
 for peaks of seven times the mean; the read service's 133 connections are
 released as the site moves over.

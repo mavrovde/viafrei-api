@@ -27,11 +27,13 @@ order by p.location::geography <-> st_setsrid(st_makepoint($1, $2), 4326)::geogr
 limit 1`, "double precision", "double precision", "text", "double precision", "text[]")
 
 // addressSectors reads, for each wedge of $1 (WKT), whether it holds an
-// address of the families $2.
-var addressSectors = opaque(`select w.i::int, exists (select 1 from contract.address a
-  where a.source_ref = any($2) and `+permitted("a")+` and st_intersects(a.location::geography, st_geogfromtext(w.wkt)))
+// address of the families $2. It is sent as written, not opaque: on the
+// fixtures its generic plan saves 0.4 ms of planning a call and loses 0.8 ms
+// executing (6.6 ms against 5.8 ms for the plan made for the asked wedges).
+var addressSectors = `select w.i::int, exists (select 1 from contract.address a
+  where a.source_ref = any($2) and ` + permitted("a") + ` and st_intersects(a.location::geography, st_geogfromtext(w.wkt)))
 from unnest($1::text[]) with ordinality as w(wkt, i)
-order by w.i`, "text[]", "text[]")
+order by w.i`
 
 // nearestAddressFamily reads the family of the nearest address of the
 // families $3 to ($1, $2), however far.

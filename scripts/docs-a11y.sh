@@ -20,6 +20,13 @@
 # - scripts/a11y-tools/layout-runner.js checks, beside axe, that the build's
 #   repairs of the reference render (its tree lines and its landmarks); each
 #   of its findings is an error.
+# - scripts/a11y-tools/portal-runner.js holds the manual pass's scriptable
+#   items on every page (#183): the skip link, a visible focus, heading
+#   names, table header cells and text that is not cut off, also at the WCAG
+#   text spacing. Every page is loaded a second time at 320 px wide (400 %
+#   zoom; its report key ends in ?reflow, a guide page's rules) with this
+#   runner alone, which there also requires that the page does not scroll
+#   sideways. Each of its findings is an error.
 #
 # Fails closed: no page, a page that did not load, fewer pages reported than
 # the site has, or a report that cannot be read is a failure, never a pass.
@@ -80,9 +87,10 @@ trap 'rm -rf "$tmp"' EXIT
 # not left to Puppeteer's default of 180 s, at 300 s: the margin over the
 # CI time, and a hung page still ends the step well inside the job's 15
 # minutes.
-jq -n --arg chrome "$chrome" --arg runner "$here/a11y-tools/axe-runner.js" --arg layout "$here/a11y-tools/layout-runner.js" '{
+jq -n --arg chrome "$chrome" --arg runner "$here/a11y-tools/axe-runner.js" --arg layout "$here/a11y-tools/layout-runner.js" \
+  --arg portal "$here/a11y-tools/portal-runner.js" '{
   defaults: {
-    runners: [$runner, $layout],
+    runners: [$runner, $layout, $portal],
     standard: "WCAG2AA",
     rules: ["target-size"],
     includeWarnings: true,
@@ -90,7 +98,7 @@ jq -n --arg chrome "$chrome" --arg runner "$here/a11y-tools/axe-runner.js" --arg
     timeout: 60000,
     chromeLaunchConfig: {executablePath: $chrome, protocolTimeout: 300000, args: ["--no-sandbox", "--disable-dev-shm-usage"]}
   },
-  urls: $ARGS.positional
+  urls: ($ARGS.positional + [$ARGS.positional[] | {url: "\(.)?reflow", viewport: {width: 320, height: 640}, runners: [$portal]}])
 }' --args "${pages[@]/#/file://}" > "$tmp/config.json"
 
 for p in "${pages[@]}"; do echo "docs a11y: found ${p#"$site"/}"; done
@@ -102,10 +110,13 @@ set -e
 jq -e '(.results | type == "object") and all(.results[]; type == "array")' "$tmp/report.json" >/dev/null 2>&1 ||
   { echo "FAIL: pa11y-ci wrote no readable report (exit $status)" >&2; cat "$tmp/stderr" >&2; exit 2; }
 
-# Every page of the site must be in the report, under its own URL.
-missing=$(jq -r '.results as $r | $ARGS.positional[] | select(. as $u | $r | has($u) | not)' --args "${pages[@]/#/file://}" < "$tmp/report.json")
+# Every page of the site must be in the report, under its own URL and under
+# its reflow URL (the second load at 320 px).
+urls=("${pages[@]/#/file://}")
+urls+=("${urls[@]/%/?reflow}")
+missing=$(jq -r '.results as $r | $ARGS.positional[] | select(. as $u | $r | has($u) | not)' --args "${urls[@]}" < "$tmp/report.json")
 if [[ -n $missing ]]; then
-  echo "FAIL: pa11y-ci reported $(jq '.results | length' "$tmp/report.json") page(s) of ${#pages[@]}; not reported:" >&2
+  echo "FAIL: pa11y-ci reported $(jq '.results | length' "$tmp/report.json") page load(s) of ${#urls[@]}; not reported:" >&2
   while IFS= read -r m; do echo "  ${m#"file://$site/"}" >&2; done <<<"$missing"
   exit 2
 fi

@@ -507,6 +507,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2 # the parent, to tell a release commit by its version.txt
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
@@ -522,9 +523,17 @@ jobs:
           scope=$(find test/requirements/scope -name '*.txt' | sort -V | tail -n 1)
           if [ -z "$scope" ]; then echo "::error::no scope file under test/requirements/scope"; exit 1; fi
           echo "scope: $scope"
+          # The report is for the release this commit makes when it changes
+          # version.txt (the release-please pull request and the release
+          # commit on main), else for the work after the last release. The
+          # scope file names the requirement milestone, not the release.
+          version=$(tr -d '[:space:]' < version.txt)
+          git rev-parse -q --verify 'HEAD^' >/dev/null || { echo "::error::no parent commit to compare version.txt with"; exit 1; }
+          if git diff --quiet 'HEAD^' HEAD -- version.txt; then version="unreleased (after $version)"; fi
+          echo "report version: $version"
           go run ./cmd/reqreport check -scope "$scope" \
             -results unit=test-unit.json -results integration=test-integration.json \
-            -version "$(basename "$scope" .txt) (after $(cat version.txt))" -commit "$GITHUB_SHA" \
+            -version "$version" -commit "$GITHUB_SHA" \
             -report requirement-report.md -completion test-completion-report.md
       - name: Publish the summary
         if: always()

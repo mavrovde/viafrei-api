@@ -3,12 +3,14 @@
 #
 # With Chrome (CHROME_PATH or on PATH): a site without pages is refused
 # before any browser starts, a clean page passes and is named, and a planted
-# critical finding (an image without a text alternative) and a planted
-# moderate one (a skipped heading level) each fail.
+# critical finding (an image without a text alternative), a planted
+# moderate one (a skipped heading level), a page whose first stop is not a
+# skip link and one that scrolls sideways at 320 px each fail.
 #
 # With a stub in place of pa11y-ci (DOCS_A11Y_PA11Y), every fail-closed path
 # and the classification: a page that did not load, fewer pages reported
-# than the site has, an unreadable report, an unreadable baseline, a
+# than the site has, a page without its 320 px load, a finding of that load,
+# an unreadable report, an unreadable baseline, a
 # needs-review result, a moderate and a minor result on a guide page, and
 # reference.html's notes held against the baseline in each direction,
 # counted as distinct failures: one per place, the selector with its
@@ -36,8 +38,9 @@ expect() { # expect WANT_EXIT NAME DIR WANT_TEXT
   fi
 }
 
-page() { # page FILE BODY
-  printf '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Planted page</title></head><body><main><h1>Planted page</h1>%s</main></body></html>\n' "$2" > "$1"
+page() { # page FILE BODY [BEFORE_MAIN]: a page with the portal's skip link and focus style, unless BEFORE_MAIN replaces the link
+  local before=${3-'<a href="#main">Skip to content</a>'}
+  printf '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Planted page</title><style>:focus{outline:3px solid #0b57d0}</style></head><body>%s<main id="main"><h1>Planted page</h1>%s</main></body></html>\n' "$before" "$2" > "$1"
 }
 
 # --- with Chrome --------------------------------------------------------
@@ -57,6 +60,14 @@ expect 1 "an image without alt fails" "$tmp/broken" "FAIL: diagram.html: image-a
 mkdir -p "$tmp/moderate"
 page "$tmp/moderate/index.html" '<h3>A skipped level</h3><p>Text.</p>'
 expect 1 "a moderate finding on a guide page fails" "$tmp/moderate" "FAIL: index.html: heading-order"
+
+mkdir -p "$tmp/noskip"
+page "$tmp/noskip/index.html" '<p><a href="#main">A link.</a></p>' ''
+expect 1 "a page whose first stop is not a skip link fails (#183)" "$tmp/noskip" "FAIL: index.html: skip-link"
+
+mkdir -p "$tmp/wide"
+page "$tmp/wide/index.html" '<p><code style="white-space:nowrap">GET /v1/a-path-far-too-long-for-a-phone-at-four-hundred-percent</code></p>'
+expect 1 "a page that scrolls sideways at 320 px fails (#183)" "$tmp/wide" "FAIL: index.html?reflow: reflow"
 
 # --- with a stub in place of pa11y-ci -----------------------------------
 
@@ -82,10 +93,10 @@ issue() { # issue TYPE CODE NEEDS_REVIEW [TARGET [FG BG [SOURCE]]]
       runnerExtras: ({needsFurtherReview: $r, target: $target}
         + (if $fg == "" then {} else {fgColor: $fg, bgColor: $bg, colourSource: $src} end))}'
 }
-report() { # report GUIDE_ISSUES_JSON REFERENCE_ISSUES_JSON
-  local guide=$1 reference=$2
-  jq -n --arg g "file://$s/index.html" --arg r "file://$s/reference.html" --argjson gi "$guide" --argjson ri "$reference" \
-    '{total: 2, passes: 0, errors: 0, results: {($g): $gi, ($r): $ri}}' > "$STUB_REPORT"
+report() { # report GUIDE_ISSUES_JSON REFERENCE_ISSUES_JSON [GUIDE_REFLOW_ISSUES_JSON]
+  local guide=$1 reference=$2 reflow=${3:-[]}
+  jq -n --arg g "file://$s/index.html" --arg r "file://$s/reference.html" --argjson gi "$guide" --argjson ri "$reference" --argjson gr "$reflow" \
+    '{total: 4, passes: 0, errors: 0, results: {($g): $gi, ($r): $ri, "\($g)?reflow": $gr, "\($r)?reflow": []}}' > "$STUB_REPORT"
 }
 cc=$(issue warning color-contrast true)
 green=$(issue warning color-contrast true 'span' 'rgb(160, 251, 170)' 'rgb(17, 23, 26)')
@@ -181,7 +192,13 @@ report "[$(issue notice region false)]" '[]'
 expect 1 "a minor result on a guide page fails" "$s" "FAIL: index.html: region (notice)"
 
 jq -n --arg g "file://$s/index.html" '{results: {($g): []}}' > "$STUB_REPORT"
-expect 2 "fewer pages reported than the site has is refused" "$s" "pa11y-ci reported 1 page(s) of 2"
+expect 2 "fewer pages reported than the site has is refused" "$s" "pa11y-ci reported 1 page load(s) of 4"
+
+jq -n --arg g "file://$s/index.html" --arg r "file://$s/reference.html" '{results: {($g): [], ($r): [], "\($g)?reflow": []}}' > "$STUB_REPORT"
+expect 2 "a page without its 320 px load is refused (#183)" "$s" "  reference.html?reflow"
+
+report '[]' '[]' "[$(issue error reflow false)]"
+expect 1 "a finding of the 320 px load fails (#183)" "$s" "FAIL: index.html?reflow: reflow"
 
 jq -n --arg g "file://$s/index.html" --arg o "file://$s/other.html" '{results: {($g): [], ($o): []}}' > "$STUB_REPORT"
 expect 2 "a report about another page is refused" "$s" "not reported:"
@@ -197,4 +214,4 @@ echo '{"reference.html": {"color-contrast": "two"}}' > "$tmp/baseline.json"
 expect 2 "an unreadable baseline is refused" "$s" "is not readable as {page: {rule: count}}"
 
 echo "docs-a11y self-test: $pass passed, $fail failed"
-(( fail == 0 && pass >= 33 ))
+(( fail == 0 && pass >= 37 ))

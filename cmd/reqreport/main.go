@@ -73,7 +73,7 @@ func check(args []string, stdout, stderr io.Writer) int {
 	scope := fs.String("scope", "", "the milestone's in-scope list")
 	report := fs.String("report", "", "write the requirement report (Markdown) here")
 	completion := fs.String("completion", "", "write the draft test completion report (Markdown) here")
-	version := fs.String("version", "unreleased", "release or milestone the report is for")
+	version := fs.String("version", "unreleased", "the release the report is for")
 	commit := fs.String("commit", "unknown", "commit the results belong to")
 	var results resultFlags
 	fs.Var(&results, "results", "LEVEL=FILE of `go test -json` output; repeat per level")
@@ -85,7 +85,7 @@ func check(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
-	m := reqreport.Meta{Version: *version, Commit: *commit, Generated: time.Now().UTC().Format(time.RFC3339)}
+	m := reqreport.Meta{Version: *version, Scope: *scope, Commit: *commit, Generated: time.Now().UTC().Format(time.RFC3339)}
 	if err := writeTo(*report, r, m, reqreport.WriteRequirementReport); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2

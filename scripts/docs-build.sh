@@ -96,12 +96,12 @@ for p in "${pages[@]}"; do
 <title>$title · ViaFrei API $version</title>
 <style>
 body{font:16px/1.5 system-ui,sans-serif;max-width:60rem;margin:0 auto;padding:1rem;color:#1a1a1a;background:#fff}
-a{color:#0b57d0}a:focus-visible{outline:3px solid #0b57d0;outline-offset:2px}
+a{color:#0b57d0}:focus{outline:3px solid #0b57d0;outline-offset:2px}
 .skip{position:absolute;left:-999px}.skip:focus{left:1rem;top:1rem;background:#fff;padding:.5rem}
 nav ul{list-style:none;padding:0;margin:0 0 1rem;display:flex;flex-wrap:wrap;gap:.25rem 1rem}
 nav a[aria-current]{font-weight:700}
 .table-wrap{overflow-x:auto}table{border-collapse:collapse}th,td{border:1px solid #767676;padding:.3rem .5rem;text-align:left;overflow-wrap:anywhere}
-code,pre{background:#f4f4f4}pre{padding:.5rem;overflow-x:auto}
+code,pre{background:#f4f4f4}pre{padding:.5rem;overflow-x:auto}:not(pre)>code{overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -191,15 +191,28 @@ grep -qF "$title" "$out/reference.html" || { echo "FAIL: reference.html does not
 #   label's contrast is undecidable (painted over). The select is shown
 #   (white on the panel, Redoc's label colour) and the label hidden; its
 #   opened options are dark on white, so no platform paints them white on white.
+# - the manual pass of 1.0.0 (#183; scripts/a11y-tools/portal-runner.js holds
+#   each on every page): the page has no skip link, so one is the body's
+#   first child, to the content column (id vf-main, focusable by script
+#   only; a click handler focuses it, as Redoc routes by the URL's hash);
+#   its controls draw no focus outline, so every element in #redoc shows a
+#   3 px outline and a white ring while it has the focus (on :focus, not
+#   :focus-visible, which a script's focus does not reliably match); each
+#   heading holding an anchor link is named by its own text, not by the
+#   link's label, and the link is "Link to" that text; its schema and
+#   parameter tables have no header cell, so each gets a header row
+#   ("Field", "Details") that only assistive technology reads; its
+#   operation paths end in an ellipsis, so they wrap.
 for c in menu-content api-content; do
   [[ $(grep -o "class=\"[^\"]* $c\"" "$out/reference.html" | wc -l | tr -d ' ') == 1 ]] ||
     { echo "FAIL: reference.html does not carry exactly one Redoc .$c to mark as a landmark; the bundle changed" >&2; exit 1; }
 done
 perl -0pi -e '
   s{(class="[^"]* menu-content")}{$1 role="navigation" aria-label="Reference contents"};
-  s{(class="[^"]* api-content")}{$1 role="main"};
-  s{</head>}{<style>.dropdown-select{opacity:1!important;background:transparent!important;color:#fff!important;font:inherit!important;padding-left:0.9em!important}.dropdown-select~label{display:none!important}.dropdown-select option{color:#1a1a1a!important;background:#fff!important}.redoc-json .collapser{display:none!important}td[kind=field]{background-image:none!important}tr:first-of-type>td[kind=field]::before,tr.last>td[kind=field]::before{content:"";position:absolute;left:0;border-left:1px solid;border-left-color:inherit}tr:first-of-type>td[kind=field]::before{top:22px;bottom:0}tr.last>td[kind=field]::before{top:0;bottom:auto;height:22px}</style></head>};
-  s{</body>}{<script>(function(){function f(){document.querySelectorAll("pre:not([tabindex])").forEach(function(p){p.setAttribute("tabindex","0")});document.querySelectorAll(".menu-content:not([role])").forEach(function(m){m.setAttribute("role","navigation");m.setAttribute("aria-label","Reference contents")});document.querySelectorAll(".api-content:not([role])").forEach(function(m){m.setAttribute("role","main")});document.querySelectorAll(".api-content").forEach(function(a){var prev=0;a.querySelectorAll("h1,h2,h3,h4,h5,h6").forEach(function(h){if(!h.getClientRects().length)return;var own=+h.tagName.charAt(1),lvl=Math.min(own,prev+1);if(lvl!==own){if(h.getAttribute("aria-level")!==String(lvl))h.setAttribute("aria-level",String(lvl))}else if(h.hasAttribute("aria-level")){h.removeAttribute("aria-level")}prev=lvl})})}document.addEventListener("DOMContentLoaded",f);new MutationObserver(f).observe(document.documentElement,{childList:true,subtree:true})})();</script></body>};
+  s{(class="[^"]* api-content")}{$1 role="main" id="vf-main" tabindex="-1"};
+  s{<body>}{<body><a class="vf-skip" href="#vf-main">Skip to content</a>};
+  s{</head>}{<style>.dropdown-select{opacity:1!important;background:transparent!important;color:#fff!important;font:inherit!important;padding-left:0.9em!important}.dropdown-select~label{display:none!important}.dropdown-select option{color:#1a1a1a!important;background:#fff!important}.redoc-json .collapser{display:none!important}td[kind=field]{background-image:none!important}tr:first-of-type>td[kind=field]::before,tr.last>td[kind=field]::before{content:"";position:absolute;left:0;border-left:1px solid;border-left-color:inherit}tr:first-of-type>td[kind=field]::before{top:22px;bottom:0}tr.last>td[kind=field]::before{top:0;bottom:auto;height:22px}.vf-skip{position:absolute;left:-999px;z-index:100}.vf-skip:focus{left:1rem;top:1rem;background:#fff;color:#0b57d0;padding:.5rem;outline:3px solid #0b57d0}#redoc :focus{outline:3px solid #0b57d0!important;outline-offset:1px;box-shadow:0 0 0 5px #fff!important;opacity:1!important}#vf-main:focus{outline:none!important;box-shadow:none!important}.http-verb+span{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere}button:has(>.http-verb){white-space:normal!important}.vf-head th{padding:0!important;border:0!important;height:0}.vf-sr{position:absolute!important;width:1px!important;height:1px!important;margin:-1px!important;padding:0!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap!important;border:0!important}</style></head>};
+  s{</body>}{<script>(function(){function f(){document.querySelectorAll("pre:not([tabindex])").forEach(function(p){p.setAttribute("tabindex","0")});document.querySelectorAll(".menu-content:not([role])").forEach(function(m){m.setAttribute("role","navigation");m.setAttribute("aria-label","Reference contents")});document.querySelectorAll(".api-content:not([role])").forEach(function(m){m.setAttribute("role","main")});document.querySelectorAll(".api-content").forEach(function(a){var prev=0;a.querySelectorAll("h1,h2,h3,h4,h5,h6").forEach(function(h){if(!h.getClientRects().length)return;var own=+h.tagName.charAt(1),lvl=Math.min(own,prev+1);if(lvl!==own){if(h.getAttribute("aria-level")!==String(lvl))h.setAttribute("aria-level",String(lvl))}else if(h.hasAttribute("aria-level")){h.removeAttribute("aria-level")}prev=lvl})});var main=document.querySelector(".api-content");if(main){if(main.id!=="vf-main")main.id="vf-main";if(!main.hasAttribute("tabindex"))main.setAttribute("tabindex","-1")}document.querySelectorAll(".api-content h1,.api-content h2,.api-content h3,.api-content h4,.api-content h5,.api-content h6").forEach(function(h){var a=h.querySelector("a[aria-label]");if(!a||(a.getAttribute("href")||"").charAt(0)!=="#")return;var t=h.textContent.split(" ").filter(Boolean).join(" ");if(h.getAttribute("aria-label")!==t)h.setAttribute("aria-label",t);if(a.getAttribute("aria-label")!=="Link to "+t)a.setAttribute("aria-label","Link to "+t)});document.querySelectorAll(".api-content table").forEach(function(t){if(t.tHead||!t.querySelector("td[kind=field]"))return;var r=t.createTHead();r.className="vf-head";r=r.insertRow();["Field","Details"].forEach(function(n){var c=document.createElement("th"),x=document.createElement("span");c.scope="col";x.className="vf-sr";x.textContent=n;c.appendChild(x);r.appendChild(c)})})}document.addEventListener("click",function(e){var k=e.target.closest&&e.target.closest(".vf-skip"),m=document.getElementById("vf-main");if(!k||!m)return;e.preventDefault();m.focus();m.scrollIntoView()},true);document.addEventListener("DOMContentLoaded",f);new MutationObserver(f).observe(document.documentElement,{childList:true,subtree:true})})();</script></body>};
 ' "$out/reference.html"
 touch "$out/.nojekyll"
 

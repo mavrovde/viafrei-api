@@ -9,6 +9,26 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [1.0.0](https://github.com/mavrovde/viafrei-api/compare/v0.4.0...v1.0.0) (2026-11-23)
+
+
+### Added
+
+* 0.5.0 parity, the API-only units of the MCP gap ([#177](https://github.com/mavrovde/viafrei-api/issues/177)) ([6185d31](https://github.com/mavrovde/viafrei-api/commit/6185d3124488da82790c4c1f9cfd979ce6466c4d))
+
+
+### Fixed
+
+* **accessstore:** an ask is registered before it starts the settle listener ([#172](https://github.com/mavrovde/viafrei-api/issues/172)) ([7e44453](https://github.com/mavrovde/viafrei-api/commit/7e44453e53b7ebf2f32b0bc0e5b9ee514b83f442))
+* **docs:** the contrast reads restyle the page once per run, not once per element ([#182](https://github.com/mavrovde/viafrei-api/issues/182)) ([8f90860](https://github.com/mavrovde/viafrei-api/commit/8f90860e64aac4d2bdbed7177e44455280c46e28))
+* **docs:** the portal passes the 1.0.0 manual accessibility pass, held by a runner on every page ([#184](https://github.com/mavrovde/viafrei-api/issues/184)) ([517f14e](https://github.com/mavrovde/viafrei-api/commit/517f14ea57beb5c991640010cc86f27acb96d379))
+* **openapi:** the document is marshalled once, and repeated headers are defined once (TST-012) ([#175](https://github.com/mavrovde/viafrei-api/issues/175)) ([08747c9](https://github.com/mavrovde/viafrei-api/commit/08747c9b21b8a0f5cd1851c7052b107dd48bb5b6))
+
+
+### Build and CI
+
+* **mutation:** a scope row that names its files mutates only those files; every job ends within 15 minutes ([#173](https://github.com/mavrovde/viafrei-api/issues/173)) ([2382881](https://github.com/mavrovde/viafrei-api/commit/2382881499ad65d7941f95cd6c6b9c2e16f0bfd8))
+
 ## [0.4.0](https://github.com/mavrovde/viafrei-api/compare/v0.3.2...v0.4.0) (2026-11-22)
 
 

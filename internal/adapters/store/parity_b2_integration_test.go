@@ -32,6 +32,9 @@ select pt.lon, pt.lat, 100000::float8, v.fs from (select st_x(geom::geometry) lo
 		"api_charging_in_radius": `with fam as (select array_agg(distinct source_feed) f from public.charging_sites)
 select pt.lat, pt.lon, v.fs, v.r from (select st_y(geom::geometry) lat, st_x(geom::geometry) lon from public.charging_sites where geom is not null
   union all values (52.52::float8, 13.405::float8)) pt, fam, lateral (values (fam.f, 5000::float8), (fam.f, 50000), ('{}'::text[], 5000)) v(fs, r)`,
+		"api_place_by_id": `with fam as (select array_agg(distinct source_id) f from public.gazetteer_places)
+select i.id, v.fs from (select id::text id from public.gazetteer_places union all values ('0'), ('x1'), ('99999999999999999999'), ('')) i, fam,
+  lateral (values (fam.f), ('{}'::text[])) v(fs)`,
 		"api_hydrogen_near": `with fam as (select array_agg(distinct source_feed) f from public.hydrogen_stations),
 pt as (select st_x(geom::geometry) lon, st_y(geom::geometry) lat from public.hydrogen_stations where geom is not null
        union all values (13.405::float8, 52.52::float8))

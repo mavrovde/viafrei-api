@@ -336,13 +336,18 @@ limit $11`, parkingArgs(q, line, q.At.Lat, q.At.Lon, listed, occupancy, q.Radius
 	return sites, more, next, err
 }
 
+// placeByID is the open place $1 (a gazetteer id, read on the key) of the
+// families $2, with the platform's kind and its point on the surface.
+var placeByID = named("api_place_by_id", `
+select g.id::text, g.name, `+placeKind+`, st_y(st_pointonsurface(g.geom::geometry)), st_x(st_pointonsurface(g.geom::geometry)), g.source_id
+from gazetteer_places g
+where g.id = (select case when $1::text ~ '^[0-9]{1,18}$' then $1::text::bigint end) and g.id::text = (select $1::text)
+  and g.closed_at is null and g.geom is not null and g.source_id = any((select $2::text[])::text[])`, "text", "text[]")
+
 // Place reads one place of the given families.
 func (s *Store) Place(ctx context.Context, id string, families []string) (places.Place, error) {
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (places.Place, error) {
-		rows, _ := tx.Query(ctx, `
-select place_id, name, place_kind, st_y(location), st_x(location), source_ref
-from contract.place
-where place_id = $1 and withdrawn_at is null and source_ref = any($2) and `+permitted("place"), id, families)
+		rows, _ := run(ctx, tx, placeByID, id, families)
 		ps, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.Place, error) {
 			var (
 				v    places.Place

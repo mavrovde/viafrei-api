@@ -53,6 +53,7 @@ each Land's probe into the first entry of its range.
 | api_charging_near | 704 ms mean, up to 1.2 s | 6-58 ms warm, 30-960 ms cold | 5 / 5 | `charging_sites_geom_gist` nearest walk, the points by `charging_points_site`; each point's report probes the 18 status partitions by key, as before |
 | api_charging_by_id | | 0.8-29 ms | 8 / 5 | the sites' key |
 | api_charging_in_radius | 24 ms mean | 3-13 ms | 5 / 5 | |
+| api_place_by_id | 162 ms mean, up to 256 ms | 0.1-3.5 ms | 5 / 5 | `gazetteer_places_pkey`: the view's text id matched no index |
 
 The view cast the area to `geometry(MultiPolygon,4326)`, an expression no
 index holds, so the box test read every warning's area; the statements test

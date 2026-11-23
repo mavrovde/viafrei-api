@@ -8,12 +8,15 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 )
 
+// placeKind is the platform's kind of a gazetteer place g.
+const placeKind = `case g.kind when 'city' then 'municipality' when 'district' then 'district' when 'admin' then 'state'
+  when 'station' then 'station_area' when 'stop' then 'station_area' when 'island' then 'locality'
+  when 'motorway' then 'motorway' when 'junction' then 'junction' else 'other' end`
+
 // coverageKinds counts the places of the families ($1) per family and kind:
 // rows, when the newest was last loaded, and those with an English name.
 var coverageKinds = named("api_coverage_kinds", `
-select g.source_id, case g.kind when 'city' then 'municipality' when 'district' then 'district' when 'admin' then 'state'
-                                when 'station' then 'station_area' when 'stop' then 'station_area' when 'island' then 'locality'
-                                when 'motorway' then 'motorway' when 'junction' then 'junction' else 'other' end kind,
+select g.source_id, `+placeKind+` kind,
        count(*)::int, max(g.last_seen_at), count(*) filter (where g.name_en is not null)::int
 from gazetteer_places g
 where g.geom is not null and g.closed_at is null and g.source_id = any((select $1::text[])::text[])

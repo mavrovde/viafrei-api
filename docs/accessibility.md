@@ -108,8 +108,9 @@ has the focus (on the reference with a white ring, so it shows on the dark
 sample panel too); each reference heading is named by its own text, not by
 the label of its anchor link; Redoc's schema and parameter tables carry a
 header row ("Field", "Details", visually hidden); its operation paths wrap
-instead of ending in an ellipsis; and inline code on the guide pages wraps,
-so no page scrolls sideways at 320 px. A third runner,
+instead of ending in an ellipsis, its links and table cells break long
+words and its Authorizations bar wraps; and inline code and headings on the
+guide pages wrap, so no page scrolls sideways at 320 px. A third runner,
 `scripts/a11y-tools/portal-runner.js`, holds these on every page as errors:
 the first stop a skip link to the main landmark, a visible focus on each
 kind of focusable element, heading names, a header cell in every table, no

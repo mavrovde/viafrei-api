@@ -42,7 +42,7 @@ equal buffers mean the same plan, and a difference in time is the host.
 | api_station_facilities | 214/356 | 3/5 | 5 863 | 981/1 433 | only the refs of the station's DHID | station lifts |
 | api_affected_alerts | 22/27 | 3/5 | 1 100 | 5.7/15 | mechanical (same buffers) | station disruptions |
 | api_affected_lifts | 72/129 | 3/5 | 9 248 | 72/146 | mechanical | station lifts |
-| api_affected_calls | 2 495/4 663 | 3/5 | 110 562 | 7 293/11 597 | recently checked sources read once; sources per station aggregated once | station disruptions |
+| api_affected_calls | 2 495/4 663 | 3/5 | 110 562 | 7 293/11 597 | recently checked sources read once; sums and sources in one aggregate per station (a join of two aggregates looped, 9 s under load) | station disruptions |
 | api_affected_places | 430/1 263 | 3/5 | 16 786 | 5 668/6 873 | refs found through the stops' indexes | station disruptions |
 | api_service_alerts | 42/112 | 3/5 | 352 | — | mechanical | region alerts |
 | api_alerts_summary | 21/49 | 3/5 | 369 | — | mechanical | region alerts |

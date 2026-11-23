@@ -325,9 +325,10 @@ group by 1`, "text[]")
 // cancelled or late, of the families ($1), as the platform's board counts
 // them: per station, minute and line the sources are folded (the most
 // cancelled, and as late the most cancelled or late less the most
-// cancelled), then summed per station; with the families read.
-//
-//nolint:misspell // materialized is the SQL keyword
+// cancelled), then summed per station; with the sources read.
+// The sums and the sources are read in one aggregate per station: a join of
+// two aggregates of d was planned as a loop over one for each row of the
+// other.
 var affectedCalls = namedOpaque("api_affected_calls", `
 with d as (
   select d.station_ifopt, d.aimed_minute, d.line_key, d.cancelled, d.late, d.source_ref
@@ -336,13 +337,13 @@ with d as (
 ), f as (
   select station_ifopt, aimed_minute, line_key, max(cancelled) as c, greatest(max(cancelled + late) - max(cancelled), 0) as l
   from d group by 1, 2, 3
-), s as (
-  select station_ifopt, sum(c)::int as c, sum(l)::int as l from f group by 1 having sum(c) + sum(l) > 0
-), srcs as materialized (
-  select station_ifopt, array_agg(distinct source_ref order by source_ref) as refs from d group by 1
+), u as (
+  select station_ifopt, c, l, null::text as src from f
+  union all
+  select station_ifopt, 0, 0, source_ref from d
 )
-select s.station_ifopt, s.c, s.l, x.refs
-from s join srcs x on x.station_ifopt = s.station_ifopt`, "text[]")
+select station_ifopt, sum(c)::int, sum(l)::int, array_agg(distinct src order by src) filter (where src is not null)
+from u group by 1 having sum(c) + sum(l) > 0`, "text[]")
 
 // affectedPlaces are the stations of the families ($1) with these ids or
 // IFOPTs ($2), each with the ref it was named by.

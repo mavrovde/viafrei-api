@@ -2,6 +2,8 @@
 
 package store_test
 
+import "github.com/mavrovde/viafrei-api/internal/domain/energy"
+
 // The parity cases of the hydrogen, bay, lorry, POI and train-board
 // statements (namedCases).
 
@@ -24,7 +26,12 @@ select pt.lon, pt.lat, 100000::float8, v.fs from (select st_x(geom::geometry) lo
 		"api_register":       `select`,
 		"api_sources": `select f from (select array_agg(source_ref) f from public.contract_sources union all select '{}'::text[]
        union all select array_agg(source_ref) from (select source_ref from public.contract_sources order by source_ref limit 3) x) v`,
-		"api_terms_texts": `select f from (select array_agg(terms_gate) f from public.source_terms union all select '{}'::text[] union all select '{nope}') v`,
+		"api_terms_texts":    `select f from (select array_agg(terms_gate) f from public.source_terms union all select '{}'::text[] union all select '{nope}') v`,
+		"api_charging_near":  chargingCases(false),
+		"api_charging_by_id": chargingCases(true),
+		"api_charging_in_radius": `with fam as (select array_agg(distinct source_feed) f from public.charging_sites)
+select pt.lat, pt.lon, v.fs, v.r from (select st_y(geom::geometry) lat, st_x(geom::geometry) lon from public.charging_sites where geom is not null
+  union all values (52.52::float8, 13.405::float8)) pt, fam, lateral (values (fam.f, 5000::float8), (fam.f, 50000), ('{}'::text[], 5000)) v(fs, r)`,
 		"api_hydrogen_near": `with fam as (select array_agg(distinct source_feed) f from public.hydrogen_stations),
 pt as (select st_x(geom::geometry) lon, st_y(geom::geometry) lat from public.hydrogen_stations where geom is not null
        union all values (13.405::float8, 52.52::float8))
@@ -71,3 +78,33 @@ pt as (select st_x(geom::geometry) lon, st_y(geom::geometry) lat from public.spe
 d as (select coalesce(max(valid_from), current_date) d from public.speed_enforcement union select current_date)
 select pt.lon, pt.lat, v.r, d.d, v.fs, v.l from pt, fam, d,
   lateral (values (2000::float8, fam.f, 50), (20000, fam.f, 3), (2000, '{}'::text[], 50)) v(r, fs, l)`
+
+// chargingCases are a point at every site and in Berlin (by id: every
+// site's id and one no site holds), now and before and after every report,
+// under the filters each alone (access, power, plug, power ceiling,
+// operator, terms), every family and none.
+func chargingCases(byID bool) string {
+	pt := `select st_y(geom::geometry) lat, st_x(geom::geometry) lon, '' id from public.charging_sites where geom is not null
+       union all values (52.52::float8, 13.405::float8, '')`
+	if byID {
+		pt = `select 0::float8 lat, 0::float8 lon, source_feed || ':' || site_id id from public.charging_sites union all values (0, 0, 'nope:x')`
+	}
+	return `with fam as (select array_agg(distinct source_feed) f from public.charging_sites),
+op as (select coalesce((select ` + energy.OperatorKeySQL("operator") + ` from public.charging_sites where operator is not null limit 1), 'x') k),
+pt as (` + pt + `),
+t as (select now() t union select max(observed_at) - interval '1 second' from public.charging_point_status
+      union select min(observed_at) from public.charging_point_status)
+select pt.lat, pt.lon, v.fs, v.r, v.acc, v.kw, v.l, t.t, v.plug, v.mx, v.op, v.pf, v.terms, pt.id
+from pt, fam, op, t, lateral (values
+  (fam.f, 5000::float8, null::text[], 0::float8, 11::bigint, null::text, 0::float8, null::text, false, null::text[]),
+  (fam.f, 50000, null, 0, 2, null, 0, null, false, null),
+  (fam.f, 5000, '{public}', 50, 11, null, 0, null, true, null),
+  (fam.f, 5000, '{restricted}', 0, 11, null, 0, null, false, null),
+  (fam.f, 5000, null, 0, 11, 'ccs2', 0, null, true, null),
+  (fam.f, 5000, null, 0, 11, 'type2', 22, null, true, null),
+  (fam.f, 5000, null, 0, 11, null, 0, op.k, false, null),
+  (fam.f, 5000, null, 0, 11, null, 0, '` + energy.NoOperatorKey + `', false, null),
+  (fam.f, 5000, null, 0, 11, null, 0, null, true, '{card}'),
+  (fam.f, 5000, null, 0, 11, null, 0, null, true, '{free,open247}'),
+  ('{}'::text[], 5000, null, 0, 11, null, 0, null, false, null)) v(fs, r, acc, kw, l, plug, mx, op, pf, terms)`
+}

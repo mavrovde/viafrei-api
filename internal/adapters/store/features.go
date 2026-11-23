@@ -113,7 +113,7 @@ func (s *Store) ChargingNear(ctx context.Context, q energy.Query, families []str
 		if q.SiteID != "" {
 			read = chargingByID
 		}
-		res, _ := tx.Query(ctx, read, q.At.Lat, q.At.Lon, families, q.RadiusM, accessCodes, q.MinKw, q.Limit+1, now,
+		res, _ := run(ctx, tx, read, q.At.Lat, q.At.Lon, families, float64(q.RadiusM), accessCodes, q.MinKw, q.Limit+1, now,
 			connector, f.MaxKw, opKey, pointFiltered, terms, q.SiteID)
 		return pgx.CollectRows(res, func(r pgx.CollectableRow) (row, error) {
 			var (
@@ -164,14 +164,8 @@ func (s *Store) ChargingNear(ctx context.Context, q energy.Query, families []str
 // read keeps (withdrawn, permitted) included.
 func (s *Store) ChargingInRadius(ctx context.Context, q energy.Query, families []string) (int, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (int, error) {
-		var n int
-		err := tx.QueryRow(ctx, `select count(*)::int
-from contract.charging_site c
-where c.withdrawn_at is null
-  and (c.source_ref = any($3)) is true
-  and `+permitted("c")+`
-  and st_dwithin(c.location::geography, st_setsrid(st_makepoint($2, $1), 4326)::geography, $4)`,
-			q.At.Lat, q.At.Lon, families, q.RadiusM).Scan(&n)
+		rows, _ := run(ctx, tx, chargingInRadius, q.At.Lat, q.At.Lon, families, float64(q.RadiusM))
+		n, err := pgx.CollectOneRow(rows, pgx.RowTo[int])
 		return n, err
 	})
 }
@@ -395,28 +389,26 @@ func threshold(staleAfterS *int64) (time.Duration, bool) {
 // before the ring. Kept, they are listed by the distance the answer reports,
 // then id, as before; the one past the limit ($7, to tell that there are
 // more) stays last.
-func chargingSites(byID bool) string {
+func chargingSites(byID bool) stmt {
 	q := `
 with here as (select st_setsrid(st_makepoint($2, $1), 4326)::geography g),
 near as (
-  select c.site_id, c.source_ref, c.name, c.operator_name, c.access, c.origin_key,
-         st_y(c.location) lat, st_x(c.location) lon,
-         round(st_distance(c.location::geography, here.g))::int dist,
-         c.location::geography <-> here.g d
-  from contract.charging_site c, here
-  where c.withdrawn_at is null
-    and (c.source_ref = any($3)) is true
-    and ` + permitted("c") + `
-    and st_dwithin(c.location::geography, here.g, $4) and $14::text = ''
+  select c.site_id, c.source_feed source_ref, c.name, c.operator_name, c.access, c.origin_key,
+         st_y(c.geom::geometry) lat, st_x(c.geom::geometry) lon,
+         round(st_distance(c.geom, here.g))::int dist,
+         c.geom <-> here.g d
+  from ` + chargingSiteRows + ` c, here
+  where (c.source_feed = any((` + ruledFamilies("$3") + `)::text[])) is true
+    and st_dwithin(c.geom, here.g, $4) and $14::text = ''
     and ($5::text[] is null or c.access = any($5))
     and ($11::text is null or coalesce(` + energy.OperatorKeySQL("c.operator_name") + `, '` + energy.NoOperatorKey + `') = $11)
     and (not $12::boolean or exists (
-          select 1 from contract.charge_point p
-          where p.site_id = c.site_id and ` + pointFilter + ` and ` + permitted("p") + `))
-  order by c.location::geography <-> here.g
+          select 1 from ` + chargePointRows + ` p
+          where p.source_feed = c.source_feed and p.raw_site = c.origin_key and ` + pointFilter + `))
+  order by c.geom <-> here.g
   fetch first $7 rows with ties),
 sites as (
-  select n.site_id, n.source_ref, n.name, n.operator_name, n.access, n.lat, n.lon, n.dist,
+  select n.site_id, n.source_ref, n.name, n.operator_name, n.access, n.lat, n.lon, n.dist, n.origin_key,
          row_number() over (order by n.d, n.source_ref, n.origin_key) rn
   from near n
   order by rn
@@ -425,27 +417,90 @@ select s.site_id, s.source_ref, s.name, s.operator_name, s.access, s.lat, s.lon,
        p.point_id, p.current_kind, p.power_max_kw::float8, o.availability, o.observed_at, o.source_ref,
        nx.next_at
 from sites s
-left join contract.charge_point p on p.site_id = s.site_id and ` + pointFilter + ` and ` + permitted("p") + `
+left join ` + chargePointRows + ` p on p.source_feed = s.source_ref and p.raw_site = s.origin_key and ` + pointFilter + `
 left join lateral (
-  select availability, observed_at, source_ref
-  from contract.charge_point_state_observation o
-  where o.point_id = p.point_id and o.source_ref = any($3) and o.observed_at <= $8 and ` + permitted("o") + `
+  select ` + chargeAvailability + ` availability, o.observed_at, o.source_feed source_ref
+  from charging_point_status o
+  where o.evse_id = p.point_id and o.source_feed = any((` + ruledFamilies("$3") + `)::text[]) and o.observed_at <= $8
+    and coalesce(o.confidentiality, 'noRestriction') = 'noRestriction'
   order by o.observed_at desc
   limit 1) o on true
 left join lateral (
   select min(o.observed_at) next_at
-  from contract.charge_point_state_observation o
-  where o.point_id = p.point_id and o.source_ref = any($3) and o.observed_at > $8 and ` + permitted("o") + `) nx on true
+  from charging_point_status o
+  where o.evse_id = p.point_id and o.source_feed = any((` + ruledFamilies("$3") + `)::text[]) and o.observed_at > $8
+    and coalesce(o.confidentiality, 'noRestriction') = 'noRestriction') nx on true
 order by s.rn = $7, s.dist, s.site_id, p.point_id`
-	radius := "double precision"
+	name := "api_charging_near"
 	if byID {
-		q = strings.Replace(q, "st_dwithin(c.location::geography, here.g, $4) and $14::text = ''", "c.site_id = $14::text and $4::int >= 0", 1)
-		radius = "integer"
+		// The site asked by its id, on the sites' key: the family before the
+		// first colon, the provider's id after it.
+		q = strings.Replace(q, "st_dwithin(c.geom, here.g, $4) and $14::text = ''",
+			"c.source_feed = split_part($14::text, ':', 1) and c.origin_key = substr($14, length(split_part($14, ':', 1)) + 2)\n    and c.site_id = $14 and $4 >= 0", 1)
+		name = "api_charging_by_id"
 	}
-	return opaque(q, "double precision", "double precision", "text[]", radius, "text[]", "double precision", "bigint",
-		"timestamp with time zone", "text", "double precision", "text", "boolean", "text[]", "text")
+	return named(name, opaqued(q, "float8", "float8", "text[]", "float8", "text[]", "float8", "bigint",
+		"timestamptz", "text", "float8", "text", "bool", "text[]", "text"),
+		"float8", "float8", "text[]", "float8", "text[]", "float8", "bigint",
+		"timestamptz", "text", "float8", "text", "bool", "text[]", "text")
+}
+
+// chargingSiteRows are the charging sites a read may list: not deleted nor
+// closed, with a position, and not withheld (a confidentiality other than
+// noRestriction, or a private access). The site's id is its family and the
+// provider's id, joined by a colon.
+const chargingSiteRows = `(
+  select s.source_feed || ':' || s.site_id site_id, s.source_feed, s.site_id origin_key, s.name, s.operator operator_name,
+         case when s.access_private then 'restricted' else 'public' end access, s.geom
+  from charging_sites s
+  where s.deleted_at is null and s.closed_at is null and s.geom is not null
+    and coalesce(s.confidentiality, 'noRestriction') = 'noRestriction' and s.access_private is not true)`
+
+// chargePointRows are the charge points a read may list, with the
+// register's terms: not deleted, of a site, not confidential. The point's id
+// is its EVSE id, else its family and key. Its family is its site's, so its
+// source rule is the one the site was read under.
+const chargePointRows = `(
+  select coalesce(p.evse_id, p.source_feed || ':' || p.point_key) point_id, p.source_feed, p.site_id raw_site,
+         case when p.current_type ~* '^ac' then 'ac' when p.current_type ~* '^dc' then 'dc' when p.current_type is not null then 'other' end current_kind,
+         p.max_power_kw power_max_kw,
+         array_remove(array[
+           case when p.connector_types && array['iec62196T2COMBO', 'iec62196T2Combo', 'iec62196t2combo', 'combo', 'ccs'] then 'ccs2' end,
+           case when p.connector_types && array['iec62196T2', 'iec62196t2', 'type2'] then 'type2' end,
+           case when p.connector_types && array['chademo', 'chaDemo', 'CHAdeMO'] then 'chademo' end,
+           case when p.connector_types && array['mcs'] then 'mcs' end], null) connectors,
+         p.price_per_kwh, p.price_adhoc_zero, p.price_last_updated price_updated_at,
+         charging_register_opening_hours(p.extras) opening_hours_kind, charging_register_payment_card(p.extras) payment_card,
+         charging_register_free_of_charge(p.extras) free_of_charge, charging_register_parking(p.extras) parking_access
+  from charging_points p
+  where p.deleted_at is null and p.site_id is not null and coalesce(p.confidentiality, 'noRestriction') = 'noRestriction')`
+
+// chargeAvailability is a status report's state over charging_point_status
+// o, the platform's mapping.
+const chargeAvailability = `case when o.status ~* '^available$' then 'available'
+              when o.status ~* '^(charging|occupied|blocked)$' then 'occupied'
+              when o.status ~* '^reserved$' then 'reserved'
+              when o.status ~* '^(out_?of_?order|inoperative|faulted)$' then 'out_of_order'
+              when o.status is null or o.status ~* '^unknown$' then 'unknown'
+              else 'other' end`
+
+// opaqued rewrites every parameter $n of sql as opaque does, for a named
+// statement: each a one-row subquery cast to its type.
+func opaqued(sql string, types ...string) string {
+	return parameter.ReplaceAllStringFunc(sql, func(p string) string {
+		n, _ := strconv.Atoi(p[1:])
+		return "((select " + p + "::" + types[n-1] + ")::" + types[n-1] + ")"
+	})
 }
 
 // chargingNear and chargingByID are the two charging reads, built once:
 // the sites in the ring and the one site asked by its id.
 var chargingNear, chargingByID = chargingSites(false), chargingSites(true)
+
+// chargingInRadius counts the sites of the families $3 within $4 metres
+// of ($2, $1).
+var chargingInRadius = named("api_charging_in_radius", `select count(*)::int
+from `+chargingSiteRows+` c
+where (c.source_feed = any((`+ruledFamilies("(select $3::text[])")+`)::text[])) is true
+  and st_dwithin(c.geom, st_setsrid(st_makepoint((select $2::float8), (select $1::float8)), 4326)::geography, (select $4::float8))`,
+	"float8", "float8", "text[]", "float8")

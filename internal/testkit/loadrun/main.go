@@ -85,7 +85,10 @@ var profiles = map[string]profile{
 		sample: time.Second, ready: 30 * time.Second, settle: 100 * time.Millisecond,
 	},
 	"nightly": {
-		rate: 50, warm: 2 * time.Minute, soak: time.Hour,
+		// The soak is 9 minutes, not the hour it was: every job of
+		// load-nightly.yml ends within 15 minutes (owner rule), and the soak
+		// is one job with the stack's start and the warm-up.
+		rate: 50, warm: 2 * time.Minute, soak: 9 * time.Minute,
 		step: 30 * time.Second, maxRate: 3200,
 		spikeBase: 30 * time.Second, spikeBurst: 10 * time.Second, recover: time.Minute,
 		fault: time.Minute, faultRate: 10, after: 1000, burst: 80,
@@ -97,6 +100,9 @@ var profiles = map[string]profile{
 var appName = regexp.MustCompile(`^[a-z0-9-]{1,63}$`)
 
 func run(args []string, getenv func(string) string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "merge" {
+		return runMerge(args[1:], stdout, stderr)
+	}
 	fs := flag.NewFlagSet(prog, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var (
@@ -107,6 +113,7 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		prof     = fs.String("profile", "", "pr or nightly")
 		only     = fs.String("scenarios", "", "comma-separated scenario names; empty runs every scenario")
 		report   = fs.String("report", "load-report.md", "the Markdown report to write; the figures go beside it, .json for .md (TST-021)")
+		shard    = fs.Bool("shard", false, "this run is one shard of a split run (load-nightly.yml): the report leaves the comparison to loadrun merge, which compares the whole run")
 		previous = fs.String("previous", "", "the previous main run's figures to compare with; empty compares with nothing, and the report says so (TST-021)")
 		tol      = fs.Float64("regression-tolerance", 0.10, "the growth of a class's p95 or p99 over the previous run that fails it, a fraction (TST-021)")
 		floor    = fs.Duration("regression-floor", 5*time.Millisecond, "a p95 or p99 growth no larger than this is never a regression (TST-021)")
@@ -152,6 +159,8 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 		return fail("-regression-floor must not be negative")
 	case !strings.HasSuffix(*report, ".md"):
 		return fail("-report must end in .md, so that the figures can go beside it")
+	case *shard && *previous != "":
+		return fail("-shard and -previous exclude each other: a split run is compared once, by loadrun merge")
 	case *failures < 1 || *probes < 1 || *openFor <= 0:
 		return fail("-breaker-failures and -breaker-probes must be at least 1, -breaker-open-for positive")
 	case *staleFor <= 0:
@@ -198,7 +207,12 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	outs := r.runAll(context.Background(), sel)
 	figs := collect(*prof, outs)
 	cmp := compare(*previous, figs, *tol, *floor)
-	text := renderReport(*prof, outs) + cmp.render(*tol, *floor)
+	text := renderReport(*prof, outs)
+	if *shard {
+		text += "\nThis run is one shard of a split run; loadrun merge compares the whole run with the previous main run.\n"
+	} else {
+		text += cmp.render(*tol, *floor)
+	}
 	if err := os.WriteFile(*report, []byte(text), 0o600); err != nil {
 		return fail("%v", err)
 	}
@@ -215,7 +229,7 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	for _, r := range cmp.regressions {
 		fmt.Fprintf(stdout, "%s: regression: %s\n", prog, r)
 	}
-	if cmp.state != compared {
+	if cmp.state != compared && !*shard {
 		fmt.Fprintf(stdout, "%s: not compared with the previous main run: %s\n", prog, cmp.reason)
 	}
 	fmt.Fprintf(stdout, "%s: %d scenario(s), %d failed; report in %s, figures in %s\n", prog, len(outs), failed, *report, figuresPath(*report))

@@ -42,6 +42,8 @@ jobs:
         run: shellcheck --version && shellcheck scripts/*.sh
       - name: Self-test of the previous-figures fetch (TST-021)
         run: bash scripts/load-previous.test.sh
+      - name: Self-test of the fuzz job matrix (TST-016)
+        run: bash scripts/fuzz.test.sh
 
   test:
     name: Unit and handler tests
@@ -325,7 +327,7 @@ jobs:
   image:
     name: Image (build, lint, scan, healthz)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 15
     permissions:
       contents: read
       security-events: write # uploads SARIF to code scanning
@@ -419,7 +421,7 @@ jobs:
   compose:
     name: Compose smoke (Schemathesis)
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -432,7 +434,7 @@ jobs:
     # load-nightly.yml. Nothing but that stack's loopback is a target.
     name: Load and faults (pull-request budget)
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

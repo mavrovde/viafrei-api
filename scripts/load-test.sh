@@ -16,6 +16,11 @@
 # (scripts/load-previous.sh fetches them); the report compares this run with
 # them and a p95 or p99 regression beyond the tolerance fails it (TST-021).
 #
+# LOADRUN_SCENARIOS, when set, names the scenarios to run, comma-separated
+# (one shard of load-nightly.yml, which runs the catalogue as parallel jobs
+# of at most 15 minutes each); the run is then a shard: its report leaves
+# the comparison to loadrun merge, and LOADRUN_PREVIOUS is refused with it.
+#
 # Only this machine's loopback is a target: the runner refuses every host
 # that is not on test/load/allow-list.txt, and this script refuses an
 # LOADRUN_API, LOADRUN_CACHED_API or LOADRUN_PROXY that is not the loopback
@@ -98,6 +103,7 @@ max_age_energy=$(setting CACHE_MAX_AGE_ENERGY) || exit 2
 versions_ttl=$(setting CACHE_VERSIONS_TTL) || exit 2
 previous=()
 [[ -n ${LOADRUN_PREVIOUS:-} ]] && previous=(-previous "$LOADRUN_PREVIOUS")
+[[ -n ${LOADRUN_SCENARIOS:-} ]] && previous+=(-scenarios "$LOADRUN_SCENARIOS" -shard)
 go run ./internal/testkit/loadrun -profile "$profile" -report "$report" -api "$API_URL" -proxy "$PROXY_URL" -place "$place" \
   -breaker-failures "$brk_failures" -breaker-open-for "$brk_open_for" -breaker-probes "$brk_probes" \
   -cached-api "$CACHED_URL" -health "$HEALTH_URL" -stale-if-error "$stale_for" \

@@ -8,12 +8,24 @@ the job that runs them, on the loopback. They never reach a deployment.
 | Run | Where | Budget |
 |---|---|---|
 | Pull request | CI workflow, job `Load and faults (pull-request budget)` | design load 20 requests/s, a 30 s soak, faults held 6 s |
-| Nightly budget, weekly | `load-nightly.yml`, Sundays (and by hand: *Run workflow*) | design load 50 requests/s, a one-hour soak, faults held 1 min |
+| Nightly budget, weekly | `load-nightly.yml`, Sundays (and by hand: *Run workflow*) | design load 50 requests/s, a 9-minute soak after 2 minutes of warm-up, faults held 1 min |
 
 Both write `load-report.md`: one row per scenario with its request count,
 its answers by status class, its p95 and its slowest answer, then every
 assertion of every scenario. It is the job summary and an artifact; the
 nightly artifact is kept 90 days for the release evidence.
+
+Every job of `load-nightly.yml` ends within 15 minutes, so the nightly run
+is split into four shards that run in parallel, each on a runner and a stack
+of its own (`LOADRUN_SCENARIOS` names a shard's scenarios): the soak; spike
+and stress; slow-storage, hanging-query, pool-exhausted and
+composed-part-timeout; storage-killed, access-store-down, clock-skew and
+instance-killed (the kill stays last in its shard). A gather job runs
+`loadrun merge` over the shards' reports: every scenario must have been run
+by exactly one shard, and the whole run is compared with the previous one,
+as below. The soak was one hour on one stack, ahead of every other scenario;
+it is now 9 minutes, so its memory growth is judged over 9 minutes, and the
+scenarios after it no longer run on a stack that has served the soak.
 
 ## How it runs
 
@@ -130,7 +142,8 @@ artifact has expired.
 
 ```sh
 scripts/load-test.sh pr                     # the pull-request budget, report in load-report.md
-scripts/load-test.sh nightly night.md       # the full run, about two hours
+scripts/load-test.sh nightly night.md       # every scenario on one stack, about 30 minutes
+LOADRUN_SCENARIOS=spike,stress scripts/load-test.sh nightly   # one shard of the nightly run
 LOADRUN_PREVIOUS=prev/load-report.json scripts/load-test.sh nightly   # compared with earlier figures
 ```
 

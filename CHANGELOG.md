@@ -9,6 +9,13 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [1.0.2](https://github.com/mavrovde/viafrei-api/compare/v1.0.1...v1.0.2) (2026-11-23)
+
+
+### Fixed
+
+* **release:** publish the draft and mark it latest in one call (GitHub refuses latest on a draft) ([#189](https://github.com/mavrovde/viafrei-api/issues/189)) ([f4746cf](https://github.com/mavrovde/viafrei-api/commit/f4746cf21ee4fa7cefcf202e7180f601b23af44e))
+
 ## [1.0.1](https://github.com/mavrovde/viafrei-api/compare/v1.0.0...v1.0.1) (2026-11-23)
 
 

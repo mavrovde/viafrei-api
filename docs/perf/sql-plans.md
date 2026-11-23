@@ -52,7 +52,7 @@ equal buffers mean the same plan, and a difference in time is the host.
 | api_national_energy | 1 309/1 509 | 3/5 | 246 135 | 4 547/8 445 (675 045; 7 268 inlined, same hour) | source rules once per source; points counted per site first | national page |
 | api_national_roads | 1 757/2 355 | 3/5 | 118 008 | 3 938/6 511 (235 971, the view inlined, same hour) | events in force read once for both parts | national page |
 | api_national_parking | 176/253 | 3/5 | 1 406 | 109/152 | mechanical (same buffers) | national page |
-| api_national_accessibility | 1 325/1 491 | 3/5 | 97 424 | 785/941 | mechanical (same buffers) | national page |
+| api_national_accessibility | 439/472 | 3/5 | 43 299 | 1 325/1 491 (785/941 earlier) | each station ref mapped to its stop place once, not per facility | national page |
 | api_national_weather | 225/352 | 3/5 | 19 267 | 27/40 | mechanical | national page |
 | api_national_transit | 6.8/63 | 3/5 | 0 | 2.2/4.2 | mechanical | national page |
 | api_storage_answers | < 1 | — | 0 | — | readiness: storage answers; the contract version is the build's | — |

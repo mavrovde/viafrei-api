@@ -89,10 +89,24 @@ from (`+relTransitPunctuality+`) p
 where p.source_ref = any($1) and `+permitted("p")+` and $2::timestamptz is not null
 order by 1, 2, 4`, "text[]", "timestamp with time zone"),
 	"accessibility": namedOpaque("api_national_accessibility", `
+with f as (
+  select e.kind as facility_kind, coalesce(st.state, 'unknown') as facility_status,
+         coalesce(st.source_feed, e.source_feed) as source_ref, e.stop_place_id as station_ref
+  from station_equipment e
+  left join station_equipment_state st on st.equipment_id = e.equipment_id
+  where e.closed_at is null
+  union all
+  select x.kind, x.state, x.source_feed, (select d.ifopt from db_stations d where d.station_no = x.station_no)
+  from db_facilities x
+), places as materialized (
+  select u.station_ref, contract_stop_place_of(u.station_ref) as stop_place_id
+  from (select distinct f.station_ref from f where f.station_ref is not null) u
+)
 select 'facilities', f.facility_kind || '/' || coalesce(f.facility_status, 'unknown'), null::text, f.source_ref,
-       count(*)::int, count(distinct f.stop_place_id)::int, null::float8, null::float8
-from (`+relStationFacility+`) f
-where f.source_ref = any($1) and `+permitted("f")+` and $2::timestamptz is not null
+       count(*)::int, count(distinct p.stop_place_id)::int, null::float8, null::float8
+from f
+left join places p on p.station_ref = f.station_ref
+where f.source_ref = any($1) and $2::timestamptz is not null
 group by 2, 4
 order by 1, 2, 4`, "text[]", "timestamp with time zone"),
 	"weather": namedOpaque("api_national_weather", `

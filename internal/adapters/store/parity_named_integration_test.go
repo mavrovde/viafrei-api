@@ -15,7 +15,9 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
+	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
+	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 )
 
 // namedCases are the arguments a parity test runs a named statement with,
@@ -238,5 +240,36 @@ func TestFacilitiesAnswerAsTheirView(t *testing.T) {
 	}
 	if n == 0 {
 		t.Error("no station answered a facility")
+	}
+}
+
+// TestEveryStationShapeAnswersAsTheView: a station search of each shape,
+// from fixture stations, read beside the view statement (the parity hook).
+func TestEveryStationShapeAnswersAsTheView(t *testing.T) {
+	st := seeded(t)
+	var fams []string
+	var name, code, area string
+	var lat, lon float64
+	owner(t, `select coalesce(array_agg(distinct source_ref), '{}') from contract.stop_place`, &fams)
+	owner(t, `select left(contract_search_fold(name), 4), coalesce(eva_no, national_stop_code, ''), coalesce(left(region_code, 2), ''),
+  st_y(location), st_x(location) from contract.stop_place where location is not null order by eva_no is null, stop_place_id limit 1`, &name, &code, &area, &lat, &lon)
+	for m := range 1 << 5 {
+		q := transit.Query{Limit: 20, RadiusM: everywhere}
+		if m&1 != 0 {
+			q.At = &geo.Point{Lat: lat, Lon: lon}
+		}
+		if m&2 != 0 {
+			q.Text = name
+		}
+		if m&4 != 0 {
+			q.Code = code
+		}
+		q.Railway = m&8 != 0
+		if m&16 != 0 {
+			q.Area = area
+		}
+		if _, _, err := st.Stations(bounded(t), q, fams); err != nil {
+			t.Fatalf("shape %02d: %v", m, err)
+		}
 	}
 }

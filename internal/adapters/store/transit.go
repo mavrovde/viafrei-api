@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"time"
 
@@ -56,15 +57,43 @@ func (s *Store) Station(ctx context.Context, id string, families []string) (tran
 // null for none; $4 the folded text, empty for none; $5 the radius; $6 the
 // limit; $7 a station code, empty for none; $8 railway stations only; $9 an
 // official region key the district code starts with, empty for any (a
-// station with no district then left out). A station stored with no position is left out: an answer places
-// every station it lists. The folded text holds letters and digits only, so
-// it carries no LIKE wildcard. It is sent as written, not opaque: each
-// optional filter is decided by its argument, and on prod the generic plan
-// that cannot see them ran past 5 s where the asked plan took 7 ms.
-var stationsPage = namedOpaque("api_stations_page", `
-with here as (
-  select case when $2::float8 is null then null
-              else st_setsrid(st_makepoint($3::float8, $2::float8), 4326)::geography end g)
+// station with no district then left out). A station stored with no
+// position is left out: an answer places every station it lists. The folded
+// text holds letters and digits only, so it carries no LIKE wildcard.
+//
+// Each search shape (which of position, text, code, railway and region it
+// asks) is a statement of its own, holding only its own filters, so each
+// settles on a generic plan that fits it: one statement with every filter
+// optional ran past 15 s on prod under its generic plan, where the asked
+// plan took 7 ms. Every shape takes all nine parameters (the unused ones in
+// a CTE the planner drops), so a caller sends the same arguments to each.
+var stationsPage = func() map[stationShape]stmt {
+	out := map[stationShape]stmt{}
+	for m := range stationShape(1 << 5) {
+		where, order := "", ""
+		if m&shapeText != 0 {
+			where += "\n  and s.search_fold like '%' || $4::text || '%'"
+			if m&shapeNear == 0 {
+				order = "case when not s.search_fold like $4::text || '%' then 1 else 0 end, "
+			}
+		}
+		if m&shapeNear != 0 {
+			where += "\n  and st_dwithin(s.location::geography, here.g, $5::double precision)"
+		}
+		if m&shapeCode != 0 {
+			where += "\n  and (s.eva_no = $7::text or s.national_stop_code = $7::text)" + stationsOfCode
+		}
+		if m&shapeRailway != 0 {
+			where += "\n  and s.eva_no is not null"
+		}
+		if m&shapeArea != 0 {
+			where += "\n  and s.region_code like $9::text || '%'"
+		}
+		out[m] = namedOpaque(fmt.Sprintf("api_stations_page_%02d", m), `
+with args as (select $1::text[], $2::double precision, $3::double precision, $4::text, $5::double precision, $6::bigint, $7::text, $8::boolean, $9::text),
+here as (
+  select case when $2::double precision is null then null
+              else st_setsrid(st_makepoint($3::double precision, $2::double precision), 4326)::geography end g)
 select s.stop_place_id, s.name, st_y(s.location), st_x(s.location), s.national_stop_code, s.region_code,
        coalesce(s.modes, '{}'), s.source_ref,
        case when here.g is null then null else round(st_distance(s.location::geography, here.g))::int end dist,
@@ -72,16 +101,50 @@ select s.stop_place_id, s.name, st_y(s.location), st_x(s.location), s.national_s
 from (`+relStopPlace+`) s, here
 where s.withdrawn_at is null
   and s.location is not null
-  and s.source_ref = any($1)
-  and `+permitted("s")+`
-  and ($4::text = '' or s.search_fold like '%' || $4::text || '%')
-  and (here.g is null or st_dwithin(s.location::geography, here.g, $5))
-  and ($7::text = '' or s.eva_no = $7::text or s.national_stop_code = $7::text)
-  and (not $8::bool or s.eva_no is not null)
-  and ($9::text = '' or s.region_code like $9::text || '%')
-order by case when here.g is null and not s.search_fold like $4::text || '%' then 1 else 0 end,
-         dist, s.name, s.stop_place_id
-limit $6`, "text[]", "double precision", "double precision", "text", "double precision", "bigint", "text", "boolean", "text")
+  and s.source_ref = any($1::text[])
+  and `+permitted("s")+where+`
+order by `+order+`dist, s.name, s.stop_place_id
+limit $6::bigint`, "text[]", "double precision", "double precision", "text", "double precision", "bigint", "text", "boolean", "text")
+	}
+	return out
+}()
+
+// stationsOfCode narrows a code search to the stops that can carry the
+// code $7 before the station relation is built: the stops whose id starts
+// with it (one range of the feed's id index: the stop of that id, and those
+// below it, whose national stop code is the id's first three parts), and
+// the stop a DB station of that EVA number names. The narrowing may hold
+// more; the filter above still decides.
+const stationsOfCode = `
+  and s.stop_place_id in (
+    select (f2.gtfs_feed_key || ':') || s2.id from feeds f2 join stops s2 on s2.gtfs_feed_key = f2.gtfs_feed_key
+     where s2.deleted_at is null and s2.id ~>=~ $7::text and s2.id ~<~ ($7::text || ';')
+    union all
+    select (f3.gtfs_feed_key || ':') || s3.id from db_stations x join feeds f3 on true
+      join stops s3 on s3.gtfs_feed_key = f3.gtfs_feed_key and s3.id = x.ifopt
+     where x.eva_no = $7::text and x.closed_at is null and s3.deleted_at is null)`
+
+// stationShape is which filters a station search asks.
+type stationShape uint8
+
+const (
+	shapeNear stationShape = 1 << iota
+	shapeText
+	shapeCode
+	shapeRailway
+	shapeArea
+)
+
+// shapeOf is the shape of the station search q, whose folded text is text.
+func shapeOf(q transit.Query, text string) stationShape {
+	var m stationShape
+	for bit, on := range map[stationShape]bool{shapeNear: q.At != nil, shapeText: text != "", shapeCode: q.Code != "", shapeRailway: q.Railway, shapeArea: q.Area != ""} {
+		if on {
+			m |= bit
+		}
+	}
+	return m
+}
 
 // Stations reads the stations that answer q (features.Transit), one more
 // than the limit, to tell whether more answer.
@@ -91,7 +154,8 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 		lat, lon = &q.At.Lat, &q.At.Lon
 	}
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.Station, error) {
-		rows, _ := run(ctx, tx, stationsPage, families, lat, lon, transit.Fold(q.Text), q.RadiusM, q.Limit+1, q.Code, q.Railway, q.Area)
+		text := transit.Fold(q.Text)
+		rows, _ := run(ctx, tx, stationsPage[shapeOf(q, text)], families, lat, lon, text, q.RadiusM, q.Limit+1, q.Code, q.Railway, q.Area)
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.Station, error) {
 			var (
 				v     transit.Station

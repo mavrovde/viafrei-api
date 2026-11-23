@@ -20,7 +20,7 @@ var viewsPending = map[string]bool{
 	"features.go": true, "freshness.go": true, "fuel.go": true, "hydrogen.go": true,
 	"location.go": true, "lookup.go": true, "lorry.go": true, "nearby.go": true,
 	"poi.go": true, "register.go": true, "roads.go": true, "roadshape.go": true, "sharing.go": true,
-	"speed.go": true, "state.go": true, "store.go": true, "trainboard.go": true,
+	"speed.go": true, "state.go": true, "trainboard.go": true,
 	"weather_cell.go": true, "weather.go": true,
 }
 

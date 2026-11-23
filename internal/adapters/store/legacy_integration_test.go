@@ -3,6 +3,7 @@
 package store
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
@@ -79,27 +80,6 @@ select s.stop_place_id, s.name, coalesce(st_y(s.location), 0), coalesce(st_x(s.l
               order by p.stop_point_id)
 from contract.stop_place s
 where s.stop_place_id = $1 and s.withdrawn_at is null and s.source_ref = any($2) and `+permitted("s"), "text", "text[]"),
-	"api_stations_page": `
-with here as (
-  select case when $2::float8 is null then null
-              else st_setsrid(st_makepoint($3::float8, $2::float8), 4326)::geography end g)
-select s.stop_place_id, s.name, st_y(s.location), st_x(s.location), s.national_stop_code, s.region_code,
-       coalesce(s.modes, '{}'), s.source_ref,
-       case when here.g is null then null else round(st_distance(s.location::geography, here.g))::int end dist,
-       s.placement_source_ref, s.eva_no, s.eva_numbers
-from contract.stop_place s, here
-where s.withdrawn_at is null
-  and s.location is not null
-  and s.source_ref = any($1)
-  and ` + permitted("s") + `
-  and ($4::text = '' or s.search_fold like '%' || $4::text || '%')
-  and (here.g is null or st_dwithin(s.location::geography, here.g, $5))
-  and ($7::text = '' or s.eva_no = $7::text or s.national_stop_code = $7::text)
-  and (not $8::bool or s.eva_no is not null)
-  and ($9::text = '' or s.region_code like $9::text || '%')
-order by case when here.g is null and not s.search_fold like $4::text || '%' then 1 else 0 end,
-         dist, s.name, s.stop_place_id
-limit $6`,
 	"api_board_calls": opaque(`
 select d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transport_mode, d.route_type,
        d.train_number, d.train_category, nullif(btrim(j.destination_label), ''),
@@ -248,6 +228,7 @@ where w.withdrawn_at is null and w.message_status <> 'cancelled' and w.source_re
   and w.valid_from <= $2 and (w.valid_to is null or w.valid_to > $2)
 group by 2, 4
 order by 1, 2, 4`,
+	"api_storage_answers": `select true`,
 }
 
 // legacyRegionAlerts is the alerts CTE as it read the view.
@@ -267,6 +248,36 @@ var legacyRegionAlerts = strings.NewReplacer("{live}", alertLive("a", "$1"), "{i
          or (f.placed_by = 'network' and length($3::text) = 2 and $3::text = any(f.state_codes)))
     and ($4::text is null or exists (select 1 from unnest(f.line_names) n where upper(regexp_replace(n, '\s+', '', 'g')) = $4::text))
 )`)
+
+func init() {
+	for m := range 1 << 5 {
+		legacyReads[fmt.Sprintf("api_stations_page_%02d", m)] = legacyStationsPage
+	}
+}
+
+// legacyStationsPage is the station search as it read the view, every
+// filter optional, for each of its shapes.
+var legacyStationsPage = `
+with here as (
+  select case when $2::float8 is null then null
+              else st_setsrid(st_makepoint($3::float8, $2::float8), 4326)::geography end g)
+select s.stop_place_id, s.name, st_y(s.location), st_x(s.location), s.national_stop_code, s.region_code,
+       coalesce(s.modes, '{}'), s.source_ref,
+       case when here.g is null then null else round(st_distance(s.location::geography, here.g))::int end dist,
+       s.placement_source_ref, s.eva_no, s.eva_numbers
+from contract.stop_place s, here
+where s.withdrawn_at is null
+  and s.location is not null
+  and s.source_ref = any($1)
+  and ` + permitted("s") + `
+  and ($4::text = '' or s.search_fold like '%' || $4::text || '%')
+  and (here.g is null or st_dwithin(s.location::geography, here.g, $5))
+  and ($7::text = '' or s.eva_no = $7::text or s.national_stop_code = $7::text)
+  and (not $8::bool or s.eva_no is not null)
+  and ($9::text = '' or s.region_code like $9::text || '%')
+order by case when here.g is null and not s.search_fold like $4::text || '%' then 1 else 0 end,
+         dist, s.name, s.stop_place_id
+limit $6`
 
 // LegacyRead is the frozen view statement the named statement name replaced.
 func LegacyRead(name string) string { return legacyReads[name] }

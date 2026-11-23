@@ -36,6 +36,12 @@ that order (`order by a.extract_date desc nulls last limit 1` under
 `a.land = l.land`); viafrei-database item: an index on `osm_addresses
 (land, extract_date desc nulls last) where closed_at is null`, which turns
 each Land's probe into the first entry of its range.
+| api_hydrogen_near | under 1 ms | 0.3-0.8 ms | 5 / 5 | index scan of `hydrogen_stations_geom_gist` (the view's geometry cast read every station) |
+| api_hydrogen_nearest | under 1 ms | 0.5-1 ms | 5 / 5 | nearest-neighbour scan of the same index |
+| api_bays_near | 6 ms mean | 0.2-16 ms | 5 / 5 | index scan of `street_bays_geom_gist` |
+| api_lorry_rules | 13 ms mean | 6-127 ms | 0 / 10 (custom by design: the road, the point and the layer decide the plan) | each lorry table's `*_geom_open` area index on its own geography |
+| api_poi_match | 608 ms mean, up to 2.1 s | 150-970 ms | 0 / 10 (custom by design) | bitmap AND of `osm_pois_geom` and the name and brand trigram indexes; the brand match is `lower(brand)`, which no index holds (db item: a trigram index on `lower(brand)`) |
+| api_train_board | under 1 ms | not measured: the board table is empty on prod | - | - |
 
 The view cast the area to `geometry(MultiPolygon,4326)`, an expression no
 index holds, so the box test read every warning's area; the statements test

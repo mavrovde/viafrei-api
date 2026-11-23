@@ -119,20 +119,39 @@ where n.nspname not in ('pg_catalog', 'information_schema') and p.relkind = 'p'`
 	return out, err
 }
 
-// statement is one SQL statement the service sent, with its arguments.
+// statement is one SQL statement the service sent, with its arguments; a
+// named statement's is the text it was prepared with, under its name.
 type statement struct {
+	name string
 	sql  string
 	args []any
 }
 
-// capture records every read statement the store sends: the text of each
-// statement sent as text (seen, which a plan test replays), and a count of
-// each, of a named statement under its name.
+// capture records every read statement the store sends: each statement
+// sent as text, and each named statement with the text it was prepared with
+// (seen, which a plan test explains), and a count of each, of a named
+// statement under its name.
 type capture struct {
-	mu    sync.Mutex
-	seen  map[string]statement
-	count map[string]*atomic.Int64
+	mu       sync.Mutex
+	seen     map[string]statement
+	count    map[string]*atomic.Int64
+	prepared map[string]string
 }
+
+// TracePrepareStart keeps the text of each named statement the store prepares.
+func (c *capture) TracePrepareStart(ctx context.Context, _ *pgx.Conn, d pgx.TracePrepareStartData) context.Context {
+	if strings.HasPrefix(d.Name, "api_") {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if c.prepared == nil {
+			c.prepared = map[string]string{}
+		}
+		c.prepared[d.Name] = d.SQL
+	}
+	return ctx
+}
+
+func (c *capture) TracePrepareEnd(context.Context, *pgx.Conn, pgx.TracePrepareEndData) {}
 
 func (c *capture) TraceQueryStart(ctx context.Context, _ *pgx.Conn, d pgx.TraceQueryStartData) context.Context {
 	sql := strings.TrimSpace(d.SQL)
@@ -143,8 +162,14 @@ func (c *capture) TraceQueryStart(ctx context.Context, _ *pgx.Conn, d pgx.TraceQ
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if _, ok := c.seen[sql]; !ok && text {
-		c.seen[sql] = statement{sql: sql, args: slices.Clone(d.Args)}
+	if _, ok := c.seen[sql]; !ok {
+		body, named := c.prepared[sql]
+		switch {
+		case text:
+			c.seen[sql] = statement{sql: sql, args: slices.Clone(d.Args)}
+		case named:
+			c.seen[sql] = statement{name: sql, sql: body, args: slices.Clone(d.Args)}
+		}
 	}
 	if c.count[sql] == nil {
 		c.count[sql] = &atomic.Int64{}
@@ -837,26 +862,33 @@ func TestNoSequentialScanOfTimeSeries(t *testing.T) {
 		stmts = append(stmts, s)
 	}
 	r.sql.mu.Unlock()
-	timeSeries := 0
+	timeSeries, named, namedSeries := 0, 0, 0
 	for _, s := range stmts {
+		if s.name != "" {
+			named++
+		}
 		for _, mode := range []string{"custom", "generic"} {
 			plan, err := explain(ctx, conn, s, mode)
 			if err != nil {
-				t.Errorf("explain (%s) failed: %v\n%s", mode, err, s.sql)
+				t.Errorf("explain (%s) failed: %v\n%s %s", mode, err, s.name, s.sql)
 				continue
 			}
 			scanned, seq := relations(plan, parts)
 			if len(scanned) > 0 && mode == "custom" {
 				timeSeries++
+				if s.name != "" {
+					namedSeries++
+				}
 			}
 			for _, rel := range seq {
-				t.Errorf("a sequential scan of the time partition %s (%s plan):\n%s", rel, mode, s.sql)
+				t.Errorf("a sequential scan of the time partition %s (%s plan):\n%s %s", rel, mode, s.name, s.sql)
 			}
 		}
 	}
-	t.Logf("explained %d read statements, %d of them on time series, in custom and generic plans", len(stmts), timeSeries)
-	if timeSeries == 0 {
-		t.Fatal("no statement read a time series: the test guarded nothing")
+	t.Logf("explained %d read statements (%d named), %d of them on time series (%d named), in custom and generic plans",
+		len(stmts), named, timeSeries, namedSeries)
+	if timeSeries == 0 || namedSeries == 0 {
+		t.Fatalf("%d statements, %d of them named, read a time series: the test guarded no named read", timeSeries, namedSeries)
 	}
 }
 

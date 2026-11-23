@@ -210,7 +210,7 @@ answers the same row.
 | A parameter's value changes the best plan (short text, a big area) | place search with a text under three characters (8.5 s, as before) | needs a prefix index on the folded names (DB item below); the API keeps the shape |
 | Per-row source rules over large tables | charging, traffic events, every relation with a source-rule join | match the rules once per source (done for the energy summary; the same form fits the others) |
 | A correlated subquery over a CTE per output row | affected stations (was 3 million row checks) | aggregate once, join |
-| Sorts of concatenated ids spilling to disk (work_mem 32 MB) | energy summary | join on the key columns, aggregate before the join |
+| Sorts of concatenated ids spilling to disk | energy summary | join on the key columns, aggregate before the join |
 | An index the platform drops | real-time departures: `(stop_ref, COALESCE(expected_dep, aimed_dep))` is to go | every real-time departure read bounds `aimed_dep` and is served by `(stop_ref, aimed_dep)`; none relies on the coalesce index |
 | Statistics drift after a large load | all | auto mode re-plans when the generic plan's cost rises above the custom plans'; the probes above are the baseline to compare against |
 
@@ -223,32 +223,3 @@ answers the same row.
 - The drop of the real-time departures' coalesce index is coordinated: no API statement needs it.
 - The DB station register's EVA number has no index (8 800 rows, a scan of about 1 ms; not
   needed now).
-
-## UI load
-
-The site will read the API in place of its own read service. That read
-service's statements on prod since 2026-11-14 20:14 UTC (about nine days):
-339 million calls, 2.07 million s of execution and 0.27 million s of
-planning: on average about 440 calls a second and 3.0 s of database time a
-second, three backends busy, with 12 of its 133 connections active at the
-sample. The API's statements above are the same reads on the same tables;
-its plans settle, so planning drops to the first five runs of each
-statement on each connection.
-
-## Pool proposal
-
-Today the read service runs a pool of 56 per replica (133 connections), the
-API's reader role is limited to 16 (`db.pool_max` at most 16), and the
-server allows 300.
-
-| Pool | Role | Size | Who |
-|-|-|-|-|
-| interactive | api_reader | 20 | people and AI clients (the tiers' permits) |
-| bots | api_reader (own pool, own application name) | 8 | verified search and AI bots, paced; a wave of bot requests waits in its pool and never takes an interactive permit |
-| access store | api_access | 2 | keys, metering |
-
-That needs the reader role's connection limit raised from 16 to 32 (a
-database release) and `db.pool_max` with a bot pool beside it (an API
-release). Three busy backends on average leave the interactive pool room
-for peaks of seven times the mean; the read service's 133 connections are
-released as the site moves over.

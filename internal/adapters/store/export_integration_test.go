@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -91,12 +93,50 @@ type parityCheck struct {
 	name, sql, legacy string
 	args              []any
 	own               string
+	// url is the request connection's connection string: the database (a
+	// test's private copy among them) and the role the read ran as, on a
+	// dialer of its own (not a test's faulty one).
+	url string
 }
 
 var (
 	parityChecks []parityCheck
 	parityKeys   = map[string]bool{}
 )
+
+// testKey carries, in a test's context, the test the reads under it belong to.
+type testKey struct{}
+
+// WithTest is ctx carrying t: a named statement read under it is compared
+// with its view statement in a cleanup of t, registered at the read, so
+// after the test's body but before the cleanups registered earlier (the
+// rows the test planted before the read are still there; t.Cleanup is
+// last in, first out).
+func WithTest(ctx context.Context, t testing.TB) context.Context {
+	return context.WithValue(ctx, testKey{}, t)
+}
+
+// replayBound is the ceiling on one check's replay: three reads, outside
+// the request's budget.
+const replayBound = time.Minute
+
+// replayInTest compares c in t's cleanup, under a bound of its own (the
+// request's context has ended by then): a miss fails t.
+func replayInTest(ctx context.Context, t testing.TB, c parityCheck) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), replayBound)
+	defer cancel()
+	conn, err := pgx.Connect(ctx, c.url)
+	if err != nil {
+		t.Errorf("parity %s: connect: %v", c.name, err)
+		return
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	if err := replay(ctx, conn, c, func(m ParityMiss) {
+		t.Errorf("parity %s (%s) %v:\n got %q\nwant %q", m.Name, m.Plan, m.Args, m.Got, m.Want)
+	}); err != nil {
+		t.Errorf("parity %s: the replay failed: %v", c.name, err)
+	}
+}
 
 // Every named statement a test runs is kept with its arguments, to run
 // beside its view statement after the tests (ReplayParity): the comparison
@@ -117,13 +157,27 @@ func init() {
 			return // the request's budget ran out, or a failure the test injected: the test's own run reports it
 		}
 		key := fmt.Sprintf("%s\x1f%s\x1f%#v", s.Name, own, args)
+		c := parityCheck{name: s.Name, sql: s.SQL, legacy: legacy, args: slices.Clone(args), own: own}
+		t, inTest := ctx.Value(testKey{}).(testing.TB)
+		if inTest {
+			key = t.Name() + "\x1f" + key
+		}
 		parityMu.Lock()
 		defer parityMu.Unlock()
-		if !parityKeys[key] {
-			parityKeys[key] = true
-			parityChecks = append(parityChecks, parityCheck{name: s.Name, sql: s.SQL, legacy: legacy, args: slices.Clone(args), own: own})
-		}
 		parityRuns[s.Name]++
+		if parityKeys[key] {
+			return
+		}
+		parityKeys[key] = true
+		if inTest {
+			c.url = tx.Conn().Config().ConnString()
+			// Registered now, so it runs before the cleanups of the rows
+			// planted before this read.
+			t.Cleanup(func() { replayInTest(ctx, t, c) })
+			return
+		}
+		// A read outside a test's context: compared after the tests.
+		parityChecks = append(parityChecks, c)
 	}
 }
 
@@ -143,24 +197,41 @@ func ReplayParity(ctx context.Context, url string) error {
 	}
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
 	for _, c := range checks {
-		if err := replay(ctx, conn, c); err != nil {
+		if err := replay(ctx, conn, c, nil); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// replay compares one kept check; it fails only when ctx does.
-func replay(ctx context.Context, conn *pgx.Conn, c parityCheck) error {
+// ReplayedAfter counts, by statement, the checks read outside a test's
+// context, so compared only after the tests, against the base seed.
+func ReplayedAfter() map[string]int {
+	parityMu.Lock()
+	defer parityMu.Unlock()
+	out := map[string]int{}
+	for _, c := range parityChecks {
+		out[c.name]++
+	}
+	return out
+}
+
+// replay compares one kept check, each miss also to onMiss when set; it
+// fails only when ctx does.
+func replay(ctx context.Context, conn *pgx.Conn, c parityCheck, onMiss func(ParityMiss)) error {
 	tx, err := conn.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 	miss := func(plan string, got, want []string) {
+		m := ParityMiss{Name: c.name, Plan: plan, Args: c.args, Got: got, Want: want}
+		if onMiss != nil {
+			onMiss(m)
+		}
 		parityMu.Lock()
 		defer parityMu.Unlock()
-		parityMisses = append(parityMisses, ParityMiss{Name: c.name, Plan: plan, Args: c.args, Got: got, Want: want})
+		parityMisses = append(parityMisses, m)
 	}
 	if _, err := tx.Exec(ctx, "select set_config('viafrei_api.own_key', $1, true)", c.own); err != nil {
 		return err

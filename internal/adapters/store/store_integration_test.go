@@ -51,7 +51,7 @@ func bounded(t *testing.T) context.Context {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), testBound)
 	t.Cleanup(cancel)
-	return ctx
+	return store.WithTest(ctx, t)
 }
 
 func readerConfig(t *testing.T, extra ...string) *config.Config {

@@ -124,9 +124,6 @@ func collect(t *testing.T, ctx context.Context, tx pgx.Tx, sql string, args []an
 // custom plans (the generic plan) it answers the same rows, and with the
 // plan cache left to choose it settles on that generic plan.
 func TestNamedStatementsAnswerAsTheViews(t *testing.T) {
-	// Every case runs three times over two keys: bounded as a whole suite.
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	defer cancel()
 	byName := map[string]store.NamedRead{}
 	for _, r := range store.NamedReads() {
 		byName[r.Name] = r
@@ -144,11 +141,20 @@ func TestNamedStatementsAnswerAsTheViews(t *testing.T) {
 					slots <- struct{}{}
 					defer func() { <-slots }()
 				}
+				// Every case runs three times over two keys: each statement
+				// bounded on its own, from when it has its slot.
+				ctx, cancel := context.WithTimeout(context.Background(), statementBound)
+				defer cancel()
 				namedParity(t, ctx, byName, name, cases)
 			})
 		}
 	})
 }
+
+// statementBound is the ceiling on one statement's parity cases, each
+// statement its own: over twice the slowest measured (35 s under -race,
+// 104 s under -race on a host at load 40, four side by side).
+const statementBound = 3 * time.Minute
 
 // namedParity is one statement's parity: its cases, over both keys.
 func namedParity(t *testing.T, ctx context.Context, byName map[string]store.NamedRead, name string,
@@ -277,6 +283,10 @@ func TestSettlingCheckFailsWithoutAGenericPlan(t *testing.T) {
 	}
 }
 
+// noRowsAccepted are the named statements a full run may compare with 0
+// rows in every run, each with its reason.
+var noRowsAccepted = map[string]string{}
+
 // parityHeld reports whether every named statement the tests ran answered
 // the rows of its view statement, under both plans, and whether a full run
 // ran each named statement at least once.
@@ -295,11 +305,18 @@ func parityHeld() bool {
 	for _, m := range misses {
 		fmt.Fprintf(os.Stderr, "parity: %s (%s) %v:\n got %q\nwant %q\n", m.Name, m.Plan, m.Args, m.Got, m.Want)
 	}
+	for name, n := range store.ReplayedAfter() {
+		fmt.Fprintf(os.Stderr, "parity: %s: %d checks read outside a test's context, compared after the tests\n", name, n)
+	}
 	unrun := 0
 	if flag.Lookup("test.run").Value.String() == "" {
 		for _, r := range store.NamedReads() {
-			if runs[r.Name] == 0 {
+			switch {
+			case runs[r.Name] == 0:
 				fmt.Fprintf(os.Stderr, "parity: %s never ran beside its view statement\n", r.Name)
+				unrun++
+			case rows[r.Name] == 0 && noRowsAccepted[r.Name] == "":
+				fmt.Fprintf(os.Stderr, "parity: %s compared 0 rows in every run: the parity proves nothing\n", r.Name)
 				unrun++
 			}
 		}

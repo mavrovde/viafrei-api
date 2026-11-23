@@ -204,7 +204,7 @@ func TestDeparturesAndAnUnknownStation(t *testing.T) {
 
 // A hydrogen read for a lorry or a car asks for that vehicle's refill codes.
 func TestHydrogenForALorry(t *testing.T) {
-	ctx := context.Background()
+	ctx := store.WithTest(context.Background(), t)
 	for _, v := range []string{"truck", "car"} {
 		if _, err := seeded(t).HydrogenNear(ctx, energy.HydrogenQuery{At: geo.Point{Lat: 51, Lon: 10}, RadiusM: 50000, Vehicle: v, Limit: 5}, every(t)); err != nil {
 			t.Fatal(v, err)

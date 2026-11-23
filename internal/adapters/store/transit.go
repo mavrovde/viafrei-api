@@ -332,7 +332,7 @@ group by 1`, "text[]")
 var affectedCalls = namedOpaque("api_affected_calls", `
 with d as (
   select d.station_ifopt, d.aimed_minute, d.line_key, d.cancelled, d.late, d.source_ref
-  from (`+relStationDisruption+`) d
+  from (`+stationDisruptionOfHour+`) d
   where d.source_ref = any($1) and `+"d.display_class <> 'withhold' and (d.audience = 'public' or "+ownKeyOn+")"+`
 ), f as (
   select station_ifopt, aimed_minute, line_key, max(cancelled) as c, greatest(max(cancelled + late) - max(cancelled), 0) as l
@@ -344,6 +344,57 @@ with d as (
 )
 select station_ifopt, sum(c)::int, sum(l)::int, array_agg(distinct src order by src) filter (where src is not null)
 from u group by 1 having sum(c) + sum(l) > 0`, "text[]")
+
+// stationDisruptionOfHour is the platform's station disruption relation
+// with the calls of the hour read in one range of the aimed departures,
+// joined to the stations' refs, not probed ref by ref (12 580 probes on
+// prod, most of a second; the hour's calls are one range of about 300 000
+// rows); the recently checked feeds and the source rules (per family of
+// $1) are read once, not per call or per group. The relation's limit of 500 calls per ref changes nothing: the
+// most a ref holds in an hour on prod is under a hundred. The calls are
+// those of the families ($1): a statement reading it keeps only those.
+var stationDisruptionOfHour = strings.NewReplacer(
+	callsPerRef, callsOfHour,
+	"\n                 LIMIT 500) c_1\n", ") c_1 ON c_1.stop_ref = r.ref\n",
+	freshPerCall, freshOnce,
+	rulesPerRow("c.source_feed"), rulesOfFamilies("c.source_feed"),
+).Replace(relStationDisruption)
+
+// freshPerCall is the relation's test of a call's feed against the recently
+// checked ones, a scan of them per call; freshOnce reads them once.
+const (
+	freshPerCall = " AND x.source_feed IN ( SELECT fr.feed_key FROM fresh fr)"
+	freshOnce    = " AND x.source_feed = ANY (ARRAY( SELECT fr.feed_key FROM fresh fr))"
+)
+
+// callsPerRef is the station disruption relation's read of the calls, one
+// probe per ref.
+const callsPerRef = `FROM refs r
+             CROSS JOIN LATERAL ( SELECT x.aimed_dep,
+                    x.journey_ref,
+                    x.line,
+                    x.cancelled,
+                    x.journey_cancelled,
+                    x.delay_s,
+                    x.source_feed,
+                    x.observed_at
+                   FROM delfi_siri_et_calls_latest x
+                  WHERE x.stop_ref = r.ref AND `
+
+// callsOfHour reads the same calls in one range, joined to the refs; the
+// relation's own conditions follow it unchanged.
+const callsOfHour = `FROM refs r
+             JOIN ( SELECT x.stop_ref,
+                    x.aimed_dep,
+                    x.journey_ref,
+                    x.line,
+                    x.cancelled,
+                    x.journey_cancelled,
+                    x.delay_s,
+                    x.source_feed,
+                    x.observed_at
+                   FROM delfi_siri_et_calls_latest x
+                  WHERE x.source_feed = any($1::text[]) AND `
 
 // affectedPlaces are the stations of the families ($1) with these ids or
 // IFOPTs ($2), each with the ref it was named by.

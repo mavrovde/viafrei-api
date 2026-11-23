@@ -129,7 +129,30 @@ order by 1, 2, 4`, "text[]", "timestamp with time zone"),
 // filter). On prod the rule match per event was a fifth of the national
 // road summary; a join to the matches was planned as a loop over them for
 // each event.
-var trafficEventsOfFamilies = strings.Replace(relTrafficEvent, rulesPerEvent, `LEFT JOIN LATERAL ( SELECT (r.j ->> 'excluded')::boolean AS excluded,
+var trafficEventsOfFamilies = strings.Replace(relTrafficEvent, rulesPerRow("b.source_ref"), rulesOfFamilies("b.source_ref"), 1)
+
+// rulesPerRow is a relation's match of the source rules for each of its
+// rows, by the source in col.
+func rulesPerRow(col string) string {
+	return `LEFT JOIN LATERAL ( SELECT k_1.priority,
+            k_1.pattern,
+            k_1.excluded,
+            k_1.audience,
+            k_1.display_class,
+            k_1.terms_gate,
+            k_1.hold_reason,
+            k_1.origin_restriction
+           FROM contract_source_rules k_1
+          WHERE ` + col + ` ~ k_1.pattern
+          ORDER BY k_1.priority
+         LIMIT 1) k ON true`
+}
+
+// rulesOfFamilies is the same match read once for the families of $1, the
+// families a rule names in one object; each row looks the source in col up
+// there (a family no rule matches reads as one with no rule).
+func rulesOfFamilies(col string) string {
+	return `LEFT JOIN LATERAL ( SELECT (r.j ->> 'excluded')::boolean AS excluded,
             r.j ->> 'audience' AS audience,
             r.j ->> 'display_class' AS display_class,
             r.j ->> 'origin_restriction' AS origin_restriction
@@ -139,22 +162,8 @@ var trafficEventsOfFamilies = strings.Replace(relTrafficEvent, rulesPerEvent, `L
                          FROM contract_source_rules k_2
                         WHERE u.f ~ k_2.pattern
                         ORDER BY k_2.priority
-                       LIMIT 1) k_1 ON true) -> b.source_ref AS j) r) k ON true`, 1)
-
-// rulesPerEvent is the traffic event relation's match of the source rules,
-// one per event.
-const rulesPerEvent = `LEFT JOIN LATERAL ( SELECT k_1.priority,
-            k_1.pattern,
-            k_1.excluded,
-            k_1.audience,
-            k_1.display_class,
-            k_1.terms_gate,
-            k_1.hold_reason,
-            k_1.origin_restriction
-           FROM contract_source_rules k_1
-          WHERE b.source_ref ~ k_1.pattern
-          ORDER BY k_1.priority
-         LIMIT 1) k ON true`
+                       LIMIT 1) k_1 ON true) -> ` + col + ` AS j) r) k ON true`
+}
 
 // nationalInForce are the road situations of the families in force at $2.
 const nationalInForce = `e.source_ref = any($1) and ` + eventPermitted + `

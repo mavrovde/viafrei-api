@@ -17,7 +17,6 @@ import (
 // a file that reads none any more fails until it leaves the list.
 var viewsPending = map[string]bool{
 	"catalogue.go": true, "disruption.go": true,
-	"features.go": true, "freshness.go": true,
 	"location.go": true, "lookup.go": true, "national.go": true, "nearby.go": true,
 	"roads.go": true, "roadshape.go": true,
 	"state.go": true, "store.go": true, "transit.go": true,

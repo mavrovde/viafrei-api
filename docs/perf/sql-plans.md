@@ -54,6 +54,10 @@ each Land's probe into the first entry of its range.
 | api_charging_by_id | | 0.8-29 ms | 8 / 5 | the sites' key |
 | api_charging_in_radius | 24 ms mean | 3-13 ms | 5 / 5 | |
 | api_place_by_id | 162 ms mean, up to 256 ms | 0.1-3.5 ms | 5 / 5 | `gazetteer_places_pkey`: the view's text id matched no index |
+| api_parking_near | 2.6 s mean, up to 7.4 s | 2-97 ms | 5 / 5 | the facilities' location indexes; each facility's newest report is one backward probe of its own table's key, where the view's composed id read every report and sorted them |
+| api_parking_next_near | | 4-52 ms | 5 / 5 | |
+| api_freshness_versions | 612 ms mean, up to 1.6 s | 386 ms-1.3 s | no parameters | the same fingerprint, byte for byte; most of it is the motorway junctions' Land, as before |
+| api_provenance | 84 ms mean | 73-127 ms | 5 / 5 | about as before: the published register is read whole for the licence's shared terms link |
 
 The view cast the area to `geometry(MultiPolygon,4326)`, an expression no
 index holds, so the box test read every warning's area; the statements test

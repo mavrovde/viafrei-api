@@ -204,26 +204,61 @@ func (r *snapshot[T]) start(ctx context.Context, now func() time.Time, read func
 	return f
 }
 
-// sourceRows are the source families the read contract publishes, as its
+// sourceCTE is the source families the read contract publishes, as its
 // source register held them: each registered source (contract_sources) with
 // its register row, its domain (contract_source_domains) and its source rule
 // (contract_source_rules, the first by priority); an excluded family and
 // one whose licence is pending are not published. A family's use classes
 // are its register's, only consumer when its rule does not give it openly.
-const sourceRows = `src as (
+// full adds what the register's own read does not need: the changes
+// statement, the freshness target (the register's cadence, else the
+// feed status's) and the stale bound (three of it), the review date, the
+// display class, the origin restriction and the publisher's website.
+func sourceCTE(full bool) string {
+	cols, joins := "", ""
+	if full {
+		cols = `,
+         g.changes_statement, coalesce(s.cadence_s, f.cadence_s) freshness_target_s, 3 * coalesce(s.cadence_s, f.cadence_s) stale_after_s,
+         g.verified_on review_signed_on, coalesce(k.display_class, 'open') display_class, k.origin_restriction,
+         coalesce(g.source_url, s.terms_url) website`
+		joins = `
+  left join lateral (select max(x.cadence_s) cadence_s from control.data_status x where x.key = s.source_ref) f on true`
+	}
+	return `src as (
   select s.source_ref, d.domain, s.licence_code, s.attribution_text, s.terms_url, s.publisher_name,
          case when g.share_alike or s.licence_code ~* '(BY-SA|ODbL|Open Database License)' then 'https://viafrei.de/impressum' end share_alike_offer_url,
          s.acceptance_required,
          case when coalesce(k.display_class, 'open') = 'open' then coalesce(g.use_classes, '{}')
               else array(select u.u from unnest(coalesce(g.use_classes, '{}')) u(u) where u.u = 'consumer') end use_classes,
          coalesce(g.register_version, (select max(v.register_version) from source_register v)) register_version,
-         coalesce(k.audience, 'public') audience, k.terms_gate, k.hold_reason
+         coalesce(k.audience, 'public') audience, k.terms_gate, k.hold_reason` + cols + `
   from contract_sources s
-  left join source_register g on g.source_id = s.register_id
+  left join source_register g on g.source_id = s.register_id` + joins + `
   left join lateral (select d.domain from contract_source_domains d where s.source_ref ~ d.pattern order by d.priority limit 1) d on true
-  left join lateral (select k.excluded, k.display_class, k.audience, k.terms_gate, k.hold_reason
+  left join lateral (select k.excluded, k.display_class, k.audience, k.terms_gate, k.hold_reason, k.origin_restriction
                        from contract_source_rules k where s.source_ref ~ k.pattern order by k.priority limit 1) k on true
   where not coalesce(k.excluded, false) and coalesce(s.licence_code, '') !~* '^pending')`
+}
+
+// sourceRows is sourceCTE without the freshness and review columns.
+var sourceRows = sourceCTE(false)
+
+// licenceURL is the link of the licence code (an expression), as the
+// platform links it: the licence text's, the known licence's, the one terms
+// link every published family under it shares, or a register row's.
+func licenceURL(code string) string {
+	return `coalesce((select t.url from licence_texts t where t.licence_label = ` + code + `),
+                case when ` + code + ` ~* '^CC BY-SA 4\.0' then 'https://creativecommons.org/licenses/by-sa/4.0/'
+                     when ` + code + ` ~* '^CC BY 4\.0' then 'https://creativecommons.org/licenses/by/4.0/'
+                     when ` + code + ` ~* '^CC BY 3\.0 DE' then 'https://creativecommons.org/licenses/by/3.0/de/'
+                     when ` + code + ` ~* '(^CC0|Creative Commons Zero)' then 'https://creativecommons.org/publicdomain/zero/1.0/'
+                     when ` + code + ` ~* '(ODbL|Open Database License)' then 'https://opendatacommons.org/licenses/odbl/1-0/'
+                     when ` + code + ` ~* '(dl-de/zero|Datenlizenz Deutschland – Zero)' then 'https://www.govdata.de/dl-de/zero-2-0'
+                     when ` + code + ` ~* '(dl-de/by|Datenlizenz Deutschland – Namensnennung)' then 'https://www.govdata.de/dl-de/by-2-0'
+                     when ` + code + ` ~* 'GeoNutzV' then 'https://www.gesetze-im-internet.de/geonutzv/' end,
+                (select min(o.terms_url) from src o where o.licence_code = ` + code + ` having count(distinct o.terms_url) = 1),
+                (select min(g.source_url) from source_register g where g.licence_label = ` + code + `))`
+}
 
 // registerRead is every published family's licence terms and envelope.
 var registerRead = named("api_register", `
@@ -239,17 +274,7 @@ from src order by src.source_ref`)
 var sourcesRead = named("api_sources", `
 with `+sourceRows+`
 select s.source_ref, s.domain, s.publisher_name, s.attribution_text, s.licence_code,
-       coalesce((select t.url from licence_texts t where t.licence_label = s.licence_code),
-                case when s.licence_code ~* '^CC BY-SA 4\.0' then 'https://creativecommons.org/licenses/by-sa/4.0/'
-                     when s.licence_code ~* '^CC BY 4\.0' then 'https://creativecommons.org/licenses/by/4.0/'
-                     when s.licence_code ~* '^CC BY 3\.0 DE' then 'https://creativecommons.org/licenses/by/3.0/de/'
-                     when s.licence_code ~* '(^CC0|Creative Commons Zero)' then 'https://creativecommons.org/publicdomain/zero/1.0/'
-                     when s.licence_code ~* '(ODbL|Open Database License)' then 'https://opendatacommons.org/licenses/odbl/1-0/'
-                     when s.licence_code ~* '(dl-de/zero|Datenlizenz Deutschland – Zero)' then 'https://www.govdata.de/dl-de/zero-2-0'
-                     when s.licence_code ~* '(dl-de/by|Datenlizenz Deutschland – Namensnennung)' then 'https://www.govdata.de/dl-de/by-2-0'
-                     when s.licence_code ~* 'GeoNutzV' then 'https://www.gesetze-im-internet.de/geonutzv/' end,
-                (select min(o.terms_url) from src o where o.licence_code = s.licence_code having count(distinct o.terms_url) = 1),
-                (select min(g.source_url) from source_register g where g.licence_label = s.licence_code)),
+       `+licenceURL("s.licence_code")+`,
        s.licence_code ~* '(BY-SA|ODbL|Open Database License)', s.share_alike_offer_url, s.terms_url
 from src s
 where s.source_ref = any((select $1::text[])::text[]) and s.publisher_name is not null and s.licence_code is not null

@@ -35,6 +35,14 @@ select pt.lat, pt.lon, v.fs, v.r from (select st_y(geom::geometry) lat, st_x(geo
 		"api_place_by_id": `with fam as (select array_agg(distinct source_id) f from public.gazetteer_places)
 select i.id, v.fs from (select id::text id from public.gazetteer_places union all values ('0'), ('x1'), ('99999999999999999999'), ('')) i, fam,
   lateral (values (fam.f), ('{}'::text[])) v(fs)`,
+		"api_freshness_versions": `select`,
+		"api_provenance": `select v.fs, l.l from (select array_agg(source_ref) fs from public.contract_sources union all select '{}'::text[]
+       union all select array_agg(source_ref) from (select source_ref from public.contract_sources order by source_ref limit 3) x) v,
+  (values ('de'), ('en'), ('fr')) l(l)`,
+		"api_parking_next_near": parkingCases(false, false),
+		"api_parking_near":      parkingCases(false, true),
+		"api_parking_next_road": parkingCases(true, false),
+		"api_parking_road":      parkingCases(true, true),
 		"api_hydrogen_near": `with fam as (select array_agg(distinct source_feed) f from public.hydrogen_stations),
 pt as (select st_x(geom::geometry) lon, st_y(geom::geometry) lat from public.hydrogen_stations where geom is not null
        union all values (13.405::float8, 52.52::float8))
@@ -110,4 +118,36 @@ from pt, fam, op, t, lateral (values
   (fam.f, 5000, null, 0, 11, null, 0, null, true, '{card}'),
   (fam.f, 5000, null, 0, 11, null, 0, null, true, '{free,open247}'),
   ('{}'::text[], 5000, null, 0, 11, null, 0, null, false, null)) v(fs, r, acc, kw, l, plug, mx, op, pf, terms)`
+}
+
+// parkingCases are the parking reads' arguments: a point at every facility
+// and in Berlin (along a road: every road filed, none, with the line through
+// every facility and without one), now and around the reports, each filter
+// alone (kind, amenities, free spaces), every family and none.
+func parkingCases(road, list bool) string {
+	at := `select st_y(st_pointonsurface(geom::geometry)) lat, st_x(st_pointonsurface(geom::geometry)) lon, ''::text road, null::text line
+         from public.parking_facilities where geom is not null union all values (52.52::float8, 13.405::float8, '', null)`
+	if road {
+		at = `select 0::float8 lat, 0::float8 lon, r.road, l.line from (select distinct road from public.parking_facilities where road is not null
+           union select 'A0') r(road), (select encode(st_asewkb(st_makeline(st_pointonsurface(geom::geometry) order by id)), 'hex') line
+           from public.parking_facilities where geom is not null union all select null) l`
+	}
+	cols := `pt.lat, pt.lon, v.fs, v.occ, v.r, t.t, v.k, v.am, pt.road`
+	if list {
+		cols = `pt.lat, pt.lon, v.fs, v.occ, v.r, v.free, t.t, v.k, v.am, pt.road, v.l`
+	}
+	if road {
+		cols += `, pt.line`
+	}
+	return `with fam as (select array_agg(distinct f) f from (select source_feed f from public.parking_facilities union select source_feed from public.parking_facilities_bysa
+       union select source_feed from public.parking_facilities_odbl union select source_feed from public.parking_facilities_sid) x),
+occ as (select array_agg(distinct f) f from (select source_feed f from public.parking_occupancy union select source_feed from public.parking_occupancy_odbl
+       union select source_feed from public.parking_occupancy_sid) x),
+am as (select coalesce((select facilities[1:1] from public.parking_facilities where cardinality(facilities) > 0 limit 1), '{x}') a),
+pt as (` + at + `),
+t as (select now() t union select max(observed_at) - interval '1 second' from public.parking_occupancy union select min(observed_at) from public.parking_occupancy)
+select ` + cols + ` from pt, t, lateral (select fam.f fs, occ.f occ, v.* from fam, occ, am, lateral (values
+  (5000::float8, 0, null::text, null::text[], 21::bigint), (50000, 0, null, null, 2), (5000, 0, 'truck', null, 21), (5000, 0, null, am.a, 21),
+  (5000, 1, null, null, 21)) v(r, free, k, am, l)
+  union all select '{}'::text[], '{}'::text[], 5000, 0, null, null, 21) v`
 }

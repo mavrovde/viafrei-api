@@ -110,7 +110,7 @@ func collect(t *testing.T, ctx context.Context, tx pgx.Tx, sql string, args []an
 		if err != nil {
 			t.Fatal(err)
 		}
-		out = append(out, fmt.Sprint(v...))
+		out = append(out, store.RowText(v))
 	}
 	if err := rows.Err(); err != nil {
 		t.Fatalf("%v (%v)", err, args)
@@ -127,70 +127,160 @@ func TestNamedStatementsAnswerAsTheViews(t *testing.T) {
 	// Every case runs three times over two keys: bounded as a whole suite.
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
+	byName := map[string]store.NamedRead{}
+	for _, r := range store.NamedReads() {
+		byName[r.Name] = r
+	}
+	// The statements that plant rows one after the other, then the rest side
+	// by side, four at a time (more queue on the reader's statement
+	// timeout), each on a connection of its own; the group returns when
+	// every one has.
+	slots := make(chan struct{}, 4)
+	t.Run("statements", func(t *testing.T) {
+		for name, cases := range namedCases {
+			t.Run(name, func(t *testing.T) {
+				if !plants(name) {
+					t.Parallel()
+					slots <- struct{}{}
+					defer func() { <-slots }()
+				}
+				namedParity(t, ctx, byName, name, cases)
+			})
+		}
+	})
+}
+
+// namedParity is one statement's parity: its cases, over both keys.
+func namedParity(t *testing.T, ctx context.Context, byName map[string]store.NamedRead, name string,
+	cases func(t *testing.T, ctx context.Context, c *pgx.Conn) [][]any) {
 	c, err := pgx.Connect(ctx, db.ReaderURL)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = c.Close(context.WithoutCancel(ctx)) }()
-	byName := map[string]store.NamedRead{}
-	for _, r := range store.NamedReads() {
-		byName[r.Name] = r
+	r, ok := byName[name]
+	if !ok {
+		t.Fatalf("no named statement %s", name)
 	}
-	for name, cases := range namedCases {
-		t.Run(name, func(t *testing.T) {
-			r, ok := byName[name]
-			if !ok {
-				t.Fatalf("no named statement %s", name)
+	legacy := store.LegacyRead(name)
+	if legacy == "" {
+		t.Fatalf("no frozen view statement for %s", name)
+	}
+	argSets := cases(t, ctx, c)
+	matched := 0
+	for _, own := range []string{"off", "on"} {
+		tx, err := c.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+		if _, err := tx.Exec(ctx, "select set_config('viafrei_api.own_key', $1, true)", own); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tx.Conn().Prepare(ctx, r.Name, r.SQL); err != nil {
+			t.Fatal(err)
+		}
+		// Under the plan cache's own choice, before any forced plan;
+		// the plan is the statement's, so one key settles it.
+		if _, custom := plannedPerCall[name]; !custom && own == "off" && len(argSets) > 0 {
+			if err := settlesGeneric(ctx, tx, r.Name, argSets[0]); err != nil {
+				t.Errorf("own %s: %v", own, err)
 			}
-			legacy := store.LegacyRead(name)
-			if legacy == "" {
-				t.Fatalf("no frozen view statement for %s", name)
-			}
-			argSets := cases(t, ctx, c)
-			matched := 0
-			for _, own := range []string{"off", "on"} {
-				tx, err := c.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
-				if err != nil {
+		}
+		for _, args := range argSets {
+			want := collect(t, ctx, tx, legacy, args)
+			for _, plan := range []string{"force_custom_plan", "force_generic_plan"} {
+				if _, err := tx.Exec(ctx, "set local plan_cache_mode = "+plan); err != nil {
 					t.Fatal(err)
 				}
-				defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
-				if _, err := tx.Exec(ctx, "select set_config('viafrei_api.own_key', $1, true)", own); err != nil {
-					t.Fatal(err)
+				if got := collect(t, ctx, tx, r.Name, args); !reflect.DeepEqual(got, want) {
+					t.Errorf("own %s %v, %s:\n got %q\nwant %q", own, args, plan, got, want)
 				}
-				if _, err := tx.Conn().Prepare(ctx, r.Name, r.SQL); err != nil {
-					t.Fatal(err)
-				}
-				for _, args := range argSets {
-					want := collect(t, ctx, tx, legacy, args)
-					got := collect(t, ctx, tx, r.Name, args)
-					if !reflect.DeepEqual(got, want) {
-						t.Errorf("own %s %v:\n got %q\nwant %q", own, args, got, want)
-					}
-					matched += len(want)
-					store.NoteParity(r.Name, len(want))
-					if _, err := tx.Exec(ctx, "set local plan_cache_mode = force_generic_plan"); err != nil {
-						t.Fatal(err)
-					}
-					if generic := collect(t, ctx, tx, r.Name, args); !reflect.DeepEqual(generic, want) {
-						t.Errorf("own %s %v, generic plan:\n got %q\nwant %q", own, args, generic, want)
-					}
-					if _, err := tx.Exec(ctx, "set local plan_cache_mode = auto"); err != nil {
-						t.Fatal(err)
-					}
-				}
-				var generic int64
-				if err := tx.QueryRow(ctx, "select generic_plans from pg_prepared_statements where name = $1", r.Name).Scan(&generic); err != nil {
-					t.Fatal(err)
-				}
-				if generic == 0 {
-					t.Errorf("own %s: never planned generically", own)
-				}
-				_ = tx.Rollback(ctx)
 			}
-			if matched == 0 {
-				t.Error("no case answered a row: the parity proves nothing")
+			if _, err := tx.Exec(ctx, "set local plan_cache_mode = auto"); err != nil {
+				t.Fatal(err)
 			}
-		})
+			matched += len(want)
+			store.NoteParity(r.Name, len(want))
+		}
+		_ = tx.Rollback(ctx)
+	}
+	if matched == 0 {
+		t.Error("no case answered a row: the parity proves nothing")
+	}
+}
+
+// plannedPerCall are the statements written to be planned on each call, so
+// the plan cache never settles them on a generic plan, with the reason; each
+// is an open decision, named here so the check holds every other one.
+var plannedPerCall = map[string]string{
+	"api_poi_match": "poi.go: the text, the town, the point and the category decide the plan, so they are sent as written, not opaque",
+}
+
+// plants reports whether the cases of the statement name plant rows of
+// their own, which their test removes when it ends (kreisCases,
+// plantNeedPlaces): those run one after the other, before the rest.
+func plants(name string) bool {
+	return name == "api_kreis_names" || strings.HasPrefix(name, "api_nearby_need_")
+}
+
+// settlingRuns are the runs after which the plan cache, left to choose,
+// holds a generic plan: five custom plans, then the generic one if it costs
+// no more than they did on average.
+const settlingRuns = 6
+
+// settlesGeneric runs the prepared statement name with args settlingRuns
+// times under tx's plan cache mode and fails unless the server then planned
+// it generically at least once: the server caches the plan, not re-planning
+// each call.
+func settlesGeneric(ctx context.Context, tx pgx.Tx, name string, args []any) error {
+	for range settlingRuns {
+		rows, err := tx.Query(ctx, name, args...)
+		if err != nil {
+			return err
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+	}
+	var generic int64
+	if err := tx.QueryRow(ctx, "select generic_plans from pg_prepared_statements where name = $1", name).Scan(&generic); err != nil {
+		return err
+	}
+	if generic == 0 {
+		return fmt.Errorf("%s: never planned generically after %d runs under the plan cache's choice", name, settlingRuns)
+	}
+	return nil
+}
+
+// TestSettlingCheckFailsWithoutAGenericPlan: the check passes a statement
+// the plan cache settles on a generic plan for, and fails one it never plans
+// generically (custom plans forced).
+func TestSettlingCheckFailsWithoutAGenericPlan(t *testing.T) {
+	ctx := bounded(t)
+	c, err := pgx.Connect(ctx, db.ReaderURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Close(context.WithoutCancel(ctx)) }()
+	for _, mode := range []string{"auto", "force_custom_plan"} {
+		tx, err := c.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tx.Exec(ctx, "set local plan_cache_mode = "+mode); err != nil {
+			t.Fatal(err)
+		}
+		name := "settle_" + mode
+		if _, err := tx.Conn().Prepare(ctx, name, "select $1::int + 1"); err != nil {
+			t.Fatal(err)
+		}
+		err = settlesGeneric(ctx, tx, name, []any{1})
+		if (err == nil) != (mode == "auto") {
+			t.Errorf("%s: %v", mode, err)
+		}
+		_ = tx.Rollback(ctx)
 	}
 }
 
@@ -198,6 +288,13 @@ func TestNamedStatementsAnswerAsTheViews(t *testing.T) {
 // the rows of its view statement, under both plans, and whether a full run
 // ran each named statement at least once.
 func parityHeld() bool {
+	// The named statements the tests ran, compared now, outside their budget.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	if err := store.ReplayParity(ctx, db.ReaderURL); err != nil {
+		fmt.Fprintln(os.Stderr, "parity: the replay failed:", err)
+		return false
+	}
 	misses, runs, rows := store.ParityResults()
 	for name, n := range runs {
 		fmt.Fprintf(os.Stderr, "parity: %s ran %d times beside its view statement, %d rows compared\n", name, n, rows[name])

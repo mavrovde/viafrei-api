@@ -13,6 +13,9 @@ import (
 // Each statement opaque rewrote declares the types Postgres infers for it as
 // written, so the rewrite changes no parameter's type, and pgx encodes every
 // value as before.
+// wantOpaque is the count of statements the package rewrites opaquely.
+const wantOpaque = 54
+
 func TestEveryOpaqueReadDeclaresTheTypesPostgresInfers(t *testing.T) {
 	ctx := bounded(t)
 	conn, err := db.Owner(ctx)
@@ -21,8 +24,8 @@ func TestEveryOpaqueReadDeclaresTheTypesPostgresInfers(t *testing.T) {
 	}
 	defer func() { _ = conn.Close(ctx) }()
 	reads := store.OpaqueReads()
-	if len(reads) == 0 {
-		t.Fatal("no opaque read: the check reads nothing")
+	if len(reads) != wantOpaque {
+		t.Fatalf("%d opaque reads, want the %d the package rewrites", len(reads), wantOpaque)
 	}
 	for i, r := range reads {
 		for j, text := range []string{r.SQL, r.Sent} {

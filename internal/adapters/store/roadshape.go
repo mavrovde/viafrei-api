@@ -75,16 +75,32 @@ func (s *Store) roadShapes(ctx context.Context) (map[string]roadShape, error) {
 	return out, nil
 }
 
+// roadShapes reads every motorway of the Autobahn register with the shape
+// the platform draws from the LCL's points of it (contract_road_shape): its
+// line, its length and its Länder.
+var roadShapes = named("api_road_shapes", `
+select r.road, l.length_km::numeric(6,1)::float8, coalesce(l.states, '{}'), l.line::geometry(MultiLineString,4326)::text
+from autobahn_roads r
+left join lateral contract_road_shape(r.road) l(line, length_km, states) on true
+order by r.road`)
+
+// roadJunctionLands reads the LCL's German motorway points with a name of
+// the road $1, each with its Land, the platform's (contract_junction_land:
+// the Land of the nearest municipality), by id.
+var roadJunctionLands = named("api_road_junction_lands", `
+select t.cid || ':' || t.tabcd || ':' || t.lcd, contract_junction_land(t.geom)
+from tmc_locations t
+where t.cid = 58 and t.tabcd = 1 and t.tcd = 1 and t.road_number ~ '^A[1-9][0-9]{0,2}$'
+  and t.geom is not null and t.name is not null and t.road_number = (select $1::text)
+order by 1`, "text")
+
 // readRoadShapes reads every road's shape, whatever a key may read: each
 // read that uses a shape applies its own row rule to the road.
 func (s *Store) readRoadShapes(ctx context.Context) ([]roadShape, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]roadShape, error) {
 		// A failed query surfaces through CollectRows (pgx returns it from
 		// rows.Err as well).
-		rows, _ := tx.Query(ctx, `
-select r.road_ref, r.length_km::float8, coalesce(r.states, '{}'), r.geometry::text
-from contract.road r
-order by r.road_ref`)
+		rows, _ := run(ctx, tx, roadShapes)
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (roadShape, error) {
 			var v roadShape
 			err := r.Scan(&v.ref, &v.lengthKm, &v.states, &v.line)
@@ -176,8 +192,7 @@ func (s *Store) readRoadLands(ctx context.Context, road string) (roadLands, erro
 		state *string
 	}
 	ls, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]land, error) {
-		rows, _ := tx.Query(ctx, `
-select j.junction_id, j.state_code from contract.junction j where j.road_ref = $1 order by j.junction_id`, road)
+		rows, _ := run(ctx, tx, roadJunctionLands, road)
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (land, error) {
 			var v land
 			err := r.Scan(&v.id, &v.state)

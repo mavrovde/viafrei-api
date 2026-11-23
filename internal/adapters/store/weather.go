@@ -337,7 +337,7 @@ func (s *Store) ZoneEntryNamed(ctx context.Context, name string) (*rules.ListEnt
 // metres of at: the Gemeinde whose key finds a zone list entry.
 func (s *Store) GemeindeAt(ctx context.Context, at geo.Point, reachM int, families []string) (*places.Place, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (*places.Place, error) {
-		rows, _ := tx.Query(ctx, nearestPlace, at.Lon, at.Lat, "municipality", reachM, families)
+		rows, _ := run(ctx, tx, nearestPlace, at.Lon, at.Lat, "municipality", reachM, families)
 		ps, err := pgx.CollectRows(rows, scanPlace)
 		return first(ps), err
 	})

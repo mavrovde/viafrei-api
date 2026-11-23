@@ -15,11 +15,7 @@ import (
 // viewsPending are the files whose statements still read a contract view,
 // until each is ported to the platform's tables; the list only shrinks, and
 // a file that reads none any more fails until it leaves the list.
-var viewsPending = map[string]bool{
-	"catalogue.go": true,
-	"location.go":  true, "lookup.go": true, "nearby.go": true,
-	"roads.go": true, "roadshape.go": true, "state.go": true,
-}
+var viewsPending = map[string]bool{}
 
 var contractRead = regexp.MustCompile(`(?i)\bcontract\.[a-z_]`)
 

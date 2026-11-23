@@ -21,6 +21,10 @@ select pt.lon, pt.lat, 100000::float8, v.fs from (select st_x(geom::geometry) lo
   union all values (13.405::float8, 52.52::float8), (6.0, 47.0)) pt, fam, lateral (values (fam.f), ('{}'::text[])) v(fs)`,
 		"api_speed_official": speedCases,
 		"api_speed_osm":      speedCases,
+		"api_register":       `select`,
+		"api_sources": `select f from (select array_agg(source_ref) f from public.contract_sources union all select '{}'::text[]
+       union all select array_agg(source_ref) from (select source_ref from public.contract_sources order by source_ref limit 3) x) v`,
+		"api_terms_texts": `select f from (select array_agg(terms_gate) f from public.source_terms union all select '{}'::text[] union all select '{nope}') v`,
 		"api_hydrogen_near": `with fam as (select array_agg(distinct source_feed) f from public.hydrogen_stations),
 pt as (select st_x(geom::geometry) lon, st_y(geom::geometry) lat from public.hydrogen_stations where geom is not null
        union all values (13.405::float8, 52.52::float8))

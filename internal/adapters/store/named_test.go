@@ -19,9 +19,16 @@ var refusedReads = map[string]*regexp.Regexp{
 	"an internal setting": regexp.MustCompile(`(?i)\b(subscription_var|runtime_config|source_schedule|control\.[a-z_]+)\b`),
 }
 
+// readableControl is the one control relation a statement may read: the
+// platform's feed status view, which the digest, the MCP and the API read
+// alike (owner-rights, kept when the contract views go); every other control
+// name stays an internal setting.
+var readableControl = regexp.MustCompile(`(?i)\bcontrol\.data_status\b`)
+
 // refusals names what of refusedReads the text sql reads.
 func refusals(sql string) []string {
 	var out []string
+	sql = readableControl.ReplaceAllString(sql, "")
 	for kind, re := range refusedReads {
 		if re.MatchString(sql) {
 			out = append(out, kind)
@@ -47,20 +54,26 @@ func TestNamedStatementsReadNoRefusedColumn(t *testing.T) {
 // passes.
 func TestRefusalsCatchEachKind(t *testing.T) {
 	for sql, want := range map[string]string{
-		"select * from t":                   "every column",
-		"select distinct * from t":          "every column",
-		"select t.* from t":                 "every column",
-		"select a from contract.place":      "a contract view",
-		"select e.raw from autobahn_events": "a raw payload",
-		"select payload from road_events":   "a raw payload",
-		"select operator_tokens from s":     "a contact column",
-		"select service_phone from s":       "a contact column",
-		"select subscription_var from c":    "an internal setting",
-		"select k from control.budgets":     "an internal setting",
+		"select * from t":                                                   "every column",
+		"select distinct * from t":                                          "every column",
+		"select t.* from t":                                                 "every column",
+		"select a from contract.place":                                      "a contract view",
+		"select e.raw from autobahn_events":                                 "a raw payload",
+		"select payload from road_events":                                   "a raw payload",
+		"select operator_tokens from s":                                     "a contact column",
+		"select service_phone from s":                                       "a contact column",
+		"select subscription_var from c":                                    "an internal setting",
+		"select k from control.budgets":                                     "an internal setting",
+		"select k from control.feed_state":                                  "an internal setting",
+		"select k from control.data_status_x":                               "an internal setting",
+		"select k from control.data_status join control.refusals r on true": "an internal setting",
 	} {
 		if got := refusals(sql); len(got) != 1 || got[0] != want {
 			t.Errorf("%q: %v, want %s", sql, got, want)
 		}
+	}
+	if got := refusals("select d.cadence_s from control.data_status d"); len(got) != 0 {
+		t.Errorf("the feed status view refused: %v", got)
 	}
 	if got := refusals("select count(*), p.name from gazetteer_places p"); len(got) != 0 {
 		t.Errorf("a plain read refused: %v", got)

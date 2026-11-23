@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -37,7 +38,7 @@ var nationalSQL = map[string]stmt{
 	"roads": namedOpaque("api_national_roads", `
 with e as materialized (
   select e.event_kind, e.state_code, e.source_ref
-  from (`+relTrafficEvent+`) e
+  from (`+trafficEventsOfFamilies+`) e
   where `+nationalInForce+`)
 select 'situations', e.event_kind, null::text, e.source_ref, count(*)::int, null::int, null::float8, null::float8
 from e
@@ -117,6 +118,42 @@ where w.withdrawn_at is null and w.message_status <> 'cancelled' and w.source_re
 group by 2, 4
 order by 1, 2, 4`, "text[]", "timestamp with time zone"),
 }
+
+// trafficEventsOfFamilies is the platform's traffic event relation with
+// the source rules matched once per family of $1, not once per event: the
+// matches are read once into an object by family (only the families a rule
+// matches: a family no rule matches reads as one with no rule), and each
+// event looks its source up there. A statement that reads it keeps only the events of $1
+// (an event of another source finds no rule here and is left out by that
+// filter). On prod the rule match per event was a fifth of the national
+// road summary; a join to the matches was planned as a loop over them for
+// each event.
+var trafficEventsOfFamilies = strings.Replace(relTrafficEvent, rulesPerEvent, `LEFT JOIN LATERAL ( SELECT (r.j ->> 'excluded')::boolean AS excluded,
+            r.j ->> 'audience' AS audience,
+            r.j ->> 'display_class' AS display_class,
+            r.j ->> 'origin_restriction' AS origin_restriction
+           FROM ( SELECT ( SELECT jsonb_object_agg(u.f, to_jsonb(k_1))
+                   FROM ( SELECT DISTINCT f FROM unnest($1::text[]) f) u
+                   JOIN LATERAL ( SELECT k_2.excluded, k_2.audience, k_2.display_class, k_2.origin_restriction
+                         FROM contract_source_rules k_2
+                        WHERE u.f ~ k_2.pattern
+                        ORDER BY k_2.priority
+                       LIMIT 1) k_1 ON true) -> b.source_ref AS j) r) k ON true`, 1)
+
+// rulesPerEvent is the traffic event relation's match of the source rules,
+// one per event.
+const rulesPerEvent = `LEFT JOIN LATERAL ( SELECT k_1.priority,
+            k_1.pattern,
+            k_1.excluded,
+            k_1.audience,
+            k_1.display_class,
+            k_1.terms_gate,
+            k_1.hold_reason,
+            k_1.origin_restriction
+           FROM contract_source_rules k_1
+          WHERE b.source_ref ~ k_1.pattern
+          ORDER BY k_1.priority
+         LIMIT 1) k ON true`
 
 // nationalInForce are the road situations of the families in force at $2.
 const nationalInForce = `e.source_ref = any($1) and ` + eventPermitted + `

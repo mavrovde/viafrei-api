@@ -50,7 +50,7 @@ equal buffers mean the same plan, and a difference in time is the host.
 | api_area_trips | 2.2/2.7 | 3/5 | 0 | 1.3/2.1 | mechanical | region punctuality |
 | api_line_in_timetable | 37/59 | 3/5 | 368 | 69/97 | mechanical | line pages |
 | api_national_energy | 1 309/1 509 | 3/5 | 246 135 | 4 547/8 445 (675 045; 7 268 inlined, same hour) | source rules once per source; points counted per site first | national page |
-| api_national_roads | 1 757/2 355 | 3/5 | 118 008 | 3 938/6 511 (235 971, the view inlined, same hour) | events in force read once for both parts | national page |
+| api_national_roads | 1 757/2 355 | 3/5 | 118 008 | 3 938/6 511 (235 971, the view inlined, same hour) | events in force read once for both parts; source rules matched once per family (A/B in one session: 1 561 against 1 811) | national page |
 | api_national_parking | 176/253 | 3/5 | 1 406 | 109/152 | mechanical (same buffers) | national page |
 | api_national_accessibility | 439/472 | 3/5 | 43 299 | 1 325/1 491 (785/941 earlier) | each station ref mapped to its stop place once, not per facility | national page |
 | api_national_weather | 225/352 (288 beside the view's 398, one snapshot) | 3/5 | 19 267 | 27/40 at an hour with few warnings; 398 with 20 535 in force | mechanical | national page |

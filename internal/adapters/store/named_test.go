@@ -131,3 +131,11 @@ func TestDeparturesOfTripsKeepTheRelation(t *testing.T) {
 		t.Fatal("the departure relation no longer begins with its select list")
 	}
 }
+
+// TestTrafficEventsOfFamiliesMatchRulesOnce: the per-event rule match is
+// found in the traffic event relation and replaced.
+func TestTrafficEventsOfFamiliesMatchRulesOnce(t *testing.T) {
+	if strings.Count(relTrafficEvent, rulesPerEvent) != 1 || strings.Contains(trafficEventsOfFamilies, rulesPerEvent) {
+		t.Fatal("the traffic event relation's rule match changed")
+	}
+}

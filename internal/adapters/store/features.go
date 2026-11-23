@@ -571,7 +571,7 @@ const chargingSiteRows = `(
 const chargePointRows = `(
   select coalesce(p.evse_id, p.source_feed || ':' || p.point_key) point_id, p.source_feed, p.site_id raw_site,
          case when p.current_type ~* '^ac' then 'ac' when p.current_type ~* '^dc' then 'dc' when p.current_type is not null then 'other' end current_kind,
-         p.max_power_kw power_max_kw,
+         p.max_power_kw::numeric(7,2) power_max_kw,
          array_remove(array[
            case when p.connector_types && array['iec62196T2COMBO', 'iec62196T2Combo', 'iec62196t2combo', 'combo', 'ccs'] then 'ccs2' end,
            case when p.connector_types && array['iec62196T2', 'iec62196t2', 'type2'] then 'type2' end,

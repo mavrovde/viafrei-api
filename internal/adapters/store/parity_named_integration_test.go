@@ -182,7 +182,7 @@ func namedParity(t *testing.T, ctx context.Context, byName map[string]store.Name
 		}
 		// Under the plan cache's own choice, before any forced plan;
 		// the plan is the statement's, so one key settles it.
-		if _, custom := plannedPerCall[name]; !custom && own == "off" && len(argSets) > 0 {
+		if own == "off" && len(argSets) > 0 {
 			if err := settlesGeneric(ctx, tx, r.Name, argSets[0]); err != nil {
 				t.Errorf("own %s: %v", own, err)
 			}
@@ -208,13 +208,6 @@ func namedParity(t *testing.T, ctx context.Context, byName map[string]store.Name
 	if matched == 0 {
 		t.Error("no case answered a row: the parity proves nothing")
 	}
-}
-
-// plannedPerCall are the statements written to be planned on each call, so
-// the plan cache never settles them on a generic plan, with the reason; each
-// is an open decision, named here so the check holds every other one.
-var plannedPerCall = map[string]string{
-	"api_poi_match": "poi.go: the text, the town, the point and the category decide the plan, so they are sent as written, not opaque",
 }
 
 // plants reports whether the cases of the statement name plant rows of

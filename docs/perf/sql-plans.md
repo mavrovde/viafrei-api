@@ -33,8 +33,8 @@ call). Times are per execution, after the first.
 Land and extract date, so the newest extract of a Land reads every address
 of the Land (19.4 M rows, 14 GB in all). The statement already reads in
 that order (`order by a.extract_date desc nulls last limit 1` under
-`a.land = l.land`); viafrei-database item: an index on `osm_addresses
-(land, extract_date desc nulls last) where closed_at is null`, which turns
+`a.land = l.land`); viafrei-database item: an index on the address table's
+`(land, extract_date desc nulls last) where closed_at is null`, which turns
 each Land's probe into the first entry of its range.
 | api_hydrogen_near | under 1 ms | 0.3-0.8 ms | 5 / 5 | index scan of `hydrogen_stations_geom_gist` (the view's geometry cast read every station) |
 | api_hydrogen_nearest | under 1 ms | 0.5-1 ms | 5 / 5 | nearest-neighbour scan of the same index |
@@ -48,7 +48,7 @@ each Land's probe into the first entry of its range.
 | api_speed_official | 5 ms mean | 0.7-6 ms | 5 / 5 | the official cameras' area indexes |
 | api_speed_osm | 139 ms mean, up to 320 ms | 89-177 ms | 5 / 5 | the Gemeinde cut (BKG points within 80 km) is read on the points' surface, which no index holds, as before |
 | api_register | 61 ms mean, up to 1.4 s (7330 calls) | 18-35 ms | no parameters | the view's freshness lateral on control.data_status is not read: no column of the register used it |
-| api_sources | 135 ms mean, up to 402 ms | 20-34 ms | 5 / 5 | one source set feeds both the attribution and the licence's shared terms link |
+| api_sources | 135 ms mean, up to 402 ms | 20-34 ms | 5 / 5 | one source set serves both the attribution and the licence's shared terms link |
 | api_terms_texts | | 0.1-1.6 ms | 5 / 5 | |
 | api_charging_near | 704 ms mean, up to 1.2 s | 6-58 ms warm, 30-960 ms cold | 5 / 5 | `charging_sites_geom_gist` nearest walk, the points by `charging_points_site`; each point's report probes the 18 status partitions by key, as before |
 | api_charging_by_id | | 0.8-29 ms | 8 / 5 | the sites' key |

@@ -19,7 +19,7 @@ import (
 // cache settles on one generic plan and does not plan each call. That one
 // plan holds a branch for each way the match is asked (poiCandidates), and
 // only the branch the parameters name runs (a one-time filter on them).
-var poiMatch = named("api_poi_match", opaqued(`select 'osm:' || p.osm_type || p.osm_id poi_id, p.name, p.category, p.category_value, p.brand, p.operator,
+var poiMatch = namedOpaque("api_poi_match", `select 'osm:' || p.osm_type || p.osm_id poi_id, p.name, p.category, p.category_value, p.brand, p.operator,
        p.street, p.house_number, p.postcode, p.place, st_y(p.geom::geometry), st_x(p.geom::geometry),
        case when $3::float8 is null then null
             else round(st_distance(p.geom, st_setsrid(st_makepoint($3::float8, $4::float8), 4326)::geography))::int end as distance_m,
@@ -32,15 +32,17 @@ where p.closed_at is null and p.geom is not null
   and p.source_id = any((`+ruledFamilies("$7::text[]")+`)::text[])
 order by case when p.name_norm = $1::text then 0 when p.name_norm like $1::text || '%' then 1 else 2 end,
          distance_m nulls last, similarity(p.name_norm, $1::text) desc, p.name, poi_id
-limit $8::int`, poiTypes...), poiTypes...)
+limit $8::int`, poiTypes...)
 
 // poiCandidates are the places the match then filters, from the one branch
 // its parameters name: the town's places through its index; else those
 // within the radius of the point through the GiST; else, for a text of three
 // characters or more, those whose name or brand holds it, a BitmapOr of the
 // two trigram indexes; else (a shorter text, of no trigram) a read of the
-// table, the columns written as an expression no trigram index serves, as a
-// pattern of no trigram matches every entry of it. Each branch holds the
+// table, the text found by strpos, which no trigram index serves (a pattern
+// of no trigram matches every entry of one) and which holds the same rows as
+// the like test, as the search form holds no wildcard (places.NameFold keeps
+// letters, digits and spaces). Each branch holds the
 // text test itself (the match's own filters hold none, as the planner pushes
 // them into every branch, and the short text's branch would take the trigram
 // index again). The branches never overlap and together hold every row the
@@ -61,14 +63,14 @@ const poiCandidates = `(
   union all
   select ` + poiColumns + ` from osm_pois p
   where $2::text is null and $3::float8 is null and length($1::text) < 3 and p.closed_at is null
-    and (p.name_norm || '' like '%' || $1::text || '%' or lower(p.brand) || '' like '%' || $1::text || '%'))`
+    and (strpos(p.name_norm, $1::text) > 0 or strpos(lower(p.brand), $1::text) > 0))`
 
 // poiColumns are the columns of a place the match reads.
 const poiColumns = `p.osm_type, p.osm_id, p.name, p.name_norm, p.category, p.category_value, p.brand, p.operator, p.street,
          p.house_number, p.postcode, p.place, p.place_norm, p.geom, p.extract_date, p.source_id, p.closed_at`
 
 // poiTypes are the match's parameter types.
-var poiTypes = []string{"text", "text", "float8", "float8", "float8", "text", "text[]", "int"}
+var poiTypes = []string{"text", "text", "double precision", "double precision", "double precision", "text", "text[]", "integer"}
 
 // Pois reads the places of interest q asks for, from the first, at most
 // places.PoiReach+1 (features.Pois).

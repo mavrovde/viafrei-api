@@ -29,6 +29,15 @@ select pt.lon, pt.lat, 5000::float8, fam.f, g.g, 25000::float8, v.s, t.t from pt
 t as (select max(observed_at) + interval '1 minute' t from public.fuel_prices union all select now())
 select x.i, v.fs, w.s, t.t from (select id i from public.fuel_stations union all select 'no-such-station') x, fam, t,
   lateral (values (fam.f), (array['tankerkoenig_hist']), ('{}'::text[])) v(fs), (values (600), (86400 * 30)) w(s)`,
+		"api_coverage_kinds": coverageFamilies,
+		"api_coverage_lands": coverageFamilies,
+		"api_coverage_addresses": `select f from (select array_agg(distinct source_id) f from public.osm_addresses) x
+union all select '{}'::text[] union all select array['osm_none']`,
+		"api_address_exact": `with fam as (select array_agg(distinct source_id) f from public.osm_addresses),
+a as (select street_norm s, house_number_norm h, postcode p, place_norm t from public.osm_addresses where street_norm is not null)
+select a.s, a.h, v.p, v.t, fam.f, v.l from a, fam,
+  lateral (values (a.p, null::text, 10), (null, a.t, 10), (a.p, a.t, 1), ('00000', a.t, 10), (null, null, 10), (a.p, 'nirgendwo', 10)) v(p, t, l)
+union all select 'x', '1', '10115', null, '{}'::text[], 10`,
 		"api_weather_warnings_page": weatherPageCases,
 		"api_weather_warnings_here": `select f, t, lat, lon from (` + weatherPoints + `) x`,
 		"api_weather_cell_at":       `select distinct f, lat, lon from (` + weatherPoints + `) x`,
@@ -57,6 +66,10 @@ union all select unnest(aliases) from public.lez_list_entries union all select '
 		namedCases[name] = casesOf(sql)
 	}
 }
+
+// coverageFamilies are every gazetteer family, one, and none.
+const coverageFamilies = `select f from (select array_agg(distinct source_id) f from public.gazetteer_places) x
+union all select array[min(source_id)] from public.gazetteer_places union all select '{}'::text[]`
 
 // weatherPoints are a point inside each seeded warning's area, at the start
 // of the warning and a minute after, a day before the first and after the

@@ -24,6 +24,18 @@ call). Times are per execution, after the first.
 | api_fuel_near | 116 ms mean | 5-80 ms (own key) | 5 / 5 | index scan of `fuel_stations_geom_gist`, then the newest price per grade by the price key |
 | api_fuel_coverage | 120 ms mean | 5-58 ms (own key) | 5 / 5 | three index scans of `fuel_stations_geom_gist` (the held stations inlined, not materialised) |
 | api_fuel_by_id | under 1 ms | 1.6-12 ms (own key, cold) | 5 / 5 | the station key, then the price key |
+| api_address_exact | 1 ms mean | 0.3-400 ms (a common street in a large town the slowest) | 5 / 5 | index scan of `osm_addresses_street_number_place` |
+| api_coverage_kinds | (the place coverage, one read) | 270-680 ms | 5 / 5 | sequential scan of the gazetteer: a count of every place of the families, by design |
+| api_coverage_lands | under 1 ms | 0.2-2.5 ms | 5 / 5 | bitmap index scan of `gazetteer_places_kind_rank` |
+| api_coverage_addresses | over 15 s | over 15 s (one execution, cancelled at the 15 s timeout) | - | the skip scan over the Land is an index scan of `osm_addresses_open_land`; each Land's newest extract is a bitmap heap scan of every open address of the Land and a sort by `extract_date` |
+
+`api_coverage_addresses`, root cause: no index holds the open addresses by
+Land and extract date, so the newest extract of a Land reads every address
+of the Land (19.4 M rows, 14 GB in all). The statement already reads in
+that order (`order by a.extract_date desc nulls last limit 1` under
+`a.land = l.land`); viafrei-database item: an index on `osm_addresses
+(land, extract_date desc nulls last) where closed_at is null`, which turns
+each Land's probe into the first entry of its range.
 
 The view cast the area to `geometry(MultiPolygon,4326)`, an expression no
 index holds, so the box test read every warning's area; the statements test

@@ -153,6 +153,49 @@ where s.station_id = $1::text
   and s.withdrawn_at is null
   and s.source_ref = any($2::text[])
   and ` + permitted("s"),
+		"api_coverage_kinds": `
+select p.source_ref, p.place_kind, count(*)::int, max(p.changed_at),
+       count(*) filter (where exists (select 1 from contract.place_alias a
+                                       where a.place_id = p.place_id and a.lang = 'en' and ` + "a.display_class <> 'withhold' and (a.audience = 'public' or " + ownKeyOn + ")" + `))::int
+from contract.place p
+where p.withdrawn_at is null and p.source_ref = any($1::text[]) and ` + "p.display_class <> 'withhold' and (p.audience = 'public' or " + ownKeyOn + ")" + `
+group by 1, 2
+order by 1, 2`,
+		"api_coverage_lands": `
+select p.official_key, p.name, p.source_ref
+from contract.place p
+where p.place_kind = 'state' and p.official_key is not null and p.withdrawn_at is null and p.source_ref = any($1::text[])
+  and ` + "p.display_class <> 'withhold' and (p.audience = 'public' or " + ownKeyOn + ")" + `
+order by 1, 3`,
+		"api_coverage_addresses": `
+with recursive lands(land) as (
+  (select a.land_name from contract.address a
+    where a.land_name is not null and a.source_ref = any($1::text[]) order by 1 limit 1)
+  union all
+  select (select a.land_name from contract.address a
+           where a.land_name > l.land and a.source_ref = any($1::text[]) order by 1 limit 1)
+    from lands l where l.land is not null)
+select l.land, x.data_as_of, x.source_ref
+from lands l
+cross join lateral (select a.data_as_of, a.source_ref from contract.address a
+                     where a.land_name = l.land and a.source_ref = any($1::text[]) and ` + "a.display_class <> 'withhold' and (a.audience = 'public' or " + ownKeyOn + ")" + `
+                     order by a.data_as_of desc nulls last limit 1) x
+where l.land is not null
+union all
+select null, x.data_as_of, x.source_ref
+from (select a.data_as_of, a.source_ref from contract.address a
+       where a.land_name is null and a.source_ref = any($1::text[]) and ` + "a.display_class <> 'withhold' and (a.audience = 'public' or " + ownKeyOn + ")" + `
+       order by a.data_as_of desc nulls last limit 1) x
+order by 1 nulls last`,
+		"api_address_exact": `select a.address_id, a.street, a.house_number, a.postcode, a.place_name, a.land_name,
+       st_y(a.location), st_x(a.location), a.data_as_of, a.source_ref
+from contract.address a
+where a.street_fold = $1::text and a.house_number_fold = $2::text
+  and (($3::text is not null and a.postcode = $3::text)
+       or ($4::text is not null and a.place_fold = $4::text and ($3::text is null or a.postcode is null or a.postcode = $3::text)))
+  and a.source_ref = any($5::text[]) and ` + permitted("a") + `
+order by a.postcode is not distinct from $3::text desc, a.address_id
+limit $6::int`,
 	} {
 		legacyReads[name] = sql
 	}

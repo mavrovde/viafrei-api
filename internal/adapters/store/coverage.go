@@ -10,54 +10,60 @@ import (
 
 // coverageKinds counts the places of the families ($1) per family and kind:
 // rows, when the newest was last loaded, and those with an English name.
-var coverageKinds = opaque(`
-select p.source_ref, p.place_kind, count(*)::int, max(p.changed_at),
-       count(*) filter (where exists (select 1 from contract.place_alias a
-                                       where a.place_id = p.place_id and a.lang = 'en' and `+"a.display_class <> 'withhold' and (a.audience = 'public' or "+ownKeyOn+")"+`))::int
-from contract.place p
-where p.withdrawn_at is null and p.source_ref = any($1) and `+"p.display_class <> 'withhold' and (p.audience = 'public' or "+ownKeyOn+")"+`
+var coverageKinds = named("api_coverage_kinds", `
+select g.source_id, case g.kind when 'city' then 'municipality' when 'district' then 'district' when 'admin' then 'state'
+                                when 'station' then 'station_area' when 'stop' then 'station_area' when 'island' then 'locality'
+                                when 'motorway' then 'motorway' when 'junction' then 'junction' else 'other' end kind,
+       count(*)::int, max(g.last_seen_at), count(*) filter (where g.name_en is not null)::int
+from gazetteer_places g
+where g.geom is not null and g.closed_at is null and g.source_id = any((select $1::text[])::text[])
 group by 1, 2
 order by 1, 2`, "text[]")
 
 // coverageLands are the Länder the gazetteer families ($1) hold, by key.
-const coverageLands = `
-select p.official_key, p.name, p.source_ref
-from contract.place p
-where p.place_kind = 'state' and p.official_key is not null and p.withdrawn_at is null and p.source_ref = any($1)
-  and ` + "p.display_class <> 'withhold' and (p.audience = 'public' or " + ownKeyOn + ")" + `
-order by 1, 3`
+var coverageLands = named("api_coverage_lands", `
+select g.admin_code, g.name, g.source_id
+from gazetteer_places g
+where g.kind = 'admin' and g.admin_code is not null and g.geom is not null and g.closed_at is null
+  and g.source_id = any((select $1::text[])::text[])
+order by 1, 3`, "text[]")
 
-// coverageAddresses are the Länder the address families ($1) hold
-// addresses of, with the newest extract date: a skip scan over the Land, one
-// probe per Land, never a count of the table; then the addresses placed in
-// no Land, when there are any.
-const coverageAddresses = `
-with recursive lands(land) as (
-  (select a.land_name from contract.address a
-    where a.land_name is not null and a.source_ref = any($1) order by 1 limit 1)
+// coverageAddresses are the Länder the address families ($1, those their
+// source rule gives the key) hold addresses of, with the newest extract
+// date: a skip scan over the Land (osm_addresses_open_land), one probe per
+// Land, never a count of the table; then the addresses placed in no Land,
+// when there are any. The newest extract of a Land is read in the order of
+// no index: on prod each probe reads every address of its Land (up to 15 s
+// in all), until viafrei-database holds the open addresses by Land and
+// extract date.
+var coverageAddresses = named("api_coverage_addresses", `
+with recursive fam as (`+ruledFamilies("(select $1::text[])")+`),
+lands(land) as (
+  (select a.land from osm_addresses a, fam
+    where a.land is not null and a.closed_at is null and a.geom is not null and a.source_id = any(fam.f) order by 1 limit 1)
   union all
-  select (select a.land_name from contract.address a
-           where a.land_name > l.land and a.source_ref = any($1) order by 1 limit 1)
+  select (select a.land from osm_addresses a, fam
+           where a.land > l.land and a.closed_at is null and a.geom is not null and a.source_id = any(fam.f) order by 1 limit 1)
     from lands l where l.land is not null)
-select l.land, x.data_as_of, x.source_ref
+select l.land, x.extract_date, x.source_id
 from lands l
-cross join lateral (select a.data_as_of, a.source_ref from contract.address a
-                     where a.land_name = l.land and a.source_ref = any($1) and ` + "a.display_class <> 'withhold' and (a.audience = 'public' or " + ownKeyOn + ")" + `
-                     order by a.data_as_of desc nulls last limit 1) x
+cross join lateral (select a.extract_date, a.source_id from osm_addresses a, fam
+                     where a.land = l.land and a.closed_at is null and a.geom is not null and a.source_id = any(fam.f)
+                     order by a.extract_date desc nulls last limit 1) x
 where l.land is not null
 union all
-select null, x.data_as_of, x.source_ref
-from (select a.data_as_of, a.source_ref from contract.address a
-       where a.land_name is null and a.source_ref = any($1) and ` + "a.display_class <> 'withhold' and (a.audience = 'public' or " + ownKeyOn + ")" + `
-       order by a.data_as_of desc nulls last limit 1) x
-order by 1 nulls last`
+select null, x.extract_date, x.source_id
+from (select a.extract_date, a.source_id from osm_addresses a, fam
+       where a.land is null and a.closed_at is null and a.geom is not null and a.source_id = any(fam.f)
+       order by a.extract_date desc nulls last limit 1) x
+order by 1 nulls last`, "text[]")
 
 // PlacesCoverage reads what the gazetteer and the addresses of the families
 // hold (features.PlacesCoverage).
 func (s *Store) PlacesCoverage(ctx context.Context, families []string) (places.Coverage, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (places.Coverage, error) {
 		var c places.Coverage
-		rows, _ := tx.Query(ctx, coverageKinds, families)
+		rows, _ := run(ctx, tx, coverageKinds, families)
 		kinds, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.KindCount, error) {
 			var v places.KindCount
 			return v, r.Scan(&v.Family, &v.Kind, &v.Rows, &v.NewestLoad, &v.EnglishNames)
@@ -65,7 +71,7 @@ func (s *Store) PlacesCoverage(ctx context.Context, families []string) (places.C
 		if err != nil {
 			return c, err
 		}
-		rows, _ = tx.Query(ctx, coverageLands, families)
+		rows, _ = run(ctx, tx, coverageLands, families)
 		lands, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.Land, error) {
 			var v places.Land
 			return v, r.Scan(&v.Code, &v.Name, &v.Family)
@@ -73,7 +79,7 @@ func (s *Store) PlacesCoverage(ctx context.Context, families []string) (places.C
 		if err != nil {
 			return c, err
 		}
-		rows, _ = tx.Query(ctx, coverageAddresses, families)
+		rows, _ = run(ctx, tx, coverageAddresses, families)
 		addrs, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.AddressLand, error) {
 			var v places.AddressLand
 			return v, r.Scan(&v.Land, &v.DataAsOf, &v.Family)

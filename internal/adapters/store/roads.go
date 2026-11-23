@@ -59,10 +59,15 @@ limit 1`, ref)
 // situationColumns are the columns every situation read selects, in the
 // order scanSituation reads them, followed by its two question-dependent
 // columns: the position along the road and the distance.
+// roadDelayMin is a situation's delay in whole minutes as the platform
+// states it, Math.round(delay_s / 60): half a minute rounds up. The
+// contract's delay_min truncates (100 s is 1 there, 2 on the platform).
+const roadDelayMin = `floor(e.delay_s / 60.0 + 0.5)::int`
+
 const situationColumns = `e.event_id, e.source_ref, e.event_kind, e.severity, e.road_ref, e.road_class,
        e.direction, e.direction_label, st_y(e.location), st_x(e.location), e.valid_from, e.valid_to,
-       e.lanes_closed, e.lanes_total, e.delay_min, e.affected_length_m, e.headline, e.description,
-       e.text_lang, e.changed_at`
+       e.lanes_closed, e.lanes_total, ` + roadDelayMin + `, e.affected_length_m, e.headline, e.description,
+       e.text_lang, e.changed_at, e.subtitle, coalesce(e.is_blocked, false)`
 
 // situationFilter is the condition every list read applies: an active,
 // published situation of the given families whose validity overlaps the
@@ -118,7 +123,7 @@ const messagesSelect = `select ` + messagesAgg + `,
 const messagesAgg = `jsonb_agg(distinct jsonb_build_object('r', e.record_class, 'k', e.event_kind, 'h', e.headline,
                                          's', e.subtitle, 't', e.description, 'p', e.place_text,
                                          'b', coalesce(e.is_blocked, false), 'y', e.traffic_type,
-                                         'ds', e.delay_s, 'd', e.delay_min)) filter (where e.valid_from <= $2)`
+                                         'ds', e.delay_s, 'd', ` + roadDelayMin + `)) filter (where e.valid_from <= $2)`
 
 // messagesFrom reads the situations of the families $1 that have not ended
 // at $2.
@@ -225,12 +230,37 @@ func coverageOf(rows pgx.Rows) (map[string]ampel.Coverage, error) {
 	return out, err
 }
 
+// lampWarnings reads the weather warnings that have not ended under cond, the
+// scope's area condition over $3 onwards (of types), opaque: those in force
+// are the lamp's, and the earliest start or end after now of any is when the
+// scope changes.
+func lampWarnings(cond string, types ...string) string {
+	return opaque(`select w.source_ref, w.warning_level, w.valid_from <= $2,
+  case when w.valid_from > $2 then w.valid_from else w.valid_to end `+warningsPending+`
+  and `+cond+`
+order by w.warning_level desc, w.warning_id`, append([]string{"text[]", "timestamp with time zone"}, types...)...)
+}
+
+// The lamp's warnings by scope. On a road they are those on the location-code
+// points of the road's junctions, as the platform's motorway page and its
+// motorway status place a DWD warning on the points of the road, not on the
+// districts the road crosses; at a point those whose own area reaches within
+// the radius, as the platform's warnings at a point test the warning's area;
+// in a state those whose cell key names the state in its first two digits.
+var (
+	warningsOnRoad = lampWarnings(`exists (select 1 from contract.junction j
+               where `+fmt.Sprintf(canonicalRef, "j.road_ref")+` = $3 and `+permitted("j")+`
+                 and st_intersects(w.area, j.location))`, "text")
+	warningsNear    = lampWarnings(`w.area is not null and st_dwithin(w.area::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`, "double precision", "double precision", "double precision")
+	warningsInState = lampWarnings(`($3 = 'de' or (left(w.warn_cell_id, 1) in ('7', '8') and substr(w.warn_cell_id, 2, 2) = $3))`, "text")
+)
+
 // scope is one read of the lamp's scope, run in the page's snapshot.
 type scope struct {
 	messages string
 	args     []any
-	// warnings is the area condition of the weather warnings, over $3
-	// onwards of warningArgs.
+	// warnings reads the weather warnings of the scope (lampWarnings), its
+	// area condition over $3 onwards of warningArgs.
 	warnings    string
 	warningArgs []any
 	// states selects the codes of the states in scope, over stateArgs.
@@ -291,7 +321,7 @@ func scanSituationWith(r pgx.CollectableRow, extra ...any) (roads.Situation, err
 	err := r.Scan(append([]any{&v.ID, &v.Family, &kind, &severity, &road, &class,
 		&direction, &v.Towards, &lat, &lon, &from, &until,
 		&lanesClosed, &lanesTotal, &delay, &length, &headline, &v.Description,
-		&lang, &updated, &v.AtKm, &v.DistanceM}, extra...)...)
+		&lang, &updated, &v.Subtitle, &v.Blocked, &v.AtKm, &v.DistanceM}, extra...)...)
 	s := &v
 	s.Kind, s.Severity, s.Class, s.Direction = roads.MapKind(kind), roads.MapSeverity(severity), roads.MapClass(class), roads.MapDirection(direction)
 	if road != nil {
@@ -350,10 +380,7 @@ func (s *Store) read(ctx context.Context, list string, listArgs []any, limit int
 				// One read of the warnings that have not ended: those in
 				// force are the lamp's, and the earliest start or end after
 				// now of any is when the scope changes.
-				res, _ := tx.Query(ctx, `select w.source_ref, w.warning_level, w.valid_from <= $2,
-  case when w.valid_from > $2 then w.valid_from else w.valid_to end `+warningsPending+`
-  and `+sc.warnings+`
-order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, sc.warningArgs...)...)
+				res, _ := tx.Query(ctx, sc.warnings, append([]any{fams.Weather, now}, sc.warningArgs...)...)
 				// A read that found none is an empty list, never nil: nil
 				// means the warnings were not read.
 				out.Warnings = []roads.Warning{}
@@ -484,7 +511,7 @@ order by case when e.event_kind = 'jam' then 0 when e.event_kind = 'closure' the
               when e.event_kind = 'roadworks' then 3 else 2 end,
          case e.traffic_type when 'QUEUING_TRAFFIC' then 0 when 'STATIONARY_TRAFFIC' then 1
               when 'HEAVY_TRAFFIC' then 2 when 'SLOW_TRAFFIC' then 3 else 4 end,
-         e.delay_min desc nulls last, e.headline, e.origin_key, e.event_id
+         e.delay_s desc nulls last, e.headline, e.origin_key, e.event_id
 limit $11 offset $14`, args, q.Limit, fams, now, scope{
 		covering: sc.covering, coveringArgs: sc.coveringArgs,
 		messages: messagesSelect + `
@@ -495,9 +522,7 @@ limit $11 offset $14`, args, q.Limit, fams, now, scope{
 		// road's junction points, as the platform's motorway page and its
 		// motorway status place a DWD warning on the location-code points
 		// of the road, not on the districts the road crosses.
-		warnings: `exists (select 1 from contract.junction j
-               where ` + fmt.Sprintf(canonicalRef, "j.road_ref") + ` = $3 and ` + permitted("j") + `
-                 and st_intersects(w.area, j.location))`,
+		warnings:    warningsOnRoad,
 		warningArgs: []any{q.Road},
 		states: statesOf(`select j.state_code from contract.junction j
 where ` + fmt.Sprintf(canonicalRef, "j.road_ref") + ` = $1 and ` + permitted("j")),
@@ -506,7 +531,8 @@ where ` + fmt.Sprintf(canonicalRef, "j.road_ref") + ` = $1 and ` + permitted("j"
 }
 
 // SituationsNear reads the active situations within the radius of a
-// position, by severity descending, then distance, then id; and, for the
+// position, by severity descending, then distance, then id, past q's
+// offset; and, for the
 // lamp, the view of every situation in the scope (the radius), the weather
 // warnings in force in an area within the radius, and the states of the
 // junctions within the radius, else of the junction nearest the position.
@@ -518,7 +544,7 @@ func (s *Store) SituationsNear(ctx context.Context, q roads.AreaQuery, fams road
 	args := append(filterArgs(q.Filter, fams.Roads, now), q.At.Lat, q.At.Lon, q.RadiusM,
 		codes(classes), other, codes(roads.Classes[:len(roads.Classes)-1]), q.Limit+1)
 	start, end := q.Window(now)
-	args = append(args, start, end)
+	args = append(args, start, end, q.Offset)
 	return s.read(ctx, `
 with here as (select st_setsrid(st_makepoint($9, $8), 4326)::geography g),
 answering as (
@@ -532,14 +558,14 @@ select `+situationColumns+`, null::float8, e.dist,
        (select jsonb_object_agg(c.source_ref, c.n) from (select source_ref, count(*)::int n from answering group by source_ref) c)
 from answering e
 order by coalesce(array_position($6::text[], e.severity), 0) desc, e.dist, e.event_id
-limit $14`, args, q.Limit, fams, now, scope{
+limit $14 offset $17`, args, q.Limit, fams, now, scope{
 		messages: messagesSelect + `
   and e.location is not null
   and st_dwithin(e.location::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`,
 		args: []any{fams.Roads, now, q.At.Lat, q.At.Lon, q.RadiusM},
 		// A warning is near when its own area reaches within the radius, as
 		// the platform's warnings at a point test the warning's area.
-		warnings:    `w.area is not null and st_dwithin(w.area::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`,
+		warnings:    warningsNear,
 		warningArgs: []any{q.At.Lat, q.At.Lon, q.RadiusM},
 		states: statesOf(`with here as (select st_setsrid(st_makepoint($2, $1), 4326) g),
 near as (select j.state_code from contract.junction j, here
@@ -554,14 +580,14 @@ where not exists (select 1 from near)`),
 
 // situationsInState reads the active situations of one Land (the Land of
 // the nearest Gemeinde to each situation's point, contract.traffic_event's
-// state_code; de: every situation), by severity descending, then road and id; the lamp's scope is
+// state_code; de: every situation), by severity descending, then road and id, past q's offset; the lamp's scope is
 // the Land: its situations, the weather warnings of its areas and the Land.
 func (s *Store) situationsInState(ctx context.Context, q roads.AreaQuery, fams roads.Families, now time.Time) (roads.Page, error) {
 	classes, other := q.KnownClasses()
 	args := append(filterArgs(q.Filter, fams.Roads, now), q.State,
 		codes(classes), other, codes(roads.Classes[:len(roads.Classes)-1]), q.Limit+1)
 	start, end := q.Window(now)
-	args = append(args, start, end)
+	args = append(args, start, end, q.Offset)
 	return s.read(ctx, `
 with answering as (
   select `+eventRow+`
@@ -573,7 +599,7 @@ select `+situationColumns+`, null::float8, null::int,
        (select jsonb_object_agg(c.source_ref, c.n) from (select source_ref, count(*)::int n from answering group by source_ref) c)
 from answering e
 order by coalesce(array_position($6::text[], e.severity), 0) desc, e.road_ref, e.event_id
-limit $12`, args, q.Limit, fams, now, scope{
+limit $12 offset $15`, args, q.Limit, fams, now, scope{
 		messages: messagesSelect + `
   and ($3 = 'de' or e.state_code = $3)`,
 		args: []any{fams.Roads, now, q.State},
@@ -581,7 +607,7 @@ limit $12`, args, q.Limit, fams, now, scope{
 		// and coast cells are 8 or 7 and the Gemeinde key, so the Land is
 		// the key's first two digits, as the platform's warnings in an area
 		// read them.
-		warnings:    `($3 = 'de' or (left(w.warn_cell_id, 1) in ('7', '8') and substr(w.warn_cell_id, 2, 2) = $3))`,
+		warnings:    warningsInState,
 		warningArgs: []any{q.State},
 		states:      `select case when $1 = 'de' then (select coalesce(array_agg(r.region_code order by r.region_code), '{}') from contract.admin_region r where r.region_level = 'state') else array[$1::text] end`,
 		stateArgs:   []any{q.State},

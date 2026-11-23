@@ -2,6 +2,7 @@ package transit
 
 import (
 	"cmp"
+	"math"
 	"slices"
 	"time"
 )
@@ -164,4 +165,16 @@ func lineOrder(a, b *string) int {
 		return -1
 	}
 	return cmp.Compare(*a, *b)
+}
+
+// DelayMinOf is a live delay in whole minutes as the platform states it,
+// Math.round(delay_s / 60): half a minute rounds up, -90 s is -1 (the
+// contract's delay_min rounds it away from zero, to -2). Nil without a
+// figure.
+func DelayMinOf(delayS *int) *int {
+	if delayS == nil {
+		return nil
+	}
+	m := int(math.Floor(float64(*delayS)/60 + 0.5))
+	return &m
 }

@@ -58,10 +58,55 @@ func (s *Store) FuelNear(ctx context.Context, q energy.FuelQuery, families []str
 	})
 }
 
+// fuelCoverage reads what the families $4 hold around the position $1, $2
+// (longitude, latitude): the stations within $3 metres; the metres to the
+// nearest one with a price for the grade $5 (null: any grade) within $6
+// metres; and, for a grade, the stations within $3 with no price for it
+// reported in the $7 seconds before the instant $8. As the platform's
+// coverage read, by no filter but the grade. Each price check is a probe of
+// one station's observations, as the price read's: the observations are a
+// time series, and a check not tied to the station would scan it whole.
+var fuelCoverage = `
+with here as (select st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography g),
+held as (
+  select s.station_id, s.location::geography loc
+  from contract.fuel_station s
+  where s.withdrawn_at is null and s.source_ref = any($4) and ` + permitted("s") + `)
+select
+  (select count(*)::int from held, here where st_dwithin(held.loc, here.g, $3)),
+  (select min(st_distance(held.loc, here.g)) from held, here
+    where st_dwithin(held.loc, here.g, $6)
+      and exists (select 1 from contract.fuel_price_observation o
+                   where o.station_id = held.station_id and o.price is not null and ($5::text is null or o.product_code = $5::text)
+                     and o.source_ref = any($4) and ` + permitted("o") + `)),
+  case when $5::text is null then 0 else
+  (select count(*)::int from held, here where st_dwithin(held.loc, here.g, $3)
+     and not exists (select 1 from contract.fuel_price_observation o
+                      where o.station_id = held.station_id and o.price is not null and o.product_code = $5::text
+                        and o.observed_at > $8::timestamptz - make_interval(secs => $7::int)
+                        and o.source_ref = any($4) and ` + permitted("o") + `)) end`
+
+// FuelCoverage reads what the families hold around q's position
+// (features.Fuel).
+func (s *Store) FuelCoverage(ctx context.Context, q energy.FuelQuery, families []string, now time.Time) (energy.FuelCoverage, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (energy.FuelCoverage, error) {
+		var (
+			c     energy.FuelCoverage
+			grade *string
+		)
+		if q.Fuel != "" {
+			grade = &q.Fuel
+		}
+		err := tx.QueryRow(ctx, fuelCoverage, q.At.Lon, q.At.Lat, q.RadiusM, families, grade, energy.MaxFuelRadiusM,
+			int(q.Fresh/time.Second), now).Scan(&c.StationsInRadius, &c.NearestPricedM, &c.WithoutCurrent)
+		return c, err
+	})
+}
+
 // fuelByID reads one filling station by its id ($1) with its address and,
 // per grade, its newest price reported in the held window ($3 seconds) up to
 // the instant $4; $2 the families. Withdrawn, it is not found.
-var fuelByID = `
+var fuelByID = opaque(`
 select s.station_id, s.name, s.brand, st_y(s.location), st_x(s.location), s.open_state, s.source_ref, s.whole_day, s.opening_times,
        s.street, s.house_number, s.postcode, s.city,
        coalesce(p.products, '{}'), coalesce(p.prices, '{}'), coalesce(p.observed, '{}')
@@ -74,12 +119,12 @@ left join lateral (
           from contract.fuel_price_observation o
          where o.station_id = s.station_id and o.price is not null
            and o.observed_at > $4::timestamptz - make_interval(secs => $3::int) and o.observed_at <= $4::timestamptz
-           and o.source_ref = any($2) and ` + permitted("o") + `
+           and o.source_ref = any($2) and `+permitted("o")+`
          order by o.product_code, o.observed_at desc) l) p on true
 where s.station_id = $1::text
   and s.withdrawn_at is null
   and s.source_ref = any($2)
-  and ` + permitted("s")
+  and `+permitted("s"), "text", "text[]", "integer", "timestamp with time zone")
 
 // FuelStation reads one filling station by its id (features.Fuel), or
 // energy.ErrNotFound.

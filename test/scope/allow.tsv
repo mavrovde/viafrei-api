@@ -51,3 +51,4 @@ column	api/openapi.json	evaNumbers	member name of a station, every railway stati
 vocabulary	live-ingestor.pin	ingest	the live refresher's published image name, which the pin must name exactly; a product name of another repository, not the API's vocabulary
 vocabulary	internal/release/livepin/livepin.go	ingest	the live pin's file name and the live refresher's published image name, written once as constants; a product name of another repository, not the API's vocabulary
 vocabulary	docs/RELEASING.md	ingest	the live pin's file name in the release checklist (make live-e2e); a product name of another repository, not the API's vocabulary
+column	api/openapi.json	stopIds	member name of a board station, the stops the departure board reads (the station, then its stop points) exactly as the platform board states stop.stopIds (FR-TRANSIT-002); the board vocabulary, not the alert view storage name

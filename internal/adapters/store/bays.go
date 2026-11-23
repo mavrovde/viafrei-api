@@ -13,7 +13,7 @@ import (
 // a state counts only while the newest message is younger than $6 s by the
 // request's clock $5, and never at a sensor-less site; the counts cover the
 // whole radius; $9 keeps only the bays reported free. $8 the families.
-var baysNear = `with p as (select st_setsrid(st_makepoint($1, $2), 4326)::geography as g),
+var baysNear = opaque(`with p as (select st_setsrid(st_makepoint($1, $2), 4326)::geography as g),
 m as (
   select b.bay_id, b.bay_kind, b.publisher_kind, b.street, b.house_number, b.postcode, b.city,
          st_y(b.location) as lat, st_x(b.location) as lon,
@@ -22,7 +22,7 @@ m as (
               then b.state end as state,
          b.state_at, b.spaces, b.reserved_when, b.source_ref
     from contract.street_bay b, p
-   where b.bay_kind = $4 and b.source_ref = any($8) and ` + permitted("b") + `
+   where b.bay_kind = $4 and b.source_ref = any($8) and `+permitted("b")+`
      and st_dwithin(b.location::geography, p.g, $3)
 )
 select m.bay_id, m.bay_kind, m.publisher_kind, m.street, m.house_number, m.postcode, m.city, m.lat, m.lon, m.distance_m,
@@ -33,7 +33,7 @@ select m.bay_id, m.bay_kind, m.publisher_kind, m.street, m.house_number, m.postc
   from m
  where not $9::boolean or m.state = 'free'
  order by m.distance_m, m.bay_id
- limit $7`
+ limit $7`, "double precision", "double precision", "double precision", "text", "timestamp with time zone", "integer", "bigint", "text[]", "boolean")
 
 // Bays reads the bays q asks for (features.Bays).
 func (s *Store) Bays(ctx context.Context, q parking.BayQuery, families []string) (parking.Bays, error) {

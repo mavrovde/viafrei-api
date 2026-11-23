@@ -168,7 +168,8 @@ func chargingAnswer() features.Answer[energy.Site] {
 func parkingAnswer() features.Answer[parking.Site] {
 	return features.Answer[parking.Site]{
 		Items: []parking.Site{
-			{ID: "pk-01-0000", Family: "src-alpha-parking", Kind: parking.KindGarage, DistanceM: 350, Occupancy: &parking.Occupancy{Free: ip(3), Total: ip(40), State: parking.StateFree, ObservedAt: fixedNow.Add(-time.Minute)}},
+			{ID: "pk-01-0000", Family: "src-alpha-parking", Kind: parking.KindGarage, DistanceM: 350, Occupancy: &parking.Occupancy{Free: ip(3), Total: ip(40), State: parking.StateFree, ObservedAt: fixedNow.Add(-time.Minute)},
+				Amenities: parking.Stated{Present: []string{"toilet", "shower"}, Absent: []string{"wifi"}}},
 			// An accepted Toll Collect site: the platform names it without a
 			// distance (Unranged), the /v1 answers around a position state it.
 			{ID: "pk-01-0001", Family: "src-delta-parking", Kind: parking.KindTruckParking, TermsRequired: true, DistanceM: 1840, Unranged: true},
@@ -347,6 +348,14 @@ func TestParkingOptionsAnswer(t *testing.T) {
 	}
 	if held["occupancy"] != nil || held["termsRequired"] != true || held["kind"] != "truck_parking" {
 		t.Errorf("withheld site %v", held)
+	}
+	// Each site states its publisher's amenities, a site stating none two
+	// empty lists (the platform's find_parking amenities).
+	if a, _ := json.Marshal(open["amenities"]); string(a) != `{"absent":["wifi"],"present":["toilet","shower"]}` {
+		t.Errorf("amenities %s", a)
+	}
+	if a, _ := json.Marshal(held["amenities"]); string(a) != `{"absent":[],"present":[]}` {
+		t.Errorf("no amenities %s", a)
 	}
 	// The /v1 contract states every site's whole-metre distance (VER-001),
 	// the Toll Collect site's too, which the platform names without one.

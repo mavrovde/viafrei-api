@@ -106,3 +106,55 @@ func TestFuelOpenAtAndWholeDay(t *testing.T) {
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/fuel-options?at=52.52,13.405&open_at=23:30&open_now=true", bearer), 400, "invalid-parameter")
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/fuel-options?at=52.52,13.405&open_at=25:00", bearer), 400, "invalid-parameter")
 }
+
+// The coverage is stated as the platform's fuel searches state it: held
+// without a read when stations are listed, the read's state, stations and,
+// on an empty answer, the nearest priced station; the stations without a
+// current price, the read's under sort=price, else the listed ones'.
+func TestFuelCoverageIsStated(t *testing.T) {
+	req.Covers(t, "FR-ENERGY-002")
+	f := everyAnswer()
+	fresh, old := fixedNow.Add(-10*time.Minute), fixedNow.Add(-2*time.Hour)
+	f.fuel = features.FuelStations{Answer: features.Answer[energy.FuelStation]{Items: []energy.FuelStation{
+		{ID: "a", Family: "src-gamma-energy", Prices: []energy.FuelPrice{{Product: "e5", Price: 1.8, ObservedAt: fresh}}},
+		{ID: "b", Family: "src-gamma-energy", Prices: []energy.FuelPrice{{Product: "e5", Price: 1.8, ObservedAt: old}, {Product: "diesel", Price: 1.7, ObservedAt: fresh}}},
+		{ID: "c", Family: "src-gamma-energy"},
+	}, At: fixedNow}}
+	h := featureHandler(t, config.Defaults(), f, nil)
+	query := func(target string) map[string]any {
+		t.Helper()
+		w := do(t, h, http.MethodGet, target, bearer)
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", target, w.Code, w.Body)
+		}
+		q, _ := meta(t, decode(t, w))["query"].(map[string]any)
+		return q
+	}
+	q := query("/v1/fuel-options?at=50.1,8.6&fuel=e5")
+	if g := f.gotFuel; !g.Coverage || g.Fresh != 30*time.Minute {
+		t.Errorf("asked %+v", g)
+	}
+	_, inRadius := q["stationsInRadius"]
+	if q["areaCoverage"] != "held" || inRadius || q["stationsWithoutCurrentPrice"] != 2.0 {
+		t.Errorf("listed, e5: %v", q)
+	}
+	if q = query("/v1/fuel-options?at=50.1,8.6"); q["stationsWithoutCurrentPrice"] != 1.0 {
+		t.Errorf("listed, any grade: %v", q)
+	}
+	m := 6234.6
+	f.fuel.Coverage = &energy.FuelCoverage{StationsInRadius: 7, NearestPricedM: &m, WithoutCurrent: 3}
+	q = query("/v1/fuel-options?at=50.1,8.6&fuel=e5&sort=price")
+	_, nearest := q["nearestPricedKm"]
+	if q["areaCoverage"] != "held" || q["stationsInRadius"] != 7.0 || q["stationsWithoutCurrentPrice"] != 3.0 || nearest {
+		t.Errorf("by price: %v", q)
+	}
+	f.fuel.Items, f.fuel.Coverage = nil, &energy.FuelCoverage{NearestPricedM: &m}
+	if q = query("/v1/fuel-options?at=50.1,8.6"); q["areaCoverage"] != "priced_beyond" || q["stationsInRadius"] != 0.0 || q["nearestPricedKm"] != 6.235 || q["stationsWithoutCurrentPrice"] != 0.0 {
+		t.Errorf("empty, priced beyond: %v", q)
+	}
+	f.fuel.Coverage = &energy.FuelCoverage{}
+	_, nearest = query("/v1/fuel-options?at=50.1,8.6")["nearestPricedKm"]
+	if q = query("/v1/fuel-options?at=50.1,8.6"); q["areaCoverage"] != "unknown" || nearest {
+		t.Errorf("empty, unknown: %v", q)
+	}
+}

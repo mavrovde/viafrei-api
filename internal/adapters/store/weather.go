@@ -35,23 +35,23 @@ where w.withdrawn_at is null and w.message_status <> 'cancelled'
 // first, then the earliest start. $5 the level floor, $6 the mapped hazards
 // kept, $7 whether the unmapped ones are kept, $8 every mapped hazard, $9
 // the limit.
-const warningsPage = `
+var warningsPage = opaque(`
 select w.warning_id, w.source_ref, w.hazard, w.warning_level, w.level_label, w.issuer_name, w.headline,
        w.text_lang, w.valid_from, w.valid_to, coalesce(w.area_name, ''),
        w.warn_cell_id, w.event, w.identifier, w.published_at
-` + warningPlaced + `
+`+warningPlaced+`
   and w.valid_from < $10
   and w.warning_level >= $5
   and (w.hazard = any($6) or ($7 and not w.hazard = any($8)))
 order by w.warning_level desc, w.valid_from, w.warning_id
-limit $9`
+limit $9`, "text[]", "timestamp with time zone", "double precision", "double precision", "integer", "text[]", "boolean", "text[]", "bigint", "timestamp with time zone")
 
 // warningsHere reads every placed warning, whatever the floor and the
 // hazards keep: its level, whether it is in force, and its next start or
 // end after now.
-const warningsHere = `select w.warning_id, w.warning_level, w.valid_from <= $2,
+var warningsHere = opaque(`select w.warning_id, w.warning_level, w.valid_from <= $2,
   case when w.valid_from > $2 then w.valid_from else w.valid_to end
-` + warningPlaced
+`+warningPlaced, "text[]", "timestamp with time zone", "double precision", "double precision")
 
 // levelOf refuses a stored level outside 0 to 4 rather than re-grading it
 // (FR-WEATHER-002); the error names the warning.
@@ -153,6 +153,7 @@ select t.topic_code, case when $2 = 'en' then coalesce(t.title_en, t.title) else
          'id', s.statement_id,
          'text', case when $2 = 'en' then coalesce(s.body_en, s.body) else s.body end,
          'basis', s.legal_basis, 'url', s.legal_basis_url, 'reviewed', s.reviewed_on,
+         'note', nullif(btrim(case when $2 = 'en' then coalesce(s.legal_basis_note_en, s.legal_basis_note) else s.legal_basis_note end), ''),
          'verify', nullif(btrim(case when $2 = 'en' then coalesce(s.to_verify_en, s.to_verify) else s.to_verify end), ''))
          order by s.position, s.statement_id) filter (where s.statement_id is not null), '[]')
 from contract.rule_topic t
@@ -169,6 +170,7 @@ group by t.topic_code, t.title, t.title_en, t.reviewed_on`, code, lang)
 					URL      *string `json:"url"`
 					Reviewed string  `json:"reviewed"`
 					Verify   *string `json:"verify"`
+					Note     *string `json:"note"`
 				}
 			)
 			if err := r.Scan(&v.Code, &v.Title, &v.ReviewedOn, &raw); err != nil {
@@ -180,7 +182,7 @@ group by t.topic_code, t.title, t.title_en, t.reviewed_on`, code, lang)
 				if err != nil {
 					return v, err
 				}
-				v.Rules[i] = rules.Rule{ID: x.ID, Text: x.Text, LegalBasis: x.Basis, LegalBasisURL: x.URL, ReviewedOn: on, ToVerify: x.Verify}
+				v.Rules[i] = rules.Rule{ID: x.ID, Text: x.Text, LegalBasis: x.Basis, LegalBasisURL: x.URL, LegalBasisNote: x.Note, ReviewedOn: on, ToVerify: x.Verify}
 			}
 			return v, nil
 		})

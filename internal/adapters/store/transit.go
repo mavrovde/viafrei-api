@@ -15,22 +15,29 @@ import (
 // The public-transport repositories (anti-corruption layer).
 
 // stationByID reads one station: $1 the id, $2 the families. A station
-// stored with no position is placed at 0,0 nowhere: the board names it.
-var stationByID = `
+// stored with no position is placed at 0,0 nowhere: the board names it. It
+// reads the station's stop points too (contract.stop_point of the stop
+// place), the family the platform's departure board reads.
+var stationByID = opaque(`
 select s.stop_place_id, s.name, coalesce(st_y(s.location), 0), coalesce(st_x(s.location), 0), s.national_stop_code,
-       s.region_code, coalesce(s.modes, '{}'), s.source_ref
+       s.region_code, coalesce(s.modes, '{}'), s.source_ref,
+       array(select p.stop_point_id from contract.stop_point p
+              where p.stop_place_id = s.stop_place_id and p.source_ref = any($2) and `+permitted("p")+`
+              order by p.stop_point_id)
 from contract.stop_place s
-where s.stop_place_id = $1 and s.withdrawn_at is null and s.source_ref = any($2) and ` + permitted("s")
+where s.stop_place_id = $1 and s.withdrawn_at is null and s.source_ref = any($2) and `+permitted("s"), "text", "text[]")
 
 // Station reads the station with this id (features.Transit).
 func (s *Store) Station(ctx context.Context, id string, families []string) (transit.Station, error) {
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (transit.Station, error) {
 		var (
-			v     transit.Station
-			modes []string
+			v      transit.Station
+			modes  []string
+			points []string
 		)
 		err := tx.QueryRow(ctx, stationByID, id, families).Scan(&v.ID, &v.Name, &v.Location.Lat, &v.Location.Lon,
-			&v.NationalCode, &v.RegionCode, &modes, &v.Family)
+			&v.NationalCode, &v.RegionCode, &modes, &v.Family, &points)
+		v.StopIDs = transit.FamilyOf(v.ID, points)
 		if errors.Is(err, pgx.ErrNoRows) {
 			// No such station is an answer, not a failure of storage.
 			return transit.Station{}, nil
@@ -51,7 +58,9 @@ func (s *Store) Station(ctx context.Context, id string, families []string) (tran
 // official region key the district code starts with, empty for any (a
 // station with no district then left out). A station stored with no position is left out: an answer places
 // every station it lists. The folded text holds letters and digits only, so
-// it carries no LIKE wildcard.
+// it carries no LIKE wildcard. It is sent as written, not opaque: each
+// optional filter is decided by its argument, and on prod the generic plan
+// that cannot see them ran past 5 s where the asked plan took 7 ms.
 var stationsPage = `
 with here as (
   select case when $2::float8 is null then null
@@ -108,8 +117,9 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 // (planned departure), $4 the families. A call is one a passenger can board
 // (contract.departure.boarding) of a trip that calls somewhere outside the
 // station after it: a trip's last call at the station is an arrival. The
-// destination is the trip's headsign, else the name of its last stop.
-var boardCalls = `
+// destination is the trip's headsign, else the name of its last stop. The
+// delay is read in seconds and stated in minutes by transit.DelayMinOf.
+var boardCalls = opaque(`
 select d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transport_mode, d.route_type,
        d.train_number, d.train_category, nullif(btrim(j.destination_label), ''),
        coalesce(nullif(btrim(j.destination_label), ''),
@@ -118,19 +128,19 @@ select d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transport_mod
                   where lc.journey_id = d.journey_id
                   order by lc.call_order desc limit 1)),
        d.planned_departure_at, d.platform, d.planned_platform, d.platform_changed, d.realtime, d.realtime_source,
-       d.cancelled, d.delay_min, d.expected_departure_at, d.no_forecast, d.source_ref, d.source_refs
+       d.cancelled, d.delay_s, d.expected_departure_at, d.no_forecast, d.source_ref, d.source_refs
 from contract.departure d
 left join contract.journey j on j.journey_id = d.journey_id
 where d.stop_place_id = $1
   and d.planned_departure_at >= $2 and d.planned_departure_at < $3
   and d.boarding
   and d.source_ref = any($4)
-  and ` + permitted("d") + `
+  and `+permitted("d")+`
   and exists (select 1 from contract.scheduled_call nx
                 join contract.stop_point np on np.stop_point_id = nx.stop_point_id
                where nx.journey_id = d.journey_id and nx.call_order > d.call_order
                  and np.stop_place_id <> $1)
-order by d.planned_departure_at, d.journey_id, d.call_order`
+order by d.planned_departure_at, d.journey_id, d.call_order`, "text", "timestamp with time zone", "timestamp with time zone", "text[]")
 
 // Departures reads the departing calls of q's station in q's window
 // (features.Transit); the board's rules are transit.Board's.
@@ -139,13 +149,15 @@ func (s *Store) Departures(ctx context.Context, q transit.DepartureQuery, famili
 		rows, _ := tx.Query(ctx, boardCalls, q.StationID, q.From, q.From.Add(q.Window), families)
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.Departure, error) {
 			var (
-				v    transit.Departure
-				mode string
+				v      transit.Departure
+				mode   string
+				delayS *int
 			)
 			err := r.Scan(&v.JourneyID, &v.StopPointID, &v.CallOrder, &v.Line, &mode, &v.RouteType, &v.TrainNumber,
 				&v.Category, &v.Headsign, &v.Destination, &v.PlannedAt, &v.Platform, &v.PlannedPlatform,
-				&v.PlatformChanged, &v.Live, &v.Source, &v.Cancelled, &v.DelayMin, &v.ExpectedAt, &v.NoForecast,
+				&v.PlatformChanged, &v.Live, &v.Source, &v.Cancelled, &delayS, &v.ExpectedAt, &v.NoForecast,
 				&v.Family, &v.Families)
+			v.DelayMin = transit.DelayMinOf(delayS)
 			v.Mode = transit.MapMode(mode)
 			return v, err
 		})
@@ -187,12 +199,12 @@ func (s *Store) Facilities(ctx context.Context, station string, families []strin
 // affectedAlerts are the refs the alerts in force at $2 of the families ($1)
 // name, with the alert and its family; only of a live publication, as the
 // platform's station card asks only the alert sources alive (alertLive).
-var affectedAlerts = `
+var affectedAlerts = opaque(`
 select distinct a.alert_id, a.source_ref, u.sid
 from contract.service_alert a, unnest(a.stop_ids) u(sid)
-where a.source_ref = any($1) and ` + "a.display_class <> 'withhold' and (a.audience = 'public' or " + ownKeyOn + ")" + `
+where a.source_ref = any($1) and `+"a.display_class <> 'withhold' and (a.audience = 'public' or "+ownKeyOn+")"+`
   and (a.active_from is null or a.active_from <= $2) and (a.active_to is null or a.active_to > $2)
-  and ` + alertLive("a", "$2")
+  and `+alertLive("a", "$2"), "text[]", "timestamp with time zone")
 
 // affectedLifts are the stations' lifts and escalators out of service, of
 // the families ($1). The out-of-service rows are kept first, in a subquery

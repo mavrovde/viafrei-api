@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"reflect"
 	"slices"
@@ -48,6 +49,7 @@ func closure() roads.Situation {
 		Location: &geo.Point{Lat: 48.1000004, Lon: 11.5999996}, From: fixedNow.Add(-time.Hour), Until: tp(fixedNow.Add(26 * time.Hour)),
 		LanesClosed: ip(2), LanesTotal: ip(2), DelayMin: ip(25), LengthM: ip(1200),
 		Headline: "Vollsperrung", Description: sp("Bergung"), TextLanguage: "de", UpdatedAt: fixedNow.Add(-2 * time.Minute), AtKm: fp(41.3),
+		Subtitle: sp("Richtung Salzburg"), Blocked: true,
 	}
 }
 
@@ -124,6 +126,12 @@ func TestMotorwayConditionsAnswer(t *testing.T) {
 		val["fromLocal"] != "2026-03-29T01:30:00+01:00" || val["untilLocal"] != "2026-03-30T05:30:00+02:00" ||
 		lanes["closed"] != 2.0 || loc["lat"] != 48.1 || s0["updatedAtLocal"] != "2026-03-29T03:28:00+02:00" || s0["sourceFamily"] != "src-alpha-roads" {
 		t.Errorf("first situation %v", s0)
+	}
+	if s0["subtitle"] != "Richtung Salzburg" || s0["blocked"] != true {
+		t.Errorf("first situation's subtitle and block: %v %v", s0["subtitle"], s0["blocked"])
+	}
+	if v, has := s1["subtitle"]; !has || v != nil || s1["blocked"] != false {
+		t.Errorf("bare situation's subtitle and block: %v %v", s1["subtitle"], s1["blocked"])
 	}
 	if _, has := s0["distanceM"]; has {
 		t.Error("a corridor situation carries a distance")
@@ -210,8 +218,17 @@ func TestRoadConditionsAnswer(t *testing.T) {
 	if types, _ := q["roadClasses"].([]any); len(types) != 2 {
 		t.Errorf("query %v", q)
 	}
+	// A page with more continues by its cursor, an area's and a Land's alike.
+	f.conditions.HasMore = true
+	for _, path := range []string{"/v1/road-conditions?at=48.1,11.6&limit=2&cursor=4", "/v1/states/09/road-conditions?limit=2&cursor=4"} {
+		page, _ := meta(t, decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, path, bearer)))["page"].(map[string]any)
+		if f.gotArea.Offset != 4 || f.gotArea.Limit != 2 || page["hasMore"] != true || page["nextCursor"] != fmt.Sprint(4+len(f.conditions.Items)) {
+			t.Errorf("%s: asked %+v, page %v", path, f.gotArea, page)
+		}
+	}
+	f.conditions.HasMore = false
 	do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/road-conditions?at=48.1,11.6", bearer)
-	if f.gotArea.Classes != nil || f.gotArea.RadiusM != 2000 || f.gotArea.Limit != 20 {
+	if f.gotArea.Classes != nil || f.gotArea.RadiusM != 2000 || f.gotArea.Limit != 20 || f.gotArea.Offset != 0 {
 		t.Errorf("defaults %+v", f.gotArea)
 	}
 }
@@ -379,5 +396,35 @@ func TestAnUnregisteredRoadAnswersItsCoverage(t *testing.T) {
 	w = do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/motorways/A8/conditions", bearer)
 	if data, _ := decode(t, w)["data"].(map[string]any); w.Code != http.StatusOK || data["coverage"] != nil {
 		t.Errorf("registered road: status %d, coverage %v", w.Code, data["coverage"])
+	}
+}
+
+// Every road status form states each attributed source's Stand, judged at
+// the answer's instant.
+func TestRoadAnswersStateTheSourcesStand(t *testing.T) {
+	req.Covers(t, "FR-ROAD-002")
+	f := everyAnswer()
+	iv := 60.0
+	changed := fixedNow.Add(-time.Hour)
+	f.conditions.Stamps = []roads.Stamp{
+		{Family: "src-a", CheckedAt: fixedNow.Add(-time.Minute), UnchangedSince: &changed, IntervalS: &iv},
+		{Family: "src-b", CheckedAt: fixedNow.Add(-10 * time.Minute), IntervalS: &iv},
+	}
+	for _, path := range []string{"/v1/motorways/A8/conditions", "/v1/road-conditions?at=48.1,11.6", "/v1/states/09/road-conditions"} {
+		if path != "/v1/motorways/A8/conditions" {
+			f.conditions.Road = nil
+		}
+		w := do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, path, bearer)
+		d, _ := decode(t, w)["data"].(map[string]any)
+		st, _ := d["sourceStamps"].([]any)
+		if len(st) != 2 {
+			t.Fatalf("%s: %d %v", path, w.Code, d["sourceStamps"])
+		}
+		a, _ := st[0].(map[string]any)
+		b, _ := st[1].(map[string]any)
+		if a["family"] != "src-a" || a["lastCheckedAt"] != "2026-03-29T01:29:00Z" || a["unchangedSince"] != "2026-03-29T00:30:00Z" || a["possiblyStale"] != false ||
+			b["unchangedSince"] != nil || b["possiblyStale"] != true {
+			t.Errorf("%s: %v", path, st)
+		}
 	}
 }

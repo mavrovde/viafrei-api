@@ -19,6 +19,9 @@ type Fuel interface {
 	// families, with its newest price per grade reported in the held window
 	// up to now, or energy.ErrNotFound.
 	FuelStation(ctx context.Context, id string, families []string, now time.Time, held time.Duration) (energy.FuelStationPage, error)
+	// FuelCoverage reads what the given families hold around q's position
+	// (energy.FuelCoverage), its fresh window ending at now.
+	FuelCoverage(ctx context.Context, q energy.FuelQuery, families []string, now time.Time) (energy.FuelCoverage, error)
 }
 
 // FuelStations is a fuel answer and what its open filter left out.
@@ -31,6 +34,9 @@ type FuelStations struct {
 	// the instant open_at named.
 	DroppedNotWholeDay int
 	OpenAt             *time.Time
+	// Coverage is the coverage read, where the query asked for it
+	// (energy.FuelQuery.Coverage); nil else.
+	Coverage *energy.FuelCoverage
 }
 
 // FuelStations answers "where can I fill up near here" for key (FR-ENERGY),
@@ -50,6 +56,14 @@ func (s *Service) FuelStations(ctx context.Context, key access.Record, q energy.
 	}
 	now := s.now()
 	a := energy.RankFuel(near, q, now)
+	var cover *energy.FuelCoverage
+	if q.Coverage && (q.Sort == "price" || len(a.Stations) == 0) {
+		c, err := s.repos.Fuel.FuelCoverage(ctx, q, permitted, now)
+		if err != nil {
+			return FuelStations{}, err
+		}
+		cover = &c
+	}
 	var contributed []string
 	for _, st := range a.Stations {
 		contributed = append(contributed, st.Family)
@@ -72,7 +86,7 @@ func (s *Service) FuelStations(ctx context.Context, key access.Record, q energy.
 	return FuelStations{
 		Answer:  Answer[energy.FuelStation]{Items: a.Stations, HasMore: a.Matched > len(a.Stations), Families: fams, Partial: partial, At: now},
 		Matched: a.Matched, DroppedClosed: a.DroppedClosed, DroppedUnknown: a.DroppedUnknown,
-		DroppedNotWholeDay: a.DroppedNotWholeDay, OpenAt: a.OpenAt,
+		DroppedNotWholeDay: a.DroppedNotWholeDay, OpenAt: a.OpenAt, Coverage: cover,
 	}, nil
 }
 

@@ -189,6 +189,20 @@ func TestARefresherThatLosesItsLoginOrRoleFails(t *testing.T) {
 	}
 }
 
+// A stop that cut the wait reads whether the listener still answers: a lost
+// one is the fake's error, a live one is none.
+func TestAStopReadsWhetherTheListenerWasLost(t *testing.T) {
+	_, owner := fresh(t)
+	f := &Fake{}
+	if err := f.heard(context.Background(), owner); err != nil {
+		t.Fatalf("a live listener: %v", err)
+	}
+	_ = owner.Close(context.Background())
+	if err := f.heard(context.Background(), owner); err == nil || !strings.Contains(err.Error(), "fakelive: the listener was lost") {
+		t.Fatalf("a closed listener: %v", err)
+	}
+}
+
 // A request an asker is being linked to is claimed all the same: the link's
 // key check (live.refresh_askers) holds a key-share lock on the request, and
 // a claim that skipped the row it locks waited on with nothing left to wake

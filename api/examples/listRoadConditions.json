@@ -29,6 +29,20 @@
           "situations": 1
         }
       ],
+      "sourceStamps": [
+        {
+          "family": "dwd_eta",
+          "lastCheckedAt": "2026-03-29T23:57:30Z",
+          "unchangedSince": "2026-03-29T23:57:30Z",
+          "possiblyStale": false
+        },
+        {
+          "family": "roads_alpha",
+          "lastCheckedAt": "2026-03-29T23:57:30Z",
+          "unchangedSince": "2026-03-29T23:57:30Z",
+          "possiblyStale": false
+        }
+      ],
       "lamp": "amber",
       "lampReason": "narrowing",
       "lampReasons": [
@@ -94,6 +108,8 @@
           "headline": "MaintenanceWorks",
           "description": null,
           "textLanguage": "de",
+          "subtitle": null,
+          "blocked": false,
           "updatedAt": "2026-03-29T23:57:30Z",
           "updatedAtLocal": "2026-03-30T01:57:30+02:00",
           "position": null,
@@ -161,7 +177,8 @@
       ],
       "page": {
         "limit": 2,
-        "hasMore": false
+        "hasMore": false,
+        "nextCursor": null
       },
       "query": {
         "at": {

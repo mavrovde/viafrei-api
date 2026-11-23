@@ -64,7 +64,7 @@ func riskAnswer() features.WeatherRisk {
 func topicAnswer() rules.Topic {
 	return rules.Topic{
 		Code: "winter_tyres", Title: "Winterreifen", ReviewedOn: time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC),
-		Rules: []rules.Rule{{Text: "Bei Glätte Winterreifen.", LegalBasis: sp("§ 2 Abs. 3a StVO")}, {Text: "Ohne Grundlage."}},
+		Rules: []rules.Rule{{Text: "Bei Glätte Winterreifen.", LegalBasis: sp("§ 2 Abs. 3a StVO"), LegalBasisNote: sp("Gilt bei Glätte.")}, {Text: "Ohne Grundlage."}},
 	}
 }
 
@@ -155,6 +155,9 @@ func TestDrivingRulesAnswer(t *testing.T) {
 	r1, _ := rs[1].(map[string]any)
 	if data["topic"] != "winter_tyres" || data["title"] != "Winterreifen" || data["reviewedOn"] != "2026-10-01" || data["disclaimer"] != rules.Disclaimer {
 		t.Errorf("data %v", data)
+	}
+	if n, has := r1["basisNote"]; r0["basisNote"] != "Gilt bei Glätte." || !has || n != nil {
+		t.Errorf("basis notes %v, %v", r0["basisNote"], n)
 	}
 	if v, has := r1["legalBasis"]; len(rs) != 2 || r0["text"] != "Bei Glätte Winterreifen." || r0["legalBasis"] != "§ 2 Abs. 3a StVO" || !has || v != nil {
 		t.Errorf("rules %v", rs)

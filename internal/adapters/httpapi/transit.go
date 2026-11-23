@@ -80,6 +80,7 @@ type BoardStation struct {
 	Name     string   `json:"name"`
 	Location Position `json:"location"`
 	StopCode *string  `json:"stopCode" nullable:"true" doc:"The national stop code (DHID); null when none is recorded."`
+	StopIDs  []string `json:"stopIds" doc:"The stops the board reads: the station first, then each of its stop points (its platforms), as the platform's departure board states them."`
 }
 
 // BoardWindow is the window a board covers and what it holds.
@@ -160,7 +161,7 @@ func registerDepartures(api huma.API, s *server, op huma.Operation) {
 		}
 		until := from.Add(q.Window)
 		data := Board{
-			Station: BoardStation{ID: b.Station.ID, Name: b.Station.Name, Location: position(b.Station.Location), StopCode: b.Station.NationalCode},
+			Station: BoardStation{ID: b.Station.ID, Name: b.Station.Name, Location: position(b.Station.Location), StopCode: b.Station.NationalCode, StopIDs: stopIDs(b.Station)},
 			Window: BoardWindow{From: from.UTC(), FromLocal: local(from), Until: until.UTC(), UntilLocal: local(until),
 				Matched: b.Matched, MatchedAll: b.MatchedAll, Dropped: dropped(b.Dropped)},
 			Departures: make([]Departure, len(b.Items)),
@@ -356,4 +357,13 @@ func departureRow(d transit.Departure) Departure {
 		RealtimeSource: d.Source, Cancelled: d.Cancelled, DelayMin: d.DelayMin, ExpectedAt: utc(d.ExpectedAt),
 		NoForecast: d.NoForecast, SourceFamily: d.Family,
 	}
+}
+
+// stopIDs is the family a board states, never null: the station alone when
+// none was read.
+func stopIDs(st transit.Station) []string {
+	if len(st.StopIDs) == 0 {
+		return []string{st.ID}
+	}
+	return st.StopIDs
 }

@@ -24,6 +24,9 @@ type Rule struct {
 	// LegalBasisURL is where the provision is published; nil when none is
 	// recorded.
 	LegalBasisURL *string
+	// LegalBasisNote is the note on the provision, in the asked language
+	// (German when no English one is recorded); nil when none is.
+	LegalBasisNote *string
 	// ReviewedOn is when the statement was last read against its source.
 	ReviewedOn time.Time
 	// ToVerify names what of the statement is not confirmed; nil when all

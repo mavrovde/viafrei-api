@@ -109,7 +109,11 @@ func (s *Store) ChargingNear(ctx context.Context, q energy.Query, families []str
 		// One statement: the sites (one more than the limit, to tell whether
 		// there are more), then their points. A failed query surfaces through
 		// CollectRows.
-		res, _ := tx.Query(ctx, chargingSites(q.SiteID != ""), q.At.Lat, q.At.Lon, families, q.RadiusM, accessCodes, q.MinKw, q.Limit+1, now,
+		read := chargingNear
+		if q.SiteID != "" {
+			read = chargingByID
+		}
+		res, _ := tx.Query(ctx, read, q.At.Lat, q.At.Lon, families, q.RadiusM, accessCodes, q.MinKw, q.Limit+1, now,
 			connector, f.MaxKw, opKey, pointFiltered, terms, q.SiteID)
 		return pgx.CollectRows(res, func(r pgx.CollectableRow) (row, error) {
 			var (
@@ -286,7 +290,8 @@ where f.withdrawn_at is null
 select f.facility_id, f.source_ref, f.name, f.operator_name, f.parking_kind,
        st_y(f.location), st_x(f.location),
        `+parkingDistance(q)+`,
-       o.free_spaces, o.total_spaces, o.occupancy_status, o.observed_at, o.source_ref
+       o.free_spaces, o.total_spaces, o.occupancy_status, o.observed_at, o.source_ref,
+       f.amenities, f.amenities_absent
 from contract.parking_facility f
 cross join here
 left join lateral (
@@ -313,10 +318,12 @@ limit $11`, parkingArgs(q, line, q.At.Lat, q.At.Lon, listed, occupancy, q.Radius
 				state       *string
 				observed    *time.Time
 				family      *string
+				has, lacks  []string
 			)
 			err := r.Scan(&v.ID, &v.Family, &v.Name, &v.Operator, &kind, &v.Location.Lat, &v.Location.Lon, &v.DistanceM,
-				&free, &total, &state, &observed, &family)
+				&free, &total, &state, &observed, &family, &has, &lacks)
 			v.Kind = parking.MapKind(kind)
+			v.Amenities = parking.StatedOf(has, lacks)
 			if state != nil {
 				v.Occupancy = &parking.Occupancy{Free: free, Total: total, State: parking.MapState(*state), ObservedAt: observed.UTC(), Family: *family}
 			}
@@ -430,8 +437,15 @@ left join lateral (
   from contract.charge_point_state_observation o
   where o.point_id = p.point_id and o.source_ref = any($3) and o.observed_at > $8 and ` + permitted("o") + `) nx on true
 order by s.rn = $7, s.dist, s.site_id, p.point_id`
+	radius := "double precision"
 	if byID {
 		q = strings.Replace(q, "st_dwithin(c.location::geography, here.g, $4) and $14::text = ''", "c.site_id = $14::text and $4::int >= 0", 1)
+		radius = "integer"
 	}
-	return q
+	return opaque(q, "double precision", "double precision", "text[]", radius, "text[]", "double precision", "bigint",
+		"timestamp with time zone", "text", "double precision", "text", "boolean", "text[]", "text")
 }
+
+// chargingNear and chargingByID are the two charging reads, built once:
+// the sites in the ring and the one site asked by its id.
+var chargingNear, chargingByID = chargingSites(false), chargingSites(true)

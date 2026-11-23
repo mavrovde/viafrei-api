@@ -53,12 +53,12 @@ limit 1`
 // lat): the nearest BKG municipality point with its eight-digit key within
 // the municipality reach ($3 m), a distance tie broken by key, as the
 // platform names a position's Gemeinde.
-var gemeindeAGS = `select p.official_key from contract.place p
+var gemeindeAGS = opaque(`select p.official_key from contract.place p
 where p.source_ref = 'bkg_gvisys' and p.place_kind = 'municipality' and p.withdrawn_at is null
-  and p.official_key ~ '^[0-9]{8}$' and ` + permitted("p") + `
+  and p.official_key ~ '^[0-9]{8}$' and `+permitted("p")+`
   and st_dwithin(p.location::geography, st_setsrid(st_makepoint($1, $2), 4326)::geography, $3)
 order by p.location::geography <-> st_setsrid(st_makepoint($1, $2), 4326)::geography, p.official_key
-limit 1`
+limit 1`, "double precision", "double precision", "double precision")
 
 // Lookup resolves value by the named lookup (refresh.Lookup); "" when
 // nothing answers.

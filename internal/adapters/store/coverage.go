@@ -10,14 +10,14 @@ import (
 
 // coverageKinds counts the places of the families ($1) per family and kind:
 // rows, when the newest was last loaded, and those with an English name.
-const coverageKinds = `
+var coverageKinds = opaque(`
 select p.source_ref, p.place_kind, count(*)::int, max(p.changed_at),
        count(*) filter (where exists (select 1 from contract.place_alias a
-                                       where a.place_id = p.place_id and a.lang = 'en' and ` + "a.display_class <> 'withhold' and (a.audience = 'public' or " + ownKeyOn + ")" + `))::int
+                                       where a.place_id = p.place_id and a.lang = 'en' and `+"a.display_class <> 'withhold' and (a.audience = 'public' or "+ownKeyOn+")"+`))::int
 from contract.place p
-where p.withdrawn_at is null and p.source_ref = any($1) and ` + "p.display_class <> 'withhold' and (p.audience = 'public' or " + ownKeyOn + ")" + `
+where p.withdrawn_at is null and p.source_ref = any($1) and `+"p.display_class <> 'withhold' and (p.audience = 'public' or "+ownKeyOn+")"+`
 group by 1, 2
-order by 1, 2`
+order by 1, 2`, "text[]")
 
 // coverageLands are the Länder the gazetteer families ($1) hold, by key.
 const coverageLands = `

@@ -9,6 +9,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/energy"
+	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/national"
 )
 
@@ -178,5 +179,42 @@ func TestPlacesCoverageCountsKindsLandsAndAddresses(t *testing.T) {
 	none, err := st.PlacesCoverage(bounded(t), []string{"no-such-family"})
 	if err != nil || len(none.Kinds)+len(none.Lands)+len(none.Addresses) != 0 {
 		t.Errorf("no family: %+v %v", none, err)
+	}
+}
+
+func TestFuelCoverageIsReadByNoFilterButTheGrade(t *testing.T) {
+	st := seeded(t)
+	var (
+		fam      string
+		lat, lon float64
+		newest   time.Time
+	)
+	owner(t, `select s.source_ref, st_y(s.location), st_x(s.location), max(o.observed_at)
+from contract.fuel_station s join contract.fuel_price_observation o using (station_id)
+where s.withdrawn_at is null and o.price is not null and o.product_code = 'e5' and s.display_class <> 'withhold' and o.display_class <> 'withhold'
+group by 1, 2, 3 order by 4 desc limit 1`, &fam, &lat, &lon, &newest)
+	ctx := access.WithAudience(bounded(t), access.AudienceOwn)
+	q := energy.FuelQuery{At: geo.Point{Lat: lat, Lon: lon}, RadiusM: 1000, Fuel: "e5", Fresh: 30 * time.Minute}
+	got, err := st.FuelCoverage(ctx, q, []string{fam}, newest.Add(time.Minute))
+	if err != nil || got.StationsInRadius < 1 || got.NearestPricedM == nil || *got.NearestPricedM > 1 || got.State() != energy.CoverageHeld {
+		t.Fatalf("at a priced station: %+v %v", got, err)
+	}
+	if got.WithoutCurrent >= got.StationsInRadius {
+		t.Errorf("the priced station counted without a current price: %+v", got)
+	}
+	// Long after every report, every station in the radius has no current
+	// price; with no grade asked, none is counted.
+	late, err := st.FuelCoverage(ctx, q, []string{fam}, newest.Add(1000*time.Hour))
+	if err != nil || late.WithoutCurrent != late.StationsInRadius {
+		t.Errorf("long after: %+v %v", late, err)
+	}
+	q.Fuel = ""
+	if anyGrade, err := st.FuelCoverage(ctx, q, []string{fam}, newest.Add(1000*time.Hour)); err != nil || anyGrade.WithoutCurrent != 0 || anyGrade.NearestPricedM == nil {
+		t.Errorf("any grade: %+v %v", anyGrade, err)
+	}
+	// Far from every station, and for no family, nothing is known.
+	q.At = geo.Point{Lat: 0, Lon: 0}
+	if none, err := st.FuelCoverage(ctx, q, []string{fam}, newest); err != nil || none.State() != energy.CoverageUnknown {
+		t.Errorf("nowhere: %+v %v", none, err)
 	}
 }

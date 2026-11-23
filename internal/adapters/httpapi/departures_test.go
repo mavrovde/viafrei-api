@@ -2,6 +2,7 @@ package httpapi_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"slices"
 	"testing"
@@ -32,7 +33,7 @@ func TestDeparturesAnswer(t *testing.T) {
 				Source: sp("src-alpha-transit"), DelayMin: ip(3), ExpectedAt: &exp, Family: "src-alpha-transit"},
 			{JourneyID: "t2@2026-03-29", Mode: "rail", PlannedAt: fixedNow, Family: "src-alpha-transit"},
 		}, HasMore: true, Families: []provenance.Family{transitFamily}, At: fixedNow},
-		Station: transit.Station{ID: "sp-05-0001", Name: "Köln Hbf", Location: geo.Point{Lat: 50.943, Lon: 6.959}},
+		Station: transit.Station{ID: "sp-05-0001", Name: "Köln Hbf", Location: geo.Point{Lat: 50.943, Lon: 6.959}, StopIDs: []string{"sp-05-0001", "sp-05-0001:1"}},
 		Matched: 4, MatchedAll: 9, Dropped: map[int]int{3: 4, 0: 1},
 	}
 	h := featureHandler(t, config.Defaults(), f, nil)
@@ -54,6 +55,9 @@ func TestDeparturesAnswer(t *testing.T) {
 	if len(deps) != 2 || len(drop) != 2 {
 		t.Fatalf("board %v", data)
 	}
+	if s, _ := data["station"].(map[string]any); fmt.Sprint(s["stopIds"]) != "[sp-05-0001 sp-05-0001:1]" {
+		t.Errorf("the family %v", s["stopIds"])
+	}
 	d0, _ := deps[0].(map[string]any)
 	d, _ := drop[0].(map[string]any)
 	if d0["id"] != "t1@2026-03-29/4" || d0["destination"] != "Köln" || d0["delayMin"] != 3.0 || d0["platform"] != "3" ||
@@ -66,12 +70,16 @@ func TestDeparturesAnswer(t *testing.T) {
 		t.Errorf("meta %v", meta)
 	}
 	// Defaults: now, an hour, ten rows, every mode.
-	f.board = features.Board{}
+	f.board = features.Board{Station: transit.Station{ID: "sp-05-0001"}}
 	w = do(t, h, http.MethodGet, "/v1/stations/sp-05-0001/departures", bearer)
 	if g := f.gotBoard; w.Code != http.StatusOK || !g.From.Equal(fixedNow) || g.Window != time.Hour || g.Limit != 10 || g.Modes != nil {
 		t.Errorf("defaults %d %+v", w.Code, g)
 	}
-	meta, _ = decode(t, w)["meta"].(map[string]any)
+	body = decode(t, w)
+	if s, _ := body["data"].(map[string]any)["station"].(map[string]any); fmt.Sprint(s["stopIds"]) != "[sp-05-0001]" {
+		t.Errorf("a family not read is the station alone: %v", s["stopIds"])
+	}
+	meta, _ = body["meta"].(map[string]any)
 	q, _ := meta["query"].(map[string]any)
 	if m, _ := q["modes"].([]any); m == nil || len(m) != 0 {
 		t.Errorf("query %v", q)

@@ -617,6 +617,18 @@ where withdrawn_at is null and source_ref in (`+in+`) and `+where, &out)
 	if got, w := ids(amen), want(`amenities @> '{toilet}'`); len(got) != len(w) {
 		t.Errorf("amenity toilet: %v, want %v", got, w)
 	}
+	// Each site carries what its publisher states, both ways.
+	stated, _, _, err := st.ParkingNear(bounded(t), amen, listed, listed, time.Now())
+	if err != nil || len(stated) == 0 {
+		t.Fatalf("stated %v %v", stated, err)
+	}
+	for _, s := range stated {
+		var has, lacks []string
+		owner(t, `select coalesce(amenities, '{}'), coalesce(amenities_absent, '{}') from contract.parking_facility where facility_id = '`+s.ID+`'`, &has, &lacks)
+		if w := parking.StatedOf(has, lacks); !slices.Contains(s.Amenities.Present, "toilet") || !slices.Equal(s.Amenities.Present, w.Present) || !slices.Equal(s.Amenities.Absent, w.Absent) {
+			t.Errorf("%s states %+v, stored %v / %v", s.ID, s.Amenities, has, lacks)
+		}
+	}
 	var road string
 	owner(t, `select coalesce(min(road_ref), 'A1') from contract.parking_facility where road_ref is not null and facility_id like 'p:%'`, &road)
 	sites, _, _, err := st.ParkingNear(bounded(t), parking.Query{Road: road, Limit: 100}, listed, listed, time.Now())

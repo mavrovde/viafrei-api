@@ -23,6 +23,16 @@ type fuFake struct {
 	stations []energy.FuelStation
 	readErr  error
 	gotFams  []string
+	cover    energy.FuelCoverage
+	coverErr error
+	covered  int
+	coverAt  time.Time
+}
+
+func (f *fuFake) FuelCoverage(_ context.Context, _ energy.FuelQuery, _ []string, at time.Time) (energy.FuelCoverage, error) {
+	f.covered++
+	f.coverAt = at
+	return f.cover, f.coverErr
 }
 
 func (f *fuFake) FuelNear(_ context.Context, _ energy.FuelQuery, fams []string) ([]energy.FuelStation, error) {
@@ -76,5 +86,37 @@ func TestFuelStationsRefusals(t *testing.T) {
 		if _, err := fuService(c.f).FuelStations(context.Background(), c.k, energy.FuelQuery{Limit: 5}); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)
 		}
+	}
+}
+
+// The coverage is read where the platform reads it: on every answer by
+// price, on an empty one else, and only when asked.
+func TestFuelCoverageIsReadWhereThePlatformReadsIt(t *testing.T) {
+	req.Covers(t, "FR-ENERGY-001")
+	k := key("commercial", []access.Scope{"energy"}, "f1")
+	held := []energy.FuelStation{{ID: "a", Family: "f1", Prices: []energy.FuelPrice{{Product: "e5", Price: 1.8, ObservedAt: now}}}}
+	for _, c := range []struct {
+		name     string
+		stations []energy.FuelStation
+		q        energy.FuelQuery
+		read     bool
+	}{
+		{"by price", held, energy.FuelQuery{Coverage: true, Sort: "price", Fuel: "e5", Limit: 5}, true},
+		{"empty", nil, energy.FuelQuery{Coverage: true, Sort: "distance", Limit: 5}, true},
+		{"listed", held, energy.FuelQuery{Coverage: true, Sort: "distance", Limit: 5}, false},
+		{"not asked", nil, energy.FuelQuery{Sort: "price", Limit: 5}, false},
+	} {
+		f := &fuFake{stations: c.stations, cover: energy.FuelCoverage{StationsInRadius: 4}}
+		a, err := fuService(f).FuelStations(context.Background(), k, c.q)
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if got := a.Coverage != nil; got != c.read || (c.read && (f.covered != 1 || a.Coverage.StationsInRadius != 4 || !f.coverAt.Equal(now))) {
+			t.Errorf("%s: read %v (%d), want %v: %+v", c.name, got, f.covered, c.read, a.Coverage)
+		}
+	}
+	f := &fuFake{coverErr: errors.New("boom")}
+	if _, err := fuService(f).FuelStations(context.Background(), k, energy.FuelQuery{Coverage: true, Limit: 5}); err == nil {
+		t.Error("a failed coverage read answered")
 	}
 }

@@ -75,12 +75,12 @@ from o where $5::int >= 0 -- $5, the limit, is the list's alone`
 var alertsCTE = strings.NewReplacer("{live}", alertLive("a", "$1"), "{inforce}", alertInForce("a", "$1")).Replace(regionAlerts)
 
 // areaPunctuality reads the punctuality of the area $1, of the families $2.
-var areaPunctuality = `select p.area_level, p.area_code, p.area_name, p.trips_observed, p.trips_late, p.trips_skipped_stop, p.trips_untimed,
+var areaPunctuality = opaque(`select p.area_level, p.area_code, p.area_name, p.trips_observed, p.trips_late, p.trips_skipped_stop, p.trips_untimed,
        p.median_worst_delay_s, p.stops_seen, p.observed_at, p.source_ref
 from contract.transit_punctuality p
-where p.area_code = $1 and p.source_ref = any($2) and ` + permitted("p") + `
+where p.area_code = $1 and p.source_ref = any($2) and `+permitted("p")+`
 order by p.area_level
-limit 1`
+limit 1`, "text", "text[]")
 
 // areaTrips counts the trips observed at the stops whose official key starts
 // with $1, and those more than $2 minutes late at one of them, of the

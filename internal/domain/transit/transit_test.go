@@ -45,3 +45,13 @@ func TestMapModes(t *testing.T) {
 		t.Errorf("no modes: %#v", got)
 	}
 }
+
+// A station's family is the station, then each stop point once, in order.
+func TestFamilyOfListsTheStationFirst(t *testing.T) {
+	if got := transit.FamilyOf("f:S", []string{"f:A", "f:S", "f:B", "f:A"}); !slices.Equal(got, []string{"f:S", "f:A", "f:B"}) {
+		t.Errorf("%v", got)
+	}
+	if got := transit.FamilyOf("f:S", nil); !slices.Equal(got, []string{"f:S"}) {
+		t.Errorf("no stop points %v", got)
+	}
+}

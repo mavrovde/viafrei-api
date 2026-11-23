@@ -28,6 +28,9 @@ type settles struct {
 	run    context.Context
 	cancel context.CancelFunc
 	done   chan struct{}
+	// start runs the listener's loop: a goroutine; a test may hold the
+	// starting ask until the loop has run.
+	start func(loop func())
 
 	mu      sync.Mutex
 	waiters map[string]map[chan struct{}]bool // request id → its asks
@@ -42,14 +45,17 @@ type listenConn interface {
 
 func newSettles(connect func(context.Context) (listenConn, error), pause time.Duration) *settles {
 	run, cancel := context.WithCancel(context.Background())
-	return &settles{connect: connect, pause: pause, run: run, cancel: cancel, done: make(chan struct{}),
+	return &settles{connect: connect, pause: pause, run: run, cancel: cancel, done: make(chan struct{}), start: func(loop func()) { go loop() },
 		waiters: map[string]map[chan struct{}]bool{}}
 }
 
 // add registers an ask for the request id; the returned poke is signalled
 // when the ask should read its request again.
+//
+// The ask is registered before the listener starts, so the poke every ask
+// gets once the connection listens never runs ahead of the ask that started
+// it.
 func (h *settles) add(id string) chan struct{} {
-	h.once.Do(func() { go h.loop() })
 	poke := make(chan struct{}, 1)
 	h.mu.Lock()
 	if h.waiters[id] == nil {
@@ -57,6 +63,7 @@ func (h *settles) add(id string) chan struct{} {
 	}
 	h.waiters[id][poke] = true
 	h.mu.Unlock()
+	h.once.Do(func() { h.start(h.loop) })
 	return poke
 }
 

@@ -105,10 +105,16 @@ func TestSettlesListensPokesAndForgets(t *testing.T) {
 	c := newFakeConn()
 	k := &connector{conns: []*fakeConn{c}, failFirst: true}
 	h := newSettles(k.connect, time.Millisecond)
+	// Both asks are registered before the listener runs: the listen pokes
+	// the asks it finds, and an ask that comes later reads after it is
+	// registered, so it needs no such poke.
+	var loop func()
+	h.start = func(l func()) { loop = l }
 	defer h.close()
 
 	p := h.add("7")
 	q := h.add("8")
+	go loop()
 	execd(t, c, listenSQL)
 	poked(t, p, "listening")
 	poked(t, q, "listening")
@@ -151,6 +157,41 @@ func TestSettlesOpensALostConnectionAgain(t *testing.T) {
 				t.Fatal("the lost connection was not closed")
 			}
 		})
+	}
+}
+
+// The ask that starts the listener is registered before the listener runs:
+// its first connection already finds the ask, so the poke the listen sends
+// every ask reaches it however the goroutines are scheduled. The start is
+// held until the loop has connected, the order a loaded host can give.
+func TestTheFirstAskIsRegisteredBeforeTheListenerStarts(t *testing.T) {
+	var h *settles
+	seen := make(chan int, 1)
+	h = newSettles(func(context.Context) (listenConn, error) {
+		h.mu.Lock()
+		n := len(h.waiters)
+		h.mu.Unlock()
+		select {
+		case seen <- n:
+		default:
+		}
+		return nil, errors.New("no connection")
+	}, time.Hour)
+	connected := make(chan int, 1)
+	h.start = func(loop func()) {
+		go loop()
+		n := <-seen
+		connected <- n
+	}
+	defer h.close()
+	h.add("7")
+	select {
+	case n := <-connected:
+		if n != 1 {
+			t.Fatalf("the listener's first connection found %d asks, want the one that started it", n)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the listener never connected")
 	}
 }
 

@@ -73,11 +73,12 @@ found as (
   cross join lateral (
     select coalesce((select t.geom::geometry(Point,4326) from tmc_locations t
                       where t.road_number = r.road and t.cid = 58 and t.tabcd = 1 and t.tcd = 1
-                        and t.road_number ~ '^A[1-9][0-9]{0,2}$' and t.name is not null
-                        and 'bast_lcl' = any((select $9::text[])::text[])
+                        and t.road_number ~ '^A[1-9][0-9]{0,2}$' and t.name is not null and t.geom is not null
+                        and 'bast_lcl' = any((select $9::text[])::text[]) and `+sourceRuled("'bast_lcl'")+`
                       order by (((t.cid || ':') || t.tabcd) || ':') || t.lcd limit 1),
                     (select st_pointonsurface(c.line) from contract_road_shape(r.road) c(line, length_km, states))) location) pt
-  where (select $10::text) <> '' and r.road = (select $10::text) and pt.location is not null and 'autobahn' = any((select $9::text[])::text[]))
+  where (select $10::text) <> '' and r.road = (select $10::text) and pt.location is not null and 'autobahn' = any((select $9::text[])::text[])
+    and `+sourceRuled("'autobahn'")+`)
 select f.id, f.name, f.kind, st_y(f.location), st_x(f.location),
        case when f.stop then (select a.ags from ags_regions a where a.ags = f.region_key)
             when f.region_key is not null then (select a.ags from ags_regions a

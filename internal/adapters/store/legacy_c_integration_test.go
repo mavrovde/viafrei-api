@@ -270,3 +270,26 @@ limit $4`
 	legacyReads["api_motorways_live_land"] = motorways(`
        or exists (select 1 from contract.junction j where j.road_ref = r.road_ref and j.state_code = $2::text)`)
 }
+
+// The families of each dataset as the read contract's views held them,
+// verbatim from before the views were replaced.
+func init() {
+	legacyReads["api_feeding"] = `select distinct 'alerts'::text, source_ref from contract.service_alert
+union
+select distinct 'events'::text, source_ref from contract.traffic_event
+union
+select distinct 'fuel'::text, source_ref from contract.fuel_station
+union
+select distinct 'lorry'::text, source_ref from contract.lorry_rule
+union
+select distinct 'sharing'::text, source_ref from contract.sharing_station
+union
+select distinct 'sharing'::text, source_ref from contract.sharing_vehicle
+union
+select distinct 'speed_cameras'::text, source_ref from contract.speed_camera
+union
+select distinct 'warnings'::text, source_ref from contract.weather_warning
+union
+select distinct 'zones'::text, source_ref from contract.low_emission_zone
+order by 1, 2`
+}

@@ -32,6 +32,7 @@ func init() {
 		"api_motorway_families":   motorwayFamilyCases,
 		"api_motorways":           motorwaysCases,
 		"api_motorways_live_land": motorwaysCases,
+		"api_feeding":             feedingCases,
 	} {
 		namedCases[name] = cases
 	}
@@ -231,4 +232,19 @@ func motorwaysCases(t *testing.T, ctx context.Context, c *pgx.Conn) [][]any {
 		}
 	}
 	return out
+}
+
+// feedingCases is the one read of the families of every dataset, which takes
+// no parameter; the fixture must hold rows of most datasets, or the case
+// compares nearly nothing.
+func feedingCases(t *testing.T, ctx context.Context, c *pgx.Conn) [][]any {
+	if sets := column(t, ctx, c, `select distinct d from (
+		select 'alerts' d from contract.service_alert union all select 'events' from contract.traffic_event
+		union all select 'fuel' from contract.fuel_station union all select 'lorry' from contract.lorry_rule
+		union all select 'sharing' from contract.sharing_station union all select 'sharing' from contract.sharing_vehicle
+		union all select 'speed_cameras' from contract.speed_camera union all select 'warnings' from contract.weather_warning
+		union all select 'zones' from contract.low_emission_zone) x order by 1`); len(sets) < 9-1 {
+		t.Fatalf("the fixture holds rows of only %v", sets)
+	}
+	return [][]any{{}}
 }

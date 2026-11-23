@@ -10,7 +10,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/national"
 )
 
-// sourceRules are the sources whose rows a reader may see, by the
+// sourceRules are the families whose rows a reader may see, by the
 // platform's source rules (the first pattern a source matches, by priority;
 // no pattern = open and public): not excluded, not withheld, public or an
 // own key. A charging site or point carries its source's rule, so the rule
@@ -18,11 +18,12 @@ import (
 // of the charging summary's seconds on prod). A site is one row of its
 // source and id, and a point's site is its source and site id: the ids the
 // relations join, source || ':' || id, are the same pairs, a source name
-// holding no colon.
+// holding no colon. The sources are the families ($1): the summary reads
+// only their sites, and a point only with its site (listing the sources of
+// every site and point took most of a second on prod).
 const sourceRules = `
 select src.feed
-from (select distinct x.source_feed as feed from charging_sites x where x.deleted_at is null
-      union select distinct y.source_feed from charging_points y where y.deleted_at is null) src
+from (select distinct f as feed from unnest($1::text[]) f) src
 left join lateral (
   select k.excluded, k.display_class, k.audience from contract_source_rules k
   where src.feed ~ k.pattern order by k.priority limit 1) k on true

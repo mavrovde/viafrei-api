@@ -68,7 +68,8 @@ rd as (select distinct upper(replace(road, ' ', '')) r from public.lorry_long_ne
 select v.fs, rd.r, l.l, pt.lon, pt.lat, 5000::float8, 50 from fam, pt, rd,
   (values ('long_lorry'), ('other')) l(l), lateral (values (fam.f), ('{}'::text[])) v(fs)`,
 		"api_poi_match": `with fam as (select array_agg(distinct source_id) f from public.osm_pois),
-q as (select distinct left(name_norm, 4) q, place_norm t, st_x(geom::geometry) lon, st_y(geom::geometry) lat, category c from public.osm_pois where name_norm is not null)
+q as (select distinct x.q, place_norm t, st_x(geom::geometry) lon, st_y(geom::geometry) lat, category c from public.osm_pois,
+  lateral (values (left(name_norm, 4)), (left(name_norm, 2)), (left(lower(brand), 3))) x(q) where name_norm is not null and x.q is not null)
 select q.q, v.t, v.lon, v.lat, v.r, v.c, v.fs, 51 from q, fam,
   lateral (values (null::text, null::float8, null::float8, 0::float8, null::text, fam.f), (q.t, null, null, 0, null, fam.f),
                   (null, q.lon, q.lat, 2000, null, fam.f), (null, q.lon, q.lat, 2000, q.c, fam.f), (null, null, null, 0, null, '{}'::text[])) v(t, lon, lat, r, c, fs)`,

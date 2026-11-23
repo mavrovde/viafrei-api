@@ -95,8 +95,8 @@ call). Times are per execution, after the first.
 | api_hydrogen_near | under 1 ms | 0.3-0.8 ms | 5 / 5 | index scan of `hydrogen_stations_geom_gist` (the view's geometry cast read every station) |
 | api_hydrogen_nearest | under 1 ms | 0.5-1 ms | 5 / 5 | nearest-neighbour scan of the same index |
 | api_bays_near | 6 ms mean | 0.2-16 ms | 5 / 5 | index scan of `street_bays_geom_gist` |
-| api_lorry_rules | 13 ms mean | 6-127 ms | 0 / 10 (custom by design: the road, the point and the layer decide the plan) | each lorry table's `*_geom_open` area index on its own geography |
-| api_poi_match | 608 ms mean, up to 2.1 s | 150-970 ms | 0 / 10 (custom by design) | bitmap AND of `osm_pois_geom` and the name and brand trigram indexes; the brand match is `lower(brand)`, which no index holds (db item: a trigram index on `lower(brand)`) |
+| api_lorry_rules | 13 ms mean | 0.4-12 ms (the view statement 0.6-13 ms in the same session) | 10 / 5 | opaque, one generic plan with a branch for a point (each lorry table's `*_geom_open` area index on its own geography) and one for a road (below) |
+| api_poi_match | 608 ms mean, up to 2.1 s | 6-1 300 ms by branch (below) | 8 / 5 | opaque, one generic plan with a branch for each way the match is asked, only the asked one runs (below) |
 | api_train_board | under 1 ms | not measured: the board table is empty on prod | - | - |
 | api_sharing_stations_near | 50 ms mean | 0.7-7 ms | 5 / 5 | index scan of `gbfs_stations_geom_open`, each count by the status key |
 | api_sharing_vehicles_near | 58 ms mean | 0.3-4 ms | 5 / 5 | index scan of `gbfs_vehicles_geom` |
@@ -114,6 +114,63 @@ call). Times are per execution, after the first.
 | api_parking_next_near | | 4-52 ms | 5 / 5 | |
 | api_freshness_versions | 612 ms mean, up to 1.6 s | 386 ms-1.3 s | no parameters | the same fingerprint, byte for byte; most of it is the motorway junctions' Land, as before |
 | api_provenance | 84 ms mean | 73-127 ms | 5 / 5 | about as before: the published register is read whole for the licence's shared terms link |
+
+`api_poi_match` is opaque like every other read: it was planned per call
+(0 generic plans of 10), as a generic plan could not tell which of the
+text, the town and the point was set. The one generic plan now holds a
+branch for each (a one-time filter on the parameters runs only the one
+asked): the town's places through `osm_pois_place_kind`; else the places
+within the radius through `osm_pois_geom`; else, for a text of three
+characters or more, a BitmapOr of the name and the brand trigram indexes;
+else (a text of one or two characters, of no trigram) a read of the
+table, as no trigram index can narrow it: the text is found there by
+`strpos`, which no trigram index serves and which keeps the like test's
+rows, as the search form holds no wildcard (`places.NameFold` keeps
+letters, digits and spaces). The rows are the match's own
+(parity cases for every branch, two-character and brand texts among them).
+
+Production, read only, 2026-11-23, 13 runs of one prepared statement
+(varied texts, towns, points, a category), then 8 generic and 5 custom
+plans:
+
+| Asked | Runs (generic plan) |
+|-|-|
+| a town (berlin, hamburg, muenchen) | 4-63 ms |
+| a point and a radius | 19-108 ms |
+| a text of 3 or more characters, anywhere | 640 ms-1.3 s: production has no trigram index on `lower(brand)` yet, so the brand side reads every brand (175 000) and rechecks them |
+| a text of 2 characters, anywhere | 0.9-2.1 s, a read of the table (2 M rows); the view statement under its per-call plan, the same texts in the same session: 0.86-2.9 s, the same read (below) |
+
+On a test database built to viafrei-database 0.5.0's indexes (0337 adds
+`osm_pois_brand_lower_trgm`), 500 000 places: the text branch is a BitmapOr
+of `osm_pois_name_trgm` and `osm_pois_brand_lower_trgm` in the generic
+plan, 69 ms for a text anywhere; a town 0.1-0.2 ms, a point 0.2 ms; the
+two-character text reads the table, 290 ms; 8 generic plans of 13 runs.
+
+The two-character text, old against new: on production, read only,
+2026-11-23, `dm` and `ok` anywhere, three times each, the view statement
+(custom plans, 0 generic of 6) and `api_poi_match` (its generic plan)
+alternating in one session. Both read the whole table (a seq scan of the
+places table, about 2 M rows removed by the filter, 7 000-10 000 kept):
+the view statement 859 ms-2.9 s, `api_poi_match` 906 ms-2.1 s. The generic
+plan is no slower than the per-call plan it replaces; both cross the 2 s
+deadline on a cold read. No order lets the limit stop the read early with
+the same rows (the order is exact, prefix, distance, then similarity over
+every match), so the fix is in the schema: a short-text table or index
+for one- and two-character texts, followed up in #196.
+
+`api_lorry_rules` is opaque: it was planned per call (0 generic plans of
+10), as a generic plan of the one test "no point, or within the radius"
+can use no area index. It now holds two branches gated by whether a point
+is given (a one-time filter): around a point, the distance test alone,
+which each lorry table's `*_geom_open` index serves; without one, the road
+test on the five tables. Production, read only, 2026-11-23, 15 runs of
+five calls (a point at 2, 5 and 25 km for the other layers and the long
+lorry, the road A1 for the long lorry, A7 for the others): 10 generic and
+5 custom plans; the generic plan's point calls are index scans of the
+five area indexes (0.4-6 ms), the road calls 9-12 ms; the view statement
+in the same session 0.6-13 ms. The rows are the view's (parity cases for
+every layer, road and point, and a mutant without the point branch's road
+test turns them red).
 
 `api_coverage_addresses`, root cause: no index holds the open addresses by
 Land and extract date, so the newest extract of a Land reads every address

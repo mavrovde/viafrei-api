@@ -38,18 +38,37 @@ const lorryRows = `(
 // around ($4, $5) the network rows ($3 long_lorry) or every other layer
 // within $6 metres, by distance; at most $7. The distance is on the rows'
 // own geography, the area index of each lorry table.
-var lorryRules = named("api_lorry_rules", `select r.rule_id, r.layer, r.kind, r.sign, r.unit, r.published_text, r.road, r.street,
+//
+// It is opaque (each parameter read once, as an initplan), so the plan cache
+// settles on one generic plan, and the two calls are two branches gated by
+// whether a point is given: around a point, a distance test without an "or"
+// that each table's area index serves; without one, the road test. A
+// generic plan of the one "point is null or within" test could use no index.
+var lorryRules = namedOpaque("api_lorry_rules", `select r.rule_id, r.layer, r.kind, r.sign, r.unit, r.published_text, r.road, r.street,
        r.municipality, r.direction, r.times, r.days, r.category, r.network_state, r.value::float8, r.exceptions, r.version_date,
        case when $4::float8 is null then null
             else round(st_distance(r.geom, st_setsrid(st_makepoint($4::float8, $5::float8), 4326)::geography))::int end,
        r.source_feed
-from `+lorryRows+`
+from (
+  select r.rule_id, r.layer, r.kind, r.sign, r.value, r.unit, r.published_text, r.road, r.street, r.municipality, r.direction,
+         r.exceptions, r.times, r.days, r.category, r.network_state, r.version_date, r.geom, r.source_feed
+  from `+lorryRows+`
+  where $4::float8 is not null
+    and st_dwithin(r.geom, st_setsrid(st_makepoint($4::float8, $5::float8), 4326)::geography, $6::float8)
+    and ($2::text = '' or upper(replace(r.road, ' ', '')) = $2::text)
+  union all
+  select r.rule_id, r.layer, r.kind, r.sign, r.value, r.unit, r.published_text, r.road, r.street, r.municipality, r.direction,
+         r.exceptions, r.times, r.days, r.category, r.network_state, r.version_date, r.geom, r.source_feed
+  from `+lorryRows+`
+  where $4::float8 is null
+    and ($2::text = '' or upper(replace(r.road, ' ', '')) = $2::text)) r
 where r.source_feed = any((`+ruledFamilies("$1::text[]")+`)::text[])
   and (case when $3::text = 'long_lorry' then r.layer = 'long_lorry' else r.layer <> 'long_lorry' end)
-  and ($2::text = '' or upper(replace(r.road, ' ', '')) = $2::text)
-  and ($4::float8 is null or st_dwithin(r.geom, st_setsrid(st_makepoint($4::float8, $5::float8), 4326)::geography, $6::float8))
 order by 18 nulls last, r.rule_id
-limit $7::int`, "text[]", "text", "text", "float8", "float8", "float8", "int")
+limit $7::int`, lorryTypes...)
+
+// lorryTypes are the parameter types of lorryRules.
+var lorryTypes = []string{"text[]", "text", "text", "double precision", "double precision", "double precision", "integer"}
 
 // LorryRules reads the lorry rows of the given families: a long lorry's
 // network rows on a road (by id), or around a position the network rows

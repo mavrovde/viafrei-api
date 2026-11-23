@@ -121,6 +121,7 @@ where w.source_ref = any($1) and ` + permitted("w") + `
   and w.warning_level >= 1
 group by w.event
 order by 2 desc, 1`,
+		//nolint:misspell // materialized is the SQL keyword
 		"api_state_alerts": `
 with f as materialized (
   select a.alert_id, a.header, a.active_to, coalesce(a.line_names, '{}') as line_names, a.dedupe_key, a.source_ref,
@@ -211,8 +212,10 @@ var legacyOpaque = regexp.MustCompile(`\(\(select (\$[0-9]+)::[a-z0-9_ \[\]]+\):
 // its parameters plain, its situations the read contract's.
 func legacyEvents(name string) string {
 	sql := legacyOpaque.ReplaceAllString(namedStmts[name].SQL, "$1")
-	sql = strings.ReplaceAll(sql, trafficEvents(true), "contract.traffic_event")
-	return strings.ReplaceAll(sql, trafficEvents(false), "contract.traffic_event")
+	for _, in := range []string{"$3", "$8", ""} {
+		sql = strings.ReplaceAll(sql, trafficEvents(in), "contract.traffic_event")
+	}
+	return sql
 }
 
 func init() {

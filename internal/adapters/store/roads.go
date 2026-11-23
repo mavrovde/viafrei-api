@@ -113,6 +113,10 @@ func opaqueNamed(name, sql string, types ...string) stmt {
 	}), types...)
 }
 
+// autobahnLand is the Land of an Autobahn row: the one stored, or for a row
+// written before it was stored, the platform's rule on the row's point.
+const autobahnLand = `coalesce(e.land_code, contract_junction_land(st_pointonsurface(e.geom::geometry)::geography))`
+
 // autobahnStarted is the start an Autobahn message states, when it states
 // one as a time, else when it was seen.
 const autobahnStarted = `coalesce(case when a.starts ~ '^\d{4}-\d\d-\d\dT\d\d:\d\d' then a.starts::timestamptz end, a.observed_at)`
@@ -126,21 +130,29 @@ const autobahnStarted = `coalesce(case when a.starts ~ '^\d{4}-\d\d-\d\dT\d\d:\d
 // description are fields of its provider message, which a sweep stores only
 // when it changed: a row without it takes those of the newest row of the
 // same message and the same message hash since the start of its UTC day.
-// With land, each also carries the Land of its point (state_code, the
-// nearest municipality's) and the family that placed it there; without, the
-// Land is not looked up.
-func trafficEvents(land bool) string {
-	state, placing := `null::text state_code, null::text placement_source_ref`, ``
-	if land {
-		state = `p.code state_code, case when p.code is not null then 'bkg_gvisys' end placement_source_ref`
-		placing = `
-left join lateral (select contract_junction_land(b.location::geography) code) p on true`
+// With in (a Land code, a parameter), only the situations placed in that
+// Land are read (with de, all), each with its Land (state_code, the
+// platform's rule: the Land of the nearest municipality within 20 km) and
+// the family that placed it there. The Land is the one stored when the
+// situation was written (land_code); an Autobahn row written before the
+// column was stored has none, and its Land is looked up by the same rule.
+// Without in, the Land is not read.
+func trafficEvents(in string) string {
+	state, landA, landR := `null::text state_code, null::text placement_source_ref`, `null::text`, `null::text`
+	inLand, inLandRE := ``, ``
+	if in != "" {
+		state = `b.land_code state_code, case when b.land_code is not null then 'bkg_gvisys' end placement_source_ref`
+		landA, landR = autobahnLand, `e.land_code`
+		inLand = `
+  where ` + in + ` = 'de' or ` + autobahnLand + ` = ` + in
+		inLandRE = `
+    and (` + in + ` = 'de' or e.land_code = ` + in + `)`
 	}
 	return `(with newest as (
   select s.road, s.kind, s.observed_at as at from autobahn_sweeps s
   where s.observed_at > now() - interval '1 day' and s.kind = any(array['warning', 'roadworks', 'closure', 'closure_entry_exit'])),
 autobahn as (
-  select e.observed_at, e.road, e.kind, e.ext_id, e.title, e.subtitle, e.abnormal_traffic_type, e.delay_s, e.geom, e.source,
+  select e.observed_at, e.road, e.kind, e.ext_id, e.title, e.subtitle, e.abnormal_traffic_type, e.delay_s, e.geom, e.source, ` + landA + ` land_code,
          coalesce(e.raw->>'isBlocked', c.blocked) blocked, coalesce(e.raw->>'startTimestamp', c.starts) starts,
          coalesce(e.raw->'description', c.lines) lines
   from autobahn_events e
@@ -151,7 +163,7 @@ autobahn as (
     where e.raw is null and r.ext_id = e.ext_id and r.raw is not null and r.raw_hash = e.raw_hash
       and r.observed_at <= e.observed_at and r.observed_at >= date_trunc('day', e.observed_at, 'UTC')
     order by r.observed_at desc
-    limit 1) c on true),
+    limit 1) c on true` + inLand + `),
 b as (
   select 'autobahn:' || a.ext_id event_id,
          case when a.kind like 'closure%' then 'closure' when a.kind = 'roadworks' then 'roadworks'
@@ -173,7 +185,8 @@ b as (
          a.observed_at recorded_at, a.observed_at changed_at, null::timestamptz withdrawn_at, 'operator_event' record_class,
          a.subtitle, null::text place_text,
          case a.blocked when 'true' then true when 'false' then false end is_blocked,
-         a.abnormal_traffic_type traffic_type, case when a.delay_s >= 0 then a.delay_s end delay_s, null::text confidentiality
+         a.abnormal_traffic_type traffic_type, case when a.delay_s >= 0 then a.delay_s end delay_s, null::text confidentiality,
+         a.land_code
   from autobahn a
   union all
   select 'datex:' || e.source_id || ':' || e.publication_id,
@@ -198,9 +211,9 @@ b as (
          coalesce(e.overall_start, e.first_seen_at), e.overall_end,
          null::int, null::int, null::int, null::int, coalesce(e.event_type, 'situation'), null::text, 'de',
          e.source_feed, e.publication_id, e.feed_ts, e.first_seen_at, e.updated_at, e.closed_at, 'traffic_message',
-         null::text, null::text, null::boolean, null::text, null::int, e.confidentiality
+         null::text, null::text, null::boolean, null::text, null::int, e.confidentiality, ` + landR + `
   from road_events e
-  where e.deleted_at is null)
+  where e.deleted_at is null` + inLandRE + `)
 select b.event_id, b.event_kind, b.severity, b.road_ref, b.road_class, b.direction, b.direction_label, b.location,
        b.valid_from, b.valid_to, b.lanes_closed, b.lanes_total, b.delay_min, b.affected_length_m, b.headline,
        b.description, b.text_lang, b.source_ref, b.origin_key, b.published_at, b.recorded_at, b.changed_at,
@@ -209,7 +222,7 @@ select b.event_id, b.event_kind, b.severity, b.road_ref, b.road_class, b.directi
        case when coalesce(b.confidentiality, 'noRestriction') <> 'noRestriction' then 'withhold'
             else coalesce(k.display_class, 'open') end display_class,
        coalesce(k.audience, 'public') audience, b.confidentiality, k.origin_restriction, ` + state + `
-from b` + placing + `
+from b
 left join lateral (select k.excluded, k.audience, k.display_class, k.origin_restriction from contract_source_rules k
                    where b.source_ref ~ k.pattern order by k.priority limit 1) k on true
 where not coalesce(k.excluded, false))`
@@ -234,10 +247,10 @@ const nextChange = `min(case when x.valid_from > $2 then x.valid_from else x.val
 // none; and the scope's next change (nextChange). It reads the scope's
 // situations that have not ended, so one that starts later is seen too; only
 // those active at now are aggregated.
-func messagesSelect(land bool) string {
+func messagesSelect(in string) string {
 	return `select ` + messagesAgg + `,
        ` + nextChange + `
-` + messagesFrom(land)
+` + messagesFrom(in)
 }
 
 // messagesAgg is the lamp's view of the situations of messagesFrom active
@@ -248,9 +261,9 @@ const messagesAgg = `jsonb_agg(distinct jsonb_build_object('r', e.record_class, 
                                          'ds', e.delay_s, 'd', ` + roadDelayMin + `)) filter (where e.valid_from <= $2)`
 
 // messagesFrom reads the situations of the families $1 that have not ended
-// at $2, with their Land (trafficEvents).
-func messagesFrom(land bool) string {
-	return `from ` + trafficEvents(land) + ` e
+// at $2, with their Land when they may lie in the Land in (trafficEvents).
+func messagesFrom(in string) string {
+	return `from ` + trafficEvents(in) + ` e
 cross join lateral (select e.valid_from, e.valid_to) x
 where e.withdrawn_at is null
   and e.source_ref = any($1::text[])
@@ -436,7 +449,7 @@ type scope struct {
 // stored class, $3 now.
 var coveringSelect = opaqueNamed("api_road_covering", `select coalesce(array_agg(f order by f), '{}')
 from unnest($1::text[]) f
-where exists (select 1 from `+trafficEvents(false)+` e
+where exists (select 1 from `+trafficEvents("")+` e
               where e.source_ref = f and e.withdrawn_at is null and e.road_class = $2
                 and (e.valid_to is null or e.valid_to > $3)
                 and `+eventPermitted+`)`, "text[]", "text", "timestamptz")
@@ -642,7 +655,7 @@ line as (
   from parts group by road_ref),
 answering as (
   select `+eventRow+`, line.km road_km, line.total road_total
-  from `+trafficEvents(false)+` e left join line on true
+  from `+trafficEvents("")+` e left join line on true
   where `+situationFilter(12)+`
     and ($15 or exists (select 1 from road))
     and `+fmt.Sprintf(canonicalRef, "e.road_ref")+` = $8
@@ -674,7 +687,7 @@ limit $11 offset $14`,
 with here as (select st_setsrid(st_makepoint($9, $8), 4326)::geography g),
 answering as (
   select `+eventRow+`, round(st_distance(e.location::geography, here.g))::int dist
-  from `+trafficEvents(false)+` e, here
+  from `+trafficEvents("")+` e, here
   where `+situationFilter(15)+`
     and e.location is not null
     and st_dwithin(e.location::geography, here.g, $10)
@@ -688,7 +701,7 @@ limit $14 offset $17`,
 	situationsInStateList = opaqueNamed("api_state_situations", `
 with answering as (
   select `+eventRow+`
-  from `+trafficEvents(true)+` e
+  from `+trafficEvents("$8")+` e
   where `+situationFilter(13)+`
     and ($8 = 'de' or e.state_code = $8)
     and (e.road_class = any($9) or ($10 and not e.road_class = any($11))))
@@ -705,18 +718,18 @@ limit $12 offset $15`,
 // directions; near a point $3 and $4 the position, $5 the radius; in a Land
 // $3 the Land (de: every situation).
 var (
-	messagesOnRoad = opaqueNamed("api_road_messages", messagesSelect(false)+`
+	messagesOnRoad = opaqueNamed("api_road_messages", messagesSelect("")+`
   and `+fmt.Sprintf(canonicalRef, "e.road_ref")+` = $3
   and ($4::text = 'both' or e.direction = $4::text or not e.direction = any($5))`, "text[]", "timestamptz", "text", "text", "text[]")
-	messagesNear = opaqueNamed("api_area_messages", messagesSelect(false)+`
+	messagesNear = opaqueNamed("api_area_messages", messagesSelect("")+`
   and e.location is not null
   and st_dwithin(e.location::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`, "text[]", "timestamptz", "float8", "float8", "float8")
-	messagesInState = opaqueNamed("api_state_messages", messagesSelect(true)+`
+	messagesInState = opaqueNamed("api_state_messages", messagesSelect("$3")+`
   and ($3 = 'de' or e.state_code = $3)`, "text[]", "timestamptz", "text")
 	// placedInState are the families that placed the Land's situations in
 	// it (over the messages' arguments), none for de.
 	placedInState = opaqueNamed("api_state_placed", `select coalesce(array_agg(distinct e.placement_source_ref order by e.placement_source_ref) filter (where e.placement_source_ref is not null), '{}')
-from `+trafficEvents(true)+` e
+from `+trafficEvents("$3")+` e
 where $3 <> 'de' and e.state_code = $3 and e.withdrawn_at is null and e.source_ref = any($1)
   and `+eventPermitted+` and (e.valid_to is null or e.valid_to > $2)`, "text[]", "timestamptz", "text")
 )
@@ -725,7 +738,7 @@ where $3 <> 'de' and e.state_code = $3 and e.withdrawn_at is null and e.source_r
 // active or ended after $3.
 var situationByID = opaqueNamed("api_situation", `
 select `+situationColumns+`, null::float8, null::int
-from `+trafficEvents(false)+` e
+from `+trafficEvents("")+` e
 where e.event_id = $1 and e.withdrawn_at is null and e.source_ref = any($2)
   and `+eventPermitted+`
   and (e.valid_to is null or e.valid_to > $3)`, "text", "text[]", "timestamptz")

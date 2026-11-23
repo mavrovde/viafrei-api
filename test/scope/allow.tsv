@@ -59,11 +59,13 @@ denylist	internal/adapters/store/bays.go	-	owner decision 2026-11-23: the store'
 denylist	internal/adapters/store/catalogue.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 denylist	internal/adapters/store/coverage.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 denylist	internal/adapters/store/features.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/feeding.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 denylist	internal/adapters/store/freshness.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 denylist	internal/adapters/store/fuel.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 denylist	internal/adapters/store/hydrogen.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 denylist	internal/adapters/store/location.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 denylist	internal/adapters/store/location_c_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/locked.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 denylist	internal/adapters/store/lookup.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 denylist	internal/adapters/store/lorry.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 denylist	internal/adapters/store/named_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
@@ -84,6 +86,7 @@ denylist	internal/adapters/store/speed.go	-	owner decision 2026-11-23: the store
 denylist	internal/adapters/store/state.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 denylist	internal/adapters/store/store_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
 denylist	internal/adapters/store/transit.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/transit_bound_c_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
 denylist	internal/adapters/store/weather.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 denylist	internal/adapters/store/weather_cell.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 denylist	internal/testkit/baseseed/base_seed.sql	-	the test seed writes the platform's tables the store reads

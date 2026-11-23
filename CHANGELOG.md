@@ -9,6 +9,13 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [1.0.1](https://github.com/mavrovde/viafrei-api/compare/v1.0.0...v1.0.1) (2026-11-23)
+
+
+### Fixed
+
+* **release:** the inventory follows the MCP server's release, and routes.tsv is frozen ([#186](https://github.com/mavrovde/viafrei-api/issues/186)) ([13354a4](https://github.com/mavrovde/viafrei-api/commit/13354a409b6b56e99588e27cfdb249096db78e16))
+
 ## [1.0.0](https://github.com/mavrovde/viafrei-api/compare/v0.4.0...v1.0.0) (2026-11-23)
 
 

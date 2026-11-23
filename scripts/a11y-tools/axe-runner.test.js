@@ -496,3 +496,37 @@ test('a filter, a backdrop filter or a blend mode, on a layer or an ancestor, ma
     assert.equal(onAncestor.runnerExtras.undeterminedBy, by, `ancestor ${JSON.stringify(fx)}`);
   }
 });
+
+test('the pointer-events override is added once per run, after axe has run, and removed after', async () => {
+  const body = el(opaque);
+  const a = el({...clear, color: 'rgb(0, 0, 0)'}, body);
+  const b = el({...clear, color: 'rgb(0, 0, 0)'}, body);
+  page({violations: [contrast(node(['a']))], incomplete: [contrast(node(['a']), node(['b']))]}, {a, b});
+  const w = globalThis.window;
+  let adds = 0;
+  const append = w.document.head.appendChild;
+  w.document.head.appendChild = e => {
+    adds++;
+    append(e);
+  };
+  const axeRun = w.axe.run;
+  w.axe.run = async (...args) => {
+    w.liftedDuringAxe = w.lifted;
+    return axeRun(...args);
+  };
+  const issues = await runner.run(opts);
+  assert.deepEqual(issues.map(i => i.runnerExtras.colourSource), ['computed', 'computed', 'computed']);
+  assert.equal(adds, 1, 'one override for every result, not one per element: each one restyles the whole page');
+  assert.equal(w.liftedDuringAxe, undefined, 'axe runs on the page as it is');
+  assert.equal(w.lifted, null, 'the override is removed after');
+});
+
+test('the pointer-events override is removed when a read throws', async () => {
+  const span = el({...clear, color: 'rgb(0, 0, 0)'}, el(opaque));
+  page({incomplete: [contrast(node(['span']))]}, {span});
+  globalThis.window.stackAt = () => {
+    throw new Error('no stack');
+  };
+  await assert.rejects(runner.run(opts), /no stack/);
+  assert.equal(globalThis.window.lifted, null);
+});

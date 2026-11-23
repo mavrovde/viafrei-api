@@ -183,8 +183,9 @@ const run = async options => {
   // and the centres of its four quarters, so text that straddles two
   // backgrounds is held to the worse one (points nearer the edge would land
   // on the neighbouring glyphs of inline text); every element is
-  // made hit-testable while the stacks are read, so a layer with
-  // pointer-events: none is not skipped. Undetermined: no element, an
+  // made hit-testable while the stacks are read (the override run adds
+  // around all results, below), so a layer with pointer-events: none is
+  // not skipped. Undetermined: no element, an
   // effect on it or an ancestor, an empty box, a box clipped
   // entirely, or a point whose
   // colour cannot be read (background, above).
@@ -225,11 +226,7 @@ const run = async options => {
     const along = (start, end) => [(start + end) / 2, start + (end - start) / 4, start + (3 * (end - start)) / 4];
     const [xc, x0, x1] = along(shown.left, shown.right);
     const [yc, y0, y1] = along(shown.top, shown.bottom);
-    const lift = window.document.createElement('style');
-    lift.textContent = '*{pointer-events:auto!important}';
-    window.document.head.appendChild(lift);
     const found = [[xc, yc], [x0, y0], [x1, y0], [x0, y1], [x1, y1]].map(([x, y]) => background(element, x, y));
-    lift.remove();
     const unreadable = found.find(f => f.by);
     if (unreadable) return undetermined(unreadable.by);
     const ratio = bg => contrast(element, {fg, bg}).ratio ?? -1;
@@ -304,8 +301,21 @@ const run = async options => {
       });
     }
   };
-  violations.forEach(r => add(r, false));
-  incomplete.forEach(r => add(r, true));
+  // The pointer-events override is in the page once, after axe has run and
+  // while every result is read, and removed after, also when a read throws.
+  // Adding and removing it restyles the whole page; once per element it
+  // took reference.html's 213 contrast results 11 s of the 35 s the page
+  // takes locally, and pushed the one page.evaluate past Puppeteer's
+  // protocol timeout on a CI runner; once per run it takes 1 s.
+  const lift = window.document.createElement('style');
+  lift.textContent = '*{pointer-events:auto!important}';
+  window.document.head.appendChild(lift);
+  try {
+    violations.forEach(r => add(r, false));
+    incomplete.forEach(r => add(r, true));
+  } finally {
+    lift.remove();
+  }
   return issues;
 };
 

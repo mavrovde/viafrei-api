@@ -72,6 +72,14 @@ trap 'rm -rf "$tmp"' EXIT
 # plus the colours and axe's selector of each result) selects the 2.0 and 2.1 A/AA tags and best
 # practices; the 2.2 AA rule is enabled by name. The layout runner checks
 # the reference's repairs.
+#
+# Each runner's checks run as one page.evaluate, which pa11y's timeout does
+# not cut short; Puppeteer's protocolTimeout bounds it. reference.html
+# (about 27,700 elements) takes about 25 s locally, two thirds of it axe's
+# own run, and several times that on a CI runner; the bound is set here,
+# not left to Puppeteer's default of 180 s, at 300 s: the margin over the
+# CI time, and a hung page still ends the step well inside the job's 15
+# minutes.
 jq -n --arg chrome "$chrome" --arg runner "$here/a11y-tools/axe-runner.js" --arg layout "$here/a11y-tools/layout-runner.js" '{
   defaults: {
     runners: [$runner, $layout],
@@ -80,7 +88,7 @@ jq -n --arg chrome "$chrome" --arg runner "$here/a11y-tools/axe-runner.js" --arg
     includeWarnings: true,
     includeNotices: true,
     timeout: 60000,
-    chromeLaunchConfig: {executablePath: $chrome, args: ["--no-sandbox", "--disable-dev-shm-usage"]}
+    chromeLaunchConfig: {executablePath: $chrome, protocolTimeout: 300000, args: ["--no-sandbox", "--disable-dev-shm-usage"]}
   },
   urls: $ARGS.positional
 }' --args "${pages[@]/#/file://}" > "$tmp/config.json"

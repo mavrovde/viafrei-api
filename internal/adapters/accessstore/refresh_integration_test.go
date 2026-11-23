@@ -5,6 +5,7 @@ package accessstore_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -237,6 +238,18 @@ func TestALostListenerIsOpenedAgain(t *testing.T) {
 	}
 }
 
+// queue states what a failed wait saw: the fake's claims and every request
+// not settled, oldest first, with its claim (CI met one never claimed).
+func queue(t *testing.T, f *fakelive.Fake) string {
+	t.Helper()
+	var open string
+	if err := owner(t).QueryRow(bounded(t), `select coalesce(string_agg(format('%s %s/%s claimed=%s', id, source, subject_key, claimed_at is not null), '; ' order by created_at, id), 'none')
+		from live.refresh_requests where settled_at is null`).Scan(&open); err != nil {
+		return fmt.Sprintf("%d claims; the queue unread: %v", f.Claims(), err)
+	}
+	return fmt.Sprintf("%d claims; not settled: %s", f.Claims(), open)
+}
+
 // TestConcurrentAsksShareOneRefresh: N people asking about one subject at
 // once, while its refresh runs (the script settles it 500 ms after the
 // claim), get one request, one claim and N identical answers; another
@@ -250,6 +263,13 @@ func TestConcurrentAsksShareOneRefresh(t *testing.T) {
 	// less the answer's reserve, which the test's 2 s bound would cut short.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	// The rows before this run's: the count below is of this run's rows
+	// only, so the test holds under -count and after other tests' rows.
+	var before int64
+	o := owner(t)
+	if err := o.QueryRow(ctx, `select coalesce(max(id), 0) from live.refresh_requests`).Scan(&before); err != nil {
+		t.Fatal(err)
+	}
 	answers := make([]refresh.Request, n)
 	errs := make([]error, n)
 	var wg sync.WaitGroup
@@ -266,15 +286,14 @@ func TestConcurrentAsksShareOneRefresh(t *testing.T) {
 	for i := range n {
 		if errs[i] != nil || answers[i].ID != answers[0].ID || answers[i].State != refresh.Refreshed ||
 			!answers[i].SettledAt.Equal(*answers[0].SettledAt) {
-			t.Fatalf("asker %d: %+v %v; first %+v", i, answers[i], errs[i], answers[0])
+			t.Fatalf("asker %d: %+v %v; first %+v; %s", i, answers[i], errs[i], answers[0], queue(t, f))
 		}
 	}
 	if f.Claims() != 1 {
 		t.Fatalf("%d claims for one subject", f.Claims())
 	}
 	var rows, linked int
-	o := owner(t)
-	if err := o.QueryRow(ctx, `select count(*) from live.refresh_requests where subject_key = '8000207'`).Scan(&rows); err != nil || rows != 1 {
+	if err := o.QueryRow(ctx, `select count(*) from live.refresh_requests where subject_key = '8000207' and id > $1`, before).Scan(&rows); err != nil || rows != 1 {
 		t.Fatalf("%d rows %v", rows, err)
 	}
 	if err := o.QueryRow(ctx, `select count(*) from live.refresh_askers where request_id = $1::bigint`, answers[0].ID).Scan(&linked); err != nil || linked != n {

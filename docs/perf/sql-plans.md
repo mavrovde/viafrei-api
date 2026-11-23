@@ -179,7 +179,7 @@ prepared and executed with the same arguments), beside the
 | api_motorways | measured 389 ms p50, 532 ms max | 399 ms p50, 616 ms max | 5 / 5 | on a par: the situations in force grouped by road | motorway pages |
 | api_motorways_live_land | measured 643 ms p50, 1104 ms max | 538 ms p50, 708 ms max | 5 / 5 | a road's junction Land by `contract_junction_land`, only for the roads in question | motorway pages |
 | api_road_shapes | 2.4 s (the road list's shape read); measured 481 ms p50, 1.3 s max | 264 ms p50, 445 ms max | no parameters | `autobahn_roads_pkey`, `contract_road_shape` once a road | road pages |
-| api_feeding | measured 4.9–10.8 s (one read of nine views, host loaded) | 0.57–3.8 s | no parameter: one plan | the dataset's rows reduced to their distinct families first (materialised), then each family's source rule once, not once a row | off the request path (the families of each dataset, renewed in the background) |
+| api_feeding | measured 4.9–10.8 s (one read of nine views, host loaded) | p50 317 ms, max 546 ms (eight runs; per family: warnings 0.4, lorry 208, events 118, sharing 41, fuel 17, speed cameras 13, alerts 10, zones 0.2) | no parameter: one plan | the dataset's rows reduced to their distinct families first (materialised), then each family's source rule once, not once a row; the warnings' families read one by one along the version key (a scan of 330 000 rows took 1.6 s) | off the request path (the families of each dataset, renewed in the background) |
 
 The state and road rows were measured with the view statement run first in
 the transaction (the first statement run warms the pages both read); run

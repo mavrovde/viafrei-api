@@ -45,7 +45,14 @@ var datasetRows = map[provenance.Dataset]string{
   union all
   select c.source_ref, c.source_ref from ` + speedOSMRows + ` c`,
 	// weather_warning: the warnings not deleted that state a start; no rule.
-	provenance.DatasetWarnings: `select w.source_feed, null::text from weather_warnings w where w.deleted_at is null and w.valid_from is not null`,
+	// The warnings' families, each the first by the version key past the one
+	// before (330 000 rows of one family on prod: a scan of them all took 1.6 s).
+	provenance.DatasetWarnings: `select f.s, null::text from (with recursive f(s) as (
+  select (select w.source_feed from weather_warnings w where w.deleted_at is null and w.valid_from is not null order by w.source_feed limit 1)
+  union all
+  select (select w.source_feed from weather_warnings w where w.source_feed > f.s and w.deleted_at is null and w.valid_from is not null order by w.source_feed limit 1)
+  from f where f.s is not null)
+select s from f where s is not null) f`,
 	// service_alert: the alerts not closed.
 	provenance.DatasetAlerts: `select a.source_feed, a.source_feed from delfi_service_alerts a where a.closed_at is null`,
 	// sharing_station and sharing_vehicle: the stations not closed and the

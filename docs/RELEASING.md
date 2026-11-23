@@ -69,7 +69,11 @@ and merge release pull requests.
      `sbom.cdx.json` and `SHA256SUMS`
    - appends the digest, the tags, the verify commands and the milestone link
      to the notes, marks every 0.x release as a pre-release, and
-     publishes the draft
+     publishes the draft and decides latest in one `gh release edit` call
+     (`--draft=false` with `--latest`): GitHub refuses `--latest` on a
+     release that is still a draft, and makes a newly published release
+     latest by default, so a backport published without `--latest=false`
+     would become latest
 6. The `verify` job of the same run pulls the image by digest, runs
    `cosign verify` and `gh attestation verify`, checks `SHA256SUMS` against
    the downloaded assets, and smoke-tests `/healthz` of the published image.
@@ -116,6 +120,14 @@ Nothing is built or published: `publish` needs the `snyk` job.
 A re-run of `release.yml` is accepted only while the release page is still a
 draft and `:X.Y.Z` does not exist. Once the image was pushed, the run is
 refused by design; release the next patch instead.
+
+**1.0.0 and 1.0.1 were never published.** The 1.0.0 run stopped at the
+inventory check, before anything was built. The 1.0.1 run built, signed and
+attested the image and uploaded the assets, then set `--latest` while the page
+was still a draft; GitHub answered 422 and the step stopped before the draft
+was published, so `verify` and `pages` were skipped. Both tags and draft pages
+remain; the 1.0.1 image exists in the registry, but no release page points at
+it. 1.0.2 is the first published 1.x release.
 
 ### The inventory (REL-015)
 

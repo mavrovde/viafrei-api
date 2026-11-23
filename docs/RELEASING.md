@@ -117,6 +117,26 @@ A re-run of `release.yml` is accepted only while the release page is still a
 draft and `:X.Y.Z` does not exist. Once the image was pushed, the run is
 refused by design; release the next patch instead.
 
+### The inventory (REL-015)
+
+`test/inventory` records what the API's consumers ask for, each file from
+the release its first line names (`# source <consumer> <X.Y.Z> <commit>`).
+The release run refuses a file older than its consumer's newest release
+(`inventory age`); export it again from that release's tag first:
+
+| File | Exported from | Compared with |
+|---|---|---|
+| `mcp.tsv` | `server/catalogue/catalogue.json` of `mavrovde/viafrei-mcp` at the tag of the release npm `viafrei` publishes: `inventory mcp -version X.Y.Z -commit SHA -catalogue catalogue.json` (one row per tool with the sha256 of its compacted input schema, per argument in the schema's order with `language` left out, per resource) | the npm dist-tag `latest` of `viafrei` (`-platform`, as `platformsync read` prints it) |
+| `routes.tsv` | the platform's fragment service, last exported at platform 2.6.44 | nothing: **frozen**, the site moves to the API. `age` prints it as skipped with that reason; it is never exported again |
+| `web.tsv` | the site's source tree at its release tag: `inventory web` | the latest release of `mavrovde/viafrei-web` (`-web`) |
+
+Run the check as the release run does:
+
+```sh
+go run ./internal/release/inventory age -dir test/inventory \
+  -platform "$(go run ./internal/release/platformsync read -timeout 10s)" -web X.Y.Z
+```
+
 ### Version rules
 
 | Change since the last release | Before 1.0.0 | From 1.0.0 |

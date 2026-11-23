@@ -14,8 +14,9 @@ import (
 
 // The inventory gate: the API serves everything its two consumers ask for.
 // test/inventory holds what the MCP server's release offers (mcp.tsv: tools,
-// their arguments, resources), the fragment routes the platform's release
-// registers (routes.tsv) and the fragment paths the site's release asks for
+// their arguments, resources), the fragment routes the platform's fragment
+// service registered (routes.tsv, frozen at its last export: the site moves
+// to the API) and the fragment paths the site's release asks for
 // (web.tsv), each exported by internal/release/inventory from the release it
 // names; mapping.tsv says which operation and parity case serve each entry.
 

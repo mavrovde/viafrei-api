@@ -2,6 +2,9 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,24 +45,47 @@ func TestUsage(t *testing.T) {
 func TestMCP(t *testing.T) {
 	req.Covers(t, "REL-015")
 	dir := t.TempDir()
-	contract := write(t, dir, "contract.json", `{"tools":[{"name":"find_x","args":[{"name":"lat","type":"number","required":true},{"name":"limit","type":"integer"}],"schema":{"type":"object"}}]}`)
-	catalogue := write(t, dir, "catalogue.json", `{"resources":[{"uri":"viafrei://x"}]}`)
-	code, out, errs := call("mcp", "-version", "2.6.18", "-commit", commit, "-contract", contract, "-catalogue", catalogue)
-	want := "# source mcp 2.6.18 " + commit + "\n# kind\tentry\tdetail\ntool\tfind_x\tschema sha256:"
-	if code != 0 || !strings.HasPrefix(out, want) ||
-		!strings.HasSuffix(out, "\nargument\tfind_x.lat\tnumber required\nargument\tfind_x.limit\tinteger optional\nresource\tviafrei://x\t-\n") {
+	// The catalogue as the MCP server's release keeps it: indented,
+	// properties in the schema's order (not sorted), language on every tool.
+	schema := `{
+      "type": "object",
+      "properties": {
+        "roads": {"type": "array", "items": {"type": "string", "pattern": "^A"}},
+        "lat": {"type": "number"},
+        "language": {"type": "string", "enum": ["de", "en"]},
+        "limit": {"type": "integer"}
+      },
+      "required": ["lat"]
+    }`
+	catalogue := write(t, dir, "catalogue.json", `{"tools": [{"name": "find_x", "inputSchema": `+schema+`}], "resources": [{"uri": "viafrei://x"}]}`)
+	code, out, errs := call("mcp", "-version", "2.7.2", "-commit", commit, "-catalogue", catalogue)
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, []byte(schema)); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(compact.Bytes())
+	want := "# source mcp 2.7.2 " + commit + "\n# kind\tentry\tdetail\ntool\tfind_x\tschema sha256:" + hex.EncodeToString(sum[:]) +
+		"\nargument\tfind_x.roads\tstring[] optional\nargument\tfind_x.lat\tnumber required\nargument\tfind_x.limit\tinteger optional\nresource\tviafrei://x\t-\n"
+	if code != 0 || out != want {
 		t.Fatalf("exit %d, stdout %q, stderr %q", code, out, errs)
 	}
-	empty := write(t, dir, "empty.json", `{}`)
-	broken := write(t, dir, "broken.json", `{`)
-	for name, c := range map[string][]string{
-		"no tools":            {"-contract", empty, "-catalogue", catalogue},
-		"a missing contract":  {"-contract", filepath.Join(dir, "none"), "-catalogue", catalogue},
-		"a broken catalogue":  {"-contract", contract, "-catalogue", broken},
-		"a missing catalogue": {"-contract", contract, "-catalogue", filepath.Join(dir, "none")},
+	tool := func(name, s string) string {
+		return write(t, dir, name+".json", `{"tools":[{"name":"find_x","inputSchema":`+s+`}],"resources":[{"uri":"viafrei://x"}]}`)
+	}
+	for name, c := range map[string]struct{ path, want string }{
+		"no tools":              {write(t, dir, "empty.json", `{"resources":[{"uri":"viafrei://x"}]}`), "no tool or no resource"},
+		"no resources":          {write(t, dir, "nores.json", `{"tools":[{"name":"find_x","inputSchema":{}}]}`), "no tool or no resource"},
+		"a broken catalogue":    {write(t, dir, "broken.json", `{`), "broken.json"},
+		"a missing catalogue":   {filepath.Join(dir, "none"), "no such file"},
+		"no input schema":       {tool("noschema", `null`), "tool find_x: the input schema has no properties object"},
+		"a schema not object":   {tool("notobject", `[1]`), "tool find_x: input schema"},
+		"properties not object": {tool("propsarray", `{"properties":[]}`), "no properties object"},
+		"a type not a string":   {tool("typelist", `{"properties":{"lat":{"type":["number","null"]}}}`), "argument lat"},
+		"no type":               {tool("notype", `{"properties":{"lat":{}}}`), "argument lat names no type"},
+		"an array of no type":   {tool("bararray", `{"properties":{"roads":{"type":"array"}}}`), "argument roads names no type"},
 	} {
-		if code, _, _ := call(append([]string{"mcp", "-version", "2.6.18", "-commit", commit}, c...)...); code != 2 {
-			t.Errorf("%s: exit %d", name, code)
+		if code, _, errs := call("mcp", "-version", "2.7.2", "-commit", commit, "-catalogue", c.path); code != 2 || !strings.Contains(errs, c.want) {
+			t.Errorf("%s: exit %d, %q", name, code, errs)
 		}
 	}
 	if code, _, errs := call("mcp", "-version", "2.6", "-commit", commit); code != 2 || !strings.Contains(errs, "needs -version X.Y.Z") {
@@ -184,8 +210,16 @@ func inventory(t *testing.T, platform, web string) string {
 func TestAge(t *testing.T) {
 	req.Covers(t, "REL-015")
 	dir := inventory(t, "2.6.18", "0.1.1")
-	if code, out, errs := call("age", "-dir", dir, "-platform", "2.6.18", "-web", "0.1.1"); code != 0 || out != "mcp.tsv: platform 2.6.18\nroutes.tsv: platform 2.6.18\nweb.tsv: web 0.1.1\n" {
+	if code, out, errs := call("age", "-dir", dir, "-platform", "2.6.18", "-web", "0.1.1"); code != 0 ||
+		out != "mcp.tsv: platform 2.6.18\nroutes.tsv: routes 2.6.18, skipped (frozen: the site moves to the API)\nweb.tsv: web 0.1.1\n" {
 		t.Fatalf("current: exit %d, %q, %q", code, out, errs)
+	}
+	// The frozen file is never compared: older than every release, it passes,
+	// and it is named as skipped.
+	frozen := inventory(t, "2.7.2", "0.1.1")
+	write(t, frozen, "routes.tsv", "# source routes 2.6.44 "+commit+"\n")
+	if code, out, errs := call("age", "-dir", frozen, "-platform", "2.7.2", "-web", "0.1.1"); code != 0 || !strings.Contains(out, "routes.tsv: routes 2.6.44, skipped (frozen: the site moves to the API)\n") {
+		t.Fatalf("frozen: exit %d, %q, %q", code, out, errs)
 	}
 	if code, _, _ := call("age", "-dir", dir, "-platform", "2.6.17", "-web", "0.1.0"); code != 0 {
 		t.Fatalf("newer than the newest release: exit %d", code)
@@ -206,6 +240,33 @@ func TestAge(t *testing.T) {
 	write(t, bad, "routes.tsv", "routes without a header\n")
 	if code, _, errs := call("age", "-dir", bad, "-platform", "2.6.18", "-web", "0.1.1"); code != 2 || !strings.Contains(errs, "routes.tsv: the first line") {
 		t.Errorf("no header: exit %d, %q", code, errs)
+	}
+}
+
+// TestOnlyRoutesIsFrozen: age skips routes.tsv and nothing else. Every other
+// file is compared with its consumer's newest release, so freezing another
+// one is a change this test must be made to accept.
+func TestOnlyRoutesIsFrozen(t *testing.T) {
+	req.Covers(t, "REL-015")
+	if len(Frozen) != 1 || Frozen["routes.tsv"] != "frozen: the site moves to the API" {
+		t.Fatalf("Frozen = %v, want routes.tsv alone", Frozen)
+	}
+	for n, consumer := range Files {
+		_, frozen := Frozen[n]
+		if frozen != (consumer == "frozen") {
+			t.Errorf("%s: consumer %q, frozen %v", n, consumer, frozen)
+		}
+		if !frozen && consumer != "platform" && consumer != "web" {
+			t.Errorf("%s: consumer %q has no -flag age compares with", n, consumer)
+		}
+	}
+	// Every file but routes.tsv refuses when it is behind.
+	for _, n := range []string{"mcp.tsv", "web.tsv"} {
+		dir := inventory(t, "2.7.2", "0.1.1")
+		write(t, dir, n, "# source x 0.0.1 "+commit+"\n")
+		if code, out, errs := call("age", "-dir", dir, "-platform", "2.7.2", "-web", "0.1.1"); code != 1 || strings.Contains(out, n) || !strings.Contains(errs, n+" records") {
+			t.Errorf("%s behind: exit %d, %q, %q", n, code, out, errs)
+		}
 	}
 }
 

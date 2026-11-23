@@ -221,7 +221,10 @@ func (f *Fake) drain(ctx context.Context) error {
 }
 
 // claim takes the oldest pending request: a never outcome is skipped and
-// left pending, any other is claimed at its created_at.
+// left pending, any other is claimed at its created_at. The row lock takes
+// no key: an asker being linked to the request holds a key-share lock on it
+// (live.refresh_askers' key check), and a key lock would skip the row with no
+// insert left to wake the fake.
 func (f *Fake) claim(ctx context.Context, conn *pgx.Conn) (claimed, Outcome, bool, error) {
 	for {
 		var c claimed
@@ -232,7 +235,7 @@ func (f *Fake) claim(ctx context.Context, conn *pgx.Conn) (claimed, Outcome, boo
 			}
 			if err := tx.QueryRow(ctx, `select id::text, source, subject_key, subject::text, created_at from live.refresh_requests
 				where state = 'pending' and claimed_at is null and not id::text = any($1)
-				order by created_at, id for update skip locked limit 1`, f.skipped).Scan(&c.id, &c.source, &c.key, &c.subject, &c.createdAt); err != nil {
+				order by created_at, id for no key update skip locked limit 1`, f.skipped).Scan(&c.id, &c.source, &c.key, &c.subject, &c.createdAt); err != nil {
 				return err
 			}
 			if o = f.script.outcome(c.source, c.key); o.State == Never {

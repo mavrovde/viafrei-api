@@ -13,34 +13,36 @@ import (
 // fuelNear reads the filling stations within a radius, nearest first: $1,
 // $2 the position's longitude and latitude; $3 the radius in metres; $4 the
 // families; $5 the most stations. Each carries its newest price per grade
-// (a station with no price carries none).
-var fuelNear = `
-with here as (select st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography g)
-select s.station_id, s.name, s.brand, st_y(s.location), st_x(s.location),
-       round(st_distance(s.location::geography, here.g))::int, s.open_state, s.source_ref, s.whole_day, s.opening_times,
+// (a station with no price carries none). A family is read when its source
+// rule gives it to the key (ruledFamilies): Tankerkönig's prices only to an
+// own key.
+var fuelNear = named("api_fuel_near", `
+with here as (select st_setsrid(st_makepoint((select $1::float8), (select $2::float8)), 4326)::geography g),
+fam as (`+ruledFamilies("(select $4::text[])")+`)
+select f.id, f.name, f.brand, st_y(f.geom::geometry), st_x(f.geom::geometry),
+       round(st_distance(f.geom, here.g))::int, coalesce(f.state, 'unknown'), coalesce(f.source_feed, f.source), f.whole_day, f.opening_times,
        coalesce(p.products, '{}'), coalesce(p.prices, '{}'), coalesce(p.observed, '{}')
-from contract.fuel_station s
+from fuel_stations f
 cross join here
+cross join fam
 left join lateral (
-  select array_agg(l.product_code order by l.product_code) products,
-         array_agg(l.price::float8 order by l.product_code) prices,
-         array_agg(l.observed_at order by l.product_code) observed
-  from (select distinct on (o.product_code) o.product_code, o.price, o.observed_at
-          from contract.fuel_price_observation o
-         where o.station_id = s.station_id and o.price is not null
-           and o.source_ref = any($4) and ` + permitted("o") + `
-         order by o.product_code, o.observed_at desc) l) p on true
-where s.withdrawn_at is null
-  and s.source_ref = any($4)
-  and ` + permitted("s") + `
-  and st_dwithin(s.location::geography, here.g, $3)
-order by st_distance(s.location::geography, here.g), s.station_id
-limit $5`
+  select array_agg(l.product order by l.product) products,
+         array_agg(l.price::float8 order by l.product) prices,
+         array_agg(l.observed_at order by l.product) observed
+  from (select distinct on (o.product) o.product, o.price, o.observed_at
+          from fuel_prices o
+         where o.station_id = f.id and o.price is not null and o.source = any(fam.f)
+         order by o.product, o.observed_at desc) l) p on true
+where f.deleted_at is null and f.geom is not null
+  and coalesce(f.source_feed, f.source) = any(fam.f)
+  and st_dwithin(f.geom, here.g, (select $3::float8))
+order by st_distance(f.geom, here.g), f.id
+limit (select $5::bigint)`, "float8", "float8", "float8", "text[]", "bigint")
 
 // FuelNear reads the filling stations within q's radius (features.Fuel).
 func (s *Store) FuelNear(ctx context.Context, q energy.FuelQuery, families []string) ([]energy.FuelStation, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]energy.FuelStation, error) {
-		rows, _ := tx.Query(ctx, fuelNear, q.At.Lon, q.At.Lat, q.RadiusM, families, energy.MaxFuelScan)
+		rows, _ := run(ctx, tx, fuelNear, q.At.Lon, q.At.Lat, float64(q.RadiusM), families, energy.MaxFuelScan)
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (energy.FuelStation, error) {
 			var (
 				v        energy.FuelStation
@@ -66,25 +68,27 @@ func (s *Store) FuelNear(ctx context.Context, q energy.FuelQuery, families []str
 // coverage read, by no filter but the grade. Each price check is a probe of
 // one station's observations, as the price read's: the observations are a
 // time series, and a check not tied to the station would scan it whole.
-var fuelCoverage = `
-with here as (select st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography g),
-held as (
-  select s.station_id, s.location::geography loc
-  from contract.fuel_station s
-  where s.withdrawn_at is null and s.source_ref = any($4) and ` + permitted("s") + `)
+var fuelCoverage = named("api_fuel_coverage", `
+with here as (select st_setsrid(st_makepoint((select $1::float8), (select $2::float8)), 4326)::geography g),
+fam as (`+ruledFamilies("(select $4::text[])")+`),
+held as not materialized (
+  select f.id station_id, f.geom loc
+  from fuel_stations f, fam
+  where f.deleted_at is null and f.geom is not null and coalesce(f.source_feed, f.source) = any(fam.f))
 select
-  (select count(*)::int from held, here where st_dwithin(held.loc, here.g, $3)),
+  (select count(*)::int from held, here where st_dwithin(held.loc, here.g, (select $3::float8))),
   (select min(st_distance(held.loc, here.g)) from held, here
-    where st_dwithin(held.loc, here.g, $6)
-      and exists (select 1 from contract.fuel_price_observation o
-                   where o.station_id = held.station_id and o.price is not null and ($5::text is null or o.product_code = $5::text)
-                     and o.source_ref = any($4) and ` + permitted("o") + `)),
-  case when $5::text is null then 0 else
-  (select count(*)::int from held, here where st_dwithin(held.loc, here.g, $3)
-     and not exists (select 1 from contract.fuel_price_observation o
-                      where o.station_id = held.station_id and o.price is not null and o.product_code = $5::text
-                        and o.observed_at > $8::timestamptz - make_interval(secs => $7::int)
-                        and o.source_ref = any($4) and ` + permitted("o") + `)) end`
+    where st_dwithin(held.loc, here.g, (select $6::float8))
+      and exists (select 1 from fuel_prices o
+                   where o.station_id = held.station_id and o.price is not null
+                     and ((select $5::text) is null or o.product = (select $5::text)) and o.source = any((select fam.f from fam)::text[]))),
+  case when (select $5::text) is null then 0 else
+  (select count(*)::int from held, here where st_dwithin(held.loc, here.g, (select $3::float8))
+     and not exists (select 1 from fuel_prices o
+                      where o.station_id = held.station_id and o.price is not null and o.product = (select $5::text)
+                        and o.observed_at > (select $8::timestamptz) - make_interval(secs => (select $7::int))
+                        and o.source = any((select fam.f from fam)::text[]))) end`,
+	"float8", "float8", "float8", "text[]", "text", "float8", "int", "timestamptz")
 
 // FuelCoverage reads what the families hold around q's position
 // (features.Fuel).
@@ -97,8 +101,11 @@ func (s *Store) FuelCoverage(ctx context.Context, q energy.FuelQuery, families [
 		if q.Fuel != "" {
 			grade = &q.Fuel
 		}
-		err := tx.QueryRow(ctx, fuelCoverage, q.At.Lon, q.At.Lat, q.RadiusM, families, grade, energy.MaxFuelRadiusM,
-			int(q.Fresh/time.Second), now).Scan(&c.StationsInRadius, &c.NearestPricedM, &c.WithoutCurrent)
+		rows, _ := run(ctx, tx, fuelCoverage, q.At.Lon, q.At.Lat, float64(q.RadiusM), families, grade, float64(energy.MaxFuelRadiusM),
+			int(q.Fresh/time.Second), now)
+		_, err := pgx.CollectOneRow(rows, func(r pgx.CollectableRow) (struct{}, error) {
+			return struct{}{}, r.Scan(&c.StationsInRadius, &c.NearestPricedM, &c.WithoutCurrent)
+		})
 		return c, err
 	})
 }
@@ -106,25 +113,26 @@ func (s *Store) FuelCoverage(ctx context.Context, q energy.FuelQuery, families [
 // fuelByID reads one filling station by its id ($1) with its address and,
 // per grade, its newest price reported in the held window ($3 seconds) up to
 // the instant $4; $2 the families. Withdrawn, it is not found.
-var fuelByID = opaque(`
-select s.station_id, s.name, s.brand, st_y(s.location), st_x(s.location), s.open_state, s.source_ref, s.whole_day, s.opening_times,
-       s.street, s.house_number, s.postcode, s.city,
+var fuelByID = named("api_fuel_by_id", `
+with fam as (`+ruledFamilies("(select $2::text[])")+`)
+select f.id, f.name, f.brand, st_y(f.geom::geometry), st_x(f.geom::geometry), coalesce(f.state, 'unknown'), coalesce(f.source_feed, f.source),
+       f.whole_day, f.opening_times, f.street, f.house_no, f.postcode, f.city,
        coalesce(p.products, '{}'), coalesce(p.prices, '{}'), coalesce(p.observed, '{}')
-from contract.fuel_station s
+from fuel_stations f
+cross join fam
 left join lateral (
-  select array_agg(l.product_code order by l.product_code) products,
-         array_agg(l.price::float8 order by l.product_code) prices,
-         array_agg(l.observed_at order by l.product_code) observed
-  from (select distinct on (o.product_code) o.product_code, o.price, o.observed_at
-          from contract.fuel_price_observation o
-         where o.station_id = s.station_id and o.price is not null
-           and o.observed_at > $4::timestamptz - make_interval(secs => $3::int) and o.observed_at <= $4::timestamptz
-           and o.source_ref = any($2) and `+permitted("o")+`
-         order by o.product_code, o.observed_at desc) l) p on true
-where s.station_id = $1::text
-  and s.withdrawn_at is null
-  and s.source_ref = any($2)
-  and `+permitted("s"), "text", "text[]", "integer", "timestamp with time zone")
+  select array_agg(l.product order by l.product) products,
+         array_agg(l.price::float8 order by l.product) prices,
+         array_agg(l.observed_at order by l.product) observed
+  from (select distinct on (o.product) o.product, o.price, o.observed_at
+          from fuel_prices o
+         where o.station_id = f.id and o.price is not null
+           and o.observed_at > (select $4::timestamptz) - make_interval(secs => (select $3::int)) and o.observed_at <= (select $4::timestamptz)
+           and o.source = any(fam.f)
+         order by o.product, o.observed_at desc) l) p on true
+where f.id = (select $1::text)
+  and f.deleted_at is null and f.geom is not null
+  and coalesce(f.source_feed, f.source) = any(fam.f)`, "text", "text[]", "int", "timestamptz")
 
 // FuelStation reads one filling station by its id (features.Fuel), or
 // energy.ErrNotFound.
@@ -136,9 +144,12 @@ func (s *Store) FuelStation(ctx context.Context, id string, families []string, n
 			prices   []float64
 			observed []time.Time
 		)
-		err := tx.QueryRow(ctx, fuelByID, id, families, int(held.Seconds()), now).Scan(
-			&v.ID, &v.Name, &v.Brand, &v.Location.Lat, &v.Location.Lon, &v.Open, &v.Family, &v.Hours.WholeDay, &v.Hours.Times,
-			&v.Address.Street, &v.Address.HouseNumber, &v.Address.Postcode, &v.Address.City, &products, &prices, &observed)
+		rows, _ := run(ctx, tx, fuelByID, id, families, int(held.Seconds()), now)
+		_, err := pgx.CollectOneRow(rows, func(r pgx.CollectableRow) (struct{}, error) {
+			return struct{}{}, r.Scan(
+				&v.ID, &v.Name, &v.Brand, &v.Location.Lat, &v.Location.Lon, &v.Open, &v.Family, &v.Hours.WholeDay, &v.Hours.Times,
+				&v.Address.Street, &v.Address.HouseNumber, &v.Address.Postcode, &v.Address.City, &products, &prices, &observed)
+		})
 		if errors.Is(err, pgx.ErrNoRows) {
 			// No such station is an answer, not a failure of storage.
 			return energy.FuelStationPage{}, nil

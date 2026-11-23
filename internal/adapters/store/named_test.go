@@ -49,7 +49,9 @@ func refusals(sql string) []string {
 // whole or around its rule match.
 func withoutTrafficEvents(sql string) string {
 	before, after, _ := strings.Cut(relTrafficEvent, rulesPerRow("b.source_ref"))
-	for _, part := range []string{relTrafficEvent, before, after} {
+	// the form that reads the stored Land, cut around its rules (their $1 is made opaque)
+	landBefore, landAfter, _ := strings.Cut(trafficEventsOfFamilies, rulesOfFamilies("b.source_ref"))
+	for _, part := range []string{relTrafficEvent, before, after, landBefore, landAfter} {
 		sql = strings.ReplaceAll(sql, part, "")
 	}
 	return sql
@@ -177,6 +179,24 @@ func TestDeparturesOfTripsKeepTheRelation(t *testing.T) {
 func TestTrafficEventsOfFamiliesMatchRulesOnce(t *testing.T) {
 	if strings.Count(relTrafficEvent, rulesPerRow("b.source_ref")) != 1 || strings.Contains(trafficEventsOfFamilies, rulesPerRow("b.source_ref")) {
 		t.Fatal("the traffic event relation's rule match changed")
+	}
+}
+
+// TestTrafficEventsOfFamiliesReadTheStoredLand: each fragment the stored
+// Land replaces is found once in the relation, and none is left.
+func TestTrafficEventsOfFamiliesReadTheStoredLand(t *testing.T) {
+	for _, f := range []string{autobahnBranchEnd, datexBranchEnd, landPerEvent, autobahnCarriesLand} {
+		if strings.Count(relTrafficEvent, f) != 1 {
+			t.Fatalf("the traffic event relation changed: %q", f)
+		}
+	}
+	for _, f := range []string{autobahnBranchEnd, datexBranchEnd, landPerEvent} {
+		if strings.Contains(trafficEventsOfFamilies, f) {
+			t.Fatalf("not replaced: %q", f)
+		}
+	}
+	if strings.Count(trafficEventsOfFamilies, "e.land_code") != 2 || !strings.Contains(trafficEventsOfFamilies, "SELECT b.land_code AS code") {
+		t.Fatal("the stored Land is not read")
 	}
 }
 

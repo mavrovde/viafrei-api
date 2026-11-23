@@ -129,7 +129,29 @@ order by 1, 2, 4`, "text[]", "timestamp with time zone"),
 // filter). On prod the rule match per event was a fifth of the national
 // road summary; a join to the matches was planned as a loop over them for
 // each event.
-var trafficEventsOfFamilies = strings.Replace(relTrafficEvent, rulesPerRow("b.source_ref"), rulesOfFamilies("b.source_ref"), 1)
+//
+// Each event's Land is the one stored at write time (database 0338,
+// land_code: the relation's own expression, kept by a trigger on geom),
+// not a nearest-municipality search per event, which was most of what the
+// summary cost on prod; an Autobahn row written before 0338 has none
+// stored and is looked up as the relation does.
+var trafficEventsOfFamilies = strings.NewReplacer(
+	rulesPerRow("b.source_ref"), rulesOfFamilies("b.source_ref"),
+	autobahnCarriesLand, autobahnCarriesLand+"            e.land_code,\n",
+	autobahnBranchEnd, "            NULL::text AS confidentiality,\n"+
+		"            COALESCE(a.land_code, contract_junction_land(st_pointonsurface(a.geom::geometry)::geometry(Point,4326)::geography)) AS land_code\n"+
+		"           FROM autobahn a\n",
+	datexBranchEnd, "            e.confidentiality,\n            e.land_code\n           FROM road_events e\n",
+	landPerEvent, "LEFT JOIN LATERAL ( SELECT b.land_code AS code) land ON true",
+).Replace(relTrafficEvent)
+
+// The fragments of relTrafficEvent the stored Land replaces, each once.
+const (
+	autobahnCarriesLand = "            e.raw_hash,\n"
+	autobahnBranchEnd   = "            NULL::text AS confidentiality\n           FROM autobahn a\n"
+	datexBranchEnd      = "            e.confidentiality\n           FROM road_events e\n"
+	landPerEvent        = "LEFT JOIN LATERAL ( SELECT contract_junction_land(b.location::geography) AS code) land ON true"
+)
 
 // rulesPerRow is a relation's match of the source rules for each of its
 // rows, by the source in col.

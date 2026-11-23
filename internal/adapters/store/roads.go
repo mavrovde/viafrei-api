@@ -113,6 +113,10 @@ func opaqueNamed(name, sql string, types ...string) stmt {
 	}), types...)
 }
 
+// autobahnLand is the Land of an Autobahn row: the one stored, or for a row
+// written before it was stored, the platform's rule on the row's point.
+const autobahnLand = `coalesce(e.land_code, contract_junction_land(st_pointonsurface(e.geom::geometry)::geography))`
+
 // autobahnStarted is the start an Autobahn message states, when it states
 // one as a time, else when it was seen.
 const autobahnStarted = `coalesce(case when a.starts ~ '^\d{4}-\d\d-\d\dT\d\d:\d\d' then a.starts::timestamptz end, a.observed_at)`
@@ -126,53 +130,29 @@ const autobahnStarted = `coalesce(case when a.starts ~ '^\d{4}-\d\d-\d\dT\d\d:\d
 // description are fields of its provider message, which a sweep stores only
 // when it changed: a row without it takes those of the newest row of the
 // same message and the same message hash since the start of its UTC day.
-// With in (a Land code, a parameter), each situation that may lie in that
-// Land also carries its Land (state_code, the platform's: the Land of the
-// nearest municipality within 20 km, contract_junction_land) and the family
-// that placed it there; any other carries none, as it lies in no Land a
-// read compares with in. A situation may lie in the Land when its point is
-// in the box of the Land's municipalities widened by more than 20 km
-// (0.2 degrees of latitude, 0.4 of longitude: 22 km, and 25 km north to
-// 55.1 degrees): the nearest municipality of a point further out is not one
-// of the Land's, or is further than 20 km. So the costly lookup runs for the
-// Land's own situations, not for every situation; for de and without in it
-// runs for none. With a Land, a situation whose shape is outside that box is
-// not read at all (its point lies in its shape's box): every read of a Land
-// keeps only the Land's own situations, so the provider message of an
-// Autobahn situation elsewhere is not resolved and the traffic messages are
-// read through their shapes' GiST. With de (no box) all are read. The lookup is contract_junction_land's own statement,
-// inlined so the planner reads it through the municipalities' GiST without a
-// function call per situation, and kept one evaluation (offset 0) where the
-// Land is both compared and returned.
+// With in (a Land code, a parameter), only the situations placed in that
+// Land are read (with de, all), each with its Land (state_code, the
+// platform's rule: the Land of the nearest municipality within 20 km) and
+// the family that placed it there. The Land is the one stored when the
+// situation was written (land_code); an Autobahn row written before the
+// column was stored has none, and its Land is looked up by the same rule.
+// Without in, the Land is not read.
 func trafficEvents(in string) string {
-	state, placing := `null::text state_code, null::text placement_source_ref`, ``
-	box, inBox, inBoxRE := ``, ``, ``
+	state, landA, landR := `null::text state_code, null::text placement_source_ref`, `null::text`, `null::text`
+	inLand, inLandRE := ``, ``
 	if in != "" {
-		box = `land as (
-  select st_expand(st_extent(g.geom::geometry), 0.4, 0.2) box from gazetteer_places g
-  where g.closed_at is null and g.source_id = 'bkg_gvisys' and g.kind = 'city' and g.geom is not null
-    and g.admin_code ~ '^[0-9]{8}$' and left(g.admin_code, 2) = ` + in + `),
-`
-		inBox = `
-  where (select l.box from land l) is null or e.geom::geometry && (select l.box from land l)`
-		inBoxRE = `
-    and ((select l.box from land l) is null or e.geom && (select l.box from land l))`
-		state = `p.code state_code, case when p.code is not null then 'bkg_gvisys' end placement_source_ref`
-		placing = `
-left join lateral (select case when b.location && (select l.box from land l)
-  then (select left(g.admin_code, 2) from gazetteer_places g
-        where g.closed_at is null and g.source_id = 'bkg_gvisys' and g.kind = 'city'
-          and g.admin_code ~ '^[0-9]{8}$' and g.geom is not null
-          and st_dwithin(g.geom, b.location::geography, 20000)
-        order by g.geom <-> b.location::geography
-        limit 1) end code
-  offset 0) p on true`
+		state = `b.land_code state_code, case when b.land_code is not null then 'bkg_gvisys' end placement_source_ref`
+		landA, landR = autobahnLand, `e.land_code`
+		inLand = `
+  where ` + in + ` = 'de' or ` + autobahnLand + ` = ` + in
+		inLandRE = `
+    and (` + in + ` = 'de' or e.land_code = ` + in + `)`
 	}
-	return `(with ` + box + `newest as (
+	return `(with newest as (
   select s.road, s.kind, s.observed_at as at from autobahn_sweeps s
   where s.observed_at > now() - interval '1 day' and s.kind = any(array['warning', 'roadworks', 'closure', 'closure_entry_exit'])),
 autobahn as (
-  select e.observed_at, e.road, e.kind, e.ext_id, e.title, e.subtitle, e.abnormal_traffic_type, e.delay_s, e.geom, e.source,
+  select e.observed_at, e.road, e.kind, e.ext_id, e.title, e.subtitle, e.abnormal_traffic_type, e.delay_s, e.geom, e.source, ` + landA + ` land_code,
          coalesce(e.raw->>'isBlocked', c.blocked) blocked, coalesce(e.raw->>'startTimestamp', c.starts) starts,
          coalesce(e.raw->'description', c.lines) lines
   from autobahn_events e
@@ -183,7 +163,7 @@ autobahn as (
     where e.raw is null and r.ext_id = e.ext_id and r.raw is not null and r.raw_hash = e.raw_hash
       and r.observed_at <= e.observed_at and r.observed_at >= date_trunc('day', e.observed_at, 'UTC')
     order by r.observed_at desc
-    limit 1) c on true` + inBox + `),
+    limit 1) c on true` + inLand + `),
 b as (
   select 'autobahn:' || a.ext_id event_id,
          case when a.kind like 'closure%' then 'closure' when a.kind = 'roadworks' then 'roadworks'
@@ -205,7 +185,8 @@ b as (
          a.observed_at recorded_at, a.observed_at changed_at, null::timestamptz withdrawn_at, 'operator_event' record_class,
          a.subtitle, null::text place_text,
          case a.blocked when 'true' then true when 'false' then false end is_blocked,
-         a.abnormal_traffic_type traffic_type, case when a.delay_s >= 0 then a.delay_s end delay_s, null::text confidentiality
+         a.abnormal_traffic_type traffic_type, case when a.delay_s >= 0 then a.delay_s end delay_s, null::text confidentiality,
+         a.land_code
   from autobahn a
   union all
   select 'datex:' || e.source_id || ':' || e.publication_id,
@@ -230,9 +211,9 @@ b as (
          coalesce(e.overall_start, e.first_seen_at), e.overall_end,
          null::int, null::int, null::int, null::int, coalesce(e.event_type, 'situation'), null::text, 'de',
          e.source_feed, e.publication_id, e.feed_ts, e.first_seen_at, e.updated_at, e.closed_at, 'traffic_message',
-         null::text, null::text, null::boolean, null::text, null::int, e.confidentiality
+         null::text, null::text, null::boolean, null::text, null::int, e.confidentiality, ` + landR + `
   from road_events e
-  where e.deleted_at is null` + inBoxRE + `)
+  where e.deleted_at is null` + inLandRE + `)
 select b.event_id, b.event_kind, b.severity, b.road_ref, b.road_class, b.direction, b.direction_label, b.location,
        b.valid_from, b.valid_to, b.lanes_closed, b.lanes_total, b.delay_min, b.affected_length_m, b.headline,
        b.description, b.text_lang, b.source_ref, b.origin_key, b.published_at, b.recorded_at, b.changed_at,
@@ -241,7 +222,7 @@ select b.event_id, b.event_kind, b.severity, b.road_ref, b.road_class, b.directi
        case when coalesce(b.confidentiality, 'noRestriction') <> 'noRestriction' then 'withhold'
             else coalesce(k.display_class, 'open') end display_class,
        coalesce(k.audience, 'public') audience, b.confidentiality, k.origin_restriction, ` + state + `
-from b` + placing + `
+from b
 left join lateral (select k.excluded, k.audience, k.display_class, k.origin_restriction from contract_source_rules k
                    where b.source_ref ~ k.pattern order by k.priority limit 1) k on true
 where not coalesce(k.excluded, false))`

@@ -121,7 +121,7 @@ where w.source_ref = any($1) and ` + permitted("w") + `
   and w.warning_level >= 1
 group by w.event
 order by 2 desc, 1`,
-		//nolint:misspell // MATERIALIZED is the SQL keyword, not prose
+		//nolint:misspell // materialized is the SQL keyword
 		"api_state_alerts": `
 with f as materialized (
   select a.alert_id, a.header, a.active_to, coalesce(a.line_names, '{}') as line_names, a.dedupe_key, a.source_ref,

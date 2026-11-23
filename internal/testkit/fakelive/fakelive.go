@@ -1,7 +1,7 @@
 // Package fakelive is a fake live refresher for tests and local runs: it
 // stands in for the live refresher of the request protocol, LISTENing on
 // live_refresh_requested, claiming the requests the API records
-// (live.refresh_requests) with FOR UPDATE SKIP LOCKED and settling them once
+// (live.refresh_requests) with FOR NO KEY UPDATE SKIP LOCKED and settling them once
 // (settled_at is null), all as the live refresher's own role,
 // viafrei_live_ingestor, and settles each by a script instead of calling a
 // provider. The API's role is never used here: it records and reads only.

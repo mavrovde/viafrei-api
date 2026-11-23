@@ -216,6 +216,24 @@ func (s *Store) Topic(ctx context.Context, code, lang string) (rules.Topic, erro
 	return out[0], nil
 }
 
+// sourceRuled is whether the source rule of the family expr (the first of
+// contract_source_rules by priority whose pattern it matches) gives its rows
+// to the key: not excluded, not withheld, and public or the key one of
+// ViaFrei's own; a family no rule matches is open and public.
+func sourceRuled(expr string) string {
+	return `coalesce((select not coalesce(k.excluded, false) and coalesce(k.display_class, 'open') <> 'withhold'
+      and (coalesce(k.audience, 'public') = 'public' or ` + ownKeyOn + `)
+    from contract_source_rules k where ` + expr + ` ~ k.pattern order by k.priority limit 1), true)`
+}
+
+// ruledFamilies is the families of the array expr whose source rule gives
+// their rows to the key (sourceRuled), as one array f: a row of a family is
+// read when its family is one of them, the rule decided once a family, not
+// once a row.
+func ruledFamilies(expr string) string {
+	return `select coalesce(array_agg(x.f), '{}') f from unnest(` + expr + `) x(f) where ` + sourceRuled("x.f")
+}
+
 // zoneAlive is the platform's freshness gate of a zone source at $3: its last
 // check within three of its own cadences (30 days when it states none), or
 // its refresh paused after a check.
@@ -243,8 +261,7 @@ r as (
   left join feed_checks c on c.feed_key = z.source_feed
   left join lez_feed_places f on f.feed_key = z.source_feed
   where z.source_feed = any((select $1::text[])::text[]) and `+zoneAlive+`
-    and coalesce((select not k.excluded and k.display_class <> 'withhold' and (k.audience = 'public' or `+ownKeyOn+`)
-                    from contract_source_rules k where z.source_feed ~ k.pattern order by k.priority limit 1), true)
+    and `+sourceRuled("z.source_feed")+`
     and z.geom_m && st_expand(p.m, (select $2::float8))
     and st_dwithin(z.geom_m, p.m, case when z.role = 'exempt_road' then (select $6::float8) else (select $2::float8) end))
 select r.zone_key, r.zone_id, r.zone_role, r.name, r.city, r.publisher_name, r.inside, r.dist,

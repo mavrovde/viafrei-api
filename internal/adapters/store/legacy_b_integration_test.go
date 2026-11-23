@@ -93,6 +93,66 @@ select e.entry_key, e.name, e.place_codes, e.plaque, e.covered, e.lifted_on
 from contract.low_emission_zone_entry e
 where (e.entry_key = $1::text or $1::text = any(e.aliases)) and ` + permitted("e") + `
 order by e.entry_key limit 1`,
+		"api_fuel_near": `
+with here as (select st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography g)
+select s.station_id, s.name, s.brand, st_y(s.location), st_x(s.location),
+       round(st_distance(s.location::geography, here.g))::int, s.open_state, s.source_ref, s.whole_day, s.opening_times,
+       coalesce(p.products, '{}'), coalesce(p.prices, '{}'), coalesce(p.observed, '{}')
+from contract.fuel_station s
+cross join here
+left join lateral (
+  select array_agg(l.product_code order by l.product_code) products,
+         array_agg(l.price::float8 order by l.product_code) prices,
+         array_agg(l.observed_at order by l.product_code) observed
+  from (select distinct on (o.product_code) o.product_code, o.price, o.observed_at
+          from contract.fuel_price_observation o
+         where o.station_id = s.station_id and o.price is not null
+           and o.source_ref = any($4::text[]) and ` + permitted("o") + `
+         order by o.product_code, o.observed_at desc) l) p on true
+where s.withdrawn_at is null
+  and s.source_ref = any($4::text[])
+  and ` + permitted("s") + `
+  and st_dwithin(s.location::geography, here.g, $3::float8)
+order by st_distance(s.location::geography, here.g), s.station_id
+limit $5::bigint`,
+		"api_fuel_coverage": `
+with here as (select st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography g),
+held as (
+  select s.station_id, s.location::geography loc
+  from contract.fuel_station s
+  where s.withdrawn_at is null and s.source_ref = any($4::text[]) and ` + permitted("s") + `)
+select
+  (select count(*)::int from held, here where st_dwithin(held.loc, here.g, $3::float8)),
+  (select min(st_distance(held.loc, here.g)) from held, here
+    where st_dwithin(held.loc, here.g, $6::float8)
+      and exists (select 1 from contract.fuel_price_observation o
+                   where o.station_id = held.station_id and o.price is not null and ($5::text is null or o.product_code = $5::text)
+                     and o.source_ref = any($4::text[]) and ` + permitted("o") + `)),
+  case when $5::text is null then 0 else
+  (select count(*)::int from held, here where st_dwithin(held.loc, here.g, $3::float8)
+     and not exists (select 1 from contract.fuel_price_observation o
+                      where o.station_id = held.station_id and o.price is not null and o.product_code = $5::text
+                        and o.observed_at > $8::timestamptz - make_interval(secs => $7::int)
+                        and o.source_ref = any($4::text[]) and ` + permitted("o") + `)) end`,
+		"api_fuel_by_id": `
+select s.station_id, s.name, s.brand, st_y(s.location), st_x(s.location), s.open_state, s.source_ref, s.whole_day, s.opening_times,
+       s.street, s.house_number, s.postcode, s.city,
+       coalesce(p.products, '{}'), coalesce(p.prices, '{}'), coalesce(p.observed, '{}')
+from contract.fuel_station s
+left join lateral (
+  select array_agg(l.product_code order by l.product_code) products,
+         array_agg(l.price::float8 order by l.product_code) prices,
+         array_agg(l.observed_at order by l.product_code) observed
+  from (select distinct on (o.product_code) o.product_code, o.price, o.observed_at
+          from contract.fuel_price_observation o
+         where o.station_id = s.station_id and o.price is not null
+           and o.observed_at > $4::timestamptz - make_interval(secs => $3::int) and o.observed_at <= $4::timestamptz
+           and o.source_ref = any($2::text[]) and ` + permitted("o") + `
+         order by o.product_code, o.observed_at desc) l) p on true
+where s.station_id = $1::text
+  and s.withdrawn_at is null
+  and s.source_ref = any($2::text[])
+  and ` + permitted("s"),
 	} {
 		legacyReads[name] = sql
 	}

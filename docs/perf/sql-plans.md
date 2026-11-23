@@ -21,6 +21,9 @@ call). Times are per execution, after the first.
 | api_zones_at | under 1 ms (fixture-size view) | 0.4-8 ms | 5 / 5 | index scan of `lez_zones_open_geom_m` |
 | api_zone_entries | 1 ms | 0.13-0.3 ms | 5 / 5 | sequential scan of the curated list (about 100 rows) |
 | api_zone_entry_named | under 1 ms | 0.08-0.2 ms | 5 / 5 | the same |
+| api_fuel_near | 116 ms mean | 5-80 ms (own key) | 5 / 5 | index scan of `fuel_stations_geom_gist`, then the newest price per grade by the price key |
+| api_fuel_coverage | 120 ms mean | 5-58 ms (own key) | 5 / 5 | three index scans of `fuel_stations_geom_gist` (the held stations inlined, not materialised) |
+| api_fuel_by_id | under 1 ms | 1.6-12 ms (own key, cold) | 5 / 5 | the station key, then the price key |
 
 The view cast the area to `geometry(MultiPolygon,4326)`, an expression no
 index holds, so the box test read every warning's area; the statements test

@@ -14,6 +14,21 @@ import (
 
 func init() {
 	for name, sql := range map[string]string{
+		"api_fuel_near": `with fam as (select array_agg(distinct coalesce(source_feed, source)) f from public.fuel_stations),
+pt as (select st_x(geom::geometry) lon, st_y(geom::geometry) lat from public.fuel_stations where geom is not null
+       union all values (13.405::float8, 52.52::float8))
+select pt.lon, pt.lat, v.r, v.fs, v.lim from pt, fam,
+  lateral (values (fam.f, 5000::float8, 200::bigint), (fam.f, 25000, 3), (array['tankerkoenig_hist'], 25000, 200), ('{}'::text[], 5000, 200)) v(fs, r, lim)`,
+		"api_fuel_coverage": `with fam as (select array_agg(distinct coalesce(source_feed, source)) f from public.fuel_stations),
+pt as (select st_x(geom::geometry) lon, st_y(geom::geometry) lat from public.fuel_stations where geom is not null
+       union all values (13.405::float8, 52.52::float8)),
+g as (select distinct product g from public.fuel_prices union all select null union all select 'hydrogen'),
+t as (select max(observed_at) + interval '1 minute' t from public.fuel_prices union all select now())
+select pt.lon, pt.lat, 5000::float8, fam.f, g.g, 25000::float8, v.s, t.t from pt, fam, g, t, (values (600), (86400 * 30)) v(s)`,
+		"api_fuel_by_id": `with fam as (select array_agg(distinct coalesce(source_feed, source)) f from public.fuel_stations),
+t as (select max(observed_at) + interval '1 minute' t from public.fuel_prices union all select now())
+select x.i, v.fs, w.s, t.t from (select id i from public.fuel_stations union all select 'no-such-station') x, fam, t,
+  lateral (values (fam.f), (array['tankerkoenig_hist']), ('{}'::text[])) v(fs), (values (600), (86400 * 30)) w(s)`,
 		"api_weather_warnings_page": weatherPageCases,
 		"api_weather_warnings_here": `select f, t, lat, lon from (` + weatherPoints + `) x`,
 		"api_weather_cell_at":       `select distinct f, lat, lon from (` + weatherPoints + `) x`,

@@ -94,7 +94,7 @@ func (s *Store) Motorways(ctx context.Context, q roads.CatalogueQuery, families 
 // a road of the register, of the families $1.
 var motorwayFamilies = opaqueNamed("api_motorway_families", `
 select coalesce(array_agg(distinct e.source_ref order by e.source_ref), '{}')
-from `+trafficEvents(false)+` e
+from `+trafficEvents("")+` e
 join autobahn_roads r on r.road = e.road_ref
 where e.source_ref = any($1) and `+eventPermitted+`
   and e.withdrawn_at is null and e.valid_from <= $2 and (e.valid_to is null or e.valid_to > $2)`, "text[]", "timestamptz")
@@ -115,7 +115,7 @@ func motorwaysOf(name string, liveLand bool) stmt {
 	return opaqueNamed(name, `
 with es as (
   select e.road_ref, count(*)::int as n, array_agg(distinct e.source_ref order by e.source_ref) as sources
-  from `+trafficEvents(false)+` e
+  from `+trafficEvents("")+` e
   where e.source_ref = any($1) and `+eventPermitted+`
     and e.withdrawn_at is null and e.valid_from <= $5 and (e.valid_to is null or e.valid_to > $5)
   group by e.road_ref)
@@ -142,7 +142,7 @@ var (
 // roadLampMessages is the lamp's view of the situations on each road of $3
 // (canonical references), of the families $1 at $2 (messagesSelect).
 var roadLampMessages = opaqueNamed("api_road_lamp_messages", `select `+fmt.Sprintf(canonicalRef, "e.road_ref")+`, `+messagesAgg+`
-`+messagesFrom(false)+`
+`+messagesFrom("")+`
   and `+fmt.Sprintf(canonicalRef, "e.road_ref")+` = any($3)
 group by 1`, "text[]", "timestamptz", "text[]")
 

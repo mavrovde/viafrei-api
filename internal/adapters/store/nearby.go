@@ -39,6 +39,7 @@ func needStatement(need string, kinds []string) stmt {
 		where += `
   and not (p.category_value = 'post_office' and p.name ~* '\m(dpd|hermes|gls|ups|fedex)\M')`
 	}
+	//nolint:misspell // MATERIALIZED is the SQL keyword, not prose
 	return named("api_nearby_need_"+need, `
 with k as materialized (
   select p.geom <-> `+atPosition+` d from osm_pois p

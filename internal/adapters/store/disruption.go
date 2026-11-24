@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -89,8 +90,26 @@ limit 1`, "text", "text[]")
 // families $3: the platform's region watch count.
 var areaTrips = namedOpaque("api_area_trips", `select count(distinct t.trip_ref)::int, (count(distinct t.trip_ref) filter (where t.worst_delay_s > $2::int * 60))::int,
        max(t.observed_at), coalesce(min(t.source_ref), '')
-from (`+relTransitTripDelay+`) t
+from (`+tripDelaysOfLand(relTransitTripDelay)+`) t
 where starts_with(t.area_code, $1) and t.source_ref = any($3) and `+permitted("t"), "text", "integer", "text[]")
+
+// tripDelaysOfLand is the trip delays relation rel bound to the Land of the
+// area $1 (landOfDelay); it panics at init when the relation no longer
+// holds the one place the bound goes, so the bound is never dropped quietly.
+func tripDelaysOfLand(rel string) string {
+	const at = "WHERE d.source = 'delfi_rt_tu'::text AND"
+	if n := strings.Count(rel, at); n != 1 {
+		panic(fmt.Sprintf("store: the trip delays relation holds %q %d times, not once: the Land bound has no place", at, n))
+	}
+	return strings.Replace(rel, at, "WHERE "+landOfDelay+" = left($1::text, 2) AND "+at[len("WHERE "):], 1)
+}
+
+// landOfDelay is the Land of a Trip Updates delay d, as the delays' index
+// of the Land and time keys it (its expression exactly, so the index is
+// read): the area key's first two digits. An area's delays are its Land's,
+// and the 30 minutes of every Land's delays were read and grouped to count
+// one area's trips, 0.6 to 1.7 s on prod (2026-11-24).
+const landOfDelay = `"left"(CASE WHEN ((d.stop_id ~* '^de:[0-9]+(:|$)'::text) AND (length(split_part(d.stop_id, ':'::text, 2)) = ANY (ARRAY[2, 3, 5, 8]))) THEN split_part(d.stop_id, ':'::text, 2) ELSE NULL::text END, 2)`
 
 // lineInTimetable reads whether a line of the families $2 may be read at all
 // (a timetable to ask), and the families whose line of the folded name $1
@@ -100,7 +119,14 @@ var lineInTimetable = namedOpaque("api_line_in_timetable", `select exists (selec
                   where upper(regexp_replace(l.line_name, '\s+', '', 'g')) = $1::text and l.source_ref = any($2) and `+permitted("l")+`), '{}')`, "text", "text[]")
 
 // punctualityFamily is the family contract.transit_punctuality is of (its
-// source_ref): the DELFI Trip Updates.
+// source_ref): the DELFI Trip Updates under its licence's id, not the
+// family the register publishes (tripUpdatesFamily), so a key holding the
+// published family is given no area punctuality. Stamped with the
+// published family, the read is served and takes 2 to 6 s on prod
+// (2026-11-24): transit_punctuality_area_live counts all sixteen Länder in
+// a materialised CTE no area filter reaches, and the API's role may not
+// read the untimed-trips relation a read of one Land would need. It
+// waits for the database to give a Land's punctuality.
 const punctualityFamily = "delfi_rt_tu"
 
 // Disruptions reads the alerts and the punctuality q asks for

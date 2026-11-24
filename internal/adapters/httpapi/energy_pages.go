@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"unicode/utf8"
 
 	"github.com/danielgtaylor/huma/v2"
 )
@@ -78,7 +79,17 @@ func registerFuelStation(api huma.API, s *server, op huma.Operation) {
 
 // ChargingSiteInput is the input of getChargingSite.
 type ChargingSiteInput struct {
-	ID string `path:"chargingId" maxLength:"200" pattern:"^[A-Za-z0-9:._/-]+$" example:"cs-000001" doc:"A charging site's id, as listChargingOptions answers it."`
+	ID string `path:"chargingId" maxLength:"200" pattern:"^[^\\x00-\\x1F\\x7F-\\x9F]+$" example:"cs-000001" doc:"A charging site's id, as listChargingOptions answers it."`
+}
+
+// Resolve refuses an id that is not UTF-8: the pattern reads an invalid
+// byte as a replacement character and lets it through, and the database
+// then fails the read (22021), a 5xx for one request.
+func (in *ChargingSiteInput) Resolve(huma.Context) []error {
+	if !utf8.ValidString(in.ID) {
+		return []error{&huma.ErrorDetail{Location: "path.chargingId", Message: "is not UTF-8", Value: in.ID}}
+	}
+	return nil
 }
 
 // ChargingSiteEnvelope is the enveloped answer of getChargingSite.

@@ -92,7 +92,13 @@ func TestChargingSiteByID(t *testing.T) {
 			t.Errorf("%q: status %d, asked %q: %s", id, w.Code, f.objects.gotID, w.Body)
 		}
 	}
-	assertProblem(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/charging-options/a%0Ab", bearer), 400, "invalid-parameter")
+	for _, bad := range []string{"a%0Ab", "a%FFb", "a%C2%85b"} { // a C0 control, a byte that is no UTF-8, a C1 control
+		f := everyAnswer()
+		assertProblem(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/charging-options/"+bad, bearer), 400, "invalid-parameter")
+		if f.objects.gotID != "" {
+			t.Errorf("%s reached the store as %q", bad, f.objects.gotID)
+		}
+	}
 }
 
 type pressureFake bool

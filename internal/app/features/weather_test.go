@@ -26,21 +26,30 @@ var wxRegister = []access.Terms{
 
 type wxFake struct {
 	*fake
-	warnings    []weather.Warning
-	levels      []weather.Level // the levels in force; those of warnings when nil
-	more        bool
-	next        *time.Time // the next start or end of a warning placed at the position
-	stale       []string
-	missing     []string
-	topic       rules.Topic
-	readErr     error
-	gotQuery    weather.Query
-	gotFamilies []string
-	gotNow      time.Time
-	gotCode     string
-	readCalls   int
-	cells       map[string]weather.Cell // by cell key, "@" for any position
-	gotCells    []weather.CellQuery
+	warnings     []weather.Warning
+	levels       []weather.Level // the levels in force; those of warnings when nil
+	more         bool
+	next         *time.Time // the next start or end of a warning placed at the position
+	stale        []string
+	missing      []string
+	topic        rules.Topic
+	readErr      error
+	gotQuery     weather.Query
+	gotFamilies  []string
+	gotNow       time.Time
+	gotCode      string
+	readCalls    int
+	cells        map[string]weather.Cell // by cell key, "@" for any position
+	gotCells     []weather.CellQuery
+	road         []weather.RoadStation
+	roadErr      error
+	gotRoad      []string // the families the road forecast was asked of
+	gotRoadQuery weather.RoadQuery
+}
+
+func (f *wxFake) RoadForecast(_ context.Context, q weather.RoadQuery, fams []string) ([]weather.RoadStation, error) {
+	f.gotRoad, f.gotRoadQuery = fams, q
+	return f.road, f.roadErr
 }
 
 // CellWarnings answers the cell f.cells holds under q's key ("@" for a
@@ -110,7 +119,8 @@ func wxService(f *wxFake) *features.Service {
 		f.reg = wxRegister
 	}
 	return features.New(features.Repositories{Register: f, Weather: f, Rules: f, Places: f},
-		features.Settings{Language: "en", MaxWarnings: 7}, func() time.Time { return now })
+		features.Settings{Language: "en", MaxWarnings: 7, Road: features.RoadReach{Stations: 3, RadiusM: 25000, Current: time.Hour, LookAhead: 24 * time.Hour}},
+		func() time.Time { return now })
 }
 
 func TestWeatherRiskIsGatedAttributedAndLit(t *testing.T) {
@@ -305,5 +315,34 @@ func TestACellWarningsEnglishTextIsCredited(t *testing.T) {
 	a, err := wxService(f).WeatherCell(context.Background(), both, "812345000", nil, 0)
 	if err != nil || !slices.Equal(names(a.Meta.Families), []string{"w1", "w2"}) {
 		t.Errorf("credited %v, %v", names(a.Meta.Families), err)
+	}
+}
+
+// The road-surface forecast near the position is read of the permitted
+// families and answered beside the warnings, its station's and its hours'
+// families credited outside the lamp's sight; a failed read fails the
+// answer.
+func TestTheRoadForecastIsAnsweredAndCredited(t *testing.T) {
+	req.Covers(t, "FR-WEATHER-001")
+	both := key("consumer", []access.Scope{"weather"}, "w1", "w2")
+	f := &wxFake{road: []weather.RoadStation{{ID: "s1", Family: "w2", ForecastFamily: "w2"}}}
+	r, err := wxService(f).WeatherRisk(context.Background(), both, weather.Query{})
+	if err != nil || len(r.Road) != 1 || r.Road[0].ID != "s1" || !slices.Equal(f.gotRoad, []string{"w1", "w2"}) {
+		t.Errorf("road %+v of %v, %v", r.Road, f.gotRoad, err)
+	}
+	if g := f.gotRoadQuery; g.Stations != 3 || g.RadiusM != 25000 || !g.From.Equal(now.Add(-time.Hour)) || !g.Until.Equal(now.Add(24*time.Hour)) {
+		t.Errorf("road asked %+v", g)
+	}
+	f = &wxFake{warnings: []weather.Warning{{ID: "a", Family: "w1", Level: 1}}, road: []weather.RoadStation{{ID: "s1", Family: "w2", ForecastFamily: "w2"}}}
+	if r, err = wxService(f).WeatherRisk(context.Background(), both, weather.Query{}); err != nil || !slices.Equal(names(r.Families), []string{"w1", "w2"}) {
+		t.Errorf("credited %v, %v", names(r.Families), err)
+	}
+	f = &wxFake{roadErr: errStore}
+	if _, err = wxService(f).WeatherRisk(context.Background(), both, weather.Query{}); !errors.Is(err, errStore) {
+		t.Errorf("a failed road read: %v", err)
+	}
+	f = &wxFake{road: []weather.RoadStation{{ID: "s1", Family: "k1", ForecastFamily: "k1"}}}
+	if _, err = wxService(f).WeatherRisk(context.Background(), both, weather.Query{}); !errors.Is(err, features.ErrGateViolation) {
+		t.Errorf("a road station of a family not permitted: %v", err)
 	}
 }

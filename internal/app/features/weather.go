@@ -26,6 +26,9 @@ type Weather interface {
 	// warnings of the given families in force at now, at or above
 	// q.MinLevel, worst first; weather.ErrNoCell when no cell answers.
 	CellWarnings(ctx context.Context, q weather.CellQuery, families []string, now time.Time) (weather.Cell, error)
+	// RoadForecast returns the road-surface forecast of the given families
+	// q asks for: the nearest stations first, each with its hours.
+	RoadForecast(ctx context.Context, q weather.RoadQuery, families []string) ([]weather.RoadStation, error)
 }
 
 // Rules is the port to the driving-rules store.
@@ -51,6 +54,9 @@ type WeatherRisk struct {
 	// on, so it is never served past it, not even stale. Nil when none
 	// starts or ends.
 	WarningChange *time.Time
+	// Road is the road-surface forecast near the position, nearest station
+	// first; empty when no station of the families answers.
+	Road []weather.RoadStation
 }
 
 // WeatherRisk answers "is there a weather warning here" for key
@@ -72,11 +78,25 @@ func (s *Service) WeatherRisk(ctx context.Context, key access.Record, q weather.
 	if err != nil {
 		return WeatherRisk{}, err
 	}
+	road, err := s.repos.Weather.RoadForecast(ctx, weather.RoadQuery{At: q.At, Stations: s.set.Road.Stations, RadiusM: s.set.Road.RadiusM,
+		From: now.Add(-s.set.Road.Current), Until: now.Add(s.set.Road.LookAhead)}, permitted)
+	if err != nil {
+		return WeatherRisk{}, err
+	}
 	contributed := make([]string, len(sc.Warnings))
+	// more are the families of what the answer states beside the warnings:
+	// the issuer's English texts and the road-surface forecast.
+	var more []string
 	for i, w := range sc.Warnings {
 		contributed[i] = w.Family
+		if w.English != nil {
+			more = append(more, w.English.Family)
+		}
 	}
-	if err := gate.Check(contributed); err != nil {
+	for _, st := range road {
+		more = append(more, st.Family, st.ForecastFamily)
+	}
+	if err := gate.Check(append(slices.Clone(contributed), more...)); err != nil {
 		return WeatherRisk{}, err
 	}
 	// The lamp's sight and credit are those of the families that hold rows of the
@@ -90,9 +110,10 @@ func (s *Service) WeatherRisk(ctx context.Context, key access.Record, q weather.
 	if err != nil {
 		return WeatherRisk{}, err
 	}
-	// The issuer's English text is credited to its own family, outside the
-	// lamp's sight: the lamp reads the levels of the original warnings.
-	if fams, err = s.withEnglish(ctx, fams, sc.Warnings); err != nil {
+	// The issuer's English text and the road-surface forecast are credited
+	// to their own families, outside the lamp's sight: the lamp reads the
+	// levels of the original warnings.
+	if fams, err = s.withCredits(ctx, fams, more); err != nil {
 		return WeatherRisk{}, err
 	}
 	// The answer changes with the clock alone when a warning starts or ends,
@@ -104,7 +125,7 @@ func (s *Service) WeatherRisk(ctx context.Context, key access.Record, q weather.
 	return WeatherRisk{
 		Answer: Answer[weather.Warning]{Items: sc.Warnings, HasMore: sc.HasMore, Families: fams, Partial: partial, At: now,
 			ChangesAt: changes},
-		Lamp: weather.LampOf(sc.Levels, partial, stale), Read: permitted, WarningChange: sc.NextChange,
+		Lamp: weather.LampOf(sc.Levels, partial, stale), Read: permitted, WarningChange: sc.NextChange, Road: road,
 	}, nil
 }
 
@@ -195,16 +216,15 @@ func (s *Service) LowEmissionZones(ctx context.Context, key access.Record, q rul
 	return out, nil
 }
 
-// withEnglish adds to fams the families of the English texts the warnings
-// carry, once each, when fams does not credit them yet.
-func (s *Service) withEnglish(ctx context.Context, fams []provenance.Family, ws []weather.Warning) ([]provenance.Family, error) {
+// withCredits adds to fams the families named, once each, that fams does
+// not credit yet.
+func (s *Service) withCredits(ctx context.Context, fams []provenance.Family, names []string) ([]provenance.Family, error) {
 	var more []string
-	for _, w := range ws {
-		if w.English == nil || slices.Contains(more, w.English.Family) ||
-			slices.ContainsFunc(fams, func(f provenance.Family) bool { return f.Source.Family == w.English.Family }) {
+	for _, n := range names {
+		if slices.Contains(more, n) || slices.ContainsFunc(fams, func(f provenance.Family) bool { return f.Source.Family == n }) {
 			continue
 		}
-		more = append(more, w.English.Family)
+		more = append(more, n)
 	}
 	if len(more) == 0 {
 		return fams, nil

@@ -6417,6 +6417,115 @@
         ],
         "type": "object"
       },
+      "RoadForecastHour": {
+        "additionalProperties": false,
+        "properties": {
+          "roadCondition": {
+            "description": "The issuer's road-condition class, as issued: 1 dry, 2 damp, 3 snow, 4 hoarfrost, 5 freezing wet, 6 black ice; 3 and above is slippery as the platform reads it. Null when not given.",
+            "format": "int64",
+            "maximum": 6,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "runAt": {
+            "description": "When the issuer's forecast run that gave this hour was made (UTC).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "surfaceTempC": {
+            "description": "The forecast road-surface temperature in degrees Celsius, as issued; null when not given.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "validAt": {
+            "description": "The hour the forecast is for (UTC).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "validAtLocal": {
+            "description": "validAt in Europe/Berlin time.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "validAt",
+          "validAtLocal",
+          "runAt",
+          "roadCondition",
+          "surfaceTempC"
+        ],
+        "type": "object"
+      },
+      "RoadForecastStation": {
+        "additionalProperties": false,
+        "properties": {
+          "distanceM": {
+            "description": "Distance from the position in metres, rounded.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "forecastFamily": {
+            "description": "The source family of the forecast hours; its attribution is in meta.attribution.",
+            "type": "string"
+          },
+          "hours": {
+            "description": "The forecast hours, earliest first.",
+            "items": {
+              "$ref": "#/components/schemas/RoadForecastHour"
+            },
+            "type": "array"
+          },
+          "id": {
+            "description": "The issuer's station id.",
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "name": {
+            "description": "The issuer's station name.",
+            "type": "string"
+          },
+          "positionSource": {
+            "description": "How the issuer took the station's position, as issued; null when not given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "segmentType": {
+            "description": "The issuer's road segment type of the station, as issued; null when not given.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "sourceFamily": {
+            "description": "The source family of the station; its attribution is in meta.attribution.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "segmentType",
+          "positionSource",
+          "location",
+          "distanceM",
+          "hours",
+          "sourceFamily",
+          "forecastFamily"
+        ],
+        "type": "object"
+      },
       "RoadSituation": {
         "additionalProperties": false,
         "properties": {
@@ -8565,6 +8674,13 @@
             ],
             "type": "string"
           },
+          "roadForecast": {
+            "description": "The issuer's road-surface forecast near the position, as the platform's weather warnings check reads it: the nearest open, active road-weather stations within 25 km, at most 3, nearest first, each with its forecast hours from 60 minutes before the answer's instant to 24 hours after it, earliest first. A station with no hour in that window is not listed; empty when no station of a family the key may read answers. Its sources and their conditions are in meta.attribution and meta.notes when a station is listed.",
+            "items": {
+              "$ref": "#/components/schemas/RoadForecastStation"
+            },
+            "type": "array"
+          },
           "roadWeather": {
             "description": "Road-weather observations near a corridor; present for along questions only, so always empty on a question about one position.",
             "items": {
@@ -8588,7 +8704,8 @@
           "lamp",
           "warnings",
           "truncated",
-          "roadWeather"
+          "roadWeather",
+          "roadForecast"
         ],
         "type": "object"
       },
@@ -24036,11 +24153,13 @@
                             "description": null,
                             "instruction": null,
                             "urgency": null,
-                            "certainty": null
+                            "certainty": null,
+                            "english": null
                           }
                         ],
                         "truncated": false,
-                        "roadWeather": []
+                        "roadWeather": [],
+                        "roadForecast": []
                       },
                       "meta": {
                         "requestId": "example-request-0001",

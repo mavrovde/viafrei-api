@@ -60,6 +60,9 @@ func riskAnswer() features.WeatherRisk {
 				Headline: "Hinweis", TextLanguage: "de", From: fixedNow, AreaName: "Kreis A"},
 		}, HasMore: true, Families: []provenance.Family{weatherFamily}, At: fixedNow},
 		Lamp: weather.LampRed,
+		Road: []weather.RoadStation{{ID: "10427", Name: "A7 Kassel", Segment: ip(2), Location: geo.Point{Lat: 51.3, Lon: 9.5}, DistanceM: 4210,
+			Family: "src-alpha-weather", ForecastFamily: "src-beta-weather",
+			Hours: []weather.RoadHour{{ValidAt: fixedNow, RunAt: fixedNow.Add(-time.Hour), Class: ip(5), SurfaceTempC: fp(-1.5)}, {ValidAt: fixedNow.Add(time.Hour), RunAt: fixedNow.Add(-time.Hour)}}}},
 	}
 }
 
@@ -108,6 +111,16 @@ func TestWeatherRiskAnswer(t *testing.T) {
 	}
 	if rw, ok := data["roadWeather"].([]any); !ok || len(rw) != 0 {
 		t.Errorf("roadWeather %v", data["roadWeather"])
+	}
+	rf, _ := data["roadForecast"].([]any)
+	st0, _ := rf[0].(map[string]any)
+	hs, _ := st0["hours"].([]any)
+	h0, _ := hs[0].(map[string]any)
+	h1, _ := hs[1].(map[string]any)
+	if len(rf) != 1 || st0["id"] != "10427" || st0["segmentType"] != 2.0 || st0["positionSource"] != nil || st0["distanceM"] != 4210.0 ||
+		st0["sourceFamily"] != "src-alpha-weather" || st0["forecastFamily"] != "src-beta-weather" || len(hs) != 2 ||
+		h0["roadCondition"] != 5.0 || h0["surfaceTempC"] != -1.5 || h0["validAtLocal"] == nil || h1["roadCondition"] != nil || h1["surfaceTempC"] != nil {
+		t.Errorf("roadForecast %v", data["roadForecast"])
 	}
 	w1, _ := ws[1].(map[string]any)
 	v1, _ := w1["validity"].(map[string]any)

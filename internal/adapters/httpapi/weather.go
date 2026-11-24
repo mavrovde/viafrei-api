@@ -85,10 +85,47 @@ type RoadWeatherObservation struct {
 // states neither, and the /v1 contract keeps both (VER-001), so the parity
 // harness leaves them out (parity.Default).
 type WeatherRiskData struct {
-	Lamp        string                   `json:"lamp" enum:"green,amber,red" doc:"Over every warning in force at the position, whatever min_level and hazards keep (they filter only the list), first match: red when a warning of level 3 or 4 is in force; amber for a warning of level 1 or 2, or, with no warning in force, when the sight is limited: a weather family the key may not read was left out (meta.partial), or a weather family read has no data or stale data (meta.freshness), since no warning cannot then be told from none heard; green when no warning is in force and every family is fresh."`
-	Warnings    []WeatherWarning         `json:"warnings" doc:"The warnings min_level and hazards keep, ordered by level descending, then validity.from ascending, then id; at most weather.max_warnings."`
-	Truncated   bool                     `json:"truncated" doc:"True when more warnings answer than weather.max_warnings and only the first are listed; the lamp reads them all."`
-	RoadWeather []RoadWeatherObservation `json:"roadWeather" doc:"Road-weather observations near a corridor; present for along questions only, so always empty on a question about one position."`
+	Lamp         string                   `json:"lamp" enum:"green,amber,red" doc:"Over every warning in force at the position, whatever min_level and hazards keep (they filter only the list), first match: red when a warning of level 3 or 4 is in force; amber for a warning of level 1 or 2, or, with no warning in force, when the sight is limited: a weather family the key may not read was left out (meta.partial), or a weather family read has no data or stale data (meta.freshness), since no warning cannot then be told from none heard; green when no warning is in force and every family is fresh."`
+	Warnings     []WeatherWarning         `json:"warnings" doc:"The warnings min_level and hazards keep, ordered by level descending, then validity.from ascending, then id; at most weather.max_warnings."`
+	Truncated    bool                     `json:"truncated" doc:"True when more warnings answer than weather.max_warnings and only the first are listed; the lamp reads them all."`
+	RoadWeather  []RoadWeatherObservation `json:"roadWeather" doc:"Road-weather observations near a corridor; present for along questions only, so always empty on a question about one position."`
+	RoadForecast []RoadForecastStation    `json:"roadForecast" doc:"The issuer's road-surface forecast near the position, as the platform's weather warnings check reads it: the nearest open, active road-weather stations within 25 km, at most 3, nearest first, each with its forecast hours from 60 minutes before the answer's instant to 24 hours after it, earliest first. A station with no hour in that window is not listed; empty when no station of a family the key may read answers. Its sources and their conditions are in meta.attribution and meta.notes when a station is listed."`
+}
+
+// RoadForecastStation is a road-weather station and its forecast hours.
+type RoadForecastStation struct {
+	ID             string             `json:"id" doc:"The issuer's station id."`
+	Name           string             `json:"name" doc:"The issuer's station name."`
+	SegmentType    *int               `json:"segmentType" nullable:"true" doc:"The issuer's road segment type of the station, as issued; null when not given."`
+	PositionSource *string            `json:"positionSource" nullable:"true" doc:"How the issuer took the station's position, as issued; null when not given."`
+	Location       Position           `json:"location"`
+	DistanceM      int                `json:"distanceM" doc:"Distance from the position in metres, rounded."`
+	Hours          []RoadForecastHour `json:"hours" doc:"The forecast hours, earliest first."`
+	SourceFamily   string             `json:"sourceFamily" doc:"The source family of the station; its attribution is in meta.attribution."`
+	ForecastFamily string             `json:"forecastFamily" doc:"The source family of the forecast hours; its attribution is in meta.attribution."`
+}
+
+// RoadForecastHour is one forecast hour of a road-weather station.
+type RoadForecastHour struct {
+	ValidAt       time.Time `json:"validAt" format:"date-time" doc:"The hour the forecast is for (UTC)."`
+	ValidAtLocal  string    `json:"validAtLocal" format:"date-time" doc:"validAt in Europe/Berlin time."`
+	RunAt         time.Time `json:"runAt" format:"date-time" doc:"When the issuer's forecast run that gave this hour was made (UTC)."`
+	RoadCondition *int      `json:"roadCondition" nullable:"true" minimum:"1" maximum:"6" doc:"The issuer's road-condition class, as issued: 1 dry, 2 damp, 3 snow, 4 hoarfrost, 5 freezing wet, 6 black ice; 3 and above is slippery as the platform reads it. Null when not given."`
+	SurfaceTempC  *float64  `json:"surfaceTempC" nullable:"true" doc:"The forecast road-surface temperature in degrees Celsius, as issued; null when not given."`
+}
+
+// roadForecast is the answer of the road-surface forecast.
+func roadForecast(stations []weather.RoadStation) []RoadForecastStation {
+	out := make([]RoadForecastStation, len(stations))
+	for i, st := range stations {
+		hs := make([]RoadForecastHour, len(st.Hours))
+		for j, h := range st.Hours {
+			hs[j] = RoadForecastHour{ValidAt: h.ValidAt, ValidAtLocal: local(h.ValidAt), RunAt: h.RunAt, RoadCondition: h.Class, SurfaceTempC: h.SurfaceTempC}
+		}
+		out[i] = RoadForecastStation{ID: st.ID, Name: st.Name, SegmentType: st.Segment, PositionSource: st.PositionSource,
+			Location: position(st.Location), DistanceM: st.DistanceM, Hours: hs, SourceFamily: st.Family, ForecastFamily: st.ForecastFamily}
+	}
+	return out
 }
 
 // WeatherRiskQuery is meta.query of getWeatherRisk.
@@ -139,7 +176,8 @@ func registerWeatherRisk(api huma.API, s *server, op huma.Operation) {
 		noteWeatherLamp(ctx, a)
 		ws := weatherWarnings(a.Items, a.At)
 		return &WeatherRiskOutput{CacheControl: noStore, Body: WeatherRiskEnvelope{
-			Data: WeatherRiskData{Lamp: string(a.Lamp), Warnings: ws, Truncated: a.HasMore, RoadWeather: []RoadWeatherObservation{}},
+			Data: WeatherRiskData{Lamp: string(a.Lamp), Warnings: ws, Truncated: a.HasMore, RoadWeather: []RoadWeatherObservation{},
+				RoadForecast: roadForecast(a.Road)},
 			Meta: WeatherRiskMeta{
 				DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
 				Query:    WeatherRiskQuery{At: position(q.At), MinLevel: in.MinLevel, Hazards: hazards},

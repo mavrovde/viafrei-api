@@ -19,3 +19,27 @@ const legacyFacilitySeen = `left join lateral (select coalesce((select st.last_s
                                      (select e.last_seen_at from station_equipment e where 'equipment:' || e.equipment_id = f.facility_id),
                                      (select d.last_seen_at from db_facilities d where 'fasta:' || d.equipment_no = f.facility_id)) seen,
                             (select e.equipment_no from station_equipment e where 'equipment:' || e.equipment_id = f.facility_id) eno) x on true`
+
+// The road-surface forecast had no view (#222): its frozen statement is the
+// platform's own read of it (its weather warnings check), the stations of
+// the families, then the hours while the forecast's family is read.
+func init() {
+	legacyReads["api_road_forecast_near"] = `
+with pt as (select st_setsrid(st_makepoint($3::float8, $2::float8), 4326)::geography as g),
+near as (
+  select s.station_id, s.name, s.segment_type, s.position_source, s.source_feed,
+         st_y(s.geom::geometry) as lat, st_x(s.geom::geometry) as lon,
+         st_distance(s.geom, pt.g) as distance_m
+    from road_weather_stations s, pt
+   where s.closed_at is null and not s.inactive and s.source_feed = any($1::text[])
+     and st_dwithin(s.geom, pt.g, $4::float8)
+   order by s.geom <-> pt.g
+   limit $5::int
+)
+select n.station_id, n.name, n.segment_type::int, n.position_source, n.source_feed, n.lat, n.lon, round(n.distance_m)::int,
+       f.valid_at, f.run_at, f.rc::int, f.ts::numeric::float8
+  from near n
+  join road_weather_forecast f on f.station_id = n.station_id
+ where 'dwd_road_forecast' = any($1::text[]) and f.valid_at >= $6::timestamptz and f.valid_at <= $7::timestamptz
+ order by n.distance_m, n.station_id, f.valid_at`
+}

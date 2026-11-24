@@ -5,6 +5,7 @@ package store_test
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"strconv"
@@ -28,6 +29,10 @@ const testBound = 2 * time.Second
 var db *pgtest.DB
 
 func TestMain(m *testing.M) {
+	flag.Parse()
+	if store.ParityOn() {
+		store.EnableParity()
+	}
 	// Starting the container is setup, outside every test body's bound.
 	ctx, cancel := context.WithTimeout(context.Background(), pgtest.SetupBound)
 	rows, err := seedRows()
@@ -40,7 +45,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	code := m.Run()
-	if code == 0 && !parityHeld() {
+	if code == 0 && store.ParityOn() && !parityHeld() {
 		code = 1
 	}
 	db.Stop()

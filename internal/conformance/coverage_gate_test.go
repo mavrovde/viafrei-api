@@ -89,11 +89,16 @@ func measureFindings(w ciJobs) []string {
 		!strings.Contains(r, "-p 1 -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-perf.out -json ./internal/perf") {
 		out = append(out, "job integration does not run internal/perf alone into coverage-perf.out")
 	}
+	// The parity of the named statements with the frozen views is a set of
+	// its own (-parity), in a job of its own, into a profile of its own.
+	if r := runOf(w.Jobs["parity"]); !strings.Contains(r, "-coverpkg=./... -coverprofile=coverage-parity.out -json ./internal/adapters/store -args -parity") {
+		out = append(out, "job parity does not run the store's parity into coverage-parity.out")
+	}
 	gate := runOf(w.Jobs["coverage"])
 	for _, want := range []string{
 		"scripts/boot-coverage.sh coverage-boot.out",
 		"covergate -min 100 -exclusions test/coverage-exclusions.txt -o coverage.out",
-		"coverage-unit.out coverage-integration.out coverage-perf.out coverage-boot.out",
+		"coverage-unit.out coverage-integration.out coverage-perf.out coverage-parity.out coverage-boot.out",
 	} {
 		if !strings.Contains(gate, want) {
 			out = append(out, "job coverage does not run "+want)
@@ -128,7 +133,7 @@ func swallowFindings(job string, j ciJob) []string {
 // accessibility runner it reads.
 func needsFindings(w ciJobs) []string {
 	var out []string
-	for job, want := range map[string][]string{"coverage": {"test", "integration"}, "sonar": {"coverage", "docs-portal"}} {
+	for job, want := range map[string][]string{"coverage": {"test", "integration", "parity"}, "sonar": {"coverage", "docs-portal"}} {
 		for _, n := range want {
 			if !slices.Contains(needs(w.Jobs[job].Needs), n) {
 				out = append(out, "job "+job+" does not need "+n)
@@ -157,7 +162,8 @@ func TestCoverageGateIsWired(t *testing.T) {
 		"ci.yml does not parse":                        {"jobs:\n", "jobs: ["},
 		"job coverage sets continue-on-error":          {"    name: Coverage gate (100 % per package)\n", "    name: Coverage gate (100 % per package)\n    continue-on-error: true\n"},
 		"(Merge and gate) sets continue-on-error":      {"      - name: Merge and gate\n", "      - name: Merge and gate\n        continue-on-error: ${{ true }}\n"},
-		"(Merge and gate) swallows a failure":          {"coverage-unit.out coverage-integration.out coverage-perf.out coverage-boot.out", "coverage-unit.out coverage-integration.out coverage-perf.out coverage-boot.out || true"},
+		"(Merge and gate) swallows a failure":          {"coverage-unit.out coverage-integration.out coverage-perf.out coverage-parity.out coverage-boot.out", "coverage-unit.out coverage-integration.out coverage-perf.out coverage-parity.out coverage-boot.out || true"},
+		"job parity does not run the store's parity":   {"./internal/adapters/store -args -parity", "./internal/adapters/store"},
 		"swallows a failure with || true":              {"-coverprofile=coverage-integration.out", "-coverprofile=coverage-integration.out || :"},
 	} {
 		bad := strings.Replace(string(ci), plant[0], plant[1], 1)

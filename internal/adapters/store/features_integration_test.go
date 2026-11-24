@@ -4,6 +4,7 @@ package store_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -622,9 +623,21 @@ where withdrawn_at is null and source_ref in (`+in+`) and `+where, &out)
 	if err != nil || len(stated) == 0 {
 		t.Fatalf("stated %v %v", stated, err)
 	}
+	// The stored amenities of every stated site, read in one statement (a
+	// connection a site was most of the test's time).
+	statedIDs := make([]string, len(stated))
+	for i, s := range stated {
+		statedIDs[i] = s.ID
+	}
+	var storedJSON string
+	owner(t, `select coalesce(jsonb_object_agg(facility_id, jsonb_build_array(coalesce(amenities, '{}'), coalesce(amenities_absent, '{}'))), '{}')::text
+from contract.parking_facility where facility_id = any('{`+strings.Join(statedIDs, ",")+`}'::text[])`, &storedJSON)
+	stored := map[string][2][]string{}
+	if err := json.Unmarshal([]byte(storedJSON), &stored); err != nil {
+		t.Fatal(err)
+	}
 	for _, s := range stated {
-		var has, lacks []string
-		owner(t, `select coalesce(amenities, '{}'), coalesce(amenities_absent, '{}') from contract.parking_facility where facility_id = '`+s.ID+`'`, &has, &lacks)
+		has, lacks := stored[s.ID][0], stored[s.ID][1]
 		if w := parking.StatedOf(has, lacks); !slices.Contains(s.Amenities.Present, "toilet") || !slices.Equal(s.Amenities.Present, w.Present) || !slices.Equal(s.Amenities.Absent, w.Absent) {
 			t.Errorf("%s states %+v, stored %v / %v", s.ID, s.Amenities, has, lacks)
 		}

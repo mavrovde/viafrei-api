@@ -4,6 +4,7 @@ package store
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"maps"
 	"slices"
@@ -13,7 +14,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // HoldJunctionRead calls hold before each road's junction read of the
@@ -94,6 +94,10 @@ type parityCheck struct {
 	name, sql, legacy string
 	args              []any
 	own               string
+	// url is the request connection's connection string: the database (a
+	// test's private copy among them) and the role the read ran as, on a
+	// dialer of its own (not a test's faulty one).
+	url string
 }
 
 var (
@@ -105,11 +109,10 @@ var (
 type testKey struct{}
 
 // WithTest is ctx carrying t: a named statement read under it is compared
-// with its view statement from the moment of the read, beside the test's
-// body, while the rows the test planted before the read are there; a
-// cleanup of t, registered at the read, waits for the comparison, so it
-// ends before the cleanups registered earlier remove those rows (t.Cleanup
-// is last in, first out).
+// with its view statement in a cleanup of t, registered at the read, so
+// after the test's body but before the cleanups registered earlier (the
+// rows the test planted before the read are still there; t.Cleanup is
+// last in, first out).
 func WithTest(ctx context.Context, t testing.TB) context.Context {
 	return context.WithValue(ctx, testKey{}, t)
 }
@@ -118,67 +121,40 @@ func WithTest(ctx context.Context, t testing.TB) context.Context {
 // the request's budget.
 const replayBound = time.Minute
 
-// replayers are the connections a test's replays share, one pool per test
-// and database (a private copy among them): connected once, not per check.
-var (
-	replayersMu sync.Mutex
-	replayers   = map[string]*pgxpool.Pool{}
-)
-
-// replayerFor is t's pool on url. A cleanup registered when it is made
-// closes it: before every cleanup registered earlier (a private copy's
-// drop among them), after every replay's wait registered later.
-func replayerFor(ctx context.Context, t testing.TB, url string) (*pgxpool.Pool, error) {
-	replayersMu.Lock()
-	defer replayersMu.Unlock()
-	key := t.Name() + "\x1f" + url
-	if p := replayers[key]; p != nil {
-		return p, nil
-	}
-	cfg, err := pgxpool.ParseConfig(url)
-	if err != nil {
-		return nil, err
-	}
-	cfg.MaxConns = replayConns
-	p, err := pgxpool.NewWithConfig(context.WithoutCancel(ctx), cfg)
-	if err != nil {
-		return nil, err
-	}
-	replayers[key] = p
-	t.Cleanup(func() {
-		replayersMu.Lock()
-		delete(replayers, key)
-		replayersMu.Unlock()
-		p.Close()
-	})
-	return p, nil
-}
-
-// replayConns are the connections a test's replays run on side by side.
-const replayConns = 2
-
-// replayInTest compares c, under a bound of its own (outside the request's
-// budget): a miss fails t.
-func replayInTest(ctx context.Context, t testing.TB, pool *pgxpool.Pool, c parityCheck) {
+// replayInTest compares c in t's cleanup, under a bound of its own (the
+// request's context has ended by then): a miss fails t.
+func replayInTest(ctx context.Context, t testing.TB, c parityCheck) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), replayBound)
 	defer cancel()
-	conn, err := pool.Acquire(ctx)
+	conn, err := pgx.Connect(ctx, c.url)
 	if err != nil {
 		t.Errorf("parity %s: connect: %v", c.name, err)
 		return
 	}
-	defer conn.Release()
-	if err := replay(ctx, conn.Conn(), c, func(m ParityMiss) {
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	if err := replay(ctx, conn, c, func(m ParityMiss) {
 		t.Errorf("parity %s (%s) %v:\n got %q\nwant %q", m.Name, m.Plan, m.Args, m.Got, m.Want)
 	}); err != nil {
 		t.Errorf("parity %s: the replay failed: %v", c.name, err)
 	}
 }
 
-// Every named statement a test runs is kept with its arguments, to run
-// beside its view statement after the tests (ReplayParity): the comparison
-// takes three reads, which inside the request would spend its budget.
-func init() {
+// parity turns on the parity of the named statements against the frozen
+// view statements they replaced (-args -parity): a verification set of its
+// own, as the benchmark set and internal/perf are, run by CI as a step of
+// its own until the views are dropped. Without it no read is compared and
+// no test pays for the comparison.
+var parity = flag.Bool("parity", false, "compare every named statement with the frozen view statement it replaced")
+
+// ParityOn reports whether the run compares the named statements with the
+// frozen view statements (-parity); the flags are parsed.
+func ParityOn() bool { return *parity }
+
+// EnableParity keeps every named statement a test runs with its arguments,
+// to run beside its view statement (ReplayParity, or the test's cleanup):
+// the comparison takes three reads, which inside the request would spend
+// its budget.
+func EnableParity() {
 	beside = func(ctx context.Context, tx pgx.Tx, s stmt, args []any) {
 		legacy, ok := legacyReads[s.Name]
 		if !ok {
@@ -207,20 +183,10 @@ func init() {
 		}
 		parityKeys[key] = true
 		if inTest {
-			pool, err := replayerFor(ctx, t, tx.Conn().Config().ConnString())
-			if err != nil {
-				t.Errorf("parity %s: %v", s.Name, err)
-				return
-			}
-			// Begun now, while the rows planted before this read are
-			// there; waited for in a cleanup registered now, so before
-			// the cleanups that remove them.
-			done := make(chan struct{})
-			go func() {
-				defer close(done)
-				replayInTest(ctx, t, pool, c)
-			}()
-			t.Cleanup(func() { <-done })
+			c.url = tx.Conn().Config().ConnString()
+			// Registered now, so it runs before the cleanups of the rows
+			// planted before this read.
+			t.Cleanup(func() { replayInTest(ctx, t, c) })
 			return
 		}
 		// A read outside a test's context: compared after the tests.

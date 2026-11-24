@@ -72,14 +72,16 @@ func TestTestImagesArePinned(t *testing.T) {
 	unpinned := strings.SplitN(pgtest.Image, "@", 2)[0]
 	pull := "docker pull " + pgtest.Image + "\n"
 	// Each plant must produce the finding named for it, not just any finding.
+	// The pulls stand in each job that starts a test database (integration,
+	// parity): a plant changes every one of them.
 	for want, c := range map[string][3]string{
 		"pgtest.Image is not pinned by digest":         {unpinned, composeSrc, ci},
 		"is not the platform's postgis/postgis:16-3.4": {strings.Replace(pgtest.Image, ":16-3.4@", ":18-3.6@", 1), strings.Replace(composeSrc, ":16-3.4@", ":18-3.6@", 1), strings.Replace(ci, ":16-3.4@", ":18-3.6@", 1)},
-		"does not pull the release database.pin names": {pgtest.Image, composeSrc, strings.Replace(ci, `docker pull "$database"`, "docker pull other/database:9.9.9@sha256:"+strings.Repeat("0", 64), 1)},
+		"does not pull the release database.pin names": {pgtest.Image, composeSrc, strings.ReplaceAll(ci, `docker pull "$database"`, "docker pull other/database:9.9.9@sha256:"+strings.Repeat("0", 64))},
 		"is not compose.yaml's db image":               {pgtest.Image, strings.Replace(composeSrc, "  db:\n    image: postgis/", "  db:\n    image: other/", 1), ci},
-		"does not pull pgtest.Image by digest":         {pgtest.Image, composeSrc, strings.Replace(ci, pull, "docker pull "+unpinned+"@sha256:"+strings.Repeat("0", 64)+"\n", 1)},
-		"does not pull the reaper":                     {pgtest.Image, composeSrc, strings.Replace(ci, "docker pull "+reaper+"@", "docker pull other/ryuk:1@", 1)},
-		"does not tag the pinned reaper":               {pgtest.Image, composeSrc, strings.Replace(ci, "docker tag ", "echo ", 1)},
+		"does not pull pgtest.Image by digest":         {pgtest.Image, composeSrc, strings.ReplaceAll(ci, pull, "docker pull "+unpinned+"@sha256:"+strings.Repeat("0", 64)+"\n")},
+		"does not pull the reaper":                     {pgtest.Image, composeSrc, strings.ReplaceAll(ci, "docker pull "+reaper+"@", "docker pull other/ryuk:1@")},
+		"does not tag the pinned reaper":               {pgtest.Image, composeSrc, strings.ReplaceAll(ci, "docker tag ", "echo ")},
 		"ci.yml pulls an image by tag alone":           {pgtest.Image, composeSrc, strings.Replace(ci, pull, pull+"          docker pull busybox:1\n", 1)},
 	} {
 		if c == [3]string{pgtest.Image, composeSrc, ci} {

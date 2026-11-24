@@ -133,21 +133,28 @@ func TestWarningsAtMoreThanTheLimitAndABadLevel(t *testing.T) {
 	owner(t, `select array_agg(source_ref order by source_ref) from contract.source`, &fams)
 	const where = `select st_y(st_pointonsurface(area)), st_x(st_pointonsurface(area)) from contract.weather_warning
 		where area is not null and valid_to is null and valid_from > now() - interval '2 hours' limit 1`
-	st, cp := private(t, plantWarning(1, 2), plantWarning(2, 3))
-	var at geo.Point
-	ownerOf(t, cp, where, &at.Lat, &at.Lon)
-	got, err := st.WarningsAt(bounded(t), weather.Query{LookAhead: lookAhead, At: at, MinLevel: 1, Limit: 1}, fams, time.Now())
-	if err != nil || len(got.Warnings) != 1 || !got.HasMore {
-		t.Fatalf("%+v %v", got, err)
-	}
+	// Each case on a private copy of its own: a subtest each, as a copy is
+	// most of a case's time.
+	t.Run("more than the limit", func(t *testing.T) {
+		st, cp := private(t, plantWarning(1, 2), plantWarning(2, 3))
+		var at geo.Point
+		ownerOf(t, cp, where, &at.Lat, &at.Lon)
+		got, err := st.WarningsAt(bounded(t), weather.Query{LookAhead: lookAhead, At: at, MinLevel: 1, Limit: 1}, fams, time.Now())
+		if err != nil || len(got.Warnings) != 1 || !got.HasMore {
+			t.Fatalf("%+v %v", got, err)
+		}
+	})
 	// A level-0 advance notice is listed at floor 0, as the platform lists
 	// it, and lights no lamp.
-	st, cp = private(t, plantWarning(1, 0))
-	ownerOf(t, cp, where, &at.Lat, &at.Lon)
-	if sc, err := st.WarningsAt(bounded(t), weather.Query{LookAhead: lookAhead, At: at, MinLevel: 0, Limit: 5}, fams, time.Now()); err != nil ||
-		len(sc.Warnings) != 1 || sc.Warnings[0].Level != 0 || weather.LampOf(sc.Levels, false, false) != weather.LampGreen {
-		t.Fatalf("a level-0 notice in force: %+v %v", sc, err)
-	}
+	t.Run("a level-0 notice", func(t *testing.T) {
+		st, cp := private(t, plantWarning(1, 0))
+		var at geo.Point
+		ownerOf(t, cp, where, &at.Lat, &at.Lon)
+		if sc, err := st.WarningsAt(bounded(t), weather.Query{LookAhead: lookAhead, At: at, MinLevel: 0, Limit: 5}, fams, time.Now()); err != nil ||
+			len(sc.Warnings) != 1 || sc.Warnings[0].Level != 0 || weather.LampOf(sc.Levels, false, false) != weather.LampGreen {
+			t.Fatalf("a level-0 notice in force: %+v %v", sc, err)
+		}
+	})
 }
 
 // At a junction the junctions read lists it, at most the limit.

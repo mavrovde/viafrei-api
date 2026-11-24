@@ -33,9 +33,10 @@ coverage: ## Unit + integration + boot profiles merged, gated at 100 % per packa
 	$(GO) test -count=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage-unit.out ./...
 	$(GO) test -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out $(NON_PERF)
 	$(GO) test -p 1 -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-perf.out $(PERF_PKG)
+	$(GO) test -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-parity.out ./internal/adapters/store -args -parity
 	scripts/boot-coverage.sh coverage-boot.out
 	$(GO) run ./internal/testkit/covergate -min 100 -exclusions test/coverage-exclusions.txt -o coverage.out \
-		coverage-unit.out coverage-integration.out coverage-perf.out coverage-boot.out
+		coverage-unit.out coverage-integration.out coverage-perf.out coverage-parity.out coverage-boot.out
 
 lint: ## golangci-lint with the repository configuration
 	golangci-lint run ./...

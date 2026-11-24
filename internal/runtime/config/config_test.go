@@ -148,9 +148,11 @@ func TestCrossFieldRules(t *testing.T) {
 		"VFAPI_DEADLINE_REQUEST=300ms",
 		"VFAPI_DEADLINE_RESERVE=300ms",
 		"VFAPI_HEALTH_READY_TIMEOUT=500ms",
+		"VFAPI_DB_MAX_CONN_IDLE=10m",
 	}})
 	assertRefused(t, err,
 		"db.pool_min: 5 is larger than db.pool_max 4",
+		"db.max_conn_idle: 10m0s is shorter than db.max_conn_lifetime 30m0s",
 		"deadline.reserve:",
 		"health.ready_timeout:",
 		"db.statement_timeout_floor:",

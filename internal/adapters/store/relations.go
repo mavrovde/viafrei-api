@@ -6,14 +6,15 @@ package store
 // Generated from the views' definitions; edit a relation only with its parity test.
 
 // tripUpdatesFamily is the family the DELFI Trip Updates' figures are read
-// under, as the source register names it: the register publishes a register
-// row a feed owns under that feed's key (contract_sources, database 0312),
-// so the row of the Trip Updates' licence ('delfi_rt_tu') is published as
-// the Trip Updates feed ('tripupdates' on the platform), and under its own id
-// only where no feed owns it. The view stamped the licence's id, a family
-// the register never publishes where a feed owns it: the licence gate's
+// under: the key of the feed they come from, the one feed_checks row
+// ('tripupdates') the relations already read for their freshness. The
+// register publishes a register row a feed owns under that feed's key
+// (contract_sources, database 0312), so the Trip Updates' figures are
+// published as 'tripupdates' (on the platform the only family of the
+// licence 'delfi_rt_tu'). The view stamped the licence's id, a family the
+// register never publishes where a feed owns it: the licence gate's
 // post-check then refused every board with a Trip Updates figure (500).
-const tripUpdatesFamily = `(select coalesce(min(c.source_ref), 'delfi_rt_tu'::text) from contract_sources c where c.register_id = 'delfi_rt_tu'::text)`
+const tripUpdatesFamily = `'tripupdates'::text`
 
 // relDeparture is the platform's departure (kind v).
 const relDeparture = `

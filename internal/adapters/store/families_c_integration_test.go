@@ -200,3 +200,37 @@ func TestAMainStationIsFoundUnderEitherSpelling(t *testing.T) {
 		}
 	}
 }
+
+// A station search by name answers the names that start with the text
+// before those holding it as a part, and reads the part matches only while
+// the starting ones leave the page short: on a short page the part matches
+// follow the starting ones; with more starting names than the limit no
+// part match is read, and the page says more answer.
+func TestAStationSearchReadsPartMatchesOnlyForAShortPage(t *testing.T) {
+	seeds := []string{}
+	for i, name := range []string{"Zettelstadt Nord", "Zettelstadt Ost", "Zettelstadt Sued", "Zettelstadt West", "Alt-Zettelstadt", "Bad Zettelstadt"} {
+		seeds = append(seeds, `insert into public.stops (gtfs_feed_key, id, name, geom, location_type)
+		 values (1, 'de:09999:6`+string(rune('0'+i))+`', '`+name+`', vf_test.point(null), 1) on conflict do nothing`)
+	}
+	st, _ := private(t, seeds...)
+	const fam = "delfi_static" // the source of the timetable the stops are planted in
+	names := func(ss []transit.Station) []string {
+		out := []string{}
+		for _, s := range ss {
+			out = append(out, s.Name)
+		}
+		return out
+	}
+	// Four starting names and both part matches fit a page of eight: the
+	// part matches come after the starting ones.
+	ss, more, err := st.Stations(bounded(t), transit.Query{Text: "Zettelstadt", Limit: 8}, []string{fam})
+	want := []string{"Zettelstadt Nord", "Zettelstadt Ost", "Zettelstadt Sued", "Zettelstadt West", "Alt-Zettelstadt", "Bad Zettelstadt"}
+	if err != nil || more || !slices.Equal(names(ss), want) {
+		t.Errorf("short page: %v more %v, %v; want %v", names(ss), more, err, want)
+	}
+	// Exactly limit+1 starting names: none of the part matches, and more.
+	ss, more, err = st.Stations(bounded(t), transit.Query{Text: "Zettelstadt", Limit: 3}, []string{fam})
+	if err != nil || !more || !slices.Equal(names(ss), want[:3]) {
+		t.Errorf("full page: %v more %v, %v; want %v and more", names(ss), more, err, want[:3])
+	}
+}

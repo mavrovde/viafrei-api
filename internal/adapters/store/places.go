@@ -43,9 +43,9 @@ named_as as (
   from gazetteer_places g
   where `+foldStarts("contract_search_fold(g.name)")+` and `+placeHeld+`
   union all
-  select g.id, case when contract_search_fold(g.name_en) = (select $2::text) then 0 else 1 end
+  select g.id, case when contract_search_fold(g.name_en) = any((select $2::text) || (select $11::text[])) then 0 else 1 end
   from gazetteer_places g
-  where g.name_en is not null and contract_search_fold(g.name_en) like (select $2::text) || '%' and `+placeHeld+`),
+  where g.name_en is not null and `+foldStarts("contract_search_fold(g.name_en)")+` and `+placeHeld+`),
 found as (
   `+placeRows("(select n.id, min(n.rank) rank from named_as n group by n.id)")+`
   union all
@@ -71,7 +71,7 @@ named_part as (
   union
   select g.id
   from gazetteer_places g
-  where `+placesShort+` and g.name_en is not null and contract_search_fold(g.name_en) like '%' || (select $2::text) || '%'
+  where `+placesShort+` and g.name_en is not null and `+foldHolds("contract_search_fold(g.name_en)")+`
     and `+notStartingPlace+` and `+placeHeld+`),
 found_part as (
   `+placeRows("(select n.id, 2 rank from named_part n)")+`
@@ -100,7 +100,7 @@ const placeHeld = `g.geom is not null and g.closed_at is null and (g.source_id =
 // notStartingPlace is a gazetteer row g none of whose names starts with the
 // folded text $2: a place one of whose names does is ranked by that name
 // among the names that start with it, and so is no part match.
-var notStartingPlace = `not coalesce(` + foldStarts("contract_search_fold(g.name)") + `, false) and not coalesce(contract_search_fold(g.name_en) like (select $2::text) || '%', false)`
+var notStartingPlace = `not coalesce(` + foldStarts("contract_search_fold(g.name)") + `, false) and not coalesce(` + foldStarts("contract_search_fold(g.name_en)") + `, false)`
 
 // foldStarts and foldHolds are a folded name col that starts with or holds
 // the folded text $2 or one of its main-station spellings $11.

@@ -47,19 +47,22 @@ func placesCases(t *testing.T, ctx context.Context, c *pgx.Conn) [][]any {
 		union select left(contract_search_fold(name), 4) from public.stops where name is not null`)
 	motorways := column(t, ctx, c, `select road from public.autobahn_roads order by road limit 3`)
 	berlin, munich := []float64{52.52, 13.405}, []float64{48.137, 11.575}
+	none := []string{}
 	var out [][]any
 	for _, q := range append(texts, "zzzz-nothing") {
 		out = append(out,
-			[]any{families, q, "", nil, nil, 0, 26, stops, roads, ""},
-			[]any{families, q, "municipality", nil, nil, 0, 26, stops, roads, ""},
-			[]any{families, q, "", berlin[0], berlin[1], 0, 6, stops, roads, ""},
-			[]any{families, q, "", munich[0], munich[1], 50000, 26, stops, roads, ""},
-			[]any{families[:1], q, "", nil, nil, 0, 26, []string{}, []string{"bast_lcl"}, ""})
+			[]any{families, q, "", nil, nil, 0, 26, stops, roads, "", none},
+			[]any{families, q, "municipality", nil, nil, 0, 26, stops, roads, "", none},
+			[]any{families, q, "", berlin[0], berlin[1], 0, 6, stops, roads, "", none},
+			[]any{families, q, "", munich[0], munich[1], 50000, 26, stops, roads, "", none},
+			[]any{families[:1], q, "", nil, nil, 0, 26, []string{}, []string{"bast_lcl"}, "", none},
+			// A main station's spellings alone find what the text does not.
+			[]any{families, "zzzz-nothing", "", nil, nil, 0, 26, stops, roads, "", []string{q, q + "hbf"}})
 	}
 	for _, m := range motorways {
 		out = append(out,
-			[]any{families, strings.ToLower(m), "", nil, nil, 0, 26, stops, roads, m},
-			[]any{families, strings.ToLower(m), "motorway", berlin[0], berlin[1], 0, 26, stops, []string{"bast_lcl"}, m})
+			[]any{families, strings.ToLower(m), "", nil, nil, 0, 26, stops, roads, m, none},
+			[]any{families, strings.ToLower(m), "motorway", berlin[0], berlin[1], 0, 26, stops, []string{"bast_lcl"}, m, none})
 	}
 	return out
 }

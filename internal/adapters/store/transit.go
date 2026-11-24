@@ -221,7 +221,12 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 // station (a stop place), $2 and $3 the window's first and end instant
 // (planned departure), $4 the families: every family a call carries (its
 // timetable's and each live figure's, source_refs) is one of them, so the
-// licence gate's post-check never meets one it refuses. A call is one a passenger can board
+// licence gate's post-check never meets one it refuses. A key whose plan
+// does not hold the Trip Updates' family loses the calls carrying a Trip
+// Updates figure from its board, not just their delay: chosen on purpose,
+// since a call row stamped with that family is a row the key may not read,
+// and dropping the figure alone would state a scheduled time as the
+// answer where a live one exists. A call is one a passenger can board
 // (the platform's boarding flag) of a trip that calls somewhere outside the
 // station after it: a trip's last call at the station is an arrival. The
 // destination is the trip's headsign, else the name of its last stop. The

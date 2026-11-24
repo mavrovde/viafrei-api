@@ -122,12 +122,6 @@ var stationsPage = func() map[stationShape]stmt {
 		if m&shapeArea != 0 {
 			where += "\n  and s.region_code like $9::text || '%'"
 		}
-		// A text search reads more than the page (pageOver), and leaves
-		// out the stops of another station after (collapsed).
-		lim := "$6::bigint"
-		if m&shapeText != 0 {
-			lim = pageOver("$6")
-		}
 		pick := func(match string) string {
 			return `
 select s.stop_place_id, s.name, st_y(s.location) lat, st_x(s.location) lon, s.national_stop_code, s.region_code,
@@ -139,10 +133,9 @@ where s.withdrawn_at is null
   and s.location is not null
   and s.source_ref = any($1::text[])
   and ` + permitted("s") + match + where + `
-order by dist, s.name, s.stop_place_id
-limit ` + lim
+order by dist, s.name, s.stop_place_id`
 		}
-		body := pick("")
+		body := pick("") + "\nlimit $6::bigint"
 		if staged {
 			// A text with no position answers the names that start with it
 			// before those holding it as a part, so the part matches can be
@@ -151,22 +144,24 @@ limit ` + lim
 			// 21 000 stop places and starts about 1 000, and reading and
 			// sorting all of them took 0.6 to 1.1 s a search on prod
 			// (2026-11-24), about 40 ms now, the same answers.
-			body = `,
-first as (` + pick("\n  and "+stationStarts) + `),
-rest as (` + pick("\n  and (select count(*) from first f where "+ownStation("f.stop_place_id")+") < $6::bigint\n  and "+stationHolds+" and not "+stationStarts) + `)
+			// Each arm is collapsed on its own (collapsed), before the
+			// two are put together: the names that hold the text are read
+			// while the starting ones, collapsed, leave the page short.
+			body = `,` + collapsed("first", pick("\n  and "+stationStarts), "$6") + `,` +
+				collapsed("rest", pick("\n  and (select count(*) from first) < $6::bigint\n  and "+stationHolds+" and not "+stationStarts), "$6") + `
 select f.stop_place_id, f.name, f.lat, f.lon, f.national_stop_code, f.region_code, f.modes, f.source_ref, f.dist,
        f.placement_source_ref, f.eva_no, f.eva_numbers
-from (select 0 k, stop_place_id, name, lat, lon, national_stop_code, region_code, modes, source_ref, dist, placement_source_ref, eva_no, eva_numbers from first union all select 1 k, stop_place_id, name, lat, lon, national_stop_code, region_code, modes, source_ref, dist, placement_source_ref, eva_no, eva_numbers from rest) f
+from (select 0 k, ` + pageCols("c") + ` from first c
+      union all
+      select 1 k, ` + pageCols("r") + ` from rest r) f
 order by f.k, f.dist, f.name, f.stop_place_id
-limit ` + lim
-		}
-		if m&shapeText != 0 {
-			if staged {
-				i := strings.LastIndex(body, "\nselect f.stop_place_id")
-				body = body[:i] + ",\npage as (" + body[i:] + ")" + collapsed("$6")
-			} else {
-				body = ",\npage as (" + body + ")" + collapsed("$6")
-			}
+limit $6::bigint`
+		} else if m&shapeText != 0 {
+			body = `,` + collapsed("page", pick(""), "$6") + `
+select ` + pageCols("p") + `
+from page p
+order by p.dist, p.name, p.stop_place_id
+limit $6::bigint`
 		}
 		out[m] = namedOpaque(fmt.Sprintf("api_stations_page_%02d", m), `
 with args as (select $1::text[], $2::double precision, $3::double precision, $4::text, $5::double precision, $6::bigint, $7::text, $8::boolean, $9::text, $10::text[]),
@@ -197,8 +192,9 @@ const (
 	stationHolds  = `(s.search_fold like '%' || $4::text || '%' or s.search_fold like any(array(select '%' || x || '%' from unnest($10::text[]) x)))`
 )
 
-// collapsed answers the page a text search read (the CTE page, in its
-// order) without the stops of another station, limit at most: DELFI files
+// collapsed is the CTE name: the rows the ordered select sel reads, without
+// the stops of another station, at least limit of them where so many
+// answer, for the caller to order and cut to limit: DELFI files
 // most platforms under the station's DHID with no parent named, so each
 // read as a station of its own ("Marienplatz" listed each platform of
 // München's and Stuttgart's Marienplatz), where the platform's name search
@@ -214,17 +210,29 @@ const (
 // The test runs after the page is read, on the page's rows only, by the
 // stops' key and id range: inside the page's own join it turned the stop
 // modes' key probe into a scan of every stop's modes (1.6 M rows filtered,
-// 2.5 s for "hbf" in Stuttgart, 2026-11-24).
-func collapsed(limit string) string {
+// 2.5 s for "hbf" in Stuttgart, 2026-11-24). It reads pageOver(limit) rows
+// first; only where all of those were read and leave fewer than limit once
+// collapsed (a page of one station's platforms, "hauptbahnhof" at 61 lost
+// six stations so) is sel read again, whole, and collapsed: the page is
+// never short.
+func collapsed(name, sel, limit string) string {
+	over := pageOver(limit)
 	return `
-select p.stop_place_id, p.name, p.lat, p.lon, p.national_stop_code, p.region_code, p.modes, p.source_ref, p.dist,
-       p.placement_source_ref, p.eva_no, p.eva_numbers
-from (select q.stop_place_id, q.name, q.lat, q.lon, q.national_stop_code, q.region_code, q.modes, q.source_ref, q.dist,
-             q.placement_source_ref, q.eva_no, q.eva_numbers, row_number() over () n
-        from page q offset 0) p
-where ` + ownStation("p.stop_place_id") + `
-order by p.n
-limit ` + limit + `::bigint`
+` + name + `_r as (` + sel + `
+limit ` + over + `),
+` + name + `_c as (select ` + pageCols("x") + ` from ` + name + `_r x where ` + ownStation("x.stop_place_id") + `),
+` + name + `_n as (select (select count(*) from ` + name + `_r) = ` + over + ` and (select count(*) from ` + name + `_c) < ` + limit + `::bigint need),
+` + name + ` as (
+  select ` + pageCols("c") + ` from ` + name + `_c c where not (select need from ` + name + `_n)
+  union all
+  select ` + pageCols("a") + ` from (` + sel + `) a
+   where (select need from ` + name + `_n) and ` + ownStation("a.stop_place_id") + `)`
+}
+
+// pageCols are the columns of a page of stations, of the relation alias a.
+func pageCols(a string) string {
+	return strings.NewReplacer("x.", a+".").Replace("x.stop_place_id, x.name, x.lat, x.lon, x.national_stop_code, x.region_code, x.modes, x.source_ref, x.dist, " +
+		"x.placement_source_ref, x.eva_no, x.eva_numbers")
 }
 
 // ownStation is whether the stop place id names a station of its own, no
@@ -341,7 +349,7 @@ limit 60`, "text[]", "text[]")
 // stops left out (collapsed), $5 at most: one statement over every district
 // the town named.
 var stationsInTowns = namedOpaque("api_stations_in_towns", `
-with page as (
+with`+collapsed("page", `
 select s.stop_place_id, s.name, st_y(s.location) lat, st_x(s.location) lon, s.national_stop_code, s.region_code,
        coalesce(s.modes, '{}') modes, s.source_ref, null::integer dist, s.placement_source_ref, s.eva_no, s.eva_numbers
 from (`+relStopPlace+`) s
@@ -351,8 +359,11 @@ where s.withdrawn_at is null
   and `+permitted("s")+`
   and left(s.region_code, 5) = any($4::text[])
   and `+strings.NewReplacer("$4", "$2", "$10", "$3").Replace(stationHolds)+`
-order by s.name, s.stop_place_id
-limit `+pageOver("$5")+`)`+collapsed("$5"), "text[]", "text", "text[]", "text[]", "bigint")
+order by s.name, s.stop_place_id`, "$5")+`
+select `+pageCols("p")+`
+from page p
+order by p.name, p.stop_place_id
+limit $5::bigint`, "text[]", "text", "text[]", "text[]", "bigint")
 
 // stationsInTown reads a text no station's name holds as a town and a stop
 // in it, as the platform's stop resolver reads "town, stop": the districts

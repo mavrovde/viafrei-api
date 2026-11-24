@@ -76,7 +76,8 @@ func TestKeptVersionsAnswerWithoutARequestRead(t *testing.T) {
 	}
 }
 
-// Keep reads at once and every half TTL until its context ends; with no
+// Keep reads at once and again, paced by the TTL and the last read's
+// duration (next), until its context ends; with no
 // TTL it keeps nothing.
 func TestKeepReadsUntilItsContextEnds(t *testing.T) {
 	fake := &versionsFake{vs: map[string]string{"f": "1"}}
@@ -117,4 +118,21 @@ func (c *countingVersions) FreshnessVersions(ctx context.Context) (p provenance.
 	default:
 	}
 	return p, err
+}
+
+// The next read starts the TTL less the last read's duration and a tenth of
+// the TTL after the last start, so it lands before the last read is as old
+// as the TTL; and never sooner than a quarter of the TTL after the read ended.
+func TestTheKeeperPacesItsReadsByTheTTL(t *testing.T) {
+	k := NewKeptVersions(&versionsFake{}, time.Second, slog.Default())
+	for took, want := range map[time.Duration]time.Duration{
+		0:                       900 * time.Millisecond,
+		100 * time.Millisecond:  800 * time.Millisecond,
+		700 * time.Millisecond:  950 * time.Millisecond,
+		1500 * time.Millisecond: 1750 * time.Millisecond,
+	} {
+		if got := k.next(took); got != want {
+			t.Errorf("a read of %v: next after %v, want %v", took, got, want)
+		}
+	}
 }

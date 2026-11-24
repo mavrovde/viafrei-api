@@ -49,26 +49,41 @@ func (k *KeptVersions) kept() (provenance.Versions, time.Time, bool) {
 	return k.vs, k.at, k.read
 }
 
-// Keep reads the versions at once and again every half TTL until ctx ends,
-// so a request finds a read younger than the TTL while a read takes less
-// than half of it. A failed read is logged at warn and tried again at the
-// next tick; the requests then read the versions themselves once the kept
-// read is older than the TTL.
+// Keep reads the versions at once and again until ctx ends, each read
+// starting late enough to spare the database and early enough that it
+// lands before the last one is as old as the TTL: the next start is the
+// TTL less the last read's duration and a margin of a tenth of the TTL
+// after the last start (next), so with the default 1 s TTL and reads of
+// 70 to 120 ms about 75 reads a minute, where a read every half TTL made
+// 120. A failed read is logged at warn and tried again at the next start;
+// requests read the versions themselves once the kept read is as old as
+// the TTL.
 func (k *KeptVersions) Keep(ctx context.Context) {
-	period := k.ttl / 2
-	if period <= 0 {
+	if k.ttl <= 0 {
 		return
 	}
-	tick := time.NewTicker(period)
-	defer tick.Stop()
 	for {
+		started := k.now()
 		k.step(ctx)
+		took := k.now().Sub(started)
+		wait := time.NewTimer(k.next(took) - took)
 		select {
 		case <-ctx.Done():
+			wait.Stop()
 			return
-		case <-tick.C:
+		case <-wait.C:
 		}
 	}
+}
+
+// next is the time from one read's start to the next one's, given the
+// read took took: the TTL less took and a tenth of the TTL, so the next
+// read, if it takes as long, lands before the last is as old as the TTL;
+// and at least a quarter of the TTL after the last read ended, so a slow
+// database is not read back to back (requests then read the versions
+// themselves while the kept read is as old as the TTL).
+func (k *KeptVersions) next(took time.Duration) time.Duration {
+	return max(k.ttl-took-k.ttl/10, took+k.ttl/4)
 }
 
 // step is one background read, bounded by the TTL.

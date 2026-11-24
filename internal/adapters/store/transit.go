@@ -119,8 +119,11 @@ var stationsPage = func() map[stationShape]stmt {
 		if m&shapeRailway != 0 {
 			where += "\n  and s.eva_no is not null"
 		}
-		if m&shapeArea != 0 {
+		if m&shapeArea != 0 && m&shapeText == 0 {
 			where += "\n  and s.region_code like $9::text || '%'"
+		}
+		if m&shapeArea != 0 && m&shapeText != 0 {
+			where += "\n  and s.area_key like $9::text || '%' and s.region_code is not null"
 		}
 		pick := func(match string) string {
 			return `
@@ -136,32 +139,43 @@ where s.withdrawn_at is null
 order by dist, s.name, s.stop_place_id`
 		}
 		body := pick("") + "\nlimit $6::bigint"
-		if staged {
-			// A text with no position answers the names that start with it
-			// before those holding it as a part, so the part matches can be
-			// among the answers only while the starting ones leave the page
-			// short, and only then are they read: "Berlin" is held by about
-			// 21 000 stop places and starts about 1 000, and reading and
-			// sorting all of them took 0.6 to 1.1 s a search on prod
-			// (2026-11-24), about 40 ms now, the same answers.
-			// Each arm is collapsed on its own (collapsed), before the
-			// two are put together: the names that hold the text are read
-			// while the starting ones, collapsed, leave the page short.
-			body = `,` + collapsed("first", pick("\n  and "+stationStarts), "$6") + `,` +
-				collapsed("rest", pick("\n  and (select count(*) from first) < $6::bigint\n  and "+stationHolds+" and not "+stationStarts), "$6") + `
-select f.stop_place_id, f.name, f.lat, f.lon, f.national_stop_code, f.region_code, f.modes, f.source_ref, f.dist,
-       f.placement_source_ref, f.eva_no, f.eva_numbers
-from (select 0 k, ` + pageCols("c") + ` from first c
-      union all
-      select 1 k, ` + pageCols("r") + ` from rest r) f
-order by f.k, f.dist, f.name, f.stop_place_id
-limit $6::bigint`
-		} else if m&shapeText != 0 {
-			body = `,` + collapsed("page", pick(""), "$6") + `
-select ` + pageCols("p") + `
-from page p
-order by p.dist, p.name, p.stop_place_id
-limit $6::bigint`
+		if m&shapeText != 0 {
+			// A text search reads its stations by key first (keyed), and
+			// the rest of each station only for the page's own rows.
+			keys := func(match string) string {
+				return `
+select s.stop_place_id, s.name,
+       case when here.g is null then null else round(st_distance(s.location::geography, here.g))::int end dist
+from (` + stationKeys(m&(shapeCode|shapeRailway) != 0) + `) s, here
+where s.withdrawn_at is null
+  and s.location is not null
+  and s.source_ref = any($1::text[])
+  and ` + permitted("s") + match + where + `
+order by dist, s.name, s.stop_place_id`
+			}
+			body = `,` + keyed("page", keys(""), "$6") + `
+` + keyedPage("page", "k.dist, k.name, k.stop_place_id", "$6")
+			if staged {
+				// A text with no position answers the names that start with
+				// it before those holding it as a part, so the part matches
+				// can be among the answers only while the starting ones
+				// leave the page short, and only then are they read:
+				// "Berlin" is held by about 21 000 stop places and starts
+				// about 1 000, and reading and sorting all of them took 0.6
+				// to 1.1 s a search on prod (2026-11-24). Each part is
+				// collapsed on its own, before the two are put together.
+				// The holding ones are read only where every starting one
+				// of a station of its own is in first, so they leave out
+				// first's rows and not every starting name: the name's fold
+				// is then worked out once a stop, not three times (a stop
+				// that held "strasse" cost 34 µs a fold on prod, 79 601
+				// held it).
+				body = `,` + keyed("first", keys("\n  and "+stationStarts), "$6") + `,` +
+					keyed("rest", keys("\n  and (select count(*) from first) < $6::bigint\n  and "+stationHolds+
+						"\n  and not exists (select 1 from first f where f.stop_place_id = s.stop_place_id)"), "$6") + `,
+arms as (select 0 o, f.stop_place_id, f.name, f.dist from first f union all select 1 o, r.stop_place_id, r.name, r.dist from rest r)
+` + keyedPage("arms", "k.o, k.dist, k.name, k.stop_place_id", "$6")
+			}
 		}
 		out[m] = namedOpaque(fmt.Sprintf("api_stations_page_%02d", m), `
 with args as (select $1::text[], $2::double precision, $3::double precision, $4::text, $5::double precision, $6::bigint, $7::text, $8::boolean, $9::text, $10::text[]),
@@ -192,47 +206,89 @@ const (
 	stationHolds  = `(s.search_fold like '%' || $4::text || '%' or s.search_fold like any(array(select '%' || x || '%' from unnest($10::text[]) x)))`
 )
 
-// collapsed is the CTE name: the rows the ordered select sel reads, without
-// the stops of another station, at least limit of them where so many
-// answer, for the caller to order and cut to limit: DELFI files
-// most platforms under the station's DHID with no parent named, so each
-// read as a station of its own ("Marienplatz" listed each platform of
-// München's and Stuttgart's Marienplatz), where the platform's name search
-// answers the station once. A stop is another station's when the stop its
-// DHID names is a station (stationFamily), or, where that DHID is no stop
-// of its own (de:09161:505, only its platforms :0:1 and :0:2 are stops),
-// when a platform under the DHID with a lower id stands for it.
+// keyed is the CTE name: the keys (stop_place_id, name, dist) the ordered
+// select sel reads, without the stops of another station, in sel's order,
+// limit at most: DELFI files most platforms under the station's DHID with
+// no parent named, so each read as a station of its own ("Marienplatz"
+// listed each platform of München's and Stuttgart's Marienplatz), where the
+// platform's name search answers the station once. A stop is another
+// station's when the stop its DHID names is a station (stationFamily), or,
+// where that DHID is no stop of its own (de:09161:505, only its platforms
+// :0:1 and :0:2 are stops), when a platform under the DHID with a lower id
+// stands for it.
 //
 // That lowest-id platform stands for the station even where it fails the
 // search's own filters (another family, outside the area): the family it
 // names is the station's either way.
 //
-// The test runs after the page is read, on the page's rows only, by the
-// stops' key and id range: inside the page's own join it turned the stop
-// modes' key probe into a scan of every stop's modes (1.6 M rows filtered,
-// 2.5 s for "hbf" in Stuttgart, 2026-11-24). It reads pageOver(limit) rows
-// first; only where all of those were read and leave fewer than limit once
-// collapsed (a page of one station's platforms, "hauptbahnhof" at 61 lost
-// six stations so) is sel read again, whole, and collapsed: the page is
-// never short.
-func collapsed(name, sel, limit string) string {
-	over := pageOver(limit)
+// The stops are left out before the limit, so the page is never short, and
+// on the keys alone (stationKeys): a station's modes, DB record and
+// placement are read for the page's rows only (keyedPage). Reading them for
+// every stop that held "strasse" (71 924 on prod) took 8 s, and leaving the
+// stops out after a page was read left it short where the page was one
+// station's platforms ("hauptbahnhof" at 61 lost six stations, 2026-11-24).
+func keyed(name, sel, limit string) string {
 	return `
-` + name + `_r as (` + sel + `
-limit ` + over + `),
-` + name + `_c as (select ` + pageCols("x") + ` from ` + name + `_r x where ` + ownStation("x.stop_place_id") + `),
-` + name + `_n as (select (select count(*) from ` + name + `_r) = ` + over + ` and (select count(*) from ` + name + `_c) < ` + limit + `::bigint need),
-` + name + ` as (
-  select ` + pageCols("c") + ` from ` + name + `_c c where not (select need from ` + name + `_n)
-  union all
-  select ` + pageCols("a") + ` from (` + sel + `) a
-   where (select need from ` + name + `_n) and ` + ownStation("a.stop_place_id") + `)`
+` + name + ` as (select k.stop_place_id, k.name, k.dist from (` + sel + `
+offset 0) k
+where ` + ownStation("k.stop_place_id") + `
+order by k.dist, k.name, k.stop_place_id
+limit ` + limit + `::bigint)`
 }
 
-// pageCols are the columns of a page of stations, of the relation alias a.
-func pageCols(a string) string {
-	return strings.NewReplacer("x.", a+".").Replace("x.stop_place_id, x.name, x.lat, x.lon, x.national_stop_code, x.region_code, x.modes, x.source_ref, x.dist, " +
-		"x.placement_source_ref, x.eva_no, x.eva_numbers")
+// keyedPage answers the stations of the keys of the CTE name, in order,
+// limit at most, each read by its key.
+func keyedPage(name, order, limit string) string {
+	return `select p.stop_place_id, p.name, st_y(p.location) lat, st_x(p.location) lon, p.national_stop_code, p.region_code,
+       coalesce(p.modes, '{}') modes, p.source_ref, k.dist, p.placement_source_ref, p.eva_no, p.eva_numbers
+from ` + name + ` k
+cross join lateral (select s.stop_place_id, s.name, s.location, s.national_stop_code, s.region_code, s.modes, s.source_ref,
+                           s.placement_source_ref, s.eva_no, s.eva_numbers
+                      from (` + relStopPlace + `) s
+                     where s.stop_place_id = k.stop_place_id
+                     limit 1) p
+order by ` + order + `
+limit ` + limit + `::bigint`
+}
+
+// stationKeys are the stop places of relStopPlace with only the columns a
+// search filters and orders on, read from the stops and their feeds alone
+// (the DB record too where the search asks a code or a railway station):
+// the same rows, keyed by stop_place_id. Its area_key is the district key
+// the region_code is read under, where there is one: a search tests it
+// before it looks the region up ("strasse" in 11000 looked up 79 601).
+func stationKeys(withDB bool) string {
+	eva, db := "null::text", ""
+	if withDB {
+		eva = "d.eva_no"
+		db = `
+     LEFT JOIN LATERAL ( SELECT x.eva_no
+           FROM db_stations x
+          WHERE x.ifopt = s.id AND x.closed_at IS NULL
+          ORDER BY (x.source_id = 'db_stada'::text) DESC, x.station_no
+         LIMIT 1) d ON true`
+	}
+	return `
+ SELECT (s.gtfs_feed_key || ':'::text) || s.id AS stop_place_id,
+    s.name,
+    s.geom::geometry(Point,4326) AS location,
+        CASE
+            WHEN s.id ~ '^[a-z]{2}:[0-9]{5}:'::text THEN (((split_part(s.id, ':'::text, 1) || ':'::text) || split_part(s.id, ':'::text, 2)) || ':'::text) || split_part(s.id, ':'::text, 3)
+            ELSE NULL::text
+        END AS national_stop_code,
+    ( SELECT a.ags
+           FROM ags_regions a
+          WHERE a.ags = split_part(s.id, ':'::text, 2)) AS region_code,
+    split_part(s.id, ':'::text, 2) AS area_key,
+    contract_search_fold(s.name) AS search_fold,
+    f.source_feed AS source_ref,
+    NULL::timestamp with time zone AS withdrawn_at,
+    'open'::text AS display_class,
+    'public'::text AS audience,
+    ` + eva + ` AS eva_no
+   FROM stops s
+     JOIN feeds f ON f.gtfs_feed_key = s.gtfs_feed_key` + db + `
+  WHERE s.deleted_at IS NULL AND s.geom IS NOT NULL AND s.name IS NOT NULL AND (s.location_type = 1 OR COALESCE(s.location_type::integer, 0) = 0 AND s.parent_id IS NULL)`
 }
 
 // ownStation is whether the stop place id names a station of its own, no
@@ -252,12 +308,6 @@ func ownStation(id string) string {
        and r.deleted_at is null and r.geom is not null and r.name is not null
        and coalesce(r.location_type::integer, 0) = 0 and r.parent_id is null)`
 }
-
-// pageOver is how many rows a text search reads for a page of limit rows
-// before collapsed leaves the other stations' stops out: a station's
-// platforms, each a stop place of its own, are seldom more than three of
-// the answers.
-func pageOver(limit string) string { return "(" + limit + "::bigint * 4 + 20)" }
 
 // stationsOfCode narrows a code search to the stops that can carry the
 // code $7 before the station relation is built: the stops whose id starts
@@ -349,21 +399,17 @@ limit 60`, "text[]", "text[]")
 // stops left out (collapsed), $5 at most: one statement over every district
 // the town named.
 var stationsInTowns = namedOpaque("api_stations_in_towns", `
-with`+collapsed("page", `
-select s.stop_place_id, s.name, st_y(s.location) lat, st_x(s.location) lon, s.national_stop_code, s.region_code,
-       coalesce(s.modes, '{}') modes, s.source_ref, null::integer dist, s.placement_source_ref, s.eva_no, s.eva_numbers
-from (`+relStopPlace+`) s
+with`+keyed("page", `
+select s.stop_place_id, s.name, null::integer dist
+from (`+stationKeys(false)+`) s
 where s.withdrawn_at is null
   and s.location is not null
   and s.source_ref = any($1::text[])
   and `+permitted("s")+`
-  and left(s.region_code, 5) = any($4::text[])
+  and left(s.area_key, 5) = any($4::text[]) and s.region_code is not null
   and `+strings.NewReplacer("$4", "$2", "$10", "$3").Replace(stationHolds)+`
 order by s.name, s.stop_place_id`, "$5")+`
-select `+pageCols("p")+`
-from page p
-order by p.name, p.stop_place_id
-limit $5::bigint`, "text[]", "text", "text[]", "text[]", "bigint")
+`+keyedPage("page", "k.name, k.stop_place_id", "$5"), "text[]", "text", "text[]", "text[]", "bigint")
 
 // stationsInTown reads a text no station's name holds as a town and a stop
 // in it, as the platform's stop resolver reads "town, stop": the districts

@@ -6,6 +6,9 @@ package store
 // (legacyReads).
 
 func init() {
+	// The junctions' part of the 'l' row fingerprints what their states are
+	// derived from (junctionLandInputs), not each derived state: on purpose,
+	// the derived states took the read to 0.6 to 1.5 s on prod (fault 2).
 	legacyReads["api_freshness_versions"] = `
 select 'r', '', md5(concat_ws('|',
   (select string_agg(t::text, ',' order by t::text) from contract.source t),
@@ -15,7 +18,7 @@ select 'r', '', md5(concat_ws('|',
 union all
 select 'l', '', md5(concat_ws('|',
   (select string_agg(t::text, ',' order by t::text) from contract.message_coverage t),
-  (select string_agg(j.junction_id || '=' || coalesce(j.state_code, ''), ',' order by j.junction_id) from contract.junction j)))
+  ` + junctionLandInputs + `))
 union all
 select 'u', '', md5(concat_ws('|',
   (select string_agg(t::text, ',' order by t::text) from contract.rule_topic t),

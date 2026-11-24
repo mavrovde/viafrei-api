@@ -24,7 +24,10 @@ import (
 // sphere, as the platform's place search measures it. A place carries its
 // official key and its English name, the platform's nameEn, when it differs
 // from the name (a stop and a motorway neither). The folded text holds
-// letters and digits only, so it carries no LIKE wildcard. Every parameter
+// letters and digits only, so it carries no LIKE wildcard. $11 are the
+// main-station spellings of the text (transit.MainStationSpellings), empty
+// for none: a name starting with or holding one answers as one with the
+// text does, so "Berlin Hbf" finds "S+U Berlin Hauptbahnhof" (#526). Every parameter
 // is read through a subquery, so a custom plan sees no more than the
 // generic one and the cached generic plan is taken after five custom ones:
 // on prod (2026-11-23) the statement settled on it at 10-40 ms a search
@@ -36,37 +39,18 @@ with here as (
   select case when (select $4::float8) is null then null
               else st_setsrid(st_makepoint((select $5::float8), (select $4::float8)), 4326)::geography end g),
 named_as as (
-  select g.id, case when contract_search_fold(g.name) = (select $2::text) then 0
-                    when contract_search_fold(g.name) like (select $2::text) || '%' then 1 else 2 end rank
+  select g.id, case when contract_search_fold(g.name) = any((select $2::text) || (select $11::text[])) then 0 else 1 end rank
   from gazetteer_places g
-  where contract_search_fold(g.name) like '%' || (select $2::text) || '%' and g.geom is not null
-    and g.closed_at is null and (g.source_id = any((select $1::text[])::text[]) or g.kind = 'junction' and g.source_id = any((select $9::text[])::text[]))
+  where `+foldStarts("contract_search_fold(g.name)")+` and `+placeHeld+`
   union all
-  select g.id, case when contract_search_fold(g.name_en) = (select $2::text) then 0
-                    when contract_search_fold(g.name_en) like (select $2::text) || '%' then 1 else 2 end
+  select g.id, case when contract_search_fold(g.name_en) = any((select $2::text) || (select $11::text[])) then 0 else 1 end
   from gazetteer_places g
-  where g.name_en is not null and contract_search_fold(g.name_en) like '%' || (select $2::text) || '%' and g.geom is not null
-    and g.closed_at is null and (g.source_id = any((select $1::text[])::text[]) or g.kind = 'junction' and g.source_id = any((select $9::text[])::text[]))),
+  where g.name_en is not null and `+foldStarts("contract_search_fold(g.name_en)")+` and `+placeHeld+`),
 found as (
-  select g.id::text id, g.name,
-         case g.kind when 'city' then 'municipality' when 'district' then 'district' when 'admin' then 'state'
-                     when 'station' then 'station_area' when 'stop' then 'station_area' when 'island' then 'locality'
-                     when 'motorway' then 'motorway' when 'junction' then 'junction' else 'other' end kind,
-         st_pointonsurface(g.geom::geometry)::geometry(Point,4326) location, g.admin_code region_key, false stop,
-         g.source_id source_ref, h.rank, coalesce(g.rank, 0) prominence, g.admin_code official_key, g.name_en
-  from (select n.id, min(n.rank) rank from named_as n group by n.id) h
-  join gazetteer_places g on g.id = h.id
+  `+placeRows("(select n.id, min(n.rank) rank from named_as n group by n.id)")+`
   union all
-  select s.gtfs_feed_key::text || ':' || s.id, s.name, 'station_area', s.geom::geometry(Point,4326), split_part(s.id, ':', 2), true,
-         f.source_feed,
-         case when contract_search_fold(s.name) = (select $2::text) then 0 when contract_search_fold(s.name) like (select $2::text) || '%' then 1 else 2 end,
-         null, null, null
-  from stops s
-  join feeds f on f.gtfs_feed_key = s.gtfs_feed_key
-  where contract_search_fold(s.name) like '%' || (select $2::text) || '%'
-    and s.deleted_at is null and s.geom is not null and s.name is not null
-    and (s.location_type = 1 or coalesce(s.location_type::integer, 0) = 0 and s.parent_id is null)
-    and f.source_feed = any((select $8::text[])::text[])
+  `+stopRows("case when contract_search_fold(s.name) = any((select $2::text) || (select $11::text[])) then 0 else 1 end",
+	foldStarts("contract_search_fold(s.name)"))+`
   union all
   select r.road, r.road, 'motorway', pt.location, null, false, 'autobahn', 0, null, null, null
   from autobahn_roads r
@@ -78,7 +62,22 @@ found as (
                       order by (((t.cid || ':') || t.tabcd) || ':') || t.lcd limit 1),
                     (select st_pointonsurface(c.line) from contract_road_shape(r.road) c(line, length_km, states))) location) pt
   where (select $10::text) <> '' and r.road = (select $10::text) and pt.location is not null and 'autobahn' = any((select $9::text[])::text[])
-    and `+sourceRuled("'autobahn'")+`)
+    and `+sourceRuled("'autobahn'")+`),
+first as (`+placesPicked("found", "true")+`),
+named_part as (
+  select g.id
+  from gazetteer_places g
+  where `+placesShort+` and `+foldHolds("contract_search_fold(g.name)")+` and `+notStartingPlace+` and `+placeHeld+`
+  union
+  select g.id
+  from gazetteer_places g
+  where `+placesShort+` and g.name_en is not null and `+foldHolds("contract_search_fold(g.name_en)")+`
+    and `+notStartingPlace+` and `+placeHeld+`),
+found_part as (
+  `+placeRows("(select n.id, 2 rank from named_part n)")+`
+  union all
+  `+stopRows("2", placesShort+" and "+foldHolds("contract_search_fold(s.name)")+" and not "+foldStarts("contract_search_fold(s.name)"))+`),
+rest as (`+placesPicked("found_part", placesShort)+`)
 select f.id, f.name, f.kind, st_y(f.location), st_x(f.location),
        case when f.stop then (select a.ags from ags_regions a where a.ags = f.region_key)
             when f.region_key is not null then (select a.ags from ags_regions a
@@ -86,16 +85,80 @@ select f.id, f.name, f.kind, st_y(f.location), st_x(f.location),
        f.source_ref, f.dist, f.official_key,
        case when btrim(f.name_en) <> '' and f.name_en <> f.name then f.name_en end
 from (
-  select f.id, f.name, f.kind, f.location, f.region_key, f.stop, f.source_ref, f.rank, f.prominence, f.official_key, f.name_en,
-         case when here.g is null then null else round(st_distance(f.location::geography, here.g, false))::int end dist
-  from found f
-  cross join here
-  where ((select $3::text) = '' or f.kind = (select $3::text))
-    and (here.g is null or (select $6::int) = 0 or st_dwithin(f.location::geography, here.g, (select $6::int), false))
-  order by f.rank, f.prominence desc nulls last, dist nulls last, f.name, f.id
+  select id, name, kind, location, region_key, stop, source_ref, rank, prominence, official_key, name_en, dist from first
+  union all
+  select id, name, kind, location, region_key, stop, source_ref, rank, prominence, official_key, name_en, dist from rest
+  order by rank, prominence desc nulls last, dist nulls last, name, id
   limit (select $7::int)) f
 order by f.rank, f.prominence desc nulls last, f.dist nulls last, f.name, f.id`,
-	"text[]", "text", "text", "float8", "float8", "int", "int", "text[]", "text[]", "text")
+	"text[]", "text", "text", "float8", "float8", "int", "int", "text[]", "text[]", "text", "text[]")
+
+// placeHeld is a gazetteer row g the place search may answer with: placed,
+// open, and of a family of $1 or a junction of a roads family of $9.
+const placeHeld = `g.geom is not null and g.closed_at is null and (g.source_id = any((select $1::text[])::text[]) or g.kind = 'junction' and g.source_id = any((select $9::text[])::text[]))`
+
+// notStartingPlace is a gazetteer row g none of whose names starts with the
+// folded text $2: a place one of whose names does is ranked by that name
+// among the names that start with it, and so is no part match.
+var notStartingPlace = `not coalesce(` + foldStarts("contract_search_fold(g.name)") + `, false) and not coalesce(` + foldStarts("contract_search_fold(g.name_en)") + `, false)`
+
+// foldStarts and foldHolds are a folded name col that starts with or holds
+// the folded text $2 or one of its main-station spellings $11.
+func foldStarts(col string) string {
+	return `(` + col + ` like (select $2::text) || '%' or ` + col + ` like any(array(select x || '%' from unnest((select $11::text[])) x)))`
+}
+
+func foldHolds(col string) string {
+	return `(` + col + ` like '%' || (select $2::text) || '%' or ` + col + ` like any(array(select '%' || x || '%' from unnest((select $11::text[])) x)))`
+}
+
+// placesShort holds while the names that are the text or start with it give
+// fewer answers than the limit $7, which is the only case in which a name
+// holding the text as a part can be among the answers: every such name
+// ranks after them. A text many names start with ("Berlin": about 1 000
+// stops start with it, about 21 000 hold it) is answered from the starting
+// names alone, without reading and sorting every name that holds it (prod
+// 2026-11-24: 0.7 to 3.7 s a search, the 503s of /v1/places?q=Berlin).
+const placesShort = `(select count(*) from first) < (select $7::int)`
+
+// placeRows are the gazetteer places of the ranked ids h (id, rank) in the
+// columns of the place search's candidates.
+func placeRows(h string) string {
+	return `select g.id::text id, g.name,
+         case g.kind when 'city' then 'municipality' when 'district' then 'district' when 'admin' then 'state'
+                     when 'station' then 'station_area' when 'stop' then 'station_area' when 'island' then 'locality'
+                     when 'motorway' then 'motorway' when 'junction' then 'junction' else 'other' end kind,
+         st_pointonsurface(g.geom::geometry)::geometry(Point,4326) location, g.admin_code region_key, false stop,
+         g.source_id source_ref, h.rank, coalesce(g.rank, 0) prominence, g.admin_code official_key, g.name_en
+  from ` + h + ` h
+  join gazetteer_places g on g.id = h.id`
+}
+
+// stopRows are the stops of a stop family of $8 whose name meets match,
+// ranked by rank, in the columns of the place search's candidates.
+func stopRows(rank, match string) string {
+	return `select s.gtfs_feed_key::text || ':' || s.id, s.name, 'station_area', s.geom::geometry(Point,4326), split_part(s.id, ':', 2), true,
+         f.source_feed, ` + rank + `, null, null, null
+  from stops s
+  join feeds f on f.gtfs_feed_key = s.gtfs_feed_key
+  where ` + match + `
+    and s.deleted_at is null and s.geom is not null and s.name is not null
+    and (s.location_type = 1 or coalesce(s.location_type::integer, 0) = 0 and s.parent_id is null)
+    and f.source_feed = any((select $8::text[])::text[])`
+}
+
+// placesPicked are the first $7 candidates of c of the kind $3 within the
+// radius $6 of the position, in the search's order, while gate holds.
+func placesPicked(c, gate string) string {
+	return `select f.id, f.name, f.kind, f.location, f.region_key, f.stop, f.source_ref, f.rank, f.prominence, f.official_key, f.name_en,
+         case when here.g is null then null else round(st_distance(f.location::geography, here.g, false))::int end dist
+  from ` + c + ` f
+  cross join here
+  where ` + gate + ` and ((select $3::text) = '' or f.kind = (select $3::text))
+    and (here.g is null or (select $6::int) = 0 or st_dwithin(f.location::geography, here.g, (select $6::int), false))
+  order by f.rank, f.prominence desc nulls last, dist nulls last, f.name, f.id
+  limit (select $7::int)`
+}
 
 // kreisNames are the names of the districts of the five-digit keys $1 that
 // a family of $2 holds, as the platform names a place's Kreis: the open
@@ -116,7 +179,7 @@ func (s *Store) Places(ctx context.Context, q places.Query, families, stops, roa
 		lat, lon = &q.At.Lat, &q.At.Lon
 	}
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]places.Place, error) {
-		rows, _ := run(ctx, tx, placesPage, families, transit.Fold(q.Text), string(q.Kind), lat, lon, q.RadiusM, q.Limit+1, stops, roads, places.RoadForm(q.Text))
+		rows, _ := run(ctx, tx, placesPage, families, transit.Fold(q.Text), string(q.Kind), lat, lon, q.RadiusM, q.Limit+1, stops, roads, places.RoadForm(q.Text), spellingsOf(q.Text))
 		ps, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.Place, error) {
 			var (
 				v    places.Place

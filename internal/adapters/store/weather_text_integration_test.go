@@ -139,8 +139,8 @@ from weather_warnings w where 'dwd:' || w.id = $1`, id); n != 1 {
 // unaltered only while its UTF-8 bytes hash to the hash taken when it was received, and
 // its English text only while the headline, description and instruction,
 // NUL-separated, hash to the English hash, as the platform judges both
-// before it quotes the issuer (#222); a changed text, a changed hash and no
-// text are not unaltered. The hashes here are taken in Go, not by the
+// before it quotes the issuer (#222); a changed text, a changed hash, no
+// text and an empty text whose hash holds are not unaltered. The hashes here are taken in Go, not by the
 // statement, so the rule is checked against its own statement of it.
 func TestTheIssuersTextIsUnalteredWhileItsHashHolds(t *testing.T) {
 	req.Covers(t, "FR-WEATHER-001")
@@ -167,25 +167,30 @@ where 'dwd:' || id = $1`, id); n != 1 {
 	}
 	en := "insert into public.weather_warnings_en (source_id, source_feed, identifier, base_identifier, language, headline, description,\n" +
 		"  content_sha256, sent_at, valid_from, valid_to, warncell_ids, raw)\n" +
-		"select 'dwd_warnings_en', 'dwd_warnings_en', 'test-en-2', 'test-en-2', 'en-GB', 'Frost', 'Frost is expected.', $2, w.published_at, w.valid_from, w.valid_to,\n" +
+		"select 'dwd_warnings_en', 'dwd_warnings_en', 'test-en-2', 'test-en-2', 'en-GB', $3, $4, $2, w.published_at, w.valid_from, w.valid_to,\n" +
 		"  array[w.warncell_id], '{\"eventCodes\": {\"II\": \"84\"}}'\nfrom weather_warnings w where 'dwd:' || w.id = $1"
 	drop := `delete from public.weather_warnings_en where identifier = 'test-en-2'`
 	t.Cleanup(func() { change(t, drop) })
 	for _, c := range []struct {
 		name               string
-		text               *string
-		hash, enHash       string
+		text, hash         *string
+		enHash             string
+		enHead, enText     string
 		unaltered, english bool
 	}{
-		{"as issued", ptr(de), sum(de), sum("Frost\x00Frost is expected.\x00"), true, true},
-		{"changed since", ptr(de + " "), sum(de), sum("Frost\x00Frost is expected."), false, false},
-		{"no text", nil, sum(""), sum("Frost\x00\x00Frost is expected."), false, false},
+		{"as issued", ptr(de), ptr(sum(de)), sum("Frost\x00Frost is expected.\x00"), "Frost", "Frost is expected.", true, true},
+		{"changed since", ptr(de + " "), ptr(sum(de)), sum("Frost\x00Frost is expected."), "Frost", "Frost is expected.", false, false},
+		{"no text", nil, ptr(sum("")), sum("Frost\x00\x00Frost is expected."), "Frost", "Frost is expected.", false, false},
+		// An empty text whose hash is the empty text's is none to quote. (No
+		// hash, null or empty, is not tested: the schema refuses both, in
+		// German and English alike; the statement reads them as altered.)
+		{"empty text, its hash", ptr(""), ptr(sum("")), sum("\x00\x00"), "", "", false, false},
 	} {
 		if n := change(t, set, id, c.text, c.hash); n != 1 {
 			t.Fatalf("%s: updated %d rows", c.name, n)
 		}
 		change(t, drop)
-		if n := change(t, en, id, c.enHash); n != 1 {
+		if n := change(t, en, id, c.enHash, c.enHead, c.enText); n != 1 {
 			t.Fatalf("%s: inserted %d rows", c.name, n)
 		}
 		sc, err := st.WarningsAt(bounded(t), weather.Query{LookAhead: lookAhead, Limit: maxWarnings, At: p}, fams, from)

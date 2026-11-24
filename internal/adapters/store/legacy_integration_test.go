@@ -14,14 +14,18 @@ import (
 // each beside the named statement that took its place and compares the rows.
 // Test-only: the store itself never reads a contract view.
 var legacyReads = map[string]string{
+	// The main-station spellings ($11) are carried from the platform's
+	// station search on purpose (#526): "Berlin Hbf" finds "S+U Berlin
+	// Hauptbahnhof"; empty, the statement reads as the view did.
 	"api_places_page": `
 with here as (
   select case when $4::float8 is null then null
               else st_setsrid(st_makepoint($5::float8, $4::float8), 4326)::geography end g),
 hit as (
-  select a.place_id, min(case when a.search_fold = $2 then 0 when a.search_fold like $2 || '%' then 1 else 2 end) rank
+  select a.place_id, min(case when a.search_fold = any(array[$2::text] || $11::text[]) then 0
+                              when a.search_fold like $2 || '%' or a.search_fold like any(array(select x || '%' from unnest($11::text[]) x)) then 1 else 2 end) rank
   from contract.place_alias a
-  where a.search_fold like '%' || $2 || '%' and ` + permitted("a") + `
+  where (a.search_fold like '%' || $2 || '%' or a.search_fold like any(array(select '%' || x || '%' from unnest($11::text[]) x))) and ` + permitted("a") + `
   group by a.place_id),
 found as (
   select p.place_id id, p.name, p.place_kind kind, p.location, p.region_code, p.source_ref, hit.rank, p.prominence, p.official_key,
@@ -34,9 +38,10 @@ found as (
     and ` + permitted("p") + `
   union all
   select s.stop_place_id, s.name, 'station_area', s.location, s.region_code, s.source_ref,
-         case when s.search_fold = $2 then 0 when s.search_fold like $2 || '%' then 1 else 2 end, null, null, false
+         case when s.search_fold = any(array[$2::text] || $11::text[]) then 0
+              when s.search_fold like $2 || '%' or s.search_fold like any(array(select x || '%' from unnest($11::text[]) x)) then 1 else 2 end, null, null, false
   from contract.stop_place s
-  where s.search_fold like '%' || $2 || '%'
+  where (s.search_fold like '%' || $2 || '%' or s.search_fold like any(array(select '%' || x || '%' from unnest($11::text[]) x)))
     and s.withdrawn_at is null
     and s.location is not null
     and s.source_ref = any($8)
@@ -80,6 +85,10 @@ select s.stop_place_id, s.name, coalesce(st_y(s.location), 0), coalesce(st_x(s.l
               order by p.stop_point_id)
 from contract.stop_place s
 where s.stop_place_id = $1 and s.withdrawn_at is null and s.source_ref = any($2) and `+permitted("s"), "text", "text[]"),
+	// A call's Trip Updates figure is credited to that source's key
+	// ('tripupdates'), as the register publishes it, not the licence id the
+	// view stamped, and a call carrying a family the key was not given is
+	// left out: on purpose (fault A of the 1.1.1 faults).
 	"api_board_calls": opaque(`
 select d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transport_mode, d.route_type,
        d.train_number, d.train_category, nullif(btrim(j.destination_label), ''),
@@ -88,14 +97,15 @@ select d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transport_mod
                    join contract.stop_point lp on lp.stop_point_id = lc.stop_point_id
                   where lc.journey_id = d.journey_id
                   order by lc.call_order desc limit 1)),
-       d.planned_departure_at, d.platform, d.planned_platform, d.platform_changed, d.realtime, d.realtime_source,
-       d.cancelled, d.delay_s, d.expected_departure_at, d.no_forecast, d.source_ref, d.source_refs
+       d.planned_departure_at, d.platform, d.planned_platform, d.platform_changed, d.realtime, case when d.realtime_source = 'delfi_rt_tu' then 'tripupdates' else d.realtime_source end,
+       d.cancelled, d.delay_s, d.expected_departure_at, d.no_forecast, d.source_ref, array_replace(d.source_refs, 'delfi_rt_tu', 'tripupdates')
 from contract.departure d
 left join contract.journey j on j.journey_id = d.journey_id
 where d.stop_place_id = $1
   and d.planned_departure_at >= $2 and d.planned_departure_at < $3
   and d.boarding
   and d.source_ref = any($4)
+  and array_replace(d.source_refs, 'delfi_rt_tu', 'tripupdates') <@ $4
   and `+permitted("d")+`
   and exists (select 1 from contract.scheduled_call nx
                 join contract.stop_point np on np.stop_point_id = nx.stop_point_id
@@ -165,10 +175,13 @@ from contract.transit_punctuality p
 where p.area_code = $1 and p.source_ref = any($2) and `+permitted("p")+`
 order by p.area_level
 limit 1`, "text", "text[]"),
+	// The trip delays are the Trip Updates' figures, published under that
+	// source's key ('tripupdates'), not the licence id the view stamped: on
+	// purpose (round 2 of the 1.1.1 faults).
 	"api_area_trips": `select count(distinct t.trip_ref)::int, (count(distinct t.trip_ref) filter (where t.worst_delay_s > $2::int * 60))::int,
-       max(t.observed_at), coalesce(min(t.source_ref), '')
+       max(t.observed_at), coalesce(min(case when t.source_ref = 'delfi_rt_tu' then 'tripupdates' else t.source_ref end), '')
 from contract.transit_trip_delay t
-where starts_with(t.area_code, $1) and t.source_ref = any($3) and ` + permitted("t"),
+where starts_with(t.area_code, $1) and case when t.source_ref = 'delfi_rt_tu' then 'tripupdates' else t.source_ref end = any($3) and ` + permitted("t"),
 	"api_line_in_timetable": `select exists (select 1 from contract.transit_line l where l.source_ref = any($2) and ` + permitted("l") + `),
        coalesce((select array_agg(distinct l.source_ref order by l.source_ref) from contract.transit_line l
                   where upper(regexp_replace(l.line_name, '\s+', '', 'g')) = $1::text and l.source_ref = any($2) and ` + permitted("l") + `), '{}')`,
@@ -256,7 +269,9 @@ func init() {
 }
 
 // legacyStationsPage is the station search as it read the view, every
-// filter optional, for each of its shapes.
+// filter optional, for each of its shapes; with the main-station spellings
+// ($10) carried from the platform's station search on purpose (#526), empty
+// for none, where the statement reads as the view did.
 var legacyStationsPage = `
 with here as (
   select case when $2::float8 is null then null
@@ -270,12 +285,12 @@ where s.withdrawn_at is null
   and s.location is not null
   and s.source_ref = any($1)
   and ` + permitted("s") + `
-  and ($4::text = '' or s.search_fold like '%' || $4::text || '%')
+  and ($4::text = '' or s.search_fold like '%' || $4::text || '%' or s.search_fold like any(array(select '%' || x || '%' from unnest($10::text[]) x)))
   and (here.g is null or st_dwithin(s.location::geography, here.g, $5))
   and ($7::text = '' or s.eva_no = $7::text or s.national_stop_code = $7::text)
   and (not $8::bool or s.eva_no is not null)
   and ($9::text = '' or s.region_code like $9::text || '%')
-order by case when here.g is null and not s.search_fold like $4::text || '%' then 1 else 0 end,
+order by case when here.g is null and not (s.search_fold like $4::text || '%' or s.search_fold like any(array(select x || '%' from unnest($10::text[]) x))) then 1 else 0 end,
          dist, s.name, s.stop_place_id
 limit $6`
 

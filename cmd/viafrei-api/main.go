@@ -113,6 +113,10 @@ func serve(environ []string, stderr io.Writer) int {
 	adm := admission.New(wire.AdmissionSettings(cfg), nil)
 	st.WithAdmission(adm).WithSharedBudget(wire.SharedBudget(cfg)).WithLogger(log).WithBreaker(wire.Breaker(cfg, log))
 	go st.KeepRegister(ctx)
+	// The versions are read in the background, so no request waits on
+	// that read (httpapi.KeptVersions).
+	versions := httpapi.NewKeptVersions(st, cfg.Cache.VersionsTTL, log)
+	go versions.Keep(ctx)
 	go st.KeepRoads(ctx)
 	go st.KeepFeeding(ctx)
 	addresses := ratelimit.NewIPLimiter(wire.AddressSettings(cfg), nil)
@@ -131,7 +135,7 @@ func serve(environ []string, stderr io.Writer) int {
 			wire.FeatureSettings(cfg), at),
 		At:        at,
 		Addresses: addresses,
-		Versions:  st,
+		Versions:  versions,
 	}
 
 	if cfg.Access.URL.IsSet() {

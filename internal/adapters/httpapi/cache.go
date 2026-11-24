@@ -397,10 +397,11 @@ func (c *resultCache) land(key string, f *flight, stored, answer *entry) {
 }
 
 // versionCache holds the last read of the family versions and the register
-// fingerprint for cache.versions_ttl. It reads only when a request asks and
-// the last read is older; while one request reads, the others wait for that
-// read, so a burst of identical requests neither reads the versions twice nor
-// falls through to the operation.
+// fingerprint for cache.versions_ttl. A reader that keeps its read in the
+// background (KeptVersions) answers it while that read is younger; else it
+// reads when a request asks and the last read is older; while one request
+// reads, the others wait for that read, so a burst of identical requests
+// neither reads the versions twice nor falls through to the operation.
 type versionCache struct {
 	reader  VersionReader
 	ttl     time.Duration
@@ -421,6 +422,14 @@ func (v *versionCache) get(ctx context.Context) (provenance.Versions, bool) {
 		return provenance.Versions{}, false
 	}
 	v.mu.Lock()
+	if kept, ok := v.reader.(*KeptVersions); ok {
+		// A read kept in the background (KeptVersions.Keep) answers when it
+		// is younger than the TTL and no older than the last one held, so
+		// no request waits on a read while the keeper keeps up.
+		if vs, at, ok := kept.kept(); ok && v.now().Sub(at) < v.ttl && (!v.read || !at.Before(v.at)) {
+			v.vs, v.at, v.read, v.failed = vs, at, true, false
+		}
+	}
 	if v.read && v.now().Sub(v.at) < v.ttl {
 		vs := v.vs
 		v.mu.Unlock()

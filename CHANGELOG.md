@@ -9,6 +9,13 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [1.1.1](https://github.com/mavrovde/viafrei-api/compare/v1.1.0...v1.1.1) (2026-11-24)
+
+
+### Fixed
+
+* **deps:** read and write viafrei-database 0.5.1 (schema head 339), beside the live refresher 0.1.1 ([#205](https://github.com/mavrovde/viafrei-api/issues/205)) ([465cfcc](https://github.com/mavrovde/viafrei-api/commit/465cfcc3534c901cbbf4ffdb9fad65b9132fc335))
+
 ## [1.1.0](https://github.com/mavrovde/viafrei-api/compare/v1.0.2...v1.1.0) (2026-11-24)
 
 

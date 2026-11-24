@@ -23,7 +23,12 @@ type stmt struct {
 }
 
 var (
-	namedMu sync.Mutex
+	// namedSealed is set once the package has loaded (init runs after every
+	// package-level statement is built): a statement named later is built per
+	// call, which no cache keeps, so every call would be prepared and planned
+	// afresh; named panics on it.
+	namedSealed bool
+	namedMu     sync.Mutex
 	// namedStmts is every named statement, by name: a name is taken once.
 	namedStmts = map[string]stmt{}
 	// paramUse is a parameter and the cast at its use.
@@ -36,6 +41,9 @@ var (
 // when the package loads, so a statement edited without its list fails every
 // test.
 func named(name, sql string, types ...string) stmt {
+	if namedSealed {
+		panic("store: " + name + " is built after the package loaded: a statement built per call is planned on every call")
+	}
 	used := make([]bool, len(types))
 	for _, m := range paramUse.FindAllStringSubmatch(sql, -1) {
 		n, _ := strconv.Atoi(m[1])
@@ -61,6 +69,8 @@ func named(name, sql string, types ...string) stmt {
 	namedStmts[name] = s
 	return s
 }
+
+func init() { namedSealed = true }
 
 // namedList is every named statement, ordered by name.
 func namedList() []stmt {

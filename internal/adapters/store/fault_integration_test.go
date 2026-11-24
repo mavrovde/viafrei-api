@@ -201,9 +201,10 @@ func TestEveryStatementFaultFailsTheRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var station, cell string
+	var station, cell, town string
 	err = owner.QueryRow(context.Background(), `select (select stop_place_id from contract.stop_place where withdrawn_at is null limit 1),
-		(select area_name from contract.weather_warning where area_name is not null limit 1)`).Scan(&station, &cell)
+		(select area_name from contract.weather_warning where area_name is not null limit 1),
+		(select name from contract.admin_region where region_level = 'district' order by region_code limit 1)`).Scan(&station, &cell, &town)
 	_ = owner.Close(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -237,6 +238,12 @@ func TestEveryStatementFaultFailsTheRead(t *testing.T) {
 		"Station": func(ctx context.Context, s *store.Store) error { _, err := s.Station(ctx, station, every); return err },
 		"Stations": func(ctx context.Context, s *store.Store) error {
 			_, _, err := s.Stations(ctx, transit.Query{Text: "a", Limit: 5}, every)
+			return err
+		},
+		// A text no name holds, read as a town (a district of the seed) and
+		// a stop: each statement of the town reading fails the read too.
+		"Stations in a town": func(ctx context.Context, s *store.Store) error {
+			_, _, err := s.Stations(ctx, transit.Query{Text: town + " Zzqxplatz", Limit: 5}, every)
 			return err
 		},
 		"Departures": func(ctx context.Context, s *store.Store) error {

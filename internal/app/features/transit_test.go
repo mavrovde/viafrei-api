@@ -101,6 +101,9 @@ func TestANameSeveralStationsAnswerCreditsTheirPlacement(t *testing.T) {
 		{"a name two stations answer", two, transit.Query{Text: "nam", Limit: 5}, []string{"p1", "t1"}},
 		{"a name one station answers", two[:1], transit.Query{Text: "nam", Limit: 5}, []string{"t1"}},
 		{"a position", two, transit.Query{Limit: 5}, []string{"t1"}},
+		// One station found in the town the text names: its district
+		// placed it there.
+		{"one station in the town", []transit.Station{{ID: "a", Family: "t1", PlacedBy: &p, InTown: true}}, transit.Query{Text: "town nam", Limit: 5}, []string{"p1", "t1"}},
 	} {
 		a, err := trService(&trFake{stations: c.stations}).Stations(context.Background(), consumer, c.q)
 		if err != nil || !slices.Equal(names(a.Families), c.want) {
@@ -148,6 +151,33 @@ func TestDeparturesAreTheBoardGatedAndAttributed(t *testing.T) {
 	if b.Station.ID != "s" || len(b.Items) != 1 || b.Items[0].JourneyID != "a" || !b.HasMore || !b.Partial || b.Matched != 2 ||
 		b.MatchedAll != 3 || b.Dropped[0] != 1 || !b.At.Equal(now) || !slices.Equal(names(b.Families), []string{"t1"}) {
 		t.Errorf("board %+v", b)
+	}
+}
+
+// A board answers the Trip Updates' family whatever domain the register
+// files it under (its calls carry that family beside the timetable's), still
+// under the licence gate.
+func TestABoardAnswersTheTripUpdatesFamily(t *testing.T) {
+	req.Covers(t, "FR-TRANSIT-002")
+	at := now.Add(time.Minute)
+	f := &trFake{station: transit.Station{ID: "s", Family: "t1", StopIDs: []string{"s", "s:1"}}, calls: []transit.Departure{
+		{JourneyID: "a", StopPointID: "s:1", PlannedAt: at, Mode: "bus", RouteType: 3, Family: "t1", Families: []string{"t1", transit.TripUpdatesFamily}},
+	}}
+	svc := trService(f)
+	f.reg = append(slices.Clone(trRegister), access.Terms{Family: transit.TripUpdatesFamily, Domain: "roads", UseClasses: all, Version: "v1"})
+	b, err := svc.Departures(context.Background(), key("commercial", []access.Scope{"transit"}, "t1", transit.TripUpdatesFamily),
+		transit.DepartureQuery{StationID: "s", From: now, Window: time.Hour, Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(f.gotFamilies, []string{"t1", transit.TripUpdatesFamily}) || len(b.Items) != 1 {
+		t.Errorf("asked %+v of %v: %+v", f.gotBoard, f.gotFamilies, b)
+	}
+	// Filed under transit, it is answered once.
+	f.reg = append(slices.Clone(trRegister), access.Terms{Family: transit.TripUpdatesFamily, Domain: "transit", UseClasses: all, Version: "v1"})
+	if _, err := svc.Departures(context.Background(), key("commercial", []access.Scope{"transit"}, "t1", transit.TripUpdatesFamily),
+		transit.DepartureQuery{StationID: "s", From: now, Window: time.Hour, Limit: 5}); err != nil || !slices.Equal(f.gotFamilies, []string{"t1", transit.TripUpdatesFamily}) {
+		t.Errorf("filed under transit: %v %v", f.gotFamilies, err)
 	}
 }
 

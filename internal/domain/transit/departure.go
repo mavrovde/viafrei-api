@@ -47,6 +47,12 @@ type Departure struct {
 	Families []string
 }
 
+// TripUpdatesFamily is the family the DELFI Trip Updates' figures on a
+// board are credited to. A board's calls carry it beside the timetable's
+// family, whatever domain the register files it under, so a board answers
+// it as one of its own families.
+const TripUpdatesFamily = "tripupdates"
+
 // DepartureQuery asks the board of a station: the departures planned in
 // [From, From+Window), of the given modes (none: every mode) and train
 // categories (none: every category), at most Limit.

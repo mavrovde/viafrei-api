@@ -380,20 +380,50 @@ func baseTables(views []string) string {
 		` select r.rel from r join pg_class c on c.oid = r.rel where c.relkind in ('r', 'p')`, strings.Join(views, "', '"))
 }
 
-// hold takes an exclusive lock on the tables under views for d in a session
-// of its own, so every read of them hangs in storage until the service
-// cancels it: the hanging query of QAS-REL-01. It returns once every lock is
-// granted; wait blocks until the session has ended.
-func (r *runner) hold(ctx context.Context, views []string, d time.Duration) (wait func() error, err error) {
+// holdName is the application_name of the lock session, by which release
+// finds it.
+const holdName = "loadrun-hold"
+
+// holdCancelled is PostgreSQL's message when release cancels the lock
+// session's statement: the end hold asks for.
+const holdCancelled = "canceling statement due to user request"
+
+// hold takes an exclusive lock on the tables under views in a session of its
+// own, so every read of them hangs in storage until the service cancels it:
+// the hanging query of QAS-REL-01. It returns once every lock is granted.
+// The lock lasts until release, which cancels the session and waits for it
+// to end: a scenario releases it only after the last of its requests was
+// answered, so none of them can see the lock end. A session that ends on its
+// own, after at most bound, is an error of release: the hold did not cover
+// the requests it was taken for.
+func (r *runner) hold(ctx context.Context, views []string, bound time.Duration) (release func() error, err error) {
 	base := baseTables(views)
 	errc := make(chan error, 1)
 	go func() {
-		_, err := r.psql(ctx, fmt.Sprintf("begin; do $$ begin execute 'lock table ' || (select string_agg(rel::regclass::text, ', ') from (%s) b(rel)) || ' in access exclusive mode'; end $$; select pg_sleep(%.3f); commit;", base, d.Seconds()))
+		_, err := r.psql(ctx, fmt.Sprintf("set application_name = '%s'; begin; do $$ begin execute 'lock table ' || (select string_agg(rel::regclass::text, ', ') from (%s) b(rel)) || ' in access exclusive mode'; end $$; select pg_sleep(%.3f); commit;", holdName, base, bound.Seconds()))
 		errc <- err
 	}()
-	wait = func() error { return <-errc }
+	release = func() error {
+		// The cancel matches every session named holdName, not only this
+		// one: safe only because the load stack is throwaway and its one
+		// runner holds one lock at a time (scripts/load-test.sh).
+		_, cerr := r.psql(ctx, fmt.Sprintf("select count(pg_cancel_backend(pid)) from pg_stat_activity where application_name = '%s' and pid <> pg_backend_pid()", holdName))
+		err := <-errc
+		switch {
+		case cerr != nil && err == nil:
+			return fmt.Errorf("the lock session could not be cancelled (%w); it ended on its own after %s", cerr, bound)
+		case cerr != nil:
+			return fmt.Errorf("the lock session could not be cancelled (%w); it ended with: %w", cerr, err)
+		case err == nil:
+			return fmt.Errorf("the lock ended on its own after %s, before its release", bound)
+		case strings.Contains(err.Error(), holdCancelled):
+			return nil
+		default:
+			return err
+		}
+	}
 	q := fmt.Sprintf("with b as (%s) select (count(*) = (select count(*) from b))::int from pg_locks where granted and mode = 'AccessExclusiveLock' and relation in (select rel from b)", base)
-	deadline := time.Now().Add(d)
+	deadline := time.Now().Add(bound)
 	for time.Now().Before(deadline) {
 		select {
 		case err := <-errc:
@@ -401,13 +431,13 @@ func (r *runner) hold(ctx context.Context, views []string, d time.Duration) (wai
 		default:
 		}
 		if out, err := r.psql(ctx, q); err == nil && out == "1" {
-			return wait, nil
+			return release, nil
 		}
 		if err := sleep(ctx, r.p.settle); err != nil {
-			return wait, err
+			return release, err
 		}
 	}
-	return wait, fmt.Errorf("the lock on the tables under %s was not granted within %s", strings.Join(views, ", "), d)
+	return release, fmt.Errorf("the lock on the tables under %s was not granted within %s", strings.Join(views, ", "), bound)
 }
 
 // awaitOK polls q until it is answered 2xx, at most within.

@@ -57,6 +57,9 @@ type Station struct {
 	// PlacedBy is the family that places the station in its district and
 	// Land (contract.stop_place's placement_source_ref); nil when none does.
 	PlacedBy *string
+	// InTown marks a station found as a stop in the town the text names
+	// (TownSplits): its district placed it there.
+	InTown bool
 	// EVA is the railway's main station number (DB StaDa); nil for a stop
 	// that is no DB station. EVANumbers are every number of the station, the
 	// main one first: a station of several parts files each part's trains

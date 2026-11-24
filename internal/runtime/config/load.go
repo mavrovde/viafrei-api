@@ -351,6 +351,9 @@ func crossField(c *Config) Errors {
 	if c.DB.PoolMin > c.DB.PoolMax {
 		out = append(out, fmt.Sprintf("db.pool_min: %d is larger than db.pool_max %d", c.DB.PoolMin, c.DB.PoolMax))
 	}
+	if c.DB.MaxConnIdle < c.DB.MaxConnLifetime {
+		out = append(out, fmt.Sprintf("db.max_conn_idle: %s is shorter than db.max_conn_lifetime %s", c.DB.MaxConnIdle, c.DB.MaxConnLifetime))
+	}
 	if c.Deadline.Reserve >= c.Deadline.Request {
 		out = append(out, fmt.Sprintf("deadline.reserve: %s must be less than deadline.request %s", c.Deadline.Reserve, c.Deadline.Request))
 	}

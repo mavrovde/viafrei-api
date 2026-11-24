@@ -119,29 +119,59 @@ where n.nspname not in ('pg_catalog', 'information_schema') and p.relkind = 'p'`
 	return out, err
 }
 
-// statement is one SQL statement the service sent, with its arguments.
+// statement is one SQL statement the service sent, with its arguments; a
+// named statement's is the text it was prepared with, under its name.
 type statement struct {
+	name string
 	sql  string
 	args []any
 }
 
-// capture records every read statement the store sends.
+// capture records every read statement the store sends: each statement
+// sent as text, and each named statement with the text it was prepared with
+// (seen, which a plan test explains), and a count of each, of a named
+// statement under its name.
 type capture struct {
-	mu    sync.Mutex
-	seen  map[string]statement
-	count map[string]*atomic.Int64
+	mu       sync.Mutex
+	seen     map[string]statement
+	count    map[string]*atomic.Int64
+	prepared map[string]string
 }
+
+// TracePrepareStart keeps the text of each named statement the store prepares.
+func (c *capture) TracePrepareStart(ctx context.Context, _ *pgx.Conn, d pgx.TracePrepareStartData) context.Context {
+	if strings.HasPrefix(d.Name, "api_") {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if c.prepared == nil {
+			c.prepared = map[string]string{}
+		}
+		c.prepared[d.Name] = d.SQL
+	}
+	return ctx
+}
+
+func (c *capture) TracePrepareEnd(context.Context, *pgx.Conn, pgx.TracePrepareEndData) {}
 
 func (c *capture) TraceQueryStart(ctx context.Context, _ *pgx.Conn, d pgx.TraceQueryStartData) context.Context {
 	sql := strings.TrimSpace(d.SQL)
 	lower := strings.ToLower(sql)
-	if !strings.HasPrefix(lower, "select") && !strings.HasPrefix(lower, "with") {
+	text := strings.HasPrefix(lower, "select") || strings.HasPrefix(lower, "with")
+	if !text && !strings.HasPrefix(sql, "api_") {
 		return ctx
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if _, ok := c.seen[sql]; !ok {
-		c.seen[sql] = statement{sql: sql, args: slices.Clone(d.Args)}
+		body, named := c.prepared[sql]
+		switch {
+		case text:
+			c.seen[sql] = statement{sql: sql, args: slices.Clone(d.Args)}
+		case named:
+			c.seen[sql] = statement{name: sql, sql: body, args: slices.Clone(d.Args)}
+		}
+	}
+	if c.count[sql] == nil {
 		c.count[sql] = &atomic.Int64{}
 	}
 	c.count[sql].Add(1)
@@ -150,7 +180,7 @@ func (c *capture) TraceQueryStart(ctx context.Context, _ *pgx.Conn, d pgx.TraceQ
 
 func (c *capture) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEndData) {}
 
-// reads counts the statements sent that mention relation.
+// reads counts the statements sent that mention relation, or are named it.
 func (c *capture) reads(relation string) int64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -769,7 +799,8 @@ func TestIdenticalConcurrentRequestsReadStorageOnce(t *testing.T) {
 	r := open(t)
 	h := r.handler(t, true)
 	target := r.targetsOf("listChargingOptions")[1]
-	before := r.sql.reads("contract.charging_site")
+	// The charging list's read: the named statement over the charging sites.
+	before := r.sql.reads("api_charging_near")
 	start := make(chan struct{})
 	var wg sync.WaitGroup
 	codes := make([]int, 50)
@@ -786,7 +817,7 @@ func TestIdenticalConcurrentRequestsReadStorageOnce(t *testing.T) {
 			t.Fatalf("answers %v", codes)
 		}
 	}
-	if n := r.sql.reads("contract.charging_site") - before; n != 1 {
+	if n := r.sql.reads("api_charging_near") - before; n != 1 {
 		t.Fatalf("%d storage reads for 50 identical concurrent requests, want 1", n)
 	}
 }
@@ -831,26 +862,33 @@ func TestNoSequentialScanOfTimeSeries(t *testing.T) {
 		stmts = append(stmts, s)
 	}
 	r.sql.mu.Unlock()
-	timeSeries := 0
+	timeSeries, named, namedSeries := 0, 0, 0
 	for _, s := range stmts {
+		if s.name != "" {
+			named++
+		}
 		for _, mode := range []string{"custom", "generic"} {
 			plan, err := explain(ctx, conn, s, mode)
 			if err != nil {
-				t.Errorf("explain (%s) failed: %v\n%s", mode, err, s.sql)
+				t.Errorf("explain (%s) failed: %v\n%s %s", mode, err, s.name, s.sql)
 				continue
 			}
 			scanned, seq := relations(plan, parts)
 			if len(scanned) > 0 && mode == "custom" {
 				timeSeries++
+				if s.name != "" {
+					namedSeries++
+				}
 			}
 			for _, rel := range seq {
-				t.Errorf("a sequential scan of the time partition %s (%s plan):\n%s", rel, mode, s.sql)
+				t.Errorf("a sequential scan of the time partition %s (%s plan):\n%s %s", rel, mode, s.name, s.sql)
 			}
 		}
 	}
-	t.Logf("explained %d read statements, %d of them on time series, in custom and generic plans", len(stmts), timeSeries)
-	if timeSeries == 0 {
-		t.Fatal("no statement read a time series: the test guarded nothing")
+	t.Logf("explained %d read statements (%d named), %d of them on time series (%d named), in custom and generic plans",
+		len(stmts), named, timeSeries, namedSeries)
+	if timeSeries == 0 || namedSeries == 0 {
+		t.Fatalf("%d statements, %d of them named, read a time series: the test guarded no named read", timeSeries, namedSeries)
 	}
 }
 

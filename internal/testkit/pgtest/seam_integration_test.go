@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -183,15 +184,17 @@ func TestSharedCopyReportsEachFault(t *testing.T) {
 		arrange func(t *testing.T)
 	}{
 		"no maintenance session": {"", func(t *testing.T) { refuseCall(t, 2) }},
-		"the seed": {"-- pgtest seam: the seed\n", func(t *testing.T) {
-			swapImage(t, (&fakeRun{answers: map[string]answer{"test-fixtures": {code: 1}}}).run)
+		"the seed session": {"-- pgtest seam: the seed session\n", func(t *testing.T) {
+			swapImage(t, pinnedRun(t))
+			refuseCall(t, 3)
 		}},
+		"the seed":          {"insert into vf_seed.contract_info (contract_version) values ('x');\n", func(t *testing.T) {}},
 		"the copy":          {"", func(t *testing.T) { cutAt(t, `create database "test_c_`, false) }},
 		"the settings read": {"", func(t *testing.T) { cutAt(t, "pg_db_role_setting", true) }},
 		"a setting's copy":  {"", func(t *testing.T) { cutAt(t, `in database "test_c_`, false) }},
 		"the statistics session": {"-- pgtest seam: the statistics session\n", func(t *testing.T) {
 			swapImage(t, pinnedRun(t))
-			refuseCall(t, 3)
+			refuseCall(t, 4)
 		}},
 		"the statistics": {"-- pgtest seam: the statistics\n", func(t *testing.T) {
 			swapImage(t, pinnedRun(t))
@@ -224,7 +227,7 @@ func TestSharedCopyReportsEachFault(t *testing.T) {
 }
 
 // A template whose sessions cannot be closed is not marked; a Rollback that
-// cannot begin fails its test; a seed runs the pinned image's seed.
+// cannot begin fails its test; a database is seeded once.
 func TestTheHarnessStepsReportTheirFaults(t *testing.T) {
 	ctx := setUp(t)
 	owner, err := pgx.Connect(ctx, harness.urlOf(harness.OwnerURL, "postgres"))
@@ -258,9 +261,11 @@ func TestTheHarnessStepsReportTheirFaults(t *testing.T) {
 		t.Error("a Rollback that could not begin passed")
 	}
 
-	f := healthyRun()
-	swapImage(t, f.run)
-	if err := harness.Seed(ctx, "-- no rows\n"); err != nil || len(f.args) != 1 || f.args[0][0] != "test-fixtures" {
-		t.Errorf("the seed ran %v: %v", f.args, err)
+	connect = pgx.Connect // the cut above is over
+	if err := harness.Seed(ctx, "-- no rows\n"); err != nil {
+		t.Errorf("the seed: %v", err)
+	}
+	if err := harness.Seed(ctx, "-- no rows\n"); err == nil || !strings.Contains(err.Error(), "seeded already") {
+		t.Errorf("a second seed = %v", err)
 	}
 }

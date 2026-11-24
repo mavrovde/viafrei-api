@@ -67,7 +67,7 @@ func TestRoadLampsReadWhatEachRoadsConditionsRead(t *testing.T) {
 	owner(t, `select j.state_code, s.source_ref from contract.junction j, contract.source s
 where j.road_ref = 'A101' and j.state_code is not null and not exists (select 1 from contract.message_coverage c where c.state_code = j.state_code and c.source_ref = s.source_ref)
 order by j.road_ref, j.junction_id, s.source_ref limit 1`, &state, &family)
-	change(t, `insert into contract.message_coverage (state_code, source_ref, coverage_role, current_only) values ('`+state+`', '`+family+`', 'own', true)`)
+	change(t, `insert into vf_seed.message_coverage (state_code, source_ref, coverage_role, current_only) values ('`+state+`', '`+family+`', 'own', true)`)
 	t.Cleanup(func() {
 		change(t, `delete from contract.message_coverage where state_code = '`+state+`' and source_ref = '`+family+`'`)
 	})

@@ -21,12 +21,12 @@ func TestRegionAlertsKeepOnlyLivePublicationsAndDropDuplicates(t *testing.T) {
 		key, ago string
 		cadence  int
 	}{{"sa_live", "1 minute", 300}, {"sx_live", "10 minutes", 3600}, {"sa_dead", "2 hours", 300}} {
-		plant(t, `insert into contract.source (source_ref, licence_code, attribution_text, freshness_target_s)
+		plant(t, `insert into vf_seed.source (source_ref, licence_code, attribution_text, freshness_target_s)
 values ('`+src.key+`', 'CC BY-SA 4.0', 'Test', `+strconv.Itoa(src.cadence)+`)`)
-		plant(t, `insert into contract.source_freshness (source_ref, data_as_of, confirmed_at, confirm_interval_s)
+		plant(t, `insert into vf_seed.source_freshness (source_ref, data_as_of, confirmed_at, confirm_interval_s)
 values ('`+src.key+`', now() - interval '`+src.ago+`', now() - interval '`+src.ago+`', `+strconv.Itoa(src.cadence)+`)`)
 	}
-	n := plant(t, `insert into contract.service_alert (alert_id, header, district_codes, state_codes, placed_by, dedupe_key, message_ref, primary_source, seen_at, source_ref)
+	n := plant(t, `insert into vf_seed.service_alert (alert_id, header, district_codes, state_codes, placed_by, dedupe_key, message_ref, primary_source, seen_at, source_ref)
 values ('sa_live:a1', 'Bauarbeiten', '{09998}', '{09}', 'stop', 'k1', null, true, now(), 'sa_live'),
        ('sa_live:a2', 'Umleitung', '{09998}', '{09}', 'stop', 'k2', 'm-2', true, now(), 'sa_live'),
        ('sx_live:s1', 'Bauarbeiten', '{09998}', '{09}', 'stop', 'k1', null, false, now(), 'sx_live'),

@@ -78,6 +78,16 @@ over the network. The keys come from the environment and are never printed.
 A scenario that cannot inject its fault or read its evidence fails. It is
 never skipped.
 
+A table lock (`hanging-query`, `pool-exhausted`, `composed-part-timeout`) is
+taken in a session of its own and counts as held only once `pg_locks` shows
+it granted on every table. It lasts until the scenario releases it, after
+the last of its requests was answered, by cancelling that session: no
+request of the fault can see the lock end. A session that ended on its own
+first fails the scenario's `lock released` assertion.
+
+The runner's log names each failed assertion with its figure, and the job
+keeps the report and its figures as an artifact whatever the outcome.
+
 | Scenario | Fault | Asserted |
 |---|---|---|
 | `soak` | none | every answer 2xx; p95 and p99 per class within `test/load/budgets.tsv` (NFR-PERF-003); resident memory grows at most 10 % after warm-up; no connection left busy |

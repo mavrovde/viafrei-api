@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -201,15 +204,81 @@ func TestFaultProxyCalls(t *testing.T) {
 	}
 }
 
-func TestHoldWaitsForTheLock(t *testing.T) {
+func TestHoldWaitsForTheLockAndKeepsItUntilRelease(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t, healthyAPI, healthyDocker)
-	wait, err := w.r.hold(ctx, featureTables, time.Second)
-	if err != nil || wait() != nil {
+	// The lock session lasts until a cancel reaches it.
+	cancelled := make(chan struct{})
+	var once sync.Once
+	w.dock.answer = func(a string) (string, error) {
+		switch {
+		case strings.Contains(a, "begin; do $$"):
+			<-cancelled
+			return "", fmt.Errorf("docker exec: exit status 1: ERROR:  %s", holdCancelled)
+		case strings.Contains(a, "pg_cancel_backend"):
+			once.Do(func() { close(cancelled) })
+			return "1", nil
+		}
+		return healthyDocker(a)
+	}
+	release, err := w.r.hold(ctx, featureTables, time.Second)
+	if err != nil {
 		t.Fatalf("hold %v", err)
 	}
-	if !w.dock.called("array['"+strings.Join(featureTables, "', '")+"']") || !w.dock.called("in access exclusive mode") || !w.dock.called("pg_sleep(1.000)") || !w.dock.called("AccessExclusiveLock") {
-		t.Errorf("calls %q", w.dock.calls)
+	if w.dock.called("pg_cancel_backend") {
+		t.Error("the lock was released before release")
+	}
+	if err := release(); err != nil {
+		t.Errorf("release %v", err)
+	}
+	for _, sub := range []string{"array['" + strings.Join(featureTables, "', '") + "']", "in access exclusive mode", "pg_sleep(1.000)", "AccessExclusiveLock", "application_name = '" + holdName + "'"} {
+		if !w.dock.called(sub) {
+			t.Errorf("no call with %q in %q", sub, w.dock.calls)
+		}
+	}
+
+	// The session ends on its own before its release: the hold did not
+	// cover the requests.
+	w.dock.answer = func(a string) (string, error) {
+		if strings.Contains(a, "begin; do $$") {
+			time.Sleep(20 * time.Millisecond)
+			return "", nil
+		}
+		return healthyDocker(a)
+	}
+	if release, err := w.r.hold(ctx, parkingTables, time.Second); err != nil {
+		t.Errorf("hold %v", err)
+	} else if err := release(); err == nil || !strings.Contains(err.Error(), "on its own") {
+		t.Errorf("a lock that ended on its own: %v", err)
+	}
+	// The session fails for another reason, and the cancel fails too.
+	w.dock.answer = func(a string) (string, error) {
+		switch {
+		case strings.Contains(a, "begin; do $$"):
+			time.Sleep(20 * time.Millisecond)
+			return "", errFake
+		case strings.Contains(a, "pg_cancel_backend"):
+			return "", errFake
+		}
+		return healthyDocker(a)
+	}
+	if release, err := w.r.hold(ctx, parkingTables, time.Second); err != nil {
+		t.Errorf("hold %v", err)
+	} else if err := release(); err == nil || !strings.Contains(err.Error(), "could not be cancelled") {
+		t.Errorf("a failed cancel: %v", err)
+	}
+	// The session fails for another reason, the cancel went through.
+	w.dock.answer = func(a string) (string, error) {
+		if strings.Contains(a, "begin; do $$") {
+			time.Sleep(20 * time.Millisecond)
+			return "", errFake
+		}
+		return healthyDocker(a)
+	}
+	if release, err := w.r.hold(ctx, parkingTables, time.Second); err != nil {
+		t.Errorf("hold %v", err)
+	} else if err := release(); !errors.Is(err, errFake) {
+		t.Errorf("a failed session: %v", err)
 	}
 
 	// The session fails before its lock is seen.
@@ -219,17 +288,18 @@ func TestHoldWaitsForTheLock(t *testing.T) {
 		}
 		return "0", nil
 	}
-	if wait, err := w.r.hold(ctx, parkingTables, time.Second); err == nil || wait() == nil {
+	if release, err := w.r.hold(ctx, parkingTables, time.Second); err == nil || release() == nil {
 		t.Errorf("a failed session: %v", err)
 	}
-	// The lock is never granted within the hold.
+	// The lock is never granted within the bound.
 	w.dock.answer = func(a string) (string, error) {
 		if strings.Contains(a, "begin;") {
 			time.Sleep(50 * time.Millisecond)
+			return "", fmt.Errorf("docker exec: exit status 1: ERROR:  %s", holdCancelled)
 		}
 		return "0", nil
 	}
-	if wait, err := w.r.hold(ctx, parkingTables, 20*time.Millisecond); err == nil || !strings.Contains(err.Error(), "not granted") || wait() != nil {
+	if release, err := w.r.hold(ctx, parkingTables, 20*time.Millisecond); err == nil || !strings.Contains(err.Error(), "not granted") || release() != nil {
 		t.Errorf("a lock never granted: %v", err)
 	}
 	// The context ends while it waits.
@@ -306,5 +376,25 @@ func TestExecDocker(t *testing.T) {
 	// docker compose top takes no ps options, so docker top is the plain CLI.
 	if out, err := execHost(bin)(context.Background(), "top", "c1", "-o", "rss"); err != nil || strings.TrimSpace(out) != "top c1 -o rss" {
 		t.Errorf("plain docker: %q %v", out, err)
+	}
+}
+
+func TestNotOKNamesWhatWasNot2xx(t *testing.T) {
+	at := time.Now()
+	if got := notOK(nil); got != "" {
+		t.Errorf("none: %q", got)
+	}
+	if got := notOK([]result{{status: 200, sent: at}}); got != "" {
+		t.Errorf("all 2xx: %q", got)
+	}
+	rs := []result{
+		{status: 200, sent: at},
+		{status: 429, problem: "overloaded", sent: at.Add(300 * time.Millisecond)},
+		{status: 429, problem: "overloaded", sent: at.Add(100 * time.Millisecond)},
+		{status: 503, problem: "deadline-exhausted", sent: at.Add(2 * time.Second)},
+	}
+	want := "; not 2xx: 429 overloaded ×2, the first sent at +100ms, 503 deadline-exhausted ×1, the first sent at +2s"
+	if got := notOK(rs); got != want {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }

@@ -5,6 +5,7 @@ package store_test
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"strconv"
@@ -28,6 +29,10 @@ const testBound = 2 * time.Second
 var db *pgtest.DB
 
 func TestMain(m *testing.M) {
+	flag.Parse()
+	if store.ParityOn() {
+		store.EnableParity()
+	}
 	// Starting the container is setup, outside every test body's bound.
 	ctx, cancel := context.WithTimeout(context.Background(), pgtest.SetupBound)
 	rows, err := seedRows()
@@ -40,6 +45,9 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	code := m.Run()
+	if code == 0 && store.ParityOn() && !parityHeld() {
+		code = 1
+	}
 	db.Stop()
 	os.Exit(code)
 }
@@ -48,7 +56,7 @@ func bounded(t *testing.T) context.Context {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), testBound)
 	t.Cleanup(cancel)
-	return ctx
+	return store.WithTest(ctx, t)
 }
 
 func readerConfig(t *testing.T, extra ...string) *config.Config {
@@ -87,7 +95,7 @@ func TestReaderRoleCannotWrite(t *testing.T) {
 	}
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
 
-	if _, err := conn.Exec(ctx, "insert into contract.publisher (publisher_id, display_name) values ('x', 'x')"); sqlState(err) != "25006" {
+	if _, err := conn.Exec(ctx, "insert into public.gazetteer_places (name) values ('x')"); sqlState(err) != "25006" {
 		t.Errorf("a default session must be read-only (25006), got %v", err)
 	}
 	// Even a session that switches itself to read-write holds no write grant.
@@ -95,7 +103,7 @@ func TestReaderRoleCannotWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tx.Exec(ctx, "insert into contract.publisher (publisher_id, display_name) values ('x', 'x')"); sqlState(err) != "42501" {
+	if _, err := tx.Exec(ctx, "insert into public.gazetteer_places (name) values ('x')"); sqlState(err) != "42501" {
 		t.Errorf("an insert must be refused by privilege (42501), got %v", err)
 	}
 	_ = tx.Rollback(ctx)

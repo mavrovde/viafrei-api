@@ -9,6 +9,23 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [1.1.2](https://github.com/mavrovde/viafrei-api/compare/v1.1.1...v1.1.2) (2026-11-24)
+
+
+### Fixed
+
+* the 1.1.1 production faults — departure boards under the published family, charging ids, freshness off the request path, staged search, Hbf ([#207](https://github.com/mavrovde/viafrei-api/issues/207)) ([39c7d0e](https://github.com/mavrovde/viafrei-api/commit/39c7d0e4cf3ad89f645cea56249d6816598a96dd))
+
+
+### Dependencies
+
+* bump github.com/jackc/pgx/v5 from 5.12.0 to 5.13.0 ([#197](https://github.com/mavrovde/viafrei-api/issues/197)) ([ad92055](https://github.com/mavrovde/viafrei-api/commit/ad920551ad371f48a13f74a93d518b5466dc1003))
+
+
+### Build and CI
+
+* bump github/codeql-action/upload-sarif from 4.39.1 to 4.39.3 ([#198](https://github.com/mavrovde/viafrei-api/issues/198)) ([df4fc76](https://github.com/mavrovde/viafrei-api/commit/df4fc76ac2232210355ead7644892ca28906934e))
+
 ## [1.1.1](https://github.com/mavrovde/viafrei-api/compare/v1.1.0...v1.1.1) (2026-11-24)
 
 

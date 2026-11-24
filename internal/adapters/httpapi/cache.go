@@ -639,7 +639,7 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 		key: key, header: b.header.Clone(), body: slices.Clone(b.body.Bytes()), requestID: RequestIDFrom(ctx),
 		register: vs.Register, until: note.until, unversioned: !versioned || note.degraded,
 	}
-	seen := map[string]bool{}
+	seen, staleNow := map[string]bool{}, map[string]bool{}
 	for _, f := range note.fams {
 		if seen[f.Source.Family] {
 			continue
@@ -647,9 +647,7 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 		seen[f.Source.Family] = true
 		version := vs.Families[f.Source.Family]
 		e.families = append(e.families, familyVersion{family: f.Source.Family, version: version})
-		if f.Assess(s.at()).Stale {
-			e.confirmed = append(e.confirmed, familyVersion{family: f.Source.Family, version: vs.Confirmations[f.Source.Family]})
-		}
+		staleNow[f.Source.Family] = f.Assess(s.at()).Stale
 		if version == "" {
 			e.unversioned = true
 		}
@@ -666,7 +664,14 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 		}
 	}
 	slices.SortFunc(e.families, func(a, b familyVersion) int { return strings.Compare(a.family, b.family) })
-	slices.SortFunc(e.confirmed, func(a, b familyVersion) int { return strings.Compare(a.family, b.family) })
+	// The confirmations of the families the answer states stale, in the
+	// families' order: a confirmation ends a stale answer (a family can
+	// recover by one, with no data change).
+	for _, f := range e.families {
+		if staleNow[f.family] {
+			e.confirmed = append(e.confirmed, familyVersion{family: f.family, version: vs.Confirmations[f.family]})
+		}
+	}
 	// A family the lamp read changes the answer as much as one it
 	// attributes: its versions are kept, and its domain's max-age and stale
 	// allowance bound the answer's.

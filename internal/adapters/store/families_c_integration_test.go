@@ -12,6 +12,19 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 )
 
+// tripUpdatesOwnTheirLicence makes the private database's register as the
+// platform's: the Trip Updates source owns the register row of its licence
+// ('delfi_rt_tu'), so the register publishes it as 'tripupdates' alone.
+var tripUpdatesOwnTheirLicence = []string{
+	`delete from public.feed_catalog where feed_key = 'delfi_rt_tu'`,
+	`update public.feed_catalog set licence_id = 'delfi_rt_tu' where feed_key = 'tripupdates'`,
+	`insert into public.source_register (source_id, attribution_text, source_url, licence_label, share_alike, share_alike_database,
+	                                    use_classes, consumer_answers_only, no_redistribution, register_version)
+	 values ('delfi_rt_tu', 'DELFI', 'https://example.org/delfi_rt_tu', 'CC BY-SA 4.0', true, false,
+	         array['consumer', 'non_commercial', 'commercial'], false, false, current_date)
+	 on conflict (source_id) do nothing`,
+}
+
 // As on the platform, the Trip Updates source owns the register row of its
 // licence, so the register publishes their figures under the source's key, not
 // the licence's id: a board reads a call's Trip Updates figure under that
@@ -20,7 +33,7 @@ import (
 // was stamped with the licence's id).
 func TestABoardCarriesOnlyTheFamiliesItWasGiven(t *testing.T) {
 	const station = "1:de:09999:77"
-	st, cp := private(t,
+	st, cp := private(t, append([]string{
 		`insert into vf_seed.departure (stop_place_id, stop_point_id, journey_id, call_order, line_name, transport_mode, planned_departure_at,
 		   boarding, realtime_source, cancelled, delay_s, source_ref)
 		 select '1:de:09999:77', '1:de:09999:77:1', '1:tu-board:' || to_char(now() at time zone 'Europe/Berlin', 'YYYYMMDD'), 1, 'RB 7', 'rail',
@@ -28,13 +41,7 @@ func TestABoardCarriesOnlyTheFamiliesItWasGiven(t *testing.T) {
 		// The trip calls at a stop after the station: the call departs.
 		`insert into public.stops (gtfs_feed_key, id, name, geom, location_type)
 		 values (1, 'de:09999:77:1:next', 'Weiter', vf_test.point(null), 0) on conflict do nothing`,
-		`delete from public.feed_catalog where feed_key = 'delfi_rt_tu'`,
-		`update public.feed_catalog set licence_id = 'delfi_rt_tu' where feed_key = 'tripupdates'`,
-		`insert into public.source_register (source_id, attribution_text, source_url, licence_label, share_alike, share_alike_database,
-		                                    use_classes, consumer_answers_only, no_redistribution, register_version)
-		 values ('delfi_rt_tu', 'DELFI', 'https://example.org/delfi_rt_tu', 'CC BY-SA 4.0', true, false,
-		         array['consumer', 'non_commercial', 'commercial'], false, false, current_date)
-		 on conflict (source_id) do nothing`)
+	}, tripUpdatesOwnTheirLicence...)...)
 	conn, err := cp.Owner(bounded(t))
 	if err != nil {
 		t.Fatal(err)
@@ -132,5 +139,49 @@ func TestTheLampsReferenceMovesWithWhatAJunctionsStateIsDerivedFrom(t *testing.T
 		if moved.Register != before.Register || moved.RulesReference != before.RulesReference || !maps.Equal(moved.Families, before.Families) {
 			t.Errorf("%s moved more than the lamp's reference", change)
 		}
+	}
+}
+
+// The punctuality and the trip delays of an area are read under the Trip
+// Updates' family as the register publishes it, like a board's figures: a
+// key given the published family is answered with them, and told it read
+// them (they were stamped with the licence's id, a family no key holds where
+// the source owns its licence's row, and never served).
+func TestAnAreasPunctualityIsReadUnderThePublishedFamily(t *testing.T) {
+	const area = "09162"
+	st, _ := private(t, append([]string{
+		// A Trip Updates call seeded as the board test's: the seed then
+		// holds the Trip Updates source the register publishes.
+		`insert into vf_seed.departure (stop_place_id, stop_point_id, journey_id, call_order, line_name, transport_mode, planned_departure_at,
+		   boarding, realtime_source, cancelled, delay_s, source_ref)
+		 select '1:de:09999:78', '1:de:09999:78:1', '1:tu-area:' || to_char(now() at time zone 'Europe/Berlin', 'YYYYMMDD'), 1, 'RB 7', 'rail',
+		        date_trunc('minute', now()) + interval '20 minutes', true, 'delfi_rt_tu', false, 300, 'delfi_static'`,
+		`insert into public.transit_delays (observed_at, feed_ts, trip_id, stop_id, stop_sequence, delay_s, schedule_relationship, source)
+		 select now() - interval '2 minutes', now() - interval '2 minutes', v.trip, 'de:09162:1', 1, v.delay, 'SCHEDULED', 'delfi_rt_tu'
+		 from (values ('tu-area-1', 900), ('tu-area-2', 60)) v(trip, delay)`,
+	}, tripUpdatesOwnTheirLicence...)...)
+	reg, err := st.Register(bounded(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fams []string
+	for _, r := range reg {
+		fams = append(fams, r.Family)
+	}
+	if slices.Contains(fams, "delfi_rt_tu") || !slices.Contains(fams, "tripupdates") {
+		t.Fatalf("the register publishes the Trip Updates under the source's key: %v", fams)
+	}
+	d, err := st.Disruptions(bounded(t), transit.DisruptionQuery{Area: area, Limit: 5, Now: time.Now(), LateOverMin: 5}, fams)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(d.PunctualityRead, []string{"tripupdates"}) {
+		t.Errorf("punctuality read under %v, want [tripupdates]", d.PunctualityRead)
+	}
+	if d.Trips == nil || d.Trips.Observed != 2 || d.Trips.Late != 1 || d.Trips.Family != "tripupdates" {
+		t.Errorf("trips %+v, want 2 observed, 1 late, of tripupdates", d.Trips)
+	}
+	if d.Punctuality != nil && d.Punctuality.Family != "tripupdates" {
+		t.Errorf("punctuality of %q, want tripupdates", d.Punctuality.Family)
 	}
 }

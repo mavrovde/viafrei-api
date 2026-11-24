@@ -5,7 +5,9 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"strings"
@@ -59,6 +61,54 @@ var (
 	connect         = pgx.Connect
 	runImage Runner = RunImage
 )
+
+// The bounds of the retry of the run's reaper while it is not started yet
+// (retryReaperStart): at most reaperStartTries runs, the first wait
+// reaperStartDelay and each next one twice the last, none begun once
+// reaperStartBound would pass; logf writes each retry. A test of the
+// package shortens them and reads what is logged.
+var (
+	reaperStartTries = 5
+	reaperStartDelay = time.Second
+	reaperStartBound = 30 * time.Second
+	logf             = log.Printf
+)
+
+// reaperNotStarted reports whether err is testcontainers' refusal of the
+// run's reaper container while it is still "created". The package processes
+// of one run share testcontainers' session and so its one reaper: a process
+// that looks the reaper up between another's create and start of it waits
+// on a container that is not running yet, and testcontainers-go (v0.45.0)
+// takes that state as final and does not retry it.
+func reaperNotStarted(err error) bool {
+	s := err.Error()
+	return strings.Contains(s, "reaper") && strings.Contains(s, `unexpected container status "created"`)
+}
+
+// retryReaperStart returns what run returns, running it again, after a
+// logged wait, only while it fails because the run's reaper is not started
+// yet (reaperNotStarted) and the tries and the bound allow; any other error
+// is returned at once.
+func retryReaperStart[C any](ctx context.Context, run func() (C, error)) (C, error) {
+	var none C
+	start, delay := time.Now(), reaperStartDelay
+	for try := 1; ; try++ {
+		c, err := run()
+		if err == nil || !reaperNotStarted(err) {
+			return c, err
+		}
+		if try == reaperStartTries || time.Since(start)+delay > reaperStartBound {
+			return none, fmt.Errorf("the run's reaper did not start in %d tries: %w", try, err)
+		}
+		logf("pgtest: the run's reaper is not started yet (try %d of %d), again in %s: %v", try, reaperStartTries, delay, err)
+		select {
+		case <-ctx.Done():
+			return none, errors.Join(err, ctx.Err())
+		case <-time.After(delay):
+		}
+		delay *= 2
+	}
+}
 
 // lockKey serialises the shared container's set-up steps across the run's
 // package processes (pg_advisory_lock on the maintenance database).
@@ -154,7 +204,9 @@ func sharedBase(ctx context.Context) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("pgtest: %w", err)
 	}
-	c, err := runShared(ctx, sessionSecret("owner"), testcontainers.WithReuseByName(sharedName(pin)))
+	c, err := retryReaperStart(ctx, func() (sharedContainer, error) {
+		return runShared(ctx, sessionSecret("owner"), testcontainers.WithReuseByName(sharedName(pin)))
+	})
 	if err != nil {
 		return nil, fmt.Errorf("pgtest: shared %s: %w", Image, err)
 	}
@@ -203,7 +255,7 @@ func (db *DB) seedTemplate(ctx context.Context, maint *pgx.Conn, name, rows stri
 	if _, err := maint.Exec(ctx, "create database "+ident(build)+" template "+ident(Database)); err != nil {
 		return fmt.Errorf("pgtest: create %s: %w", build, err)
 	}
-	if err := SeedWith(ctx, db.Pin, db.urlOf(db.imageURL, build), rows, runImage); err != nil {
+	if err := SeedWith(ctx, db.urlOf(db.OwnerURL, build), rows); err != nil {
 		return err
 	}
 	// A copy carries the template's statistics: gathered here once, a copy's

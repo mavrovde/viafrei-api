@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 )
 
 // The endpoint classes of NFR-PERF-003 the request mix uses.
@@ -358,12 +360,12 @@ func (r *runner) reset(ctx context.Context) error {
 	return r.toxi(ctx, http.MethodPost, "/reset", nil)
 }
 
-// The read-contract views the feature reads touch; a lock on the tables
-// under them hangs every storage read of the request mix, a lock on those
-// under the parking ones only the parking part.
+// The platform's tables the feature reads touch (the store's lists); a lock
+// on them hangs every storage read of the request mix, a lock on the parking
+// ones only the parking part.
 var (
-	featureTables = []string{"contract.place", "contract.charging_site", "contract.charge_point", "contract.charge_point_state_observation", "contract.parking_facility", "contract.occupancy_observation"}
-	parkingTables = []string{"contract.parking_facility", "contract.occupancy_observation"}
+	featureTables = store.FeatureTables
+	parkingTables = store.ParkingTables
 )
 
 // baseTables is a query of the oids of the tables under views, followed

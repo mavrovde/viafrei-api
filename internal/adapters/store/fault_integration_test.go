@@ -219,7 +219,7 @@ func TestEveryStatementFaultFailsTheRead(t *testing.T) {
 			return err
 		},
 		"NeedPlaces": func(ctx context.Context, s *store.Store) error {
-			_, err := s.NeedPlaces(ctx, places.NearbyQuery{At: berlin, RadiusM: 5000, Needs: []string{"fuel", "toilet"}, Limit: 5}, every)
+			_, err := s.NeedPlaces(ctx, places.NearbyQuery{At: berlin, RadiusM: 5000, Needs: []string{"toilets", "fuel"}, Limit: 5}, every)
 			return err
 		},
 		"Junctions": func(ctx context.Context, s *store.Store) error {

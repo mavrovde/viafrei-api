@@ -17,11 +17,11 @@ import (
 // in each Gemeinde.
 func plantSpeedCut(t *testing.T) {
 	t.Helper()
-	plant(t, `insert into contract.place (place_id, place_kind, name, location, official_key, prominence, source_ref, origin_key, recorded_at, changed_at)
+	plant(t, `insert into vf_seed.place (place_id, place_kind, name, location, official_key, prominence, source_ref, origin_key, recorded_at, changed_at)
 values ('99000001', 'municipality', 'Westdorf', st_setsrid(st_makepoint(-20.0, 75.0), 4326), '99000001', 1, 'bkg_gvisys', 'cut:w', '2026-03-28T00:00:00Z', '2026-03-28T00:00:00Z'),
        ('99000002', 'municipality', 'Mitteldorf', st_setsrid(st_makepoint(-19.65, 75.0), 4326), '99000002', 1, 'bkg_gvisys', 'cut:m', '2026-03-28T00:00:00Z', '2026-03-28T00:00:00Z'),
        ('99000003', 'municipality', 'Ostdorf', st_setsrid(st_makepoint(-19.3, 75.0), 4326), '99000003', 1, 'bkg_gvisys', 'cut:e', '2026-03-28T00:00:00Z', '2026-03-28T00:00:00Z')`)
-	plant(t, `insert into contract.speed_camera (camera_id, camera_kind, enforces, location, max_speed_kmh, name, street, data_as_of, valid_from, valid_to, source_ref, recorded_at)
+	plant(t, `insert into vf_seed.speed_camera (camera_id, camera_kind, enforces, location, max_speed_kmh, name, street, data_as_of, valid_from, valid_to, source_ref, recorded_at)
 values ('se:990001', 'fixed', 'speed', st_setsrid(st_makepoint(-20.01, 75.0), 4326), 50, 'Westdorf', 'Hauptstraße', '2026-03-01', null, null, 'speed_alpha', '2026-03-28T00:00:00Z'),
        ('se:990002', 'mobile_announced', 'speed', st_setsrid(st_makepoint(-19.31, 75.0), 4326), 50, 'Ostdorf', 'Ring', '2026-03-01', '2026-03-28', '2026-04-30', 'speed_alpha', '2026-03-28T00:00:00Z'),
        ('osm:node990011', 'fixed', 'speed', st_setsrid(st_makepoint(-19.98, 75.0), 4326), 50, 'Blitzer West', null, '2026-03-01', null, null, 'osm_speed_cameras', '2026-03-28T00:00:00Z'),

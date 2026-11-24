@@ -16,7 +16,7 @@ import (
 // kind is read.
 func TestBaysReadAsThePlatformsBayRead(t *testing.T) {
 	st := seeded(t)
-	n := plant(t, `insert into contract.street_bay (bay_id, bay_kind, street, house_number, postcode, city, location, state, state_at, spaces, reserved_when, source_ref)
+	n := plant(t, `insert into vf_seed.street_bay (bay_id, bay_kind, street, house_number, postcode, city, location, state, state_at, spaces, reserved_when, source_ref)
 values ('dortmund:fresh', 'disabled', 'Kuhstraße', '12', '44137', 'Testdorf', 'SRID=4326;POINT(7.0000 50.0000)', 'free', now() - interval '1 hour', null, null, 'dortmund_parksensoren_bays'),
        ('dortmund:old', 'disabled', 'Kuhstraße', '14', '44137', 'Testdorf', 'SRID=4326;POINT(7.0010 50.0000)', 'occupied', now() - interval '4 hours', null, null, 'dortmund_parksensoren_bays'),
        ('dortmund:none', 'disabled', null, null, null, null, 'SRID=4326;POINT(7.0020 50.0000)', null, null, null, null, 'dortmund_parksensoren_bays'),

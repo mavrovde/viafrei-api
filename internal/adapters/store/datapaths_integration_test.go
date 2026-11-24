@@ -133,21 +133,28 @@ func TestWarningsAtMoreThanTheLimitAndABadLevel(t *testing.T) {
 	owner(t, `select array_agg(source_ref order by source_ref) from contract.source`, &fams)
 	const where = `select st_y(st_pointonsurface(area)), st_x(st_pointonsurface(area)) from contract.weather_warning
 		where area is not null and valid_to is null and valid_from > now() - interval '2 hours' limit 1`
-	st, cp := private(t, plantWarning(1, 2), plantWarning(2, 3))
-	var at geo.Point
-	ownerOf(t, cp, where, &at.Lat, &at.Lon)
-	got, err := st.WarningsAt(bounded(t), weather.Query{LookAhead: lookAhead, At: at, MinLevel: 1, Limit: 1}, fams, time.Now())
-	if err != nil || len(got.Warnings) != 1 || !got.HasMore {
-		t.Fatalf("%+v %v", got, err)
-	}
+	// Each case on a private copy of its own: a subtest each, as a copy is
+	// most of a case's time.
+	t.Run("more than the limit", func(t *testing.T) {
+		st, cp := private(t, plantWarning(1, 2), plantWarning(2, 3))
+		var at geo.Point
+		ownerOf(t, cp, where, &at.Lat, &at.Lon)
+		got, err := st.WarningsAt(bounded(t), weather.Query{LookAhead: lookAhead, At: at, MinLevel: 1, Limit: 1}, fams, time.Now())
+		if err != nil || len(got.Warnings) != 1 || !got.HasMore {
+			t.Fatalf("%+v %v", got, err)
+		}
+	})
 	// A level-0 advance notice is listed at floor 0, as the platform lists
 	// it, and lights no lamp.
-	st, cp = private(t, plantWarning(1, 0))
-	ownerOf(t, cp, where, &at.Lat, &at.Lon)
-	if sc, err := st.WarningsAt(bounded(t), weather.Query{LookAhead: lookAhead, At: at, MinLevel: 0, Limit: 5}, fams, time.Now()); err != nil ||
-		len(sc.Warnings) != 1 || sc.Warnings[0].Level != 0 || weather.LampOf(sc.Levels, false, false) != weather.LampGreen {
-		t.Fatalf("a level-0 notice in force: %+v %v", sc, err)
-	}
+	t.Run("a level-0 notice", func(t *testing.T) {
+		st, cp := private(t, plantWarning(1, 0))
+		var at geo.Point
+		ownerOf(t, cp, where, &at.Lat, &at.Lon)
+		if sc, err := st.WarningsAt(bounded(t), weather.Query{LookAhead: lookAhead, At: at, MinLevel: 0, Limit: 5}, fams, time.Now()); err != nil ||
+			len(sc.Warnings) != 1 || sc.Warnings[0].Level != 0 || weather.LampOf(sc.Levels, false, false) != weather.LampGreen {
+			t.Fatalf("a level-0 notice in force: %+v %v", sc, err)
+		}
+	})
 }
 
 // At a junction the junctions read lists it, at most the limit.
@@ -204,7 +211,7 @@ func TestDeparturesAndAnUnknownStation(t *testing.T) {
 
 // A hydrogen read for a lorry or a car asks for that vehicle's refill codes.
 func TestHydrogenForALorry(t *testing.T) {
-	ctx := context.Background()
+	ctx := store.WithTest(context.Background(), t)
 	for _, v := range []string{"truck", "car"} {
 		if _, err := seeded(t).HydrogenNear(ctx, energy.HydrogenQuery{At: geo.Point{Lat: 51, Lon: 10}, RadiusM: 50000, Vehicle: v, Limit: 5}, every(t)); err != nil {
 			t.Fatal(v, err)
@@ -252,7 +259,7 @@ func private(t *testing.T, rows ...string) (*store.Store, *pgtest.DB) {
 // A Land's coverage names its own families, those current only, and the
 // families it carries.
 func TestStateCoverageReadsEveryRole(t *testing.T) {
-	st, _ := private(t, `insert into contract.message_coverage (state_code, source_ref, coverage_role, current_only)
+	st, _ := private(t, `insert into vf_seed.message_coverage (state_code, source_ref, coverage_role, current_only)
 		select '09', s.source_ref, case when s.n = 1 then 'own' else 'carried' end, s.n = 1
 		from (select source_ref, row_number() over (order by source_ref) n from contract.source
 		      where source_ref not in (select source_ref from contract.message_coverage where state_code = '09')) s
@@ -267,7 +274,7 @@ func TestStateCoverageReadsEveryRole(t *testing.T) {
 
 // An alert placed on a station's stops counts against that station.
 func TestAffectedStationsCountAnAlertOnTheirStops(t *testing.T) {
-	st, cp := private(t, `insert into contract.service_alert (alert_id, header, source_ref, recorded_at, changed_at, active_periods, placed_by, stop_ids)
+	st, cp := private(t, `insert into vf_seed.service_alert (alert_id, header, source_ref, recorded_at, changed_at, active_periods, placed_by, stop_ids)
 		select a.alert_id || '-stop', a.header, a.source_ref, now(), now(), '[]', 'stop',
 		       array[(select stop_place_id from contract.stop_place where withdrawn_at is null order by stop_place_id limit 1)]
 		from contract.service_alert a order by a.alert_id limit 1`)

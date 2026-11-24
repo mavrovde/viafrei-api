@@ -6,7 +6,8 @@
 package dbcontract
 
 // ContractVersion is the read-contract version this build expects, in
-// major.minor form: contract.contract_info must state it.
+// major.minor form. Readiness and /v1/meta state it; the platform release
+// database.pin names is the one it reads.
 const ContractVersion = "0.3"
 
 // ReaderRole is the read-only role the service reads the contract as.

@@ -47,7 +47,7 @@ type ReadinessOutput struct {
 
 func registerReadiness(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "Readiness"
-	op.Description = "Storage answers within the readiness timeout and publishes a compatible read contract (FR-SVC-004)."
+	op.Description = "Storage answers within the readiness timeout, and the read-contract version this build carries is the one required (FR-SVC-004)."
 	// The 503 answer carries the same body and cache header as the 200 one;
 	// every other failure is a problem, as on every operation.
 	reg := api.OpenAPI().Components.Schemas

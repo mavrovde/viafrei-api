@@ -277,7 +277,7 @@ func TestTheLampsVersionsMoveWithWhatItJudges(t *testing.T) {
 	}
 	refs := map[string]bool{base.LampReference: true}
 	for _, change := range []string{
-		`insert into contract.message_coverage (state_code, source_ref, coverage_role, current_only) values ('96', '` + family + `', 'own', true)`,
+		`insert into vf_seed.message_coverage (state_code, source_ref, coverage_role, current_only) values ('96', '` + family + `', 'own', true)`,
 		`update contract.message_coverage set current_only = false where state_code = '96'`,
 		`update contract.junction set state_code = '96' where junction_id = '` + junction + `'`,
 	} {
@@ -335,8 +335,8 @@ func TestTheRulesReferenceMovesWithTheRuleRows(t *testing.T) {
 	})
 	refs := map[string]bool{base.RulesReference: true}
 	for _, change := range []string{
-		`insert into contract.rule_topic (topic_code, title, title_en, reviewed_on) values ('rt_reference', 'Bezug', 'Reference', '2026-01-01')`,
-		`insert into contract.rule_statement (statement_id, topic_code, position, body, body_en, legal_basis, legal_basis_url, reviewed_on, headline)
+		`insert into vf_seed.rule_topic (topic_code, title, title_en, reviewed_on) values ('rt_reference', 'Bezug', 'Reference', '2026-01-01')`,
+		`insert into vf_seed.rule_statement (statement_id, topic_code, position, body, body_en, legal_basis, legal_basis_url, reviewed_on, headline)
 values ('rt_reference.one', 'rt_reference', 1, 'Eins', 'One', '§ 0 synthetic', 'https://law.example/rt_reference', '2026-01-01', false)`,
 		`update contract.rule_statement set body = 'Eins, geändert' where statement_id = 'rt_reference.one'`,
 		`update contract.rule_topic set reviewed_on = '2026-02-01' where topic_code = 'rt_reference'`,

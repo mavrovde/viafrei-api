@@ -1,5 +1,5 @@
 // Package health is the readiness use case (FR-SVC-004): storage must answer
-// within the readiness timeout and publish a compatible read contract.
+// within the readiness timeout and state a compatible read-contract version.
 package health
 
 import (

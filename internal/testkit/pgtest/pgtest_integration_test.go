@@ -105,6 +105,13 @@ func TestHarnessIsUsable(t *testing.T) {
 	if err := passwords(ctx, harness.AccessURL, "A", own); err == nil || !strings.Contains(err.Error(), "set the password of api_reader") {
 		t.Fatalf("passwords as api_access = %v", err)
 	}
+	// A seed install that fails is the step's error; the roles keep their passwords.
+	ru, _ := url.Parse(harness.ReaderURL)
+	readerPW, _ := ru.User.Password()
+	cutAt(t, "vf_seed", false)
+	if err := passwords(ctx, harness.OwnerURL, readerPW, own); err == nil || !strings.Contains(err.Error(), "install the test seed") {
+		t.Fatalf("passwords with a lost seed install = %v", err)
+	}
 }
 
 func TestStartWithAnEndedContextFails(t *testing.T) {
@@ -193,7 +200,7 @@ func TestStartWithoutAPinFails(t *testing.T) {
 // TestRunImageReportsAnImageThatCannotRun: a reference no runtime can pull
 // is an error of the runtime, never an exit status.
 func TestRunImageReportsAnImageThatCannotRun(t *testing.T) {
-	if _, _, err := RunImage(bounded(t), "invalid reference::", nil, nil, "version"); err == nil {
+	if _, _, err := RunImage(bounded(t), "invalid reference::", nil, "version"); err == nil {
 		t.Fatal("an invalid reference ran")
 	}
 }

@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"testing"
 	"time"
 
@@ -82,6 +83,22 @@ func TestChargingSiteByID(t *testing.T) {
 		t.Fatalf("data %v", data)
 	}
 	assertProblem(t, do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: energy.ErrNotFound}, nil), http.MethodGet, "/v1/charging-options/nope", bearer), 404, "not-found")
+	// A site's id is its family and the provider's key, as the list answers
+	// it: a key holds a comma (a position), a space, an umlaut or a sign.
+	for _, id := range []string{"bnetza_lsr:54.323293,10.122765:1a6a82f4cba3", "afir_x:Lade (Süd) & Co@1+2"} {
+		f := everyAnswer()
+		w := do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/charging-options/"+url.PathEscape(id), bearer)
+		if w.Code != http.StatusOK || f.objects.gotID != id {
+			t.Errorf("%q: status %d, asked %q: %s", id, w.Code, f.objects.gotID, w.Body)
+		}
+	}
+	for _, bad := range []string{"a%0Ab", "a%FFb", "a%C2%85b"} { // a C0 control, a byte that is no UTF-8, a C1 control
+		f := everyAnswer()
+		assertProblem(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/charging-options/"+bad, bearer), 400, "invalid-parameter")
+		if f.objects.gotID != "" {
+			t.Errorf("%s reached the store as %q", bad, f.objects.gotID)
+		}
+	}
 }
 
 type pressureFake bool

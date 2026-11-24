@@ -7,12 +7,14 @@ package, in the **Coverage gate** job.
 
 ## How it is measured
 
-Three profiles are merged. A block counts as covered when any of them ran it.
+Five profiles are merged. A block counts as covered when any of them ran it.
 
 | Profile | Produced by | Reaches |
 |---|---|---|
 | `coverage-unit.out` | `go test -coverpkg=./...` (Unit and handler tests job) | everything a unit or handler test can reach |
 | `coverage-integration.out` | `go test -tags integration -coverpkg=./...` against a throwaway PostGIS container (testcontainers) | the store, the generated queries and the container harness |
+| `coverage-perf.out` | `go test -p 1 -tags integration -coverpkg=./... ./internal/perf`, alone, as its budgets time the queries | the query budgets |
+| `coverage-parity.out` | `go test -tags integration -coverpkg=./... ./internal/adapters/store -args -parity` (the Store parity job) | the store's comparison of each named statement with the frozen view statement it replaced. It is a verification set of its own, like the benchmark: its replays would spend a test's 2 s bound (TST-012), and it lives until the views are dropped |
 | `coverage-boot.out` | `scripts/boot-coverage.sh`: every main package built with `-cover` and run once | `func main()` itself |
 
 `internal/testkit/covergate` merges them, prints the table per package (also in

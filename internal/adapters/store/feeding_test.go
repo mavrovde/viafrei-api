@@ -13,7 +13,7 @@ import (
 // TestFeedingSnapshot answers the families of a dataset from the snapshot
 // when it is on, without storage, in the order asked and once each; a
 // dataset without views is an error; KeepFeeding returns at once when the
-// snapshot is off; every dataset's views are read by one statement.
+// snapshot is off; every dataset's rows are read by one statement.
 func TestFeedingSnapshot(t *testing.T) {
 	off := &Store{nowFn: time.Now}
 	done := make(chan struct{})
@@ -39,13 +39,11 @@ func TestFeedingSnapshot(t *testing.T) {
 		t.Fatalf("zones: %v %v", got, err)
 	}
 	if _, err := s.Feeding(context.Background(), "parking", []string{"tk"}); err == nil {
-		t.Fatal("a dataset without views answered")
+		t.Fatal("a dataset without rows answered")
 	}
-	for d, views := range datasetViews {
-		for _, v := range views {
-			if want := "select distinct '" + string(d) + "'::text, source_ref from contract." + v; !strings.Contains(feedingRead, want) {
-				t.Errorf("the read lacks %q", want)
-			}
+	for d, rows := range datasetRows {
+		if want := "select '" + string(d) + "'::text d, r.family, r.ruled from (\n" + rows + ") r(family, ruled)"; !strings.Contains(feedingRead.SQL, want) {
+			t.Errorf("the read lacks the rows of %q", d)
 		}
 	}
 }

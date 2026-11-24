@@ -68,6 +68,18 @@ func TestMainStationSpellings(t *testing.T) {
 		"Hauptbahnhof":          nil,
 		"Berlin":                nil,
 		"Dom/Hbfweg":            nil,
+		// The platform's own cases (#526): the English forms.
+		"Cologne main station":         {"koelnhbf", "koelnhauptbahnhof"},
+		"Munich main station":          {"muenchenhbf", "muenchenhauptbahnhof"},
+		"Nuremberg central station":    {"nuernberghbf", "nuernberghauptbahnhof"},
+		"Hanover main railway station": {"hannoverhbf", "hannoverhauptbahnhof"},
+		"Frankfort central":            {"frankfurthbf", "frankfurthauptbahnhof"},
+		"Brunswick main st":            {"braunschweighbf", "braunschweighauptbahnhof"},
+		"Main station":                 nil,
+		"Berlin Ostbahnhof":            nil,
+		"Mitte, Berlin":                nil,
+		"Kölner Dom, Köln":             nil,
+		"Cologne station":              nil,
 	} {
 		if got := transit.MainStationSpellings(in); !slices.Equal(got, want) {
 			t.Errorf("%q: %v, want %v", in, got, want)

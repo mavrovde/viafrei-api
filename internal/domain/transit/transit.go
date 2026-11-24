@@ -108,27 +108,67 @@ func Fold(s string) string {
 
 // MainStationSpellings are the folded spellings under which a register may
 // hold the main station a text names, as the platform states them
-// (mainStationSpellings, #502 and #526): DB writes almost every Hauptbahnhof
-// "<town> Hbf" and the timetable some "<town> Hauptbahnhof" ("S+U Berlin
-// Hauptbahnhof", "S Potsdam Hauptbahnhof"), so "Berlin Hbf",
-// "Berlin Hauptbahnhof" and "Hauptbahnhof, Berlin" each give "berlinhbf" and
-// "berlinhauptbahnhof". None for a text that names no main station, or names
-// no town beside the word ("Hbf" alone stays the list it is).
+// (germanStationQuery and mainStationSpellings, #502 and #526). The text is
+// first read as the gazetteer spells it: the English city names (Munich,
+// Cologne, Nuremberg, Hanover, Brunswick, Frankfort) become the German, and
+// the main-station words ("Hauptbahnhof", "main station", "central
+// station", "main railway station", "central railway station", "main st",
+// "central") become "Hbf", each phrase whole and the longest first. DB
+// writes almost every Hauptbahnhof "<town> Hbf" and the timetable some
+// "<town> Hauptbahnhof" ("S+U Berlin Hauptbahnhof"), so "Berlin Hbf",
+// "Hauptbahnhof, Berlin" and "Berlin main station" each give "berlinhbf"
+// and "berlinhauptbahnhof", "Cologne main station" "koelnhbf" and
+// "koelnhauptbahnhof". None for a text that names no main station
+// ("Berlin Ostbahnhof", "Kölner Dom, Köln"), or no town beside it ("Hbf"
+// alone stays the list it is).
 func MainStationSpellings(s string) []string {
+	words := strings.FieldsFunc(strings.ToLower(s), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
 	var place strings.Builder
 	main := false
-	for _, w := range strings.FieldsFunc(s, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
-		switch f := Fold(w); f {
-		case "hbf", "hauptbahnhof":
+	for i := 0; i < len(words); {
+		if n := mainStationPhraseAt(words[i:]); n > 0 {
 			main = true
-		default:
-			place.WriteString(f)
+			i += n
+			continue
 		}
+		w := words[i]
+		if german, ok := englishCityNames[w]; ok {
+			w = german
+		}
+		place.WriteString(Fold(w))
+		i++
 	}
 	if !main || place.Len() == 0 {
 		return nil
 	}
 	return []string{place.String() + "hbf", place.String() + "hauptbahnhof"}
+}
+
+// englishCityNames are the English names of German cities the platform
+// reads as the German (ENGLISH_FORMS).
+var englishCityNames = map[string]string{
+	"munich": "münchen", "cologne": "köln", "nuremberg": "nürnberg",
+	"hanover": "hannover", "brunswick": "braunschweig", "frankfort": "frankfurt",
+}
+
+// mainStationPhrases are the words that name a main station
+// (MAIN_STATION_WORDS, and "hbf" itself), the most words first, so a phrase
+// is taken whole before a part of it.
+var mainStationPhrases = [][]string{
+	{"central", "railway", "station"}, {"main", "railway", "station"},
+	{"central", "station"}, {"main", "station"}, {"main", "st"},
+	{"hauptbahnhof"}, {"central"}, {"hbf"},
+}
+
+// mainStationPhraseAt is the number of words of the main-station phrase the
+// words start with, 0 for none.
+func mainStationPhraseAt(words []string) int {
+	for _, p := range mainStationPhrases {
+		if len(p) <= len(words) && slices.Equal(words[:len(p)], p) {
+			return len(p)
+		}
+	}
+	return 0
 }
 
 // strip is a letter without its diacritic, for the Latin letters a German

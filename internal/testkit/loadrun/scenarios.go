@@ -180,7 +180,43 @@ func (r *runner) recovered(ctx context.Context, o *outcome, q request) {
 	tail := r.drive(ctx, r.p.rate, r.p.recover, r.mix)
 	o.results = append(o.results, tail...)
 	n := count(tail, ok)
-	o.add("design load after the repair: all 2xx", n == len(tail), "%d of %d", n, len(tail))
+	o.add("design load after the repair: all 2xx", n == len(tail), "%d of %d%s", n, len(tail), notOK(tail))
+}
+
+// notOK names the answers of rs that were not 2xx, by status and problem,
+// with when the first of each was sent after the first request of rs:
+// empty when every answer was 2xx.
+func notOK(rs []result) string {
+	if len(rs) == 0 {
+		return ""
+	}
+	first := slices.MinFunc(rs, func(a, b result) int { return a.sent.Compare(b.sent) }).sent
+	type seen struct {
+		n  int
+		at time.Duration
+	}
+	by := map[string]*seen{}
+	for _, x := range rs {
+		if ok(x) {
+			continue
+		}
+		k := fmt.Sprintf("%d %s", x.status, x.problem)
+		at := x.sent.Sub(first)
+		if s, has := by[k]; has {
+			s.n++
+			s.at = min(s.at, at)
+		} else {
+			by[k] = &seen{n: 1, at: at}
+		}
+	}
+	var out []string
+	for _, k := range slices.Sorted(maps.Keys(by)) {
+		out = append(out, fmt.Sprintf("%s ×%d, the first sent at +%s", k, by[k].n, by[k].at.Round(time.Millisecond)))
+	}
+	if len(out) == 0 {
+		return ""
+	}
+	return "; not 2xx: " + strings.Join(out, ", ")
 }
 
 func problemIs(slug string) func(result) bool {
@@ -413,10 +449,10 @@ func slowStorage(ctx context.Context, r *runner, o *outcome) {
 }
 
 func hangingQuery(ctx context.Context, r *runner, o *outcome) {
-	wait, err := r.hold(ctx, featureTables, r.p.fault+r.limit)
+	release, err := r.hold(ctx, featureTables, r.p.fault+r.p.ready)
 	if err != nil {
 		o.add("feature tables locked", false, "%v", err)
-		_ = wait()
+		_ = release()
 		return
 	}
 	rs := r.drive(ctx, r.p.faultRate, r.p.fault, func(int) request { return r.charging() })
@@ -424,7 +460,7 @@ func hangingQuery(ctx context.Context, r *runner, o *outcome) {
 	cut := count(rs, problemIs("deadline-exhausted"))
 	o.add("a hanging read is cut at the deadline: 503 deadline-exhausted, or shed, with Retry-After", count(rs, cutOrShed) == len(rs) && cut > 0,
 		"%d deadline-exhausted, %d shed, %d answers", cut, count(rs, refused), len(rs))
-	err = wait()
+	err = release()
 	o.add("lock released", err == nil, "%v", err)
 	after := r.drive(ctx, r.p.rate, time.Duration(float64(r.p.after)/r.p.rate*float64(time.Second)), r.mix)
 	o.results = append(o.results, after...)
@@ -433,10 +469,10 @@ func hangingQuery(ctx context.Context, r *runner, o *outcome) {
 }
 
 func poolExhausted(ctx context.Context, r *runner, o *outcome) {
-	wait, err := r.hold(ctx, featureTables, r.p.fault+r.limit)
+	release, err := r.hold(ctx, featureTables, r.p.fault+r.p.ready)
 	if err != nil {
 		o.add("feature tables locked", false, "%v", err)
-		_ = wait()
+		_ = release()
 		return
 	}
 	var rs []result
@@ -450,17 +486,43 @@ func poolExhausted(ctx context.Context, r *runner, o *outcome) {
 	// A request is refused at once when its estimated wait does not fit,
 	// else it waits in its tier's queue at most queue_max_wait
 	// (docs/rate-limits.md, gate 4): no refusal may come later than that.
+	// The 50 ms on top is NFR-CAP-003's budget for a refusal's own path:
+	// the queue's timer firing, the 429 rendered and read back by the
+	// client. Measured on the local load stack (three runs, 2026-11-24, a
+	// burst of 40 timing out together), a refusal that waited out
+	// queue_max_wait took beyond it p50 12-15 ms, p95 17-31 ms, max 18-31
+	// ms; the run's note gives the figures of each run.
 	o.add(fmt.Sprintf("each refusal within the tier's queue_max_wait plus 50 ms: p95 within %s (RATE-011)", r.queued+r.fast), len(shed) > 0 && p95 <= r.queued+r.fast, "p95 %s", p95.Round(time.Millisecond))
-	err = wait()
+	o.note("%s", refusalCost(shed, r.queued))
+	err = release()
 	o.add("lock released", err == nil, "%v", err)
 	r.recovered(ctx, o, r.charging())
 }
 
+// refusalCost splits refusals into those refused at once and those that
+// waited out queue_max_wait, and gives what the latter took beyond it: the
+// timer, the refusal's answer and the way back to the client, which the
+// 50 ms of NFR-CAP-003 covers.
+func refusalCost(shed []time.Duration, wait time.Duration) string {
+	var beyond []time.Duration
+	for _, d := range shed {
+		if d >= wait {
+			beyond = append(beyond, d-wait)
+		}
+	}
+	if len(beyond) == 0 {
+		return fmt.Sprintf("%d refused at once, none waited out queue_max_wait", len(shed))
+	}
+	return fmt.Sprintf("%d refused at once; %d waited out queue_max_wait and took beyond it p50 %s, p95 %s, max %s",
+		len(shed)-len(beyond), len(beyond), percentile(beyond, 0.5).Round(time.Millisecond),
+		percentile(beyond, 0.95).Round(time.Millisecond), percentile(beyond, 1).Round(time.Millisecond))
+}
+
 func composedPart(ctx context.Context, r *runner, o *outcome) {
-	wait, err := r.hold(ctx, parkingTables, r.p.fault+r.limit)
+	release, err := r.hold(ctx, parkingTables, r.p.fault+r.p.ready)
 	if err != nil {
 		o.add("parking tables locked", false, "%v", err)
-		_ = wait()
+		_ = release()
 		return
 	}
 	q := r.overview()
@@ -470,7 +532,7 @@ func composedPart(ctx context.Context, r *runner, o *outcome) {
 	want := map[string]string{"charging": "ok", "parking": "timeout"}
 	n := count(rs, func(x result) bool { return x.status == http.StatusOK && maps.Equal(parts(x.body), want) })
 	o.add("200 with the parking part timeout and the charging part ok (NFR-RES-003)", n == len(rs), "%d of %d", n, len(rs))
-	err = wait()
+	err = release()
 	o.add("lock released", err == nil, "%v", err)
 	r.recovered(ctx, o, r.overview())
 }

@@ -96,7 +96,7 @@ func TestRunPassesAndWritesTheReport(t *testing.T) {
 func TestRunFailsOnAFailedAssertion(t *testing.T) {
 	req.Covers(t, "TST-007")
 	c := newCLI(t, brokenAPI)
-	if code, out, _ := c.run(c.args()...); code != 1 || !strings.Contains(out, "1 failed") {
+	if code, out, _ := c.run(c.args()...); code != 1 || !strings.Contains(out, "1 failed") || !strings.Contains(out, ": FAIL: ") {
 		t.Errorf("exit %d\n%s", code, out)
 	}
 }

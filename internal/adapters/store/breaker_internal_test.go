@@ -62,3 +62,42 @@ func TestVerdictOfARead(t *testing.T) {
 		}
 	}
 }
+
+// TestAnsweredReadsAloneFeedTheEstimate: only a read storage answered,
+// error or not, gives the admission its time (RATE-011).
+func TestAnsweredReadsAloneFeedTheEstimate(t *testing.T) {
+	req.Covers(t, "RATE-011")
+	gone, cancel := context.WithCancel(context.Background())
+	cancel()
+	live := context.Background()
+	unavailable := func(err error) error { return fmt.Errorf("%w: %w", ErrUnavailable, err) }
+	sqlstate := func(code string) error { return unavailable(&pgconn.PgError{Code: code}) }
+	reset := unavailable(&net.OpError{Op: "read", Net: "tcp", Err: errors.New("connection reset by peer")})
+	late := fmt.Errorf("%w: %w", ErrDeadlineExhausted, context.DeadlineExceeded)
+	cases := []struct {
+		name    string
+		ctx     context.Context
+		reached stage
+		err     error
+		want    bool
+	}{
+		{"the read succeeded", live, opened, nil, true},
+		{"one statement named a missing relation (42P01)", live, opened, sqlstate("42P01"), true},
+		{"a row the code could not decode", live, opened, unavailable(errors.New("can't scan into dest[0]")), true},
+		{"refused before storage", live, refused, ErrDeadlineExhausted, false},
+		{"the transaction could not be opened", live, begun, reset, false},
+		{"the read succeeded after its caller went away", gone, opened, nil, false},
+		{"cut at the deadline", gone, opened, late, false},
+		{"a statement ran out of time", live, opened, late, false},
+		{"a bare deadline", live, opened, context.DeadlineExceeded, false},
+		{"a cancelled read", live, opened, unavailable(context.Canceled), false},
+		{"a statement timeout (57014)", live, opened, sqlstate("57014"), false},
+		{"the connection was reset inside the transaction", live, opened, reset, false},
+		{"cannot connect now (57P03)", live, opened, sqlstate("57P03"), false},
+	}
+	for _, c := range cases {
+		if got := answered(c.ctx, c.reached, c.err); got != c.want {
+			t.Errorf("%s: answered %v, want %v", c.name, got, c.want)
+		}
+	}
+}

@@ -666,7 +666,8 @@ BEGIN
 END $$;
 
 -- A departure is the stop, line, trip, service date and stop time the view
--- reads, plus a later stop unless it terminates there. A realtime figure is
+-- reads, plus a later stop unless it terminates there: a stop of another
+-- station ('next:' and the stop's id, no DHID the station's family holds). A realtime figure is
 -- seeded through the feed it names, which is marked up: delfi_rt_tu writes a
 -- tick of the call (SKIPPED when cancelled), delfi_siri_et* a call at the
 -- stop's DHID with the platform; either applies only to a call planned within
@@ -702,7 +703,7 @@ BEGIN
           CASE WHEN NEW.boarding = false THEN 1 ELSE 0 END);
   IF NOT coalesce(NEW.terminates, false) THEN
     INSERT INTO public.stop_times (gtfs_feed_key, trip_id, stop_sequence, stop_id, arrival, departure)
-    VALUES (k, trip, NEW.call_order + 1, point || ':next', coalesce(NEW.planned_departure_at, NEW.planned_arrival_at) - base + interval '5 minutes',
+    VALUES (k, trip, NEW.call_order + 1, 'next:' || point, coalesce(NEW.planned_departure_at, NEW.planned_arrival_at) - base + interval '5 minutes',
             coalesce(NEW.planned_departure_at, NEW.planned_arrival_at) - base + interval '5 minutes')
     ON CONFLICT DO NOTHING;
   END IF;

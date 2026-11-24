@@ -270,6 +270,7 @@ func stationKeys(withDB bool) string {
 	}
 	return `
  SELECT (s.gtfs_feed_key || ':'::text) || s.id AS stop_place_id,
+    s.id AS origin_key,
     s.name,
     s.geom::geometry(Point,4326) AS location,
         CASE

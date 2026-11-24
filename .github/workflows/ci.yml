@@ -277,7 +277,7 @@ jobs:
           jq -e '.runs | type == "array"' sarif/spectral.sarif >/dev/null
       - name: Upload SARIF to code scanning
         if: always() && hashFiles('sarif/spectral.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: sarif/spectral.sarif
           category: spectral
@@ -364,7 +364,7 @@ jobs:
           jq -e '.runs | type == "array"' sarif/govulncheck.sarif >/dev/null
       - name: Upload SARIF to code scanning
         if: always() && hashFiles('sarif/govulncheck.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: sarif/govulncheck.sarif
           category: govulncheck
@@ -391,7 +391,7 @@ jobs:
           jq '.runs[].results[]?.locations[]?.physicalLocation.artifactLocation.uri |= "Dockerfile"' sarif/hadolint.sarif > sarif/hadolint.tmp && mv sarif/hadolint.tmp sarif/hadolint.sarif
       - name: Upload SARIF to code scanning
         if: always() && hashFiles('sarif/hadolint.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: sarif/hadolint.sarif
           category: hadolint
@@ -431,7 +431,7 @@ jobs:
             --format sarif --output /tmp/trivy-image.sarif viafrei-api:ci
       - name: Upload SARIF to code scanning
         if: always() && hashFiles('sarif/trivy-image.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: sarif/trivy-image.sarif
           category: trivy-image

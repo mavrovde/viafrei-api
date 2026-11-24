@@ -77,12 +77,22 @@ from contract.place p
 where p.place_kind = 'district' and p.official_key = any($1) and p.withdrawn_at is null
   and p.source_ref = '` + places.KreisFamily + `' and p.source_ref = any($2) and ` + permitted("p") + `
 group by p.official_key`,
+	// The station's family is the platform board's (fault 3 of the 1.1.2
+	// faults): the stops filed under the station's DHID, a parent named or
+	// not, not only the stop points naming the station as their parent.
+	// A stop whose id is no DHID is its own root here, where the store
+	// takes its parent's root (stationFamily): the seed holds no such stop
+	// with a parent, so the two forms agree on every station it holds.
 	"api_station_by_id": opaque(`
 select s.stop_place_id, s.name, coalesce(st_y(s.location), 0), coalesce(st_x(s.location), 0), s.national_stop_code,
        s.region_code, coalesce(s.modes, '{}'), s.source_ref,
-       array(select p.stop_point_id from contract.stop_point p
-              where p.stop_place_id = s.stop_place_id and p.source_ref = any($2) and `+permitted("p")+`
-              order by p.stop_point_id)
+       array(select distinct x.id from (
+               select p.stop_point_id id, p.stop_place_id parent from contract.stop_point p where p.source_ref = any($2) and `+permitted("p")+`
+               union
+               select q.stop_place_id, null from contract.stop_place q where q.source_ref = any($2) and `+permitted("q")+`) x,
+             (select split_part(s.stop_place_id, ':', 1) || ':' || coalesce(substring(s.origin_key from '`+dhidStation+`'), s.origin_key) root) k
+              where (x.id = k.root or x.parent = k.root or x.id like k.root || ':%' or x.id like k.root || '\_%') and x.id <> s.stop_place_id
+              order by x.id)
 from contract.stop_place s
 where s.stop_place_id = $1 and s.withdrawn_at is null and s.source_ref = any($2) and `+permitted("s"), "text", "text[]"),
 	// A call's Trip Updates figure is credited to that source's key
@@ -120,7 +130,12 @@ select f.facility_id, f.facility_kind, f.position_text,
        f.status_observed_at, f.source_ref
 from contract.station_facility f
 join contract.source s on s.source_ref = f.source_ref
-where f.stop_place_id = $1 and f.source_ref = any($2) and ` + permitted("f") + `
+where (f.stop_place_id = $1
+       -- the station DB files under the DHID the station's platforms name
+       -- as their parent (S+U Berlin Hauptbahnhof, 1.1.2 faults)
+       or f.stop_place_id in (select p.stop_place_id from contract.stop_point p
+                               where p.stop_point_id like $1::text || ':%' or p.stop_point_id like $1::text || '\_%'))
+  and f.source_ref = any($2) and ` + permitted("f") + `
 order by f.facility_id`,
 	"api_affected_alerts": opaque(`
 select distinct a.alert_id, a.source_ref, u.sid
@@ -262,7 +277,31 @@ var legacyRegionAlerts = strings.NewReplacer("{live}", alertLive("a", "$1"), "{i
     and ($4::text is null or exists (select 1 from unnest(f.line_names) n where upper(regexp_replace(n, '\s+', '', 'g')) = $4::text))
 )`)
 
+// legacyStationsInTowns is the town search (fault 2 of the 1.1.2 faults)
+// as the view answers it: the stations of the districts the town names
+// whose name holds the stop name, by name then id, collapsed as the name
+// search is (legacyStationsPage).
+var legacyStationsInTowns = `
+select s.stop_place_id, s.name, st_y(s.location), st_x(s.location), s.national_stop_code, s.region_code,
+       coalesce(s.modes, '{}'), s.source_ref, null::integer, s.placement_source_ref, s.eva_no, s.eva_numbers
+from contract.stop_place s
+where s.withdrawn_at is null
+  and s.location is not null
+  and s.source_ref = any($1)
+  and ` + permitted("s") + `
+  and left(s.region_code, 5) = any($4::text[])
+  and (s.search_fold like '%' || $2::text || '%' or s.search_fold like any(array(select '%' || x || '%' from unnest($3::text[]) x)))
+  and not exists (
+        select 1 from contract.stop_place r
+         where r.withdrawn_at is null and r.stop_place_id <> s.stop_place_id
+           and (r.stop_place_id = split_part(s.stop_place_id, ':', 1) || ':' || substring(s.origin_key from '` + dhidStation + `')
+                or (r.stop_place_id like split_part(s.stop_place_id, ':', 1) || ':' || substring(s.origin_key from '` + dhidStation + `') || ':%'
+                    and r.stop_place_id ~<~ s.stop_place_id)))
+order by s.name, s.stop_place_id
+limit $5`
+
 func init() {
+	legacyReads["api_stations_in_towns"] = legacyStationsInTowns
 	for m := range 1 << 5 {
 		legacyReads[fmt.Sprintf("api_stations_page_%02d", m)] = legacyStationsPage
 	}
@@ -290,6 +329,12 @@ where s.withdrawn_at is null
   and ($7::text = '' or s.eva_no = $7::text or s.national_stop_code = $7::text)
   and (not $8::bool or s.eva_no is not null)
   and ($9::text = '' or s.region_code like $9::text || '%')
+  and ($4::text = '' or not exists (
+        select 1 from contract.stop_place r
+         where r.withdrawn_at is null and r.stop_place_id <> s.stop_place_id
+           and (r.stop_place_id = split_part(s.stop_place_id, ':', 1) || ':' || substring(s.origin_key from '` + dhidStation + `')
+                or (r.stop_place_id like split_part(s.stop_place_id, ':', 1) || ':' || substring(s.origin_key from '` + dhidStation + `') || ':%'
+                    and r.stop_place_id ~<~ s.stop_place_id))))
 order by case when here.g is null and not (s.search_fold like $4::text || '%' or s.search_fold like any(array(select x || '%' from unnest($10::text[]) x))) then 1 else 0 end,
          dist, s.name, s.stop_place_id
 limit $6`

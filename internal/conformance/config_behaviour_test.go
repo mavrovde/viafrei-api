@@ -105,8 +105,8 @@ func behaviours() map[string]behaviour {
 		"db.pool_max":          {"9", poolConfig},
 		"db.pool_min":          {"0", poolConfig},
 		"db.connect_timeout":   {"500ms", poolConfig},
-		"db.max_conn_lifetime": {"2h", poolConfig},
-		"db.max_conn_idle":     {"1m", poolConfig},
+		"db.max_conn_lifetime": {"10m", poolConfig},
+		"db.max_conn_idle":     {"2h", poolConfig},
 		"db.cancel_grace":      {"400ms", poolConfig},
 		"db.application_name":  {"another-name", poolConfig},
 		"db.register_snapshot_ttl": {"3s", func(t *testing.T, c *config.Config) string {

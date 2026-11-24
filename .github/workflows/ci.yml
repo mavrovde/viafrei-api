@@ -194,7 +194,7 @@ jobs:
   coverage:
     name: Coverage gate (100 % per package)
     # TST-001: every package of every layer at 100 % of its statements, from
-    # the unit, integration and boot-smoke profiles merged. Generated code may
+    # the five profiles merged: unit, integration, perf, parity and boot smoke. Generated code may
     # be left out only through test/coverage-exclusions.txt, one reason per
     # entry. The merged profile is the one SonarCloud reads.
     needs: [test, integration, parity]

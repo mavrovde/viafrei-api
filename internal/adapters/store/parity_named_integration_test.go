@@ -131,7 +131,7 @@ func TestNamedStatementsAnswerAsTheViews(t *testing.T) {
 	for _, r := range store.NamedReads() {
 		byName[r.Name] = r
 	}
-	// The statements that run alone (alone) one after the other, then the rest side
+	// The statements alone names run one after the other, then the rest side
 	// by side, four at a time (more queue on the reader's statement
 	// timeout), each on a connection of its own; the group returns when
 	// every one has.

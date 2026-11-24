@@ -46,18 +46,19 @@ func needs(v any) []string {
 }
 
 // coverageGateFindings: the 100 % rule (TST-001) is wired so it cannot be
-// weakened unnoticed. Both test jobs measure every package with -coverpkg, the
-// coverage job merges them with the boot smoke at -min 100 through the named
-// exclusion file, and SonarCloud waits for that merged profile. None of the
-// three jobs may swallow a failure: no continue-on-error on the job or a step,
-// and no "|| true" in a step that runs.
+// weakened unnoticed. The test jobs (unit, integration with perf, parity)
+// measure every package with -coverpkg, the coverage job merges them with the
+// boot smoke at -min 100 through the named exclusion file, and SonarCloud
+// waits for that merged profile. None of the four jobs may swallow a failure:
+// no continue-on-error on the job or a step, and no "|| true" in a step that
+// runs.
 func coverageGateFindings(src []byte) []string {
 	var w ciJobs
 	if err := yaml.Unmarshal(src, &w); err != nil {
 		return []string{"ci.yml does not parse: " + err.Error()}
 	}
 	out := measureFindings(w)
-	for _, job := range []string{"test", "integration", "coverage"} {
+	for _, job := range []string{"test", "integration", "parity", "coverage"} {
 		out = append(out, swallowFindings(job, w.Jobs[job])...)
 	}
 	out = append(out, needsFindings(w)...)
@@ -165,6 +166,10 @@ func TestCoverageGateIsWired(t *testing.T) {
 		"(Merge and gate) swallows a failure":          {"coverage-unit.out coverage-integration.out coverage-perf.out coverage-parity.out coverage-boot.out", "coverage-unit.out coverage-integration.out coverage-perf.out coverage-parity.out coverage-boot.out || true"},
 		"job parity does not run the store's parity":   {"./internal/adapters/store -args -parity", "./internal/adapters/store"},
 		"swallows a failure with || true":              {"-coverprofile=coverage-integration.out", "-coverprofile=coverage-integration.out || :"},
+		"job parity sets continue-on-error":            {"    name: Store parity against the frozen views (PostGIS)\n", "    name: Store parity against the frozen views (PostGIS)\n    continue-on-error: true\n"},
+		"job parity step 4 (go test -tags integration (store parity against the frozen views)) swallows a failure with || true": {
+			"| tee test-parity.json | go run ./internal/testkit/gotestsum-lite", "| tee test-parity.json | go run ./internal/testkit/gotestsum-lite || true"},
+		"job coverage does not need parity": {"needs: [test, integration, parity]", "needs: [test, integration]"},
 	} {
 		bad := strings.Replace(string(ci), plant[0], plant[1], 1)
 		if bad == string(ci) {

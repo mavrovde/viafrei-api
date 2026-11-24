@@ -630,6 +630,7 @@ where withdrawn_at is null and source_ref in (`+in+`) and `+where, &out)
 		statedIDs[i] = s.ID
 	}
 	var storedJSON string
+	// The array literal is safe only because the seed fixes facility ids as <family>:<bigint> (base_seed.sql:485).
 	owner(t, `select coalesce(jsonb_object_agg(facility_id, jsonb_build_array(coalesce(amenities, '{}'), coalesce(amenities_absent, '{}'))), '{}')::text
 from contract.parking_facility where facility_id = any('{`+strings.Join(statedIDs, ",")+`}'::text[])`, &storedJSON)
 	stored := map[string][2][]string{}

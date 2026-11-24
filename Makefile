@@ -29,7 +29,7 @@ test-integration: ## Integration tests against a throwaway PostGIS (testcontaine
 	$(GO) test -race -count=1 -tags integration $(NON_PERF)
 	$(GO) test -race -p 1 -count=1 -tags integration $(PERF_PKG)
 
-coverage: ## Unit + integration + boot profiles merged, gated at 100 % per package (TST-001)
+coverage: ## Unit + integration + perf + parity + boot profiles merged, gated at 100 % per package (TST-001)
 	$(GO) test -count=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage-unit.out ./...
 	$(GO) test -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out $(NON_PERF)
 	$(GO) test -p 1 -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-perf.out $(PERF_PKG)

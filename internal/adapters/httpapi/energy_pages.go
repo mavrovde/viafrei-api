@@ -78,7 +78,7 @@ func registerFuelStation(api huma.API, s *server, op huma.Operation) {
 
 // ChargingSiteInput is the input of getChargingSite.
 type ChargingSiteInput struct {
-	ID string `path:"chargingId" maxLength:"200" pattern:"^[A-Za-z0-9:._/-]+$" example:"cs-000001" doc:"A charging site's id, as listChargingOptions answers it."`
+	ID string `path:"chargingId" maxLength:"200" pattern:"^[^\\x00-\\x1F\\x7F]+$" example:"cs-000001" doc:"A charging site's id, as listChargingOptions answers it."`
 }
 
 // ChargingSiteEnvelope is the enveloped answer of getChargingSite.

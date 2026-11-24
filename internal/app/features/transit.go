@@ -2,6 +2,7 @@ package features
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
@@ -56,9 +57,11 @@ func (s *Service) Stations(ctx context.Context, key access.Record, q transit.Que
 	// district and Land each lies in, as the platform's name search labels
 	// its candidates with their town and Land: the family that placed them
 	// is credited.
-	if q.Text != "" && len(stations) > 1 {
+	// So is a station found in the town the text names: the district
+	// placed it there.
+	if q.Text != "" {
 		for _, st := range stations {
-			if st.PlacedBy != nil {
+			if st.PlacedBy != nil && (len(stations) > 1 || st.InTown) {
 				contributed = append(contributed, *st.PlacedBy)
 			}
 		}
@@ -90,7 +93,7 @@ func (s *Service) Departures(ctx context.Context, key access.Record, q transit.D
 	if err != nil {
 		return Board{}, err
 	}
-	permitted, partial, err := gate.Answer(access.Answering(reg, "transit"))
+	permitted, partial, err := gate.Answer(boardFamilies(reg))
 	if err != nil {
 		return Board{}, err
 	}
@@ -168,4 +171,22 @@ func (s *Service) Facilities(ctx context.Context, key access.Record, q transit.F
 		Answer:  Answer[transit.Facility]{Items: l.Rows, HasMore: l.Active+l.Inactive+l.Unknown > len(l.Rows), Families: fams, Partial: partial || stPartial, At: now},
 		Station: st, Active: l.Active, Inactive: l.Inactive, Unknown: l.Unknown,
 	}, nil
+}
+
+// boardFamilies are the families a departure board answers from: the
+// transit families, and the Trip Updates' family where the register holds
+// it, whatever domain the register files it under. A board's call carries
+// the Trip Updates' family beside the timetable's (transit.TripUpdatesFamily),
+// and a call carrying a family the board did not ask is left out: filed under
+// another domain, every call with a Trip Updates figure was left out of
+// every board. The licence gate still decides whether the key may read it.
+func boardFamilies(reg []access.Terms) []string {
+	out := access.Answering(reg, "transit")
+	for _, t := range reg {
+		if t.Family == transit.TripUpdatesFamily && !slices.Contains(out, t.Family) {
+			out = append(out, t.Family)
+		}
+	}
+	slices.Sort(out)
+	return out
 }

@@ -170,11 +170,11 @@ func TestOneRowAnswersTheScanError(t *testing.T) {
 	}
 }
 
-// TestDeparturesOfTripsKeepTheRelation: the trip keys are put before the
+// TestDeparturesOfTripsKeepTheRelation: the trip and stop keys are put before the
 // departure relation's own columns, which stay as they are.
 func TestDeparturesOfTripsKeepTheRelation(t *testing.T) {
 	if !strings.HasPrefix(relDeparture, "\n SELECT ") ||
-		departuresOfTrips != "\n SELECT t.gtfs_feed_key AS board_feed, t.id AS board_trip, t.headsign AS board_headsign,"+relDeparture[len("\n SELECT"):] {
+		departuresOfTrips != "\n SELECT t.gtfs_feed_key AS board_feed, t.id AS board_trip, t.headsign AS board_headsign, s.gtfs_feed_key AS board_stop_feed, s.id AS board_stop,"+relDeparture[len("\n SELECT"):] {
 		t.Fatal("the departure relation no longer begins with its select list")
 	}
 }

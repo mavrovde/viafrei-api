@@ -59,6 +59,8 @@ denylist	internal/adapters/store/bays.go	-	owner decision 2026-11-23: the store'
 denylist	internal/adapters/store/catalogue.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 denylist	internal/adapters/store/coverage.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 denylist	internal/adapters/store/families_c_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/town_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/facility_parent_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
 denylist	internal/adapters/store/features.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 denylist	internal/adapters/store/feeding.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 denylist	internal/adapters/store/freshness.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
@@ -115,6 +117,8 @@ vocabulary	internal/adapters/store/transit.go	feed	owner decision 2026-11-23: th
 vocabulary	internal/adapters/store/transit.go	feeds	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
 vocabulary	internal/adapters/store/transit.go	gtfs	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
 vocabulary	internal/adapters/store/families_c_integration_test.go	gtfs	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/town_integration_test.go	gtfs	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/facility_parent_integration_test.go	gtfs	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
 vocabulary	internal/testkit/baseseed/base_seed.sql	datex	the platform's table and column names the test seed writes carry this word
 vocabulary	internal/testkit/baseseed/base_seed.sql	feed	the platform's table and column names the test seed writes carry this word
 vocabulary	internal/testkit/baseseed/base_seed.sql	feeds	the platform's table and column names the test seed writes carry this word

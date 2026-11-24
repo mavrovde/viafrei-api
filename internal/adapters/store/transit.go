@@ -18,16 +18,49 @@ import (
 
 // stationByID reads one station: $1 the id, $2 the families. A station
 // stored with no position is placed at 0,0 nowhere: the board names it. It
-// reads the station's stop points too (contract.stop_point of the stop
-// place), the family the platform's departure board reads.
+// reads the station's family too, the stops the platform's departure board
+// reads (stationFamily).
 var stationByID = namedOpaque("api_station_by_id", `
 select s.stop_place_id, s.name, coalesce(st_y(s.location), 0), coalesce(st_x(s.location), 0), s.national_stop_code,
        s.region_code, coalesce(s.modes, '{}'), s.source_ref,
-       array(select p.stop_point_id from (`+relStopPoint+`) p
-              where p.stop_place_id = s.stop_place_id and p.source_ref = any($2) and `+permitted("p")+`
-              order by p.stop_point_id)
+       array(select f.id from (`+stationFamily("s.stop_place_id")+`) f(id) where f.id <> s.stop_place_id order by f.id)
 from (`+relStopPlace+`) s
 where s.stop_place_id = $1 and s.withdrawn_at is null and s.source_ref = any($2) and `+permitted("s"), "text", "text[]")
+
+// stationFamily is the family of the station of the id id (an SQL
+// expression), as the platform's board
+// reads it: the station a stop belongs to is the first three parts of its
+// DHID (country, district, station), of its own id or else its parent's,
+// else its parent, else itself, so the platforms DELFI files under a
+// station's DHID with no parent named (most of them: München Marienplatz's
+// platforms, Stuttgart's Stadtbahn platforms) are the station's, and a
+// parent of a suffixed id (de:09162:2_G) is the station de:09162:2. Its
+// members are the station, the stops naming it as their parent and those
+// whose id continues it after a colon or an underscore, each in an arm of
+// its own, so each is a range of one index. The stops of the station's feed,
+// by id, once each.
+func stationFamily(id string) string {
+	return `
+select (k.feed || ':') || m.id from (
+  select r.feed, coalesce(substring(r.own from '` + dhidStation + `'),
+                          (select coalesce(substring(x.id from '` + dhidStation + `'), substring(x.parent_id from '` + dhidStation + `'), x.parent_id, x.id)
+                             from stops x where x.gtfs_feed_key = r.feed and x.id = r.own and x.deleted_at is null), r.own) root
+  from (select case when ` + id + ` ~ '^[0-9]+:' then split_part(` + id + `, ':', 1)::smallint end feed,
+               substr(` + id + `, strpos(` + id + `, ':') + 1) own) r) k
+cross join lateral (
+  select m.id from stops m where m.gtfs_feed_key = k.feed and m.deleted_at is null and m.id = k.root
+  union
+  select m.id from stops m where m.gtfs_feed_key = k.feed and m.deleted_at is null and m.parent_id = k.root
+  union
+  select m.id from stops m where m.gtfs_feed_key = k.feed and m.deleted_at is null and m.id ~>=~ (k.root || ':') and m.id ~<~ (k.root || ';')
+  union
+  select m.id from stops m where m.gtfs_feed_key = k.feed and m.deleted_at is null and m.id ~>=~ (k.root || '_') and m.id ~<~ (k.root || '` + "`" + `')) m
+order by m.id`
+}
+
+// dhidStation is the station part of a DHID: country, district, station;
+// it stops at an underscore, so de:09162:2_G is de:09162:2.
+const dhidStation = `^([a-z]{2}:[0-9]{5,8}:[^:_]+)`
 
 // Station reads the station with this id (features.Transit).
 func (s *Store) Station(ctx context.Context, id string, families []string) (transit.Station, error) {
@@ -88,6 +121,9 @@ var stationsPage = func() map[stationShape]stmt {
 		}
 		if m&shapeArea != 0 {
 			where += "\n  and s.region_code like $9::text || '%'"
+		}
+		if m&shapeText != 0 {
+			where += stationOwnsTheStop
 		}
 		pick := func(match string) string {
 			return `
@@ -150,6 +186,27 @@ const (
 	stationHolds  = `(s.search_fold like '%' || $4::text || '%' or s.search_fold like any(array(select '%' || x || '%' from unnest($10::text[]) x)))`
 )
 
+// stationOwnsTheStop leaves a stop out of a name search when it is a stop
+// of another station, the station its DHID names (stationFamily): DELFI
+// files most platforms under the station's DHID with no parent named, so
+// each read as a station of its own ("Marienplatz" listed each platform of
+// München's and Stuttgart's Marienplatz), where the platform's name search
+// answers the station once. Where the station's DHID is no stop of its own
+// (de:09161:505, only its platforms :0:1 and :0:2 are stops), its first
+// platform by id stands for it, as the family it names is the station's.
+const stationOwnsTheStop = `
+  and not exists (
+    select 1 from stops r
+     where r.gtfs_feed_key = split_part(s.stop_place_id, ':', 1)::smallint and r.id = substring(s.origin_key from '` + dhidStation + `')
+       and r.id <> s.origin_key and r.deleted_at is null and r.geom is not null and r.name is not null
+       and (r.location_type = 1 or coalesce(r.location_type::integer, 0) = 0 and r.parent_id is null)
+    union all
+    select 1 from stops r
+     where r.gtfs_feed_key = split_part(s.stop_place_id, ':', 1)::smallint
+       and r.id ~>=~ (substring(s.origin_key from '` + dhidStation + `') || ':') and r.id ~<~ (substring(s.origin_key from '` + dhidStation + `') || ';')
+       and r.id ~<~ s.origin_key and r.deleted_at is null and r.geom is not null and r.name is not null
+       and coalesce(r.location_type::integer, 0) = 0 and r.parent_id is null)`
+
 // stationsOfCode narrows a code search to the stops that can carry the
 // code $7 before the station relation is built: the stops whose id starts
 // with it (one range of the feed's id index: the stop of that id, and those
@@ -197,17 +254,11 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.Station, error) {
 		text := transit.Fold(q.Text)
 		rows, _ := run(ctx, tx, stationsPage[shapeOf(q, text)], families, lat, lon, text, q.RadiusM, q.Limit+1, q.Code, q.Railway, q.Area, spellingsOf(q.Text))
-		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.Station, error) {
-			var (
-				v     transit.Station
-				modes []string
-			)
-			err := r.Scan(&v.ID, &v.Name, &v.Location.Lat, &v.Location.Lon, &v.NationalCode, &v.RegionCode,
-				&modes, &v.Family, &v.DistanceM, &v.PlacedBy, &v.EVA, &v.EVANumbers)
-			v.Modes = transit.MapModes(modes)
-			return v, err
-		})
+		return pgx.CollectRows(rows, stationRow)
 	})
+	if err == nil && len(out) == 0 && q.Code == "" && q.Area == "" {
+		out, err = s.stationsInTown(ctx, q, families)
+	}
 	if err != nil {
 		return nil, false, err
 	}
@@ -217,8 +268,92 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 	return out, false, nil
 }
 
+// stationTownKreise are the districts (Kreise and kreisfreie Städte) the
+// town spellings $1 name, as the platform's stop resolver reads a town: a
+// district by its name, or a Gemeinde by its name, in the district its key
+// starts with.
+var stationTownKreise = namedOpaque("api_station_town_kreise", `
+select k.ags from (
+  select a.ags from ags_regions a
+   where a.level = 'kreis' and (a.name_norm = any($1::text[]) or a.name_en_norm = any($1::text[]))
+  union
+  select left(g.admin_code, 5) from gazetteer_places g
+   where g.closed_at is null and g.source_id = 'bkg_gvisys' and g.kind = 'city' and g.admin_code ~ '^[0-9]{8}$'
+     and g.name_norm = any($1::text[])) k
+order by k.ags`, "text[]")
+
+// stationsInTown reads a text no station's name holds as a town and a stop
+// in it (transit.TownSplits), as the platform's stop resolver reads "town,
+// stop": the first reading whose town names a district, and whose stop name
+// a station of that district holds, answers, by name then id.
+func (s *Store) stationsInTown(ctx context.Context, q transit.Query, families []string) ([]transit.Station, error) {
+	var lat, lon *float64
+	if q.At != nil {
+		lat, lon = &q.At.Lat, &q.At.Lon
+	}
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.Station, error) {
+		for _, sp := range transit.TownSplits(q.Text) {
+			rows, _ := run(ctx, tx, stationTownKreise, sp.Runs)
+			kreise, err := pgx.CollectRows(rows, pgx.RowTo[string])
+			if err != nil {
+				return nil, err
+			}
+			text := transit.Fold(sp.Rest)
+			var out []transit.Station
+			for _, ags := range kreise {
+				in := q
+				in.Area = ags
+				rows, _ := run(ctx, tx, stationsPage[shapeOf(in, text)], families, lat, lon, text, q.RadiusM, q.Limit+1, q.Code, q.Railway, ags, townSpellings(sp.Rest))
+				got, err := pgx.CollectRows(rows, inTown)
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, got...)
+			}
+			if len(out) > 0 {
+				slices.SortStableFunc(out, func(x, y transit.Station) int {
+					return cmp.Or(cmp.Compare(x.Name, y.Name), cmp.Compare(x.ID, y.ID))
+				})
+				return out, nil
+			}
+		}
+		return nil, nil
+	})
+}
+
+// townSpellings are the spellings a town reading's stop name is searched
+// under: the main station's where it names only the main station
+// ("Stuttgart Hbf" finds the town's "Hauptbahnhof").
+func townSpellings(rest string) []string {
+	if sp := transit.StopSpellings(rest); sp != nil {
+		return sp
+	}
+	return spellingsOf(rest)
+}
+
+// inTown is one station a town and a stop name found.
+func inTown(r pgx.CollectableRow) (transit.Station, error) {
+	v, err := stationRow(r)
+	v.InTown = true
+	return v, err
+}
+
+// stationRow is one station of a station search.
+func stationRow(r pgx.CollectableRow) (transit.Station, error) {
+	var (
+		v     transit.Station
+		modes []string
+	)
+	err := r.Scan(&v.ID, &v.Name, &v.Location.Lat, &v.Location.Lon, &v.NationalCode, &v.RegionCode,
+		&modes, &v.Family, &v.DistanceM, &v.PlacedBy, &v.EVA, &v.EVANumbers)
+	v.Modes = transit.MapModes(modes)
+	return v, err
+}
+
 // boardCalls reads the departing calls of a station in a window: $1 the
-// station (a stop place), $2 and $3 the window's first and end instant
+// station (a stop place), whose family (stationFamily, the stops
+// Station.StopIDs states) it reads, as the platform's board reads the calls
+// of each of the station's stops; $2 and $3 the window's first and end instant
 // (planned departure), $4 the families: every family a call carries (its
 // timetable's and each live figure's, source_refs) is one of them, so the
 // licence gate's post-check never meets one it refuses. A key whose plan
@@ -227,11 +362,14 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 // since a call row stamped with that family is a row the key may not read,
 // and dropping the figure alone would state a scheduled time as the
 // answer where a live one exists. A call is one a passenger can board
-// (the platform's boarding flag) of a trip that calls somewhere outside the
-// station after it: a trip's last call at the station is an arrival. The
+// (the platform's boarding flag) of a trip that calls at a stop outside the
+// family after it: a trip's last call at the station is an arrival. The
 // destination is the trip's headsign, else the name of its last stop. The
 // delay is read in seconds and stated in minutes by transit.DelayMinOf.
+//
+//nolint:misspell // materialized is the SQL keyword
 var boardCalls = namedOpaque("api_board_calls", `
+with fam as materialized (select array(`+stationFamily("$1::text")+`) ids)
 select d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transport_mode, d.route_type,
        d.train_number, d.train_category, nullif(btrim(d.board_headsign), ''),
        coalesce(nullif(btrim(d.board_headsign), ''),
@@ -243,7 +381,9 @@ select d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transport_mod
        d.planned_departure_at, d.platform, d.planned_platform, d.platform_changed, d.realtime, d.realtime_source,
        d.cancelled, d.delay_s, d.expected_departure_at, d.no_forecast, d.source_ref, d.source_refs
 from (`+departuresOfTrips+`) d
-where d.stop_place_id = $1::text
+where d.board_stop_feed = any(array(select split_part(x, ':', 1)::smallint from unnest((select f.ids from fam f)) x))
+  and d.board_stop = any(array(select substr(x, strpos(x, ':') + 1) from unnest((select f.ids from fam f)) x))
+  and d.stop_point_id = any((select f.ids from fam f)::text[])
   and d.planned_departure_at >= $2::timestamp with time zone and d.planned_departure_at < $3::timestamp with time zone
   and d.boarding
   and d.source_ref = any($4::text[])
@@ -253,7 +393,7 @@ where d.stop_place_id = $1::text
                 join stops np on np.gtfs_feed_key = nx.gtfs_feed_key and np.id = nx.stop_id
                where nx.gtfs_feed_key = d.board_feed and nx.trip_id = d.board_trip and nx.stop_sequence > d.call_order
                  and nx.deleted_at is null and np.deleted_at is null and coalesce(np.location_type::integer, 0) = 0
-                 and (np.gtfs_feed_key || ':') || coalesce(np.parent_id, np.id) <> $1::text)
+                 and (np.gtfs_feed_key || ':') || np.id <> all((select f.ids from fam f)::text[]))
 order by d.planned_departure_at, d.journey_id, d.call_order`, "text", "timestamp with time zone", "timestamp with time zone", "text[]")
 
 // departuresOfTrips is the platform's departure relation with the trip's
@@ -262,7 +402,7 @@ order by d.planned_departure_at, d.journey_id, d.call_order`, "text", "timestamp
 // times' trip key, not on a journey id no index holds: on prod the view
 // statement hashed every scheduled call of the network for each board and
 // ran past 60 s.
-var departuresOfTrips = "\n SELECT t.gtfs_feed_key AS board_feed, t.id AS board_trip, t.headsign AS board_headsign," +
+var departuresOfTrips = "\n SELECT t.gtfs_feed_key AS board_feed, t.id AS board_trip, t.headsign AS board_headsign, s.gtfs_feed_key AS board_stop_feed, s.id AS board_stop," +
 	strings.TrimPrefix(relDeparture, "\n SELECT")
 
 // Departures reads the departing calls of q's station in q's window
@@ -298,28 +438,35 @@ select f.facility_id, f.facility_kind, f.position_text,
        f.status_observed_at, f.source_ref
 from (`+stationFacilityOf+`) f
 join (`+relSource+`) s on s.source_ref = f.source_ref
-where f.stop_place_id = $1 and f.source_ref = any($2) and `+permitted("f")+`
+where f.source_ref = any($2) and `+permitted("f")+`
 order by f.facility_id`, "text", "text[]", "timestamp with time zone")
 
 // stationFacilityOf is the station facility relation of the station $1
-// only. A facility's stop place is contract_stop_place_of its ref, the
+// only: of the DHIDs of its stop family and of the stops the family's
+// stops name as their parent, as DB files a station under the DHID its
+// platforms name (S+U Berlin Hauptbahnhof is de:11000:900003200 in the
+// timetable, its platforms' parent de:11000:900003201 at DB). A facility's stop place is contract_stop_place_of its ref, the
 // timetable's station whose id is the ref's DHID or starts with it and a
 // colon: so the DHID of that station's id is the ref's DHID, and only refs
 // of that DHID are mapped (on prod mapping every ref took 850 ms a station).
-const stationFacilityOf = `
-with k as (select substring(substr($1::text, 3), '` + dhidOf + `') d where left($1::text, 2) = '1:')
+var stationFacilityOf = `
+with fam as (select substr(f.id, 3) id from (` + stationFamily("$1::text") + `) f(id) where left($1::text, 2) = '1:'),
+k as (select distinct substring(y.id, '` + dhidOf + `') d from (
+        select f.id from fam f
+        union all
+        select p.parent_id from stops p join fam f on p.gtfs_feed_key = 1 and p.id = f.id where p.parent_id is not null) y)
 select 'equipment:' || e.equipment_id facility_id, contract_stop_place_of(e.stop_place_id) stop_place_id, e.kind facility_kind,
        e.description position_text, coalesce(st.state, 'unknown') facility_status,
        coalesce(st.status_since, st.last_seen_at, e.last_seen_at) status_observed_at, coalesce(st.source_feed, e.source_feed) source_ref,
        'open' display_class, 'public' audience
 from station_equipment e
 left join station_equipment_state st on st.equipment_id = e.equipment_id
-where e.closed_at is null and substring(e.stop_place_id, '` + dhidOf + `') = (select k.d from k)
+where e.closed_at is null and substring(e.stop_place_id, '` + dhidOf + `') in (select k.d from k)
 union all
 select 'fasta:' || f.equipment_no, (select contract_stop_place_of(d.ifopt) from db_stations d where d.station_no = f.station_no),
        f.kind, f.description, f.state, coalesce(f.state_since, f.last_seen_at), f.source_feed, 'open', 'public'
 from db_facilities f
-where f.station_no in (select d.station_no from db_stations d where substring(d.ifopt, '` + dhidOf + `') = (select k.d from k))`
+where f.station_no in (select d.station_no from db_stations d where substring(d.ifopt, '` + dhidOf + `') in (select k.d from k))`
 
 // dhidOf is the DHID a ref names, as contract_stop_place_of reads it.
 const dhidOf = `^(?:dhid:)?([a-z]{2}:[0-9]{5}:[0-9]+)`

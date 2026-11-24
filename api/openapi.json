@@ -7929,6 +7929,13 @@
       "StationFacility": {
         "additionalProperties": false,
         "properties": {
+          "equipmentNo": {
+            "description": "DB's equipment number of the unit, as its source lists it, the number the platform's station facilities check names a unit by; null when the source gives none (the unit is then named by its id).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "type": "string"
           },
@@ -7956,7 +7963,8 @@
           "kind",
           "position",
           "state",
-          "sourceFamily"
+          "sourceFamily",
+          "equipmentNo"
         ],
         "type": "object"
       },
@@ -22654,14 +22662,16 @@
                             "kind": "escalator",
                             "position": "zu Gleis 1",
                             "state": "active",
-                            "sourceFamily": "openstation_siri_fm"
+                            "sourceFamily": "openstation_siri_fm",
+                            "equipmentNo": null
                           },
                           {
                             "id": "equipment:100004",
                             "kind": "escalator",
                             "position": "zu Gleis 2",
                             "state": "active",
-                            "sourceFamily": "openstation_siri_fm"
+                            "sourceFamily": "openstation_siri_fm",
+                            "equipmentNo": null
                           }
                         ]
                       },

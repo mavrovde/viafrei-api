@@ -32,14 +32,16 @@
           "kind": "escalator",
           "position": "zu Gleis 1",
           "state": "active",
-          "sourceFamily": "openstation_siri_fm"
+          "sourceFamily": "openstation_siri_fm",
+          "equipmentNo": null
         },
         {
           "id": "equipment:100004",
           "kind": "escalator",
           "position": "zu Gleis 2",
           "state": "active",
-          "sourceFamily": "openstation_siri_fm"
+          "sourceFamily": "openstation_siri_fm",
+          "equipmentNo": null
         }
       ]
     },

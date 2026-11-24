@@ -21,6 +21,9 @@ type Facility struct {
 	State      string
 	ObservedAt *time.Time
 	Family     string
+	// EquipmentNo is DB's equipment number of the unit, as its source
+	// lists it; nil when the source gives none.
+	EquipmentNo *string
 }
 
 // FacilityQuery asks for the facilities of a station: of one kind (empty:

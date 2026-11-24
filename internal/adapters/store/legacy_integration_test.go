@@ -140,7 +140,7 @@ select v.facility_id, v.facility_kind, v.position_text,
        case when v.seen is null then 'unknown'
             when s.stale_after_s is not null and v.seen < $3::timestamptz - make_interval(secs => s.stale_after_s) then 'unknown'
             else v.facility_status end,
-       v.seen, v.source_ref
+       v.seen, v.source_ref, case when v.facility_id like 'fasta:%' then substr(v.facility_id, 7) else v.eno end
 from v
 join contract.source s on s.source_ref = v.source_ref
 where not exists (select 1 from v g where g.facility_id = 'fasta:' || v.eno)

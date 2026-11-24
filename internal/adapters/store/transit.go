@@ -574,7 +574,7 @@ select f.facility_id, f.facility_kind, f.position_text,
        case when f.status_observed_at is null then 'unknown'
             when s.stale_after_s is not null and f.status_observed_at < $3::timestamptz - make_interval(secs => s.stale_after_s) then 'unknown'
             else f.facility_status end,
-       f.status_observed_at, f.source_ref
+       f.status_observed_at, f.source_ref, f.equipment_no
 from (`+stationFacilityOf+`) f
 join (`+relSource+`) s on s.source_ref = f.source_ref
 where f.source_ref = any($2) and `+permitted("f")+`
@@ -604,7 +604,7 @@ n as (select d.station_no from db_stations d where substring(d.ifopt, '` + dhidO
 select 'equipment:' || e.equipment_id facility_id, contract_stop_place_of(e.stop_place_id) stop_place_id, e.kind facility_kind,
        e.description position_text, coalesce(st.state, 'unknown') facility_status,
        coalesce(st.last_seen_at, e.last_seen_at) status_observed_at, coalesce(st.source_feed, e.source_feed) source_ref,
-       'open' display_class, 'public' audience
+       'open' display_class, 'public' audience, e.equipment_no
 from station_equipment e
 left join station_equipment_state st on st.equipment_id = e.equipment_id
 where e.closed_at is null and substring(e.stop_place_id, '` + dhidOf + `') in (select k.d from k)
@@ -612,7 +612,7 @@ where e.closed_at is null and substring(e.stop_place_id, '` + dhidOf + `') in (s
                    and x.source_feed = any($2))
 union all
 select 'fasta:' || f.equipment_no, (select contract_stop_place_of(d.ifopt) from db_stations d where d.station_no = f.station_no),
-       f.kind, f.description, f.state, f.last_seen_at, f.source_feed, 'open', 'public'
+       f.kind, f.description, f.state, f.last_seen_at, f.source_feed, 'open', 'public', f.equipment_no
 from db_facilities f
 where f.station_no in (select n.station_no from n)`
 
@@ -625,7 +625,7 @@ func (s *Store) Facilities(ctx context.Context, station string, families []strin
 		rows, _ := run(ctx, tx, stationFacilities, station, families, now)
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.Facility, error) {
 			var v transit.Facility
-			err := r.Scan(&v.ID, &v.Kind, &v.Position, &v.State, &v.ObservedAt, &v.Family)
+			err := r.Scan(&v.ID, &v.Kind, &v.Position, &v.State, &v.ObservedAt, &v.Family, &v.EquipmentNo)
 			return v, err
 		})
 	})

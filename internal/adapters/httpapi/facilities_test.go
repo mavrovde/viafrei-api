@@ -25,7 +25,7 @@ func TestFacilitiesAnswer(t *testing.T) {
 	seen := fixedNow
 	f.facilities = features.StationFacilities{
 		Answer: features.Answer[transit.Facility]{Items: []transit.Facility{
-			{ID: "e1", Kind: "elevator", Position: sp("zu Gleis 1"), State: "inactive", ObservedAt: &seen, Family: "src-alpha-transit"},
+			{ID: "e1", Kind: "elevator", Position: sp("zu Gleis 1"), State: "inactive", ObservedAt: &seen, Family: "src-alpha-transit", EquipmentNo: sp("10500001")},
 			{ID: "e2", Kind: "elevator", State: "unknown", Family: "src-alpha-transit"},
 		}, HasMore: true, Families: []provenance.Family{transitFamily}, At: fixedNow},
 		Station: transit.Station{ID: "sp-1", Name: "Köln Hbf"}, Active: 3, Inactive: 1, Unknown: 1,
@@ -45,6 +45,10 @@ func TestFacilitiesAnswer(t *testing.T) {
 	r1, _ := rows[1].(map[string]any)
 	// The platform's facilities check states no report instant per unit and names the station only (docs/parity.md).
 	if _, has := r0["observedAt"]; r0["state"] != "inactive" || has || r1["state"] != "unknown" {
+		t.Errorf("rows %v", rows)
+	}
+	// The unit's DB equipment number, null when its source gives none.
+	if v, has := r1["equipmentNo"]; r0["equipmentNo"] != "10500001" || !has || v != nil {
 		t.Errorf("rows %v", rows)
 	}
 	if st, _ := data["station"].(map[string]any); len(st) != 1 || st["name"] == nil {

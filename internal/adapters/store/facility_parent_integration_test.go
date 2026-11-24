@@ -54,17 +54,26 @@ func TestAFacilityStateIsCurrentWhileRestatedAndAUnitIsListedOnce(t *testing.T) 
 		        ('9990021', '999000920', 'elevator', 'active', now() - interval '7 days', now() - interval '7 days', now() - interval '1 day', 'db_fasta', 'DB', 'zu Gleis 2')`,
 		`insert into public.station_equipment (equipment_id, kind, equipment_no, stop_place_id, description, first_seen_at, last_seen_at, source_feed, source_publisher)
 		 values ('diid:9990020', 'elevator', '9990020', 'de:09998:920', 'zu Gleis 1', now(), now(), 'openstation_netex', 'DB'),
-		        ('diid:9990022', 'escalator', '9990022', 'de:09998:920', 'zur Halle', now(), now(), 'openstation_netex', 'DB')`,
+		        ('diid:9990022', 'escalator', '9990022', 'de:09998:920', 'zur Halle', now(), now(), 'openstation_netex', 'DB'),
+		        ('diid:9990023', 'escalator', null, 'de:09998:920', 'zum Ausgang', now(), now(), 'openstation_netex', 'DB')`,
 		`insert into public.station_equipment_state (equipment_id, status, state, status_since, last_seen_at, known_equipment, source_feed, source_publisher)
 		 values ('diid:9990020', 'available', 'inactive', now() - interval '3 days', now() - interval '1 minute', true, 'openstation_siri_fm', 'DB'),
-		        ('diid:9990022', 'available', 'active', now() - interval '3 days', now() - interval '1 minute', true, 'openstation_siri_fm', 'DB')`)
+		        ('diid:9990022', 'available', 'active', now() - interval '3 days', now() - interval '1 minute', true, 'openstation_siri_fm', 'DB'),
+		        ('diid:9990023', 'available', 'active', now() - interval '3 days', now() - interval '1 minute', true, 'openstation_siri_fm', 'DB')`)
 	all := []string{"db_fasta", "openstation_siri_fm", "openstation_netex"}
 	fs, err := st.Facilities(bounded(t), "1:de:09998:920", all, time.Now())
 	got := map[string]string{}
 	for _, f := range fs {
-		got[f.ID] = f.State + " " + f.Family
+		// The unit's DB equipment number, as its source lists it; none for
+		// the unit OpenStation gives no number.
+		no := "-"
+		if f.EquipmentNo != nil {
+			no = *f.EquipmentNo
+		}
+		got[f.ID] = f.State + " " + f.Family + " " + no
 	}
-	want := map[string]string{"fasta:9990020": "active db_fasta", "fasta:9990021": "unknown db_fasta", "equipment:diid:9990022": "active openstation_siri_fm"}
+	want := map[string]string{"fasta:9990020": "active db_fasta 9990020", "fasta:9990021": "unknown db_fasta 9990021",
+		"equipment:diid:9990022": "active openstation_siri_fm 9990022", "equipment:diid:9990023": "active openstation_siri_fm -"}
 	if err != nil || len(got) != len(want) || len(fs) != len(want) {
 		t.Fatalf("the station's facilities: %v, %v", got, err)
 	}
@@ -74,7 +83,7 @@ func TestAFacilityStateIsCurrentWhileRestatedAndAUnitIsListedOnce(t *testing.T) 
 		}
 	}
 	fs, err = st.Facilities(bounded(t), "1:de:09998:920", []string{"openstation_siri_fm", "openstation_netex"}, time.Now())
-	if err != nil || len(fs) != 2 || fs[0].ID != "equipment:diid:9990020" || fs[0].State != "inactive" {
+	if err != nil || len(fs) != 3 || fs[0].ID != "equipment:diid:9990020" || fs[0].State != "inactive" {
 		t.Errorf("without FaSta, OpenStation answers alone: %+v, %v", fs, err)
 	}
 }

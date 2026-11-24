@@ -360,6 +360,11 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 	})
 	if err == nil && len(out) == 0 && q.Code == "" && q.Area == "" {
 		out, err = s.stationsInTown(ctx, q, families)
+		if q.Railway {
+			// The town and stop read lists every stop: a railway search
+			// keeps the DB stations among them.
+			out = slices.DeleteFunc(out, func(st transit.Station) bool { return st.EVA == nil })
+		}
 	}
 	if err != nil {
 		return nil, false, err

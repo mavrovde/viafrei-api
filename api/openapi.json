@@ -8005,6 +8005,10 @@
               "integer",
               "null"
             ]
+          },
+          "railway": {
+            "description": "Whether only the railway stations were kept.",
+            "type": "boolean"
           }
         },
         "required": [
@@ -8012,7 +8016,8 @@
           "code",
           "at",
           "radiusM",
-          "area"
+          "area",
+          "railway"
         ],
         "type": "object"
       },
@@ -21583,6 +21588,16 @@
               ],
               "pattern": "^(0[1-9]|1[0-6])([0-9]{3})?$",
               "type": "string"
+            }
+          },
+          {
+            "description": "Only the railway stations: those of the DB station register, which carry an EVA number (eva), as the platform's train departures and station facilities checks resolve a station name. Without it a stop of the same name and no EVA number may come first (Frankfurt (Main) Hauptbahnhof is a bus stop's name too). It narrows q, code or at, and is no search of its own.",
+            "explode": false,
+            "in": "query",
+            "name": "railway",
+            "schema": {
+              "description": "Only the railway stations: those of the DB station register, which carry an EVA number (eva), as the platform's train departures and station facilities checks resolve a station name. Without it a stop of the same name and no EVA number may come first (Frankfurt (Main) Hauptbahnhof is a bus stop's name too). It narrows q, code or at, and is no search of its own.",
+              "type": "boolean"
             }
           },
           {

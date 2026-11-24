@@ -40,7 +40,10 @@ func TestAStationIsFoundAsAStopInTheTownTheTextNames(t *testing.T) {
 		        ('city', 'Halle (Saale)', 'halle saale', '15002000', vf_test.point(null), 'bkg_gvisys', 'test-halle')`,
 		`insert into public.stops (gtfs_feed_key, id, name, geom, location_type)
 		 values (1, 'de:06412:99001', 'Konstablerwache', vf_test.point(null), 1), (1, 'de:15002:99001', 'Marktplatz', vf_test.point(null), 1)
-		 on conflict do nothing`)
+		 on conflict do nothing`,
+		// The town's main station is a DB station; its other stops are not.
+		`insert into public.db_stations (station_no, name, content_hash, first_seen_at, last_seen_at, updated_at, ifopt, source_id, eva_no)
+		 values ('999000903', 'Rosenstadt Hbf', 'test', now(), now(), now(), 'de:09998:903', 'db_stada', '9999903')`)
 	const fam = "delfi_static" // the source of the timetable the stops are planted in
 	ids := func(ss []transit.Station) []string {
 		out := []string{}
@@ -77,6 +80,14 @@ func TestAStationIsFoundAsAStopInTheTownTheTextNames(t *testing.T) {
 		if ss, _, err := st.Stations(bounded(t), transit.Query{Text: asked, Limit: 5}, []string{fam}); err != nil || !slices.Equal(ids(ss), []string{"1:de:09998:903"}) {
 			t.Errorf("%q: %v, %v", asked, ids(ss), err)
 		}
+	}
+	// A railway search keeps the town's DB stations: its main station, and
+	// none of the stops that are no DB station.
+	if ss, _, err := st.Stations(bounded(t), transit.Query{Text: "Rosenstadt Hbf", Limit: 5, Railway: true}, []string{fam}); err != nil || !slices.Equal(ids(ss), []string{"1:de:09998:903"}) {
+		t.Errorf("the town's railway station: %v, %v", ids(ss), err)
+	}
+	if ss, _, err := st.Stations(bounded(t), transit.Query{Text: "Rosenstadt Dornen", Limit: 5, Railway: true}, []string{fam}); err != nil || len(ss) != 0 {
+		t.Errorf("no railway station in the town holds the name: %v, %v", ids(ss), err)
 	}
 	if ss, _, err := st.Stations(bounded(t), transit.Query{Text: "Rosenstadt Zzqxplatz", Limit: 5}, []string{fam}); err != nil || len(ss) != 0 {
 		t.Errorf("no such stop in the town: %v, %v", ids(ss), err)

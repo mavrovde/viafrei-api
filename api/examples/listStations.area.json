@@ -113,7 +113,8 @@
         "code": null,
         "at": null,
         "radiusM": null,
-        "area": "01002"
+        "area": "01002",
+        "railway": false
       }
     },
     "links": {

@@ -23,6 +23,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/app/admission"
 	"github.com/mavrovde/viafrei-api/internal/app/breaker"
+	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/invariant"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
@@ -447,13 +448,19 @@ func (s *Store) takeSlot(ctx context.Context, tx slotTx) error {
 // IsDeadline reports whether err means the request budget ran out.
 func IsDeadline(err error) bool { return errors.Is(err, ErrDeadlineExhausted) }
 
-// ContractVersion implements health.ContractReader.
+// storageAnswers is the readiness read: storage answers a statement.
+var storageAnswers = named("api_storage_answers", `select true`)
+
+// ContractVersion implements health.ContractReader: once storage answers,
+// the read-contract version is the one this build carries
+// (dbcontract.ContractVersion). The statements read the platform's tables,
+// whose release database.pin names, so the database publishes no version
+// of its own to compare.
 func (s *Store) ContractVersion(ctx context.Context) (string, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (string, error) {
-		// The newest read-contract version the database publishes.
-		var v string
-		err := tx.QueryRow(ctx, `select contract_version from contract.contract_info order by published_at desc limit 1`).Scan(&v)
-		return v, err
+		var ok bool
+		err := runRow(ctx, tx, storageAnswers).Scan(&ok)
+		return dbcontract.ContractVersion, err
 	})
 }
 

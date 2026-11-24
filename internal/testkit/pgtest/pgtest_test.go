@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/moby/moby/api/types/container"
 )
 
@@ -144,13 +145,11 @@ type answer struct {
 type fakeRun struct {
 	answers map[string]answer
 	env     []map[string]string
-	files   []map[string]string
 	args    [][]string
 }
 
-func (f *fakeRun) run(_ context.Context, _ string, env, files map[string]string, args ...string) (string, int, error) {
+func (f *fakeRun) run(_ context.Context, _ string, env map[string]string, args ...string) (string, int, error) {
 	f.env = append(f.env, env)
-	f.files = append(f.files, files)
 	f.args = append(f.args, args)
 	a := f.answers[args[0]]
 	return a.out, a.code, a.err
@@ -248,29 +247,12 @@ func TestMigrateReportsEachFailure(t *testing.T) {
 	}
 }
 
-// TestSeedWithHandsTheRowsToThePinnedImage: the rows go to the image's test
-// seed as a file, with the test-fixtures switch and the database URL; a
-// failed seed names the step and the image's last line.
-func TestSeedWithHandsTheRowsToThePinnedImage(t *testing.T) {
-	pin, err := ParsePin(pinSrc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ok := &fakeRun{answers: map[string]answer{"test-fixtures": {out: "seeded\n"}}}
-	if err := SeedWith(context.Background(), pin, "postgres://db/test_contract", "insert into contract.source ...", ok.run); err != nil {
-		t.Fatal(err)
-	}
-	if strings.Join(ok.args[0], " ") != "test-fixtures seed "+SeedPath || ok.files[0][SeedPath] != "insert into contract.source ..." ||
-		ok.env[0]["DATABASE_URL"] != "postgres://db/test_contract" || ok.env[0]["VF_TEST_FIXTURES"] != "1" {
-		t.Fatalf("the seed step: %v %v %v", ok.args, ok.files, ok.env)
-	}
-	for want, a := range map[string]answer{
-		"test-fixtures seed: no runtime":                  {err: errors.New("no runtime")},
-		"test-fixtures seed exited 1: no such relation x": {out: "reading\nno such relation x\n", code: 1},
-	} {
-		f := &fakeRun{answers: map[string]answer{"test-fixtures": a}}
-		if err := SeedWith(context.Background(), pin, "postgres://db", "x", f.run); err == nil || !strings.Contains(err.Error(), want) {
-			t.Errorf("planted %q: %v", want, err)
-		}
+// TestSeedWithReportsAnUnreachableDatabase: a seed that cannot connect
+// names the step.
+func TestSeedWithReportsAnUnreachableDatabase(t *testing.T) {
+	t.Cleanup(func() { connect = pgx.Connect })
+	connect = func(context.Context, string) (*pgx.Conn, error) { return nil, errors.New("no route") }
+	if err := SeedWith(context.Background(), "postgres://db/test_contract", "x"); err == nil || !strings.Contains(err.Error(), "connect to seed: no route") {
+		t.Fatalf("SeedWith = %v", err)
 	}
 }

@@ -3,7 +3,10 @@ package pgtest
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
+	"time"
 )
 
 // A URL that does not parse is kept as it is; a role name and a value are
@@ -75,5 +78,83 @@ func TestStopOfNoneAndSharedWithoutAPin(t *testing.T) {
 	t.Chdir(t.TempDir())
 	if _, err := Shared(context.Background()); err == nil {
 		t.Fatal("a database was shared without a pin")
+	}
+}
+
+// errReaperCreated is the error testcontainers returns for the run's reaper
+// while another package process has created but not started it.
+var errReaperCreated = errors.New(`run postgres: generic container: create container: reaper: from container "04a06ab2": ` +
+	`wait for reaper 04a06ab2: unexpected container status "created"`)
+
+// shortReaperRetry shortens the retry's waits to bound and collects what it
+// logs.
+func shortReaperRetry(t *testing.T, bound time.Duration) *[]string {
+	t.Helper()
+	tries, delay, b, l := reaperStartTries, reaperStartDelay, reaperStartBound, logf
+	t.Cleanup(func() { reaperStartTries, reaperStartDelay, reaperStartBound, logf = tries, delay, b, l })
+	var logged []string
+	reaperStartDelay, reaperStartBound = time.Millisecond, bound
+	logf = func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) }
+	return &logged
+}
+
+// failing returns a run that fails with errs in turn, then succeeds, and
+// counts its calls.
+func failing(calls *int, errs ...error) func() (sharedContainer, error) {
+	return func() (sharedContainer, error) {
+		*calls++
+		if *calls <= len(errs) {
+			return nil, errs[*calls-1]
+		}
+		return fakeShared{}, nil
+	}
+}
+
+type fakeShared struct{}
+
+func (fakeShared) ConnectionString(context.Context, ...string) (string, error) { return "", nil }
+func (fakeShared) ContainerIP(context.Context) (string, error)                 { return "", nil }
+
+// TestReaperStartIsRetriedOnlyWhileNotStarted: a reaper that is not started
+// yet is waited for, each wait logged, up to the tries; any other error
+// fails at once, unlogged.
+func TestReaperStartIsRetriedOnlyWhileNotStarted(t *testing.T) {
+	ctx := context.Background()
+	logged := shortReaperRetry(t, time.Minute)
+	calls := 0
+	if c, err := retryReaperStart(ctx, failing(&calls, errReaperCreated, errReaperCreated)); err != nil || c == nil || calls != 3 || len(*logged) != 2 {
+		t.Fatalf("not retried until started: %v %d %q", err, calls, *logged)
+	}
+	if !strings.Contains((*logged)[1], "try 2 of 5") || !strings.Contains((*logged)[1], `"created"`) {
+		t.Errorf("the retry's line: %q", (*logged)[1])
+	}
+	other := errors.New(`create container: unexpected container status "created"`)
+	calls, *logged = 0, nil
+	if _, err := retryReaperStart(ctx, failing(&calls, other)); !errors.Is(err, other) || calls != 1 || len(*logged) != 0 {
+		t.Fatalf("another error retried: %v %d %q", err, calls, *logged)
+	}
+	calls = 0
+	errs := []error{errReaperCreated, errReaperCreated, errReaperCreated, errReaperCreated, errReaperCreated, errReaperCreated}
+	if _, err := retryReaperStart(ctx, failing(&calls, errs...)); !errors.Is(err, errReaperCreated) || calls != 5 || len(*logged) != 4 ||
+		!strings.Contains(err.Error(), "did not start in 5 tries") {
+		t.Fatalf("the tries not bounded: %v %d", err, calls)
+	}
+}
+
+// TestReaperStartStopsAtItsBoundAndItsContext: no wait begins that would
+// pass the bound, and a cancelled context ends the wait.
+func TestReaperStartStopsAtItsBoundAndItsContext(t *testing.T) {
+	logged := shortReaperRetry(t, 0)
+	calls := 0
+	if _, err := retryReaperStart(context.Background(), failing(&calls, errReaperCreated, errReaperCreated)); calls != 1 || len(*logged) != 0 ||
+		err == nil || !strings.Contains(err.Error(), "did not start in 1 tries") {
+		t.Fatalf("the bound not kept: %v %d", err, calls)
+	}
+	reaperStartBound, reaperStartDelay = time.Minute, time.Second
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	calls = 0
+	if _, err := retryReaperStart(ctx, failing(&calls, errReaperCreated)); !errors.Is(err, context.Canceled) || !errors.Is(err, errReaperCreated) || calls != 1 {
+		t.Fatalf("the context not kept: %v %d", err, calls)
 	}
 }

@@ -18,27 +18,82 @@ import (
 // (kind u) carrying the fingerprint of the curated rule rows, every topic and
 // every rule. The register and the reference rows are small tables, never an
 // observation, so they are read whole. One statement means one failure path.
-const freshnessVersions = `
+var freshnessVersions = named("api_freshness_versions", `
+with `+sourceCTE(true)+`,
+lic as (`+licenceRows+`),
+fresh as (`+freshnessRows+`)
 select 'r', '', md5(concat_ws('|',
-  (select string_agg(t::text, ',' order by t::text) from contract.source t),
-  (select string_agg(t::text, ',' order by t::text) from contract.source_note t),
-  (select string_agg(t::text, ',' order by t::text) from contract.licence t),
-  (select string_agg(t::text, ',' order by t::text) from contract.publisher t)))
+  (select string_agg(t::text, ',' order by t::text) from (
+     select row(s.source_ref, s.domain, s.source_ref, s.licence_code, s.attribution_text, s.changes_statement, s.terms_url,
+                s.share_alike_offer_url, s.acceptance_required, s.use_classes, s.freshness_target_s, s.stale_after_s,
+                s.review_signed_on, s.register_version, s.display_class, s.audience, s.terms_gate, s.hold_reason,
+                s.origin_restriction) t from src s) t),
+  (select string_agg(t::text, ',' order by t::text) from (`+sourceNotes+`) t),
+  (select string_agg(t::text, ',' order by t::text) from (
+     select row(l.licence_code, l.licence_name, l.licence_url, l.licence_category, l.share_alike, l.attribution_required) t from lic l) t),
+  (select string_agg(t::text, ',' order by t::text) from (`+publisherRows+`) t)))
 union all
 select 'l', '', md5(concat_ws('|',
-  (select string_agg(t::text, ',' order by t::text) from contract.message_coverage t),
-  (select string_agg(j.junction_id || '=' || coalesce(j.state_code, ''), ',' order by j.junction_id) from contract.junction j)))
+  (select string_agg(t::text, ',' order by t::text) from (
+     select row(m.state_code, m.source_ref, m.coverage_role, m.current_only, m.measured_on, 'open'::text, 'public'::text) t
+     from message_coverage_sources m) t),
+  (select string_agg(j.junction_id || '=' || coalesce(j.state_code, ''), ',' order by j.junction_id) from (
+     select t.cid || ':' || t.tabcd || ':' || t.lcd junction_id, land.code state_code
+     from tmc_locations t cross join lateral (select contract_junction_land(t.geom) code) land
+     where t.cid = 58 and t.tabcd = 1 and t.tcd = 1 and t.road_number ~ '^A[1-9][0-9]{0,2}$' and t.geom is not null and t.name is not null) j)))
 union all
 select 'u', '', md5(concat_ws('|',
-  (select string_agg(t::text, ',' order by t::text) from contract.rule_topic t),
-  (select string_agg(t::text, ',' order by t::text) from contract.rule_statement t)))
+  (select string_agg(t::text, ',' order by t::text) from (
+     select row(t.topic_code, t.title_de, t.reviewed_on, t.title_en, 'viafrei_rules'::text, array['viafrei_rules'::text], 'open'::text, 'public'::text) t
+     from driving_rule_topics t) t),
+  (select string_agg(t::text, ',' order by t::text) from (
+     select row(f.fact_key, f.topic_code, f.position, f.body_de, f.source_name, f.body_en, f.source_url, f.source_note_de,
+                f.source_note_en, f.to_verify_de, f.to_verify_en, f.reviewed_on, f.headline, 'viafrei_rules'::text,
+                array['viafrei_rules'::text], 'open'::text, 'public'::text) t
+     from driving_rule_facts f) t)))
 union all
-select 'f', f.source_ref::text, ` + familyVersion + ` from contract.source_freshness f
+select 'f', f.source_ref::text, `+familyVersion+` from fresh f
 union all
-select 'c', f.source_ref::text, ` + confirmationVersion + ` from contract.source_freshness f`
+select 'c', f.source_ref::text, `+confirmationVersion+` from fresh f`)
+
+// freshnessRows are each family's feed status (control.data_status, the
+// platform's feed status view) whose source rule does not exclude it: the
+// instant its data last changed and its version, its last confirmation,
+// the interval and whether its updates are paused.
+const freshnessRows = `select d.key source_ref, d.last_changed_at data_as_of,
+       coalesce(extract(epoch from d.last_changed_at)::bigint::text, '0') freshness_version,
+       d.held_since confirmed_at, d.cadence_s confirm_interval_s, d.paused updates_paused
+  from control.data_status d
+ where not coalesce((select k.excluded from contract_source_rules k where d.key ~ k.pattern order by k.priority limit 1), false)`
+
+// sourceNotes are the register notes of every family its rule does not
+// exclude, as rows (family, kind, language, text).
+const sourceNotes = `select row(s.source_ref, n.note_kind, n.lang, n.body) t
+  from contract_sources s
+  join source_register_notes n on n.source_id = s.register_id
+ where not coalesce((select k.excluded from contract_source_rules k where s.source_ref ~ k.pattern order by k.priority limit 1), false)`
+
+// publisherRows are the publisher of every family its rule does not
+// exclude, as rows (family, name, website).
+const publisherRows = `select row(s.source_ref, s.publisher_name, coalesce(g.source_url, s.terms_url)) t
+  from contract_sources s
+  left join source_register g on g.source_id = s.register_id
+ where s.publisher_name is not null
+   and not coalesce((select k.excluded from contract_source_rules k where s.source_ref ~ k.pattern order by k.priority limit 1), false)`
+
+// licenceRows are every licence a published family names or a licence text
+// holds, with its link, category, share-alike and attribution, over src.
+var licenceRows = `select l.code licence_code, l.code licence_name, ` + licenceURL("l.code") + ` licence_url,
+       case when l.code ~* '(CC0|Creative Commons Zero|zero-2-0|Datenlizenz Deutschland – Zero)' then 'public_domain'
+            when l.code ~* '(BY-SA|ODbL|Open Database License)' then 'share_alike'
+            when l.code ~* '(CC BY|Namensnennung|by-2-0|GeoNutzV)' then 'attribution'
+            else 'terms' end licence_category,
+       l.code ~* '(BY-SA|ODbL|Open Database License)' share_alike,
+       not l.code ~* '(CC0|Creative Commons Zero|zero-2-0|Datenlizenz Deutschland – Zero)' attribution_required
+  from (select s.licence_code code from src s where s.licence_code is not null union select t.licence_label from licence_texts t) l`
 
 // confirmationVersion is the version of a family's newest confirmation, over
-// contract.source_freshness as f: the instant, the interval and whether its
+// the feed status as f (freshnessRows): the instant, the interval and whether its
 // updates are paused. The road lamp judges a family's sight by them, so a
 // confirmation that recovers a family, or a changed interval, ends a cached
 // lamp; a confirmation lapsing with the clock alone is an instant the answer
@@ -47,7 +102,7 @@ select 'c', f.source_ref::text, ` + confirmationVersion + ` from contract.source
 const confirmationVersion = `coalesce(extract(epoch from f.confirmed_at)::text, '') || '@' || coalesce(f.confirm_interval_s::text, '') || '@' || f.updates_paused::text`
 
 // familyVersion is the version of a family's data that the HTTP cache
-// compares and an ETag is built from, over contract.source_freshness as f:
+// compares and an ETag is built from, over the feed status as f (freshnessRows):
 // the freshness version AND the instant the data is current to. An answer
 // renders dataAsOf, ageS, stale and Last-Modified from data_as_of, so a
 // moved data_as_of must end a cached answer even when the freshness version
@@ -69,7 +124,7 @@ func (s *Store) FreshnessVersions(ctx context.Context) (provenance.Versions, err
 		out := provenance.Versions{Families: map[string]string{}, Confirmations: map[string]string{}}
 		var kind, family, version string
 		// A failed query surfaces through ForEachRow.
-		rows, _ := tx.Query(ctx, freshnessVersions)
+		rows, _ := run(ctx, tx, freshnessVersions)
 		_, err := pgx.ForEachRow(rows, []any{&kind, &family, &version}, func() error {
 			switch kind {
 			case "r":

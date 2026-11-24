@@ -70,8 +70,9 @@ func healthyDocker(a string) (string, error) {
 	case strings.Contains(a, "pg_locks"):
 		return "1\n", nil
 	case strings.Contains(a, "begin; do $$"):
+		// The lock session, ended by release's cancel.
 		time.Sleep(20 * time.Millisecond)
-		return "", nil
+		return "", fmt.Errorf("docker exec: exit status 1: ERROR:  %s", holdCancelled)
 	case a == "ps -q api":
 		return "c1\n", nil
 	case a == "top c1 -o pid,rss":

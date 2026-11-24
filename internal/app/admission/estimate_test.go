@@ -47,9 +47,9 @@ func TestTheWaitEstimateCountsOnlyTheWaitersServedFirst(t *testing.T) {
 		before := waiting(c)
 		done := make(chan error, 1)
 		go func() {
-			release, err := c.Acquire(ctx)
+			release, err := c.AcquireRead(ctx)
 			if release != nil {
-				release()
+				release(true)
 			}
 			done <- err
 		}()

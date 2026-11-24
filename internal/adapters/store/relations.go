@@ -660,19 +660,6 @@ const relStopPlace = `
          LIMIT 1) d ON true
   WHERE s.deleted_at IS NULL AND s.geom IS NOT NULL AND s.name IS NOT NULL AND (s.location_type = 1 OR COALESCE(s.location_type::integer, 0) = 0 AND s.parent_id IS NULL)`
 
-// relStopPoint is the platform's stop point (kind v).
-const relStopPoint = `
- SELECT (s.gtfs_feed_key || ':'::text) || s.id AS stop_point_id,
-    (s.gtfs_feed_key || ':'::text) || COALESCE(s.parent_id, s.id) AS stop_place_id,
-    NULLIF(btrim(s.platform_code), ''::text) AS platform_label,
-    f.source_feed AS source_ref,
-    'open'::text AS display_class,
-    'public'::text AS audience,
-    NULLIF(btrim(s.name), ''::text) AS name
-   FROM stops s
-     JOIN feeds f ON f.gtfs_feed_key = s.gtfs_feed_key
-  WHERE s.deleted_at IS NULL AND COALESCE(s.location_type::integer, 0) = 0`
-
 // relTrafficEvent is the platform's traffic event (kind v).
 const relTrafficEvent = `
  WITH newest AS (

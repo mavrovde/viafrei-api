@@ -225,6 +225,13 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 			failed++
 		}
 		fmt.Fprintf(stdout, "%s: %s: %d requests, %s\n", prog, o.name, len(o.results), o.verdict())
+		// Each failed assertion with its figure, so a run's log alone names
+		// what failed (issue #215).
+		for _, c := range o.checks {
+			if !c.ok {
+				fmt.Fprintf(stdout, "%s: %s: FAIL: %s (%s)\n", prog, o.name, c.name, c.detail)
+			}
+		}
 	}
 	for _, r := range cmp.regressions {
 		fmt.Fprintf(stdout, "%s: regression: %s\n", prog, r)

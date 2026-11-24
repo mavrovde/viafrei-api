@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
 
 // refusedReads are what no statement of the store may read: every column of a
@@ -120,6 +122,8 @@ func TestRefusalsCatchEachKind(t *testing.T) {
 // TestNamedRefusesAMalformedStatement: a taken name, a parameter without a
 // type, an unused type and a use without its cast each panic.
 func TestNamedRefusesAMalformedStatement(t *testing.T) {
+	namedSealed = false
+	defer func() { namedSealed = true }()
 	named("api_test_once", "select $1::int", "int")
 	for what, f := range map[string]func(){
 		"taken":   func() { named("api_test_once", "select $1::int", "int") },
@@ -170,11 +174,11 @@ func TestOneRowAnswersTheScanError(t *testing.T) {
 	}
 }
 
-// TestDeparturesOfTripsKeepTheRelation: the trip keys are put before the
+// TestDeparturesOfTripsKeepTheRelation: the trip and stop keys are put before the
 // departure relation's own columns, which stay as they are.
 func TestDeparturesOfTripsKeepTheRelation(t *testing.T) {
 	if !strings.HasPrefix(relDeparture, "\n SELECT ") ||
-		departuresOfTrips != "\n SELECT t.gtfs_feed_key AS board_feed, t.id AS board_trip, t.headsign AS board_headsign,"+relDeparture[len("\n SELECT"):] {
+		departuresOfTrips != "\n SELECT t.gtfs_feed_key AS board_feed, t.id AS board_trip, t.headsign AS board_headsign, s.gtfs_feed_key AS board_stop_feed, s.id AS board_stop,"+relDeparture[len("\n SELECT"):] {
 		t.Fatal("the departure relation no longer begins with its select list")
 	}
 }
@@ -213,5 +217,37 @@ func TestStationDisruptionOfHourReadsOneRange(t *testing.T) {
 		strings.Count(relStationDisruption, freshPerCall) != 1 || strings.Contains(stationDisruptionOfHour, freshPerCall) ||
 		strings.Count(relStationDisruption, rulesPerRow("c.source_feed")) != 1 || strings.Contains(stationDisruptionOfHour, rulesPerRow("c.source_feed")) {
 		t.Fatal("the station disruption relation's read of the calls changed")
+	}
+}
+
+// TestNamedIsSealedOnceThePackageLoaded: every statement is built when the
+// package loads; one named later (built per call, so planned on every call)
+// panics.
+func TestNamedIsSealedOnceThePackageLoaded(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("a statement named after the package loaded: no panic")
+		}
+	}()
+	named("api_test_per_call", "select $1::int", "int")
+}
+
+// TestStatementCacheCoversEveryStatement: the default statement cache holds
+// every distinct statement of the store, the named ones and the texts sent
+// as they are, so none is evicted and prepared (and planned) again on the
+// same connection.
+func TestStatementCacheCoversEveryStatement(t *testing.T) {
+	cfg, err := config.Load(config.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := len(namedList())
+	for file, texts := range rawAllowed {
+		if file != "named.go" { // run's own call sends a named statement
+			n += len(texts)
+		}
+	}
+	if n < 100 || cfg.DB.StatementCacheCapacity < n {
+		t.Errorf("db.statement_cache_capacity %d for %d statements", cfg.DB.StatementCacheCapacity, n)
 	}
 }

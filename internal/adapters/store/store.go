@@ -226,9 +226,9 @@ func ReadValue[T any](ctx context.Context, s *Store, fn func(context.Context, pg
 		report(refused, ErrDeadlineExhausted)
 		return zero, ErrDeadlineExhausted
 	}
-	release := func() {}
+	release := func(bool) {}
 	if s.admit != nil {
-		r, err := s.admit.Acquire(ctx)
+		r, err := s.admit.AcquireRead(ctx)
 		if err != nil {
 			report(refused, err)
 			if errors.Is(err, admission.ErrOverloaded) {
@@ -245,7 +245,7 @@ func ReadValue[T any](ctx context.Context, s *Store, fn func(context.Context, pg
 	done, gone := make(chan outcome[T]), make(chan struct{})
 	go func() {
 		o := guarded(ctx, s, fn)
-		release()
+		release(answered(ctx, o.reached, o.err))
 		report(o.reached, o.err)
 		select {
 		case done <- o:
@@ -316,6 +316,24 @@ func verdict(ctx context.Context, reached stage, err error) breaker.Outcome {
 	default:
 		return breaker.Success
 	}
+}
+
+// answered reports whether storage answered a read: its transaction was
+// opened, it ended before its context did, no deadline or statement timeout
+// cut it, and storage did not fail under it. Only such a read's time is a
+// storage time for the admission's wait estimate (RATE-011): a cut read
+// measured its deadline, a failed one the failure.
+func answered(ctx context.Context, reached stage, err error) bool {
+	if reached != opened || ctx.Err() != nil || err == nil {
+		return reached == opened && ctx.Err() == nil
+	}
+	if errors.Is(err, ErrDeadlineExhausted) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return false
+	}
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok && pgErr.Code == "57014" { // query_canceled: a statement timeout
+		return false
+	}
+	return !storageDown(err)
 }
 
 // storageDown reports whether err says storage itself is unavailable rather

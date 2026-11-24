@@ -84,3 +84,18 @@ func TestLineOrder(t *testing.T) {
 		}
 	}
 }
+
+// A delay is in minutes as the platform's Math.round states it: half a
+// minute up, -90 s to -1, never as the contract's truncated or away-from-zero
+// minute.
+func TestDelayMinOfRoundsAsThePlatform(t *testing.T) {
+	req.Covers(t, "FR-TRANSIT-001")
+	if DelayMinOf(nil) != nil {
+		t.Error("no figure was given a minute")
+	}
+	for s, want := range map[int]int{0: 0, 29: 0, 30: 1, 89: 1, 90: 2, 100: 2, 150: 3, -29: 0, -30: 0, -31: -1, -90: -1, -91: -2} {
+		if got := DelayMinOf(&s); *got != want {
+			t.Errorf("%d s: %d, want %d", s, *got, want)
+		}
+	}
+}

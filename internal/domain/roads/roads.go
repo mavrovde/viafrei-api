@@ -229,7 +229,13 @@ type Situation struct {
 	Description *string
 	// TextLanguage is the language of Headline and Description.
 	TextLanguage string
-	UpdatedAt    time.Time
+	// Subtitle is the publisher's second line (on Autobahn GmbH messages
+	// the carriageway's direction), in TextLanguage; nil when not published.
+	Subtitle *string
+	// Blocked is whether the publisher states the carriageway is blocked;
+	// false when it does not say.
+	Blocked   bool
+	UpdatedAt time.Time
 	// AtKm is the situation's position along its road in kilometres, one
 	// decimal, projected onto the road's line; nil where it cannot be
 	// placed on the road.
@@ -556,7 +562,8 @@ type Page struct {
 // changes with the clock alone: a situation or a warning of the scope
 // starting or ending (NextChange), a family read turning stale (the first
 // whole second past its threshold, as Assess counts it), or a family's
-// confirmation lapsing (ampel.LapsesAt). Nil when nothing in it changes
+// confirmation lapsing (ampel.LapsesAt), or a family's Stand turning
+// possibly out of date (Stamp.LapsesAt). Nil when nothing in it changes
 // with the clock; until then, only a new version of a family read, of its
 // confirmation or of the lamp's reference rows changes it.
 func (p Page) ChangesAt(now time.Time) *time.Time {
@@ -574,6 +581,10 @@ func (p Page) ChangesAt(now time.Time) *time.Time {
 	}
 	for _, c := range p.Confirmations {
 		consider(ampel.LapsesAt(&c))
+	}
+	// A source's Stand turning possibly out of date (Stamp.LapsesAt).
+	for _, s := range Stamps(p.Sources, p.Confirmations) {
+		consider(s.LapsesAt())
 	}
 	return out
 }
@@ -681,6 +692,9 @@ type AreaQuery struct {
 	Classes []Class
 	Filter
 	Limit int
+	// Offset is how many situations of the order the page skips (the
+	// cursor of the page before).
+	Offset int
 }
 
 // KnownClasses returns the mapped classes the query keeps, and whether it

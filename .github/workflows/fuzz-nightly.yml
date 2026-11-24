@@ -5,6 +5,12 @@
 # time held to the 2 s deadline plus 50 ms. Neither reaches anything but the
 # code under test and that CI-started instance (TST-010).
 #
+# Every job ends within 15 minutes (owner rule): each native target runs in
+# a job of its own, from the matrix scripts/fuzz.sh --matrix derives from the
+# inventory (so a new target gets its job without an edit here), and a
+# gather job assembles the one report and fails when a target's job failed
+# or left no report. A budget above 12m per target is refused up front.
+#
 # The report names, per target, the executions, the new corpus entries and
 # the crashes; a target that ran zero executions fails. Crash reproducers
 # and the new corpus entries are uploaded in the package layout, ready to be
@@ -19,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       budget:
-        description: Fuzzing time per target (a Go duration)
+        description: Fuzzing time per target (a Go duration, at most 12m)
         default: 10m
 
 permissions:
@@ -33,10 +39,33 @@ env:
   GOTOOLCHAIN: local
 
 jobs:
-  native:
-    name: Native fuzz targets (nightly budget)
+  plan:
+    name: One job per fuzz target
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 5
+    outputs:
+      targets: ${{ steps.matrix.outputs.targets }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: matrix
+        env:
+          BUDGET: ${{ inputs.budget || '10m' }}
+        run: scripts/fuzz.sh --matrix "$BUDGET" >> "$GITHUB_OUTPUT"
+
+  native:
+    name: Fuzz ${{ matrix.target }} (nightly budget)
+    needs: plan
+    runs-on: ubuntu-24.04
+    # Evidence (run of 2026-11-22, one job): a target took its 10 min budget
+    # plus 1 to 20 s of build; the job's setup 13 s. One target per job is
+    # about 11 min.
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.targets) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -44,29 +73,60 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
-      - name: Every fuzz target
+      - name: The job's fuzz target
         env:
           BUDGET: ${{ inputs.budget || '10m' }}
+          FUZZ_TARGETS: ${{ matrix.target }}
           FUZZ_CORPUS_OUT: fuzz-corpus
-        run: scripts/fuzz.sh "$BUDGET" fuzz-report.md
-      - name: Report in the job summary
+          NAME: ${{ matrix.name }}
+        run: scripts/fuzz.sh "$BUDGET" "fuzz-report-$NAME.md"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
-        run: cat fuzz-report.md >> "$GITHUB_STEP_SUMMARY"
+        with:
+          name: fuzz-shard-${{ matrix.name }}
+          path: |
+            fuzz-report-${{ matrix.name }}.md
+            fuzz-crashers
+            fuzz-corpus
+          retention-days: 7
+          if-no-files-found: warn
+
+  gather:
+    name: Every fuzz target, one report
+    needs: [plan, native]
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: fuzz-shard-*
+          path: fuzz-nightly
+          merge-multiple: true
+      - name: One report over every target
+        env:
+          BUDGET: ${{ inputs.budget || '10m' }}
+          SHARDS: ${{ needs.native.result }}
+        run: scripts/fuzz.sh --gather fuzz-nightly "$BUDGET" fuzz-nightly/fuzz-report.md && { [[ $SHARDS == success ]] || { echo "FAIL, a fuzz job ended $SHARDS" >&2; exit 1; }; }
+      - name: Report in the job summary
+        if: always() && hashFiles('fuzz-nightly/fuzz-report.md') != ''
+        run: cat fuzz-nightly/fuzz-report.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: fuzz-nightly
-          path: |
-            fuzz-report.md
-            fuzz-crashers
-            fuzz-corpus
+          path: fuzz-nightly
           retention-days: 30
           if-no-files-found: error
 
   schema:
     name: Schema-driven fuzzing (Schemathesis, nightly budget)
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    # Evidence: 4.4 and 8.8 min in the runs of 2026-11-15 and 2026-11-22.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

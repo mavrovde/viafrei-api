@@ -91,7 +91,10 @@
         "matched": 1,
         "droppedClosed": 0,
         "droppedUnknown": 0,
-        "droppedNotWholeDay": 0
+        "droppedNotWholeDay": 0,
+        "areaCoverage": "held",
+        "stationsInRadius": 1,
+        "stationsWithoutCurrentPrice": 0
       }
     },
     "links": {

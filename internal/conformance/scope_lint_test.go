@@ -292,12 +292,18 @@ func scanPublicNames(path string, names []string, columns map[string]bool) []sco
 }
 
 // applyAllow drops the findings an allow entry covers and marks the entry used.
+// A denylist entry whose word is "-" covers every denylist finding of the
+// one file it names (a denylist finding prints no word): each file of the
+// store that reads the platform's tables directly (owner decision
+// 2026-11-23), and of its test seed, whose table and column names are the
+// platform's. A file of its own, never a directory, so a new file is linted.
 func applyAllow(findings []scopeFinding, allow []*allowEntry) []scopeFinding {
 	var out []scopeFinding
 next:
 	for _, f := range findings {
 		for _, a := range allow {
-			if a.rule == f.rule && a.path == f.path && strings.EqualFold(a.token, f.token) {
+			whole := a.rule == "denylist" && a.token == "-"
+			if a.rule == f.rule && a.path == f.path && (whole || strings.EqualFold(a.token, f.token)) {
 				a.used = true
 				continue next
 			}
@@ -451,6 +457,18 @@ func TestScopeLintCanSayNo(t *testing.T) {
 	}
 	if rest := applyAllow(cols, allow); len(rest) != 2 || !allow[0].used || allow[1].used {
 		t.Fatalf("allow: rest %v, used %v %v", rest, allow[0].used, allow[1].used)
+	}
+
+	// A denylist entry of word "-" covers the storage names of the one file
+	// it names, and no other rule's, and no other file: a directory is no
+	// path of a file, so it covers nothing.
+	stored := []scopeFinding{{rule: "denylist", path: "a/b/x.go", line: 1, length: 9}, {rule: "denylist", path: "a/bc.go", line: 1, length: 9}, {rule: "vocabulary", path: "a/b/x.go", token: "never"}}
+	file, err := parseAllow([]byte("denylist\ta/b/x.go\t-\treason\ndenylist\ta/\t-\treason\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rest := applyAllow(stored, file); len(rest) != 2 || rest[0].path != "a/bc.go" || rest[1].rule != "vocabulary" || !file[0].used || file[1].used {
+		t.Fatalf("file allow: rest %v, used %v %v", rest, file[0].used, file[1].used)
 	}
 }
 

@@ -4,6 +4,7 @@ package store_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -616,6 +617,31 @@ where withdrawn_at is null and source_ref in (`+in+`) and `+where, &out)
 	amen.Amenities = []string{"toilet"}
 	if got, w := ids(amen), want(`amenities @> '{toilet}'`); len(got) != len(w) {
 		t.Errorf("amenity toilet: %v, want %v", got, w)
+	}
+	// Each site carries what its publisher states, both ways.
+	stated, _, _, err := st.ParkingNear(bounded(t), amen, listed, listed, time.Now())
+	if err != nil || len(stated) == 0 {
+		t.Fatalf("stated %v %v", stated, err)
+	}
+	// The stored amenities of every stated site, read in one statement (a
+	// connection a site was most of the test's time).
+	statedIDs := make([]string, len(stated))
+	for i, s := range stated {
+		statedIDs[i] = s.ID
+	}
+	var storedJSON string
+	// The array literal is safe only because the seed fixes facility ids as <family>:<bigint> (base_seed.sql:485).
+	owner(t, `select coalesce(jsonb_object_agg(facility_id, jsonb_build_array(coalesce(amenities, '{}'), coalesce(amenities_absent, '{}'))), '{}')::text
+from contract.parking_facility where facility_id = any('{`+strings.Join(statedIDs, ",")+`}'::text[])`, &storedJSON)
+	stored := map[string][2][]string{}
+	if err := json.Unmarshal([]byte(storedJSON), &stored); err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range stated {
+		has, lacks := stored[s.ID][0], stored[s.ID][1]
+		if w := parking.StatedOf(has, lacks); !slices.Contains(s.Amenities.Present, "toilet") || !slices.Equal(s.Amenities.Present, w.Present) || !slices.Equal(s.Amenities.Absent, w.Absent) {
+			t.Errorf("%s states %+v, stored %v / %v", s.ID, s.Amenities, has, lacks)
+		}
 	}
 	var road string
 	owner(t, `select coalesce(min(road_ref), 'A1') from contract.parking_facility where road_ref is not null and facility_id like 'p:%'`, &road)

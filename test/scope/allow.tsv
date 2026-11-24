@@ -1,6 +1,8 @@
 # Reasoned exceptions to the scope lint. One line per exception:
 # rule (vocabulary, denylist or column), the path, the matched word, the reason.
 # An entry that matches no finding fails the lint, so none outlives its cause.
+# A denylist entry whose word is "-" covers the denylist findings of the one
+# file it names; a directory is never named.
 column	api/openapi.json	contractVersion	the version of the read contract itself is public by design (FR-SVC-003); the contract is the published interface, not storage
 column	api/openapi.json	licenceUrl	member name of the attribution object fixed by Spec: Data Licensing and Attribution, section 2; the licence vocabulary, not a storage name
 column	api/openapi.json	shareAlike	member name of the attribution object fixed by Spec: Data Licensing and Attribution, section 2; the licence vocabulary, not a storage name
@@ -51,3 +53,69 @@ column	api/openapi.json	evaNumbers	member name of a station, every railway stati
 vocabulary	live-ingestor.pin	ingest	the live refresher's published image name, which the pin must name exactly; a product name of another repository, not the API's vocabulary
 vocabulary	internal/release/livepin/livepin.go	ingest	the live pin's file name and the live refresher's published image name, written once as constants; a product name of another repository, not the API's vocabulary
 vocabulary	docs/RELEASING.md	ingest	the live pin's file name in the release checklist (make live-e2e); a product name of another repository, not the API's vocabulary
+column	api/openapi.json	stopIds	member name of a board station, the stops the departure board reads (the station, then its stop points) exactly as the platform board states stop.stopIds (FR-TRANSIT-002); the board vocabulary, not the alert view storage name
+denylist	internal/adapters/store/address.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/bays.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/catalogue.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/coverage.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/features.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/feeding.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/freshness.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/fuel.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/hydrogen.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/location.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/location_c_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/locked.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/lookup.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/lorry.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/named_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/national.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/nearby.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/parity_b2_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/parity_b_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/parity_c_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/parity_events_c_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/parity_named_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/places.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/poi.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/relations.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/roads.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/roadshape.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/sharing.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/speed.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/state.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/store_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/transit.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/transit_bound_c_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/weather.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/weather_cell.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/testkit/baseseed/base_seed.sql	-	the test seed writes the platform's tables the store reads
+vocabulary	internal/adapters/store/features.go	feed	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/freshness.go	feed	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/lookup.go	feed	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/lookup.go	feeds	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/lookup.go	gtfs	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/named_test.go	datex	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/named_test.go	gtfs	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/national.go	datex	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/national.go	feed	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/parity_named_integration_test.go	feeds	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/places.go	feeds	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/places.go	gtfs	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/register.go	feed	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/relations.go	datex	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/relations.go	feed	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/relations.go	feeds	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/relations.go	gtfs	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/relations.go	siri	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/roads.go	datex	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/sharing.go	feed	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/transit.go	feed	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/transit.go	feeds	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/transit.go	gtfs	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/testkit/baseseed/base_seed.sql	datex	the platform's table and column names the test seed writes carry this word
+vocabulary	internal/testkit/baseseed/base_seed.sql	feed	the platform's table and column names the test seed writes carry this word
+vocabulary	internal/testkit/baseseed/base_seed.sql	feeds	the platform's table and column names the test seed writes carry this word
+vocabulary	internal/testkit/baseseed/base_seed.sql	gtfs	the platform's table and column names the test seed writes carry this word
+vocabulary	internal/testkit/baseseed/base_seed.sql	ingest	the platform's table and column names the test seed writes carry this word
+vocabulary	internal/testkit/baseseed/base_seed.sql	siri	the platform's table and column names the test seed writes carry this word

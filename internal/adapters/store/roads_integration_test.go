@@ -316,6 +316,11 @@ where e.withdrawn_at is null and e.source_ref in (`+quoted(fams)+`) and e.locati
 	if near, err := st.SituationsNear(bounded(t), roads.AreaQuery{At: at, RadiusM: wide, Filter: q.Filter, Limit: 1}, onRoads(fams), now); err != nil || sum(near.Counts) != want {
 		t.Errorf("an area page of one counts %v, want %d in all: %v", near.Counts, want, err)
 	}
+	// A page past an offset goes on where the page before ended.
+	if next, err := st.SituationsNear(bounded(t), roads.AreaQuery{At: at, RadiusM: wide, Filter: q.Filter, Limit: 1, Offset: 1}, onRoads(fams), now); err != nil ||
+		len(next.Items) != 1 || next.Items[0].ID != sits[1].ID || next.HasMore != (want > 2) {
+		t.Errorf("the second page of one: %+v, want %s: %v", next.Items, sits[1].ID, err)
+	}
 	if np.Placed != nil {
 		t.Errorf("an area that is no Land credits no placement: %v", np.Placed)
 	}
@@ -323,9 +328,15 @@ where e.withdrawn_at is null and e.source_ref in (`+quoted(fams)+`) and e.locati
 	var land string
 	owner(t, `select state_code from contract.traffic_event e where e.withdrawn_at is null and e.state_code is not null
   and e.source_ref in (`+quoted(fams)+`) order by state_code limit 1`, &land)
-	if lp, err := st.SituationsNear(bounded(t), roads.AreaQuery{State: land, Filter: q.Filter, Limit: 100}, onRoads(fams), now); err != nil ||
-		!slices.Equal(lp.Placed, []string{"bkg_gvisys"}) {
+	lp, err := st.SituationsNear(bounded(t), roads.AreaQuery{State: land, Filter: q.Filter, Limit: 100}, onRoads(fams), now)
+	if err != nil || !slices.Equal(lp.Placed, []string{"bkg_gvisys"}) {
 		t.Errorf("Land %s placed by %v: %v", land, lp.Placed, err)
+	}
+	if len(lp.Items) > 1 {
+		if next, err := st.SituationsNear(bounded(t), roads.AreaQuery{State: land, Filter: q.Filter, Limit: 1, Offset: 1}, onRoads(fams), now); err != nil ||
+			len(next.Items) != 1 || next.Items[0].ID != lp.Items[1].ID {
+			t.Errorf("Land %s, the second page of one: %+v, want %s: %v", land, next.Items, lp.Items[1].ID, err)
+		}
 	}
 	found := false
 	for i, s := range sits {
@@ -409,7 +420,7 @@ func TestTheLampReadsTheScopeNotTheFilters(t *testing.T) {
 	})
 	var n int
 	owner(t, `with ins as (
-  insert into contract.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from, headline, source_ref,
+  insert into vf_seed.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from, headline, source_ref,
     origin_key, published_at, recorded_at, changed_at)
   select '`+fixtures.PlantedEvent("")+`' || v.id, v.kind, v.ref, 'motorway', e.location, '2102-01-01T00:00:00Z', v.headline, e.source_ref,
     v.id, '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z'
@@ -543,7 +554,7 @@ func TestAReadIsOneSnapshot(t *testing.T) {
 			return err
 		}
 		defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
-		if _, err := conn.Exec(ctx, `insert into contract.rule_topic (topic_code, title, title_en, reviewed_on) values ('snapshot_probe', 'Probe', 'Probe', '2026-01-01')`); err != nil {
+		if _, err := conn.Exec(ctx, `insert into vf_seed.rule_topic (topic_code, title, title_en, reviewed_on) values ('snapshot_probe', 'Probe', 'Probe', '2026-01-01')`); err != nil {
 			return err
 		}
 		return tx.QueryRow(ctx, "select count(*) from contract.rule_topic").Scan(&after)
@@ -579,7 +590,7 @@ func TestTheLampReadsItsRecordsAndItsSight(t *testing.T) {
 	change(t, `update contract.junction set state_code = case when road_ref <> 'A101' then '97'
   when right(junction_id, 1) in ('0', '2', '4', '6', '8') then '98' else '99' end`)
 	var n int
-	owner(t, `with ins as (insert into contract.message_coverage (state_code, source_ref, coverage_role, current_only)
+	owner(t, `with ins as (insert into vf_seed.message_coverage (state_code, source_ref, coverage_role, current_only)
 values ('98', '`+fams[0]+`', 'own', true), ('98', '`+fams[1]+`', 'carried', false), ('98', '`+weather[0]+`', 'carried', false)
 returning 1) select count(*) from ins`, &n)
 	t.Cleanup(func() { change(t, `delete from contract.message_coverage where state_code = '98'`) })
@@ -598,24 +609,25 @@ returning 1) select count(*) from ins`, &n)
 	}
 	message := fixtures.PlantedEvent("ev-lamp-message")
 	t.Cleanup(func() {
-		change(t, `delete from contract.traffic_event where event_id in ('autobahn:ev-lamp-operator', $1)`, message)
+		change(t, `delete from contract.traffic_event where event_id in ('autobahn:ev-lamp-operator', 'autobahn:ev-lamp-later', $1)`, message)
 	})
 	owner(t, `with ins as (
-  insert into contract.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from,
+  insert into vf_seed.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from,
     headline, description, source_ref, origin_key, published_at, recorded_at, changed_at, subtitle, is_blocked, traffic_type, delay_s)
   select v.id, v.kind, 'A101', 'motorway', e.location, '2102-01-01T00:00:00Z',
     v.headline, v.description, coalesce(v.family, e.source_ref), v.origin,
     case when v.family is null then '2102-01-01T00:00:00Z'::timestamptz end, '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z',
     v.subtitle, v.blocked, v.traffic, v.delay_s
   from contract.traffic_event e,
-    (values ('autobahn:ev-lamp-operator', 'jam', 'Stau', E'Zeile 1\nZeile 2', 'autobahn', 'ev-lamp-operator', 'AS Nord', true, 'stationary', 1800),
+    (values ('autobahn:ev-lamp-operator', 'jam', 'Stau', E'Zeile 1\nZeile 2', 'autobahn', 'ev-lamp-operator', 'AS Nord', true, 'stationary', 1650),
+            ('autobahn:ev-lamp-later', 'jam', 'Zzz', null, 'autobahn', 'ev-lamp-later', null, false, 'stationary', 1670),
             ('`+message+`', 'roadworks', 'MaintenanceWorks', null, null, 'ev-lamp-message', null, null, null, null))
     v(id, kind, headline, description, family, origin, subtitle, blocked, traffic, delay_s)
   where e.event_id = '`+fixtures.PlantedEvent("ev-u-kind")+`'
   returning 1)
 select count(*) from ins`, &n)
-	if n != 2 {
-		t.Fatalf("planted %d of 2", n)
+	if n != 3 {
+		t.Fatalf("planted %d of 3", n)
 	}
 	// The operator event is the Autobahn family's.
 	asked := roads.Families{Roads: slices.Clone(fams), Weather: weather}
@@ -630,8 +642,10 @@ where source_ref = any('{`+strings.Join(append(slices.Clone(asked.Roads), weathe
 	if err != nil {
 		t.Fatal(err)
 	}
-	lines, delayS, sub, traffic := "Zeile 1\nZeile 2", 1800, "AS Nord", "stationary"
-	mins := 30
+	// 1650 s is 28 minutes as the platform rounds it (the contract's
+	// delay_min truncates it to 27).
+	lines, delayS, sub, traffic := "Zeile 1\nZeile 2", 1650, "AS Nord", "stationary"
+	mins := 28
 	for _, want := range []roads.Message{
 		{Record: roads.RecordOperatorEvent, Kind: roads.KindJam, Headline: "Stau", Subtitle: &sub, Description: &lines, Blocked: true, TrafficType: &traffic, DelayS: &delayS, DelayMin: &mins},
 		{Record: roads.RecordTrafficMessage, Kind: roads.KindRoadworks, Headline: "MaintenanceWorks"},
@@ -639,6 +653,13 @@ where source_ref = any('{`+strings.Join(append(slices.Clone(asked.Roads), weathe
 		if !slices.ContainsFunc(p.Messages, func(m roads.Message) bool { return reflect.DeepEqual(m, want) }) {
 			t.Errorf("the record %s is not read as written: %+v", want.Headline, p.Messages)
 		}
+	}
+	// Two jams of one minute go by their seconds, as the platform orders
+	// them (delay_s desc), not by the minute and then the headline.
+	op := slices.IndexFunc(p.Items, func(s roads.Situation) bool { return s.ID == "autobahn:ev-lamp-operator" })
+	later := slices.IndexFunc(p.Items, func(s roads.Situation) bool { return s.ID == "autobahn:ev-lamp-later" })
+	if op < 0 || later < 0 || later > op || *p.Items[op].DelayMin != 28 || *p.Items[later].DelayMin != 28 {
+		t.Errorf("the jams at %d and %d: %+v", op, later, p.Items)
 	}
 	if !slices.Equal(p.States, []string{"98", "99"}) {
 		t.Errorf("the corridor's states %v", p.States)
@@ -699,7 +720,7 @@ func TestTheLampReadsWhenItsScopeNextChanges(t *testing.T) {
 		change(t, `delete from contract.traffic_event where event_id like $1`, fixtures.PlantedEvent("ev-next-%"))
 	})
 	owner(t, `with ins as (
-  insert into contract.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from, valid_to,
+  insert into vf_seed.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from, valid_to,
     headline, source_ref, origin_key, published_at, recorded_at, changed_at, withdrawn_at)
   select '`+fixtures.PlantedEvent("")+`' || v.id, 'jam', 'A101', 'motorway', e.location, v.since::timestamptz, v.until::timestamptz,
     v.headline, e.source_ref, v.id, '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z', v.withdrawn::timestamptz
@@ -786,7 +807,7 @@ func TestAnUnregisteredRoadIsReadByItsReference(t *testing.T) {
 	// road no other test asks for, in 2102; a second run plants it once.
 	var family string
 	owner(t, `select source_ref from contract.traffic_event where event_id = '`+fixtures.PlantedEvent("ev-u-kind")+`'`, &family)
-	change(t, `insert into contract.traffic_event (event_id, event_kind, road_ref, road_class, valid_from, headline, source_ref,
+	change(t, `insert into vf_seed.traffic_event (event_id, event_kind, road_ref, road_class, valid_from, headline, source_ref,
     origin_key, published_at, recorded_at, changed_at)
   select $1, 'other', 'L 1025', 'state', '2102-01-01T00:00:00Z', 'Baustelle', $2,
     'ev-land-l', '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z'
@@ -834,7 +855,7 @@ from contract.weather_warning w, contract.junction j
 where w.warning_id = 'dwd:900001' and j.road_ref = 'A101' order by j.junction_id limit 1`, &region, &family, &lat, &lon)
 	var n int
 	owner(t, `with ins as (
-  insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
+  insert into vf_seed.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
     valid_from, valid_to, published_at, region_code, source_ref, recorded_at, withdrawn_at, area)
   select v.id, 'fog', v.level, 'Stufe', 'actual', 'Deutscher Wetterdienst', 'Nebel', 'de',
     '2104-01-01T00:00:00Z', '2104-01-02T00:00:00Z', null, '`+region+`', '`+family+`', '2104-01-01T00:00:00Z', null,
@@ -891,7 +912,7 @@ where w.warning_id = 'dwd:900001' and j.road_ref = 'A101' order by j.junction_id
 	}
 	var n int
 	owner(t, `with ins as (
-  insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
+  insert into vf_seed.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
     valid_from, valid_to, published_at, region_code, source_ref, recorded_at, withdrawn_at, area, warn_cell_id)
   select v.id, 'fog', v.level, 'Stufe', 'actual', 'Deutscher Wetterdienst', 'Nebel', 'de',
     '2104-01-01T00:00:00Z', '2104-01-02T00:00:00Z', null, null, '`+family+`', '2104-01-01T00:00:00Z', null,
@@ -959,4 +980,28 @@ func sum(counts map[string]int) int {
 		n += c
 	}
 	return n
+}
+
+// A situation states the publisher's second line and whether the
+// carriageway is blocked; a blocked flag not published is false. Both are
+// Autobahn GmbH facts in the read contract.
+func TestASituationStatesItsSubtitleAndBlock(t *testing.T) {
+	req.Covers(t, "FR-ROAD-002")
+	said, unsaid := "autobahn:ev-said", "autobahn:ev-unsaid"
+	st, _ := private(t, `insert into vf_seed.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from,
+    headline, source_ref, origin_key, recorded_at, changed_at, subtitle, is_blocked)
+  select v.id, 'jam', 'A101', 'motorway', e.location, '2102-01-01T00:00:00Z',
+    'Stau', 'autobahn', v.origin, '2102-01-01T00:00:00Z', '2102-01-01T00:00:00Z', v.subtitle, v.blocked
+  from contract.traffic_event e,
+    (values ('`+said+`', 'ev-said', 'Richtung Nord', true), ('`+unsaid+`', 'ev-unsaid', null, null)) v(id, origin, subtitle, blocked)
+  where e.event_id = '`+fixtures.PlantedEvent("ev-u-kind")+`'`)
+	fams := append(families(t, st, "roads"), "autobahn")
+	s, err := st.Situation(bounded(t), said, fams, time.Time{})
+	if err != nil || s.Subtitle == nil || *s.Subtitle != "Richtung Nord" || !s.Blocked {
+		t.Fatalf("published: %+v, %v", s, err)
+	}
+	s, err = st.Situation(bounded(t), unsaid, fams, time.Time{})
+	if err != nil || s.Subtitle != nil || s.Blocked {
+		t.Fatalf("not published: %+v, %v", s, err)
+	}
 }

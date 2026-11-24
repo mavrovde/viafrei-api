@@ -101,6 +101,20 @@
           "situations": 8
         }
       ],
+      "sourceStamps": [
+        {
+          "family": "dwd_eta",
+          "lastCheckedAt": "2026-03-29T23:57:30Z",
+          "unchangedSince": "2026-03-29T23:57:30Z",
+          "possiblyStale": false
+        },
+        {
+          "family": "roads_alpha",
+          "lastCheckedAt": "2026-03-29T23:57:30Z",
+          "unchangedSince": "2026-03-29T23:57:30Z",
+          "possiblyStale": false
+        }
+      ],
       "coverage": null,
       "situations": [
         {
@@ -127,6 +141,8 @@
           "headline": "GeneralObstruction",
           "description": null,
           "textLanguage": "de",
+          "subtitle": null,
+          "blocked": false,
           "updatedAt": "2026-03-29T23:57:30Z",
           "updatedAtLocal": "2026-03-30T01:57:30+02:00",
           "position": null,
@@ -156,6 +172,8 @@
           "headline": "GeneralObstruction",
           "description": null,
           "textLanguage": "de",
+          "subtitle": null,
+          "blocked": false,
           "updatedAt": "2026-03-29T23:57:30Z",
           "updatedAtLocal": "2026-03-30T01:57:30+02:00",
           "position": null,

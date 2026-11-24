@@ -182,7 +182,17 @@ type Exclusion struct {
 // in a case of operation asking request.
 func (r Rules) Excludes(operation, request, name string) bool {
 	for _, e := range r.Excluded {
-		if exclusionPattern(e.Pattern).MatchString(name) && (e.Asked == "" || Asks(request, e.Asked)) && (e.Operation == "" || e.Operation == operation) {
+		// The operation and the pattern's literal start are compared first:
+		// Excludes is asked for every fact against every exclusion, and the
+		// pattern alone made loading the pinned bundle take 2 s under -race
+		// (TST-012). The start before a [*] is a part every match begins with.
+		if e.Operation != "" && e.Operation != operation {
+			continue
+		}
+		if start, _, _ := strings.Cut(e.Pattern, "[*]"); !strings.HasPrefix(name, start) {
+			continue
+		}
+		if exclusionPattern(e.Pattern).MatchString(name) && (e.Asked == "" || Asks(request, e.Asked)) {
 			return true
 		}
 	}
@@ -217,6 +227,17 @@ func exclusionPattern(p string) *regexp.Regexp {
 	re, _ := exclusionPatterns.LoadOrStore(p, regexp.MustCompile(`^`+q+`(?:$|[.\[])`))
 	return re.(*regexp.Regexp)
 }
+
+// unprojectedReason is why a member the 0.5.0 parity units added is not
+// compared yet: the MCP tool states it, but the pinned bundles predate it
+// and the platform's producer does not project it. The exclusion goes when
+// the producer states it and a bundle answered with it is pinned; Parse
+// refuses that bundle until then, so the removal cannot be missed.
+const unprojectedReason = "a 0.5.0 parity member the MCP tool states and the pinned bundles predate: the platform's producer does not project it yet"
+
+// roadsCursorReason is why a road conditions page's cursor is not compared:
+// the platform's road status lists every message at once and has no cursor.
+const roadsCursorReason = "API-only: the platform's road status lists every message at once and has no cursor"
 
 // Default is the projection rule set of this format.
 var Default = Rules{
@@ -326,6 +347,24 @@ var Default = Rules{
 		{"meta.attribution[*].shareAlikeOffer", "", "", attributionReason},
 		{"meta.attribution[*].termsUrl", "", "", attributionReason},
 		{"meta.attribution[*].text", "", "", attributionReason},
+		{"data.sourceStamps", "", "getMotorwayConditions", unprojectedReason},
+		{"data.sourceStamps", "", "listRoadConditions", unprojectedReason},
+		{"data.sourceStamps", "", "listStateRoadConditions", unprojectedReason},
+		{"data.rules[*].basisNote", "", "getDrivingRules", unprojectedReason},
+		{"data[*].amenities", "", "listParkingOptions", unprojectedReason},
+		{"data[*].amenities", "", "listMotorwayParking", unprojectedReason},
+		{"data.parking.sites[*].amenities", "", "getPlaceOverview", unprojectedReason},
+		{"data[*].ags", "", "listPlaces", unprojectedReason},
+		{"data[*].nameEn", "", "listPlaces", unprojectedReason},
+		{"data.station.stopIds", "", "listStationDepartures", unprojectedReason},
+		{"data.situations[*].subtitle", "", "getMotorwayConditions", unprojectedReason},
+		{"data.situations[*].subtitle", "", "listRoadConditions", unprojectedReason},
+		{"data.situations[*].subtitle", "", "listStateRoadConditions", unprojectedReason},
+		{"data.situations[*].blocked", "", "getMotorwayConditions", unprojectedReason},
+		{"data.situations[*].blocked", "", "listRoadConditions", unprojectedReason},
+		{"data.situations[*].blocked", "", "listStateRoadConditions", unprojectedReason},
+		{"meta.page.nextCursor", "", "listRoadConditions", roadsCursorReason},
+		{"meta.page.nextCursor", "", "listStateRoadConditions", roadsCursorReason},
 	},
 	// The fixture's condition and purpose notes are synthetic register texts
 	// and the platform states its own register's (attributionReason): which

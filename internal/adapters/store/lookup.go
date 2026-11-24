@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -29,42 +28,55 @@ const (
 	AnchorMatchM = 15
 )
 
-// motorwayAnchor reads the BASt LCL location code (the last part of the
-// junction id, country:table:code) of the motorway point of the LCL nearest
-// the position ($1 lon, $2 lat) within $3 m, a tie broken by id: the public id
-// a motorway page's anchor is stored as (lead ruling 2026-11-17).
-var motorwayAnchor = `select split_part(j.junction_id, ':', 3) from contract.junction j
-where j.source_ref = 'bast_lcl' and j.location is not null and ` + permitted("j") + `
-  and split_part(j.junction_id, ':', 3) ~ '^[0-9]{1,6}$'
-  and st_dwithin(j.location::geography, st_setsrid(st_makepoint($1, $2), 4326)::geography, $3)
-order by j.location::geography <-> st_setsrid(st_makepoint($1, $2), 4326)::geography, j.junction_id
-limit 1`
+// motorwayAnchor reads the BASt LCL location code of the motorway point of
+// the LCL nearest the position ($1 lon, $2 lat) within $3 m, a tie broken by
+// the junction id (country:table:code): the public id a motorway page's
+// anchor is stored as (lead ruling 2026-11-17). The points are the LCL's
+// German motorway points with a name, read through their geography GiST.
+var motorwayAnchor = named("api_lookup_anchor", `
+select t.lcd::text from tmc_locations t
+where t.cid = 58 and t.tabcd = 1 and t.tcd = 1 and t.road_number ~ '^A[1-9][0-9]{0,2}$'
+  and t.geom is not null and t.name is not null and t.lcd::text ~ '^[0-9]{1,6}$'
+  and st_dwithin(t.geom::geometry(Point,4326)::geography, `+atPosition+`, (select $3::float8))
+order by t.geom::geometry(Point,4326)::geography <-> `+atPosition+`, t.cid || ':' || t.tabcd || ':' || t.lcd
+limit 1`, "float8", "float8", "float8")
 
 // stationEVA reads the EVA number of the railway station whose folded name
-// is $1, else the shortest whose folded name starts with it.
-var stationEVA = `select s.eva_no from contract.stop_place s
-where s.withdrawn_at is null and s.eva_no is not null
-  and ` + permitted("s") + `
-  and s.search_fold like $1::text || '%'
-order by s.search_fold = $1::text desc, length(s.name), s.name, s.stop_place_id
-limit 1`
+// is $1, else the shortest whose folded name starts with it: a stop place
+// (a station, or a stop with no parent) of a live feed, its EVA number that
+// of the open DB station with its IFOPT, DB StaDa's first.
+var stationEVA = named("api_lookup_eva", `
+select d.eva_no from stops s
+join feeds f on f.gtfs_feed_key = s.gtfs_feed_key
+cross join lateral (
+  select x.eva_no from db_stations x where x.ifopt = s.id and x.closed_at is null
+  order by (x.source_id = 'db_stada') desc, x.station_no limit 1) d
+where s.deleted_at is null and s.geom is not null and s.name is not null
+  and (s.location_type = 1 or (coalesce(s.location_type::int, 0) = 0 and s.parent_id is null))
+  and contract_search_fold(s.name) like (select $1::text) || '%'
+  and d.eva_no is not null
+order by contract_search_fold(s.name) = (select $1::text) desc, length(s.name), s.name, s.gtfs_feed_key || ':' || s.id
+limit 1`, "text")
 
 // gemeindeAGS reads the AGS of the Gemeinde of the position ($1 lon, $2
-// lat): the nearest BKG municipality point with its eight-digit key within
-// the municipality reach ($3 m), a distance tie broken by key, as the
+// lat): the nearest open BKG municipality point with its eight-digit key
+// within the municipality reach ($3 m), a distance tie broken by key, as the
 // platform names a position's Gemeinde.
-var gemeindeAGS = `select p.official_key from contract.place p
-where p.source_ref = 'bkg_gvisys' and p.place_kind = 'municipality' and p.withdrawn_at is null
-  and p.official_key ~ '^[0-9]{8}$' and ` + permitted("p") + `
-  and st_dwithin(p.location::geography, st_setsrid(st_makepoint($1, $2), 4326)::geography, $3)
-order by p.location::geography <-> st_setsrid(st_makepoint($1, $2), 4326)::geography, p.official_key
-limit 1`
+var gemeindeAGS = named("api_lookup_ags", `
+select g.admin_code from gazetteer_places g
+cross join lateral (select st_pointonsurface(g.geom::geometry)::geometry(Point,4326) p) l
+where g.source_id = 'bkg_gvisys' and g.kind = 'city' and g.closed_at is null and g.geom is not null
+  and g.admin_code ~ '^[0-9]{8}$'
+  and st_dwithin(g.geom, `+atPosition+`, (select $3::float8))
+  and st_dwithin(l.p::geography, `+atPosition+`, (select $3::float8))
+order by l.p::geography <-> `+atPosition+`, g.admin_code
+limit 1`, "float8", "float8", "float8")
 
 // Lookup resolves value by the named lookup (refresh.Lookup); "" when
 // nothing answers.
 func (s *Store) Lookup(ctx context.Context, name, value string) (string, error) {
 	var (
-		sql  string
+		stmt stmt
 		args []any
 	)
 	switch name {
@@ -73,29 +85,29 @@ func (s *Store) Lookup(ctx context.Context, name, value string) (string, error) 
 		if folded == "" {
 			return "", nil
 		}
-		sql, args = stationEVA, []any{folded}
+		stmt, args = stationEVA, []any{folded}
 	case LookupAGS:
 		lat, lon, ok := position(value)
 		if !ok {
 			return "", nil
 		}
-		sql, args = gemeindeAGS, []any{lon, lat, places.MunicipalityReachM}
+		stmt, args = gemeindeAGS, []any{lon, lat, places.MunicipalityReachM}
 	case LookupAnchor:
 		lat, lon, ok := position(value)
 		if !ok {
 			return "", nil
 		}
-		sql, args = motorwayAnchor, []any{lon, lat, AnchorMatchM}
+		stmt, args = motorwayAnchor, []any{lon, lat, AnchorMatchM}
 	default:
 		return "", fmt.Errorf("store: no lookup %q", name)
 	}
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (string, error) {
-		var got string
-		err := tx.QueryRow(ctx, sql, args...).Scan(&got)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", nil
+		rows, _ := run(ctx, tx, stmt, args...)
+		got, err := pgx.CollectRows(rows, pgx.RowTo[string])
+		if err != nil || len(got) == 0 {
+			return "", err
 		}
-		return got, err
+		return got[0], nil
 	})
 }
 

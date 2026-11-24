@@ -247,7 +247,7 @@ func TestAWarningWithNoAreaAnswersNoPosition(t *testing.T) {
 	at, region, _ := plantedAt(t)
 	var n int
 	owner(t, `with ins as (
-  insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
+  insert into vf_seed.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
     valid_from, valid_to, published_at, region_code, source_ref, recorded_at, withdrawn_at)
   select v.id, 'ice', 3, 'Stufe 3', 'issued', 'Synthetischer Wetterdienst', 'Glätte', 'de',
     '2103-01-01T00:00:00Z', '2103-01-02T00:00:00Z', null, v.region, w.source_ref, '2103-01-01T00:00:00Z', null
@@ -284,7 +284,7 @@ func TestWarningsAtRefuseALevelOutsideTheScaleByID(t *testing.T) {
 	from := time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC)
 	owner(t, `select region_code, st_y(st_centroid(boundary)), st_x(st_centroid(boundary)) from contract.admin_region
 where region_code = (select region_code from contract.weather_warning where warning_id = 'dwd:900001')`, &region, &at.Lat, &at.Lon)
-	owner(t, `insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
+	owner(t, `insert into vf_seed.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
   valid_from, valid_to, published_at, region_code, source_ref, recorded_at, withdrawn_at)
 select 'ww-level-7', 'ice', 7, 'Stufe 7', 'issued', 'Synthetischer Wetterdienst', 'Glätte', 'de',
   '2100-01-01T00:00:00Z', null, null, '`+region+`', source_ref, '2100-01-01T00:00:00Z', null
@@ -325,7 +325,7 @@ func TestWarningsAtStopAtTheCap(t *testing.T) {
 where region_code = (select region_code from contract.weather_warning where warning_id = 'dwd:900001')`, &region, &at.Lat, &at.Lon)
 	var n int
 	owner(t, `with ins as (
-  insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
+  insert into vf_seed.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
     valid_from, valid_to, published_at, region_code, source_ref, recorded_at, withdrawn_at)
   select 'ww-cap-' || g, 'wind', 1, 'Stufe 1', 'issued', 'Synthetischer Wetterdienst', 'Wind', 'de',
     '2101-01-01T00:00:00Z', null, null, '`+region+`', w.source_ref, '2101-01-01T00:00:00Z', null
@@ -369,6 +369,22 @@ group by t.topic_code, t.reviewed_on order by t.topic_code limit 1`, &code, &rev
 	if topic.Code != code || topic.Title == "" || !topic.ReviewedOn.Equal(reviewed) || len(got) != n || strings.Join(got, "|") != bodies || withBasis != based {
 		t.Errorf("topic %s: %+v, want %d rules (%d with a basis): %s", code, topic, n, based, bodies)
 	}
+	// A rule's note on its provision is read in the asked language; a blank
+	// one is none.
+	first := topic.Rules[0].ID
+	change(t, `update contract.rule_statement set legal_basis_note = 'Hinweis', legal_basis_note_en = case when statement_id = $1 then 'Note' else '  ' end where topic_code = $2`, first, code)
+	t.Cleanup(func() {
+		change(t, `update contract.rule_statement set legal_basis_note = null, legal_basis_note_en = null where topic_code = $1`, code)
+	})
+	for lang, want := range map[string]string{"de": "Hinweis", "en": "Note"} {
+		noted, err := st.Topic(bounded(t), code, lang)
+		if err != nil || noted.Rules[0].LegalBasisNote == nil || *noted.Rules[0].LegalBasisNote != want {
+			t.Errorf("%s: the note %+v %v", lang, noted.Rules, err)
+		}
+		if len(noted.Rules) > 1 && lang == "en" && noted.Rules[1].LegalBasisNote != nil {
+			t.Errorf("a blank English note was read: %q", *noted.Rules[1].LegalBasisNote)
+		}
+	}
 	if _, err := st.Topic(bounded(t), "no_such_topic", "de"); !errors.Is(err, rules.ErrUnknownTopic) {
 		t.Errorf("an unknown topic: %v", err)
 	}
@@ -404,7 +420,7 @@ func TestWarningsAtPlaceEveryWarningByItsArea(t *testing.T) {
 	}
 	// A copy of the first warning in a cell of no known Kreis: the read
 	// contract derives its region code from the cell, so it has none.
-	if n := change(t, `insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
+	if n := change(t, `insert into vf_seed.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
     valid_from, valid_to, published_at, region_code, source_ref, recorded_at, withdrawn_at, area, warn_cell_id, area_name)
   select 'dwd:990021', hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
     valid_from, valid_to, published_at, null, source_ref, recorded_at, null, area, '809999999', area_name
@@ -465,7 +481,7 @@ func TestWarningsAtListTheNextDayAhead(t *testing.T) {
 	owner(t, `select st_y(st_pointonsurface(area)), st_x(st_pointonsurface(area)) from contract.weather_warning
 where withdrawn_at is null and message_status <> 'cancelled' and area is not null and display_class <> 'withhold' and audience = 'public'
 order by warning_id limit 1`, &p.Lat, &p.Lon)
-	if n := change(t, `insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
+	if n := change(t, `insert into vf_seed.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
     valid_from, valid_to, published_at, region_code, source_ref, recorded_at, withdrawn_at, area, warn_cell_id, area_name)
   select v.id, w.hazard, 4, w.level_label, w.message_status, w.issuer_name, w.headline, w.text_lang,
     $1::timestamptz + v.after, $1::timestamptz + v.after + interval '6 hours', null, w.region_code, w.source_ref, $1::timestamptz, null, w.area, w.warn_cell_id, w.area_name

@@ -82,6 +82,8 @@ const page = (results, elements = {}) => {
     innerHeight: 800,
     getComputedStyle: (e, pseudo) => (pseudo ? e.pseudo[pseudo] || {content: 'none'} : e.style),
     axe: {
+      _audit: {checks: {'color-contrast': {options: {ignoreLength: false, contrastRatio: {normal: {expected: 4.5}}}}}},
+      configure: spec => calls.push({configure: spec}),
       run: async (context, options) => {
         calls.push({context, options});
         return results;
@@ -95,6 +97,25 @@ const node = (target, data) => ({target, any: data === undefined ? undefined : [
 const contrast = (...nodes) => ({id: 'color-contrast', impact: 'serious', help: 'h', helpUrl: 'u', nodes});
 const opts = {standard: 'WCAG2AA'};
 
+test('color-contrast runs with ignoreLength over the loaded axe defaults, before axe runs', async () => {
+  const calls = page({});
+  await runner.run(opts);
+  assert.deepEqual(calls[0], {
+    configure: {checks: [{id: 'color-contrast', options: {ignoreLength: true, contrastRatio: {normal: {expected: 4.5}}}}]}
+  });
+  assert.equal(globalThis.window.axe._audit.checks['color-contrast'].options.ignoreLength, false);
+  assert.equal(calls[1].context, globalThis.window.document);
+});
+
+test('an axe without color-contrast check options is refused before it runs', async () => {
+  for (const audit of [undefined, {}, {checks: {}}, {checks: {'color-contrast': {}}}]) {
+    const calls = page({});
+    globalThis.window.axe._audit = audit;
+    await assert.rejects(runner.run(opts), /axe has no color-contrast check options to extend/);
+    assert.deepEqual(calls, []);
+  }
+});
+
 test('a standard other than WCAG2AA is refused', async () => {
   page({});
   await assert.rejects(runner.run({standard: 'WCAG2A'}), /standard WCAG2A is not WCAG2AA/);
@@ -103,8 +124,8 @@ test('a standard other than WCAG2AA is refused', async () => {
 test('axe runs on the document with the WCAG 2.0/2.1 A/AA tags, best practices and the named rules', async () => {
   const calls = page({});
   assert.deepEqual(await runner.run({standard: 'WCAG2AA', rules: ['target-size'], ignore: ['region']}), []);
-  assert.equal(calls[0].context, globalThis.window.document);
-  assert.deepEqual(calls[0].options, {
+  assert.equal(calls[1].context, globalThis.window.document);
+  assert.deepEqual(calls[1].options, {
     runOnly: {type: 'tags', values: ['wcag2a', 'wcag21a', 'wcag2aa', 'wcag21aa', 'best-practice']},
     rules: {'target-size': {enabled: true}, region: {enabled: false}}
   });
@@ -474,4 +495,38 @@ test('a filter, a backdrop filter or a blend mode, on a layer or an ancestor, ma
     const [onAncestor] = await runner.run(opts);
     assert.equal(onAncestor.runnerExtras.undeterminedBy, by, `ancestor ${JSON.stringify(fx)}`);
   }
+});
+
+test('the pointer-events override is added once per run, after axe has run, and removed after', async () => {
+  const body = el(opaque);
+  const a = el({...clear, color: 'rgb(0, 0, 0)'}, body);
+  const b = el({...clear, color: 'rgb(0, 0, 0)'}, body);
+  page({violations: [contrast(node(['a']))], incomplete: [contrast(node(['a']), node(['b']))]}, {a, b});
+  const w = globalThis.window;
+  let adds = 0;
+  const append = w.document.head.appendChild;
+  w.document.head.appendChild = e => {
+    adds++;
+    append(e);
+  };
+  const axeRun = w.axe.run;
+  w.axe.run = async (...args) => {
+    w.liftedDuringAxe = w.lifted;
+    return axeRun(...args);
+  };
+  const issues = await runner.run(opts);
+  assert.deepEqual(issues.map(i => i.runnerExtras.colourSource), ['computed', 'computed', 'computed']);
+  assert.equal(adds, 1, 'one override for every result, not one per element: each one restyles the whole page');
+  assert.equal(w.liftedDuringAxe, undefined, 'axe runs on the page as it is');
+  assert.equal(w.lifted, null, 'the override is removed after');
+});
+
+test('the pointer-events override is removed when a read throws', async () => {
+  const span = el({...clear, color: 'rgb(0, 0, 0)'}, el(opaque));
+  page({incomplete: [contrast(node(['span']))]}, {span});
+  globalThis.window.stackAt = () => {
+    throw new Error('no stack');
+  };
+  await assert.rejects(runner.run(opts), /no stack/);
+  assert.equal(globalThis.window.lifted, null);
 });

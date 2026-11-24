@@ -14,7 +14,7 @@ import (
 // does not name reads nothing.
 func TestTrainBoardReadsTheNewestFetch(t *testing.T) {
 	st := seeded(t)
-	n := plant(t, `insert into contract.train_board (station_eva, fetched_at, planned_departure_at, changed_departure_at, platform, changed_platform, category, train_number, line, destination, cancelled)
+	n := plant(t, `insert into vf_seed.train_board (station_eva, fetched_at, planned_departure_at, changed_departure_at, platform, changed_platform, category, train_number, line, destination, cancelled)
 values ('8099001', now() - interval '3 minutes', now() + interval '5 minutes', null, '1', null, 'RE', '1', 'RE 1', 'Alt', false),
        ('8099001', now() - interval '20 seconds', now() + interval '20 minutes', null, '3', null, 'RE', '3311', 'RE 1', 'Frankfurt (Oder)', true),
        ('8099001', now() - interval '20 seconds', now() + interval '12 minutes', now() + interval '17 minutes', '5', '7', 'ICE', '571', 'ICE 571', 'München Hbf', false)`)

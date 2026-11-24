@@ -15,7 +15,7 @@ import (
 // line of those families at all nothing could be told.
 func TestALineIsLookedUpInTheTimetable(t *testing.T) {
 	st := seeded(t)
-	if n := plant(t, `insert into contract.transit_line (line_id, line_name, transport_mode, source_ref)
+	if n := plant(t, `insert into vf_seed.transit_line (line_id, line_name, transport_mode, source_ref)
 values ('71:ln-1', 'ZQ 45', 'rail', 'ln_a'), ('71:ln-2', 'zq45', 'bus', 'ln_a')`); n != 2 {
 		t.Fatalf("planted %d of 2", n)
 	}

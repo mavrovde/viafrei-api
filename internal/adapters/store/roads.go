@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,15 +29,22 @@ func codes[T ~string](list []T) []string {
 	return out
 }
 
+// roadByRef reads the motorway of the Autobahn register whose reference,
+// upper case without spaces, is $1, with the length and the Länder of the
+// shape the platform draws for it (contract_road_shape), drawn for that
+// road alone.
+var roadByRef = named("api_road", `
+select r.road, 'motorway', l.length_km::numeric(6,1)::float8, l.states
+from autobahn_roads r
+left join lateral contract_road_shape(r.road) l(line, length_km, states) on true
+where upper(replace(r.road, ' ', '')) = (select $1::text)
+order by r.road
+limit 1`, "text")
+
 // Road reads one road by its canonical reference.
 func (s *Store) Road(ctx context.Context, ref string) (roads.Road, error) {
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]roads.Road, error) {
-		rows, _ := tx.Query(ctx, `
-select road_ref, road_class, length_km::float8, states
-from contract.road r
-where upper(replace(road_ref, ' ', '')) = $1 and `+permitted("r")+`
-order by road_ref
-limit 1`, ref)
+		rows, _ := run(ctx, tx, roadByRef, ref)
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (roads.Road, error) {
 			var (
 				v          roads.Road
@@ -59,10 +67,15 @@ limit 1`, ref)
 // situationColumns are the columns every situation read selects, in the
 // order scanSituation reads them, followed by its two question-dependent
 // columns: the position along the road and the distance.
+// roadDelayMin is a situation's delay in whole minutes as the platform
+// states it, Math.round(delay_s / 60): half a minute rounds up. The
+// contract's delay_min truncates (100 s is 1 there, 2 on the platform).
+const roadDelayMin = `floor(e.delay_s / 60.0 + 0.5)::int`
+
 const situationColumns = `e.event_id, e.source_ref, e.event_kind, e.severity, e.road_ref, e.road_class,
        e.direction, e.direction_label, st_y(e.location), st_x(e.location), e.valid_from, e.valid_to,
-       e.lanes_closed, e.lanes_total, e.delay_min, e.affected_length_m, e.headline, e.description,
-       e.text_lang, e.changed_at`
+       e.lanes_closed, e.lanes_total, ` + roadDelayMin + `, e.affected_length_m, e.headline, e.description,
+       e.text_lang, e.changed_at, e.subtitle, coalesce(e.is_blocked, false)`
 
 // situationFilter is the condition every list read applies: an active,
 // published situation of the given families whose validity overlaps the
@@ -79,7 +92,7 @@ func situationFilter(w int) string {
   and coalesce(array_position($6::text[], e.severity), 0) >= $7`, w, w+1)
 }
 
-// eventRow is every column of contract.traffic_event a list read carries
+// eventRow is every column of trafficEvents a list read carries
 // forward, never state_code: a Land is looked up only where it is asked for.
 var eventRow = "e." + strings.Join(strings.Split("event_id, event_kind, severity, road_ref, road_class, direction, direction_label, location, valid_from, valid_to, lanes_closed, lanes_total, delay_min, affected_length_m, headline, description, text_lang, source_ref, origin_key, published_at, recorded_at, changed_at, withdrawn_at, record_class, subtitle, place_text, is_blocked, traffic_type, delay_s, source_refs, display_class, audience, confidentiality, origin_restriction", ", "), ", e.")
 
@@ -89,6 +102,131 @@ const eventPermitted = `e.display_class <> 'withhold' and (e.audience = 'public'
 // canonicalRef is a stored road reference compared in its canonical form,
 // as Road compares it.
 const canonicalRef = `upper(replace(%s, ' ', ''))`
+
+// opaqueNamed is the named statement name of sql with each parameter read
+// opaque ((select $n::type)::type, of types in order), so a custom plan sees
+// no more than the generic one and auto keeps the generic plan.
+func opaqueNamed(name, sql string, types ...string) stmt {
+	return named(name, parameter.ReplaceAllStringFunc(sql, func(p string) string {
+		n, _ := strconv.Atoi(p[1:])
+		return "((select " + p + "::" + types[n-1] + ")::" + types[n-1] + ")"
+	}), types...)
+}
+
+// autobahnLand is the Land of an Autobahn row: the one stored, or for a row
+// written before it was stored, the platform's rule on the row's point.
+const autobahnLand = `coalesce(e.land_code, contract_junction_land(st_pointonsurface(e.geom::geometry)::geography))`
+
+// autobahnStarted is the start an Autobahn message states, when it states
+// one as a time, else when it was seen.
+const autobahnStarted = `coalesce(case when a.starts ~ '^\d{4}-\d\d-\d\dT\d\d:\d\d' then a.starts::timestamptz end, a.observed_at)`
+
+// trafficEvents are the situations as the platform publishes them, read
+// from its tables as the read contract's situation reads them: the
+// Autobahn messages of each road and kind's newest sweep of the last day,
+// and the open traffic messages; each with its family's rule (excluded
+// families dropped, a message under a confidentiality withheld), the
+// columns of eventRow. An Autobahn message's start, blocking and
+// description are fields of its provider message, which a sweep stores only
+// when it changed: a row without it takes those of the newest row of the
+// same message and the same message hash since the start of its UTC day.
+// With in (a Land code, a parameter), only the situations placed in that
+// Land are read (with de, all), each with its Land (state_code, the
+// platform's rule: the Land of the nearest municipality within 20 km) and
+// the family that placed it there. The Land is the one stored when the
+// situation was written (land_code); an Autobahn row written before the
+// column was stored has none, and its Land is looked up by the same rule.
+// Without in, the Land is not read.
+func trafficEvents(in string) string {
+	state, landA, landR := `null::text state_code, null::text placement_source_ref`, `null::text`, `null::text`
+	inLand, inLandRE := ``, ``
+	if in != "" {
+		state = `b.land_code state_code, case when b.land_code is not null then 'bkg_gvisys' end placement_source_ref`
+		landA, landR = autobahnLand, `e.land_code`
+		inLand = `
+  where ` + in + ` = 'de' or ` + autobahnLand + ` = ` + in
+		inLandRE = `
+    and (` + in + ` = 'de' or e.land_code = ` + in + `)`
+	}
+	return `(with newest as (
+  select s.road, s.kind, s.observed_at as at from autobahn_sweeps s
+  where s.observed_at > now() - interval '1 day' and s.kind = any(array['warning', 'roadworks', 'closure', 'closure_entry_exit'])),
+autobahn as (
+  select e.observed_at, e.road, e.kind, e.ext_id, e.title, e.subtitle, e.abnormal_traffic_type, e.delay_s, e.geom, e.source, ` + landA + ` land_code,
+         coalesce(e.raw->>'isBlocked', c.blocked) blocked, coalesce(e.raw->>'startTimestamp', c.starts) starts,
+         coalesce(e.raw->'description', c.lines) lines
+  from autobahn_events e
+  join newest n on n.road = e.road and n.kind = e.kind and n.at = e.observed_at
+  left join lateral (
+    select r.raw->>'isBlocked' blocked, r.raw->>'startTimestamp' starts, r.raw->'description' lines
+    from autobahn_events r
+    where e.raw is null and r.ext_id = e.ext_id and r.raw is not null and r.raw_hash = e.raw_hash
+      and r.observed_at <= e.observed_at and r.observed_at >= date_trunc('day', e.observed_at, 'UTC')
+    order by r.observed_at desc
+    limit 1) c on true` + inLand + `),
+b as (
+  select 'autobahn:' || a.ext_id event_id,
+         case when a.kind like 'closure%' then 'closure' when a.kind = 'roadworks' then 'roadworks'
+              when a.kind = 'warning' and a.abnormal_traffic_type = any(array['QUEUING_TRAFFIC', 'STATIONARY_TRAFFIC', 'SLOW_TRAFFIC', 'HEAVY_TRAFFIC']) then 'jam'
+              when a.kind = 'warning' then 'hazard' else 'other' end event_kind,
+         case when a.kind = 'closure' or a.blocked = 'true' then 'road_closed' when a.kind = 'closure_entry_exit' then 'major'
+              when a.kind = 'roadworks' then 'lane_closed'
+              when a.kind = 'warning' and a.abnormal_traffic_type = any(array['QUEUING_TRAFFIC', 'STATIONARY_TRAFFIC', 'SLOW_TRAFFIC', 'HEAVY_TRAFFIC'])
+                then case when a.delay_s >= 600 then 'major' else 'minor' end
+              when a.kind = 'warning' then 'info' else 'other' end severity,
+         a.road road_ref, 'motorway' road_class, 'unknown' direction, null::text direction_label,
+         st_pointonsurface(a.geom::geometry)::geometry(Point,4326) location,
+         ` + autobahnStarted + ` valid_from, null::timestamptz valid_to,
+         null::int lanes_closed, null::int lanes_total, case when a.delay_s >= 0 then a.delay_s / 60 end delay_min,
+         null::int affected_length_m, coalesce(a.title, a.kind) headline,
+         (select string_agg(l.line, e'\n' order by l.n)
+          from jsonb_array_elements_text(case when jsonb_typeof(a.lines) = 'array' then a.lines end) with ordinality l(line, n)) description,
+         'de' text_lang, a.source source_ref, a.ext_id origin_key, null::timestamptz published_at,
+         a.observed_at recorded_at, a.observed_at changed_at, null::timestamptz withdrawn_at, 'operator_event' record_class,
+         a.subtitle, null::text place_text,
+         case a.blocked when 'true' then true when 'false' then false end is_blocked,
+         a.abnormal_traffic_type traffic_type, case when a.delay_s >= 0 then a.delay_s end delay_s, null::text confidentiality,
+         a.land_code
+  from autobahn a
+  union all
+  select 'datex:' || e.source_id || ':' || e.publication_id,
+         case when e.event_type ~* '(maintenance|roadworks|construction)' then 'roadworks'
+              when e.event_type ~* '(accident|unfall)' then 'accident'
+              when e.event_type ~* 'abnormaltraffic' then 'jam'
+              when e.event_type ~* '(weather|environment)' then 'weather'
+              when e.event_type ~* '(closure|sperrung)' then 'closure'
+              when e.event_type ~* '(speedmanagement|restriction|reroutingmanagement|carriagewayorlanemanagement|networkmanagement)' then 'restriction'
+              when e.event_type ~* '(obstruction|hazard|animal|vehicle|equipment)' then 'hazard'
+              else 'other' end,
+         case when e.event_type ~* '(closure|sperrung)' then 'road_closed'
+              when e.event_type ~* '(accident|unfall)' then 'major'
+              when e.event_type ~* '(maintenance|roadworks|construction)' then 'lane_closed'
+              when e.event_type ~* '(abnormaltraffic|speedmanagement|restriction|reroutingmanagement|carriagewayorlanemanagement|networkmanagement)' then 'minor'
+              when e.event_type ~* '(weather|environment|obstruction|hazard|animal|vehicle|equipment)' then 'info'
+              else 'other' end,
+         e.road_number,
+         case when e.road_number ~ '^A ?[0-9]' then 'motorway' when e.road_number ~ '^B ?[0-9]' then 'federal'
+              when e.road_number ~ '^(L|S|St) ?[0-9]' then 'state' else 'other' end,
+         'unknown', null::text, st_pointonsurface(e.geom)::geometry(Point,4326),
+         coalesce(e.overall_start, e.first_seen_at), e.overall_end,
+         null::int, null::int, null::int, null::int, coalesce(e.event_type, 'situation'), null::text, 'de',
+         e.source_feed, e.publication_id, e.feed_ts, e.first_seen_at, e.updated_at, e.closed_at, 'traffic_message',
+         null::text, null::text, null::boolean, null::text, null::int, e.confidentiality, ` + landR + `
+  from road_events e
+  where e.deleted_at is null` + inLandRE + `)
+select b.event_id, b.event_kind, b.severity, b.road_ref, b.road_class, b.direction, b.direction_label, b.location,
+       b.valid_from, b.valid_to, b.lanes_closed, b.lanes_total, b.delay_min, b.affected_length_m, b.headline,
+       b.description, b.text_lang, b.source_ref, b.origin_key, b.published_at, b.recorded_at, b.changed_at,
+       b.withdrawn_at, b.record_class, b.subtitle, b.place_text, b.is_blocked, b.traffic_type, b.delay_s,
+       array[b.source_ref] source_refs,
+       case when coalesce(b.confidentiality, 'noRestriction') <> 'noRestriction' then 'withhold'
+            else coalesce(k.display_class, 'open') end display_class,
+       coalesce(k.audience, 'public') audience, b.confidentiality, k.origin_restriction, ` + state + `
+from b
+left join lateral (select k.excluded, k.audience, k.display_class, k.origin_restriction from contract_source_rules k
+                   where b.source_ref ~ k.pattern order by k.priority limit 1) k on true
+where not coalesce(k.excluded, false))`
+}
 
 // filterArgs are the arguments $1 to $7 of situationFilter.
 func filterArgs(f roads.Filter, families []string, now time.Time) []any {
@@ -109,25 +247,29 @@ const nextChange = `min(case when x.valid_from > $2 then x.valid_from else x.val
 // none; and the scope's next change (nextChange). It reads the scope's
 // situations that have not ended, so one that starts later is seen too; only
 // those active at now are aggregated.
-const messagesSelect = `select ` + messagesAgg + `,
+func messagesSelect(in string) string {
+	return `select ` + messagesAgg + `,
        ` + nextChange + `
-` + messagesFrom
+` + messagesFrom(in)
+}
 
 // messagesAgg is the lamp's view of the situations of messagesFrom active
 // at $2, as messagesSelect aggregates it.
 const messagesAgg = `jsonb_agg(distinct jsonb_build_object('r', e.record_class, 'k', e.event_kind, 'h', e.headline,
                                          's', e.subtitle, 't', e.description, 'p', e.place_text,
                                          'b', coalesce(e.is_blocked, false), 'y', e.traffic_type,
-                                         'ds', e.delay_s, 'd', e.delay_min)) filter (where e.valid_from <= $2)`
+                                         'ds', e.delay_s, 'd', ` + roadDelayMin + `)) filter (where e.valid_from <= $2)`
 
 // messagesFrom reads the situations of the families $1 that have not ended
-// at $2.
-const messagesFrom = `from contract.traffic_event e
+// at $2, with their Land when they may lie in the Land in (trafficEvents).
+func messagesFrom(in string) string {
+	return `from ` + trafficEvents(in) + ` e
 cross join lateral (select e.valid_from, e.valid_to) x
 where e.withdrawn_at is null
-  and e.source_ref = any($1)
+  and e.source_ref = any($1::text[])
   and ` + eventPermitted + `
-  and (e.valid_to is null or e.valid_to > $2)`
+  and (e.valid_to is null or e.valid_to > $2::timestamptz)`
+}
 
 // storedMessage is one element of messagesSelect, in stored codes.
 type storedMessage struct {
@@ -143,42 +285,58 @@ type storedMessage struct {
 	DelayMin    *int    `json:"d"`
 }
 
-// warningsPending is the condition of a weather warning the lamp reads or
-// will read: a published, not cancelled warning of the given families that
-// has not ended at now. $1 families, $2 now. Those whose valid_from is at or
-// before now are in force; the others start later. Each scope places it by
-// the warning's own area or its warn cell, as the platform places a DWD
-// warning, never by the region code it is filed under: the code is often
-// null, and a join on it answered "no warning" where the area holds one.
-const warningsPending = `from contract.weather_warning w
-where w.withdrawn_at is null and w.message_status <> 'cancelled'
-  and w.source_ref = any($1)
-  and w.display_class <> 'withhold' and (w.audience = 'public' or ` + ownKeyOn + `)
-  and (w.valid_to is null or w.valid_to > $2)`
-
 // sourcesSelect reads the freshness of the given families and the newest
-// confirmation of those that have a freshness row. $1 families.
-const sourcesSelect = `select s.source_ref, s.stale_after_s, f.data_as_of,
-       f.source_ref is not null, f.confirmed_at, f.confirm_interval_s::float8, coalesce(f.updates_paused, false)
-from contract.source s
-left join contract.source_freshness f using (source_ref)
-where s.source_ref = any($1)
-order by s.source_ref`
+// confirmation of those that have a freshness row. $1 families. A family is
+// a registered source of the platform that its rule does not exclude and
+// whose licence is not pending; it is stale after three of its cadences,
+// its own or else its status rows' longest; its freshness is its status
+// row's.
+var sourcesSelect = opaqueNamed("api_road_sources", `select s.source_ref,
+       3 * coalesce(s.cadence_s, (select max(x.cadence_s) from control.data_status x where x.key = s.source_ref)),
+       d.last_changed_at, d.key is not null, d.held_since, d.cadence_s::float8, coalesce(d.paused, false)
+from contract_sources s
+left join lateral (select k.excluded from contract_source_rules k where s.source_ref ~ k.pattern order by k.priority limit 1) k on true
+left join control.data_status d on d.key = s.source_ref
+where s.source_ref = any($1) and not coalesce(k.excluded, false) and coalesce(s.licence_code, '') !~* '^pending'
+order by s.source_ref`, "text[]")
 
 // coverageSelect reads which of the given families cover the traffic
-// messages of the given states. $1 states, $2 families.
-const coverageSelect = `select state_code, source_ref, coverage_role, current_only
-from contract.message_coverage
-where state_code = any($1) and source_ref = any($2)
-  and display_class <> 'withhold' and (audience = 'public' or ` + ownKeyOn + `)
-order by state_code, source_ref`
+// messages of the given states. $1 states, $2 families. Coverage is the
+// platform's own measure of the families, open to every key.
+var coverageSelect = named("api_road_coverage", `
+select m.state_code, m.source_ref, m.coverage_role, m.current_only
+from message_coverage_sources m
+where m.state_code = any((select $1::text[])::text[]) and m.source_ref = any((select $2::text[])::text[])
+order by m.state_code, m.source_ref`, "text[]", "text[]")
 
-// statesOf aggregates the distinct, known state codes of the junctions a
-// query selects (column state_code) into a sorted array, empty when none.
-func statesOf(junctions string) string {
-	return `select coalesce(array_agg(distinct state_code order by state_code) filter (where state_code is not null), '{}')
-from (` + junctions + `) j`
+// statesOf is the statement name of the sorted Länder, as one array, of the
+// junctions the select junctions yields (one Land code a row, state_code).
+func statesOf(name, junctions string, types ...string) stmt {
+	return named(name, `select coalesce(array_agg(distinct state_code order by state_code) filter (where state_code is not null), '{}')
+from (`+junctions+`) j`, types...)
 }
+
+// The Länder of a scope. On a road those of its junctions (a motorway
+// point's reference is A and digits, as written, its canonical form); near a
+// point those of the junctions within $3 metres of ($2, $1), else that of the
+// nearest junction; in a state the state itself, or for de every Land of
+// the region register. A junction's Land is the platform's
+// (contract_junction_land: the Land of the nearest municipality).
+var (
+	statesOnRoad = statesOf("api_states_road", `select contract_junction_land(t.geom) state_code from tmc_locations t
+where t.road_number = (select $1::text) and `+motorwayJunctions, "text")
+	statesNear = statesOf("api_states_near", `with here as (select st_setsrid(st_makepoint((select $2::float8), (select $1::float8)), 4326) g),
+near as (select contract_junction_land(t.geom) state_code from tmc_locations t, here
+         where st_dwithin(t.geom::geometry(Point,4326)::geography, here.g::geography, (select $3::float8)) and `+motorwayJunctions+`)
+select state_code from near
+union all
+select (select contract_junction_land(t.geom) from tmc_locations t, here where `+motorwayJunctions+`
+        order by t.geom::geometry(Point,4326) <-> here.g, t.cid || ':' || t.tabcd || ':' || t.lcd limit 1)
+where not exists (select 1 from near)`, "float8", "float8", "float8")
+	statesInState = named("api_states_state", `select case when (select $1::text) = 'de'
+  then (select coalesce(array_agg(a.ags order by a.ags), '{}') from ags_regions a where a.level = 'land')
+  else array[(select $1::text)] end`, "text")
+)
 
 // sourcesOf collects the rows of sourcesSelect: the freshness of every
 // family, and into confirmations the newest confirmation of each that has a
@@ -225,36 +383,76 @@ func coverageOf(rows pgx.Rows) (map[string]ampel.Coverage, error) {
 	return out, err
 }
 
+// lampWarnings is the statement name of the weather warnings that have not
+// ended under cond, the scope's area condition over $3 onwards (of types):
+// those in force are the lamp's, and the earliest start or end after now of
+// any is when the scope changes. A warning is published (begun or not, not
+// deleted), not withdrawn and not cancelled, of the families $1, and has not
+// ended at $2.
+func lampWarnings(name, cond string, types ...string) stmt {
+	return named(name, `
+select w.source_feed, w.level::int, w.valid_from <= (select $2::timestamptz),
+  case when w.valid_from > (select $2::timestamptz) then w.valid_from else w.valid_to end
+from weather_warnings w
+where w.deleted_at is null and w.valid_from is not null and w.closed_at is null
+  and coalesce(w.closed_reason, '') <> 'withdrawn'
+  and w.source_feed = any((select $1::text[])::text[])
+  and (w.valid_to is null or w.valid_to > (select $2::timestamptz))
+  and `+cond+`
+order by w.level::int desc, 'dwd:' || w.id`, append([]string{"text[]", "timestamptz"}, types...)...)
+}
+
+// The lamp's warnings by scope. On a road they are those on the location-code
+// points of the road's junctions, as the platform's motorway page and its
+// motorway status place a DWD warning on the points of the road, not on the
+// districts the road crosses; at a point those whose own area reaches within
+// the radius, as the platform's warnings at a point test the warning's area;
+// in a state those whose cell key names the state in its first two digits.
+// A road's points are read by the road's own reference (a motorway point's
+// reference is A and digits, as written, so it is its canonical form), and
+// each point finds the open warnings on it through their area's GiST.
+var (
+	warningsOnRoad = lampWarnings("api_lamp_warnings_road", `w.id in (select o.id from tmc_locations t
+               join weather_warnings o on st_intersects(o.area::geometry, t.geom::geometry(Point,4326))
+                 and o.closed_at is null and o.deleted_at is null
+               where t.road_number = (select $3::text) and `+motorwayJunctions+`)`, "text")
+	warningsNear = lampWarnings("api_lamp_warnings_near", `w.area is not null
+  and st_dwithin(w.area, st_setsrid(st_makepoint((select $4::float8), (select $3::float8)), 4326)::geography, (select $5::float8))`,
+		"float8", "float8", "float8")
+	warningsInState = lampWarnings("api_lamp_warnings_state", `((select $3::text) = 'de'
+  or (left(w.warncell_id, 1) in ('7', '8') and substr(w.warncell_id, 2, 2) = (select $3::text)))`, "text")
+)
+
 // scope is one read of the lamp's scope, run in the page's snapshot.
 type scope struct {
-	messages string
+	messages stmt
 	args     []any
-	// warnings is the area condition of the weather warnings, over $3
-	// onwards of warningArgs.
-	warnings    string
+	// warnings reads the weather warnings of the scope (lampWarnings), its
+	// area condition over $3 onwards of warningArgs.
+	warnings    stmt
 	warningArgs []any
 	// states selects the codes of the states in scope, over stateArgs.
-	states    string
+	states    stmt
 	stateArgs []any
 	// placed selects the families that placed the scope's situations in a
 	// Land, over args; empty when the scope is no Land.
-	placed string
+	placed stmt
 	// covering selects, over coveringArgs, the families read that hold a
 	// situation on a road of an unregistered road's class; empty for any
 	// other scope.
-	covering     string
+	covering     stmt
 	coveringArgs []any
 }
 
 // coveringSelect reads which of the given families hold a situation that
 // has not ended on a road of a class, in name order. $1 families, $2 the
 // stored class, $3 now.
-const coveringSelect = `select coalesce(array_agg(f order by f), '{}')
+var coveringSelect = opaqueNamed("api_road_covering", `select coalesce(array_agg(f order by f), '{}')
 from unnest($1::text[]) f
-where exists (select 1 from contract.traffic_event e
+where exists (select 1 from `+trafficEvents("")+` e
               where e.source_ref = f and e.withdrawn_at is null and e.road_class = $2
                 and (e.valid_to is null or e.valid_to > $3)
-                and ` + eventPermitted + `)`
+                and `+eventPermitted+`)`, "text[]", "text", "timestamptz")
 
 // counted is a listed situation and, by family, how many situations the
 // list's filters keep before the limit.
@@ -291,7 +489,7 @@ func scanSituationWith(r pgx.CollectableRow, extra ...any) (roads.Situation, err
 	err := r.Scan(append([]any{&v.ID, &v.Family, &kind, &severity, &road, &class,
 		&direction, &v.Towards, &lat, &lon, &from, &until,
 		&lanesClosed, &lanesTotal, &delay, &length, &headline, &v.Description,
-		&lang, &updated, &v.AtKm, &v.DistanceM}, extra...)...)
+		&lang, &updated, &v.Subtitle, &v.Blocked, &v.AtKm, &v.DistanceM}, extra...)...)
 	s := &v
 	s.Kind, s.Severity, s.Class, s.Direction = roads.MapKind(kind), roads.MapSeverity(severity), roads.MapClass(class), roads.MapDirection(direction)
 	if road != nil {
@@ -311,12 +509,21 @@ func scanSituationWith(r pgx.CollectableRow, extra ...any) (roads.Situation, err
 	return v, err
 }
 
+// scanOne scans the one row of rows (a statement run) into dest: no row is
+// pgx.ErrNoRows, as a QueryRow scan answers.
+func scanOne(rows pgx.Rows, _ error) func(dest ...any) error {
+	return func(dest ...any) error {
+		_, err := pgx.CollectExactlyOneRow(rows, func(r pgx.CollectableRow) (struct{}, error) { return struct{}{}, r.Scan(dest...) })
+		return err
+	}
+}
+
 // read runs the page query and the reads of the lamp's scope (its
 // situations, the weather warnings in force there when a weather family is
 // read, the freshness and newest confirmation of every family read, the
 // states in scope and which roads families read cover their traffic
 // messages) in one snapshot.
-func (s *Store) read(ctx context.Context, list string, listArgs []any, limit int, fams roads.Families, now time.Time, sc scope) (roads.Page, error) {
+func (s *Store) read(ctx context.Context, list stmt, listArgs []any, limit int, fams roads.Families, now time.Time, sc scope) (roads.Page, error) {
 	// The page and its messages are built inside the read and handed back
 	// by ReadValue, so nothing the caller holds is written after a read that
 	// ran past its deadline.
@@ -332,7 +539,7 @@ func (s *Store) read(ctx context.Context, list string, listArgs []any, limit int
 		// The reads in order; the first that fails ends the snapshot.
 		for _, step := range []func() error{
 			func() (err error) {
-				res, _ := tx.Query(ctx, list, listArgs...)
+				res, _ := run(ctx, tx, list, listArgs...)
 				rows, err := pgx.CollectRows(res, scanCounted)
 				// Every row carries the counts of the whole filtered set, the
 				// families past the limit too; none listed is none counted.
@@ -342,7 +549,7 @@ func (s *Store) read(ctx context.Context, list string, listArgs []any, limit int
 				}
 				return err
 			},
-			func() error { return tx.QueryRow(ctx, sc.messages, sc.args...).Scan(&stored, &out.NextChange) },
+			func() error { return scanOne(run(ctx, tx, sc.messages, sc.args...))(&stored, &out.NextChange) },
 			func() error {
 				if len(fams.Weather) == 0 {
 					return nil
@@ -350,10 +557,7 @@ func (s *Store) read(ctx context.Context, list string, listArgs []any, limit int
 				// One read of the warnings that have not ended: those in
 				// force are the lamp's, and the earliest start or end after
 				// now of any is when the scope changes.
-				res, _ := tx.Query(ctx, `select w.source_ref, w.warning_level, w.valid_from <= $2,
-  case when w.valid_from > $2 then w.valid_from else w.valid_to end `+warningsPending+`
-  and `+sc.warnings+`
-order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, sc.warningArgs...)...)
+				res, _ := run(ctx, tx, sc.warnings, append([]any{fams.Weather, now}, sc.warningArgs...)...)
 				// A read that found none is an empty list, never nil: nil
 				// means the warnings were not read.
 				out.Warnings = []roads.Warning{}
@@ -372,25 +576,29 @@ order by w.warning_level desc, w.warning_id`, append([]any{fams.Weather, now}, s
 				return err
 			},
 			func() (err error) {
-				res, _ := tx.Query(ctx, sourcesSelect, append(slices.Clone(fams.Roads), fams.Weather...))
+				res, _ := run(ctx, tx, sourcesSelect, append(slices.Clone(fams.Roads), fams.Weather...))
 				out.Sources, err = sourcesOf(res, out.Confirmations)
 				return err
 			},
-			func() error { return tx.QueryRow(ctx, sc.states, sc.stateArgs...).Scan(&out.States) },
-			func() error {
-				if sc.placed == "" {
-					return nil
-				}
-				return tx.QueryRow(ctx, sc.placed, sc.args...).Scan(&out.Placed)
+			func() (err error) {
+				res, _ := run(ctx, tx, sc.states, sc.stateArgs...)
+				out.States, err = pgx.CollectExactlyOneRow(res, pgx.RowTo[[]string])
+				return err
 			},
 			func() error {
-				if sc.covering == "" {
+				if sc.placed.Name == "" {
 					return nil
 				}
-				return tx.QueryRow(ctx, sc.covering, sc.coveringArgs...).Scan(&out.Covering)
+				return scanOne(run(ctx, tx, sc.placed, sc.args...))(&out.Placed)
+			},
+			func() error {
+				if sc.covering.Name == "" {
+					return nil
+				}
+				return scanOne(run(ctx, tx, sc.covering, sc.coveringArgs...))(&out.Covering)
 			},
 			func() (err error) {
-				res, _ := tx.Query(ctx, coverageSelect, out.States, fams.Roads)
+				res, _ := run(ctx, tx, coverageSelect, out.States, fams.Roads)
 				out.Coverage, err = coverageOf(res)
 				return err
 			},
@@ -424,6 +632,117 @@ func messagesOf(stored []storedMessage) []roads.Message {
 	return out
 }
 
+// The situation lists by scope (filterArgs $1 to $7, then the scope's):
+// on a road $8 the road, $9 the direction, $10 the compass directions, $11
+// the limit, $12 and $13 the window, $14 the offset, $15 whether the road
+// may be unregistered; near a point $8 and $9 the position, $10 the radius,
+// $11 the classes kept, $12 whether unmapped classes are kept, $13 every
+// mapped class, $14 the limit, $15 and $16 the window, $17 the offset; in a
+// Land $8 the Land, $9 to $11 the classes as near a point, $12 the limit,
+// $13 and $14 the window, $15 the offset. A road's line is its shape
+// (contract_road_shape), its parts in their stored order.
+var (
+	situationsOnRoad = opaqueNamed("api_road_situations", `with road as (
+  select k.road road_ref from autobahn_roads k
+  where upper(replace(k.road, ' ', '')) = $8 order by k.road limit 1),
+parts as (
+  select r.road_ref, d.path[1] n, d.geom g, st_length(d.geom::geography) len, l.length_km::numeric(6,1)::float8 km
+  from road r
+  cross join lateral contract_road_shape(r.road_ref) l(line, length_km, states)
+  cross join lateral st_dump(l.line::geometry(MultiLineString,4326)) d),
+line as (
+  select road_ref, max(km) km, sum(len) total
+  from parts group by road_ref),
+answering as (
+  select `+eventRow+`, line.km road_km, line.total road_total
+  from `+trafficEvents("")+` e left join line on true
+  where `+situationFilter(12)+`
+    and ($15 or exists (select 1 from road))
+    and `+fmt.Sprintf(canonicalRef, "e.road_ref")+` = $8
+    and ($9::text = 'both' or e.direction = $9::text or not e.direction = any($10))),
+placed as (
+  select `+strings.ReplaceAll(eventRow, "e.", "a.")+`, a.road_km, a.road_total, at.share
+  from answering a
+  left join lateral (
+    select ((select coalesce(sum(q.len), 0) from parts q where q.n < p.n)
+            + st_linelocatepoint(p.g, a.location) * p.len) / nullif(a.road_total, 0) share
+    from parts p
+    where a.location is not null
+    order by p.g <-> a.location, p.n
+    limit 1) at on true)
+select `+situationColumns+`,
+       case when e.share is null or e.road_km is null then null
+            else round((e.share * e.road_km)::numeric, 1)::float8 end km,
+       null::int,
+       (select jsonb_object_agg(c.source_ref, c.n) from (select source_ref, count(*)::int n from answering group by source_ref) c)
+from placed e
+order by case when e.event_kind = 'jam' then 0 when e.event_kind = 'closure' then 1
+              when e.event_kind = 'roadworks' then 3 else 2 end,
+         case e.traffic_type when 'QUEUING_TRAFFIC' then 0 when 'STATIONARY_TRAFFIC' then 1
+              when 'HEAVY_TRAFFIC' then 2 when 'SLOW_TRAFFIC' then 3 else 4 end,
+         e.delay_s desc nulls last, e.headline, e.origin_key, e.event_id
+limit $11 offset $14`,
+		"text[]", "timestamptz", "text[]", "bool", "text[]", "text[]", "int8", "text", "text", "text[]", "int8", "timestamptz", "timestamptz", "int8", "bool")
+	situationsNear = opaqueNamed("api_area_situations", `
+with here as (select st_setsrid(st_makepoint($9, $8), 4326)::geography g),
+answering as (
+  select `+eventRow+`, round(st_distance(e.location::geography, here.g))::int dist
+  from `+trafficEvents("")+` e, here
+  where `+situationFilter(15)+`
+    and e.location is not null
+    and st_dwithin(e.location::geography, here.g, $10)
+    and (e.road_class = any($11) or ($12 and not e.road_class = any($13))))
+select `+situationColumns+`, null::float8, e.dist,
+       (select jsonb_object_agg(c.source_ref, c.n) from (select source_ref, count(*)::int n from answering group by source_ref) c)
+from answering e
+order by coalesce(array_position($6::text[], e.severity), 0) desc, e.dist, e.event_id
+limit $14 offset $17`,
+		"text[]", "timestamptz", "text[]", "bool", "text[]", "text[]", "int8", "float8", "float8", "float8", "text[]", "bool", "text[]", "int8", "timestamptz", "timestamptz", "int8")
+	situationsInStateList = opaqueNamed("api_state_situations", `
+with answering as (
+  select `+eventRow+`
+  from `+trafficEvents("$8")+` e
+  where `+situationFilter(13)+`
+    and ($8 = 'de' or e.state_code = $8)
+    and (e.road_class = any($9) or ($10 and not e.road_class = any($11))))
+select `+situationColumns+`, null::float8, null::int,
+       (select jsonb_object_agg(c.source_ref, c.n) from (select source_ref, count(*)::int n from answering group by source_ref) c)
+from answering e
+order by coalesce(array_position($6::text[], e.severity), 0) desc, e.road_ref, e.event_id
+limit $12 offset $15`,
+		"text[]", "timestamptz", "text[]", "bool", "text[]", "text[]", "int8", "text", "text[]", "bool", "text[]", "int8", "timestamptz", "timestamptz", "int8")
+)
+
+// The lamp's view of the situations by scope (messagesSelect: $1 families,
+// $2 now): on a road $3 the road, $4 the direction, $5 the compass
+// directions; near a point $3 and $4 the position, $5 the radius; in a Land
+// $3 the Land (de: every situation).
+var (
+	messagesOnRoad = opaqueNamed("api_road_messages", messagesSelect("")+`
+  and `+fmt.Sprintf(canonicalRef, "e.road_ref")+` = $3
+  and ($4::text = 'both' or e.direction = $4::text or not e.direction = any($5))`, "text[]", "timestamptz", "text", "text", "text[]")
+	messagesNear = opaqueNamed("api_area_messages", messagesSelect("")+`
+  and e.location is not null
+  and st_dwithin(e.location::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`, "text[]", "timestamptz", "float8", "float8", "float8")
+	messagesInState = opaqueNamed("api_state_messages", messagesSelect("$3")+`
+  and ($3 = 'de' or e.state_code = $3)`, "text[]", "timestamptz", "text")
+	// placedInState are the families that placed the Land's situations in
+	// it (over the messages' arguments), none for de.
+	placedInState = opaqueNamed("api_state_placed", `select coalesce(array_agg(distinct e.placement_source_ref order by e.placement_source_ref) filter (where e.placement_source_ref is not null), '{}')
+from `+trafficEvents("$3")+` e
+where $3 <> 'de' and e.state_code = $3 and e.withdrawn_at is null and e.source_ref = any($1)
+  and `+eventPermitted+` and (e.valid_to is null or e.valid_to > $2)`, "text[]", "timestamptz", "text")
+)
+
+// situationByID is the published situation $1 of the families $2 that is
+// active or ended after $3.
+var situationByID = opaqueNamed("api_situation", `
+select `+situationColumns+`, null::float8, null::int
+from `+trafficEvents("")+` e
+where e.event_id = $1 and e.withdrawn_at is null and e.source_ref = any($2)
+  and `+eventPermitted+`
+  and (e.valid_to is null or e.valid_to > $3)`, "text", "text[]", "timestamptz")
+
 // SituationsOnRoad reads the active situations on one road in the order of
 // travel (FR-ROAD-003). The chainage runs across every part of the road's
 // line in their stored order: a situation is placed on the nearest part, at
@@ -446,67 +765,24 @@ func (s *Store) SituationsOnRoad(ctx context.Context, q roads.CorridorQuery, fam
 	if q.Unregistered {
 		sc.covering, sc.coveringArgs = coveringSelect, []any{fams.Roads, string(q.Class), now}
 	}
-	return s.read(ctx, `
-with road as (
-  select k.road_ref from contract.road k
-  where `+fmt.Sprintf(canonicalRef, "k.road_ref")+` = $8 and `+permitted("k")+` order by k.road_ref limit 1),
-parts as (
-  select r.road_ref, d.path[1] n, d.geom g, st_length(d.geom::geography) len, r.length_km::float8 km
-  from contract.road r, st_dump(r.geometry) d
-  where r.road_ref = (select road_ref from road)),
-line as (
-  select road_ref, max(km) km, sum(len) total
-  from parts group by road_ref),
-answering as (
-  select `+eventRow+`, line.km road_km, line.total road_total
-  from contract.traffic_event e left join line on true
-  where `+situationFilter(12)+`
-    and ($15 or exists (select 1 from road))
-    and `+fmt.Sprintf(canonicalRef, "e.road_ref")+` = $8
-    and ($9::text = 'both' or e.direction = $9::text or not e.direction = any($10))),
-placed as (
-  select a.*, at.share
-  from answering a
-  left join lateral (
-    select ((select coalesce(sum(q.len), 0) from parts q where q.n < p.n)
-            + st_linelocatepoint(p.g, a.location) * p.len) / nullif(a.road_total, 0) share
-    from parts p
-    where a.location is not null
-    order by p.g <-> a.location, p.n
-    limit 1) at on true)
-select `+situationColumns+`,
-       case when e.share is null or e.road_km is null then null
-            else round((e.share * e.road_km)::numeric, 1)::float8 end km,
-       null::int,
-       (select jsonb_object_agg(c.source_ref, c.n) from (select source_ref, count(*)::int n from answering group by source_ref) c)
-from placed e
-order by case when e.event_kind = 'jam' then 0 when e.event_kind = 'closure' then 1
-              when e.event_kind = 'roadworks' then 3 else 2 end,
-         case e.traffic_type when 'QUEUING_TRAFFIC' then 0 when 'STATIONARY_TRAFFIC' then 1
-              when 'HEAVY_TRAFFIC' then 2 when 'SLOW_TRAFFIC' then 3 else 4 end,
-         e.delay_min desc nulls last, e.headline, e.origin_key, e.event_id
-limit $11 offset $14`, args, q.Limit, fams, now, scope{
+	return s.read(ctx, situationsOnRoad, args, q.Limit, fams, now, scope{
 		covering: sc.covering, coveringArgs: sc.coveringArgs,
-		messages: messagesSelect + `
-  and ` + fmt.Sprintf(canonicalRef, "e.road_ref") + ` = $3
-  and ($4::text = 'both' or e.direction = $4::text or not e.direction = any($5))`,
-		args: []any{fams.Roads, now, q.Road, string(q.Direction), codes(roads.Compass())},
+		messages: messagesOnRoad,
+		args:     []any{fams.Roads, now, q.Road, string(q.Direction), codes(roads.Compass())},
 		// A warning is on the road when its own area holds one of the
 		// road's junction points, as the platform's motorway page and its
 		// motorway status place a DWD warning on the location-code points
 		// of the road, not on the districts the road crosses.
-		warnings: `exists (select 1 from contract.junction j
-               where ` + fmt.Sprintf(canonicalRef, "j.road_ref") + ` = $3 and ` + permitted("j") + `
-                 and st_intersects(w.area, j.location))`,
+		warnings:    warningsOnRoad,
 		warningArgs: []any{q.Road},
-		states: statesOf(`select j.state_code from contract.junction j
-where ` + fmt.Sprintf(canonicalRef, "j.road_ref") + ` = $1 and ` + permitted("j")),
-		stateArgs: []any{q.Road},
+		states:      statesOnRoad,
+		stateArgs:   []any{q.Road},
 	})
 }
 
 // SituationsNear reads the active situations within the radius of a
-// position, by severity descending, then distance, then id; and, for the
+// position, by severity descending, then distance, then id, past q's
+// offset; and, for the
 // lamp, the view of every situation in the scope (the radius), the weather
 // warnings in force in an area within the radius, and the states of the
 // junctions within the radius, else of the junction nearest the position.
@@ -518,79 +794,43 @@ func (s *Store) SituationsNear(ctx context.Context, q roads.AreaQuery, fams road
 	args := append(filterArgs(q.Filter, fams.Roads, now), q.At.Lat, q.At.Lon, q.RadiusM,
 		codes(classes), other, codes(roads.Classes[:len(roads.Classes)-1]), q.Limit+1)
 	start, end := q.Window(now)
-	args = append(args, start, end)
-	return s.read(ctx, `
-with here as (select st_setsrid(st_makepoint($9, $8), 4326)::geography g),
-answering as (
-  select `+eventRow+`, round(st_distance(e.location::geography, here.g))::int dist
-  from contract.traffic_event e, here
-  where `+situationFilter(15)+`
-    and e.location is not null
-    and st_dwithin(e.location::geography, here.g, $10)
-    and (e.road_class = any($11) or ($12 and not e.road_class = any($13))))
-select `+situationColumns+`, null::float8, e.dist,
-       (select jsonb_object_agg(c.source_ref, c.n) from (select source_ref, count(*)::int n from answering group by source_ref) c)
-from answering e
-order by coalesce(array_position($6::text[], e.severity), 0) desc, e.dist, e.event_id
-limit $14`, args, q.Limit, fams, now, scope{
-		messages: messagesSelect + `
-  and e.location is not null
-  and st_dwithin(e.location::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`,
-		args: []any{fams.Roads, now, q.At.Lat, q.At.Lon, q.RadiusM},
+	args = append(args, start, end, q.Offset)
+	return s.read(ctx, situationsNear, args, q.Limit, fams, now, scope{
+		messages: messagesNear,
+		args:     []any{fams.Roads, now, q.At.Lat, q.At.Lon, q.RadiusM},
 		// A warning is near when its own area reaches within the radius, as
 		// the platform's warnings at a point test the warning's area.
-		warnings:    `w.area is not null and st_dwithin(w.area::geography, st_setsrid(st_makepoint($4, $3), 4326)::geography, $5)`,
+		warnings:    warningsNear,
 		warningArgs: []any{q.At.Lat, q.At.Lon, q.RadiusM},
-		states: statesOf(`with here as (select st_setsrid(st_makepoint($2, $1), 4326) g),
-near as (select j.state_code from contract.junction j, here
-         where st_dwithin(j.location::geography, here.g::geography, $3) and ` + permitted("j") + `)
-select state_code from near
-union all
-select (select j.state_code from contract.junction j, here where ` + permitted("j") + ` order by j.location <-> here.g, j.junction_id limit 1)
-where not exists (select 1 from near)`),
-		stateArgs: []any{q.At.Lat, q.At.Lon, q.RadiusM},
+		states:      statesNear,
+		stateArgs:   []any{q.At.Lat, q.At.Lon, q.RadiusM},
 	})
 }
 
 // situationsInState reads the active situations of one Land (the Land of
-// the nearest Gemeinde to each situation's point, contract.traffic_event's
-// state_code; de: every situation), by severity descending, then road and id; the lamp's scope is
+// the nearest Gemeinde to each situation's point, trafficEvents'
+// state_code; de: every situation), by severity descending, then road and id, past q's offset; the lamp's scope is
 // the Land: its situations, the weather warnings of its areas and the Land.
 func (s *Store) situationsInState(ctx context.Context, q roads.AreaQuery, fams roads.Families, now time.Time) (roads.Page, error) {
 	classes, other := q.KnownClasses()
 	args := append(filterArgs(q.Filter, fams.Roads, now), q.State,
 		codes(classes), other, codes(roads.Classes[:len(roads.Classes)-1]), q.Limit+1)
 	start, end := q.Window(now)
-	args = append(args, start, end)
-	return s.read(ctx, `
-with answering as (
-  select `+eventRow+`
-  from contract.traffic_event e
-  where `+situationFilter(13)+`
-    and ($8 = 'de' or e.state_code = $8)
-    and (e.road_class = any($9) or ($10 and not e.road_class = any($11))))
-select `+situationColumns+`, null::float8, null::int,
-       (select jsonb_object_agg(c.source_ref, c.n) from (select source_ref, count(*)::int n from answering group by source_ref) c)
-from answering e
-order by coalesce(array_position($6::text[], e.severity), 0) desc, e.road_ref, e.event_id
-limit $12`, args, q.Limit, fams, now, scope{
-		messages: messagesSelect + `
-  and ($3 = 'de' or e.state_code = $3)`,
-		args: []any{fams.Roads, now, q.State},
+	args = append(args, start, end, q.Offset)
+	return s.read(ctx, situationsInStateList, args, q.Limit, fams, now, scope{
+		messages: messagesInState,
+		args:     []any{fams.Roads, now, q.State},
 		// A Land's warnings are those of its warn cells: the DWD's Gemeinde
 		// and coast cells are 8 or 7 and the Gemeinde key, so the Land is
 		// the key's first two digits, as the platform's warnings in an area
 		// read them.
-		warnings:    `($3 = 'de' or (left(w.warn_cell_id, 1) in ('7', '8') and substr(w.warn_cell_id, 2, 2) = $3))`,
+		warnings:    warningsInState,
 		warningArgs: []any{q.State},
-		states:      `select case when $1 = 'de' then (select coalesce(array_agg(r.region_code order by r.region_code), '{}') from contract.admin_region r where r.region_level = 'state') else array[$1::text] end`,
+		states:      statesInState,
 		stateArgs:   []any{q.State},
 		// The Land form places every situation of the scope by its nearest
 		// municipality: the families that placed them are credited.
-		placed: `select coalesce(array_agg(distinct e.placement_source_ref order by e.placement_source_ref) filter (where e.placement_source_ref is not null), '{}')
-from contract.traffic_event e
-where $3 <> 'de' and e.state_code = $3 and e.withdrawn_at is null and e.source_ref = any($1)
-  and ` + eventPermitted + ` and (e.valid_to is null or e.valid_to > $2)`,
+		placed: placedInState,
 	})
 }
 
@@ -598,12 +838,7 @@ where $3 <> 'de' and e.state_code = $3 and e.withdrawn_at is null and e.source_r
 // active or ended after endedSince (roads.ended_retention_h).
 func (s *Store) Situation(ctx context.Context, id string, families []string, endedSince time.Time) (roads.Situation, error) {
 	rows, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]roads.Situation, error) {
-		res, _ := tx.Query(ctx, `
-select `+situationColumns+`, null::float8, null::int
-from contract.traffic_event e
-where e.event_id = $1 and e.withdrawn_at is null and e.source_ref = any($2)
-  and `+eventPermitted+`
-  and (e.valid_to is null or e.valid_to > $3)`, id, families, endedSince)
+		res, _ := run(ctx, tx, situationByID, id, families, endedSince)
 		return pgx.CollectRows(res, scanSituation)
 	})
 	if err == nil && len(rows) == 0 {

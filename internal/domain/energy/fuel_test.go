@@ -65,3 +65,22 @@ func TestRankFuelIsThePlatformsSearch(t *testing.T) {
 		t.Errorf("no e10: %v", p)
 	}
 }
+
+// The coverage state is the platform's one classification: a held station
+// wins, then a priced one beyond the radius, else nothing is known.
+func TestFuelCoverageState(t *testing.T) {
+	m := 6000.0
+	for _, c := range []struct {
+		c    FuelCoverage
+		want string
+	}{
+		{FuelCoverage{StationsInRadius: 2, NearestPricedM: &m}, CoverageHeld},
+		{FuelCoverage{StationsInRadius: 1}, CoverageHeld},
+		{FuelCoverage{NearestPricedM: &m}, CoveragePricedBeyond},
+		{FuelCoverage{}, CoverageUnknown},
+	} {
+		if got := c.c.State(); got != c.want {
+			t.Errorf("%+v: %s, want %s", c.c, got, c.want)
+		}
+	}
+}

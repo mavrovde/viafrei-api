@@ -199,8 +199,8 @@ func keyedResponses(api huma.API) map[string]*huma.Response {
 			Description: "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
 			Headers: map[string]*huma.Param{
 				"Retry-After":      {Description: "Whole seconds to wait before retrying.", Schema: &huma.Schema{Type: huma.TypeInteger}},
-				"RateLimit-Policy": {Description: rateLimitDoc, Schema: &huma.Schema{Type: huma.TypeString}},
-				"RateLimit":        {Description: rateLimitDoc, Schema: &huma.Schema{Type: huma.TypeString}},
+				"RateLimit-Policy": sharedHeader("RateLimit-Policy"),
+				"RateLimit":        sharedHeader("RateLimit"),
 			},
 			Content: problem,
 		},
@@ -225,7 +225,7 @@ func documentRateLimit(api huma.API) {
 					r.Headers = map[string]*huma.Param{}
 				}
 				for _, name := range []string{"RateLimit-Policy", "RateLimit"} {
-					r.Headers[name] = &huma.Param{Description: rateLimitDoc, Schema: &huma.Schema{Type: huma.TypeString}}
+					r.Headers[name] = sharedHeader(name)
 				}
 			}
 		}

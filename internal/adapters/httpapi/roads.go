@@ -75,6 +75,8 @@ type RoadSituation struct {
 	Headline       string        `json:"headline" doc:"Plain text, in textLanguage."`
 	Description    *string       `json:"description" nullable:"true" doc:"Plain text, in textLanguage; null when not published."`
 	TextLanguage   string        `json:"textLanguage" doc:"The language of headline and description (BCP 47)."`
+	Subtitle       *string       `json:"subtitle" nullable:"true" doc:"The publisher's second line, in textLanguage (on Autobahn GmbH messages the carriageway's direction); null when not published."`
+	Blocked        bool          `json:"blocked" doc:"Whether the publisher states the carriageway is blocked; false when it does not say."`
 	UpdatedAt      time.Time     `json:"updatedAt" doc:"When the situation last changed."`
 	UpdatedAtLocal string        `json:"updatedAtLocal" format:"date-time" doc:"updatedAt in Europe/Berlin time."`
 	Position       *RoadPosition `json:"position" doc:"Chainage along the road; null when the situation cannot be placed on its road, and on answers that are not about one road."`
@@ -87,7 +89,8 @@ func roadSituation(v roads.Situation) RoadSituation {
 		ID: v.ID, Kind: string(v.Kind), Severity: string(v.Severity), Road: v.Road, RoadType: string(v.Class),
 		Direction: string(v.Direction), DirectionText: v.Towards, Validity: timeWindow(v.From, v.Until),
 		DelayMin: v.DelayMin, LengthM: v.LengthM, Headline: v.Headline, Description: v.Description,
-		TextLanguage: v.TextLanguage, UpdatedAt: v.UpdatedAt.UTC(), UpdatedAtLocal: local(v.UpdatedAt),
+		TextLanguage: v.TextLanguage, Subtitle: v.Subtitle, Blocked: v.Blocked,
+		UpdatedAt: v.UpdatedAt.UTC(), UpdatedAtLocal: local(v.UpdatedAt),
 		DistanceM: v.DistanceM, SourceFamily: v.Family,
 	}
 	if v.AtKm != nil {
@@ -101,6 +104,32 @@ func roadSituation(v roads.Situation) RoadSituation {
 		out.Lanes = &Lanes{Closed: v.LanesClosed, Total: v.LanesTotal}
 	}
 	return out
+}
+
+// SourceStamp is one source family's Stand.
+type SourceStamp struct {
+	Family         string     `json:"family" doc:"The source family; its attribution is in meta.attribution."`
+	CheckedAt      time.Time  `json:"lastCheckedAt" doc:"When the family was last checked: its newest confirmation, or its data's instant when that is newer or it was never confirmed."`
+	UnchangedSince *time.Time `json:"unchangedSince" nullable:"true" doc:"The instant of the family's data (meta.freshness dataAsOf); null when unknown."`
+	PossiblyStale  bool       `json:"possiblyStale" doc:"True when checkedAt is more than three of the family's own cycles before the answer's instant, as the platform judges a source; never for a family whose cycle no register states."`
+}
+
+// sourceStamps states the Stand of each stamp at the answer's instant.
+func sourceStamps(stamps []roads.Stamp, at time.Time) []SourceStamp {
+	out := make([]SourceStamp, len(stamps))
+	for i, s := range stamps {
+		out[i] = SourceStamp{Family: s.Family, CheckedAt: s.CheckedAt.UTC(), UnchangedSince: utcOrNil(s.UnchangedSince), PossiblyStale: s.PossiblyStale(at)}
+	}
+	return out
+}
+
+// utcOrNil is t in UTC, nil for nil.
+func utcOrNil(t *time.Time) *time.Time {
+	if t == nil {
+		return nil
+	}
+	u := t.UTC()
+	return &u
 }
 
 func roadSituations(list []roads.Situation) []RoadSituation {
@@ -298,6 +327,7 @@ type MotorwayData struct {
 	LampReasons []LampReason    `json:"lampReasons" doc:"Every reason of the lamp with how many give it, in lampReason's order (lampReason is the first); empty for green."`
 	Sight       []LampSight     `json:"sight" doc:"The sight of every group the lamp read; any group not fresh keeps the lamp from green (limited_sight)."`
 	Counts      []FamilyCount   `json:"counts" doc:"How many situations the filters keep, by source family, before limit and cursor (the platform's counts per publisher), in family order; empty when none."`
+	Stamps      []SourceStamp   `json:"sourceStamps" doc:"The Stand of every attributed source family, as the platform's road status states each source's beside its credit, in family order: when it was last checked, when its data last changed, and whether it is possibly out of date. A family with neither instant has none."`
 	Coverage    *RoadCoverage   `json:"coverage" doc:"Null for a road the road register holds. For a road it does not hold (a federal or Land road, or a motorway it lacks), the answer is read from the situations whose reference names the road, none placed along a line and no state named; coverage then says what was read, as the platform's roadworks-ahead answer says it: an empty list is no sites on what the named families publish, never a road with no works."`
 	Situations  []RoadSituation `json:"situations" doc:"In the platform's motorway status order: jams, closures, the other reports, then roadworks; within each, by traffic type (queuing, stationary, heavy, slow), delay descending, headline, then the publisher's id."`
 }
@@ -323,10 +353,11 @@ type CursorPage struct {
 	NextCursor *string `json:"nextCursor" nullable:"true" doc:"The cursor of the next page; null on the last."`
 }
 
-func cursorPage(q roads.CorridorQuery, more bool, n int) CursorPage {
-	out := CursorPage{Page: Page{Limit: q.Limit, HasMore: more}}
+// cursorPage is the page of n situations read past offset, limit at most.
+func cursorPage(limit, offset int, more bool, n int) CursorPage {
+	out := CursorPage{Page: Page{Limit: limit, HasMore: more}}
 	if more {
-		next := strconv.Itoa(q.Offset + n)
+		next := strconv.Itoa(offset + n)
 		out.NextCursor = &next
 	}
 	return out
@@ -375,11 +406,12 @@ func registerMotorwayConditions(api huma.API, s *server, op huma.Operation) {
 				Sight:       lampSight(c),
 				Coverage:    roadCoverage(c),
 				Counts:      familyCounts(c.Counts),
+				Stamps:      sourceStamps(c.Stamps, c.At),
 				Situations:  roadSituations(c.Items),
 			},
 			Meta: MotorwayMeta{
 				DataMeta: s.dataMeta(ctx, c.Families, c.At, c.Partial, partialDetail),
-				Page:     cursorPage(q, c.HasMore, len(c.Items)),
+				Page:     cursorPage(q.Limit, q.Offset, c.HasMore, len(c.Items)),
 				Query:    MotorwayQuery{Road: c.Road.Ref, Direction: string(q.Direction), FilterQuery: filterQuery(q.Filter)},
 			},
 			Links: s.selfLink(ctx),
@@ -404,10 +436,14 @@ type RoadConditionsInput struct {
 	SituationFilters
 	SituationWindow
 	RoadClass []string `query:"road_class" enum:"motorway,federal,state,urban,other" doc:"Only situations on roads of these classes, comma-separated; other keeps the classes that cannot be mapped. Default: every class held."`
+	Cursor    string   `query:"cursor" pattern:"^[0-9]{1,4}$" doc:"The meta.page.nextCursor of the page before; omit for the first page."`
+	offset    int
 }
 
-// Resolve reads the position and refuses a window that cannot be read.
+// Resolve reads the position and the cursor and refuses a window that
+// cannot be read.
 func (in *RoadConditionsInput) Resolve(ctx huma.Context) []error {
+	in.offset, _ = strconv.Atoi(in.Cursor)
 	return append(in.AtPosition.Resolve(ctx), in.check()...)
 }
 
@@ -424,6 +460,7 @@ type Area struct {
 type RoadConditionsData struct {
 	Area        Area            `json:"area"`
 	Counts      []FamilyCount   `json:"counts" doc:"How many situations the filters keep, by source family, before limit and cursor (the platform's counts per publisher), in family order; empty when none."`
+	Stamps      []SourceStamp   `json:"sourceStamps" doc:"The Stand of every attributed source family, as the platform's road status states each source's beside its credit, in family order: when it was last checked, when its data last changed, and whether it is possibly out of date. A family with neither instant has none."`
 	Lamp        string          `json:"lamp" enum:"green,amber,red" doc:"The lamp over the question's scope (the road and direction, or the radius), whatever kinds and min_severity keep in the list, by the platform's motorway Ampel (amber is its yellow). It reads every situation in the scope as its record is read (the motorway operator's event, any other traffic message, a bridge's state) and every official weather warning in force in an area the road crosses, or within the radius. Red: a closure of the carriageway; a safety message by its words on any kind (a wrong-way driver, an object, a person or an animal on the road, an accident with the road closed); a closed bridge; a jam with a delay of 30 minutes or more; a weather warning of level 3 or 4. Amber: a closed entry, exit or junction link; a shorter jam or one with no delay; a weather warning of level 1 or 2; any other message (an accident without a closure, a restricted bridge, a situation that cannot be mapped); roadworks or a lane restriction on the carriageway (works on a ramp give no colour); or limited sight: a roads family stale or without data, a roads family the key may not read (meta.partial), the weather warnings not readable with the key or their source not current, or a state in scope whose traffic messages no current roads family the key may read covers. A situation's severity does not colour the lamp. Green when nothing gives a colour and every group read is current, which is no guarantee that the road is free."`
 	LampReason  *string         `json:"lampReason" nullable:"true" enum:"road_closed,ramp_closed,safety,bridge_closed,long_jam,jam,weather_warning,slippery,warning,narrowing,limited_sight" doc:"Why the lamp has its colour: the first of its reasons, a red one before any amber one, and inside a colour in the platform's order, which is this enumeration's order; null for green. slippery is never given while the read contract holds no road-weather forecast. Open enumeration."`
 	LampReasons []LampReason    `json:"lampReasons" doc:"Every reason of the lamp with how many give it, in lampReason's order (lampReason is the first); empty for green."`
@@ -441,7 +478,7 @@ type RoadConditionsQuery struct {
 // RoadConditionsMeta is the meta member of listRoadConditions.
 type RoadConditionsMeta struct {
 	DataMeta
-	Page  Page                `json:"page"`
+	Page  CursorPage          `json:"page"`
 	Query RoadConditionsQuery `json:"query"`
 }
 
@@ -468,7 +505,7 @@ func registerRoadConditions(api huma.API, s *server, op huma.Operation) {
 		}
 		f := in.filter()
 		f.Listed = roads.AreaKinds
-		q := roads.AreaQuery{At: in.point, RadiusM: s.radius(in.RadiusM), Filter: s.windowed(ctx, f, in.SituationWindow), Limit: s.limit(in.Limit)}
+		q := roads.AreaQuery{At: in.point, RadiusM: s.radius(in.RadiusM), Filter: s.windowed(ctx, f, in.SituationWindow), Limit: s.limit(in.Limit), Offset: in.offset}
 		types := []string{}
 		for _, c := range in.RoadClass {
 			q.Classes = append(q.Classes, roads.Class(c))
@@ -494,11 +531,12 @@ func registerRoadConditions(api huma.API, s *server, op huma.Operation) {
 				LampReasons: lampReasons(c),
 				Sight:       lampSight(c),
 				Counts:      familyCounts(c.Counts),
+				Stamps:      sourceStamps(c.Stamps, c.At),
 				Situations:  listed,
 			},
 			Meta: RoadConditionsMeta{
 				DataMeta: s.dataMeta(ctx, c.Families, c.At, c.Partial, partialDetail),
-				Page:     Page{Limit: q.Limit, HasMore: c.HasMore},
+				Page:     cursorPage(q.Limit, q.Offset, c.HasMore, len(c.Items)),
 				Query:    RoadConditionsQuery{NearQuery: NearQuery{At: position(q.At), RadiusM: q.RadiusM}, FilterQuery: filterQuery(q.Filter), RoadClasses: types},
 			},
 			Links: s.selfLink(ctx),
@@ -556,14 +594,20 @@ type StateConditionsInput struct {
 	SituationWindow
 	RoadClass []string `query:"road_class" enum:"motorway,federal,state,urban,other" doc:"Only situations on roads of these classes, comma-separated; motorway for a Land's motorways. Default: every class held."`
 	Limit     int      `query:"limit" minimum:"1" maximum:"100" doc:"Most situations to return. Default: pagination.default_limit."`
+	Cursor    string   `query:"cursor" pattern:"^[0-9]{1,4}$" doc:"The meta.page.nextCursor of the page before; omit for the first page."`
+	offset    int
 }
 
-// Resolve refuses a window that cannot be read.
-func (in *StateConditionsInput) Resolve(huma.Context) []error { return in.check() }
+// Resolve reads the cursor and refuses a window that cannot be read.
+func (in *StateConditionsInput) Resolve(huma.Context) []error {
+	in.offset, _ = strconv.Atoi(in.Cursor)
+	return in.check()
+}
 
 // StateConditionsData is the answer of listStateRoadConditions.
 type StateConditionsData struct {
 	Counts      []FamilyCount   `json:"counts" doc:"How many situations the filters keep, by source family, before limit and cursor (the platform's counts per publisher), in family order; empty when none."`
+	Stamps      []SourceStamp   `json:"sourceStamps" doc:"The Stand of every attributed source family, as the platform's road status states each source's beside its credit, in family order: when it was last checked, when its data last changed, and whether it is possibly out of date. A family with neither instant has none."`
 	State       string          `json:"state" doc:"The Land's code."`
 	Lamp        string          `json:"lamp" enum:"green,amber,red" doc:"The lamp over every situation of the Land and every official weather warning in force in its areas, by the rules of listRoadConditions."`
 	LampReason  *string         `json:"lampReason" nullable:"true" doc:"Why the lamp has its colour, as in listRoadConditions; null for green."`
@@ -584,7 +628,7 @@ type StateConditionsEnvelope struct {
 	Data StateConditionsData `json:"data"`
 	Meta struct {
 		DataMeta
-		Page  Page                 `json:"page"`
+		Page  CursorPage           `json:"page"`
 		Query StateConditionsQuery `json:"query"`
 	} `json:"meta"`
 	Links Links `json:"links"`
@@ -604,7 +648,7 @@ func registerStateConditions(api huma.API, s *server, op huma.Operation) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
-		q := roads.AreaQuery{State: in.State, Filter: s.windowed(ctx, in.filter(), in.SituationWindow), Limit: s.limit(in.Limit)}
+		q := roads.AreaQuery{State: in.State, Filter: s.windowed(ctx, in.filter(), in.SituationWindow), Limit: s.limit(in.Limit), Offset: in.offset}
 		types := []string{}
 		for _, c := range in.RoadClass {
 			q.Classes = append(q.Classes, roads.Class(c))
@@ -617,9 +661,9 @@ func registerStateConditions(api huma.API, s *server, op huma.Operation) {
 		noteLamp(ctx, c)
 		out := &StateConditionsOutput{CacheControl: noStore}
 		out.Body.Data = StateConditionsData{State: q.State, Lamp: string(c.Lamp), LampReason: lampReason(c.Reason),
-			LampReasons: lampReasons(c), Sight: lampSight(c), Counts: familyCounts(c.Counts), Situations: roadSituations(c.Items)}
+			LampReasons: lampReasons(c), Sight: lampSight(c), Counts: familyCounts(c.Counts), Stamps: sourceStamps(c.Stamps, c.At), Situations: roadSituations(c.Items)}
 		out.Body.Meta.DataMeta = s.dataMeta(ctx, c.Families, c.At, c.Partial, partialDetail)
-		out.Body.Meta.Page = Page{Limit: q.Limit, HasMore: c.HasMore}
+		out.Body.Meta.Page = cursorPage(q.Limit, q.Offset, c.HasMore, len(c.Items))
 		out.Body.Meta.Query = StateConditionsQuery{State: q.State, FilterQuery: filterQuery(q.Filter), RoadClasses: types}
 		out.Body.Links = s.selfLink(ctx)
 		return out, nil

@@ -259,7 +259,7 @@ func logger(d Deps) *slog.Logger {
 // build makes the handler of the operations served on surf and the document
 // it serves; extra operations are registered after the catalogue (tests
 // only; one without a surface is public). The document is marshalled on
-// first use, once: it is ~100 KB with its examples, and a handler built for
+// first use, once: it is ~0.9 MB with its examples, and a handler built for
 // a request path that never asks for it (every test, most processes until
 // the first /v1/openapi.json) should not pay for it.
 func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte, error) {
@@ -415,6 +415,7 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 	}
 	// The document describes the public listener; the health listener
 	// serves none.
+	documentSharedHeaders(api)
 	if surf == onPublic {
 		amendNullableObjects(api)
 		if err := documentExamples(api.OpenAPI(), base); err != nil {
@@ -425,6 +426,9 @@ func build(d Deps, extra []operation, surf surface) (http.Handler, func() []byte
 		}
 		if d.Config.Cache.Enabled {
 			documentCaching(api)
+		}
+		if err := everySchemaReached(api.OpenAPI()); err != nil {
+			return nil, nil, err
 		}
 	}
 

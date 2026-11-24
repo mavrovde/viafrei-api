@@ -20,26 +20,31 @@ import (
 // contract and hand the domain its own model, mapping every stored code
 // through the domain's mapping (ENV-051). No storage name leaves this package.
 
+// provenanceRead is the attribution of the families $1 (as sourcesRead),
+// the publisher's website, the stale bound, the feed status and the
+// register notes in $2.
+var provenanceRead = named("api_provenance", `
+with `+sourceCTE(true)+`,
+fresh as (`+freshnessRows+`)
+select s.source_ref, s.domain, s.publisher_name, s.attribution_text, s.licence_code, `+licenceURL("s.licence_code")+`,
+       s.licence_code ~* '(BY-SA|ODbL|Open Database License)', s.share_alike_offer_url, s.terms_url, s.website, s.stale_after_s,
+       f.data_as_of, f.confirmed_at, `+familyVersion+`,
+       array(select n.note_kind from contract_sources c join source_register_notes n on n.source_id = c.register_id
+             where c.source_ref = s.source_ref and n.lang = (select $2::text) order by n.note_kind, n.body),
+       array(select n.body from contract_sources c join source_register_notes n on n.source_id = c.register_id
+             where c.source_ref = s.source_ref and n.lang = (select $2::text) order by n.note_kind, n.body)
+from src s
+left join fresh f on f.source_ref = s.source_ref
+where s.source_ref = any((select $1::text[])::text[]) and s.publisher_name is not null and s.licence_code is not null
+order by s.source_ref`, "text[]", "text")
+
 // Provenance reads the attribution, the notes in lang and the freshness of
 // the given families only.
 func (s *Store) Provenance(ctx context.Context, families []string, lang string) ([]provenance.Family, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]provenance.Family, error) {
 		// A failed query surfaces through CollectRows (pgx returns it from
 		// rows.Err as well).
-		rows, _ := tx.Query(ctx, `
-select s.source_ref, s.domain, p.display_name, s.attribution_text, l.licence_name, l.licence_url,
-       l.share_alike, s.share_alike_offer_url, s.terms_url, p.website, s.stale_after_s, f.data_as_of, f.confirmed_at,
-       `+familyVersion+`,
-       array(select n.note_kind from contract.source_note n
-             where n.source_ref = s.source_ref and n.lang = $2 order by n.note_kind, n.body),
-       array(select n.body from contract.source_note n
-             where n.source_ref = s.source_ref and n.lang = $2 order by n.note_kind, n.body)
-from contract.source s
-join contract.publisher p using (publisher_id)
-join contract.licence l using (licence_code)
-left join contract.source_freshness f using (source_ref)
-where s.source_ref = any($1)
-order by s.source_ref`, families, lang)
+		rows, _ := run(ctx, tx, provenanceRead, families, lang)
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (provenance.Family, error) {
 			var (
 				f            provenance.Family
@@ -109,7 +114,11 @@ func (s *Store) ChargingNear(ctx context.Context, q energy.Query, families []str
 		// One statement: the sites (one more than the limit, to tell whether
 		// there are more), then their points. A failed query surfaces through
 		// CollectRows.
-		res, _ := tx.Query(ctx, chargingSites(q.SiteID != ""), q.At.Lat, q.At.Lon, families, q.RadiusM, accessCodes, q.MinKw, q.Limit+1, now,
+		read := chargingNear
+		if q.SiteID != "" {
+			read = chargingByID
+		}
+		res, _ := run(ctx, tx, read, q.At.Lat, q.At.Lon, families, float64(q.RadiusM), accessCodes, q.MinKw, q.Limit+1, now,
 			connector, f.MaxKw, opKey, pointFiltered, terms, q.SiteID)
 		return pgx.CollectRows(res, func(r pgx.CollectableRow) (row, error) {
 			var (
@@ -160,14 +169,8 @@ func (s *Store) ChargingNear(ctx context.Context, q energy.Query, families []str
 // read keeps (withdrawn, permitted) included.
 func (s *Store) ChargingInRadius(ctx context.Context, q energy.Query, families []string) (int, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (int, error) {
-		var n int
-		err := tx.QueryRow(ctx, `select count(*)::int
-from contract.charging_site c
-where c.withdrawn_at is null
-  and (c.source_ref = any($3)) is true
-  and `+permitted("c")+`
-  and st_dwithin(c.location::geography, st_setsrid(st_makepoint($2, $1), 4326)::geography, $4)`,
-			q.At.Lat, q.At.Lon, families, q.RadiusM).Scan(&n)
+		rows, _ := run(ctx, tx, chargingInRadius, q.At.Lat, q.At.Lon, families, float64(q.RadiusM))
+		n, err := pgx.CollectOneRow(rows, pgx.RowTo[int])
 		return n, err
 	})
 }
@@ -183,24 +186,81 @@ func earliest(a, b *time.Time) *time.Time {
 // parkingHere is the asked position, $1 lat and $2 lon.
 const parkingHere = `with here as (select st_setsrid(st_makepoint($2, $1), 4326)::geography g)`
 
+// parkingLocation is a facility's point (its area's point on the surface),
+// as the facilities' location indexes hold it.
+const parkingLocation = `st_pointonsurface(f.geom::geometry)::geometry(Point,4326)`
+
+// parkingFacilities are the facilities of the four parking tables in one
+// shape (tbl and raw_id name the row; facility_id is the platform's id, the
+// table's prefix and the row's id): the platform's own (not deleted), the
+// CC BY-SA and ODbL lists without amenities, and the SID's without an
+// operator or a road.
+const parkingFacilities = `(
+  select 'p' tbl, x.id raw_id, 'p:' || x.id facility_id, x.name, x.kind, x.operator, x.road, x.geom, x.source_feed, x.closed_at,
+         x.confidentiality, x.facilities, x.facilities_absent
+  from parking_facilities x where x.deleted_at is null
+  union all
+  select 'bysa', x.id, 'bysa:' || x.id, x.name, x.kind, x.operator, x.road, x.geom, x.source_feed, x.closed_at, x.confidentiality, '{}'::text[], '{}'::text[]
+  from parking_facilities_bysa x
+  union all
+  select 'odbl', x.id, 'odbl:' || x.id, x.name, x.kind, x.operator, x.road, x.geom, x.source_feed, x.closed_at, x.confidentiality, '{}'::text[], '{}'::text[]
+  from parking_facilities_odbl x
+  union all
+  select 'sid', x.id, 'sid:' || x.id, x.name, x.kind, null::text, null::text, x.geom, x.source_feed, x.closed_at, x.confidentiality,
+         x.facilities, x.facilities_absent
+  from parking_facilities_sid x)`
+
+// parkingOccupancy are the occupancy reports of facility f that cond (over
+// the reports t) keeps, from its own table's reports (the CC BY-SA list has
+// none), on each table's key; with newest, only each table's newest, so
+// each is one backward probe of its key rather than every report sorted.
+func parkingOccupancy(cond string, newest bool) string {
+	branch := func(table, tbl string) string {
+		b := `select t.observed_at, t.spaces_free, t.spaces_total, t.status, t.source_feed, t.confidentiality
+  from ` + table + ` t where f.tbl = '` + tbl + `' and t.facility_id = f.raw_id and ` + cond
+		if newest {
+			b = `(` + b + ` order by t.observed_at desc limit 1)`
+		}
+		return b
+	}
+	return `(
+  ` + branch("parking_occupancy", "p") + `
+  union all
+  ` + branch("parking_occupancy_odbl", "odbl") + `
+  union all
+  ` + branch("parking_occupancy_sid", "sid") + `)`
+}
+
+// heldFamilies are the families of expr (a text[] expression) their
+// source rule gives the key and holds nothing back from: as ruledFamilies,
+// and with no hold.
+func heldFamilies(expr string) string {
+	return `select coalesce(array_agg(x.f), '{}') f from unnest(` + expr + `) x(f) where ` + sourceRuled("x.f") + `
+    and (select k.hold_reason from contract_source_rules k where x.f ~ k.pattern order by k.priority limit 1) is null`
+}
+
+// parkingKept is a facility's or a report's own rule over alias a with the
+// family column col: of the families fams, and not confidential.
+func parkingKept(a, col, fams string) string {
+	return a + `.` + col + ` = any((` + heldFamilies(fams) + `)::text[]) and coalesce(` + a + `.confidentiality, 'noRestriction') = 'noRestriction'`
+}
+
 // parkingWhere is the where of a parking read past its gates, and its order:
 // $5 the radius, $7 the stored kind or null, $8 the amenities or null, $9
 // the road or empty; a road read's $10 is the road's line (hex EWKB, null
-// without one), from the road snapshot: the read contract's road view derives
-// it per read, and the corridor test asked it once per facility. A road read
-// keeps the platform's corridor (CorridorM of
-// one of the road's location-code points, which only the platform's own
-// parking family is matched by, or filed under the road by its source) and
-// is in name order, unnamed last; a position read keeps the radius and is
-// nearest first. Both then go by id.
+// without one), from the road snapshot. A road read keeps the platform's
+// corridor (CorridorM of one of the road's location-code points, which only
+// the platform's own parking family is matched by, or filed under the road
+// by its source) and is in name order, unnamed last; a position read keeps
+// the radius and is nearest first. Both then go by id.
 func parkingWhere(q parking.Query) (where, order string) {
-	filters := `($7::text is null or f.stored_kind = $7) and ($8::text[] is null or f.amenities @> $8)`
+	filters := `($7::text is null or f.kind = $7) and ($8::text[] is null or f.facilities @> $8)`
 	if q.Road == "" {
-		return `$9 = '' and st_dwithin(f.location::geography, here.g, $5) and ` + filters, `8, f.facility_id`
+		return `$9 = '' and st_dwithin(` + parkingLocation + `::geography, here.g, $5) and ` + filters, `8, f.facility_id`
 	}
-	return `$5::int >= 0 and f.facility_id like 'p:%' and (f.road_ref = $9 or exists (
+	return `$5 >= 0 and f.tbl = 'p' and (f.road = $9 or exists (
     select 1 from st_dumppoints($10::text::geometry) d
-    where st_dwithin(f.location::geography, d.geom::geography, ` + strconv.Itoa(parking.CorridorM) + `))) and ` + filters, `f.name nulls last, f.facility_id`
+    where st_dwithin(` + parkingLocation + `::geography, d.geom::geography, ` + strconv.Itoa(parking.CorridorM) + `))) and ` + filters, `f.name nulls last, f.facility_id`
 }
 
 // shiftParams moves the where's $7..$10 to $8..$10 and $12, the positions
@@ -218,13 +278,82 @@ func parkingArgs(q parking.Query, line *string, args ...any) []any {
 	return append(args, line)
 }
 
+// parkingStatus is a report's state over the reports o, the platform's
+// mapping.
+const parkingStatus = `case when o.status is null then 'unknown' when o.status ~* 'almost|filling' then 'filling'
+       when o.status ~* 'full' then 'full' when o.status ~* 'closed' then 'closed'
+       when o.status ~* '(free|available|open|vacant)' then 'free' when o.status ~* 'unknown' then 'unknown' else 'other' end`
+
+// parkingStale is the stale bound (seconds) of the family o.source_ref, as
+// the published register states it: three of its cadence, the register's
+// else the feed status's; no row when the family is not published.
+const parkingStale = `select 3 * coalesce(c.cadence_s, (select max(x.cadence_s) from control.data_status x where x.key = c.source_ref)) stale_after_s
+        from contract_sources c
+        where c.source_ref = o.source_ref and coalesce(c.licence_code, '') !~* '^pending'
+          and not coalesce((select k.excluded from contract_source_rules k where c.source_ref ~ k.pattern order by k.priority limit 1), false)`
+
+// parkingNext is the earliest report after now of a facility the read
+// keeps; parkingList the facilities, each with its newest report.
+func parkingStatements(road bool) (next, list stmt) {
+	q := parking.Query{}
+	name := "near"
+	if road {
+		q.Road, name = "road", "road"
+	}
+	where, order := parkingWhere(q)
+	nextSQL := parkingHere + `
+select min(nx.next_at)
+from ` + parkingFacilities + ` f
+cross join here
+cross join lateral (
+  select min(o.observed_at) next_at
+  from ` + parkingOccupancy(parkingKept("t", "source_feed", "$4")+` and t.observed_at > $6`, false) + ` o) nx
+where f.closed_at is null and f.geom is not null
+  and ` + parkingKept("f", "source_feed", "$3") + `
+  and ` + where
+	listSQL := parkingHere + `
+select f.facility_id, f.source_feed, f.name, f.operator,
+       case f.kind when 'rest_area' then 'rest_area' when 'park_and_ride' then 'park_and_ride' when 'truck' then 'truck_parking' else 'other' end,
+       st_y(` + parkingLocation + `), st_x(` + parkingLocation + `),
+       ` + parkingDistance(q) + `,
+       o.free_spaces, o.total_spaces, o.occupancy_status, o.observed_at, o.source_ref,
+       f.facilities, f.facilities_absent
+from ` + parkingFacilities + ` f
+cross join here
+left join lateral (
+  select o.spaces_free free_spaces, o.spaces_total total_spaces, ` + parkingStatus + ` occupancy_status, o.observed_at, o.source_feed source_ref
+  from ` + parkingOccupancy(parkingKept("t", "source_feed", "$4")+` and t.observed_at <= $7`, true) + ` o
+  order by o.observed_at desc
+  limit 1) o on true
+where f.closed_at is null and f.geom is not null
+  and ` + parkingKept("f", "source_feed", "$3") + `
+  and ` + shiftParams(where) + `
+  and ($6 <= 0 or (o.free_spaces >= $6 and (
+        select s.stale_after_s is null or o.observed_at >= $7 - make_interval(secs => s.stale_after_s)
+        from (` + parkingStale + `) s)))
+order by ` + order + `
+limit $11`
+	nt := []string{"float8", "float8", "text[]", "text[]", "float8", "timestamptz", "text", "text[]", "text"}
+	lt := []string{"float8", "float8", "text[]", "text[]", "float8", "int", "timestamptz", "text", "text[]", "text", "bigint"}
+	if road {
+		nt, lt = append(nt, "text"), append(lt, "text")
+	}
+	return named("api_parking_next_"+name, opaqued(nextSQL, nt...), nt...), named("api_parking_"+name, opaqued(listSQL, lt...), lt...)
+}
+
+// The parking reads, built once: by position and along a road.
+var (
+	parkingNextNear, parkingNear = parkingStatements(false)
+	parkingNextRoad, parkingRoad = parkingStatements(true)
+)
+
 // parkingDistance is the distance column: the metres from the asked
 // position, or 0 along a road, where no point was asked.
 func parkingDistance(q parking.Query) string {
 	if q.Road != "" {
 		return `0`
 	}
-	return `round(st_distance(f.location::geography, here.g))::int`
+	return `round(st_distance(` + parkingLocation + `::geography, here.g))::int`
 }
 
 // parkingKind is the stored kind a query keeps, or nil for every kind.
@@ -269,41 +398,14 @@ func (s *Store) ParkingNear(ctx context.Context, q parking.Query, listed, occupa
 		// leaves out may qualify once a later report takes effect. A failure
 		// aborts the transaction, so the next statement fails too and both
 		// surface together.
-		where, order := parkingWhere(q)
-		nextErr := tx.QueryRow(ctx, parkingHere+`
-select min(nx.next_at)
-from contract.parking_facility f
-cross join here
-cross join lateral (
-  select min(o.observed_at) next_at
-  from contract.occupancy_observation o
-  where o.facility_id = f.facility_id and o.source_ref = any($4) and o.observed_at > $6 and `+held("o")+`) nx
-where f.withdrawn_at is null
-  and f.source_ref = any($3)
-  and `+held("f")+`
-  and `+where, parkingArgs(q, line, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, now, parkingKind(q), parkingAmenities(q), q.Road)...).Scan(&a.next)
-		rows, _ := tx.Query(ctx, parkingHere+`
-select f.facility_id, f.source_ref, f.name, f.operator_name, f.parking_kind,
-       st_y(f.location), st_x(f.location),
-       `+parkingDistance(q)+`,
-       o.free_spaces, o.total_spaces, o.occupancy_status, o.observed_at, o.source_ref
-from contract.parking_facility f
-cross join here
-left join lateral (
-  select free_spaces, total_spaces, occupancy_status, observed_at, source_ref
-  from contract.occupancy_observation o
-  where o.facility_id = f.facility_id and o.source_ref = any($4) and o.observed_at <= $7 and `+held("o")+`
-  order by o.observed_at desc
-  limit 1) o on true
-where f.withdrawn_at is null
-  and f.source_ref = any($3)
-  and `+held("f")+`
-  and `+shiftParams(where)+`
-  and ($6::int <= 0 or (o.free_spaces >= $6 and (
-        select s.stale_after_s is null or o.observed_at >= $7::timestamptz - make_interval(secs => s.stale_after_s)
-        from contract.source s where s.source_ref = o.source_ref)))
-order by `+order+`
-limit $11`, parkingArgs(q, line, q.At.Lat, q.At.Lon, listed, occupancy, q.RadiusM, q.FreeMin, now, parkingKind(q), parkingAmenities(q), q.Road, q.Limit+1)...)
+		next, list := parkingNextNear, parkingNear
+		if q.Road != "" {
+			next, list = parkingNextRoad, parkingRoad
+		}
+		nextRows, _ := run(ctx, tx, next, parkingArgs(q, line, q.At.Lat, q.At.Lon, listed, occupancy, float64(q.RadiusM), now, parkingKind(q), parkingAmenities(q), q.Road)...)
+		var nextErr error
+		a.next, nextErr = pgx.CollectOneRow(nextRows, pgx.RowTo[*time.Time])
+		rows, _ := run(ctx, tx, list, parkingArgs(q, line, q.At.Lat, q.At.Lon, listed, occupancy, float64(q.RadiusM), q.FreeMin, now, parkingKind(q), parkingAmenities(q), q.Road, q.Limit+1)...)
 		var err error
 		a.sites, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (parking.Site, error) {
 			var (
@@ -313,10 +415,12 @@ limit $11`, parkingArgs(q, line, q.At.Lat, q.At.Lon, listed, occupancy, q.Radius
 				state       *string
 				observed    *time.Time
 				family      *string
+				has, lacks  []string
 			)
 			err := r.Scan(&v.ID, &v.Family, &v.Name, &v.Operator, &kind, &v.Location.Lat, &v.Location.Lon, &v.DistanceM,
-				&free, &total, &state, &observed, &family)
+				&free, &total, &state, &observed, &family, &has, &lacks)
 			v.Kind = parking.MapKind(kind)
+			v.Amenities = parking.StatedOf(has, lacks)
 			if state != nil {
 				v.Occupancy = &parking.Occupancy{Free: free, Total: total, State: parking.MapState(*state), ObservedAt: observed.UTC(), Family: *family}
 			}
@@ -335,13 +439,18 @@ limit $11`, parkingArgs(q, line, q.At.Lat, q.At.Lon, listed, occupancy, q.Radius
 	return sites, more, next, err
 }
 
+// placeByID is the open place $1 (a gazetteer id, read on the key) of the
+// families $2, with the platform's kind and its point on the surface.
+var placeByID = named("api_place_by_id", `
+select g.id::text, g.name, `+placeKind+`, st_y(st_pointonsurface(g.geom::geometry)), st_x(st_pointonsurface(g.geom::geometry)), g.source_id
+from gazetteer_places g
+where g.id = (select case when $1::text ~ '^[0-9]{1,18}$' then $1::text::bigint end) and g.id::text = (select $1::text)
+  and g.closed_at is null and g.geom is not null and g.source_id = any((select $2::text[])::text[])`, "text", "text[]")
+
 // Place reads one place of the given families.
 func (s *Store) Place(ctx context.Context, id string, families []string) (places.Place, error) {
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (places.Place, error) {
-		rows, _ := tx.Query(ctx, `
-select place_id, name, place_kind, st_y(location), st_x(location), source_ref
-from contract.place
-where place_id = $1 and withdrawn_at is null and source_ref = any($2) and `+permitted("place"), id, families)
+		rows, _ := run(ctx, tx, placeByID, id, families)
 		ps, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.Place, error) {
 			var (
 				v    places.Place
@@ -388,28 +497,26 @@ func threshold(staleAfterS *int64) (time.Duration, bool) {
 // before the ring. Kept, they are listed by the distance the answer reports,
 // then id, as before; the one past the limit ($7, to tell that there are
 // more) stays last.
-func chargingSites(byID bool) string {
+func chargingSites(byID bool) stmt {
 	q := `
 with here as (select st_setsrid(st_makepoint($2, $1), 4326)::geography g),
 near as (
-  select c.site_id, c.source_ref, c.name, c.operator_name, c.access, c.origin_key,
-         st_y(c.location) lat, st_x(c.location) lon,
-         round(st_distance(c.location::geography, here.g))::int dist,
-         c.location::geography <-> here.g d
-  from contract.charging_site c, here
-  where c.withdrawn_at is null
-    and (c.source_ref = any($3)) is true
-    and ` + permitted("c") + `
-    and st_dwithin(c.location::geography, here.g, $4) and $14::text = ''
+  select c.site_id, c.source_feed source_ref, c.name, c.operator_name, c.access, c.origin_key,
+         st_y(c.geom::geometry) lat, st_x(c.geom::geometry) lon,
+         round(st_distance(c.geom, here.g))::int dist,
+         c.geom <-> here.g d
+  from ` + chargingSiteRows + ` c, here
+  where (c.source_feed = any((` + ruledFamilies("$3") + `)::text[])) is true
+    and st_dwithin(c.geom, here.g, $4) and $14::text = ''
     and ($5::text[] is null or c.access = any($5))
     and ($11::text is null or coalesce(` + energy.OperatorKeySQL("c.operator_name") + `, '` + energy.NoOperatorKey + `') = $11)
     and (not $12::boolean or exists (
-          select 1 from contract.charge_point p
-          where p.site_id = c.site_id and ` + pointFilter + ` and ` + permitted("p") + `))
-  order by c.location::geography <-> here.g
+          select 1 from ` + chargePointRows + ` p
+          where p.source_feed = c.source_feed and p.raw_site = c.origin_key and ` + pointFilter + `))
+  order by c.geom <-> here.g
   fetch first $7 rows with ties),
 sites as (
-  select n.site_id, n.source_ref, n.name, n.operator_name, n.access, n.lat, n.lon, n.dist,
+  select n.site_id, n.source_ref, n.name, n.operator_name, n.access, n.lat, n.lon, n.dist, n.origin_key,
          row_number() over (order by n.d, n.source_ref, n.origin_key) rn
   from near n
   order by rn
@@ -418,20 +525,90 @@ select s.site_id, s.source_ref, s.name, s.operator_name, s.access, s.lat, s.lon,
        p.point_id, p.current_kind, p.power_max_kw::float8, o.availability, o.observed_at, o.source_ref,
        nx.next_at
 from sites s
-left join contract.charge_point p on p.site_id = s.site_id and ` + pointFilter + ` and ` + permitted("p") + `
+left join ` + chargePointRows + ` p on p.source_feed = s.source_ref and p.raw_site = s.origin_key and ` + pointFilter + `
 left join lateral (
-  select availability, observed_at, source_ref
-  from contract.charge_point_state_observation o
-  where o.point_id = p.point_id and o.source_ref = any($3) and o.observed_at <= $8 and ` + permitted("o") + `
+  select ` + chargeAvailability + ` availability, o.observed_at, o.source_feed source_ref
+  from charging_point_status o
+  where o.evse_id = p.point_id and o.source_feed = any((` + ruledFamilies("$3") + `)::text[]) and o.observed_at <= $8
+    and coalesce(o.confidentiality, 'noRestriction') = 'noRestriction'
   order by o.observed_at desc
   limit 1) o on true
 left join lateral (
   select min(o.observed_at) next_at
-  from contract.charge_point_state_observation o
-  where o.point_id = p.point_id and o.source_ref = any($3) and o.observed_at > $8 and ` + permitted("o") + `) nx on true
+  from charging_point_status o
+  where o.evse_id = p.point_id and o.source_feed = any((` + ruledFamilies("$3") + `)::text[]) and o.observed_at > $8
+    and coalesce(o.confidentiality, 'noRestriction') = 'noRestriction') nx on true
 order by s.rn = $7, s.dist, s.site_id, p.point_id`
+	name := "api_charging_near"
 	if byID {
-		q = strings.Replace(q, "st_dwithin(c.location::geography, here.g, $4) and $14::text = ''", "c.site_id = $14::text and $4::int >= 0", 1)
+		// The site asked by its id, on the sites' key: the family before the
+		// first colon, the provider's id after it.
+		q = strings.Replace(q, "st_dwithin(c.geom, here.g, $4) and $14::text = ''",
+			"c.source_feed = split_part($14::text, ':', 1) and c.origin_key = substr($14, length(split_part($14, ':', 1)) + 2)\n    and c.site_id = $14 and $4 >= 0", 1)
+		name = "api_charging_by_id"
 	}
-	return q
+	return named(name, opaqued(q, "float8", "float8", "text[]", "float8", "text[]", "float8", "bigint",
+		"timestamptz", "text", "float8", "text", "bool", "text[]", "text"),
+		"float8", "float8", "text[]", "float8", "text[]", "float8", "bigint",
+		"timestamptz", "text", "float8", "text", "bool", "text[]", "text")
 }
+
+// chargingSiteRows are the charging sites a read may list: not deleted nor
+// closed, with a position, and not withheld (a confidentiality other than
+// noRestriction, or a private access). The site's id is its family and the
+// provider's id, joined by a colon.
+const chargingSiteRows = `(
+  select s.source_feed || ':' || s.site_id site_id, s.source_feed, s.site_id origin_key, s.name, s.operator operator_name,
+         case when s.access_private then 'restricted' else 'public' end access, s.geom
+  from charging_sites s
+  where s.deleted_at is null and s.closed_at is null and s.geom is not null
+    and coalesce(s.confidentiality, 'noRestriction') = 'noRestriction' and s.access_private is not true)`
+
+// chargePointRows are the charge points a read may list, with the
+// register's terms: not deleted, of a site, not confidential. The point's id
+// is its EVSE id, else its family and key. Its family is its site's, so its
+// source rule is the one the site was read under.
+const chargePointRows = `(
+  select coalesce(p.evse_id, p.source_feed || ':' || p.point_key) point_id, p.source_feed, p.site_id raw_site,
+         case when p.current_type ~* '^ac' then 'ac' when p.current_type ~* '^dc' then 'dc' when p.current_type is not null then 'other' end current_kind,
+         p.max_power_kw::numeric(7,2) power_max_kw,
+         array_remove(array[
+           case when p.connector_types && array['iec62196T2COMBO', 'iec62196T2Combo', 'iec62196t2combo', 'combo', 'ccs'] then 'ccs2' end,
+           case when p.connector_types && array['iec62196T2', 'iec62196t2', 'type2'] then 'type2' end,
+           case when p.connector_types && array['chademo', 'chaDemo', 'CHAdeMO'] then 'chademo' end,
+           case when p.connector_types && array['mcs'] then 'mcs' end], null) connectors,
+         p.price_per_kwh, p.price_adhoc_zero, p.price_last_updated price_updated_at,
+         charging_register_opening_hours(p.extras) opening_hours_kind, charging_register_payment_card(p.extras) payment_card,
+         charging_register_free_of_charge(p.extras) free_of_charge, charging_register_parking(p.extras) parking_access
+  from charging_points p
+  where p.deleted_at is null and p.site_id is not null and coalesce(p.confidentiality, 'noRestriction') = 'noRestriction')`
+
+// chargeAvailability is a status report's state over charging_point_status
+// o, the platform's mapping.
+const chargeAvailability = `case when o.status ~* '^available$' then 'available'
+              when o.status ~* '^(charging|occupied|blocked)$' then 'occupied'
+              when o.status ~* '^reserved$' then 'reserved'
+              when o.status ~* '^(out_?of_?order|inoperative|faulted)$' then 'out_of_order'
+              when o.status is null or o.status ~* '^unknown$' then 'unknown'
+              else 'other' end`
+
+// opaqued rewrites every parameter $n of sql as opaque does, for a named
+// statement: each a one-row subquery cast to its type.
+func opaqued(sql string, types ...string) string {
+	return parameter.ReplaceAllStringFunc(sql, func(p string) string {
+		n, _ := strconv.Atoi(p[1:])
+		return "((select " + p + "::" + types[n-1] + ")::" + types[n-1] + ")"
+	})
+}
+
+// chargingNear and chargingByID are the two charging reads, built once:
+// the sites in the ring and the one site asked by its id.
+var chargingNear, chargingByID = chargingSites(false), chargingSites(true)
+
+// chargingInRadius counts the sites of the families $3 within $4 metres
+// of ($2, $1).
+var chargingInRadius = named("api_charging_in_radius", `select count(*)::int
+from `+chargingSiteRows+` c
+where (c.source_feed = any((`+ruledFamilies("(select $3::text[])")+`)::text[])) is true
+  and st_dwithin(c.geom, st_setsrid(st_makepoint((select $2::float8), (select $1::float8)), 4326)::geography, (select $4::float8))`,
+	"float8", "float8", "text[]", "float8")

@@ -20,9 +20,9 @@ import (
 // so a late call of that kind is the database's own test's.
 func plantLiveCalls(t *testing.T) {
 	t.Helper()
-	plant(t, `insert into contract.stop_place (stop_place_id, name, location, national_stop_code, source_ref, eva_no)
+	plant(t, `insert into vf_seed.stop_place (stop_place_id, name, location, national_stop_code, source_ref, eva_no)
 values ('1:de:09999:1', 'Testbahnhof Live', st_setsrid(st_makepoint(11.0, 49.0), 4326), 'de:09999:1', 'delfi_static', '8099999')`)
-	n := plant(t, `insert into contract.departure (stop_place_id, stop_point_id, journey_id, call_order, line_name, transport_mode, planned_departure_at,
+	n := plant(t, `insert into vf_seed.departure (stop_place_id, stop_point_id, journey_id, call_order, line_name, transport_mode, planned_departure_at,
   boarding, realtime_source, cancelled, delay_s, source_ref)
 select '1:de:09999:1', v.point, '1:' || v.trip || ':' || to_char(now() at time zone 'Europe/Berlin', 'YYYYMMDD'), 1, v.line, 'rail',
        date_trunc('minute', now()) + v.at, true, v.src, v.cancelled, v.delay, 'delfi_static'

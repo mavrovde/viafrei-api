@@ -1,9 +1,15 @@
 # Weekly load and fault runs with the nightly budget (TST-007, issue #19): the
-# soak (design load for one hour), the stress ramp past the knee, the spike, and
+# soak (design load for 9 minutes), the stress ramp past the knee, the spike, and
 # every fault of the Performance Test Plan through the fault proxy and container
 # control, on the test stack this job starts. Nothing but that stack's loopback
 # is a target (TST-010): the runner refuses every host not on
 # test/load/allow-list.txt.
+#
+# Every job ends within 15 minutes (owner rule): the catalogue runs as four
+# shards in parallel, each on a runner and a stack of its own, and a gather
+# job merges them (loadrun merge): every scenario must have been run by
+# exactly one shard. The soak is 9 minutes of the nightly budget, not the
+# hour it was (docs/load-tests.md).
 #
 # The report names every scenario, its assertions and its counts; it is the
 # job summary and an artifact kept for the release evidence. A scenario that
@@ -11,7 +17,7 @@
 #
 # Each run also writes its figures (load-report.json) into that artifact. A
 # run on main fetches the figures of the newest successful nightly run on
-# main of the same budget and the report compares the two (TST-021, issue
+# main of the same budget and the merged report compares the two (TST-021, issue
 # #80): a p95 or p99 regression beyond the tolerance fails the run, and a
 # missing or unreadable previous file is named in the report, never read as
 # "no change". A dispatch with compare off runs without the comparison, so
@@ -36,7 +42,6 @@ on:
 
 permissions:
   contents: read
-  actions: read # the previous nightly run's artifact (scripts/load-previous.sh)
 
 concurrency:
   group: load-nightly
@@ -47,9 +52,26 @@ env:
 
 jobs:
   load:
-    name: Soak, stress, spike and faults (nightly budget)
+    name: Load shard ${{ matrix.shard }} (nightly budget)
     runs-on: ubuntu-24.04
-    timeout-minutes: 150
+    # Evidence (run of 2026-11-15, one job): the stack is up 1.2 min after the
+    # step starts; the soak took 62 min (2 + 60), the other ten scenarios 17.5
+    # min together. Per shard, from the profile's run lengths: soak 2 + 9 min,
+    # spike-stress about 5, faults-a about 9, faults-b about 7, each plus the
+    # stack's start.
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: soak
+            scenarios: soak
+          - shard: spike-stress
+            scenarios: spike,stress
+          - shard: faults-a
+            scenarios: slow-storage,hanging-query,pool-exhausted,composed-part-timeout
+          - shard: faults-b
+            scenarios: storage-killed,access-store-down,clock-skew,instance-killed
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -57,6 +79,41 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - name: The shard's scenarios on a test stack of its own
+        env:
+          PROFILE: ${{ inputs.profile || 'nightly' }}
+          LOADRUN_SCENARIOS: ${{ matrix.scenarios }}
+        run: scripts/load-test.sh "$PROFILE" load-report.md
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: load-shard-${{ matrix.shard }}
+          path: |
+            load-report.md
+            load-report.json
+          retention-days: 7
+          if-no-files-found: warn
+
+  gather:
+    name: Every scenario, merged and compared (nightly budget)
+    needs: load
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read # the previous nightly run's artifact (scripts/load-previous.sh)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: load-shard-*
+          path: shards
       - name: The previous main run's figures (TST-021)
         # A scheduled run on main always compares; a dispatch on main unless
         # its compare input is off.
@@ -66,14 +123,22 @@ jobs:
           REPO: ${{ github.repository }}
           PROFILE: ${{ inputs.profile || 'nightly' }}
         run: scripts/load-previous.sh previous "$PROFILE"
-      - name: Every scenario on the test stack
+      - name: Merge the shards and compare
         env:
           PROFILE: ${{ inputs.profile || 'nightly' }}
           # On main the run is compared with the previous main run's figures
           # of its budget, unless a dispatch turned compare off; when there
           # are none the report names the absent file.
           LOADRUN_PREVIOUS: ${{ github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.compare) && 'previous/load-report.json' || '' }}
-        run: scripts/load-test.sh "$PROFILE" load-report.md
+          SHARDS: ${{ needs.load.result }}
+        run: |
+          shopt -s nullglob
+          reports=(shards/load-shard-*/load-report.md)
+          code=0
+          go run ./internal/testkit/loadrun merge -profile "$PROFILE" -report load-report.md \
+            ${LOADRUN_PREVIOUS:+-previous "$LOADRUN_PREVIOUS"} "${reports[@]}" || code=$?
+          [[ $SHARDS == success ]] || { echo "FAIL: a load shard ended $SHARDS" >&2; code=1; }
+          exit "$code"
       - name: Report in the job summary
         if: always() && hashFiles('load-report.md') != ''
         run: cat load-report.md >> "$GITHUB_STEP_SUMMARY"

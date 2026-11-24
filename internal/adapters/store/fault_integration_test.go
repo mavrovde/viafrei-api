@@ -43,6 +43,14 @@ func (f *fault) arm(at int) {
 	f.at, f.seen, f.fired = at, 0, false
 }
 
+// counted is how many statements were sent since arm; arm(-1) counts
+// without failing any.
+func (f *fault) counted() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.seen
+}
+
 func (f *fault) hasFired() bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -145,6 +153,35 @@ func failEach(t *testing.T, st *store.Store, f *fault, name string, call func(co
 	}
 }
 
+// failEnds fails, of a read that sends one statement per item after its
+// first (the warm-up's junction read, a road a statement), the first
+// statement, the first item's and the last's: the same statement each item,
+// so failing every one of them adds a reconnect a road and no case, and its
+// time grows with the square of the roads (TST-012: 4.9 s under -race).
+func failEnds(t *testing.T, st *store.Store, f *fault, name string, call func(context.Context, *store.Store) error) {
+	t.Helper()
+	f.arm(-1)
+	ctx, cancel := context.WithTimeout(context.Background(), testBound)
+	err := call(ctx, st)
+	cancel()
+	n := f.counted()
+	f.arm(0)
+	if err != nil || n < 3 {
+		t.Fatalf("%s unfaulted: %d statements, %v (at least one item is needed)", name, n, err)
+	}
+	for _, k := range []int{1, 2, n} {
+		f.arm(k)
+		ctx, cancel := context.WithTimeout(context.Background(), testBound)
+		err := call(ctx, st)
+		cancel()
+		fired := f.hasFired()
+		f.arm(0)
+		if !fired || err == nil {
+			t.Errorf("%s: statement %d of %d failed (%v) and the call answered %v", name, k, n, fired, err)
+		}
+	}
+}
+
 // Every statement of a read that fails fails the read: none is swallowed.
 func TestEveryStatementFaultFailsTheRead(t *testing.T) {
 	st, f := faulty(t)
@@ -182,7 +219,7 @@ func TestEveryStatementFaultFailsTheRead(t *testing.T) {
 			return err
 		},
 		"NeedPlaces": func(ctx context.Context, s *store.Store) error {
-			_, err := s.NeedPlaces(ctx, places.NearbyQuery{At: berlin, RadiusM: 5000, Needs: []string{"fuel", "toilet"}, Limit: 5}, every)
+			_, err := s.NeedPlaces(ctx, places.NearbyQuery{At: berlin, RadiusM: 5000, Needs: []string{"toilets", "fuel"}, Limit: 5}, every)
 			return err
 		},
 		"Junctions": func(ctx context.Context, s *store.Store) error {
@@ -218,7 +255,6 @@ func TestEveryStatementFaultFailsTheRead(t *testing.T) {
 			_, err := s.WarningsAt(ctx, weather.Query{LookAhead: lookAhead, At: berlin, MinLevel: 1, Limit: 5}, every, now)
 			return err
 		},
-		"WarmRoads": func(ctx context.Context, s *store.Store) error { return s.WarmRoads(ctx) },
 		"Motorways": func(ctx context.Context, s *store.Store) error {
 			_, _, err := s.Motorways(ctx, roads.CatalogueQuery{Limit: 5}, every, now)
 			return err
@@ -248,4 +284,7 @@ func TestEveryStatementFaultFailsTheRead(t *testing.T) {
 		// each: one subtest per read (TST-012).
 		t.Run(name, func(t *testing.T) { failEach(t, st, f, name, call) })
 	}
+	t.Run("WarmRoads", func(t *testing.T) {
+		failEnds(t, st, f, "WarmRoads", func(ctx context.Context, s *store.Store) error { return s.WarmRoads(ctx) })
+	})
 }

@@ -69,7 +69,11 @@ and merge release pull requests.
      `sbom.cdx.json` and `SHA256SUMS`
    - appends the digest, the tags, the verify commands and the milestone link
      to the notes, marks every 0.x release as a pre-release, and
-     publishes the draft
+     publishes the draft and decides latest in one `gh release edit` call
+     (`--draft=false` with `--latest`): GitHub refuses `--latest` on a
+     release that is still a draft, and makes a newly published release
+     latest by default, so a backport published without `--latest=false`
+     would become latest
 6. The `verify` job of the same run pulls the image by digest, runs
    `cosign verify` and `gh attestation verify`, checks `SHA256SUMS` against
    the downloaded assets, and smoke-tests `/healthz` of the published image.
@@ -116,6 +120,34 @@ Nothing is built or published: `publish` needs the `snyk` job.
 A re-run of `release.yml` is accepted only while the release page is still a
 draft and `:X.Y.Z` does not exist. Once the image was pushed, the run is
 refused by design; release the next patch instead.
+
+**1.0.0 and 1.0.1 were never published.** The 1.0.0 run stopped at the
+inventory check, before anything was built. The 1.0.1 run built, signed and
+attested the image and uploaded the assets, then set `--latest` while the page
+was still a draft; GitHub answered 422 and the step stopped before the draft
+was published, so `verify` and `pages` were skipped. Both tags and draft pages
+remain; the 1.0.1 image exists in the registry, but no release page points at
+it. 1.0.2 is the first published 1.x release.
+
+### The inventory (REL-015)
+
+`test/inventory` records what the API's consumers ask for, each file from
+the release its first line names (`# source <consumer> <X.Y.Z> <commit>`).
+The release run refuses a file older than its consumer's newest release
+(`inventory age`); export it again from that release's tag first:
+
+| File | Exported from | Compared with |
+|---|---|---|
+| `mcp.tsv` | `server/catalogue/catalogue.json` of `mavrovde/viafrei-mcp` at the tag of the release npm `viafrei` publishes: `inventory mcp -version X.Y.Z -commit SHA -catalogue catalogue.json` (one row per tool with the sha256 of its compacted input schema, per argument in the schema's order with `language` left out, per resource) | the npm dist-tag `latest` of `viafrei` (`-platform`, as `platformsync read` prints it) |
+| `routes.tsv` | the platform's fragment service, last exported at platform 2.6.44 | nothing: **frozen**, the site moves to the API. `age` prints it as skipped with that reason; it is never exported again |
+| `web.tsv` | the site's source tree at its release tag: `inventory web` | the latest release of `mavrovde/viafrei-web` (`-web`) |
+
+Run the check as the release run does:
+
+```sh
+go run ./internal/release/inventory age -dir test/inventory \
+  -platform "$(go run ./internal/release/platformsync read -timeout 10s)" -web X.Y.Z
+```
 
 ### Version rules
 

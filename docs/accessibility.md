@@ -99,10 +99,25 @@ checks both repairs in the rendered page and reports a missing one as an
 error: a field cell still drawing a background image, a row whose line or
 segment is missing or not in the line colour, no field cell at all, more or
 fewer than one main landmark, or the menu not a navigation landmark outside
-it. Since #20 the reference stands
-at four distinct failures, all `heading-order`: Redoc's headings skip a
-level between an operation and its parameters, which its theme cannot
-change.
+it.
+
+The 1.0.0 manual pass (#183) found what axe does not see, and the build now
+repairs it: the reference has a "Skip to content" link to its content
+column; every focusable element of the portal shows a 3 px outline while it
+has the focus (on the reference with a white ring, so it shows on the dark
+sample panel too); each reference heading is named by its own text, not by
+the label of its anchor link; Redoc's schema and parameter tables carry a
+header row ("Field", "Details", visually hidden); its operation paths wrap
+instead of ending in an ellipsis, its links and table cells break long
+words and its Authorizations bar wraps; and inline code and headings on the
+guide pages wrap, so no page scrolls sideways at 320 px. A third runner,
+`scripts/a11y-tools/portal-runner.js`, holds these on every page as errors:
+the first stop a skip link to the main landmark, a visible focus on each
+kind of focusable element, heading names, a header cell in every table, no
+text cut off (also at the WCAG 1.4.12 text spacing), and, in a second load
+of every page at 320 px wide, no sideways scrolling. The reference stands at no
+failures: its `heading-order` count in `scripts/docs-a11y-baseline.json` is
+0, and the run measures 0.
 
 A raise that is deliberate (a Redoc upgrade that brings a new failure we
 accept) is declared, with its reason, by a line in the message of a commit

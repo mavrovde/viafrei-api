@@ -17,7 +17,7 @@ const ageDoc = "Sent when the body was read for an earlier request: the whole se
 func cacheHeaders() map[string]*huma.Param {
 	out := map[string]*huma.Param{}
 	for _, name := range []string{"ETag", "Cache-Control", "Vary", "Last-Modified"} {
-		out[name] = &huma.Param{Description: cacheDoc, Schema: &huma.Schema{Type: huma.TypeString}}
+		out[name] = sharedHeader(name)
 	}
 	return out
 }
@@ -36,7 +36,7 @@ func documentCaching(api huma.API) {
 				ok.Headers = map[string]*huma.Param{}
 			}
 			maps.Copy(ok.Headers, cacheHeaders())
-			ok.Headers["Age"] = &huma.Param{Description: ageDoc, Schema: &huma.Schema{Type: huma.TypeInteger, Minimum: new(float64)}}
+			ok.Headers["Age"] = sharedHeader("Age")
 		}
 		op.Responses["304"] = &huma.Response{
 			Description: "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",

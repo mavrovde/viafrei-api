@@ -109,7 +109,7 @@ jobs:
     name: Build, sign, attest, publish
     needs: [commit, snyk, mutation]
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 15
     permissions:
       contents: write
       checks: read
@@ -386,8 +386,13 @@ jobs:
             [[ -n $milestone ]] && echo "Milestone: $milestone"
           } >> /tmp/notes.md
           gh release upload "$TAG" dist/* --clobber
-          gh release edit "$TAG" --notes-file /tmp/notes.md --prerelease="$PRERELEASE" --latest="$([[ $PRERELEASE == false && $HIGHEST == true ]] && echo true || echo false)"
-          gh release edit "$TAG" --draft=false
+          # One update publishes the draft and decides latest. GitHub refuses
+          # --latest on a release that is still a draft (HTTP 422), and its
+          # make_latest defaults to true for a newly published release, so a
+          # publish without --latest would make any backport latest. The
+          # update-release API is designed for draft=false and make_latest in
+          # the same request.
+          gh release edit "$TAG" --notes-file /tmp/notes.md --prerelease="$PRERELEASE" --draft=false --latest="$([[ $PRERELEASE == false && $HIGHEST == true ]] && echo true || echo false)"
           echo "published $(gh release view "$TAG" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
 
   verify:

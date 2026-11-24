@@ -404,15 +404,20 @@ func (r *runner) hold(ctx context.Context, views []string, bound time.Duration) 
 		errc <- err
 	}()
 	release = func() error {
+		// The cancel matches every session named holdName, not only this
+		// one: safe only because the load stack is throwaway and its one
+		// runner holds one lock at a time (scripts/load-test.sh).
 		_, cerr := r.psql(ctx, fmt.Sprintf("select count(pg_cancel_backend(pid)) from pg_stat_activity where application_name = '%s' and pid <> pg_backend_pid()", holdName))
 		err := <-errc
 		switch {
+		case cerr != nil && err == nil:
+			return fmt.Errorf("the lock session could not be cancelled (%w); it ended on its own after %s", cerr, bound)
+		case cerr != nil:
+			return fmt.Errorf("the lock session could not be cancelled (%w); it ended with: %w", cerr, err)
 		case err == nil:
 			return fmt.Errorf("the lock ended on its own after %s, before its release", bound)
 		case strings.Contains(err.Error(), holdCancelled):
 			return nil
-		case cerr != nil:
-			return fmt.Errorf("the lock session could not be cancelled (%w): %w", cerr, err)
 		default:
 			return err
 		}

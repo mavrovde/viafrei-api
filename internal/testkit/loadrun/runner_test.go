@@ -267,6 +267,23 @@ func TestHoldWaitsForTheLockAndKeepsItUntilRelease(t *testing.T) {
 	} else if err := release(); err == nil || !strings.Contains(err.Error(), "could not be cancelled") {
 		t.Errorf("a failed cancel: %v", err)
 	}
+	// The cancel fails and the session ends on its own: the failed cancel
+	// is named, not only the end.
+	w.dock.answer = func(a string) (string, error) {
+		switch {
+		case strings.Contains(a, "begin; do $$"):
+			time.Sleep(20 * time.Millisecond)
+			return "", nil
+		case strings.Contains(a, "pg_cancel_backend"):
+			return "", errFake
+		}
+		return healthyDocker(a)
+	}
+	if release, err := w.r.hold(ctx, parkingTables, time.Second); err != nil {
+		t.Errorf("hold %v", err)
+	} else if err := release(); !errors.Is(err, errFake) || !strings.Contains(err.Error(), "could not be cancelled") || !strings.Contains(err.Error(), "on its own") {
+		t.Errorf("a failed cancel, then the end: %v", err)
+	}
 	// The session fails for another reason, the cancel went through.
 	w.dock.answer = func(a string) (string, error) {
 		if strings.Contains(a, "begin; do $$") {
@@ -376,6 +393,17 @@ func TestExecDocker(t *testing.T) {
 	// docker compose top takes no ps options, so docker top is the plain CLI.
 	if out, err := execHost(bin)(context.Background(), "top", "c1", "-o", "rss"); err != nil || strings.TrimSpace(out) != "top c1 -o rss" {
 		t.Errorf("plain docker: %q %v", out, err)
+	}
+}
+
+func TestRefusalCostSplitsWaitedFromImmediate(t *testing.T) {
+	ms := time.Millisecond
+	if got := refusalCost([]time.Duration{2 * ms, 3 * ms}, 400*ms); got != "2 refused at once, none waited out queue_max_wait" {
+		t.Errorf("at once: %q", got)
+	}
+	got := refusalCost([]time.Duration{2 * ms, 405 * ms, 410 * ms, 430 * ms}, 400*ms)
+	if want := "1 refused at once; 3 waited out queue_max_wait and took beyond it p50 10ms, p95 30ms, max 30ms"; got != want {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }
 

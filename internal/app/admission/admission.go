@@ -190,16 +190,6 @@ func New(s Settings, now func() time.Time) *Controller {
 	return c
 }
 
-// Acquire is AcquireRead for a holder whose release always counts as an
-// answered read.
-func (c *Controller) Acquire(ctx context.Context) (release func(), err error) {
-	r, err := c.AcquireRead(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return func() { r(true) }, nil
-}
-
 // AcquireRead waits for a permit for the caller in ctx. It answers a
 // *Refusal (errors.Is ErrOverloaded) when the request is shed, or ctx's
 // error when the request ends while waiting. release must be called exactly

@@ -45,7 +45,7 @@ func queuedBehindFull(t *testing.T, c *admission.Controller) int {
 	for _, name := range []string{"first", "second"} {
 		before := waiting(c)
 		go func() {
-			r, err := c.Acquire(as(admission.Standard, name))
+			r, err := c.AcquireRead(as(admission.Standard, name))
 			got <- result{name, r, err}
 		}()
 		waitUntil(t, name+" queued or shed", func() bool { return waiting(c) > before || len(got) > 0 })
@@ -66,7 +66,7 @@ func queuedBehindFull(t *testing.T, c *admission.Controller) int {
 		if r.err != nil {
 			t.Fatalf("%s: %v", r.name, r.err)
 		}
-		r.release()
+		r.release(true)
 	}
 	return shed
 }
@@ -141,7 +141,7 @@ func TestAQueuedRequestIsShedWithinQueueMaxWait(t *testing.T) {
 	if took := time.Since(start); took < 50*time.Millisecond || took > 50*time.Millisecond+200*time.Millisecond {
 		t.Errorf("shed after %s, want queue_max_wait 50ms", took)
 	}
-	if _, err := c.Acquire(admission.WithCaller(cancelled(), admission.Caller{Tier: admission.Standard, Key: "gone"})); err == nil {
+	if _, err := c.AcquireRead(admission.WithCaller(cancelled(), admission.Caller{Tier: admission.Standard, Key: "gone"})); err == nil {
 		t.Error("an ended request got a permit")
 	}
 }

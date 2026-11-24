@@ -486,10 +486,36 @@ func poolExhausted(ctx context.Context, r *runner, o *outcome) {
 	// A request is refused at once when its estimated wait does not fit,
 	// else it waits in its tier's queue at most queue_max_wait
 	// (docs/rate-limits.md, gate 4): no refusal may come later than that.
+	// The 50 ms on top is NFR-CAP-003's budget for a refusal's own path:
+	// the queue's timer firing, the 429 rendered and read back by the
+	// client. Measured on the local load stack (three runs, 2026-11-24, a
+	// burst of 40 timing out together), a refusal that waited out
+	// queue_max_wait took beyond it p50 12-15 ms, p95 17-31 ms, max 18-31
+	// ms; the run's note gives the figures of each run.
 	o.add(fmt.Sprintf("each refusal within the tier's queue_max_wait plus 50 ms: p95 within %s (RATE-011)", r.queued+r.fast), len(shed) > 0 && p95 <= r.queued+r.fast, "p95 %s", p95.Round(time.Millisecond))
+	o.note("%s", refusalCost(shed, r.queued))
 	err = release()
 	o.add("lock released", err == nil, "%v", err)
 	r.recovered(ctx, o, r.charging())
+}
+
+// refusalCost splits refusals into those refused at once and those that
+// waited out queue_max_wait, and gives what the latter took beyond it: the
+// timer, the refusal's answer and the way back to the client, which the
+// 50 ms of NFR-CAP-003 covers.
+func refusalCost(shed []time.Duration, wait time.Duration) string {
+	var beyond []time.Duration
+	for _, d := range shed {
+		if d >= wait {
+			beyond = append(beyond, d-wait)
+		}
+	}
+	if len(beyond) == 0 {
+		return fmt.Sprintf("%d refused at once, none waited out queue_max_wait", len(shed))
+	}
+	return fmt.Sprintf("%d refused at once; %d waited out queue_max_wait and took beyond it p50 %s, p95 %s, max %s",
+		len(shed)-len(beyond), len(beyond), percentile(beyond, 0.5).Round(time.Millisecond),
+		percentile(beyond, 0.95).Round(time.Millisecond), percentile(beyond, 1).Round(time.Millisecond))
 }
 
 func composedPart(ctx context.Context, r *runner, o *outcome) {

@@ -57,7 +57,7 @@ func TestPoolConfigCarriesEveryDBKey(t *testing.T) {
 		"VFAPI_DB_POOL_MIN=3",
 		"VFAPI_DB_CONNECT_TIMEOUT=1500ms",
 		"VFAPI_DB_MAX_CONN_LIFETIME=7m",
-		"VFAPI_DB_MAX_CONN_IDLE=90s",
+		"VFAPI_DB_MAX_CONN_IDLE=9m",
 		"VFAPI_DB_CANCEL_GRACE=250ms",
 		"VFAPI_DB_APPLICATION_NAME=probe-name",
 		"VFAPI_DB_QUERY_EXEC_MODE=describe_exec",
@@ -76,7 +76,7 @@ func TestPoolConfigCarriesEveryDBKey(t *testing.T) {
 	if pc.MaxConns != 7 || pc.MinConns != 3 {
 		t.Errorf("pool bounds %d/%d", pc.MinConns, pc.MaxConns)
 	}
-	if pc.ConnConfig.ConnectTimeout != 1500*time.Millisecond || pc.MaxConnLifetime != 7*time.Minute || pc.MaxConnIdleTime != 90*time.Second {
+	if pc.ConnConfig.ConnectTimeout != 1500*time.Millisecond || pc.MaxConnLifetime != 7*time.Minute || pc.MaxConnIdleTime != 9*time.Minute {
 		t.Errorf("timeouts %s %s %s", pc.ConnConfig.ConnectTimeout, pc.MaxConnLifetime, pc.MaxConnIdleTime)
 	}
 	if pc.ConnConfig.DefaultQueryExecMode != pgx.QueryExecModeDescribeExec || pc.ConnConfig.StatementCacheCapacity != 33 || pc.ConnConfig.DescriptionCacheCapacity != 33 {

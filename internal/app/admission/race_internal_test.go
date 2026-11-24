@@ -18,14 +18,14 @@ func TestAPermitGrantedAsTheWaitEndsIsKept(t *testing.T) {
 	for range 64 {
 		c := New(Settings{Permits: 1, Tiers: [tierCount]TierSettings{ts, ts, ts}, PerKey: 1, AgingAfter: time.Hour, Alpha: 1}, nil)
 		// The first permit is taken back by hand below, not through its release.
-		_, err := c.Acquire(context.Background())
+		_, err := c.AcquireRead(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}
 		ctx, cancel := context.WithCancel(WithCaller(context.Background(), Caller{Tier: Standard, Key: "k"}))
-		done := make(chan func(), 1)
+		done := make(chan func(answered bool), 1)
 		go func() {
-			release, err := c.Acquire(ctx)
+			release, err := c.AcquireRead(ctx)
 			if err != nil {
 				t.Error("a granted permit was refused:", err)
 			}
@@ -50,7 +50,7 @@ func TestAPermitGrantedAsTheWaitEndsIsKept(t *testing.T) {
 		if release == nil {
 			t.Fatal("no release for a granted permit")
 		}
-		release()
+		release(true)
 		if s := c.Snapshot(); s.Free != 1 || s.Waiting[Standard] != 0 {
 			t.Fatalf("the permit leaked: %+v", s)
 		}
@@ -63,16 +63,16 @@ func TestSaturatedOnlyWhileAReadWaits(t *testing.T) {
 	if c.Saturated() {
 		t.Fatal("an idle controller is saturated")
 	}
-	release, err := c.Acquire(context.Background())
+	release, err := c.AcquireRead(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if c.Saturated() {
 		t.Fatal("every slot taken and nobody waiting is not saturated")
 	}
-	got := make(chan func(), 1)
+	got := make(chan func(answered bool), 1)
 	go func() {
-		r, _ := c.Acquire(WithCaller(context.Background(), Caller{Tier: Standard, Key: "k"}))
+		r, _ := c.AcquireRead(WithCaller(context.Background(), Caller{Tier: Standard, Key: "k"}))
 		got <- r
 	}()
 	deadline := time.Now().Add(time.Second)
@@ -82,9 +82,9 @@ func TestSaturatedOnlyWhileAReadWaits(t *testing.T) {
 		}
 		time.Sleep(time.Millisecond)
 	}
-	release()
+	release(true)
 	if r := <-got; r != nil {
-		r()
+		r(true)
 	}
 	if c.Saturated() {
 		t.Fatal("still saturated once the waiter was served")

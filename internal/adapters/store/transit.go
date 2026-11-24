@@ -314,8 +314,18 @@ func ownStation(id string) string {
 // with it (one range of the feed's id index: the stop of that id, and those
 // below it, whose national stop code is the id's first three parts), and
 // the stop a DB station of that EVA number names. The narrowing may hold
-// more; the filter above still decides.
+// more; the filter above still decides. The stop's own id (origin_key) is
+// narrowed first, over the feeds so the stops' (key, id) index answers it:
+// the stop place id is an expression of key and id, which no index reads, so
+// that filter alone read every stop (production, 2026-11-24: 270-1,020 ms a
+// lookup, 503 at the deadline under load; with the id narrowed 10-44 ms, the
+// same rows for eight codes).
 const stationsOfCode = `
+  and s.origin_key in (
+    select s2.id from feeds f2 join stops s2 on s2.gtfs_feed_key = f2.gtfs_feed_key
+     where s2.deleted_at is null and s2.id ~>=~ $7::text and s2.id ~<~ ($7::text || ';')
+    union all
+    select x.ifopt from db_stations x where x.eva_no = $7::text and x.closed_at is null)
   and s.stop_place_id in (
     select (f2.gtfs_feed_key || ':') || s2.id from feeds f2 join stops s2 on s2.gtfs_feed_key = f2.gtfs_feed_key
      where s2.deleted_at is null and s2.id ~>=~ $7::text and s2.id ~<~ ($7::text || ';')

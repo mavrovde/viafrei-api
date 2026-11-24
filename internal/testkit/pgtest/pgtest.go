@@ -106,7 +106,10 @@ func Start(ctx context.Context) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("pgtest: %w", err)
 	}
-	c, err := runContainer(ctx, rand.Text())
+	// A container of its own meets the run's reaper as the shared one does.
+	c, err := retryReaperStart(ctx, func() (*postgres.PostgresContainer, error) {
+		return runContainer(ctx, rand.Text())
+	})
 	db := &DB{container: c, Pin: pin}
 	if err == nil {
 		err = db.migrate(ctx, c.ContainerIP, c.ConnectionString)

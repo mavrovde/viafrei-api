@@ -1,6 +1,7 @@
 package store
 
 import (
+	"bytes"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -104,7 +105,16 @@ func contractReaders(t *testing.T, root string) map[string]bool {
 			return nil
 		}
 		n++
-		file, err := parser.ParseFile(fset, p, nil, 0)
+		src, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		// A literal naming a contract relation holds the word, in any
+		// case: a file without it is not parsed.
+		if !bytes.Contains(bytes.ToLower(src), []byte("contract")) {
+			return nil
+		}
+		file, err := parser.ParseFile(fset, p, src, parser.SkipObjectResolution)
 		if err != nil {
 			return err
 		}

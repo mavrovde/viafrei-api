@@ -64,13 +64,18 @@ func withoutTrafficEvents(sql string) string {
 // per family) reads the Autobahn payload, to derive an event's fields from
 // it as the platform does; it never answers it.
 func TestNamedStatementsReadNoRefusedColumn(t *testing.T) {
+	// One statement a subtest, side by side: each one's patterns are its
+	// own work.
 	for _, s := range namedList() {
-		if r := refusals(withoutTrafficEvents(s.SQL)); len(r) > 0 {
-			t.Errorf("%s reads %s", s.Name, strings.Join(r, ", "))
-		}
-		if !strings.HasPrefix(s.Name, "api_") {
-			t.Errorf("%s: a statement's name starts with api_", s.Name)
-		}
+		t.Run(s.Name, func(t *testing.T) {
+			t.Parallel()
+			if r := refusals(withoutTrafficEvents(s.SQL)); len(r) > 0 {
+				t.Errorf("%s reads %s", s.Name, strings.Join(r, ", "))
+			}
+			if !strings.HasPrefix(s.Name, "api_") {
+				t.Errorf("%s: a statement's name starts with api_", s.Name)
+			}
+		})
 	}
 }
 

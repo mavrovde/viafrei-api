@@ -89,7 +89,8 @@ func reaperNotStarted(err error) bool {
 // logged wait, only while it fails because the run's reaper is not started
 // yet (reaperNotStarted) and the tries and the bound allow; any other error
 // is returned at once.
-func retryReaperStart(ctx context.Context, run func() (sharedContainer, error)) (sharedContainer, error) {
+func retryReaperStart[C any](ctx context.Context, run func() (C, error)) (C, error) {
+	var none C
 	start, delay := time.Now(), reaperStartDelay
 	for try := 1; ; try++ {
 		c, err := run()
@@ -97,12 +98,12 @@ func retryReaperStart(ctx context.Context, run func() (sharedContainer, error)) 
 			return c, err
 		}
 		if try == reaperStartTries || time.Since(start)+delay > reaperStartBound {
-			return nil, fmt.Errorf("the run's reaper did not start in %d tries: %w", try, err)
+			return none, fmt.Errorf("the run's reaper did not start in %d tries: %w", try, err)
 		}
 		logf("pgtest: the run's reaper is not started yet (try %d of %d), again in %s: %v", try, reaperStartTries, delay, err)
 		select {
 		case <-ctx.Done():
-			return nil, errors.Join(err, ctx.Err())
+			return none, errors.Join(err, ctx.Err())
 		case <-time.After(delay):
 		}
 		delay *= 2

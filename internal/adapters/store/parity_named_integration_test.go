@@ -8,11 +8,14 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
@@ -128,42 +131,50 @@ func TestNamedStatementsAnswerAsTheViews(t *testing.T) {
 	for _, r := range store.NamedReads() {
 		byName[r.Name] = r
 	}
-	// The statements that plant rows one after the other, then the rest side
-	// by side, four at a time (more queue on the reader's statement
-	// timeout), each on a connection of its own; the group returns when
-	// every one has.
-	slots := make(chan struct{}, 4)
+	// One pool for every leaf: its connections are made once, and it holds
+	// as many reads side by side as the reader's statement timeout bears.
+	cfg, err := pgxpool.ParseConfig(db.ReaderURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.MaxConns = poolSize
+	ctx, cancel := context.WithTimeout(context.Background(), statementBound)
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	cancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	// The statements that plant rows one after the other (their cases are
+	// read while their rows are there), the rest side by side; within a
+	// statement, its settling and each case are leaves of their own, side by
+	// side.
 	t.Run("statements", func(t *testing.T) {
 		for name, cases := range namedCases {
 			t.Run(name, func(t *testing.T) {
 				if !plants(name) {
 					t.Parallel()
-					slots <- struct{}{}
-					defer func() { <-slots }()
 				}
-				// Every case runs three times over two keys: each statement
-				// bounded on its own, from when it has its slot.
-				ctx, cancel := context.WithTimeout(context.Background(), statementBound)
-				defer cancel()
-				namedParity(t, ctx, byName, name, cases)
+				namedParity(t, pool, byName, name, cases)
 			})
 		}
 	})
 }
 
-// statementBound is the ceiling on one statement's parity cases, each
-// statement its own: over twice the slowest measured (35 s under -race,
-// 104 s under -race on a host at load 40, four side by side).
-const statementBound = 3 * time.Minute
+// poolSize is a connection for each leaf the run holds side by side
+// (-parallel, GOMAXPROCS by default), and two to spare: a leaf never waits
+// for a connection another leaf holds.
+var poolSize = int32(runtime.GOMAXPROCS(0) + 2)
 
-// namedParity is one statement's parity: its cases, over both keys.
-func namedParity(t *testing.T, ctx context.Context, byName map[string]store.NamedRead, name string,
+// statementBound is the ceiling on one leaf of the harness: a statement's
+// cases read, its settling, or one case over both keys and both plans.
+const statementBound = time.Minute
+
+// namedParity is one statement's parity: its cases read, then a leaf that
+// checks it settles on a generic plan and a leaf a case, each over both
+// keys and both plans; when they are done, whether any case answered a row.
+func namedParity(t *testing.T, pool *pgxpool.Pool, byName map[string]store.NamedRead, name string,
 	cases func(t *testing.T, ctx context.Context, c *pgx.Conn) [][]any) {
-	c, err := pgx.Connect(ctx, db.ReaderURL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = c.Close(context.WithoutCancel(ctx)) }()
 	r, ok := byName[name]
 	if !ok {
 		t.Fatalf("no named statement %s", name)
@@ -172,48 +183,85 @@ func namedParity(t *testing.T, ctx context.Context, byName map[string]store.Name
 	if legacy == "" {
 		t.Fatalf("no frozen view statement for %s", name)
 	}
-	argSets := cases(t, ctx, c)
-	matched := 0
-	for _, own := range []string{"off", "on"} {
-		tx, err := c.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
-		if err != nil {
-			t.Fatal(err)
+	ctx, cancel := context.WithTimeout(context.Background(), statementBound)
+	c, err := pool.Acquire(ctx)
+	if err != nil {
+		cancel()
+		t.Fatal(err)
+	}
+	argSets := cases(t, ctx, c.Conn())
+	c.Release()
+	cancel()
+	var matched atomic.Int64
+	// Registered before the leaves start: runs when they have all ended.
+	t.Cleanup(func() {
+		if !t.Failed() && matched.Load() == 0 {
+			t.Error("no case answered a row: the parity proves nothing")
 		}
-		defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
-		if _, err := tx.Exec(ctx, "select set_config('viafrei_api.own_key', $1, true)", own); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := tx.Conn().Prepare(ctx, r.Name, r.SQL); err != nil {
-			t.Fatal(err)
-		}
-		// Under the plan cache's own choice, before any forced plan;
-		// the plan is the statement's, so one key settles it.
-		if own == "off" && len(argSets) > 0 {
-			if err := settlesGeneric(ctx, tx, r.Name, argSets[0]); err != nil {
-				t.Errorf("own %s: %v", own, err)
-			}
-		}
-		for _, args := range argSets {
-			want := collect(t, ctx, tx, legacy, args)
-			for _, plan := range []string{"force_custom_plan", "force_generic_plan"} {
-				if _, err := tx.Exec(ctx, "set local plan_cache_mode = "+plan); err != nil {
+	})
+	if len(argSets) > 0 {
+		t.Run("settles", func(t *testing.T) {
+			t.Parallel()
+			inTx(t, pool, r, "off", func(ctx context.Context, tx pgx.Tx) {
+				// A name of its own, prepared now: no run under a forced
+				// plan has counted a plan of it.
+				n := "settle_" + r.Name
+				if _, err := tx.Conn().Prepare(ctx, n, r.SQL); err != nil {
 					t.Fatal(err)
 				}
-				if got := collect(t, ctx, tx, r.Name, args); !reflect.DeepEqual(got, want) {
-					t.Errorf("own %s %v, %s:\n got %q\nwant %q", own, args, plan, got, want)
+				if err := settlesGeneric(ctx, tx, n, argSets[0]); err != nil {
+					t.Error(err)
 				}
+			})
+		})
+	}
+	// A leaf a case, key and plan: the view statement, then the named one
+	// under that plan, in one snapshot.
+	for i, args := range argSets {
+		for _, own := range []string{"off", "on"} {
+			for _, plan := range []string{"force_custom_plan", "force_generic_plan"} {
+				t.Run(fmt.Sprintf("%d/own_%s/%s", i, own, plan), func(t *testing.T) {
+					t.Parallel()
+					inTx(t, pool, r, own, func(ctx context.Context, tx pgx.Tx) {
+						want := collect(t, ctx, tx, legacy, args)
+						if _, err := tx.Exec(ctx, "set local plan_cache_mode = "+plan); err != nil {
+							t.Fatal(err)
+						}
+						if got := collect(t, ctx, tx, r.Name, args); !reflect.DeepEqual(got, want) {
+							t.Errorf("own %s %v, %s:\n got %q\nwant %q", own, args, plan, got, want)
+						}
+						matched.Add(int64(len(want)))
+						store.NoteParity(r.Name, len(want))
+					})
+				})
 			}
-			if _, err := tx.Exec(ctx, "set local plan_cache_mode = auto"); err != nil {
-				t.Fatal(err)
-			}
-			matched += len(want)
-			store.NoteParity(r.Name, len(want))
 		}
-		_ = tx.Rollback(ctx)
 	}
-	if matched == 0 {
-		t.Error("no case answered a row: the parity proves nothing")
+}
+
+// inTx runs fn in a read-only transaction of a connection of pool, under
+// the key's own-audience setting own, with r prepared on the connection.
+func inTx(t *testing.T, pool *pgxpool.Pool, r store.NamedRead, own string, fn func(context.Context, pgx.Tx)) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), statementBound)
+	defer cancel()
+	c, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatal(err)
 	}
+	defer c.Release()
+	tx, err := c.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+	if _, err := tx.Exec(ctx, "select set_config('viafrei_api.own_key', $1, true)", own); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Conn().Prepare(ctx, r.Name, r.SQL); err != nil {
+		t.Fatal(err)
+	}
+	fn(ctx, tx)
 }
 
 // plants reports whether the cases of the statement name plant rows of

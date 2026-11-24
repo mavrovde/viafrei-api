@@ -27,7 +27,11 @@ import (
 // to geometry(MultiPolygon,4326), an expression no index holds, and read
 // every open warning's area on prod (1.4 s a call).
 const warningPlaced = `from weather_warnings w
-where w.closed_at is null and w.deleted_at is null and w.valid_from is not null
+` + warningPlacedWhere
+
+// warningPlacedWhere is warningPlaced's condition, for a read that joins
+// more to the warning first.
+const warningPlacedWhere = `where w.closed_at is null and w.deleted_at is null and w.valid_from is not null
   and w.closed_reason is distinct from 'withdrawn'
   and w.source_feed = any((select $1::text[])::text[])
   and (w.valid_to is null or w.valid_to > (select $2::timestamptz))
@@ -46,7 +50,19 @@ const warningHazard = `case when w.event ~* 'gewitter' then 'thunderstorm'
 const warningColumns = `select 'dwd:' || w.id warning_id, w.source_feed, ` + warningHazard + ` hazard, w.level::int warning_level,
        coalesce(w.severity, w.level::text), 'Deutscher Wetterdienst', coalesce(w.headline, w.event),
        'de', w.valid_from, w.valid_to, coalesce(w.area_desc, ''), w.warncell_id, w.event, w.identifier, w.published_at,
-       w.description, w.instruction, w.urgency, w.certainty`
+       w.description, w.instruction, w.urgency, w.certainty, en.en_headline, en.en_description, en.en_instruction`
+
+// warningEnglish joins the DWD's own English text of the warning aliased w
+// (#222), as the platform's warnings at a point read it: the English
+// message the DWD issues for the same alert, matched by its content
+// (weather_warning_english), read only while the English source is among
+// the families ($1). No match is NULLs.
+const warningEnglish = `left join lateral (select e.en_headline, e.en_description, e.en_instruction from weather_warning_english(w.id) e
+  where '` + englishWarnings + `' = any((select $1::text[])::text[])) en on true
+`
+
+// englishWarnings is the source family of the DWD's English warnings.
+const englishWarnings = "dwd_warnings_en"
 
 // warningsPage reads the placed warnings in force at now or starting before
 // $10 (now and the look-ahead) that the floor and the hazards keep, worst
@@ -55,7 +71,8 @@ const warningColumns = `select 'dwd:' || w.id warning_id, w.source_feed, ` + war
 // the limit. Every parameter is read through a subquery, so the plan cache
 // keeps the generic plan.
 var warningsPage = named("api_weather_warnings_page", warningColumns+`
-`+warningPlaced+`
+from weather_warnings w
+`+warningEnglish+warningPlacedWhere+`
   and w.valid_from < (select $10::timestamptz)
   and w.level >= (select $5::int)
   and (`+warningHazard+` = any((select $6::text[])::text[])
@@ -86,10 +103,14 @@ func scanWarning(r pgx.CollectableRow) (weather.Warning, error) {
 		hazard string
 		level  int
 		until  *time.Time
+		en     weather.Text
 	)
 	err := r.Scan(&v.ID, &v.Family, &hazard, &level, &v.LevelName, &v.Issuer, &v.Headline,
 		&v.TextLanguage, &v.From, &until, &v.AreaName, &v.CellID, &v.Event, &v.Identifier, &v.Published,
-		&v.Description, &v.Instruction, &v.Urgency, &v.Certainty)
+		&v.Description, &v.Instruction, &v.Urgency, &v.Certainty, &en.Headline, &en.Description, &en.Instruction)
+	if en.Headline != nil || en.Description != nil || en.Instruction != nil {
+		en.Family, v.English = englishWarnings, &en
+	}
 	v.Hazard, v.From = weather.MapHazard(hazard), v.From.UTC()
 	if v.Published != nil {
 		p := v.Published.UTC()

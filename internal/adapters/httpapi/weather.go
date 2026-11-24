@@ -25,25 +25,34 @@ type WeatherRiskInput struct {
 
 // WeatherWarning is one official weather warning, in the issuer's words.
 type WeatherWarning struct {
-	ID             string      `json:"id"`
-	Hazard         string      `json:"hazard" enum:"thunderstorm,wind,rain,snow,ice,fog,heat,frost,uv,flood,other" doc:"What it warns of. Open enumeration; treat an unknown value as other."`
-	Level          int         `json:"level" minimum:"0" maximum:"4" doc:"The official level, 1 (minor) to 4 (extreme), or 0 for an advance notice (Vorabinformation Unwetter), as issued; never re-graded. A level-0 notice does not light the lamp."`
-	LevelName      string      `json:"levelName" doc:"The issuer's name of the level, as issued."`
-	Issuer         string      `json:"issuer" doc:"The issuing service."`
-	Headline       string      `json:"headline" doc:"The official wording, in textLanguage."`
-	TextLanguage   string      `json:"textLanguage" doc:"The language of headline (BCP 47)."`
-	Validity       TimeWindow  `json:"validity"`
-	InForce        bool        `json:"inForce" doc:"Whether the warning is in force at the answer's instant; false for one that starts within weather.lookahead (24 hours by default), which is listed beside those in force as the platform lists it (the lamp reads only those in force)."`
-	Event          *string     `json:"event" nullable:"true" doc:"The issuer's event name, as issued (the DWD's EVENT, e.g. FROST); null when not given."`
-	Identifier     *string     `json:"identifier" nullable:"true" doc:"The issuer's message identifier, as issued; null when not given."`
-	Published      *time.Time  `json:"published" nullable:"true" format:"date-time" doc:"When the issuer published the warning (its sent time); null when not given."`
-	PublishedLocal *string     `json:"publishedLocal" nullable:"true" format:"date-time" doc:"published in Europe/Berlin time; null when published is."`
-	Area           WarningArea `json:"area"`
-	SourceFamily   string      `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
-	Description    *string     `json:"description" nullable:"true" doc:"The issuer's full text of the warning, in textLanguage, unaltered; null when not given."`
-	Instruction    *string     `json:"instruction" nullable:"true" doc:"The issuer's advice on what to do, in textLanguage, unaltered; null when not given."`
-	Urgency        *string     `json:"urgency" nullable:"true" doc:"The issuer's CAP urgency (e.g. Immediate, Future), as issued; null when not given."`
-	Certainty      *string     `json:"certainty" nullable:"true" doc:"The issuer's CAP certainty (e.g. Observed, Likely), as issued; null when not given."`
+	ID             string       `json:"id"`
+	Hazard         string       `json:"hazard" enum:"thunderstorm,wind,rain,snow,ice,fog,heat,frost,uv,flood,other" doc:"What it warns of. Open enumeration; treat an unknown value as other."`
+	Level          int          `json:"level" minimum:"0" maximum:"4" doc:"The official level, 1 (minor) to 4 (extreme), or 0 for an advance notice (Vorabinformation Unwetter), as issued; never re-graded. A level-0 notice does not light the lamp."`
+	LevelName      string       `json:"levelName" doc:"The issuer's name of the level, as issued."`
+	Issuer         string       `json:"issuer" doc:"The issuing service."`
+	Headline       string       `json:"headline" doc:"The official wording, in textLanguage."`
+	TextLanguage   string       `json:"textLanguage" doc:"The language of headline (BCP 47)."`
+	Validity       TimeWindow   `json:"validity"`
+	InForce        bool         `json:"inForce" doc:"Whether the warning is in force at the answer's instant; false for one that starts within weather.lookahead (24 hours by default), which is listed beside those in force as the platform lists it (the lamp reads only those in force)."`
+	Event          *string      `json:"event" nullable:"true" doc:"The issuer's event name, as issued (the DWD's EVENT, e.g. FROST); null when not given."`
+	Identifier     *string      `json:"identifier" nullable:"true" doc:"The issuer's message identifier, as issued; null when not given."`
+	Published      *time.Time   `json:"published" nullable:"true" format:"date-time" doc:"When the issuer published the warning (its sent time); null when not given."`
+	PublishedLocal *string      `json:"publishedLocal" nullable:"true" format:"date-time" doc:"published in Europe/Berlin time; null when published is."`
+	Area           WarningArea  `json:"area"`
+	SourceFamily   string       `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
+	Description    *string      `json:"description" nullable:"true" doc:"The issuer's full text of the warning, in textLanguage, unaltered; null when not given."`
+	Instruction    *string      `json:"instruction" nullable:"true" doc:"The issuer's advice on what to do, in textLanguage, unaltered; null when not given."`
+	Urgency        *string      `json:"urgency" nullable:"true" doc:"The issuer's CAP urgency (e.g. Immediate, Future), as issued; null when not given."`
+	Certainty      *string      `json:"certainty" nullable:"true" doc:"The issuer's CAP certainty (e.g. Observed, Likely), as issued; null when not given."`
+	English        *WarningText `json:"english" doc:"The issuer's own English text of the warning, its English message for the same alert, unaltered; null when the issuer gave none or its English source is not read for the key. The source is credited in meta.attribution when given."`
+}
+
+// WarningText is a warning's wording in one more language, as issued.
+type WarningText struct {
+	Headline     *string `json:"headline" nullable:"true" doc:"The headline, unaltered; null when not given."`
+	Description  *string `json:"description" nullable:"true" doc:"The full text, unaltered; null when not given."`
+	Instruction  *string `json:"instruction" nullable:"true" doc:"The advice on what to do, unaltered; null when not given."`
+	SourceFamily string  `json:"sourceFamily" doc:"The source family of the text; its attribution is in meta.attribution."`
 }
 
 // WarningArea is the area a warning is issued for.
@@ -338,6 +347,9 @@ func weatherWarnings(items []weather.Warning, at time.Time) []WeatherWarning {
 			InForce: !w.From.After(at), Area: WarningArea{Name: w.AreaName, CellID: w.CellID}, SourceFamily: w.Family,
 			Event: w.Event, Identifier: w.Identifier,
 			Description: w.Description, Instruction: w.Instruction, Urgency: w.Urgency, Certainty: w.Certainty,
+		}
+		if e := w.English; e != nil {
+			ws[i].English = &WarningText{Headline: e.Headline, Description: e.Description, Instruction: e.Instruction, SourceFamily: e.Family}
 		}
 		if w.Published != nil {
 			p, l := w.Published.UTC(), local(*w.Published)

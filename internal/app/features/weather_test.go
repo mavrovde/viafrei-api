@@ -270,3 +270,40 @@ func TestDrivingRulesCarryTheirTopicAndFamilies(t *testing.T) {
 		t.Errorf("a failed register read the topic (%d)", f.readCalls)
 	}
 }
+
+// The issuer's English text of a warning is credited to its own family once,
+// outside the lamp's sight; a family already credited is not credited twice.
+func TestTheEnglishTextOfAWarningIsCredited(t *testing.T) {
+	req.Covers(t, "FR-WEATHER-001")
+	both := key("consumer", []access.Scope{"weather"}, "w1", "w2")
+	frost := "Frost"
+	en := &weather.Text{Family: "w2", Headline: &frost}
+	f := &wxFake{warnings: []weather.Warning{{ID: "a", Family: "w1", Level: 2, English: en}, {ID: "b", Family: "w1", Level: 1, English: en}}}
+	r, err := wxService(f).WeatherRisk(context.Background(), both, weather.Query{})
+	if err != nil || !slices.Equal(names(r.Families), []string{"w1", "w2"}) || r.Lamp != weather.LampAmber {
+		t.Errorf("credited %v, lamp %s, %v", names(r.Families), r.Lamp, err)
+	}
+	if last := f.gotProv[len(f.gotProv)-1]; !slices.Equal(last, []string{"w2"}) {
+		t.Errorf("the English family was asked %v", f.gotProv)
+	}
+	f = &wxFake{warnings: []weather.Warning{{ID: "a", Family: "w1", Level: 2, English: &weather.Text{Family: "w1"}}}}
+	if r, err = wxService(f).WeatherRisk(context.Background(), both, weather.Query{}); err != nil || !slices.Equal(names(r.Families), []string{"w1"}) || len(f.gotProv) != 1 {
+		t.Errorf("already credited: %v, asked %v, %v", names(r.Families), f.gotProv, err)
+	}
+	f = &wxFake{fake: &fake{provErr: errStore, provErrOnCall: 2}, warnings: []weather.Warning{{ID: "a", Family: "w1", Level: 2, English: en}}}
+	if _, err = wxService(f).WeatherRisk(context.Background(), both, weather.Query{}); !errors.Is(err, errStore) {
+		t.Errorf("the English credit's read failing: %v", err)
+	}
+}
+
+// A cell's warning with an English text credits that text's family too.
+func TestACellWarningsEnglishTextIsCredited(t *testing.T) {
+	req.Covers(t, "FR-WEATHER-001")
+	both := key("consumer", []access.Scope{"weather"}, "w1", "w2")
+	f := &wxFake{cells: map[string]weather.Cell{"812345000": {Key: "812345000",
+		Warnings: []weather.Warning{{ID: "a", Family: "w1", Level: 2, English: &weather.Text{Family: "w2"}}}}}}
+	a, err := wxService(f).WeatherCell(context.Background(), both, "812345000", nil, 0)
+	if err != nil || !slices.Equal(names(a.Meta.Families), []string{"w1", "w2"}) {
+		t.Errorf("credited %v, %v", names(a.Meta.Families), err)
+	}
+}

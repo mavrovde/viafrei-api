@@ -18,7 +18,7 @@ const legacyWarningColumns = `
 select w.warning_id, w.source_ref, w.hazard, w.warning_level, w.level_label, w.issuer_name, w.headline,
        w.text_lang, w.valid_from, w.valid_to, coalesce(w.area_name, ''),
        w.warn_cell_id, w.event, w.identifier, w.published_at,
-       x.description, x.instruction, x.urgency, x.certainty
+       x.description, x.instruction, x.urgency, x.certainty, en.en_headline, en.en_description, en.en_instruction
 `
 
 const legacyZoneAlive = `(z.checked_at > $3::timestamptz - make_interval(secs => 3 * coalesce(z.cadence_s, 2592000))

@@ -78,6 +78,17 @@ type Warning struct {
 	// in TextLanguage, as issued; Urgency and Certainty its CAP urgency and
 	// certainty, as issued. Each is nil when not given.
 	Description, Instruction, Urgency, Certainty *string
+	// English is the issuer's own English text of the warning, its English
+	// message for the same alert; nil when the issuer gave none or its
+	// English source is not read.
+	English *Text
+}
+
+// Text is a warning's wording in one more language, as issued, and the
+// source family that carries it; each part is nil when not given.
+type Text struct {
+	Family                             string
+	Headline, Description, Instruction *string
 }
 
 // Query asks for the warnings in force at a position, or starting within

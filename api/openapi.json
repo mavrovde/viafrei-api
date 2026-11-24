@@ -8722,6 +8722,47 @@
               "null"
             ]
           },
+          "english": {
+            "additionalProperties": false,
+            "description": "The issuer's own English text of the warning, its English message for the same alert, unaltered; null when the issuer gave none or its English source is not read for the key. The source is credited in meta.attribution when given.",
+            "properties": {
+              "description": {
+                "description": "The full text, unaltered; null when not given.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "headline": {
+                "description": "The headline, unaltered; null when not given.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "instruction": {
+                "description": "The advice on what to do, unaltered; null when not given.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sourceFamily": {
+                "description": "The source family of the text; its attribution is in meta.attribution.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "headline",
+              "description",
+              "instruction",
+              "sourceFamily"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "event": {
             "description": "The issuer's event name, as issued (the DWD's EVENT, e.g. FROST); null when not given.",
             "type": [
@@ -8840,7 +8881,8 @@
           "description",
           "instruction",
           "urgency",
-          "certainty"
+          "certainty",
+          "english"
         ],
         "type": "object"
       },
@@ -21720,7 +21762,8 @@
                           "code": null,
                           "at": null,
                           "radiusM": null,
-                          "area": "01002"
+                          "area": "01002",
+                          "railway": false
                         }
                       },
                       "links": {
@@ -21833,7 +21876,8 @@
                           "code": null,
                           "at": null,
                           "radiusM": null,
-                          "area": null
+                          "area": null,
+                          "railway": false
                         }
                       },
                       "links": {
@@ -22483,23 +22527,23 @@
                           "name": "Pienköckheim Nord"
                         },
                         "counts": {
-                          "active": 0,
+                          "active": 2,
                           "inactive": 0,
-                          "unknown": 2
+                          "unknown": 0
                         },
                         "facilities": [
                           {
                             "id": "equipment:100003",
                             "kind": "escalator",
                             "position": "zu Gleis 1",
-                            "state": "unknown",
+                            "state": "active",
                             "sourceFamily": "openstation_siri_fm"
                           },
                           {
                             "id": "equipment:100004",
                             "kind": "escalator",
                             "position": "zu Gleis 2",
-                            "state": "unknown",
+                            "state": "active",
                             "sourceFamily": "openstation_siri_fm"
                           }
                         ]

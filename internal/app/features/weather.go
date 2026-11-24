@@ -2,6 +2,7 @@ package features
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
@@ -87,6 +88,11 @@ func (s *Service) WeatherRisk(ctx context.Context, key access.Record, q weather.
 	}
 	fams, stale, turns, err := s.sight(ctx, warned, contributed, now)
 	if err != nil {
+		return WeatherRisk{}, err
+	}
+	// The issuer's English text is credited to its own family, outside the
+	// lamp's sight: the lamp reads the levels of the original warnings.
+	if fams, err = s.withEnglish(ctx, fams, sc.Warnings); err != nil {
 		return WeatherRisk{}, err
 	}
 	// The answer changes with the clock alone when a warning starts or ends,
@@ -187,4 +193,22 @@ func (s *Service) LowEmissionZones(ctx context.Context, key access.Record, q rul
 		out.Meta.Families = append(out.Meta.Families, fams...)
 	}
 	return out, nil
+}
+
+// withEnglish adds to fams the families of the English texts the warnings
+// carry, once each, when fams does not credit them yet.
+func (s *Service) withEnglish(ctx context.Context, fams []provenance.Family, ws []weather.Warning) ([]provenance.Family, error) {
+	var more []string
+	for _, w := range ws {
+		if w.English == nil || slices.Contains(more, w.English.Family) ||
+			slices.ContainsFunc(fams, func(f provenance.Family) bool { return f.Source.Family == w.English.Family }) {
+			continue
+		}
+		more = append(more, w.English.Family)
+	}
+	if len(more) == 0 {
+		return fams, nil
+	}
+	extra, err := s.creditsOf(ctx, more)
+	return append(fams, extra...), err
 }

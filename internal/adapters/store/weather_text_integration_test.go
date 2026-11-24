@@ -6,6 +6,7 @@ package store_test
 // platform's warnings table, which the store reads directly.
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -56,5 +57,78 @@ order by id limit 1`, &p.Lat, &p.Lon, &from, &id)
 	}
 	if !seen {
 		t.Fatalf("%s not listed: %v", id, sc.Warnings)
+	}
+}
+
+// TestWarningsAtStateTheIssuersEnglishText: the DWD's English message of
+// the same alert (its sent instant, onset, expiry, the warning's cell among
+// its cells and the same event code) is the warning's English text, as
+// today's MCP answer reads it (#222), credited to the English source and
+// read only while that source is among the families; a warning with no
+// English message has none, and so has every warning in the cell read.
+func TestWarningsAtStateTheIssuersEnglishText(t *testing.T) {
+	req.Covers(t, "FR-WEATHER-001")
+	st := seeded(t)
+	// The platform's English source, beside the fixtures' weather families.
+	fams := append(families(t, st, "weather"), "dwd_warnings_en")
+	var (
+		p    geo.Point
+		from time.Time
+		id   string
+		cell string
+	)
+	owner(t, `select st_y(st_pointonsurface(area::geometry)), st_x(st_pointonsurface(area::geometry)), valid_from, 'dwd:' || id, warncell_id from weather_warnings
+where closed_at is null and deleted_at is null and valid_from is not null and closed_reason is distinct from 'withdrawn' and area is not null
+  and published_at is not null and warncell_id is not null
+order by id limit 1`, &p.Lat, &p.Lon, &from, &id, &cell)
+	if n := change(t, `update weather_warnings set raw = jsonb_set(coalesce(raw, '{}'), '{properties}', coalesce(raw->'properties', '{}') || '{"EC_II": "84"}')
+where 'dwd:' || id = $1`, id); n != 1 {
+		t.Fatalf("updated %d rows", n)
+	}
+	if n := change(t, `insert into public.weather_warnings_en (source_id, source_feed, identifier, base_identifier, language, headline, description,
+  content_sha256, sent_at, valid_from, valid_to, warncell_ids, raw)
+select 'dwd_warnings_en', 'dwd_warnings_en', 'test-en-1', 'test-en-1', 'en-GB', 'Frost', 'Frost is expected.', repeat('a', 64), w.published_at, w.valid_from, w.valid_to,
+  array[w.warncell_id], '{"eventCodes": {"II": "84"}}'
+from weather_warnings w where 'dwd:' || w.id = $1`, id); n != 1 {
+		t.Fatalf("inserted %d rows", n)
+	}
+	t.Cleanup(func() { change(t, `delete from public.weather_warnings_en where identifier = 'test-en-1'`) })
+	for name, read := range map[string][]string{"read": fams, "not read": slices.DeleteFunc(slices.Clone(fams), func(f string) bool { return f == "dwd_warnings_en" })} {
+		sc, err := st.WarningsAt(bounded(t), weather.Query{LookAhead: lookAhead, Limit: maxWarnings, At: p}, read, from)
+		if err != nil {
+			t.Fatal(err)
+		}
+		seen := false
+		for _, w := range sc.Warnings {
+			if w.ID != id || name == "not read" {
+				if w.English != nil {
+					t.Errorf("%s, %s: an English text %+v", name, w.ID, w.English)
+				}
+				seen = seen || w.ID == id
+				continue
+			}
+			seen = true
+			if e := w.English; e == nil || e.Family != "dwd_warnings_en" || e.Headline == nil || *e.Headline != "Frost" ||
+				e.Description == nil || *e.Description != "Frost is expected." || e.Instruction != nil {
+				t.Errorf("%s: %+v", id, e)
+			}
+		}
+		if !seen {
+			t.Fatalf("%s, %s not listed", name, id)
+		}
+	}
+	c, err := st.CellWarnings(bounded(t), weather.CellQuery{Cell: cell}, fams, from)
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed := false
+	for _, w := range c.Warnings {
+		listed = listed || w.ID == id
+		if (w.ID == id) != (w.English != nil) {
+			t.Errorf("the cell read, %s: %+v", w.ID, w.English)
+		}
+	}
+	if !listed {
+		t.Errorf("the cell read does not list %s: %v", id, c.Warnings)
 	}
 }

@@ -9,6 +9,13 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [1.1.0](https://github.com/mavrovde/viafrei-api/compare/v1.0.2...v1.1.0) (2026-11-24)
+
+
+### Added
+
+* **store:** base-table SQL with named, plan-stable statements; no contract views ([#203](https://github.com/mavrovde/viafrei-api/issues/203)) ([2105ef4](https://github.com/mavrovde/viafrei-api/commit/2105ef44f4b575cdba55bc426883c9fc2597c43c))
+
 ## [1.0.2](https://github.com/mavrovde/viafrei-api/compare/v1.0.1...v1.0.2) (2026-11-23)
 
 

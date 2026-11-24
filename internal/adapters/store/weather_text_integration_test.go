@@ -6,6 +6,8 @@ package store_test
 // platform's warnings table, which the store reads directly.
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"slices"
 	"testing"
 	"time"
@@ -130,5 +132,78 @@ from weather_warnings w where 'dwd:' || w.id = $1`, id); n != 1 {
 	}
 	if !listed {
 		t.Errorf("the cell read does not list %s: %v", id, c.Warnings)
+	}
+}
+
+// TestTheIssuersTextIsUnalteredWhileItsHashHolds: a warning's German text is
+// unaltered only while its UTF-8 bytes hash to the hash taken when it was received, and
+// its English text only while the headline, description and instruction,
+// NUL-separated, hash to the English hash, as the platform judges both
+// before it quotes the issuer (#222); a changed text, a changed hash and no
+// text are not unaltered. The hashes here are taken in Go, not by the
+// statement, so the rule is checked against its own statement of it.
+func TestTheIssuersTextIsUnalteredWhileItsHashHolds(t *testing.T) {
+	req.Covers(t, "FR-WEATHER-001")
+	st := seeded(t)
+	fams := append(families(t, st, "weather"), "dwd_warnings_en")
+	var (
+		p    geo.Point
+		from time.Time
+		id   string
+		hash string
+	)
+	owner(t, `select st_y(st_pointonsurface(area::geometry)), st_x(st_pointonsurface(area::geometry)), valid_from, 'dwd:' || id, official_sha256 from weather_warnings
+where closed_at is null and deleted_at is null and valid_from is not null and closed_reason is distinct from 'withdrawn' and area is not null
+  and published_at is not null and warncell_id is not null
+order by id limit 1`, &p.Lat, &p.Lon, &from, &id, &hash)
+	sum := func(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
+	ptr := func(s string) *string { return &s }
+	const de = "Es tritt leichter Frost auf. Glätte möglich."
+	set := `update weather_warnings set description = $2, official_sha256 = $3 where 'dwd:' || id = $1`
+	t.Cleanup(func() { change(t, set, id, nil, hash) })
+	if n := change(t, `update weather_warnings set raw = jsonb_set(coalesce(raw, '{}'), '{properties}', coalesce(raw->'properties', '{}') || '{"EC_II": "84"}')
+where 'dwd:' || id = $1`, id); n != 1 {
+		t.Fatalf("updated %d rows", n)
+	}
+	en := "insert into public.weather_warnings_en (source_id, source_feed, identifier, base_identifier, language, headline, description,\n" +
+		"  content_sha256, sent_at, valid_from, valid_to, warncell_ids, raw)\n" +
+		"select 'dwd_warnings_en', 'dwd_warnings_en', 'test-en-2', 'test-en-2', 'en-GB', 'Frost', 'Frost is expected.', $2, w.published_at, w.valid_from, w.valid_to,\n" +
+		"  array[w.warncell_id], '{\"eventCodes\": {\"II\": \"84\"}}'\nfrom weather_warnings w where 'dwd:' || w.id = $1"
+	drop := `delete from public.weather_warnings_en where identifier = 'test-en-2'`
+	t.Cleanup(func() { change(t, drop) })
+	for _, c := range []struct {
+		name               string
+		text               *string
+		hash, enHash       string
+		unaltered, english bool
+	}{
+		{"as issued", ptr(de), sum(de), sum("Frost\x00Frost is expected.\x00"), true, true},
+		{"changed since", ptr(de + " "), sum(de), sum("Frost\x00Frost is expected."), false, false},
+		{"no text", nil, sum(""), sum("Frost\x00\x00Frost is expected."), false, false},
+	} {
+		if n := change(t, set, id, c.text, c.hash); n != 1 {
+			t.Fatalf("%s: updated %d rows", c.name, n)
+		}
+		change(t, drop)
+		if n := change(t, en, id, c.enHash); n != 1 {
+			t.Fatalf("%s: inserted %d rows", c.name, n)
+		}
+		sc, err := st.WarningsAt(bounded(t), weather.Query{LookAhead: lookAhead, Limit: maxWarnings, At: p}, fams, from)
+		if err != nil {
+			t.Fatal(err)
+		}
+		seen := false
+		for _, w := range sc.Warnings {
+			if w.ID != id {
+				continue
+			}
+			seen = true
+			if w.Unaltered != c.unaltered || w.English == nil || w.English.Unaltered != c.english {
+				t.Errorf("%s: unaltered %v, English %+v", c.name, w.Unaltered, w.English)
+			}
+		}
+		if !seen {
+			t.Fatalf("%s: %s not listed", c.name, id)
+		}
 	}
 }

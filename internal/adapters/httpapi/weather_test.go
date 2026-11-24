@@ -54,7 +54,7 @@ func riskAnswer() features.WeatherRisk {
 			{ID: "w-1", Family: "src-alpha-weather", Hazard: "snow", Level: 3, LevelName: "Unwetter", Issuer: "Wetterdienst",
 				Headline: "Schneefall", TextLanguage: "de", From: fixedNow.Add(-time.Hour), Until: tp(fixedNow.Add(26 * time.Hour)), AreaName: "Kreis A",
 				CellID: sp("814626000"), Event: sp("FROST"), Identifier: sp("2.49.0.0.276.0.DWD.PVW.1"), Published: tp(fixedNow.Add(-2 * time.Hour)),
-				Description: sp("Es fällt Schnee."), Instruction: sp("Fahren Sie vorsichtig."), Urgency: sp("Immediate"), Certainty: sp("Likely"),
+				Description: sp("Es fällt Schnee."), Instruction: sp("Fahren Sie vorsichtig."), Urgency: sp("Immediate"), Certainty: sp("Likely"), Unaltered: true,
 				English: &weather.Text{Family: "src-beta-weather", Headline: sp("Snowfall"), Description: sp("Snow is falling.")}},
 			{ID: "w-2", Family: "src-alpha-weather", Hazard: weather.Other, Level: 1, LevelName: "Wetterwarnung", Issuer: "Wetterdienst",
 				Headline: "Hinweis", TextLanguage: "de", From: fixedNow, AreaName: "Kreis A"},
@@ -106,8 +106,12 @@ func TestWeatherRiskAnswer(t *testing.T) {
 		t.Errorf("text %v %v %v %v", w0["description"], w0["instruction"], w0["urgency"], w0["certainty"])
 	}
 	if en, _ := w0["english"].(map[string]any); en["headline"] != "Snowfall" || en["description"] != "Snow is falling." ||
-		en["instruction"] != nil || en["sourceFamily"] != "src-beta-weather" {
+		en["instruction"] != nil || en["sourceFamily"] != "src-beta-weather" || en["unaltered"] != false {
 		t.Errorf("english %v", w0["english"])
+	}
+	// Whether each text is the issuer's, unaltered, as the platform checks before it quotes one.
+	if w0["unaltered"] != true {
+		t.Errorf("unaltered %v", w0["unaltered"])
 	}
 	if rw, ok := data["roadWeather"].([]any); !ok || len(rw) != 0 {
 		t.Errorf("roadWeather %v", data["roadWeather"])

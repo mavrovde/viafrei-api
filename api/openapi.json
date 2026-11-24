@@ -8875,12 +8875,17 @@
               "sourceFamily": {
                 "description": "The source family of the text; its attribution is in meta.attribution.",
                 "type": "string"
+              },
+              "unaltered": {
+                "description": "Whether the text is, provably, the issuer's own: a headline or a description given, and the headline, description and instruction, NUL-separated, still hash (SHA-256) to the hash taken when it was received, as the platform checks before it quotes the issuer's English. False else; such a text may not be passed on as the issuer's.",
+                "type": "boolean"
               }
             },
             "required": [
               "headline",
               "description",
               "instruction",
+              "unaltered",
               "sourceFamily"
             ],
             "type": [
@@ -8976,6 +8981,10 @@
             "description": "The language of headline (BCP 47).",
             "type": "string"
           },
+          "unaltered": {
+            "description": "Whether description is, provably, the text the issuer published: not empty, and its UTF-8 bytes still hash (SHA-256) to the hash taken over them when it was received, as the platform checks before it quotes the issuer's wording under the issuer's source note. False when description is null or changed since; such a text may not be passed on as the issuer's.",
+            "type": "boolean"
+          },
           "urgency": {
             "description": "The issuer's CAP urgency (e.g. Immediate, Future), as issued; null when not given.",
             "type": [
@@ -9005,6 +9014,7 @@
           "sourceFamily",
           "description",
           "instruction",
+          "unaltered",
           "urgency",
           "certainty",
           "english"
@@ -24162,6 +24172,7 @@
                             "sourceFamily": "dwd_eta",
                             "description": null,
                             "instruction": null,
+                            "unaltered": false,
                             "urgency": null,
                             "certainty": null,
                             "english": null

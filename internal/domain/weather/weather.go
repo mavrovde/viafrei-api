@@ -78,6 +78,10 @@ type Warning struct {
 	// in TextLanguage, as issued; Urgency and Certainty its CAP urgency and
 	// certainty, as issued. Each is nil when not given.
 	Description, Instruction, Urgency, Certainty *string
+	// Unaltered is whether Description is, provably, the text the issuer
+	// published (its hash taken when it was received still matches); false when there
+	// is none.
+	Unaltered bool
 	// English is the issuer's own English text of the warning, its English
 	// message for the same alert; nil when the issuer gave none or its
 	// English source is not read.
@@ -89,6 +93,9 @@ type Warning struct {
 type Text struct {
 	Family                             string
 	Headline, Description, Instruction *string
+	// Unaltered is whether the text is, provably, the issuer's own (its
+	// hash taken when it was received still matches).
+	Unaltered bool
 }
 
 // Query asks for the warnings in force at a position, or starting within

@@ -14,11 +14,12 @@ const legacyWarningPlaced = `from contract.weather_warning w
   and w.area is not null and w.area && st_setsrid(st_makepoint($4::float8, $3::float8), 4326)
   and st_intersects(w.area::geography, st_setsrid(st_makepoint($4::float8, $3::float8), 4326)::geography)`
 
-const legacyWarningColumns = `
+var legacyWarningColumns = `
 select w.warning_id, w.source_ref, w.hazard, w.warning_level, w.level_label, w.issuer_name, w.headline,
        w.text_lang, w.valid_from, w.valid_to, coalesce(w.area_name, ''),
        w.warn_cell_id, w.event, w.identifier, w.published_at,
-       x.description, x.instruction, x.urgency, x.certainty, en.en_headline, en.en_description, en.en_instruction
+       x.description, x.instruction, x.urgency, x.certainty, en.en_headline, en.en_description, en.en_instruction,
+       ` + descriptionUnaltered("x") + `, ` + englishUnaltered + `
 `
 
 const legacyZoneAlive = `(z.checked_at > $3::timestamptz - make_interval(secs => 3 * coalesce(z.cadence_s, 2592000))

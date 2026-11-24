@@ -42,6 +42,7 @@ type WeatherWarning struct {
 	SourceFamily   string       `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
 	Description    *string      `json:"description" nullable:"true" doc:"The issuer's full text of the warning, in textLanguage, unaltered; null when not given."`
 	Instruction    *string      `json:"instruction" nullable:"true" doc:"The issuer's advice on what to do, in textLanguage, unaltered; null when not given."`
+	Unaltered      bool         `json:"unaltered" doc:"Whether description is, provably, the text the issuer published: not empty, and its UTF-8 bytes still hash (SHA-256) to the hash taken over them when it was received, as the platform checks before it quotes the issuer's wording under the issuer's source note. False when description is null or changed since; such a text may not be passed on as the issuer's."`
 	Urgency        *string      `json:"urgency" nullable:"true" doc:"The issuer's CAP urgency (e.g. Immediate, Future), as issued; null when not given."`
 	Certainty      *string      `json:"certainty" nullable:"true" doc:"The issuer's CAP certainty (e.g. Observed, Likely), as issued; null when not given."`
 	English        *WarningText `json:"english" doc:"The issuer's own English text of the warning, its English message for the same alert, unaltered; null when the issuer gave none or its English source is not read for the key. The source is credited in meta.attribution when given."`
@@ -52,6 +53,7 @@ type WarningText struct {
 	Headline     *string `json:"headline" nullable:"true" doc:"The headline, unaltered; null when not given."`
 	Description  *string `json:"description" nullable:"true" doc:"The full text, unaltered; null when not given."`
 	Instruction  *string `json:"instruction" nullable:"true" doc:"The advice on what to do, unaltered; null when not given."`
+	Unaltered    bool    `json:"unaltered" doc:"Whether the text is, provably, the issuer's own: a headline or a description given, and the headline, description and instruction, NUL-separated, still hash (SHA-256) to the hash taken when it was received, as the platform checks before it quotes the issuer's English. False else; such a text may not be passed on as the issuer's."`
 	SourceFamily string  `json:"sourceFamily" doc:"The source family of the text; its attribution is in meta.attribution."`
 }
 
@@ -384,10 +386,10 @@ func weatherWarnings(items []weather.Warning, at time.Time) []WeatherWarning {
 			Headline: w.Headline, TextLanguage: w.TextLanguage, Validity: timeWindow(w.From, w.Until),
 			InForce: !w.From.After(at), Area: WarningArea{Name: w.AreaName, CellID: w.CellID}, SourceFamily: w.Family,
 			Event: w.Event, Identifier: w.Identifier,
-			Description: w.Description, Instruction: w.Instruction, Urgency: w.Urgency, Certainty: w.Certainty,
+			Description: w.Description, Instruction: w.Instruction, Urgency: w.Urgency, Certainty: w.Certainty, Unaltered: w.Unaltered,
 		}
 		if e := w.English; e != nil {
-			ws[i].English = &WarningText{Headline: e.Headline, Description: e.Description, Instruction: e.Instruction, SourceFamily: e.Family}
+			ws[i].English = &WarningText{Headline: e.Headline, Description: e.Description, Instruction: e.Instruction, SourceFamily: e.Family, Unaltered: e.Unaltered}
 		}
 		if w.Published != nil {
 			p, l := w.Published.UTC(), local(*w.Published)

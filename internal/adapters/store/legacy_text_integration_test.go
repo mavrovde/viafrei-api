@@ -5,9 +5,9 @@ package store
 // legacyWarningText are the text columns the view never carried (#222), read
 // from the warning's own row: the frozen statements gain them as the named
 // ones did, so the replay still compares every other column.
-const legacyWarningText = `left join lateral (select x.id, x.description, x.instruction, x.urgency, x.certainty
+const legacyWarningText = `left join lateral (select x.id, x.description, x.instruction, x.urgency, x.certainty, x.official_sha256
   from weather_warnings x where 'dwd:' || x.id = w.warning_id) x on true
-left join lateral (select e.en_headline, e.en_description, e.en_instruction from weather_warning_english(x.id) e
+left join lateral (select e.en_headline, e.en_description, e.en_instruction, e.en_sha256 from weather_warning_english(x.id) e
   where 'dwd_warnings_en' = any($1::text[])) en on true
 `
 

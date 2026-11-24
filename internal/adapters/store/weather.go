@@ -47,17 +47,35 @@ const warningHazard = `case when w.event ~* 'gewitter' then 'thunderstorm'
   when w.event ~* 'frost' then 'frost' when w.event ~* 'uv' then 'uv' else 'other' end`
 
 // warningColumns are a warning's columns, as scanWarning reads them.
-const warningColumns = `select 'dwd:' || w.id warning_id, w.source_feed, ` + warningHazard + ` hazard, w.level::int warning_level,
+var warningColumns = `select 'dwd:' || w.id warning_id, w.source_feed, ` + warningHazard + ` hazard, w.level::int warning_level,
        coalesce(w.severity, w.level::text), 'Deutscher Wetterdienst', coalesce(w.headline, w.event),
        'de', w.valid_from, w.valid_to, coalesce(w.area_desc, ''), w.warncell_id, w.event, w.identifier, w.published_at,
-       w.description, w.instruction, w.urgency, w.certainty, en.en_headline, en.en_description, en.en_instruction`
+       w.description, w.instruction, w.urgency, w.certainty, en.en_headline, en.en_description, en.en_instruction,
+       ` + descriptionUnaltered("w") + `, ` + englishUnaltered
+
+// descriptionUnaltered is whether the description of the warning aliased a
+// is, provably, the text the issuer published, as the platform judges it
+// before it quotes the text: not empty, and its UTF-8 bytes hashing (SHA-256,
+// hex) to the hash taken over them when received. A text changed since, or one
+// with no hash, is not.
+func descriptionUnaltered(a string) string {
+	return `coalesce(coalesce(` + a + `.description, '') <> '' and encode(sha256(convert_to(` + a + `.description, 'UTF8')), 'hex') = ` + a + `.official_sha256, false)`
+}
+
+// englishUnaltered is whether the English text joined as en is, provably,
+// the issuer's own, as the platform judges it: a headline or a description
+// given, and the three texts, NUL-separated (an absent one empty), hashing
+// to the hash stored over them when received.
+const englishUnaltered = `coalesce(coalesce(en.en_sha256, '') <> '' and (coalesce(en.en_headline, '') <> '' or coalesce(en.en_description, '') <> '')
+       and encode(sha256(convert_to(coalesce(en.en_headline, ''), 'UTF8') || '\x00'::bytea || convert_to(coalesce(en.en_description, ''), 'UTF8')
+         || '\x00'::bytea || convert_to(coalesce(en.en_instruction, ''), 'UTF8')), 'hex') = en.en_sha256, false)`
 
 // warningEnglish joins the DWD's own English text of the warning aliased w
 // (#222), as the platform's warnings at a point read it: the English
 // message the DWD issues for the same alert, matched by its content
 // (weather_warning_english), read only while the English source is among
 // the families ($1). No match is NULLs.
-const warningEnglish = `left join lateral (select e.en_headline, e.en_description, e.en_instruction from weather_warning_english(w.id) e
+const warningEnglish = `left join lateral (select e.en_headline, e.en_description, e.en_instruction, e.en_sha256 from weather_warning_english(w.id) e
   where '` + englishWarnings + `' = any((select $1::text[])::text[])) en on true
 `
 
@@ -107,7 +125,8 @@ func scanWarning(r pgx.CollectableRow) (weather.Warning, error) {
 	)
 	err := r.Scan(&v.ID, &v.Family, &hazard, &level, &v.LevelName, &v.Issuer, &v.Headline,
 		&v.TextLanguage, &v.From, &until, &v.AreaName, &v.CellID, &v.Event, &v.Identifier, &v.Published,
-		&v.Description, &v.Instruction, &v.Urgency, &v.Certainty, &en.Headline, &en.Description, &en.Instruction)
+		&v.Description, &v.Instruction, &v.Urgency, &v.Certainty, &en.Headline, &en.Description, &en.Instruction,
+		&v.Unaltered, &en.Unaltered)
 	if en.Headline != nil || en.Description != nil || en.Instruction != nil {
 		en.Family, v.English = englishWarnings, &en
 	}

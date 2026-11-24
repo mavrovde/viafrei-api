@@ -122,17 +122,14 @@ where d.stop_place_id = $1
                where nx.journey_id = d.journey_id and nx.call_order > d.call_order
                  and np.stop_place_id <> $1)
 order by d.planned_departure_at, d.journey_id, d.call_order`, "text", "timestamp with time zone", "timestamp with time zone", "text[]"),
-	// A state is current while its feed restates it (its last sighting,
+	// A state is current while its source restates it (its last sighting,
 	// which the view never carried), and a unit FaSta lists is FaSta's
 	// alone (#222): both read from the facility's own row.
 	"api_station_facilities": `
 with v as (
   select f.*, x.seen, x.eno
   from contract.station_facility f
-  left join lateral (select coalesce((select st.last_seen_at from station_equipment_state st where 'equipment:' || st.equipment_id = f.facility_id),
-                                     (select e.last_seen_at from station_equipment e where 'equipment:' || e.equipment_id = f.facility_id),
-                                     (select d.last_seen_at from db_facilities d where 'fasta:' || d.equipment_no = f.facility_id)) seen,
-                            (select e.equipment_no from station_equipment e where 'equipment:' || e.equipment_id = f.facility_id) eno) x on true
+  ` + legacyFacilitySeen + `
   where (f.stop_place_id = $1
          -- the station DB files under the DHID the station's platforms name
          -- as their parent (S+U Berlin Hauptbahnhof, 1.1.2 faults)

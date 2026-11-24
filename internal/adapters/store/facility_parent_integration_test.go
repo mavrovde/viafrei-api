@@ -31,7 +31,7 @@ func TestAStationAnswersTheFacilitiesFiledUnderItsPlatformsParent(t *testing.T) 
 	}
 }
 
-// A state is current while its feed restates it, whenever it began: a lift
+// A state is current while its source restates it, whenever it began: a lift
 // in service for a week and restated a minute ago is in service (Hamburg
 // Hbf read 49 of 49 unknown, judged on when each state began). A unit DB's
 // FaSta and OpenStation both list (one equipment number) is FaSta's alone

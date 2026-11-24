@@ -147,7 +147,7 @@ func ExamplePlants(out io.Writer, profile string, seed uint64, contractVersion s
 	// example would drift with the calendar. The examples state the topics'
 	// own review day instead; the generated rows (and the parity bundles
 	// recorded on their hash) stay as they are.
-	g.w.write("update contract.rule_statement set reviewed_on = " + date(time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)) + ";\n")
+	g.w.write("update driving_rule_facts set reviewed_on = " + date(time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)) + ";\n")
 	if _, err := g.w.close(); err != nil {
 		return fmt.Errorf("fixtures: write: %w", err)
 	}

@@ -56,3 +56,18 @@ func TestRoadShapesMissingRoad(t *testing.T) {
 		t.Fatalf("a missing road: %+v %v %v", sh, ok, err)
 	}
 }
+
+// TestKeepRoadsEndsWithItsContext: with the snapshot on, KeepRoads reads
+// once and returns when its context has ended.
+func TestKeepRoadsEndsWithItsContext(t *testing.T) {
+	s := (&Store{nowFn: time.Now}).WithRoadSnapshot(time.Minute, time.Minute)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	done := make(chan struct{})
+	go func() { s.KeepRoads(ctx); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("KeepRoads did not return after its context ended")
+	}
+}

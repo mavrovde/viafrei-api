@@ -15,5 +15,5 @@
 # A <name>:<X.Y.Z>-local line names a locally built, unpublished release:
 # the tests and the local stack run it, and internal/release/pinguard
 # refuses it, so CI and the release workflow stop on it.
-ghcr.io/mavrovde/viafrei-database:0.5.0@sha256:1490f14758627cce4364a87a2a7e841e9181ed324139337290cf66d6699e582b
-schema-head 338
+ghcr.io/mavrovde/viafrei-database:0.5.1@sha256:1c7607a8e8503a550ed7ae89f7ad472e540babbc3e07a1ea08e2fb87635a0520
+schema-head 339

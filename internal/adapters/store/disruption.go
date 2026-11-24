@@ -90,18 +90,18 @@ limit 1`, "text", "text[]")
 // families $3: the platform's region watch count.
 var areaTrips = namedOpaque("api_area_trips", `select count(distinct t.trip_ref)::int, (count(distinct t.trip_ref) filter (where t.worst_delay_s > $2::int * 60))::int,
        max(t.observed_at), coalesce(min(t.source_ref), '')
-from (`+tripDelaysOfLand()+`) t
+from (`+tripDelaysOfLand(relTransitTripDelay)+`) t
 where starts_with(t.area_code, $1) and t.source_ref = any($3) and `+permitted("t"), "text", "integer", "text[]")
 
-// tripDelaysOfLand is the trip delays relation bound to the Land of the
+// tripDelaysOfLand is the trip delays relation rel bound to the Land of the
 // area $1 (landOfDelay); it panics at init when the relation no longer
 // holds the one place the bound goes, so the bound is never dropped quietly.
-func tripDelaysOfLand() string {
+func tripDelaysOfLand(rel string) string {
 	const at = "WHERE d.source = 'delfi_rt_tu'::text AND"
-	if n := strings.Count(relTransitTripDelay, at); n != 1 {
+	if n := strings.Count(rel, at); n != 1 {
 		panic(fmt.Sprintf("store: the trip delays relation holds %q %d times, not once: the Land bound has no place", at, n))
 	}
-	return strings.Replace(relTransitTripDelay, at, "WHERE "+landOfDelay+" = left($1::text, 2) AND "+at[len("WHERE "):], 1)
+	return strings.Replace(rel, at, "WHERE "+landOfDelay+" = left($1::text, 2) AND "+at[len("WHERE "):], 1)
 }
 
 // landOfDelay is the Land of a Trip Updates delay d, as the delays' index

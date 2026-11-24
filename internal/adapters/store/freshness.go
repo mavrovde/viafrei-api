@@ -37,10 +37,7 @@ select 'l', '', md5(concat_ws('|',
   (select string_agg(t::text, ',' order by t::text) from (
      select row(m.state_code, m.source_ref, m.coverage_role, m.current_only, m.measured_on, 'open'::text, 'public'::text) t
      from message_coverage_sources m) t),
-  (select string_agg(j.junction_id || '=' || coalesce(j.state_code, ''), ',' order by j.junction_id) from (
-     select t.cid || ':' || t.tabcd || ':' || t.lcd junction_id, land.code state_code
-     from tmc_locations t cross join lateral (select contract_junction_land(t.geom) code) land
-     where t.cid = 58 and t.tabcd = 1 and t.tcd = 1 and t.road_number ~ '^A[1-9][0-9]{0,2}$' and t.geom is not null and t.name is not null) j)))
+  `+junctionLandInputs+`))
 union all
 select 'u', '', md5(concat_ws('|',
   (select string_agg(t::text, ',' order by t::text) from (
@@ -55,6 +52,23 @@ union all
 select 'f', f.source_ref::text, `+familyVersion+` from fresh f
 union all
 select 'c', f.source_ref::text, `+confirmationVersion+` from fresh f`)
+
+// junctionLandInputs fingerprints what each junction's state is derived
+// from, not the derived states: contract_junction_land gives a junction the
+// Land of the nearest municipality of the BKG gazetteer within 20 km, so the
+// junctions (their key and position) and those municipalities (their id,
+// Land and position) decide every junction's state, and the fingerprint
+// moves whenever any of them does (a state that stays put may move it too:
+// a cached lamp then ends early, never late). Deriving every motorway
+// junction's state on each read was a nearest-neighbour search per junction,
+// about 3 000 of them: 230 ms of a versions read the cache waits for once a
+// second (cache.versions_ttl), before every answer.
+const junctionLandInputs = `(select md5(string_agg(t.cid || ':' || t.tabcd || ':' || t.lcd || '@' || md5(st_asbinary(t.geom)), ',' order by t.cid, t.tabcd, t.lcd))
+     from tmc_locations t
+     where t.cid = 58 and t.tabcd = 1 and t.tcd = 1 and t.road_number ~ '^A[1-9][0-9]{0,2}$' and t.geom is not null and t.name is not null),
+  (select md5(string_agg(g.id::text || '=' || left(g.admin_code, 2) || '@' || md5(st_asbinary(g.geom)), ',' order by g.id))
+     from gazetteer_places g
+     where g.closed_at is null and g.source_id = 'bkg_gvisys' and g.kind = 'city' and g.admin_code ~ '^[0-9]{8}$' and g.geom is not null)`
 
 // freshnessRows are each family's feed status (control.data_status, the
 // platform's feed status view) whose source rule does not exclude it: the

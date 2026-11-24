@@ -142,12 +142,12 @@ func TestTheLampsReferenceMovesWithWhatAJunctionsStateIsDerivedFrom(t *testing.T
 	}
 }
 
-// The punctuality and the trip delays of an area are read under the Trip
-// Updates' family as the register publishes it, like a board's figures: a
-// key given the published family is answered with them, and told it read
-// them (they were stamped with the licence's id, a family no key holds where
-// the source owns its licence's row, and never served).
-func TestAnAreasPunctualityIsReadUnderThePublishedFamily(t *testing.T) {
+// The trip delays of an area are read under the Trip Updates' family as the
+// register publishes it, like a board's figures: a key given the published
+// family is answered with them (they were stamped with the licence's id, a
+// family no key holds where the source owns its licence's row, and never
+// served). The area's punctuality waits for the database (punctualityFamily).
+func TestAnAreasTripDelaysAreReadUnderThePublishedFamily(t *testing.T) {
 	const area = "09162"
 	st, _ := private(t, append([]string{
 		// A Trip Updates call seeded as the board test's: the seed then
@@ -175,13 +175,7 @@ func TestAnAreasPunctualityIsReadUnderThePublishedFamily(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(d.PunctualityRead, []string{"tripupdates"}) {
-		t.Errorf("punctuality read under %v, want [tripupdates]", d.PunctualityRead)
-	}
 	if d.Trips == nil || d.Trips.Observed != 2 || d.Trips.Late != 1 || d.Trips.Family != "tripupdates" {
 		t.Errorf("trips %+v, want 2 observed, 1 late, of tripupdates", d.Trips)
-	}
-	if d.Punctuality != nil && d.Punctuality.Family != "tripupdates" {
-		t.Errorf("punctuality of %q, want tripupdates", d.Punctuality.Family)
 	}
 }

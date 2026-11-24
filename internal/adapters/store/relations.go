@@ -908,7 +908,7 @@ const relTransitPunctuality = `
     p.median_worst_delay_s,
     p.stops_seen,
     p.newest AS observed_at,
-    ` + tripUpdatesFamily + ` AS source_ref,
+    'delfi_rt_tu'::text AS source_ref,
     COALESCE(k.display_class, 'open'::text) AS display_class,
     COALESCE(k.audience, 'public'::text) AS audience
    FROM transit_punctuality_area_live p

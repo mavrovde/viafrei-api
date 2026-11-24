@@ -67,13 +67,11 @@ limit $5`, "timestamp with time zone", "text[]", "text", "text", "bigint")
 // alertsSummary reads whether a publication of the families was alive to
 // ask (an open alert of one), the region's alerts in force less the
 // duplicates, the duplicates left out, and the families of every row
-// counted, as the platform credits them; and those of the families the
-// punctuality is read under (tripUpdatesFamily), null for none.
+// counted, as the platform credits them.
 var alertsSummary = namedOpaque("api_alerts_summary", `with `+alertsCTE+`
 select exists (select 1 from (`+relServiceAlert+`) a where a.source_ref = any($2) and `+alertLive("a", "$1")+`),
        (count(*) filter (where not o.duplicate))::int, (count(*) filter (where o.duplicate))::int,
-       coalesce(array_agg(distinct o.source_ref order by o.source_ref), '{}'),
-       (select array_agg(f order by f) from unnest($2::text[]) f where f = `+tripUpdatesFamily+`)
+       coalesce(array_agg(distinct o.source_ref order by o.source_ref), '{}')
 from o where $5::int >= 0 -- $5, the limit, is the list's alone`, "timestamp with time zone", "text[]", "text", "text", "integer")
 
 var alertsCTE = strings.NewReplacer("{live}", alertLive("a", "$1"), "{inforce}", alertInForce("a", "$1")).Replace(regionAlerts)
@@ -108,20 +106,24 @@ var lineInTimetable = namedOpaque("api_line_in_timetable", `select exists (selec
        coalesce((select array_agg(distinct l.source_ref order by l.source_ref) from (`+relTransitLine+`) l
                   where upper(regexp_replace(l.line_name, '\s+', '', 'g')) = $1::text and l.source_ref = any($2) and `+permitted("l")+`), '{}')`, "text", "text[]")
 
+// punctualityFamily is the family contract.transit_punctuality is of (its
+// source_ref): the DELFI Trip Updates under its licence's id, not the
+// family the register publishes (tripUpdatesFamily), so a key holding the
+// published family is given no area punctuality. Stamped with the
+// published family, the read is served and takes 2 to 6 s on prod
+// (2026-11-24): transit_punctuality_area_live counts all sixteen Länder in
+// a materialised CTE no area filter reaches, and the API's role may not
+// read the untimed-trips relation a read of one Land would need. It
+// waits for the database to give a Land's punctuality.
+const punctualityFamily = "delfi_rt_tu"
+
 // Disruptions reads the alerts and the punctuality q asks for
 // (features.Disruptions).
 func (s *Store) Disruptions(ctx context.Context, q transit.DisruptionQuery, families []string) (transit.Disruptions, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (transit.Disruptions, error) {
-		var (
-			out transit.Disruptions
-			// punctuality are those of the families the punctuality is read
-			// under: the DELFI Trip Updates' family as the register
-			// publishes it (tripUpdatesFamily), the family
-			// relTransitPunctuality stamps; given only for an area.
-			punctuality []string
-		)
+		var out transit.Disruptions
 		args := []any{q.Now, families, nullText(q.Area), nullText(q.Line), q.Limit}
-		if err := runRow(ctx, tx, alertsSummary, args...).Scan(&out.AlertsChecked, &out.AlertsTotal, &out.AlertsDuplicates, &out.AlertFamilies, &punctuality); err != nil {
+		if err := runRow(ctx, tx, alertsSummary, args...).Scan(&out.AlertsChecked, &out.AlertsTotal, &out.AlertsDuplicates, &out.AlertFamilies); err != nil {
 			return out, err
 		}
 		rows, _ := run(ctx, tx, serviceAlerts, args...)
@@ -146,7 +148,11 @@ func (s *Store) Disruptions(ctx context.Context, q transit.DisruptionQuery, fami
 		if q.Area == "" {
 			return out, nil
 		}
-		out.PunctualityRead = punctuality
+		for _, f := range families {
+			if f == punctualityFamily {
+				out.PunctualityRead = append(out.PunctualityRead, f)
+			}
+		}
 		rows, _ = run(ctx, tx, areaPunctuality, q.Area, families)
 		ps, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.Punctuality, error) {
 			var p transit.Punctuality

@@ -85,12 +85,13 @@ func TestLiveCallsCountAsThePlatformCountsThem(t *testing.T) {
 	})
 
 	t.Run("the region watch's trips over any threshold", func(t *testing.T) {
+		// The trips are the Trip Updates' figures, under that source's key.
 		for _, c := range []struct {
 			area       string
 			over, late int
 		}{{"09", 5, 1}, {"09999", 1, 2}, {"09999", 15, 0}} {
 			d, err := st.Disruptions(bounded(t), transit.DisruptionQuery{Area: c.area, Limit: 6, Now: time.Now(), LateOverMin: c.over}, fams)
-			if err != nil || d.Trips == nil || d.Trips.Observed != 2 || d.Trips.Late != c.late || d.Trips.Family != "delfi_rt_tu" || d.Trips.ObservedAt.IsZero() {
+			if err != nil || d.Trips == nil || d.Trips.Observed != 2 || d.Trips.Late != c.late || d.Trips.Family != "tripupdates" || d.Trips.ObservedAt.IsZero() {
 				t.Errorf("%s over %d: %+v %v", c.area, c.over, d.Trips, err)
 			}
 		}

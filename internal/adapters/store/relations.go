@@ -5,6 +5,17 @@ package store
 // subquery where no tuned form of its own answers the same rows faster.
 // Generated from the views' definitions; edit a relation only with its parity test.
 
+// tripUpdatesFamily is the family the DELFI Trip Updates' figures are read
+// under: the key of the feed they come from, the one feed_checks row
+// ('tripupdates') the relations already read for their freshness. The
+// register publishes a register row a feed owns under that feed's key
+// (contract_sources, database 0312), so the Trip Updates' figures are
+// published as 'tripupdates' (on the platform the only family of the
+// licence 'delfi_rt_tu'). The view stamped the licence's id, a family the
+// register never publishes where a feed owns it: the licence gate's
+// post-check then refused every board with a Trip Updates figure (500).
+const tripUpdatesFamily = `'tripupdates'::text`
+
 // relDeparture is the platform's departure (kind v).
 const relDeparture = `
  SELECT (s.gtfs_feed_key::text || ':'::text) || COALESCE(s.parent_id, s.id) AS stop_place_id,
@@ -39,7 +50,7 @@ const relDeparture = `
     src.feed AS source_ref,
     array_remove(ARRAY[src.feed,
         CASE
-            WHEN tu.carried THEN 'delfi_rt_tu'::text
+            WHEN tu.carried THEN ` + tripUpdatesFamily + `
             ELSE NULL::text
         END,
         CASE
@@ -156,7 +167,7 @@ const relDeparture = `
      CROSS JOIN LATERAL ( SELECT
                 CASE pk.pick
                     WHEN 'siri'::text THEN sc.source_feed
-                    WHEN 'tu'::text THEN 'delfi_rt_tu'::text
+                    WHEN 'tu'::text THEN ` + tripUpdatesFamily + `
                     ELSE NULL::text
                 END AS feed,
                 CASE pk.pick
@@ -922,7 +933,7 @@ const relTransitTripDelay = `
     split_part(d.stop_id, ':'::text, 2) AS area_code,
     max(d.delay_s) AS worst_delay_s,
     max(d.observed_at) AS observed_at,
-    'delfi_rt_tu'::text AS source_ref,
+    ` + tripUpdatesFamily + ` AS source_ref,
     COALESCE(k.display_class, 'open'::text) AS display_class,
     COALESCE(k.audience, 'public'::text) AS audience
    FROM transit_delays d

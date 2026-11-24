@@ -41,7 +41,11 @@
             "cellId": "805002000",
             "geometry": null
           },
-          "sourceFamily": "dwd_eta"
+          "sourceFamily": "dwd_eta",
+          "description": null,
+          "instruction": null,
+          "urgency": null,
+          "certainty": null
         }
       ],
       "truncated": false,

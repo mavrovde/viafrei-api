@@ -53,7 +53,8 @@ func riskAnswer() features.WeatherRisk {
 		Answer: features.Answer[weather.Warning]{Items: []weather.Warning{
 			{ID: "w-1", Family: "src-alpha-weather", Hazard: "snow", Level: 3, LevelName: "Unwetter", Issuer: "Wetterdienst",
 				Headline: "Schneefall", TextLanguage: "de", From: fixedNow.Add(-time.Hour), Until: tp(fixedNow.Add(26 * time.Hour)), AreaName: "Kreis A",
-				CellID: sp("814626000"), Event: sp("FROST"), Identifier: sp("2.49.0.0.276.0.DWD.PVW.1"), Published: tp(fixedNow.Add(-2 * time.Hour))},
+				CellID: sp("814626000"), Event: sp("FROST"), Identifier: sp("2.49.0.0.276.0.DWD.PVW.1"), Published: tp(fixedNow.Add(-2 * time.Hour)),
+				Description: sp("Es fällt Schnee."), Instruction: sp("Fahren Sie vorsichtig."), Urgency: sp("Immediate"), Certainty: sp("Likely")},
 			{ID: "w-2", Family: "src-alpha-weather", Hazard: weather.Other, Level: 1, LevelName: "Wetterwarnung", Issuer: "Wetterdienst",
 				Headline: "Hinweis", TextLanguage: "de", From: fixedNow, AreaName: "Kreis A"},
 		}, HasMore: true, Families: []provenance.Family{weatherFamily}, At: fixedNow},
@@ -97,12 +98,16 @@ func TestWeatherRiskAnswer(t *testing.T) {
 	if w0["event"] != "FROST" || w0["identifier"] != "2.49.0.0.276.0.DWD.PVW.1" || w0["published"] != "2026-03-28T23:30:00Z" || w0["publishedLocal"] != "2026-03-29T00:30:00+01:00" {
 		t.Errorf("issued %v %v %v %v", w0["event"], w0["identifier"], w0["published"], w0["publishedLocal"])
 	}
+	if w0["description"] != "Es fällt Schnee." || w0["instruction"] != "Fahren Sie vorsichtig." || w0["urgency"] != "Immediate" || w0["certainty"] != "Likely" {
+		t.Errorf("text %v %v %v %v", w0["description"], w0["instruction"], w0["urgency"], w0["certainty"])
+	}
 	if rw, ok := data["roadWeather"].([]any); !ok || len(rw) != 0 {
 		t.Errorf("roadWeather %v", data["roadWeather"])
 	}
 	w1, _ := ws[1].(map[string]any)
 	v1, _ := w1["validity"].(map[string]any)
-	if w1["hazard"] != "other" || v1["until"] != nil || w1["event"] != nil || w1["published"] != nil || w1["publishedLocal"] != nil {
+	if w1["hazard"] != "other" || v1["until"] != nil || w1["event"] != nil || w1["published"] != nil || w1["publishedLocal"] != nil ||
+		w1["description"] != nil || w1["instruction"] != nil || w1["urgency"] != nil || w1["certainty"] != nil {
 		t.Errorf("second warning %v", w1)
 	}
 	q, _ := meta(t, body)["query"].(map[string]any)

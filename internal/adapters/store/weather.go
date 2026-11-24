@@ -45,7 +45,8 @@ const warningHazard = `case when w.event ~* 'gewitter' then 'thunderstorm'
 // warningColumns are a warning's columns, as scanWarning reads them.
 const warningColumns = `select 'dwd:' || w.id warning_id, w.source_feed, ` + warningHazard + ` hazard, w.level::int warning_level,
        coalesce(w.severity, w.level::text), 'Deutscher Wetterdienst', coalesce(w.headline, w.event),
-       'de', w.valid_from, w.valid_to, coalesce(w.area_desc, ''), w.warncell_id, w.event, w.identifier, w.published_at`
+       'de', w.valid_from, w.valid_to, coalesce(w.area_desc, ''), w.warncell_id, w.event, w.identifier, w.published_at,
+       w.description, w.instruction, w.urgency, w.certainty`
 
 // warningsPage reads the placed warnings in force at now or starting before
 // $10 (now and the look-ahead) that the floor and the hazards keep, worst
@@ -87,7 +88,8 @@ func scanWarning(r pgx.CollectableRow) (weather.Warning, error) {
 		until  *time.Time
 	)
 	err := r.Scan(&v.ID, &v.Family, &hazard, &level, &v.LevelName, &v.Issuer, &v.Headline,
-		&v.TextLanguage, &v.From, &until, &v.AreaName, &v.CellID, &v.Event, &v.Identifier, &v.Published)
+		&v.TextLanguage, &v.From, &until, &v.AreaName, &v.CellID, &v.Event, &v.Identifier, &v.Published,
+		&v.Description, &v.Instruction, &v.Urgency, &v.Certainty)
 	v.Hazard, v.From = weather.MapHazard(hazard), v.From.UTC()
 	if v.Published != nil {
 		p := v.Published.UTC()

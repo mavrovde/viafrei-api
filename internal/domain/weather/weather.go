@@ -74,6 +74,10 @@ type Warning struct {
 	// issued; Published is when it was issued. Each is nil when not given.
 	CellID, Event, Identifier *string
 	Published                 *time.Time
+	// Description and Instruction are the issuer's full text and advice,
+	// in TextLanguage, as issued; Urgency and Certainty its CAP urgency and
+	// certainty, as issued. Each is nil when not given.
+	Description, Instruction, Urgency, Certainty *string
 }
 
 // Query asks for the warnings in force at a position, or starting within

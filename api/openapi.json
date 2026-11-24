@@ -8703,6 +8703,20 @@
           "area": {
             "$ref": "#/components/schemas/WarningArea"
           },
+          "certainty": {
+            "description": "The issuer's CAP certainty (e.g. Observed, Likely), as issued; null when not given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "description": "The issuer's full text of the warning, in textLanguage, unaltered; null when not given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "event": {
             "description": "The issuer's event name, as issued (the DWD's EVENT, e.g. FROST); null when not given.",
             "type": [
@@ -8745,6 +8759,13 @@
             "description": "Whether the warning is in force at the answer's instant; false for one that starts within weather.lookahead (24 hours by default), which is listed beside those in force as the platform lists it (the lamp reads only those in force).",
             "type": "boolean"
           },
+          "instruction": {
+            "description": "The issuer's advice on what to do, in textLanguage, unaltered; null when not given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "issuer": {
             "description": "The issuing service.",
             "type": "string"
@@ -8784,6 +8805,13 @@
             "description": "The language of headline (BCP 47).",
             "type": "string"
           },
+          "urgency": {
+            "description": "The issuer's CAP urgency (e.g. Immediate, Future), as issued; null when not given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "validity": {
             "$ref": "#/components/schemas/TimeWindow"
           }
@@ -8803,7 +8831,11 @@
           "published",
           "publishedLocal",
           "area",
-          "sourceFamily"
+          "sourceFamily",
+          "description",
+          "instruction",
+          "urgency",
+          "certainty"
         ],
         "type": "object"
       },
@@ -23941,7 +23973,11 @@
                               "cellId": "805002000",
                               "geometry": null
                             },
-                            "sourceFamily": "dwd_eta"
+                            "sourceFamily": "dwd_eta",
+                            "description": null,
+                            "instruction": null,
+                            "urgency": null,
+                            "certainty": null
                           }
                         ],
                         "truncated": false,

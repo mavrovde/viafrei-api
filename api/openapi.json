@@ -21768,12 +21768,12 @@
             }
           },
           {
-            "description": "Only the railway stations: those of the DB station register, which carry an EVA number (eva), as the platform's train departures and station facilities checks resolve a station name. Without it a stop of the same name and no EVA number may come first (Frankfurt (Main) Hauptbahnhof is a bus stop's name too). It narrows q, code or at, and is no search of its own.",
+            "description": "Only the railway stations: those of the DB station register, which carry an EVA number (eva), as the platform's train departures and station facilities checks resolve a station name. Without it a stop of the same name and no EVA number may come first (Frankfurt (Main) Hauptbahnhof is a bus stop's name too). It narrows q, code or at, and is no search of its own; when q is read as a town and a stop in it, only the town's DB stations are listed and paged.",
             "explode": false,
             "in": "query",
             "name": "railway",
             "schema": {
-              "description": "Only the railway stations: those of the DB station register, which carry an EVA number (eva), as the platform's train departures and station facilities checks resolve a station name. Without it a stop of the same name and no EVA number may come first (Frankfurt (Main) Hauptbahnhof is a bus stop's name too). It narrows q, code or at, and is no search of its own.",
+              "description": "Only the railway stations: those of the DB station register, which carry an EVA number (eva), as the platform's train departures and station facilities checks resolve a station name. Without it a stop of the same name and no EVA number may come first (Frankfurt (Main) Hauptbahnhof is a bus stop's name too). It narrows q, code or at, and is no search of its own; when q is read as a town and a stop in it, only the town's DB stations are listed and paged.",
               "type": "boolean"
             }
           },

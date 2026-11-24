@@ -371,11 +371,6 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 	})
 	if err == nil && len(out) == 0 && q.Code == "" && q.Area == "" {
 		out, err = s.stationsInTown(ctx, q, families)
-		if q.Railway {
-			// The town and stop read lists every stop: a railway search
-			// keeps the DB stations among them.
-			out = slices.DeleteFunc(out, func(st transit.Station) bool { return st.EVA == nil })
-		}
 	}
 	if err != nil {
 		return nil, false, err
@@ -413,19 +408,31 @@ limit 60`, "text[]", "text[]")
 // stationsInTowns are the stations of the districts $4 whose name holds the
 // stop name $2 or a spelling $3 of it, by name then id, the other stations'
 // stops left out (collapsed), $5 at most: one statement over every district
-// the town named.
-var stationsInTowns = namedOpaque("api_stations_in_towns", `
+// the town named; railwayInTowns the same of the DB stations only, kept
+// before the limit so the stops that are none cannot fill it.
+var (
+	stationsInTowns = stationsInTownsOf("api_stations_in_towns", false)
+	railwayInTowns  = stationsInTownsOf("api_stations_in_towns_railway", true)
+)
+
+func stationsInTownsOf(name string, railway bool) stmt {
+	db := ""
+	if railway {
+		db = "\n  and s.eva_no is not null"
+	}
+	return namedOpaque(name, `
 with`+keyed("page", `
 select s.stop_place_id, s.name, null::integer dist
-from (`+stationKeys(false)+`) s
+from (`+stationKeys(railway)+`) s
 where s.withdrawn_at is null
   and s.location is not null
   and s.source_ref = any($1::text[])
   and `+permitted("s")+`
   and left(s.area_key, 5) = any($4::text[]) and s.region_code is not null
-  and `+strings.NewReplacer("$4", "$2", "$10", "$3").Replace(stationHolds)+`
+  and `+strings.NewReplacer("$4", "$2", "$10", "$3").Replace(stationHolds)+db+`
 order by s.name, s.stop_place_id`, "$5")+`
 `+keyedPage("page", "k.name, k.stop_place_id", "$5"), "text[]", "text", "text[]", "text[]", "bigint")
+}
 
 // stationsInTown reads a text no station's name holds as a town and a stop
 // in it, as the platform's stop resolver reads "town, stop": the districts
@@ -456,7 +463,11 @@ func (s *Store) stationsInTown(ctx context.Context, q transit.Query, families []
 		if rest == "" {
 			return nil, nil
 		}
-		rows, _ = run(ctx, tx, stationsInTowns, families, transit.Fold(rest), townSpellings(rest), kreise, q.Limit+1)
+		read := stationsInTowns
+		if q.Railway {
+			read = railwayInTowns
+		}
+		rows, _ = run(ctx, tx, read, families, transit.Fold(rest), townSpellings(rest), kreise, q.Limit+1)
 		return pgx.CollectRows(rows, inTown)
 	})
 }

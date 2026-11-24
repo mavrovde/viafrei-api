@@ -310,6 +310,7 @@ limit $5`
 
 func init() {
 	legacyReads["api_stations_in_towns"] = legacyStationsInTowns
+	legacyReads["api_stations_in_towns_railway"] = strings.Replace(legacyStationsInTowns, "order by s.name", "and s.eva_no is not null\norder by s.name", 1)
 	for m := range 1 << 5 {
 		legacyReads[fmt.Sprintf("api_stations_page_%02d", m)] = legacyStationsPage
 	}

@@ -221,7 +221,7 @@ type StationsInput struct {
 	RadiusM int    `query:"radius_m" minimum:"1" maximum:"50000" doc:"Search radius around at, in metres. Default: geo.default_radius_m. Ignored without at."`
 	Limit   int    `query:"limit" minimum:"1" maximum:"60" doc:"Most stations to return. Default: pagination.default_limit."`
 	Area    string `query:"area" pattern:"^(0[1-9]|1[0-6])([0-9]{3})?$" example:"05315" doc:"Only the stations of an area: its official region code, two digits a Land (01 to 16), five a Kreis or kreisfreie Stadt, as listPlaces or describeLocation give it. It narrows q, code or at, and is no search of its own; a station whose district is unknown is left out."`
-	Railway bool   `query:"railway" doc:"Only the railway stations: those of the DB station register, which carry an EVA number (eva), as the platform's train departures and station facilities checks resolve a station name. Without it a stop of the same name and no EVA number may come first (Frankfurt (Main) Hauptbahnhof is a bus stop's name too). It narrows q, code or at, and is no search of its own."`
+	Railway bool   `query:"railway" doc:"Only the railway stations: those of the DB station register, which carry an EVA number (eva), as the platform's train departures and station facilities checks resolve a station name. Without it a stop of the same name and no EVA number may come first (Frankfurt (Main) Hauptbahnhof is a bus stop's name too). It narrows q, code or at, and is no search of its own; when q is read as a town and a stop in it, only the town's DB stations are listed and paged."`
 	point   *geo.Point
 }
 

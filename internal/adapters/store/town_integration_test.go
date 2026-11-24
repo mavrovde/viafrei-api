@@ -110,3 +110,41 @@ func TestAStationIsFoundAsAStopInTheTownTheTextNames(t *testing.T) {
 		t.Errorf("the family of a platform: %v, %v", sp.StopIDs, err)
 	}
 }
+
+// A railway search of a town keeps its DB stations before the limit: the
+// stops of the town that are no DB station, however many sort first, never
+// fill the page.
+func TestARailwaySearchOfATownPagesItsDBStationsOnly(t *testing.T) {
+	st, _ := private(t,
+		`insert into public.ags_regions (ags, level, name, name_norm, parent_ags, source_id)
+		 values ('09997', 'kreis', 'Ahornstadt', 'ahornstadt', '09', 'destatis_gv') on conflict do nothing`,
+		`insert into public.stops (gtfs_feed_key, id, name, geom, location_type)
+		 values (1, 'de:09997:905', 'Ahornallee', vf_test.point(null), 1), (1, 'de:09997:906', 'Ahornallee', vf_test.point(null), 1),
+		        (1, 'de:09997:907', 'Ahornallee Bf', vf_test.point(null), 1), (1, 'de:09997:908', 'Ahornallee Nord', vf_test.point(null), 1)
+		 on conflict do nothing`,
+		`insert into public.db_stations (station_no, name, content_hash, first_seen_at, last_seen_at, updated_at, ifopt, source_id, eva_no)
+		 values ('999000907', 'Ahornallee Bf', 'test', now(), now(), now(), 'de:09997:907', 'db_stada', '9999907'),
+		        ('999000908', 'Ahornallee Nord', 'test', now(), now(), now(), 'de:09997:908', 'db_stada', '9999908')`)
+	fam := []string{"delfi_static"}
+	ids := func(ss []transit.Station) []string {
+		out := []string{}
+		for _, s := range ss {
+			out = append(out, s.ID)
+		}
+		return out
+	}
+	// Every stop, the two that are no DB station first.
+	if ss, more, err := st.Stations(bounded(t), transit.Query{Text: "Ahornstadt Ahornallee", Limit: 2}, fam); err != nil ||
+		!slices.Equal(ids(ss), []string{"1:de:09997:905", "1:de:09997:906"}) || !more {
+		t.Errorf("every stop: %v, %v, %v", ids(ss), more, err)
+	}
+	for limit, want := range map[int]struct {
+		ids  []string
+		more bool
+	}{1: {[]string{"1:de:09997:907"}, true}, 2: {[]string{"1:de:09997:907", "1:de:09997:908"}, false}} {
+		ss, more, err := st.Stations(bounded(t), transit.Query{Text: "Ahornstadt Ahornallee", Limit: limit, Railway: true}, fam)
+		if err != nil || !slices.Equal(ids(ss), want.ids) || more != want.more || !ss[0].InTown || ss[0].EVA == nil {
+			t.Errorf("limit %d: %v, %v, %v", limit, ids(ss), more, err)
+		}
+	}
+}

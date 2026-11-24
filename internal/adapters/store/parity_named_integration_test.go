@@ -425,3 +425,24 @@ func TestEveryBoardAnswersAsTheView(t *testing.T) {
 		t.Error("no board answered a departure")
 	}
 }
+
+// A frozen statement that fails where the named one answers (one left
+// behind by a new parameter) is a miss, never a silent skip; only when both
+// fail is there nothing to compare.
+func TestTheParityReplayCountsAFrozenStatementThatFails(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	for _, c := range []struct {
+		why, named, frozen string
+		misses             int
+	}{
+		{"a frozen statement of the wrong arity", "select $1::int", "select $1::int + $2::int", 1},
+		{"both fail", "select $1::int + $2::int", "select $1::int + $2::int", 0},
+		{"both answer alike", "select $1::int", "select $1::int", 0},
+	} {
+		misses, err := store.ReplayOne(ctx, db.ReaderURL, "api_zz_replay_arity", c.named, c.frozen, []any{1})
+		if err != nil || len(misses) != c.misses || c.misses > 0 && !strings.HasPrefix(misses[0].Plan, "frozen statement failed: ") {
+			t.Errorf("%s: %+v, %v", c.why, misses, err)
+		}
+	}
+}

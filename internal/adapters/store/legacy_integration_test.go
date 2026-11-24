@@ -179,7 +179,7 @@ limit 1`, "text", "text[]"),
 	// source's key ('tripupdates'), not the licence id the view stamped: on
 	// purpose (round 2 of the 1.1.1 faults).
 	"api_area_trips": `select count(distinct t.trip_ref)::int, (count(distinct t.trip_ref) filter (where t.worst_delay_s > $2::int * 60))::int,
-       max(t.observed_at), coalesce(min('tripupdates'::text), '')
+       max(t.observed_at), coalesce(min(case when t.source_ref = 'delfi_rt_tu' then 'tripupdates' else t.source_ref end), '')
 from contract.transit_trip_delay t
 where starts_with(t.area_code, $1) and case when t.source_ref = 'delfi_rt_tu' then 'tripupdates' else t.source_ref end = any($3) and ` + permitted("t"),
 	"api_line_in_timetable": `select exists (select 1 from contract.transit_line l where l.source_ref = any($2) and ` + permitted("l") + `),

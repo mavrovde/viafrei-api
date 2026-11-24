@@ -253,9 +253,27 @@ func replay(ctx context.Context, conn *pgx.Conn, c parityCheck, onMiss func(Pari
 	if err != nil {
 		return err
 	}
-	want, err := textRows(ctx, sp, c.legacy, c.args)
-	if err != nil {
-		return ctx.Err() // the view statement fails with these arguments too: nothing to compare
+	want, frozenErr := textRows(ctx, sp, c.legacy, c.args)
+	if frozenErr != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if err := sp.Rollback(ctx); err != nil {
+			return err
+		}
+		// The frozen statement failed: only a named statement that fails
+		// as well (arguments a test meant to fail) leaves nothing to
+		// compare; one that answers is a miss, never a silent skip (a
+		// frozen statement left behind by a new parameter).
+		if _, err := conn.Prepare(ctx, c.name, c.sql); err != nil {
+			return ctx.Err()
+		}
+		got, err := textRows(ctx, tx, c.name, c.args)
+		if err != nil {
+			return ctx.Err()
+		}
+		miss("frozen statement failed: "+frozenErr.Error(), got, nil)
+		return nil
 	}
 	if err := sp.Commit(ctx); err != nil {
 		return err
@@ -286,6 +304,26 @@ func replay(ctx context.Context, conn *pgx.Conn, c parityCheck, onMiss func(Pari
 	parityRows[c.name] += len(want)
 	parityMu.Unlock()
 	return nil
+}
+
+// ReplayOne compares one named statement with a frozen one as the parity
+// replay does, on a connection of its own to url, and returns its misses
+// without keeping them among the run's (a test of the replay itself).
+func ReplayOne(ctx context.Context, url, name, sql, legacy string, args []any) ([]ParityMiss, error) {
+	conn, err := pgx.Connect(ctx, url)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	var got []ParityMiss
+	parityMu.Lock()
+	n, rows := len(parityMisses), parityRows[name]
+	parityMu.Unlock()
+	err = replay(ctx, conn, parityCheck{name: name, sql: sql, legacy: legacy, args: args, own: "off"}, func(m ParityMiss) { got = append(got, m) })
+	parityMu.Lock()
+	parityMisses, parityRows[name] = parityMisses[:n], rows
+	parityMu.Unlock()
+	return got, err
 }
 
 // RowText is a row's values as text, each apart from the next by a unit

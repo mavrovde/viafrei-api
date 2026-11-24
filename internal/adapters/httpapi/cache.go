@@ -198,6 +198,11 @@ type entry struct {
 	read           []familyVersion
 	rules          bool
 	rulesReference string
+	// confirmed are the families the answer states stale, each at the
+	// version of its newest confirmation: a confirmation recovers a family
+	// with no change in its data (provenance.Family.KnownCurrent), and the
+	// stale answer then ends, though its data version stayed the same.
+	confirmed []familyVersion
 	// bound is cacheNote.bound: the answer is neither current nor served
 	// stale at or after it.
 	bound time.Time
@@ -249,6 +254,11 @@ func (e *entry) current(versions provenance.Versions, at time.Time) bool {
 	}
 	if e.rules && versions.RulesReference != e.rulesReference {
 		return false
+	}
+	for _, f := range e.confirmed {
+		if versions.Confirmations[f.family] != f.version {
+			return false
+		}
 	}
 	for _, f := range e.sight {
 		if sightVersion(versions, f.family) != f.version {
@@ -358,7 +368,7 @@ const entryOverhead = 256
 // the stored headers and the body, plus the fixed overhead.
 func (e *entry) size() int {
 	n := entryOverhead + len(e.key) + len(e.etag) + len(e.register) + len(e.lampReference) + len(e.rulesReference) + len(e.requestID) + len(e.body)
-	for _, f := range slices.Concat(e.families, e.sight, e.read) {
+	for _, f := range slices.Concat(e.families, e.sight, e.read, e.confirmed) {
 		n += len(f.family) + len(f.version)
 	}
 	for name, vs := range e.header {
@@ -637,6 +647,9 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 		seen[f.Source.Family] = true
 		version := vs.Families[f.Source.Family]
 		e.families = append(e.families, familyVersion{family: f.Source.Family, version: version})
+		if f.Assess(s.at()).Stale {
+			e.confirmed = append(e.confirmed, familyVersion{family: f.Source.Family, version: vs.Confirmations[f.Source.Family]})
+		}
 		if version == "" {
 			e.unversioned = true
 		}
@@ -653,6 +666,7 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 		}
 	}
 	slices.SortFunc(e.families, func(a, b familyVersion) int { return strings.Compare(a.family, b.family) })
+	slices.SortFunc(e.confirmed, func(a, b familyVersion) int { return strings.Compare(a.family, b.family) })
 	// A family the lamp read changes the answer as much as one it
 	// attributes: its versions are kept, and its domain's max-age and stale
 	// allowance bound the answer's.
@@ -698,6 +712,12 @@ func (s *server) newEntry(ctx context.Context, key string, note *cacheNote, vs p
 	if e.rules {
 		h.Write([]byte{6})
 		h.Write([]byte(e.rulesReference))
+	}
+	for _, f := range e.confirmed {
+		h.Write([]byte{7})
+		h.Write([]byte(f.family))
+		h.Write([]byte{0})
+		h.Write([]byte(f.version))
 	}
 	h.Write([]byte{1})
 	h.Write([]byte(e.register))

@@ -27,9 +27,9 @@ func TestWarningsAtStateTheIssuersText(t *testing.T) {
 		from time.Time
 		id   string
 	)
-	owner(t, `select st_y(st_pointonsurface(area)), st_x(st_pointonsurface(area)), valid_from, warning_id from contract.weather_warning
-where withdrawn_at is null and message_status <> 'cancelled' and area is not null and display_class <> 'withhold' and audience = 'public'
-order by warning_id limit 1`, &p.Lat, &p.Lon, &from, &id)
+	owner(t, `select st_y(st_pointonsurface(area::geometry)), st_x(st_pointonsurface(area::geometry)), valid_from, 'dwd:' || id from weather_warnings
+where closed_at is null and deleted_at is null and valid_from is not null and closed_reason is distinct from 'withdrawn' and area is not null
+order by id limit 1`, &p.Lat, &p.Lon, &from, &id)
 	set := `update weather_warnings set description = $2, instruction = $3, urgency = $4, certainty = $5 where 'dwd:' || id = $1`
 	if n := change(t, set, id, "Es tritt Frost auf.", "Vorsicht auf Brücken.", "Immediate", "Likely"); n != 1 {
 		t.Fatalf("updated %d rows", n)

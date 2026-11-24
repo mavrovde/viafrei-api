@@ -60,9 +60,9 @@ func riskAnswer() features.WeatherRisk {
 				Headline: "Hinweis", TextLanguage: "de", From: fixedNow, AreaName: "Kreis A"},
 		}, HasMore: true, Families: []provenance.Family{weatherFamily}, At: fixedNow},
 		Lamp: weather.LampRed,
-		Road: []weather.RoadStation{{ID: "10427", Name: "A7 Kassel", Segment: ip(2), Location: geo.Point{Lat: 51.3, Lon: 9.5}, DistanceM: 4210,
+		Road: weather.RoadForecast{Loaded: true, Stations: []weather.RoadStation{{ID: "10427", Name: "A7 Kassel", Segment: ip(2), Location: geo.Point{Lat: 51.3, Lon: 9.5}, DistanceM: 4210,
 			Family: "src-alpha-weather", ForecastFamily: "src-beta-weather",
-			Hours: []weather.RoadHour{{ValidAt: fixedNow, RunAt: fixedNow.Add(-time.Hour), Class: ip(5), SurfaceTempC: fp(-1.5)}, {ValidAt: fixedNow.Add(time.Hour), RunAt: fixedNow.Add(-time.Hour)}}}},
+			Hours: []weather.RoadHour{{ValidAt: fixedNow, RunAt: fixedNow.Add(-time.Hour), Class: ip(5), SurfaceTempC: fp(-1.5)}, {ValidAt: fixedNow.Add(time.Hour), RunAt: fixedNow.Add(-time.Hour)}}}}},
 	}
 }
 
@@ -126,6 +126,9 @@ func TestWeatherRiskAnswer(t *testing.T) {
 		h0["roadCondition"] != 5.0 || h0["surfaceTempC"] != -1.5 || h0["validAtLocal"] == nil || h1["roadCondition"] != nil || h1["surfaceTempC"] != nil {
 		t.Errorf("roadForecast %v", data["roadForecast"])
 	}
+	if data["roadForecastLoaded"] != true {
+		t.Errorf("roadForecastLoaded %v", data["roadForecastLoaded"])
+	}
 	w1, _ := ws[1].(map[string]any)
 	v1, _ := w1["validity"].(map[string]any)
 	if w1["hazard"] != "other" || v1["until"] != nil || w1["event"] != nil || w1["published"] != nil || w1["publishedLocal"] != nil ||
@@ -151,6 +154,17 @@ func TestWeatherRiskAnswer(t *testing.T) {
 	}
 	if hz, _ := q["hazards"].([]any); hz == nil || len(hz) != 0 {
 		t.Errorf("an empty hazard list is [] in meta.query: %v", q)
+	}
+	// No station and no catalogue: the forecast is not offered here, which
+	// an empty list alone cannot tell from no station within 25 km.
+	if rf, _ := data["roadForecast"].([]any); rf == nil || len(rf) != 0 || data["roadForecastLoaded"] != false {
+		t.Errorf("not loaded: %v, %v", data["roadForecast"], data["roadForecastLoaded"])
+	}
+	f.risk.Road.Loaded = true
+	body = decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/weather-risk?at=52.52,13.405", bearer))
+	data, _ = body["data"].(map[string]any)
+	if rf, _ := data["roadForecast"].([]any); rf == nil || len(rf) != 0 || data["roadForecastLoaded"] != true {
+		t.Errorf("no station within 25 km: %v, %v", data["roadForecast"], data["roadForecastLoaded"])
 	}
 
 	// A warning is in force from its start, at the answer's instant

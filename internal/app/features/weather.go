@@ -28,7 +28,7 @@ type Weather interface {
 	CellWarnings(ctx context.Context, q weather.CellQuery, families []string, now time.Time) (weather.Cell, error)
 	// RoadForecast returns the road-surface forecast of the given families
 	// q asks for: the nearest stations first, each with its hours.
-	RoadForecast(ctx context.Context, q weather.RoadQuery, families []string) ([]weather.RoadStation, error)
+	RoadForecast(ctx context.Context, q weather.RoadQuery, families []string) (weather.RoadForecast, error)
 }
 
 // Rules is the port to the driving-rules store.
@@ -55,8 +55,9 @@ type WeatherRisk struct {
 	// starts or ends.
 	WarningChange *time.Time
 	// Road is the road-surface forecast near the position, nearest station
-	// first; empty when no station of the families answers.
-	Road []weather.RoadStation
+	// first; empty when no station of the families answers, and whether
+	// the station catalogue is loaded.
+	Road weather.RoadForecast
 }
 
 // WeatherRisk answers "is there a weather warning here" for key
@@ -93,7 +94,7 @@ func (s *Service) WeatherRisk(ctx context.Context, key access.Record, q weather.
 			more = append(more, w.English.Family)
 		}
 	}
-	for _, st := range road {
+	for _, st := range road.Stations {
 		more = append(more, st.Family, st.ForecastFamily)
 	}
 	if err := gate.Check(append(slices.Clone(contributed), more...)); err != nil {

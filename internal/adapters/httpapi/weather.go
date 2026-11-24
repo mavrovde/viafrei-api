@@ -87,11 +87,12 @@ type RoadWeatherObservation struct {
 // states neither, and the /v1 contract keeps both (VER-001), so the parity
 // harness leaves them out (parity.Default).
 type WeatherRiskData struct {
-	Lamp         string                   `json:"lamp" enum:"green,amber,red" doc:"Over every warning in force at the position, whatever min_level and hazards keep (they filter only the list), first match: red when a warning of level 3 or 4 is in force; amber for a warning of level 1 or 2, or, with no warning in force, when the sight is limited: a weather family the key may not read was left out (meta.partial), or a weather family read has no data or stale data (meta.freshness), since no warning cannot then be told from none heard; green when no warning is in force and every family is fresh."`
-	Warnings     []WeatherWarning         `json:"warnings" doc:"The warnings min_level and hazards keep, ordered by level descending, then validity.from ascending, then id; at most weather.max_warnings."`
-	Truncated    bool                     `json:"truncated" doc:"True when more warnings answer than weather.max_warnings and only the first are listed; the lamp reads them all."`
-	RoadWeather  []RoadWeatherObservation `json:"roadWeather" doc:"Road-weather observations near a corridor; present for along questions only, so always empty on a question about one position."`
-	RoadForecast []RoadForecastStation    `json:"roadForecast" doc:"The issuer's road-surface forecast near the position, as the platform's weather warnings check reads it: the nearest open, active road-weather stations within 25 km, at most 3, nearest first, each with its forecast hours from 60 minutes before the answer's instant to 24 hours after it, earliest first. A station with no hour in that window is not listed; empty when no station of a family the key may read answers. Its sources and their conditions are in meta.attribution and meta.notes when a station is listed."`
+	Lamp               string                   `json:"lamp" enum:"green,amber,red" doc:"Over every warning in force at the position, whatever min_level and hazards keep (they filter only the list), first match: red when a warning of level 3 or 4 is in force; amber for a warning of level 1 or 2, or, with no warning in force, when the sight is limited: a weather family the key may not read was left out (meta.partial), or a weather family read has no data or stale data (meta.freshness), since no warning cannot then be told from none heard; green when no warning is in force and every family is fresh."`
+	Warnings           []WeatherWarning         `json:"warnings" doc:"The warnings min_level and hazards keep, ordered by level descending, then validity.from ascending, then id; at most weather.max_warnings."`
+	Truncated          bool                     `json:"truncated" doc:"True when more warnings answer than weather.max_warnings and only the first are listed; the lamp reads them all."`
+	RoadWeather        []RoadWeatherObservation `json:"roadWeather" doc:"Road-weather observations near a corridor; present for along questions only, so always empty on a question about one position."`
+	RoadForecast       []RoadForecastStation    `json:"roadForecast" doc:"The issuer's road-surface forecast near the position, as the platform's weather warnings check reads it: the nearest open, active road-weather stations within 25 km, at most 3, nearest first, each with its forecast hours from 60 minutes before the answer's instant to 24 hours after it, earliest first. A station with no hour in that window is not listed; empty when no station of a family the key may read answers. Its sources and their conditions are in meta.attribution and meta.notes when a station is listed."`
+	RoadForecastLoaded bool                     `json:"roadForecastLoaded" doc:"Whether the road-weather station catalogue is loaded and the key may read it and the forecast, as the platform's weather warnings check tells its two empty answers apart: with roadForecast empty, true means no station within 25 km answers (reason no_station_within_radius), false that the forecast is not offered here (reason not_loaded). True whenever a station is listed."`
 }
 
 // RoadForecastStation is a road-weather station and its forecast hours.
@@ -179,7 +180,7 @@ func registerWeatherRisk(api huma.API, s *server, op huma.Operation) {
 		ws := weatherWarnings(a.Items, a.At)
 		return &WeatherRiskOutput{CacheControl: noStore, Body: WeatherRiskEnvelope{
 			Data: WeatherRiskData{Lamp: string(a.Lamp), Warnings: ws, Truncated: a.HasMore, RoadWeather: []RoadWeatherObservation{},
-				RoadForecast: roadForecast(a.Road)},
+				RoadForecast: roadForecast(a.Road.Stations), RoadForecastLoaded: a.Road.Loaded},
 			Meta: WeatherRiskMeta{
 				DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
 				Query:    WeatherRiskQuery{At: position(q.At), MinLevel: in.MinLevel, Hazards: hazards},

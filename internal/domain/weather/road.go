@@ -17,6 +17,15 @@ type RoadQuery struct {
 	From, Until time.Time
 }
 
+// RoadForecast is the road-surface forecast near a position: its
+// stations, nearest first, and whether the station catalogue is loaded at
+// all, so an empty list can be told: no station within the radius when
+// Loaded, the forecast not offered here when not.
+type RoadForecast struct {
+	Stations []RoadStation
+	Loaded   bool
+}
+
 // RoadStation is a road-weather station and its forecast hours, as
 // issued; nearest first.
 type RoadStation struct {

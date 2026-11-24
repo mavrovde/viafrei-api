@@ -35,7 +35,8 @@ func TestTheRoadForecastNearAPosition(t *testing.T) {
 		        ('t6', '{}', 'dwd_road', 'Zu', 1, st_setsrid(st_makepoint(9.51, 51.30), 4326)::geography, 'swsKatalog', false, 'dwd_road_catalogue', now()),
 		        ('t7', '{}', 'dwd_road', 'Aus', 1, st_setsrid(st_makepoint(9.52, 51.30), 4326)::geography, 'swsKatalog', true, 'dwd_road_catalogue', null),
 		        ('t8', '{}', 'dwd_road', 'Andere', 1, st_setsrid(st_makepoint(9.53, 51.30), 4326)::geography, 'swsKatalog', false, 'other_catalogue', null),
-		        ('t9', '{}', 'dwd_road', 'Alt', 1, st_setsrid(st_makepoint(9.54, 51.30), 4326)::geography, 'swsKatalog', false, 'dwd_road_catalogue', null)`,
+		        ('t9', '{}', 'dwd_road', 'Alt', 1, st_setsrid(st_makepoint(9.54, 51.30), 4326)::geography, 'swsKatalog', false, 'dwd_road_catalogue', null),
+		        ('t10', '{}', 'dwd_road', 'Geschlossen', 1, st_setsrid(st_makepoint(9.55, 53.0), 4326)::geography, 'swsKatalog', false, 'closed_only_catalogue', now())`,
 		`insert into public.road_weather_forecast (station_id, valid_at, run_at, source_id, rc, ts, source_run_id)
 		 select s, date_trunc('hour', now()) + make_interval(hours => h), date_trunc('hour', now()) - interval '1 hour', 'dwd_road',
 		        case when s = 't1' and h = 2 then 5 when s = 't2' then null else 1 end, case when s = 't2' then null else -0.5 end, 1
@@ -44,10 +45,11 @@ func TestTheRoadForecastNearAPosition(t *testing.T) {
 		 values ('t9', date_trunc('hour', now()) - interval '3 hours', date_trunc('hour', now()) - interval '4 hours', 'dwd_road', 1, 0, 1)`)
 	q := weather.RoadQuery{At: geo.Point{Lat: 51.30, Lon: 9.49}, Stations: 3, RadiusM: 25000, From: now.Add(-time.Hour), Until: now.Add(24 * time.Hour)}
 	fams := []string{"dwd_road_catalogue", "dwd_road_forecast"}
-	ss, err := st.RoadForecast(bounded(t), q, fams)
-	if err != nil {
-		t.Fatal(err)
+	rf, err := st.RoadForecast(bounded(t), q, fams)
+	if err != nil || !rf.Loaded {
+		t.Fatal(rf.Loaded, err)
 	}
+	ss := rf.Stations
 	ids := []string{}
 	for _, s := range ss {
 		ids = append(ids, s.ID)
@@ -73,13 +75,21 @@ func TestTheRoadForecastNearAPosition(t *testing.T) {
 	if s2 := ss[1]; s2.Segment != nil || s2.Hours[0].Class != nil || s2.Hours[0].SurfaceTempC != nil {
 		t.Errorf("the second station %+v", s2)
 	}
-	// The forecast's family not read: no station is listed.
-	if ss, err := st.RoadForecast(bounded(t), q, fams[:1]); err != nil || len(ss) != 0 {
-		t.Errorf("no forecast family: %v, %v", ss, err)
+	// The forecast's family not read: no station is listed, and the
+	// forecast is not offered (not loaded), as with no catalogue family.
+	for _, fs := range [][]string{fams[:1], fams[1:]} {
+		if rf, err := st.RoadForecast(bounded(t), q, fs); err != nil || len(rf.Stations) != 0 || rf.Stations == nil || rf.Loaded {
+			t.Errorf("%v: %+v, %v", fs, rf, err)
+		}
 	}
-	// No station within 25 km.
+	// No station within 25 km: the catalogue is loaded, none is near, as
+	// the platform's ROAD_STATIONS_LOADED tells it.
 	q.At = geo.Point{Lat: 53, Lon: 9.5}
-	if ss, err := st.RoadForecast(bounded(t), q, fams); err != nil || len(ss) != 0 {
-		t.Errorf("far away: %v, %v", ss, err)
+	if rf, err := st.RoadForecast(bounded(t), q, fams); err != nil || len(rf.Stations) != 0 || !rf.Loaded {
+		t.Errorf("far away: %+v, %v", rf, err)
+	}
+	// Only closed stations of the family: not loaded.
+	if rf, err := st.RoadForecast(bounded(t), q, []string{"dwd_road_forecast", "closed_only_catalogue"}); err != nil || rf.Loaded {
+		t.Errorf("no open station: %+v, %v", rf, err)
 	}
 }

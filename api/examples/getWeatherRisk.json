@@ -52,7 +52,8 @@
       ],
       "truncated": false,
       "roadWeather": [],
-      "roadForecast": []
+      "roadForecast": [],
+      "roadForecastLoaded": false
     },
     "meta": {
       "requestId": "example-request-0001",

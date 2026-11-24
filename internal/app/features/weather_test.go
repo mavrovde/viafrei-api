@@ -47,9 +47,9 @@ type wxFake struct {
 	gotRoadQuery weather.RoadQuery
 }
 
-func (f *wxFake) RoadForecast(_ context.Context, q weather.RoadQuery, fams []string) ([]weather.RoadStation, error) {
+func (f *wxFake) RoadForecast(_ context.Context, q weather.RoadQuery, fams []string) (weather.RoadForecast, error) {
 	f.gotRoad, f.gotRoadQuery = fams, q
-	return f.road, f.roadErr
+	return weather.RoadForecast{Stations: f.road, Loaded: len(f.road) > 0}, f.roadErr
 }
 
 // CellWarnings answers the cell f.cells holds under q's key ("@" for a
@@ -327,7 +327,7 @@ func TestTheRoadForecastIsAnsweredAndCredited(t *testing.T) {
 	both := key("consumer", []access.Scope{"weather"}, "w1", "w2")
 	f := &wxFake{road: []weather.RoadStation{{ID: "s1", Family: "w2", ForecastFamily: "w2"}}}
 	r, err := wxService(f).WeatherRisk(context.Background(), both, weather.Query{})
-	if err != nil || len(r.Road) != 1 || r.Road[0].ID != "s1" || !slices.Equal(f.gotRoad, []string{"w1", "w2"}) {
+	if err != nil || len(r.Road.Stations) != 1 || r.Road.Stations[0].ID != "s1" || !r.Road.Loaded || !slices.Equal(f.gotRoad, []string{"w1", "w2"}) {
 		t.Errorf("road %+v of %v, %v", r.Road, f.gotRoad, err)
 	}
 	if g := f.gotRoadQuery; g.Stations != 3 || g.RadiusM != 25000 || !g.From.Equal(now.Add(-time.Hour)) || !g.Until.Equal(now.Add(24*time.Hour)) {

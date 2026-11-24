@@ -39,10 +39,21 @@ where '`+roadForecastFamily+`' = any((select $1::text[])::text[])
   and f.valid_at >= (select $6::timestamptz) and f.valid_at <= (select $7::timestamptz)
 order by n.distance_m, n.station_id, f.valid_at`, "text[]", "float8", "float8", "float8", "int", "timestamptz", "timestamptz")
 
+// roadStationsLoaded is whether the station catalogue is loaded, as the
+// platform's ROAD_STATIONS_LOADED reads it: any open station, of the
+// families ($1), while the forecast's family is among them. "No station
+// within 25 km" is a statement about the catalogue, so it is only made
+// when this holds.
+var roadStationsLoaded = named("api_road_stations_loaded", `
+select '`+roadForecastFamily+`' = any((select $1::text[])::text[])
+   and exists (select 1 from road_weather_stations s where s.closed_at is null and s.source_feed = any((select $1::text[])::text[])) loaded`, "text[]")
+
 // RoadForecast reads the road-surface forecast of the families q asks
-// for: the stations nearest first, each with its hours, earliest first.
-func (s *Store) RoadForecast(ctx context.Context, q weather.RoadQuery, families []string) ([]weather.RoadStation, error) {
-	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]weather.RoadStation, error) {
+// for: the stations nearest first, each with its hours, earliest first;
+// and, when none is
+// listed, whether the catalogue is loaded.
+func (s *Store) RoadForecast(ctx context.Context, q weather.RoadQuery, families []string) (weather.RoadForecast, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (weather.RoadForecast, error) {
 		rows, _ := run(ctx, tx, roadForecastNear, families, q.At.Lat, q.At.Lon, q.RadiusM, q.Stations, q.From, q.Until)
 		type row struct {
 			st weather.RoadStation
@@ -63,6 +74,10 @@ func (s *Store) RoadForecast(ctx context.Context, q weather.RoadQuery, families 
 			}
 			out[len(out)-1].Hours = append(out[len(out)-1].Hours, x.h)
 		}
-		return out, err
+		if err != nil || len(out) > 0 {
+			return weather.RoadForecast{Stations: out, Loaded: err == nil}, err
+		}
+		f := weather.RoadForecast{Stations: out}
+		return f, runRow(ctx, tx, roadStationsLoaded, families).Scan(&f.Loaded)
 	})
 }

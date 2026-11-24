@@ -8689,6 +8689,10 @@
             },
             "type": "array"
           },
+          "roadForecastLoaded": {
+            "description": "Whether the road-weather station catalogue is loaded and the key may read it and the forecast, as the platform's weather warnings check tells its two empty answers apart: with roadForecast empty, true means no station within 25 km answers (reason no_station_within_radius), false that the forecast is not offered here (reason not_loaded). True whenever a station is listed.",
+            "type": "boolean"
+          },
           "roadWeather": {
             "description": "Road-weather observations near a corridor; present for along questions only, so always empty on a question about one position.",
             "items": {
@@ -8713,7 +8717,8 @@
           "warnings",
           "truncated",
           "roadWeather",
-          "roadForecast"
+          "roadForecast",
+          "roadForecastLoaded"
         ],
         "type": "object"
       },
@@ -24180,7 +24185,8 @@
                         ],
                         "truncated": false,
                         "roadWeather": [],
-                        "roadForecast": []
+                        "roadForecast": [],
+                        "roadForecastLoaded": false
                       },
                       "meta": {
                         "requestId": "example-request-0001",

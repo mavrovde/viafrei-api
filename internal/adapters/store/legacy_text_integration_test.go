@@ -24,6 +24,8 @@ const legacyFacilitySeen = `left join lateral (select coalesce((select st.last_s
 // platform's own read of it (its weather warnings check), the stations of
 // the families, then the hours while the forecast's family is read.
 func init() {
+	legacyReads["api_road_stations_loaded"] = `
+select 'dwd_road_forecast' = any($1::text[]) and exists (select 1 from road_weather_stations where closed_at is null and source_feed = any($1::text[])) as loaded`
 	legacyReads["api_road_forecast_near"] = `
 with pt as (select st_setsrid(st_makepoint($3::float8, $2::float8), 4326)::geography as g),
 near as (

@@ -209,6 +209,82 @@ func TestDeparturesAndAnUnknownStation(t *testing.T) {
 	}
 }
 
+// As on the platform, the Trip Updates feed owns the register row of its
+// licence, so the register publishes their figures under the feed's key, not
+// the licence's id: a board reads a call's Trip Updates figure under that
+// family, and every family a call carries is one the read was given (the
+// licence gate's post-check refused every such board, 500, when the figure
+// was stamped with the licence's id).
+func TestABoardCarriesOnlyTheFamiliesItWasGiven(t *testing.T) {
+	const station = "1:de:09999:77"
+	st, cp := private(t,
+		`insert into vf_seed.departure (stop_place_id, stop_point_id, journey_id, call_order, line_name, transport_mode, planned_departure_at,
+		   boarding, realtime_source, cancelled, delay_s, source_ref)
+		 select '1:de:09999:77', '1:de:09999:77:1', '1:tu-board:' || to_char(now() at time zone 'Europe/Berlin', 'YYYYMMDD'), 1, 'RB 7', 'rail',
+		        date_trunc('minute', now()) + interval '20 minutes', true, 'delfi_rt_tu', false, 300, 'delfi_static'`,
+		// The trip calls at a stop after the station: the call departs.
+		`insert into public.stops (gtfs_feed_key, id, name, geom, location_type)
+		 values (1, 'de:09999:77:1:next', 'Weiter', vf_test.point(null), 0) on conflict do nothing`,
+		`delete from public.feed_catalog where feed_key = 'delfi_rt_tu'`,
+		`update public.feed_catalog set licence_id = 'delfi_rt_tu' where feed_key = 'tripupdates'`,
+		`insert into public.source_register (source_id, attribution_text, source_url, licence_label, share_alike, share_alike_database,
+		                                    use_classes, consumer_answers_only, no_redistribution, register_version)
+		 values ('delfi_rt_tu', 'DELFI', 'https://example.org/delfi_rt_tu', 'CC BY-SA 4.0', true, false,
+		         array['consumer', 'non_commercial', 'commercial'], false, false, current_date)
+		 on conflict (source_id) do nothing`)
+	conn, err := cp.Owner(bounded(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(bounded(t)) }()
+	var (
+		at   time.Time
+		refs []string
+	)
+	if err := conn.QueryRow(bounded(t), `select planned_departure_at, source_refs from contract.departure
+		where stop_place_id = $1 and boarding`, station).Scan(&at, &refs); err != nil || !slices.Contains(refs, "delfi_rt_tu") {
+		t.Fatalf("the planted call carries no Trip Updates figure: %v %v", refs, err)
+	}
+	reg, err := st.Register(bounded(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fams []string
+	for _, r := range reg {
+		fams = append(fams, r.Family)
+	}
+	if slices.Contains(fams, "delfi_rt_tu") || !slices.Contains(fams, "tripupdates") {
+		t.Fatalf("the register publishes the Trip Updates as the feed's key: %v", fams)
+	}
+	ds, err := st.Departures(bounded(t), transit.DepartureQuery{StationID: station, From: at, Window: time.Minute, Limit: 5}, fams)
+	if err != nil || len(ds) == 0 {
+		t.Fatalf("%s: %+v %v", station, ds, err)
+	}
+	tu := false
+	for _, d := range ds {
+		for _, f := range d.Families {
+			if !slices.Contains(fams, f) {
+				t.Errorf("%s: a call carries %q, a family the read was not given", d.JourneyID, f)
+			}
+			tu = tu || f == "tripupdates"
+		}
+	}
+	if !tu {
+		t.Errorf("%s: no call credits the Trip Updates feed: %+v", station, ds)
+	}
+	// A key not given the Trip Updates gets no call that carries them.
+	ds, err = st.Departures(bounded(t), transit.DepartureQuery{StationID: station, From: at, Window: time.Minute, Limit: 5},
+		slices.DeleteFunc(slices.Clone(fams), func(f string) bool { return f == "tripupdates" }))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range ds {
+		if slices.Contains(d.Families, "tripupdates") {
+			t.Errorf("%s: a call carries the Trip Updates the read was not given", d.JourneyID)
+		}
+	}
+}
+
 // A hydrogen read for a lorry or a car asks for that vehicle's refill codes.
 func TestHydrogenForALorry(t *testing.T) {
 	ctx := store.WithTest(context.Background(), t)

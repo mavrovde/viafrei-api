@@ -5,6 +5,16 @@ package store
 // subquery where no tuned form of its own answers the same rows faster.
 // Generated from the views' definitions; edit a relation only with its parity test.
 
+// tripUpdatesFamily is the family the DELFI Trip Updates' figures are read
+// under, as the source register names it: the register publishes a register
+// row a feed owns under that feed's key (contract_sources, database 0312),
+// so the row of the Trip Updates' licence ('delfi_rt_tu') is published as
+// the Trip Updates feed ('tripupdates' on the platform), and under its own id
+// only where no feed owns it. The view stamped the licence's id, a family
+// the register never publishes where a feed owns it: the licence gate's
+// post-check then refused every board with a Trip Updates figure (500).
+const tripUpdatesFamily = `(select coalesce(min(c.source_ref), 'delfi_rt_tu'::text) from contract_sources c where c.register_id = 'delfi_rt_tu'::text)`
+
 // relDeparture is the platform's departure (kind v).
 const relDeparture = `
  SELECT (s.gtfs_feed_key::text || ':'::text) || COALESCE(s.parent_id, s.id) AS stop_place_id,
@@ -39,7 +49,7 @@ const relDeparture = `
     src.feed AS source_ref,
     array_remove(ARRAY[src.feed,
         CASE
-            WHEN tu.carried THEN 'delfi_rt_tu'::text
+            WHEN tu.carried THEN ` + tripUpdatesFamily + `
             ELSE NULL::text
         END,
         CASE
@@ -156,7 +166,7 @@ const relDeparture = `
      CROSS JOIN LATERAL ( SELECT
                 CASE pk.pick
                     WHEN 'siri'::text THEN sc.source_feed
-                    WHEN 'tu'::text THEN 'delfi_rt_tu'::text
+                    WHEN 'tu'::text THEN ` + tripUpdatesFamily + `
                     ELSE NULL::text
                 END AS feed,
                 CASE pk.pick

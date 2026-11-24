@@ -179,7 +179,9 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 
 // boardCalls reads the departing calls of a station in a window: $1 the
 // station (a stop place), $2 and $3 the window's first and end instant
-// (planned departure), $4 the families. A call is one a passenger can board
+// (planned departure), $4 the families: every family a call carries (its
+// timetable's and each live figure's, source_refs) is one of them, so the
+// licence gate's post-check never meets one it refuses. A call is one a passenger can board
 // (the platform's boarding flag) of a trip that calls somewhere outside the
 // station after it: a trip's last call at the station is an arrival. The
 // destination is the trip's headsign, else the name of its last stop. The
@@ -200,6 +202,7 @@ where d.stop_place_id = $1::text
   and d.planned_departure_at >= $2::timestamp with time zone and d.planned_departure_at < $3::timestamp with time zone
   and d.boarding
   and d.source_ref = any($4::text[])
+  and d.source_refs <@ $4::text[]
   and `+permitted("d")+`
   and exists (select 1 from stop_times nx
                 join stops np on np.gtfs_feed_key = nx.gtfs_feed_key and np.id = nx.stop_id

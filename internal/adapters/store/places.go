@@ -24,7 +24,10 @@ import (
 // sphere, as the platform's place search measures it. A place carries its
 // official key and its English name, the platform's nameEn, when it differs
 // from the name (a stop and a motorway neither). The folded text holds
-// letters and digits only, so it carries no LIKE wildcard. Every parameter
+// letters and digits only, so it carries no LIKE wildcard. $11 are the
+// main-station spellings of the text (transit.MainStationSpellings), empty
+// for none: a name starting with or holding one answers as one with the
+// text does, so "Berlin Hbf" finds "S+U Berlin Hauptbahnhof" (#526). Every parameter
 // is read through a subquery, so a custom plan sees no more than the
 // generic one and the cached generic plan is taken after five custom ones:
 // on prod (2026-11-23) the statement settled on it at 10-40 ms a search
@@ -36,9 +39,9 @@ with here as (
   select case when (select $4::float8) is null then null
               else st_setsrid(st_makepoint((select $5::float8), (select $4::float8)), 4326)::geography end g),
 named_as as (
-  select g.id, case when contract_search_fold(g.name) = (select $2::text) then 0 else 1 end rank
+  select g.id, case when contract_search_fold(g.name) = any((select $2::text) || (select $11::text[])) then 0 else 1 end rank
   from gazetteer_places g
-  where contract_search_fold(g.name) like (select $2::text) || '%' and `+placeHeld+`
+  where `+foldStarts("contract_search_fold(g.name)")+` and `+placeHeld+`
   union all
   select g.id, case when contract_search_fold(g.name_en) = (select $2::text) then 0 else 1 end
   from gazetteer_places g
@@ -46,8 +49,8 @@ named_as as (
 found as (
   `+placeRows("(select n.id, min(n.rank) rank from named_as n group by n.id)")+`
   union all
-  `+stopRows("case when contract_search_fold(s.name) = (select $2::text) then 0 else 1 end",
-	"contract_search_fold(s.name) like (select $2::text) || '%'")+`
+  `+stopRows("case when contract_search_fold(s.name) = any((select $2::text) || (select $11::text[])) then 0 else 1 end",
+	foldStarts("contract_search_fold(s.name)"))+`
   union all
   select r.road, r.road, 'motorway', pt.location, null, false, 'autobahn', 0, null, null, null
   from autobahn_roads r
@@ -64,7 +67,7 @@ first as (`+placesPicked("found", "true")+`),
 named_part as (
   select g.id
   from gazetteer_places g
-  where `+placesShort+` and contract_search_fold(g.name) like '%' || (select $2::text) || '%' and `+notStartingPlace+` and `+placeHeld+`
+  where `+placesShort+` and `+foldHolds("contract_search_fold(g.name)")+` and `+notStartingPlace+` and `+placeHeld+`
   union
   select g.id
   from gazetteer_places g
@@ -73,7 +76,7 @@ named_part as (
 found_part as (
   `+placeRows("(select n.id, 2 rank from named_part n)")+`
   union all
-  `+stopRows("2", placesShort+" and contract_search_fold(s.name) like '%' || (select $2::text) || '%' and not (contract_search_fold(s.name) like (select $2::text) || '%')")+`),
+  `+stopRows("2", placesShort+" and "+foldHolds("contract_search_fold(s.name)")+" and not "+foldStarts("contract_search_fold(s.name)"))+`),
 rest as (`+placesPicked("found_part", placesShort)+`)
 select f.id, f.name, f.kind, st_y(f.location), st_x(f.location),
        case when f.stop then (select a.ags from ags_regions a where a.ags = f.region_key)
@@ -88,7 +91,7 @@ from (
   order by rank, prominence desc nulls last, dist nulls last, name, id
   limit (select $7::int)) f
 order by f.rank, f.prominence desc nulls last, f.dist nulls last, f.name, f.id`,
-	"text[]", "text", "text", "float8", "float8", "int", "int", "text[]", "text[]", "text")
+	"text[]", "text", "text", "float8", "float8", "int", "int", "text[]", "text[]", "text", "text[]")
 
 // placeHeld is a gazetteer row g the place search may answer with: placed,
 // open, and of a family of $1 or a junction of a roads family of $9.
@@ -97,7 +100,17 @@ const placeHeld = `g.geom is not null and g.closed_at is null and (g.source_id =
 // notStartingPlace is a gazetteer row g none of whose names starts with the
 // folded text $2: a place one of whose names does is ranked by that name
 // among the names that start with it, and so is no part match.
-const notStartingPlace = `not coalesce(contract_search_fold(g.name) like (select $2::text) || '%', false) and not coalesce(contract_search_fold(g.name_en) like (select $2::text) || '%', false)`
+var notStartingPlace = `not coalesce(` + foldStarts("contract_search_fold(g.name)") + `, false) and not coalesce(contract_search_fold(g.name_en) like (select $2::text) || '%', false)`
+
+// foldStarts and foldHolds are a folded name col that starts with or holds
+// the folded text $2 or one of its main-station spellings $11.
+func foldStarts(col string) string {
+	return `(` + col + ` like (select $2::text) || '%' or ` + col + ` like any(array(select x || '%' from unnest((select $11::text[])) x)))`
+}
+
+func foldHolds(col string) string {
+	return `(` + col + ` like '%' || (select $2::text) || '%' or ` + col + ` like any(array(select '%' || x || '%' from unnest((select $11::text[])) x)))`
+}
 
 // placesShort holds while the names that are the text or start with it give
 // fewer answers than the limit $7, which is the only case in which a name
@@ -166,7 +179,7 @@ func (s *Store) Places(ctx context.Context, q places.Query, families, stops, roa
 		lat, lon = &q.At.Lat, &q.At.Lon
 	}
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]places.Place, error) {
-		rows, _ := run(ctx, tx, placesPage, families, transit.Fold(q.Text), string(q.Kind), lat, lon, q.RadiusM, q.Limit+1, stops, roads, places.RoadForm(q.Text))
+		rows, _ := run(ctx, tx, placesPage, families, transit.Fold(q.Text), string(q.Kind), lat, lon, q.RadiusM, q.Limit+1, stops, roads, places.RoadForm(q.Text), spellingsOf(q.Text))
 		ps, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.Place, error) {
 			var (
 				v    places.Place

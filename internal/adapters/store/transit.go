@@ -58,7 +58,8 @@ func (s *Store) Station(ctx context.Context, id string, families []string) (tran
 // null for none; $4 the folded text, empty for none; $5 the radius; $6 the
 // limit; $7 a station code, empty for none; $8 railway stations only; $9 an
 // official region key the district code starts with, empty for any (a
-// station with no district then left out). A station stored with no
+// station with no district then left out); $10 the main-station spellings of
+// the text (stationStarts), empty for none. A station stored with no
 // position is left out: an answer places every station it lists. The folded
 // text holds letters and digits only, so it carries no LIKE wildcard.
 //
@@ -66,7 +67,7 @@ func (s *Store) Station(ctx context.Context, id string, families []string) (tran
 // asks) is a statement of its own, holding only its own filters, so each
 // settles on a generic plan that fits it: one statement with every filter
 // optional ran past 15 s on prod under its generic plan, where the asked
-// plan took 7 ms. Every shape takes all nine parameters (the unused ones in
+// plan took 7 ms. Every shape takes all ten parameters (the unused ones in
 // a CTE the planner drops), so a caller sends the same arguments to each.
 var stationsPage = func() map[stationShape]stmt {
 	out := map[stationShape]stmt{}
@@ -74,7 +75,7 @@ var stationsPage = func() map[stationShape]stmt {
 		where := ""
 		staged := m&shapeText != 0 && m&shapeNear == 0
 		if m&shapeText != 0 && !staged {
-			where += "\n  and s.search_fold like '%' || $4::text || '%'"
+			where += "\n  and " + stationHolds
 		}
 		if m&shapeNear != 0 {
 			where += "\n  and st_dwithin(s.location::geography, here.g, $5::double precision)"
@@ -112,8 +113,8 @@ limit $6::bigint`
 			// sorting all of them took 0.6 to 1.1 s a search on prod
 			// (2026-11-24), about 40 ms now, the same answers.
 			body = `,
-first as (` + pick("\n  and s.search_fold like $4::text || '%'") + `),
-rest as (` + pick("\n  and (select count(*) from first) < $6::bigint\n  and s.search_fold like '%' || $4::text || '%' and not s.search_fold like $4::text || '%'") + `)
+first as (` + pick("\n  and "+stationStarts) + `),
+rest as (` + pick("\n  and (select count(*) from first) < $6::bigint\n  and "+stationHolds+" and not "+stationStarts) + `)
 select f.stop_place_id, f.name, f.lat, f.lon, f.national_stop_code, f.region_code, f.modes, f.source_ref, f.dist,
        f.placement_source_ref, f.eva_no, f.eva_numbers
 from (select 0 k, stop_place_id, name, lat, lon, national_stop_code, region_code, modes, source_ref, dist, placement_source_ref, eva_no, eva_numbers from first union all select 1 k, stop_place_id, name, lat, lon, national_stop_code, region_code, modes, source_ref, dist, placement_source_ref, eva_no, eva_numbers from rest) f
@@ -121,14 +122,33 @@ order by f.k, f.dist, f.name, f.stop_place_id
 limit $6::bigint`
 		}
 		out[m] = namedOpaque(fmt.Sprintf("api_stations_page_%02d", m), `
-with args as (select $1::text[], $2::double precision, $3::double precision, $4::text, $5::double precision, $6::bigint, $7::text, $8::boolean, $9::text),
+with args as (select $1::text[], $2::double precision, $3::double precision, $4::text, $5::double precision, $6::bigint, $7::text, $8::boolean, $9::text, $10::text[]),
 here as (
   select case when $2::double precision is null then null
               else st_setsrid(st_makepoint($3::double precision, $2::double precision), 4326)::geography end g)`+body,
-			"text[]", "double precision", "double precision", "text", "double precision", "bigint", "text", "boolean", "text")
+			"text[]", "double precision", "double precision", "text", "double precision", "bigint", "text", "boolean", "text", "text[]")
 	}
 	return out
 }()
+
+// spellingsOf are the main-station spellings of a text, none as an empty
+// list (a statement parameter is never null).
+func spellingsOf(text string) []string {
+	if sp := transit.MainStationSpellings(text); sp != nil {
+		return sp
+	}
+	return []string{}
+}
+
+// stationStarts and stationHolds are a stop place s whose name starts with
+// or holds the folded text $4, or one of the main-station spellings $10 the
+// text gives (transit.MainStationSpellings): "Berlin Hbf" finds "S+U Berlin
+// Hauptbahnhof", the timetable's name of the station, as the platform's
+// station search does (#526).
+const (
+	stationStarts = `(s.search_fold like $4::text || '%' or s.search_fold like any(array(select x || '%' from unnest($10::text[]) x)))`
+	stationHolds  = `(s.search_fold like '%' || $4::text || '%' or s.search_fold like any(array(select '%' || x || '%' from unnest($10::text[]) x)))`
+)
 
 // stationsOfCode narrows a code search to the stops that can carry the
 // code $7 before the station relation is built: the stops whose id starts
@@ -176,7 +196,7 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 	}
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.Station, error) {
 		text := transit.Fold(q.Text)
-		rows, _ := run(ctx, tx, stationsPage[shapeOf(q, text)], families, lat, lon, text, q.RadiusM, q.Limit+1, q.Code, q.Railway, q.Area)
+		rows, _ := run(ctx, tx, stationsPage[shapeOf(q, text)], families, lat, lon, text, q.RadiusM, q.Limit+1, q.Code, q.Railway, q.Area, spellingsOf(q.Text))
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.Station, error) {
 			var (
 				v     transit.Station

@@ -106,6 +106,31 @@ func Fold(s string) string {
 	return b.String()
 }
 
+// MainStationSpellings are the folded spellings under which a register may
+// hold the main station a text names, as the platform states them
+// (mainStationSpellings, #502 and #526): DB writes almost every Hauptbahnhof
+// "<town> Hbf" and the timetable some "<town> Hauptbahnhof" ("S+U Berlin
+// Hauptbahnhof", "S Potsdam Hauptbahnhof"), so "Berlin Hbf",
+// "Berlin Hauptbahnhof" and "Hauptbahnhof, Berlin" each give "berlinhbf" and
+// "berlinhauptbahnhof". None for a text that names no main station, or names
+// no town beside the word ("Hbf" alone stays the list it is).
+func MainStationSpellings(s string) []string {
+	var place strings.Builder
+	main := false
+	for _, w := range strings.FieldsFunc(s, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
+		switch f := Fold(w); f {
+		case "hbf", "hauptbahnhof":
+			main = true
+		default:
+			place.WriteString(f)
+		}
+	}
+	if !main || place.Len() == 0 {
+		return nil
+	}
+	return []string{place.String() + "hbf", place.String() + "hauptbahnhof"}
+}
+
 // strip is a letter without its diacritic, for the Latin letters a German
 // station name carries; any other letter is kept as it is.
 func strip(r rune) string {

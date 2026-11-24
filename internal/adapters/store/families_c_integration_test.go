@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mavrovde/viafrei-api/internal/domain/places"
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 )
@@ -177,5 +178,25 @@ func TestAnAreasTripDelaysAreReadUnderThePublishedFamily(t *testing.T) {
 	}
 	if d.Trips == nil || d.Trips.Observed != 2 || d.Trips.Late != 1 || d.Trips.Family != "tripupdates" {
 		t.Errorf("trips %+v, want 2 observed, 1 late, of tripupdates", d.Trips)
+	}
+}
+
+// As the platform's station search does (#526), a question naming a main
+// station as "Hbf" finds the one the timetable writes "Hauptbahnhof", and
+// the other way round, in the station and the place search alike.
+func TestAMainStationIsFoundUnderEitherSpelling(t *testing.T) {
+	st, _ := private(t,
+		`insert into public.stops (gtfs_feed_key, id, name, geom, location_type)
+		 values (1, 'de:09999:526', 'S+U Testhausen Hauptbahnhof', vf_test.point(null), 1) on conflict do nothing`)
+	const fam = "delfi_static" // the source of the timetable the stop is planted in
+	for _, asked := range []string{"Testhausen Hbf", "Hauptbahnhof Testhausen", "testhausen hauptbahnhof"} {
+		ss, _, err := st.Stations(bounded(t), transit.Query{Text: asked, Limit: 5}, []string{fam})
+		if err != nil || !slices.ContainsFunc(ss, func(s transit.Station) bool { return s.Name == "S+U Testhausen Hauptbahnhof" }) {
+			t.Errorf("station search %q: %+v, %v", asked, ss, err)
+		}
+		ps, _, err := st.Places(bounded(t), places.Query{Text: asked, Limit: 5}, nil, []string{fam}, nil)
+		if err != nil || !slices.ContainsFunc(ps, func(p places.Place) bool { return p.Name == "S+U Testhausen Hauptbahnhof" }) {
+			t.Errorf("place search %q: %+v, %v", asked, ps, err)
+		}
 	}
 }

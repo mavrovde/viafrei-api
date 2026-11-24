@@ -55,3 +55,22 @@ func TestFamilyOfListsTheStationFirst(t *testing.T) {
 		t.Errorf("no stop points %v", got)
 	}
 }
+
+// A text naming a main station gives both spellings a register writes it
+// under, the town first; one naming none, or no town, gives none.
+func TestMainStationSpellings(t *testing.T) {
+	for in, want := range map[string][]string{
+		"Berlin Hbf":            {"berlinhbf", "berlinhauptbahnhof"},
+		"Hauptbahnhof, Potsdam": {"potsdamhbf", "potsdamhauptbahnhof"},
+		"München Hauptbahnhof":  {"muenchenhbf", "muenchenhauptbahnhof"},
+		"KÖLN-HBF":              {"koelnhbf", "koelnhauptbahnhof"},
+		"Hbf":                   nil,
+		"Hauptbahnhof":          nil,
+		"Berlin":                nil,
+		"Dom/Hbfweg":            nil,
+	} {
+		if got := transit.MainStationSpellings(in); !slices.Equal(got, want) {
+			t.Errorf("%q: %v, want %v", in, got, want)
+		}
+	}
+}

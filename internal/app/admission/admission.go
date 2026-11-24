@@ -190,11 +190,26 @@ func New(s Settings, now func() time.Time) *Controller {
 	return c
 }
 
-// Acquire waits for a permit for the caller in ctx. It answers a *Refusal
-// (errors.Is ErrOverloaded) when the request is shed, or ctx's error when the
-// request ends while waiting. release must be called exactly once when the
-// read is over.
+// Acquire is AcquireRead for a holder whose release always counts as an
+// answered read.
 func (c *Controller) Acquire(ctx context.Context) (release func(), err error) {
+	r, err := c.AcquireRead(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return func() { r(true) }, nil
+}
+
+// AcquireRead waits for a permit for the caller in ctx. It answers a
+// *Refusal (errors.Is ErrOverloaded) when the request is shed, or ctx's
+// error when the request ends while waiting. release must be called exactly
+// once when the read is over, with whether storage answered it: only an
+// answered read's time enters the moving average the wait estimate uses
+// (RATE-011). A read cut at its deadline, or one whose transaction could not
+// be opened, measured the deadline or the failure, not storage: counted, it
+// would keep the estimate at the deadline after storage has recovered and
+// shed healthy requests at once.
+func (c *Controller) AcquireRead(ctx context.Context) (release func(answered bool), err error) {
 	caller := callerFrom(ctx)
 	ts := c.s.Tiers[caller.Tier]
 	w := &waiter{caller: caller, ready: make(chan struct{})}
@@ -337,21 +352,23 @@ func (c *Controller) dispatch(now time.Time) {
 }
 
 // releaser returns the release of w's permit: the service time updates the
-// moving average and the request's tally, and the permit goes to the next
-// waiter.
-func (c *Controller) releaser(ctx context.Context, w *waiter) func() {
+// request's tally and, for a read storage answered, the moving average, and
+// the permit goes to the next waiter.
+func (c *Controller) releaser(ctx context.Context, w *waiter) func(answered bool) {
 	start := c.now()
 	var once sync.Once
-	return func() {
+	return func(answered bool) {
 		once.Do(func() {
 			c.mu.Lock()
 			defer c.mu.Unlock()
 			now := c.now()
 			took := now.Sub(start)
 			addStorageTime(ctx, took)
-			if c.ewma == 0 {
+			switch {
+			case !answered:
+			case c.ewma == 0:
 				c.ewma = took
-			} else {
+			default:
 				c.ewma = time.Duration(c.s.Alpha*float64(took) + (1-c.s.Alpha)*float64(c.ewma))
 			}
 			c.free++

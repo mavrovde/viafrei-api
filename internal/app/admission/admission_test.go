@@ -50,11 +50,11 @@ func as(tier admission.Tier, key string) context.Context {
 
 func acquire(t *testing.T, c *admission.Controller, ctx context.Context) func() {
 	t.Helper()
-	release, err := c.Acquire(ctx)
+	release, err := c.AcquireRead(ctx)
 	if err != nil {
 		t.Fatalf("acquire: %v", err)
 	}
-	return release
+	return func() { release(true) }
 }
 
 // waitUntil polls cond for at most one second.
@@ -71,17 +71,17 @@ func waitUntil(t *testing.T, what string, cond func() bool) {
 
 type result struct {
 	name    string
-	release func()
+	release func(answered bool)
 	err     error
 }
 
-// queue starts an Acquire for ctx in the background and waits until it is
+// queue starts an AcquireRead for ctx in the background and waits until it is
 // queued.
 func queue(t *testing.T, c *admission.Controller, ctx context.Context, name string, out chan<- result) {
 	t.Helper()
 	before := waiting(c)
 	go func() {
-		r, err := c.Acquire(ctx)
+		r, err := c.AcquireRead(ctx)
 		out <- result{name, r, err}
 	}()
 	waitUntil(t, name+" queued", func() bool { return waiting(c) > before })
@@ -158,7 +158,7 @@ func TestAReleasedPermitGoesToTheHighestTierFirstInFirstOut(t *testing.T) {
 		if r.err != nil || r.name != want {
 			t.Fatalf("served %s (%v), want %s", r.name, r.err, want)
 		}
-		r.release()
+		r.release(true)
 	}
 }
 
@@ -170,7 +170,7 @@ func TestReservationsKeepPermitsForHigherTiers(t *testing.T) {
 	c := admission.New(s, newClock().now)
 	first := acquire(t, c, as(admission.Standard, "a"))
 	// One permit is free, but it is critical's reservation.
-	_, err := c.Acquire(as(admission.Standard, "b"))
+	_, err := c.AcquireRead(as(admission.Standard, "b"))
 	var refusal *admission.Refusal
 	if !errors.As(err, &refusal) || !errors.Is(err, admission.ErrOverloaded) || err.Error() != admission.ErrOverloaded.Error() {
 		t.Fatalf("standard took the reserved permit: %v", err)
@@ -192,7 +192,7 @@ func TestTheBulkCapAndThePerKeyCapHoldWithFreePermits(t *testing.T) {
 	s.Tiers[admission.Bulk].MaxWait = 20 * time.Millisecond
 	c := admission.New(s, newClock().now)
 	bulk := acquire(t, c, as(admission.Bulk, "a"))
-	if _, err := c.Acquire(as(admission.Bulk, "b")); !errors.Is(err, admission.ErrOverloaded) {
+	if _, err := c.AcquireRead(as(admission.Bulk, "b")); !errors.Is(err, admission.ErrOverloaded) {
 		t.Fatalf("a second bulk read passed the cap: %v", err)
 	}
 	bulk()
@@ -210,7 +210,7 @@ func TestTheBulkCapAndThePerKeyCapHoldWithFreePermits(t *testing.T) {
 	if r.err != nil || r.name != "a again" {
 		t.Fatalf("key a's second read: %v", r.err)
 	}
-	r.release()
+	r.release(true)
 	if s := c.Snapshot(); s.Free != 3 {
 		t.Fatalf("permits leaked: %+v", s)
 	}
@@ -235,7 +235,7 @@ func TestAnOldWaiterIsPromotedOneTier(t *testing.T) {
 		if r.err != nil || r.name != want {
 			t.Fatalf("served %s, want %s", r.name, want)
 		}
-		r.release()
+		r.release(true)
 	}
 }
 
@@ -256,7 +256,7 @@ func TestAWaiterBelowTheAgingThresholdIsNotPromoted(t *testing.T) {
 		if r.name != want {
 			t.Fatalf("served %s, want %s", r.name, want)
 		}
-		r.release()
+		r.release(true)
 	}
 }
 
@@ -279,7 +279,7 @@ func TestARequestIsRefusedAtOnceWhenItsWaitWillNotFit(t *testing.T) {
 	ctx, cancel := context.WithDeadline(as(admission.Standard, "b"), clk.now().Add(240*time.Millisecond))
 	defer cancel()
 	start := time.Now()
-	_, err := c.Acquire(ctx)
+	_, err := c.AcquireRead(ctx)
 	var refusal *admission.Refusal
 	if !errors.As(err, &refusal) || time.Since(start) > 100*time.Millisecond {
 		t.Fatalf("not refused at once: %v after %v", err, time.Since(start))
@@ -291,14 +291,14 @@ func TestARequestIsRefusedAtOnceWhenItsWaitWillNotFit(t *testing.T) {
 	// A deadline inside the reserve is refused too, whatever the average.
 	ctx2, cancel2 := context.WithDeadline(as(admission.Standard, "b"), clk.now().Add(50*time.Millisecond))
 	defer cancel2()
-	if _, err := c.Acquire(ctx2); !errors.Is(err, admission.ErrOverloaded) {
+	if _, err := c.AcquireRead(ctx2); !errors.Is(err, admission.ErrOverloaded) {
 		t.Fatalf("a budget inside the reserve: %v", err)
 	}
 	// With room for the wait the request queues and times out at its
 	// deadline instead.
 	ctx3, cancel3 := context.WithDeadline(as(admission.Standard, "b"), clk.now().Add(300*time.Millisecond))
 	defer cancel3()
-	if _, err := c.Acquire(ctx3); !errors.Is(err, admission.ErrOverloaded) || time.Since(start) < 200*time.Millisecond {
+	if _, err := c.AcquireRead(ctx3); !errors.Is(err, admission.ErrOverloaded) || time.Since(start) < 200*time.Millisecond {
 		t.Fatalf("a request that fits did not wait out its budget: %v", err)
 	}
 }
@@ -314,7 +314,7 @@ func TestAFullQueueShedsAndTheWaitIsBounded(t *testing.T) {
 	got := make(chan result, 1)
 	queue(t, c, as(admission.Bulk, "b1"), "b1", got)
 	// The queue holds one: the second bulk request is shed at once.
-	if _, err := c.Acquire(as(admission.Bulk, "b2")); !errors.Is(err, admission.ErrOverloaded) {
+	if _, err := c.AcquireRead(as(admission.Bulk, "b2")); !errors.Is(err, admission.ErrOverloaded) {
 		t.Fatalf("over the queue: %v", err)
 	}
 	// The queued one is shed when its wait ends, and leaves the queue.
@@ -392,7 +392,7 @@ func TestATiersOwnKeyShareAdmitsAServiceKeysConcurrency(t *testing.T) {
 	for range 4 {
 		held = append(held, acquire(t, c, as(admission.Standard, "site")))
 	}
-	if _, err := c.Acquire(as(admission.Standard, "site")); !errors.Is(err, admission.ErrOverloaded) {
+	if _, err := c.AcquireRead(as(admission.Standard, "site")); !errors.Is(err, admission.ErrOverloaded) {
 		t.Fatalf("a standard key's fifth read passed the general share: %v", err)
 	}
 	for _, r := range held {

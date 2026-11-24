@@ -90,7 +90,11 @@ the queue of its plan's tier, `critical`, `standard` or `bulk`:
 - a request is refused at once when the estimated wait, from a moving
   average of storage time (`admission.ewma_alpha`), does not fit its tier's
   `queue_max_wait` or what is left of its deadline; a full queue
-  (`tiers.*.queue_len`) refuses the next one (RATE-011);
+  (`tiers.*.queue_len`) refuses the next one (RATE-011). Only reads storage
+  answered count in that average: a read cut at its deadline or by a statement
+  timeout, refused by the breaker, or whose transaction could not be opened
+  measured the deadline or the failure, not storage, and would keep shedding
+  healthy requests after storage recovers;
 - no key holds more than `tiers.per_key_inflight` permits (RATE-016).
 
 `Retry-After` on an `overloaded` refusal is the estimated time for the

@@ -41,7 +41,7 @@ func TestABoardCarriesOnlyTheFamiliesItWasGiven(t *testing.T) {
 		        date_trunc('minute', now()) + interval '20 minutes', true, 'delfi_rt_tu', false, 300, 'delfi_static'`,
 		// The trip calls at a stop after the station: the call departs.
 		`insert into public.stops (gtfs_feed_key, id, name, geom, location_type)
-		 values (1, 'de:09999:77:1:next', 'Weiter', vf_test.point(null), 0) on conflict do nothing`,
+		 values (1, 'next:de:09999:77:1', 'Weiter', vf_test.point(null), 0) on conflict do nothing`,
 	}, tripUpdatesOwnTheirLicence...)...)
 	conn, err := cp.Owner(bounded(t))
 	if err != nil {

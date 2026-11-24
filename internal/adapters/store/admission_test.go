@@ -25,10 +25,11 @@ func held(t *testing.T, env ...string) (*store.Store, func(), *config.Config) {
 		t.Fatal(err)
 	}
 	c := admission.New(wire.AdmissionSettings(cfg), nil)
-	release, err := c.Acquire(context.Background())
+	r, err := c.AcquireRead(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
+	release := func() { r(true) }
 	t.Cleanup(release)
 	return store.New(nil, cfg).WithAdmission(c), release, cfg
 }

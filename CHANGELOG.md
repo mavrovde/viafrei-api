@@ -9,6 +9,26 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [1.1.3](https://github.com/mavrovde/viafrei-api/compare/v1.1.2...v1.1.3) (2026-11-24)
+
+
+### Fixed
+
+* **admission:** only answered reads feed the wait estimate; the load runner's lock lasts its scenario ([#219](https://github.com/mavrovde/viafrei-api/issues/219)) ([daa6b4c](https://github.com/mavrovde/viafrei-api/commit/daa6b4c6722554669700be00930b8b4651167d56))
+* **serve:** bind both listeners before serving, so /healthz never answers while the public address refuses ([#220](https://github.com/mavrovde/viafrei-api/issues/220)) ([748f0dc](https://github.com/mavrovde/viafrei-api/commit/748f0dcff67f35bf4ee2565932013da70f2203f2)), closes [#216](https://github.com/mavrovde/viafrei-api/issues/216)
+* the 1.1.2 station, board and facility faults; every statement on its cached plan ([#214](https://github.com/mavrovde/viafrei-api/issues/214)) ([2d57436](https://github.com/mavrovde/viafrei-api/commit/2d574364a1f041de41df223d4f6767c129ba92ac))
+
+
+### Dependencies
+
+* bump github.com/andybalholm/brotli from 1.2.8 to 1.3.0 ([#202](https://github.com/mavrovde/viafrei-api/issues/202)) ([d63ff5f](https://github.com/mavrovde/viafrei-api/commit/d63ff5f9bdee9367537060347df3366e3af32056))
+* bump github.com/moby/moby/api from 1.56.1 to 1.57.0 ([#200](https://github.com/mavrovde/viafrei-api/issues/200)) ([a6d5762](https://github.com/mavrovde/viafrei-api/commit/a6d576280330e4bf42c40ff72c31839e1465728f))
+
+
+### Build and CI
+
+* bump SonarSource/sonarqube-scan-action from 8.4.1 to 8.5.0 ([#201](https://github.com/mavrovde/viafrei-api/issues/201)) ([b81a3a6](https://github.com/mavrovde/viafrei-api/commit/b81a3a6d9996f353776ac940868a5f1ce3612d10))
+
 ## [1.1.2](https://github.com/mavrovde/viafrei-api/compare/v1.1.1...v1.1.2) (2026-11-24)
 
 

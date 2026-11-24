@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -117,6 +118,7 @@ func TestStressFindsTheKnee(t *testing.T) {
 func lockedWorld(t *testing.T, shed func(http.ResponseWriter)) *world {
 	t.Helper()
 	var locked atomic.Bool
+	released := make(chan struct{}, 1)
 	w := newWorld(t, func(rw http.ResponseWriter, r *http.Request) {
 		if locked.Load() && !strings.Contains(r.URL.Path, "/overview") {
 			shed(rw)
@@ -127,12 +129,14 @@ func lockedWorld(t *testing.T, shed func(http.ResponseWriter)) *world {
 	w.dock.answer = func(a string) (string, error) {
 		switch {
 		case strings.Contains(a, "begin; do $$"):
-			// Held well past the scenario's 40 ms of load, so a slow
-			// runner still sends every request under the lock.
+			// Held until release cancels it, as in the database.
 			locked.Store(true)
-			time.Sleep(150 * time.Millisecond)
+			<-released
 			locked.Store(false)
-			return "", nil
+			return "", fmt.Errorf("docker exec: exit status 1: ERROR:  %s", holdCancelled)
+		case strings.Contains(a, "pg_cancel_backend"):
+			released <- struct{}{}
+			return "1\n", nil
 		case strings.Contains(a, "pg_locks"):
 			// The lock is seen only once it is taken, as in the database.
 			if locked.Load() {

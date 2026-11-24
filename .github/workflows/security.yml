@@ -69,7 +69,7 @@ jobs:
             -c 'git config --global --add safe.directory /repo && gitleaks git /repo --redact --verbose --exit-code 1 --report-format sarif --report-path /tmp/gitleaks.sarif'
       - name: Upload SARIF to code scanning
         if: always() && hashFiles('sarif/gitleaks.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: sarif/gitleaks.sarif
           category: gitleaks
@@ -144,7 +144,7 @@ jobs:
           retention-days: 30
       - name: Upload SARIF to code scanning
         if: always() && hashFiles('zap-report/zap.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: zap-report/zap.sarif
           category: zap

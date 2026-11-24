@@ -21,7 +21,7 @@ func plantCells(t *testing.T) {
 	t.Helper()
 	var n int
 	owner(t, `with ins as (
-  insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
+  insert into vf_seed.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
     valid_from, valid_to, published_at, source_ref, recorded_at, withdrawn_at, warn_cell_id, area_name, area, event, identifier, seen_at)
   select v.id, 'wind', v.level, 'Stufe', 'actual', 'Deutscher Wetterdienst', 'Wind', 'de',
     v.since::timestamptz, '2103-01-02T00:00:00Z', null, w.source_ref, '2103-01-01T00:00:00Z', null, v.cell, v.name,
@@ -98,7 +98,7 @@ func plantHistory(t *testing.T, live string) {
 	t.Helper()
 	var n int
 	owner(t, `with ins as (
-  insert into contract.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
+  insert into vf_seed.weather_warning (warning_id, hazard, warning_level, level_label, message_status, issuer_name, headline, text_lang,
     valid_from, valid_to, published_at, source_ref, recorded_at, withdrawn_at, warn_cell_id, area_name, area, event, identifier, seen_at)
   select v.id, 'wind', 2, 'Stufe', 'actual', 'Deutscher Wetterdienst', 'Wind', 'de',
     '2103-01-01T00:00:00Z', '2103-01-02T00:00:00Z', null, w.source_ref, '2103-01-01T00:00:00Z', v.gone::timestamptz, v.cell, v.name,

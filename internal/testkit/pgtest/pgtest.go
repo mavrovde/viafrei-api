@@ -45,6 +45,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/mavrovde/viafrei-api/internal/dbcontract"
+	"github.com/mavrovde/viafrei-api/internal/testkit/baseseed"
 )
 
 // Image is the PostGIS image every test and development database runs on,
@@ -67,8 +68,8 @@ const PartitionDays = "7"
 // test_.
 const Database = "test_contract"
 
-// SeedPath is where Seed places the rows inside the pinned image's container.
-const SeedPath = "/tmp/viafrei-api-seed.sql"
+// seedName is the name a seed records in the database it seeds.
+const seedName = "viafrei-api"
 
 // maxLocks is the lock table the container gets: making the partitions is
 // one transaction over every tick table and day.
@@ -105,7 +106,10 @@ func Start(ctx context.Context) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("pgtest: %w", err)
 	}
-	c, err := runContainer(ctx, rand.Text())
+	// A container of its own meets the run's reaper as the shared one does.
+	c, err := retryReaperStart(ctx, func() (*postgres.PostgresContainer, error) {
+		return runContainer(ctx, rand.Text())
+	})
 	db := &DB{container: c, Pin: pin}
 	if err == nil {
 		err = db.migrate(ctx, c.ContainerIP, c.ConnectionString)
@@ -182,32 +186,39 @@ func (db *DB) imageAddress(ctx context.Context, containerIP func(context.Context
 	return nil
 }
 
-// Seed writes rows, statements of the form `insert into contract.<relation>
+// Seed writes rows, statements of the form `insert into vf_seed.<relation>
 // (<columns>) values ...` in the read contract's own names, into the
-// database through the pinned image's test seed (`test-fixtures seed`): the
-// image owns how a contract row is stored in the platform's tables, so a
-// test reads it back through the contract's views as production would.
+// database's platform tables through the test seed (baseseed): a test reads
+// them back with the API's own statements, as production would.
 func (db *DB) Seed(ctx context.Context, rows string) error {
-	return SeedWith(ctx, db.Pin, db.imageURL, rows, runImage)
+	return SeedWith(ctx, db.OwnerURL, rows)
 }
 
-// SeedWith runs the pinned image's test seed of rows against dbURL with run.
-func SeedWith(ctx context.Context, pin Pin, dbURL, rows string, run Runner) error {
-	env := map[string]string{"DATABASE_URL": dbURL, "VF_TEST_FIXTURES": "1"}
-	out, code, err := run(ctx, pin.Ref, env, map[string]string{SeedPath: rows}, "test-fixtures", "seed", SeedPath)
-	return stepError("test-fixtures seed", out, code, err)
+// SeedWith runs the test seed of rows against dbURL as the owner, in one
+// transaction: a row the seed cannot write, or a second seed, leaves nothing
+// behind.
+func SeedWith(ctx context.Context, dbURL, rows string) error {
+	conn, err := connect(ctx, dbURL)
+	if err != nil {
+		return fmt.Errorf("pgtest: connect to seed: %w", err)
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	// One simple query is one transaction: the statements commit together.
+	if _, err := conn.Exec(ctx, baseseed.Script(seedName, rows)); err != nil {
+		return fmt.Errorf("pgtest: seed: %w", err)
+	}
+	return nil
 }
 
-// Runner runs ref with env and args to its end, with each of files (its
-// path in the container to its content) in place, and returns what it wrote
+// Runner runs ref with env and args to its end and returns what it wrote
 // and its exit status.
-type Runner func(ctx context.Context, ref string, env, files map[string]string, args ...string) (string, int, error)
+type Runner func(ctx context.Context, ref string, env map[string]string, args ...string) (string, int, error)
 
 // MigrateWith migrates the database at dbURL with the pinned release, run
 // by run: the image must say it is the pinned release, its migrate and
 // partitions steps must succeed, and its head must print READY <head>.
 func MigrateWith(ctx context.Context, pin Pin, dbURL string, run Runner) error {
-	out, code, err := run(ctx, pin.Ref, nil, nil, "version")
+	out, code, err := run(ctx, pin.Ref, nil, "version")
 	if err := stepError("version", out, code, err); err != nil {
 		return err
 	}
@@ -216,7 +227,7 @@ func MigrateWith(ctx context.Context, pin Pin, dbURL string, run Runner) error {
 	}
 	env := map[string]string{"DATABASE_URL": dbURL}
 	for _, step := range [][]string{{"migrate"}, {"partitions", "ensure", "--days", PartitionDays}, {"head"}} {
-		out, code, err = run(ctx, pin.Ref, env, nil, step...)
+		out, code, err = run(ctx, pin.Ref, env, step...)
 		if err := stepError(strings.Join(step, " "), out, code, err); err != nil {
 			return err
 		}
@@ -246,16 +257,11 @@ func lastLine(out string) string {
 
 // RunImage is the Runner of the container runtime: ref runs on the default
 // network to its exit, and its combined output is returned.
-func RunImage(ctx context.Context, ref string, env, files map[string]string, args ...string) (string, int, error) {
-	var copies []testcontainers.ContainerFile
-	for path, content := range files {
-		copies = append(copies, testcontainers.ContainerFile{Reader: strings.NewReader(content), ContainerFilePath: path, FileMode: 0o444})
-	}
+func RunImage(ctx context.Context, ref string, env map[string]string, args ...string) (string, int, error) {
 	c, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
 			Image:      ref,
 			Env:        env,
-			Files:      copies,
 			Cmd:        args,
 			WaitingFor: wait.ForExit(), // bounded by ctx, the caller's bound on setup
 		},
@@ -313,7 +319,8 @@ func (db *DB) finish(ctx context.Context, connString func(context.Context, ...st
 }
 
 // passwords sets the password of each role, as the image's roles step does
-// in production from its secret files.
+// in production from its secret files, and installs the test seed's
+// staging tables (baseseed).
 func passwords(ctx context.Context, ownerURL, readerPassword, accessPassword string) error {
 	conn, err := connect(ctx, ownerURL)
 	if err != nil {
@@ -324,6 +331,10 @@ func passwords(ctx context.Context, ownerURL, readerPassword, accessPassword str
 		if _, err := conn.Exec(ctx, fmt.Sprintf("alter role %s password '%s'", role, pw)); err != nil {
 			return fmt.Errorf("set the password of %s: %w", role, err)
 		}
+	}
+	// The seed's staging tables and triggers, so every copy can plant rows.
+	if _, err := conn.Exec(ctx, baseseed.Triggers()); err != nil {
+		return fmt.Errorf("install the test seed: %w", err)
 	}
 	return nil
 }

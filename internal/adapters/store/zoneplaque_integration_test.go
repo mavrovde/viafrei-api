@@ -17,7 +17,7 @@ import (
 func TestZoneEntriesReadTheCuratedListByGemeinde(t *testing.T) {
 	req.Covers(t, "SEC-030")
 	st := seeded(t)
-	plant(t, `insert into contract.low_emission_zone_entry (entry_key, name, place_codes, plaque, covered, lifted_on)
+	plant(t, `insert into vf_seed.low_emission_zone_entry (entry_key, name, place_codes, plaque, covered, lifted_on)
 values ('testdorf', 'Testdorf', array['99000101', '99000102'], null, false, '2025-01-31')`)
 	got, err := st.ZoneEntries(bounded(t), []string{"09162000", "03241001", "99000102", "00000000"})
 	if err != nil {
@@ -64,7 +64,7 @@ func TestZoneEntryNamedReadsTheCuratedListByNameOrAlias(t *testing.T) {
 func TestGemeindeAtReadsTheNearestMunicipalityWithinReach(t *testing.T) {
 	req.Covers(t, "SEC-030")
 	st := seeded(t)
-	plant(t, `insert into contract.place (place_id, place_kind, name, location, official_key, prominence, source_ref, origin_key, recorded_at, changed_at)
+	plant(t, `insert into vf_seed.place (place_id, place_kind, name, location, official_key, prominence, source_ref, origin_key, recorded_at, changed_at)
 values ('99000101', 'municipality', 'Testdorf', st_setsrid(st_makepoint(-30.0, 72.0), 4326), '99000101', 1, 'bkg_gvisys', 'lez:t', '2026-03-28T00:00:00Z', '2026-03-28T00:00:00Z')`)
 	near := geo.Point{Lat: 72.05, Lon: -30.0} // about 5.6 km north
 	g, err := st.GemeindeAt(bounded(t), near, rules.GemeindeReachM, []string{"bkg_gvisys"})

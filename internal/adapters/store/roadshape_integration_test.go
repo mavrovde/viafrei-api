@@ -158,7 +158,7 @@ order by j.road_ref, j.junction_id limit 1`, &ref, &state)
 	// its deadline is well short of the test's bound.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	one, _, err := st.Motorways(ctx, roads.CatalogueQuery{Road: ref, Limit: 1}, nil, time.Now())
+	one, _, err := st.Motorways(store.WithTest(ctx, t), roads.CatalogueQuery{Road: ref, Limit: 1}, nil, time.Now())
 	if err != nil || len(one) != 1 {
 		t.Fatalf("%s during the junction read: %v %v", ref, one, err)
 	}

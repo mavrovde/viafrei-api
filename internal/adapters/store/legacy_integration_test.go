@@ -122,21 +122,32 @@ where d.stop_place_id = $1
                where nx.journey_id = d.journey_id and nx.call_order > d.call_order
                  and np.stop_place_id <> $1)
 order by d.planned_departure_at, d.journey_id, d.call_order`, "text", "timestamp with time zone", "timestamp with time zone", "text[]"),
+	// A state is current while its feed restates it (its last sighting,
+	// which the view never carried), and a unit FaSta lists is FaSta's
+	// alone (#222): both read from the facility's own row.
 	"api_station_facilities": `
-select f.facility_id, f.facility_kind, f.position_text,
-       case when f.status_observed_at is null then 'unknown'
-            when s.stale_after_s is not null and f.status_observed_at < $3::timestamptz - make_interval(secs => s.stale_after_s) then 'unknown'
-            else f.facility_status end,
-       f.status_observed_at, f.source_ref
-from contract.station_facility f
-join contract.source s on s.source_ref = f.source_ref
-where (f.stop_place_id = $1
-       -- the station DB files under the DHID the station's platforms name
-       -- as their parent (S+U Berlin Hauptbahnhof, 1.1.2 faults)
-       or f.stop_place_id in (select p.stop_place_id from contract.stop_point p
-                               where p.stop_point_id like $1::text || ':%' or p.stop_point_id like $1::text || '\_%'))
-  and f.source_ref = any($2) and ` + permitted("f") + `
-order by f.facility_id`,
+with v as (
+  select f.*, x.seen, x.eno
+  from contract.station_facility f
+  left join lateral (select coalesce((select st.last_seen_at from station_equipment_state st where 'equipment:' || st.equipment_id = f.facility_id),
+                                     (select e.last_seen_at from station_equipment e where 'equipment:' || e.equipment_id = f.facility_id),
+                                     (select d.last_seen_at from db_facilities d where 'fasta:' || d.equipment_no = f.facility_id)) seen,
+                            (select e.equipment_no from station_equipment e where 'equipment:' || e.equipment_id = f.facility_id) eno) x on true
+  where (f.stop_place_id = $1
+         -- the station DB files under the DHID the station's platforms name
+         -- as their parent (S+U Berlin Hauptbahnhof, 1.1.2 faults)
+         or f.stop_place_id in (select p.stop_place_id from contract.stop_point p
+                                 where p.stop_point_id like $1::text || ':%' or p.stop_point_id like $1::text || '\_%'))
+    and f.source_ref = any($2) and ` + permitted("f") + `)
+select v.facility_id, v.facility_kind, v.position_text,
+       case when v.seen is null then 'unknown'
+            when s.stale_after_s is not null and v.seen < $3::timestamptz - make_interval(secs => s.stale_after_s) then 'unknown'
+            else v.facility_status end,
+       v.seen, v.source_ref
+from v
+join contract.source s on s.source_ref = v.source_ref
+where not exists (select 1 from v g where g.facility_id = 'fasta:' || v.eno)
+order by v.facility_id`,
 	"api_affected_alerts": opaque(`
 select distinct a.alert_id, a.source_ref, u.sid
 from contract.service_alert a, unnest(a.stop_ids) u(sid)

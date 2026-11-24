@@ -13,20 +13,28 @@ import (
 // a town, the other words the stop.
 func TestATextIsReadAsATownAndAStop(t *testing.T) {
 	req.Covers(t, "FR-TRANSIT-001")
-	if got := transit.TownSplits("Marienplatz"); got != nil {
-		t.Errorf("one word: %v", got)
+	if got := transit.TownRuns("München, Marienplatz"); !reflect.DeepEqual(got, []string{"munchen", "marienplatz", "munchen marienplatz"}) {
+		t.Errorf("runs: %v", got)
 	}
-	want := []transit.TownSplit{
-		{Runs: []string{"munchen"}, Rest: "marienplatz"},
-		{Runs: []string{"marienplatz"}, Rest: "munchen"},
+	want := []string{"kreis", "muenchen", "munchen", "muenchen u", "munchen u"}
+	if got := transit.TownRuns("Kreis Muenchen U"); !reflect.DeepEqual(got, want) {
+		t.Errorf("runs with an administrative word: %v", got)
 	}
-	if got := transit.TownSplits("München, Marienplatz"); !reflect.DeepEqual(got, want) {
-		t.Errorf("two words: %+v", got)
+	for text, want := range map[string][]string{
+		"Frankfurt Konstablerwache": {"frankfurt"},
+		"Bahnhof, Neustadt":         {"neustadt"},
+		"Hbf Bad Ems":               nil,
+		"Nord":                      nil,
+	} {
+		if got := transit.TownPrefixes(text); !reflect.DeepEqual(got, want) {
+			t.Errorf("TownPrefixes(%q) = %v, want %v", text, got, want)
+		}
 	}
-	got := transit.TownSplits("Muenchen Ost Bf")
-	if len(got) != 5 || !reflect.DeepEqual(got[0], transit.TownSplit{Runs: []string{"muenchen ost", "munchen ost"}, Rest: "bf"}) ||
-		!reflect.DeepEqual(got[4], transit.TownSplit{Runs: []string{"bf"}, Rest: "muenchen ost"}) {
-		t.Errorf("three words: %+v", got)
+	if got := transit.TownRest("Landkreis Fulda Bahnhof", []string{"fulda"}); got != "bahnhof" {
+		t.Errorf("rest after an administrative word: %q", got)
+	}
+	if got := transit.TownRest("Muenchen, Marienplatz", []string{"munchen"}); got != "marienplatz" {
+		t.Errorf("rest: %q", got)
 	}
 	if got := transit.NameFold("  Groß-Gerau (Süd) "); got != "gross gerau sud" {
 		t.Errorf("fold: %q", got)

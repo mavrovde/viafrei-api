@@ -29,6 +29,17 @@ func TestAStationIsFoundAsAStopInTheTownTheTextNames(t *testing.T) {
 		 on conflict do nothing`,
 		`insert into public.stops (gtfs_feed_key, id, name, geom, location_type)
 		 values (1, 'de:09998:903', 'Hauptbahnhof', vf_test.point(null), 1), (1, 'de:09998:904', 'Dornenweg', vf_test.point(null), 1)
+		 on conflict do nothing`,
+		// Towns written without their suffix: the Gemeinde whose name
+		// starts with the word and a space.
+		`insert into public.ags_regions (ags, level, name, name_norm, parent_ags, source_id)
+		 values ('06412', 'kreis', 'Frankfurt am Main', 'frankfurt am main', '06', 'destatis_gv'),
+		        ('15002', 'kreis', 'Halle (Saale)', 'halle saale', '15', 'destatis_gv') on conflict do nothing`,
+		`insert into public.gazetteer_places (kind, name, name_norm, admin_code, geom, source_id, external_id)
+		 values ('city', 'Frankfurt am Main', 'frankfurt am main', '06412000', vf_test.point(null), 'bkg_gvisys', 'test-frankfurt'),
+		        ('city', 'Halle (Saale)', 'halle saale', '15002000', vf_test.point(null), 'bkg_gvisys', 'test-halle')`,
+		`insert into public.stops (gtfs_feed_key, id, name, geom, location_type)
+		 values (1, 'de:06412:99001', 'Konstablerwache', vf_test.point(null), 1), (1, 'de:15002:99001', 'Marktplatz', vf_test.point(null), 1)
 		 on conflict do nothing`)
 	const fam = "delfi_static" // the source of the timetable the stops are planted in
 	ids := func(ss []transit.Station) []string {
@@ -47,6 +58,15 @@ func TestAStationIsFoundAsAStopInTheTownTheTextNames(t *testing.T) {
 		if err != nil || !slices.Equal(ids(ss), []string{"1:de:09998:901"}) || !ss[0].InTown {
 			t.Errorf("%q: %+v, %v", asked, ss, err)
 		}
+	}
+	for asked, want := range map[string]string{"Frankfurt Konstablerwache": "1:de:06412:99001", "Halle Marktplatz": "1:de:15002:99001", "Kreis Rosenstadt, Dornenplatz": "1:de:09998:901"} {
+		if ss, _, err := st.Stations(bounded(t), transit.Query{Text: asked, Limit: 5}, []string{fam}); err != nil || !slices.Equal(ids(ss), []string{want}) {
+			t.Errorf("%q: %v, %v", asked, ids(ss), err)
+		}
+	}
+	// The town alone names no stop.
+	if ss, _, err := st.Stations(bounded(t), transit.Query{Text: "Kreis Rosenstadt", Limit: 5}, []string{fam}); err != nil || len(ss) != 0 {
+		t.Errorf("the town alone: %v, %v", ids(ss), err)
 	}
 	// Two stations of the town hold the stop name: by name, then id.
 	if ss, _, err := st.Stations(bounded(t), transit.Query{Text: "Rosenstadt Dornen", Limit: 5}, []string{fam}); err != nil || !slices.Equal(ids(ss), []string{"1:de:09998:901", "1:de:09998:904"}) {

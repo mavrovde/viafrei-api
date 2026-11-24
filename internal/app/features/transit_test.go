@@ -101,6 +101,9 @@ func TestANameSeveralStationsAnswerCreditsTheirPlacement(t *testing.T) {
 		{"a name two stations answer", two, transit.Query{Text: "nam", Limit: 5}, []string{"p1", "t1"}},
 		{"a name one station answers", two[:1], transit.Query{Text: "nam", Limit: 5}, []string{"t1"}},
 		{"a position", two, transit.Query{Limit: 5}, []string{"t1"}},
+		// One station found in the town the text names: its district
+		// placed it there.
+		{"one station in the town", []transit.Station{{ID: "a", Family: "t1", PlacedBy: &p, InTown: true}}, transit.Query{Text: "town nam", Limit: 5}, []string{"p1", "t1"}},
 	} {
 		a, err := trService(&trFake{stations: c.stations}).Stations(context.Background(), consumer, c.q)
 		if err != nil || !slices.Equal(names(a.Families), c.want) {

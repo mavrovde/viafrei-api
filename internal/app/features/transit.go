@@ -175,7 +175,10 @@ func (s *Service) Facilities(ctx context.Context, key access.Record, q transit.F
 
 // boardFamilies are the families a departure board answers from: the
 // transit families, and the Trip Updates' family where the register holds
-// it, whatever domain the register files it under. A board's call carries
+// it, whatever domain the register files it under. This is a bridge: the
+// source domains send tripupdates to roads through their catch-all pattern,
+// and the root fix is tripupdates in the transit pattern, in the database
+// (viafrei-database#110); once that ships, this union adds nothing. A board's call carries
 // the Trip Updates' family beside the timetable's (transit.TripUpdatesFamily),
 // and a call carrying a family the board did not ask is left out: filed under
 // another domain, every call with a Trip Updates figure was left out of

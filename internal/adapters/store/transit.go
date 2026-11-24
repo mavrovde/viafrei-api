@@ -122,8 +122,11 @@ var stationsPage = func() map[stationShape]stmt {
 		if m&shapeArea != 0 {
 			where += "\n  and s.region_code like $9::text || '%'"
 		}
+		// A text search reads more than the page (pageOver), and leaves
+		// out the stops of another station after (collapsed).
+		lim := "$6::bigint"
 		if m&shapeText != 0 {
-			where += stationOwnsTheStop
+			lim = pageOver("$6")
 		}
 		pick := func(match string) string {
 			return `
@@ -137,7 +140,7 @@ where s.withdrawn_at is null
   and s.source_ref = any($1::text[])
   and ` + permitted("s") + match + where + `
 order by dist, s.name, s.stop_place_id
-limit $6::bigint`
+limit ` + lim
 		}
 		body := pick("")
 		if staged {
@@ -150,12 +153,20 @@ limit $6::bigint`
 			// (2026-11-24), about 40 ms now, the same answers.
 			body = `,
 first as (` + pick("\n  and "+stationStarts) + `),
-rest as (` + pick("\n  and (select count(*) from first) < $6::bigint\n  and "+stationHolds+" and not "+stationStarts) + `)
+rest as (` + pick("\n  and (select count(*) from first f where "+ownStation("f.stop_place_id")+") < $6::bigint\n  and "+stationHolds+" and not "+stationStarts) + `)
 select f.stop_place_id, f.name, f.lat, f.lon, f.national_stop_code, f.region_code, f.modes, f.source_ref, f.dist,
        f.placement_source_ref, f.eva_no, f.eva_numbers
 from (select 0 k, stop_place_id, name, lat, lon, national_stop_code, region_code, modes, source_ref, dist, placement_source_ref, eva_no, eva_numbers from first union all select 1 k, stop_place_id, name, lat, lon, national_stop_code, region_code, modes, source_ref, dist, placement_source_ref, eva_no, eva_numbers from rest) f
 order by f.k, f.dist, f.name, f.stop_place_id
-limit $6::bigint`
+limit ` + lim
+		}
+		if m&shapeText != 0 {
+			if staged {
+				i := strings.LastIndex(body, "\nselect f.stop_place_id")
+				body = body[:i] + ",\npage as (" + body[i:] + ")" + collapsed("$6")
+			} else {
+				body = ",\npage as (" + body + ")" + collapsed("$6")
+			}
 		}
 		out[m] = namedOpaque(fmt.Sprintf("api_stations_page_%02d", m), `
 with args as (select $1::text[], $2::double precision, $3::double precision, $4::text, $5::double precision, $6::bigint, $7::text, $8::boolean, $9::text, $10::text[]),
@@ -186,26 +197,59 @@ const (
 	stationHolds  = `(s.search_fold like '%' || $4::text || '%' or s.search_fold like any(array(select '%' || x || '%' from unnest($10::text[]) x)))`
 )
 
-// stationOwnsTheStop leaves a stop out of a name search when it is a stop
-// of another station, the station its DHID names (stationFamily): DELFI
-// files most platforms under the station's DHID with no parent named, so
-// each read as a station of its own ("Marienplatz" listed each platform of
+// collapsed answers the page a text search read (the CTE page, in its
+// order) without the stops of another station, limit at most: DELFI files
+// most platforms under the station's DHID with no parent named, so each
+// read as a station of its own ("Marienplatz" listed each platform of
 // München's and Stuttgart's Marienplatz), where the platform's name search
-// answers the station once. Where the station's DHID is no stop of its own
-// (de:09161:505, only its platforms :0:1 and :0:2 are stops), its first
-// platform by id stands for it, as the family it names is the station's.
-const stationOwnsTheStop = `
-  and not exists (
+// answers the station once. A stop is another station's when the stop its
+// DHID names is a station (stationFamily), or, where that DHID is no stop
+// of its own (de:09161:505, only its platforms :0:1 and :0:2 are stops),
+// when a platform under the DHID with a lower id stands for it.
+//
+// That lowest-id platform stands for the station even where it fails the
+// search's own filters (another family, outside the area): the family it
+// names is the station's either way.
+//
+// The test runs after the page is read, on the page's rows only, by the
+// stops' key and id range: inside the page's own join it turned the stop
+// modes' key probe into a scan of every stop's modes (1.6 M rows filtered,
+// 2.5 s for "hbf" in Stuttgart, 2026-11-24).
+func collapsed(limit string) string {
+	return `
+select p.stop_place_id, p.name, p.lat, p.lon, p.national_stop_code, p.region_code, p.modes, p.source_ref, p.dist,
+       p.placement_source_ref, p.eva_no, p.eva_numbers
+from (select q.stop_place_id, q.name, q.lat, q.lon, q.national_stop_code, q.region_code, q.modes, q.source_ref, q.dist,
+             q.placement_source_ref, q.eva_no, q.eva_numbers, row_number() over () n
+        from page q offset 0) p
+where ` + ownStation("p.stop_place_id") + `
+order by p.n
+limit ` + limit + `::bigint`
+}
+
+// ownStation is whether the stop place id names a station of its own, no
+// stop of another station (collapsed), by the stops' key and id range.
+func ownStation(id string) string {
+	feed := "(case when " + id + " ~ '^[0-9]+:' then split_part(" + id + ", ':', 1)::smallint end)"
+	own := "substr(" + id + ", strpos(" + id + ", ':') + 1)"
+	root := "substring(" + own + " from '" + dhidStation + "')"
+	return `not exists (
     select 1 from stops r
-     where r.gtfs_feed_key = split_part(s.stop_place_id, ':', 1)::smallint and r.id = substring(s.origin_key from '` + dhidStation + `')
-       and r.id <> s.origin_key and r.deleted_at is null and r.geom is not null and r.name is not null
+     where r.gtfs_feed_key = ` + feed + ` and r.id = ` + root + ` and r.id <> ` + own + `
+       and r.deleted_at is null and r.geom is not null and r.name is not null
        and (r.location_type = 1 or coalesce(r.location_type::integer, 0) = 0 and r.parent_id is null)
     union all
     select 1 from stops r
-     where r.gtfs_feed_key = split_part(s.stop_place_id, ':', 1)::smallint
-       and r.id ~>=~ (substring(s.origin_key from '` + dhidStation + `') || ':') and r.id ~<~ (substring(s.origin_key from '` + dhidStation + `') || ';')
-       and r.id ~<~ s.origin_key and r.deleted_at is null and r.geom is not null and r.name is not null
+     where r.gtfs_feed_key = ` + feed + ` and r.id ~>=~ (` + root + ` || ':') and r.id ~<~ (` + root + ` || ';') and r.id ~<~ ` + own + `
+       and r.deleted_at is null and r.geom is not null and r.name is not null
        and coalesce(r.location_type::integer, 0) = 0 and r.parent_id is null)`
+}
+
+// pageOver is how many rows a text search reads for a page of limit rows
+// before collapsed leaves the other stations' stops out: a station's
+// platforms, each a stop place of its own, are seldom more than three of
+// the answers.
+func pageOver(limit string) string { return "(" + limit + "::bigint * 4 + 20)" }
 
 // stationsOfCode narrows a code search to the stops that can carry the
 // code $7 before the station relation is built: the stops whose id starts
@@ -268,57 +312,86 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 	return out, false, nil
 }
 
-// stationTownKreise are the districts (Kreise and kreisfreie Städte) the
-// town spellings $1 name, as the platform's stop resolver reads a town: a
-// district by its name, or a Gemeinde by its name, in the district its key
-// starts with.
+// stationTownKreise are the districts (Kreise and kreisfreie Städte) a
+// station text's town names, as the platform's TOWN_KREISE_SQL reads them,
+// in one statement: a district by its name, or a Gemeinde by its name, in
+// the district its key starts with, for every run $1 of the text
+// (transit.TownRuns); and, flagged not exact, a Gemeinde whose name starts
+// with a prefix $2 and a space (transit.TownPrefixes): "Frankfurt" for
+// "Frankfurt am Main". Exact rows first; sixty at most.
 var stationTownKreise = namedOpaque("api_station_town_kreise", `
-select k.ags from (
-  select a.ags from ags_regions a
-   where a.level = 'kreis' and (a.name_norm = any($1::text[]) or a.name_en_norm = any($1::text[]))
-  union
-  select left(g.admin_code, 5) from gazetteer_places g
+select distinct k.ags, k.run, k.exact from (
+  select a.ags, r.run, true exact
+    from unnest($1::text[]) r(run)
+    join ags_regions a on a.level = 'kreis' and (a.name_norm = r.run or a.name_en_norm = r.run)
+  union all
+  select left(g.admin_code, 5), g.name_norm, true from gazetteer_places g
    where g.closed_at is null and g.source_id = 'bkg_gvisys' and g.kind = 'city' and g.admin_code ~ '^[0-9]{8}$'
-     and g.name_norm = any($1::text[])) k
-order by k.ags`, "text[]")
+     and g.name_norm = any($1::text[])
+  union all
+  select left(g.admin_code, 5), p.w, false
+    from unnest($2::text[]) p(w)
+    join gazetteer_places g on left(g.name_norm, length(p.w) + 1) = p.w || ' '
+   where g.closed_at is null and g.source_id = 'bkg_gvisys' and g.kind = 'city' and g.admin_code ~ '^[0-9]{8}$') k
+order by k.exact desc, k.ags, k.run
+limit 60`, "text[]", "text[]")
+
+// stationsInTowns are the stations of the districts $4 whose name holds the
+// stop name $2 or a spelling $3 of it, by name then id, the other stations'
+// stops left out (collapsed), $5 at most: one statement over every district
+// the town named.
+var stationsInTowns = namedOpaque("api_stations_in_towns", `
+with page as (
+select s.stop_place_id, s.name, st_y(s.location) lat, st_x(s.location) lon, s.national_stop_code, s.region_code,
+       coalesce(s.modes, '{}') modes, s.source_ref, null::integer dist, s.placement_source_ref, s.eva_no, s.eva_numbers
+from (`+relStopPlace+`) s
+where s.withdrawn_at is null
+  and s.location is not null
+  and s.source_ref = any($1::text[])
+  and `+permitted("s")+`
+  and left(s.region_code, 5) = any($4::text[])
+  and `+strings.NewReplacer("$4", "$2", "$10", "$3").Replace(stationHolds)+`
+order by s.name, s.stop_place_id
+limit `+pageOver("$5")+`)`+collapsed("$5"), "text[]", "text", "text[]", "text[]", "bigint")
 
 // stationsInTown reads a text no station's name holds as a town and a stop
-// in it (transit.TownSplits), as the platform's stop resolver reads "town,
-// stop": the first reading whose town names a district, and whose stop name
-// a station of that district holds, answers, by name then id.
+// in it, as the platform's stop resolver reads "town, stop": the districts
+// its town names (stationTownKreise: the exact names where there are any,
+// else the Gemeinden its prefix starts), and the stations of those districts
+// whose name holds the rest of the text (transit.TownRest). Two statements,
+// whatever the text.
 func (s *Store) stationsInTown(ctx context.Context, q transit.Query, families []string) ([]transit.Station, error) {
-	var lat, lon *float64
-	if q.At != nil {
-		lat, lon = &q.At.Lat, &q.At.Lon
-	}
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.Station, error) {
-		for _, sp := range transit.TownSplits(q.Text) {
-			rows, _ := run(ctx, tx, stationTownKreise, sp.Runs)
-			kreise, err := pgx.CollectRows(rows, pgx.RowTo[string])
-			if err != nil {
-				return nil, err
-			}
-			text := transit.Fold(sp.Rest)
-			var out []transit.Station
-			for _, ags := range kreise {
-				in := q
-				in.Area = ags
-				rows, _ := run(ctx, tx, stationsPage[shapeOf(in, text)], families, lat, lon, text, q.RadiusM, q.Limit+1, q.Code, q.Railway, ags, townSpellings(sp.Rest))
-				got, err := pgx.CollectRows(rows, inTown)
-				if err != nil {
-					return nil, err
+		rows, _ := run(ctx, tx, stationTownKreise, transit.TownRuns(q.Text), transit.TownPrefixes(q.Text))
+		towns, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (townRow, error) {
+			var v townRow
+			return v, r.Scan(&v.ags, &v.run, &v.exact)
+		})
+		if err != nil || len(towns) == 0 {
+			return nil, err
+		}
+		var kreise, runs []string
+		for _, tw := range towns {
+			if tw.exact == towns[0].exact {
+				if !slices.Contains(kreise, tw.ags) {
+					kreise = append(kreise, tw.ags)
 				}
-				out = append(out, got...)
-			}
-			if len(out) > 0 {
-				slices.SortStableFunc(out, func(x, y transit.Station) int {
-					return cmp.Or(cmp.Compare(x.Name, y.Name), cmp.Compare(x.ID, y.ID))
-				})
-				return out, nil
+				runs = append(runs, tw.run)
 			}
 		}
-		return nil, nil
+		rest := transit.TownRest(q.Text, runs)
+		if rest == "" {
+			return nil, nil
+		}
+		rows, _ = run(ctx, tx, stationsInTowns, families, transit.Fold(rest), townSpellings(rest), kreise, q.Limit+1)
+		return pgx.CollectRows(rows, inTown)
 	})
+}
+
+// townRow is one district a town names.
+type townRow struct {
+	ags, run string
+	exact    bool
 }
 
 // townSpellings are the spellings a town reading's stop name is searched

@@ -80,6 +80,9 @@ group by p.official_key`,
 	// The station's family is the platform board's (fault 3 of the 1.1.2
 	// faults): the stops filed under the station's DHID, a parent named or
 	// not, not only the stop points naming the station as their parent.
+	// A stop whose id is no DHID is its own root here, where the store
+	// takes its parent's root (stationFamily): the seed holds no such stop
+	// with a parent, so the two forms agree on every station it holds.
 	"api_station_by_id": opaque(`
 select s.stop_place_id, s.name, coalesce(st_y(s.location), 0), coalesce(st_x(s.location), 0), s.national_stop_code,
        s.region_code, coalesce(s.modes, '{}'), s.source_ref,
@@ -274,7 +277,31 @@ var legacyRegionAlerts = strings.NewReplacer("{live}", alertLive("a", "$1"), "{i
     and ($4::text is null or exists (select 1 from unnest(f.line_names) n where upper(regexp_replace(n, '\s+', '', 'g')) = $4::text))
 )`)
 
+// legacyStationsInTowns is the town search (fault 2 of the 1.1.2 faults)
+// as the view answers it: the stations of the districts the town names
+// whose name holds the stop name, by name then id, collapsed as the name
+// search is (legacyStationsPage).
+var legacyStationsInTowns = `
+select s.stop_place_id, s.name, st_y(s.location), st_x(s.location), s.national_stop_code, s.region_code,
+       coalesce(s.modes, '{}'), s.source_ref, null::integer, s.placement_source_ref, s.eva_no, s.eva_numbers
+from contract.stop_place s
+where s.withdrawn_at is null
+  and s.location is not null
+  and s.source_ref = any($1)
+  and ` + permitted("s") + `
+  and left(s.region_code, 5) = any($4::text[])
+  and (s.search_fold like '%' || $2::text || '%' or s.search_fold like any(array(select '%' || x || '%' from unnest($3::text[]) x)))
+  and not exists (
+        select 1 from contract.stop_place r
+         where r.withdrawn_at is null and r.stop_place_id <> s.stop_place_id
+           and (r.stop_place_id = split_part(s.stop_place_id, ':', 1) || ':' || substring(s.origin_key from '` + dhidStation + `')
+                or (r.stop_place_id like split_part(s.stop_place_id, ':', 1) || ':' || substring(s.origin_key from '` + dhidStation + `') || ':%'
+                    and r.stop_place_id ~<~ s.stop_place_id)))
+order by s.name, s.stop_place_id
+limit $5`
+
 func init() {
+	legacyReads["api_stations_in_towns"] = legacyStationsInTowns
 	for m := range 1 << 5 {
 		legacyReads[fmt.Sprintf("api_stations_page_%02d", m)] = legacyStationsPage
 	}

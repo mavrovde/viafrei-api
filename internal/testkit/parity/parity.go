@@ -290,6 +290,9 @@ var Default = Rules{
 		{"data.counts", "", "listRoadConditions", familyCountsReason},
 		{"data.counts", "", "listStateRoadConditions", familyCountsReason},
 		{"data.line", "", "listTransitDisruptions", lineCheckReason},
+		{"data.roadForecast", "", "getWeatherRisk", roadForecastReason},
+		{"data.roadForecastLoaded", "", "getWeatherRisk", roadForecastReason},
+		{"data.facilities[*].equipmentNo", "", "listStationFacilities", equipmentNoReason},
 		{"data[*].kilometres", "", "listMotorways", motorwayListReason},
 		{"data[*].sourceFamily", "", "listMotorways", motorwayListReason},
 		{"data.apiVersion", "", "getMeta", serviceMetaReason},
@@ -417,6 +420,14 @@ const sourceURLReason = "Not compared until a bundle the MCP side produced carri
 // lineCheckReason is why the timetable's word on a line asked is not
 // compared.
 const lineCheckReason = "API-only until a bundle the MCP side produced carries it: the /v1 contract states whether the static timetable knows the line asked; no bundle recorded so far holds that fact"
+
+// roadForecastReason is why the issuer's road-surface forecast of a
+// weather answer is not compared yet.
+const roadForecastReason = "Not compared until a bundle the MCP side produced carries it: the issuer's road-surface forecast near the position and whether its station catalogue is loaded are new in the /v1 contract, and no bundle recorded so far holds those facts; remove this exclusion with the first bundle that does"
+
+// equipmentNoReason is why a facility's DB equipment number is not compared
+// yet.
+const equipmentNoReason = "Not compared until a bundle the MCP side produced carries it: DB's equipment number of a unit is new in the /v1 contract, and no bundle recorded so far holds that fact; remove this exclusion with the first bundle that does"
 
 // roadsLampReason is why the lamp of the conditions near a position is not
 // compared: the /v1 contract keeps it (VER-001).

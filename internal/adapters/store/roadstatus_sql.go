@@ -269,7 +269,7 @@ var (
          r.window_from, r.window_to,
          road_event_in_force(r.overall_start, r.overall_end, dp.p, r.valid_windows, $3::timestamptz) as now_in_force,
          r.on_road, r.lat, r.lon,
-         case when r.feed_key <> all($6::text[]) then (jsonb_build_object(
+         case when r.feed_key <> all($6::text[]) then (coalesce(r.entry_static, jsonb_build_object(
     'pri', coalesce(jsonb_path_query_first(dp.p, '$.situationRecord[0].groupOfLocations.**.alertCMethod4PrimaryPointLocation.alertCLocation.specificLocation."#text"'),
                     jsonb_path_query_first(dp.p, '$.situationRecord[0].groupOfLocations.**.alertCMethod2PrimaryPointLocation.alertCLocation.specificLocation."#text"')),
     'sec', coalesce(jsonb_path_query_first(dp.p, '$.situationRecord[0].groupOfLocations.**.alertCMethod4SecondaryPointLocation.alertCLocation.specificLocation."#text"'),
@@ -277,7 +277,7 @@ var (
     'senses', jsonb_path_query_array(dp.p, '$.situationRecord[*].groupOfLocations.**.alertCDirectionCoded."#text"'),
     'works', jsonb_path_query_first(dp.p, '$.situationRecord[0].generalPublicComment ? (@.commentExtension.commentExtended.commentType2."#text" == "roadworksType").comment.values.value."#text"'),
     'line', jsonb_path_query_first(dp.p, '$.situationRecord[0].groupOfLocations.**.gmlLineString.posList."#text"')
-  ) || coalesce((
+  )) || coalesce((
     select jsonb_build_object('restricted', x.lanes_restricted, 'total', x.lanes_total, 'inuse', x.lanes_in_use, 'width', x.residual_width,
                               'closed', x.closed_lanes, 'shoulder', x.hard_shoulder, 'speed', x.speed_limit, 'mgmt', x.mgmt_now, 'sensesNow', x.senses_now)
       from (select f.lanes_restricted, f.lanes_total, f.lanes_in_use, f.residual_width, f.closed_lanes, f.hard_shoulder, f.speed_limit, (count(*) over ())::int as phases_now,
@@ -309,7 +309,7 @@ var (
          r.windows
     from (
       select e.feed_key, e.source_id, e.publication_id, e.road_number, e.event_type,
-             `+strategyPayloadColumn+`, e.overall_end, e.valid_windows,
+             `+strategyPayloadColumn+`, e.entry_static, e.overall_end, e.valid_windows,
              ST_Y(e.geom::geometry) as lat, ST_X(e.geom::geometry) as lon,
              (select count(*) from unnest(e.valid_windows) x where ((upper_inf(x) or upper(x) > $3::timestamptz) and lower(x) <= $4::timestamptz) and (upper_inf(x) or upper(x) > $3::timestamptz))::int as windows,
              coalesce(lower(w.x), e.overall_start) as window_from,

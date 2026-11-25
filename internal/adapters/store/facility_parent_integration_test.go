@@ -52,6 +52,8 @@ func TestAFacilityStateIsCurrentWhileRestatedAndAUnitIsListedOnce(t *testing.T) 
 		`insert into public.db_facilities (equipment_no, station_no, kind, state, state_since, first_seen_at, last_seen_at, source_feed, source_publisher, description)
 		 values ('9990020', '999000920', 'elevator', 'active', now() - interval '7 days', now() - interval '7 days', now() - interval '1 minute', 'db_fasta', 'DB', 'zu Gleis 1'),
 		        ('9990021', '999000920', 'elevator', 'active', now() - interval '7 days', now() - interval '7 days', now() - interval '1 day', 'db_fasta', 'DB', 'zu Gleis 2')`,
+		// The operator's explanation of a state is kept verbatim.
+		`update public.db_facilities set state_explanation = 'under maintenance' where equipment_no = '9990021'`,
 		`insert into public.station_equipment (equipment_id, kind, equipment_no, stop_place_id, description, first_seen_at, last_seen_at, source_feed, source_publisher)
 		 values ('diid:9990020', 'elevator', '9990020', 'de:09998:920', 'zu Gleis 1', now(), now(), 'openstation_netex', 'DB'),
 		        ('diid:9990022', 'escalator', '9990022', 'de:09998:920', 'zur Halle', now(), now(), 'openstation_netex', 'DB'),
@@ -76,8 +78,11 @@ func TestAFacilityStateIsCurrentWhileRestatedAndAUnitIsListedOnce(t *testing.T) 
 		if f.Listing != "" {
 			got[f.ID] += " listed " + f.Listing
 		}
+		if f.StateExplanation != nil {
+			got[f.ID] += " " + *f.StateExplanation
+		}
 	}
-	want := map[string]string{"fasta:9990020": "active db_fasta 9990020", "fasta:9990021": "unknown db_fasta 9990021",
+	want := map[string]string{"fasta:9990020": "active db_fasta 9990020", "fasta:9990021": "unknown db_fasta 9990021 under maintenance",
 		"equipment:diid:9990022": "active openstation_siri_fm 9990022 listed openstation_netex", "equipment:diid:9990023": "active openstation_siri_fm - listed openstation_netex"}
 	if err != nil || len(got) != len(want) || len(fs) != len(want) {
 		t.Fatalf("the station's facilities: %v, %v", got, err)

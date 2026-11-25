@@ -33,3 +33,36 @@ func TestFacilitiesListBrokenFirst(t *testing.T) {
 		t.Errorf("lifts %v %+v", ids(got), got)
 	}
 }
+
+// One row per equipment number: the first, unless it is unknown and a later
+// copy has a state; a row without a number is its own unit. A unit sharing
+// its kind and position with another is marked, even beyond the limit.
+func TestOneRowPerUnitAndTwinsAreMarked(t *testing.T) {
+	no := func(s string) *string { return &s }
+	fs := OnePerUnit([]Facility{
+		{ID: "a", EquipmentNo: no("1"), State: "unknown"}, {ID: "b", EquipmentNo: no("1"), State: "active"},
+		{ID: "c", EquipmentNo: no("1"), State: "inactive"}, {ID: "d", EquipmentNo: no("2"), State: "active"},
+		{ID: "e", EquipmentNo: no("2"), State: "unknown"}, {ID: "f"}, {ID: "g"},
+	})
+	var ids []string
+	for _, f := range fs {
+		ids = append(ids, f.ID)
+	}
+	if !slices.Equal(ids, []string{"b", "d", "f", "g"}) {
+		t.Errorf("one per unit: %v", ids)
+	}
+	if got := OnePerUnit(nil); got == nil || len(got) != 0 {
+		t.Errorf("none: %v", got)
+	}
+	gleis := no("zu Gleis 8/9")
+	all := []Facility{
+		{ID: "x", Kind: "elevator", Position: gleis, State: "active"}, {ID: "y", Kind: "elevator", Position: gleis, State: "unknown"},
+		{ID: "z", Kind: "escalator", Position: gleis, State: "active"},
+	}
+	if l := ListFacilities(all, FacilityQuery{Limit: 1}); len(l.Rows) != 1 || !l.Rows[0].NameShared {
+		t.Errorf("a twin beyond the limit: %+v", l.Rows)
+	}
+	if l := ListFacilities(all, FacilityQuery{Kind: "escalator", Limit: 5}); len(l.Rows) != 1 || l.Rows[0].NameShared {
+		t.Errorf("no twin: %+v", l.Rows)
+	}
+}

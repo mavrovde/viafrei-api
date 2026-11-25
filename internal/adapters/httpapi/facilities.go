@@ -27,6 +27,9 @@ type StationFacility struct {
 	State        string  `json:"state" doc:"active, inactive or unknown: a state older than its family's freshness threshold is unknown. Open enumeration."`
 	SourceFamily string  `json:"sourceFamily"`
 	EquipmentNo  *string `json:"equipmentNo" nullable:"true" doc:"DB's equipment number of the unit, as its source lists it, the number the platform's station facilities check names a unit by; null when the source gives none (the unit is then named by its id)."`
+	// StateExplanation and NameShared: the operator's word and a twin.
+	StateExplanation *string `json:"stateExplanation" nullable:"true" doc:"The operator's explanation of the state, verbatim (not monitored, under maintenance, or the operator's own words); null when it gives none or one that repeats the state (available, not available)."`
+	NameShared       bool    `json:"nameShared" doc:"Another unit of the station has the same kind and position, listed or beyond the limit: name this unit by its number."`
 }
 
 // FacilityCounts counts every facility of the asked kind by state.
@@ -87,7 +90,8 @@ func registerFacilities(api huma.API, s *server, op huma.Operation) {
 		}
 		rows := make([]StationFacility, len(a.Items))
 		for i, f := range a.Items {
-			rows[i] = StationFacility{ID: f.ID, Kind: f.Kind, Position: f.Position, State: f.State, SourceFamily: f.Family, EquipmentNo: f.EquipmentNo}
+			rows[i] = StationFacility{ID: f.ID, Kind: f.Kind, Position: f.Position, State: f.State, SourceFamily: f.Family, EquipmentNo: f.EquipmentNo,
+				StateExplanation: f.StateExplanation, NameShared: f.NameShared}
 		}
 		return &FacilitiesOutput{CacheControl: noStore, Body: FacilitiesEnvelope{
 			Data: StationFacilitiesData{

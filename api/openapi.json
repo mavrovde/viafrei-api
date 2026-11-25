@@ -8035,6 +8035,10 @@
             "description": "elevator, escalator or other. Open enumeration.",
             "type": "string"
           },
+          "nameShared": {
+            "description": "Another unit of the station has the same kind and position, listed or beyond the limit: name this unit by its number.",
+            "type": "boolean"
+          },
           "position": {
             "description": "Where it is, as published (zu Gleis 2); null when not published.",
             "type": [
@@ -8048,6 +8052,13 @@
           "state": {
             "description": "active, inactive or unknown: a state older than its family's freshness threshold is unknown. Open enumeration.",
             "type": "string"
+          },
+          "stateExplanation": {
+            "description": "The operator's explanation of the state, verbatim (not monitored, under maintenance, or the operator's own words); null when it gives none or one that repeats the state (available, not available).",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -8056,7 +8067,9 @@
           "position",
           "state",
           "sourceFamily",
-          "equipmentNo"
+          "equipmentNo",
+          "stateExplanation",
+          "nameShared"
         ],
         "type": "object"
       },

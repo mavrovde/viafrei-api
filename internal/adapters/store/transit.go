@@ -614,7 +614,8 @@ select f.facility_id, f.facility_kind, f.position_text,
             when s.stale_after_s is not null and f.status_observed_at < $3::timestamptz - make_interval(secs => s.stale_after_s) then 'unknown'
             else f.facility_status end,
        f.status_observed_at, f.source_ref, f.equipment_no,
-       case when f.listed_ref <> f.source_ref and f.listed_ref = any($2) then f.listed_ref else '' end
+       case when f.listed_ref <> f.source_ref and f.listed_ref = any($2) then f.listed_ref else '' end,
+       case when lower(btrim(f.state_explanation)) in ('', 'available', 'not available') then null else btrim(f.state_explanation) end
 from (`+stationFacilityOf+`) f
 join (`+relSource+`) s on s.source_ref = f.source_ref
 where f.source_ref = any($2) and `+permitted("f")+`
@@ -644,7 +645,7 @@ n as (select d.station_no from db_stations d where substring(d.ifopt, '` + dhidO
 select 'equipment:' || e.equipment_id facility_id, contract_stop_place_of(e.stop_place_id) stop_place_id, e.kind facility_kind,
        e.description position_text, coalesce(st.state, 'unknown') facility_status,
        coalesce(st.last_seen_at, e.last_seen_at) status_observed_at, coalesce(st.source_feed, e.source_feed) source_ref,
-       'open' display_class, 'public' audience, e.equipment_no, e.source_feed listed_ref
+       'open' display_class, 'public' audience, e.equipment_no, e.source_feed listed_ref, st.status_description state_explanation
 from station_equipment e
 left join station_equipment_state st on st.equipment_id = e.equipment_id
 where e.closed_at is null and substring(e.stop_place_id, '` + dhidOf + `') in (select k.d from k)
@@ -652,22 +653,26 @@ where e.closed_at is null and substring(e.stop_place_id, '` + dhidOf + `') in (s
                    and x.source_feed = any($2))
 union all
 select 'fasta:' || f.equipment_no, (select contract_stop_place_of(d.ifopt) from db_stations d where d.station_no = f.station_no),
-       f.kind, f.description, f.state, f.last_seen_at, f.source_feed, 'open', 'public', f.equipment_no, f.source_feed
+       f.kind, f.description, f.state, f.last_seen_at, f.source_feed, 'open', 'public', f.equipment_no, f.source_feed, f.state_explanation
 from db_facilities f
 where f.station_no in (select n.station_no from n)`
 
 // dhidOf is the DHID a ref names, as contract_stop_place_of reads it.
 const dhidOf = `^(?:dhid:)?([a-z]{2}:[0-9]{5}:[0-9]+)`
 
-// Facilities reads the facilities of a station (features.Transit).
+// Facilities reads the facilities of a station (features.Transit), one row
+// per unit (transit.OnePerUnit), each with the operator's explanation of its
+// state where it adds one (not "available" or "not available", which repeat
+// the state).
 func (s *Store) Facilities(ctx context.Context, station string, families []string, now time.Time) ([]transit.Facility, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.Facility, error) {
 		rows, _ := run(ctx, tx, stationFacilities, station, families, now)
-		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.Facility, error) {
+		fs, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.Facility, error) {
 			var v transit.Facility
-			err := r.Scan(&v.ID, &v.Kind, &v.Position, &v.State, &v.ObservedAt, &v.Family, &v.EquipmentNo, &v.Listing)
+			err := r.Scan(&v.ID, &v.Kind, &v.Position, &v.State, &v.ObservedAt, &v.Family, &v.EquipmentNo, &v.Listing, &v.StateExplanation)
 			return v, err
 		})
+		return transit.OnePerUnit(fs), err
 	})
 }
 

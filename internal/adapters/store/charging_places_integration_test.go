@@ -92,6 +92,17 @@ var placesSeed = []string{
 	placePoint("afir_beta", "r9", "r9k1", "", "iec62196T2", "22", "", "", ""),
 	placeSite("afir_beta", "r10", "bnetza_lsr_70.00989_-30", "", "Kaiweg", "7", "99999", "Nordhafen", "2026-09-01", "70.009892"),
 	placePoint("afir_beta", "r10", "r10k1", "", "iec62196T2", "22", "", "", ""),
+	// Rows the platform's live charging views drop, so a read that loses
+	// their filters lists them and the places and the parity replay turn
+	// red: a site whose name marks it private (600 m), a deleted site
+	// (700 m) and a deleted point on the operator's site.
+	placeSite("afir_alpha", "x1", "Privatparkplatz Hafen", "", "", "", "", "", "", "70.005396"),
+	placePoint("afir_alpha", "x1", "x1k1", "", "iec62196T2", "11", "", "", ""),
+	placeSite("afir_alpha", "x2", "Abgerissen", "", "", "", "", "", "", "70.006295"),
+	placePoint("afir_alpha", "x2", "x2k1", "", "iec62196T2", "11", "", "", ""),
+	`update public.charging_sites set deleted_at = now() - interval '1 day' where site_id = 'x2'`,
+	placePoint("afir_alpha", "a1", "a1k9", "XX*QPK*E9", "iec62196T2", "300", "", "", ""),
+	`update public.charging_points set deleted_at = now() - interval '1 day' where point_key = 'a1k9'`,
 }
 
 func placesService(st *store.Store) *features.Service {

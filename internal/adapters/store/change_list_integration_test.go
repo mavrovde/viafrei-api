@@ -473,7 +473,13 @@ func TestTheOSMStationsWithoutAPriceAreTheUnheldFuelAmenities(t *testing.T) {
 		poi(9970000004, "Tank Zwilling", 0.01, 0),  // a held station 100 m away
 		poi(9970000005, "Tank Draussen", 0, 0.25),  // outside the boundary
 		`insert into public.fuel_stations (id, name, geom, source, source_feed) values
-		 ('99700000-0000-4000-8000-000000000001', 'Held', st_setsrid(st_makepoint(-19.5 + 0.01, 74.5 + 0.0009), 4326)::geography, 'tankerkoenig', 'tankerkoenig')`)
+		 ('99700000-0000-4000-8000-000000000001', 'Held', st_setsrid(st_makepoint(-19.5 + 0.01, 74.5 + 0.0009), 4326)::geography, 'tankerkoenig', 'tankerkoenig')`,
+		// A deleted station beside Tank Weit holds it no more, and a closed
+		// amenity is none: a read that loses either filter changes the list.
+		`insert into public.fuel_stations (id, name, geom, source, source_feed, deleted_at) values
+		 ('99700000-0000-4000-8000-000000000002', 'Gone', st_setsrid(st_makepoint(-19.5, 74.5 + 0.0301), 4326)::geography, 'tankerkoenig', 'tankerkoenig', now())`,
+		poi(9970000006, "Tank Zu", 0, 0.005),
+		`update public.osm_pois set closed_at = now() where osm_id = 9970000006`)
 	q := energy.FuelQuery{At: geo.Point{Lat: 74.5, Lon: -19.5}, RadiusM: 30000}
 	names := func(limit int, q energy.FuelQuery) []string {
 		t.Helper()

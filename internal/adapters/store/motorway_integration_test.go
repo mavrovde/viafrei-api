@@ -48,6 +48,23 @@ var motorwaySeed = []string{
 	 values ('fs.s2_1', 'mq.s2', 'impossible', now() - interval '1 minute', now(), now(), 'los_nrw_lanes', 'p')`,
 	`insert into public.tmc_locations (cid, tabcd, lcd, lcl_version, class, tcd, stcd, name, road_number, geom)
 	 values (58, 1, 990001, '1.0', 'P', 1, 1, 'Haar', 'A99', 'SRID=4326;POINT(11.61 48.1)'), (58, 1, 990002, '1.0', 'P', 1, 1, 'Ottobrunn', 'A99', 'SRID=4326;POINT(11.71 48.2)')`,
+	// Rows the platform's live views drop, so a read that loses their
+	// filters lists them: a closed site, a site on a slip road, a
+	// confidential reading, a location of another table and a deleted plan.
+	`insert into public.los_sites (site_id, carriageway, geom, road, first_seen_at, last_seen_at, source_feed, source_publisher, closed_at, confidentiality)
+	 values ('x1', 'hfb', 'SRID=4326;POINT(11.62 48.1)', 'A99', now(), now(), 'los_nrw_sites', 'p', now() - interval '1 hour', null),
+	        ('x2', 'exit', 'SRID=4326;POINT(11.63 48.1)', 'A99', now(), now(), 'los_nrw_sites', 'p', null, null),
+	        ('x3', 'hfb', 'SRID=4326;POINT(11.64 48.1)', 'A99', now(), now(), 'los_nrw_sites', 'p', null, 'restricted')`,
+	`insert into public.los_state (site_id, status, measured_at, status_since, last_seen_at, source_feed, source_publisher)
+	 select x, 'congested', now() - interval '2 minutes', now(), now(), 'los_nrw', 'p' from unnest(array['x1', 'x2', 'x3']) x`,
+	`insert into public.los_lane_sites (lane_id, site_id, lane, first_seen_at, last_seen_at, source_feed, source_publisher, closed_at)
+	 values ('fs.s2_9', 'mq.s2', 9, now(), now(), 'los_nrw_lane_sites', 'p', now() - interval '1 hour')`,
+	`insert into public.los_lane_state (lane_id, site_id, status, measured_at, status_since, last_seen_at, source_feed, source_publisher)
+	 values ('fs.s2_9', 'mq.s2', 'impossible', now() - interval '1 minute', now(), now(), 'los_nrw_lanes', 'p')`,
+	`insert into public.tmc_locations (cid, tabcd, lcd, lcl_version, class, tcd, stcd, name, road_number, geom)
+	 values (59, 1, 990003, '1.0', 'P', 1, 1, 'Elsewhere', 'A99', 'SRID=4326;POINT(11.62 48.1)')`,
+	`insert into public.road_events (feed_key, source_id, publication_id, version, payload, event_type, road_number, overall_start, overall_end, source_feed, first_seen_at, updated_at, deleted_at)
+	 values ('roadworks_akd', 's', 'p9', 1, '{"situationRecord": [{}]}', 'MaintenanceWorks', 'A99', now() - interval '1 hour', now() + interval '1 hour', 'roadworks_akd', now(), now(), now())`,
 	`insert into public.road_events (feed_key, source_id, publication_id, version, payload, event_type, road_number, overall_start, overall_end, source_feed, first_seen_at, updated_at)
 	 values ('roadworks_akd', 's', 'p1', 1, '{"situationRecord": [{"cause": [{"causeDescription": [{"values": [{"value": [{"#text": "Mäharbeiten"}]}]}]}]}]}', 'MaintenanceWorks', 'A99',
 	         now() - interval '1 hour', now() + interval '1 hour', 'roadworks_akd', now(), now())`,

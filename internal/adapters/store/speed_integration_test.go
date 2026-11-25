@@ -98,7 +98,11 @@ values ('osm:node12230389900', 'fixed', 'speed', st_setsrid(st_makepoint(-19.651
 // once its family's version moves, the next read cuts by it. Before a
 // versions read states the gazetteer's, every read reads them.
 func TestTheOfficialCellsAreKeptUnderTheirFamiliesVersions(t *testing.T) {
-	st, cp := private(t, speedCutRows...)
+	// A closed official camera in the middle Gemeinde: the platform's live
+	// view drops it, so a read that loses the filter cuts that Gemeinde.
+	st, cp := private(t, append(slices.Clone(speedCutRows), `create temp table c0 as select * from speed_enforcement s where s.source_feed = 'speed_alpha' and s.kind = 'fixed' limit 1;
+	      update c0 set id = 990776, external_id = 'cells-990776', closed_at = now() - interval '1 day', geom = st_setsrid(st_makepoint(-19.64, 75.0), 4326)::geography;
+	      insert into speed_enforcement select * from c0`)...)
 	fams := families(t, st, "roads")
 	q := roads.SpeedQuery{At: geo.Point{Lat: 75.0, Lon: -19.65}, RadiusM: 30000, Today: time.Date(2026, 3, 30, 0, 0, 0, 0, time.UTC), Limit: 10}
 	exec := func(sql string) {

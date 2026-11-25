@@ -76,7 +76,27 @@ func TestTrainInterchangeReadsThePairedStops(t *testing.T) {
 		   on conflict (ledger, key) do update set last_success_at = excluded.last_success_at`,
 		fmt.Sprintf(`insert into public.transit_delays (observed_at, feed_ts, trip_id, stop_id, stop_sequence, delay_s, schedule_relationship, source)
 		   select distinct now() - interval '2 minutes', now() - interval '2 minutes', st.trip_id, null::text, null::int, null::int, 'CANCELED', 'delfi_rt_tu'
-		   from public.stop_times st where st.stop_id like '%[1]s%%' and st.deleted_at is null`, dhid))
+		   from public.stop_times st where st.stop_id like '%[1]s%%' and st.deleted_at is null`, dhid),
+		// Rows the platform's live timetable views drop, so a read that
+		// loses their filters pairs or plans them: a deleted copy of the
+		// station's stop; each call at the station again, deleted, half a
+		// minute later; each of its trips again under a deleted trip of
+		// another destination; and again under a deleted route of another
+		// line.
+		fmt.Sprintf(`create temp table x_st as select * from public.stop_times where stop_id like '%[1]s%%' and deleted_at is null;
+		  insert into public.stops select (jsonb_populate_record(null::public.stops, to_jsonb(p) || jsonb_build_object('id', p.id || ':xs', 'deleted_at', now()))).*
+		    from public.stops p where (p.gtfs_feed_key, p.id) in (select gtfs_feed_key, stop_id from x_st);
+		  insert into public.stop_times select (jsonb_populate_record(null::public.stop_times, to_jsonb(s) || jsonb_build_object(
+		      'stop_sequence', s.stop_sequence - 1000, 'departure', s.departure + interval '30 seconds', 'deleted_at', now()))).* from x_st s;
+		  insert into public.trips select (jsonb_populate_record(null::public.trips, to_jsonb(t) || jsonb_build_object('id', t.id || ':xt', 'headsign', 'Gelöscht', 'deleted_at', now()))).*
+		    from public.trips t where (t.gtfs_feed_key, t.id) in (select gtfs_feed_key, trip_id from x_st);
+		  insert into public.routes select (jsonb_populate_record(null::public.routes, to_jsonb(r) || jsonb_build_object('id', r.id || ':xr', 'short_name', 'X99', 'deleted_at', now()))).*
+		    from public.routes r where (r.gtfs_feed_key, r.id) in (select t.gtfs_feed_key, t.route_id from public.trips t where (t.gtfs_feed_key, t.id) in (select gtfs_feed_key, trip_id from x_st));
+		  insert into public.trips select (jsonb_populate_record(null::public.trips, to_jsonb(t) || jsonb_build_object('id', t.id || ':xr', 'route_id', t.route_id || ':xr'))).*
+		    from public.trips t where (t.gtfs_feed_key, t.id) in (select gtfs_feed_key, trip_id from x_st);
+		  insert into public.stop_times select (jsonb_populate_record(null::public.stop_times, to_jsonb(s) || jsonb_build_object('trip_id', s.trip_id || x.k))).*
+		    from public.stop_times s cross join (values (':xt'), (':xr')) x(k)
+		   where (s.gtfs_feed_key, s.trip_id) in (select gtfs_feed_key, trip_id from x_st) and s.deleted_at is null`, dhid))
 	// The fixture's register files no Trip Updates family; a board adds it
 	// (boardFamilies).
 	fams := append(every(t), transit.TripUpdatesFamily)

@@ -41,6 +41,11 @@ var aroundSeed = []string{
 	    st_setsrid(st_makepoint(-19.5, 74.505), 4326), st_setsrid(st_makepoint(-19.5, 74.505), 4326), 'h3', now(), now()),
 	   ('ctx_old', 'p', 'b2', 'street_parking', 'disc', 'Alt', '{}',
 	    st_setsrid(st_makepoint(-19.5, 74.5001), 4326), st_setsrid(st_makepoint(-19.5, 74.5001), 4326), 'h4', now(), now())`,
+	// Bays the platform's live context view drops, a closed one and one
+	// it may not answer, so a read that loses its filter lists them.
+	`insert into public.road_context_features (source_feed, source_publisher, feature_id, kind, variant, name, props, geom, anchor, content_hash, first_seen_at, last_seen_at, closed_at, answerable) values
+	   ('ctx_now', 'p', 'x1', 'street_parking', 'ticket', 'Geschlossen', '{}', st_setsrid(st_makepoint(-19.5, 74.5001), 4326), st_setsrid(st_makepoint(-19.5, 74.5001), 4326), 'h5', now(), now(), now(), true),
+	   ('ctx_now', 'p', 'x2', 'street_parking', 'ticket', 'Unbeantwortbar', '{}', st_setsrid(st_makepoint(-19.5, 74.5001), 4326), st_setsrid(st_makepoint(-19.5, 74.5001), 4326), 'h6', now(), now(), null, false)`,
 }
 
 func TestParkingAroundReadsTheToolsStatements(t *testing.T) {

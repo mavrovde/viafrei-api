@@ -22,6 +22,12 @@ var roadStatusSeed = append(slices.Clone(motorwaySeed[:3]),
 	        ('nms_events', 's', 'n1', 1, '{"situationRecord": [{}]}', 'roadClosed', 'A99', now() - interval '1 hour', now() + interval '1 hour', 'nms_events', now(), now(), now() - interval '5 minutes'),
 	        ('routing_bab', 'r', 'g1', 1, '{"situationRecord": [{"cause": [{"causeDescription": [{"values": [{"value": [{"#text": "Unfall", "@lang": "de"}]}]}]}], "alternativeRoute": [{"roadNumber": {"#text": "A92"}}]}]}',
 	         'reroutingManagement', 'A99', now() - interval '1 hour', now() + interval '1 hour', 'routing_bab', now(), now(), now())`,
+	// Deleted entries, a works plan and a detour, the platform's live
+	// events view drops, so a read that loses its filter counts them.
+	`insert into public.road_events (feed_key, source_id, publication_id, version, payload, event_type, road_number, overall_start, overall_end, source_feed, first_seen_at, updated_at, last_seen_at, deleted_at)
+	 values ('roadworks_bast', 's', 'b9', 1, '{"situationRecord": [{}]}', 'MaintenanceWorks', 'A99', now() - interval '1 day', now() + interval '1 day', 'roadworks_bast', now(), now(), now() - interval '1 hour', now() - interval '1 minute'),
+	        ('routing_bab', 'r', 'g9', 1, '{"situationRecord": [{"alternativeRoute": [{"roadNumber": {"#text": "A93"}}]}]}',
+	         'reroutingManagement', 'A99', now() - interval '1 hour', now() + interval '1 hour', 'routing_bab', now(), now(), now(), now() - interval '1 minute')`,
 	`insert into public.feed_runs (feed_key, started_at, finished_at, status) values ('roadworks_bast', now() - interval '2 minutes', now() - interval '1 minute', 'ok')`,
 	`insert into public.feed_catalog (feed_key, provider, display_name, licence_id, cadence_s) select k, 'p', k, (select licence_id from public.feed_catalog limit 1), 300 from unnest(array['routing_bab', 'routing_dvl_ni']) k on conflict (feed_key) do update set cadence_s = 300, closed_at = null`,
 	`insert into control.feed_state (ledger, key, updated_at, last_success_at) values ('feed', 'routing_bab', now(), now()), ('feed', 'routing_dvl_ni', now(), now() - interval '1 day')

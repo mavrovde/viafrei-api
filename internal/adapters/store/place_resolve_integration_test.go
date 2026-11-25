@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/domain/places"
 )
 
@@ -68,7 +69,8 @@ func TestResolveTheWorldOverTheStatements(t *testing.T) {
 		wg.Go(func() {
 			for i := range next {
 				e := w.Expect[i]
-				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				// Under the test's context, so the parity replay reads the world too.
+				ctx, cancel := context.WithTimeout(store.WithTest(context.Background(), t), 30*time.Second)
 				got, err := places.Resolve(ctx, reads, e.Q, e.Lang)
 				cancel()
 				if err != nil || !reflect.DeepEqual(norm(got), norm(e.R)) {

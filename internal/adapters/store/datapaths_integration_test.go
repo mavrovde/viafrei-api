@@ -353,7 +353,13 @@ func TestStationRecordAndAlerts(t *testing.T) {
 		 values ('delfi_rt_sa', 'delfi_rt_sa', 'a1', 'Bauarbeiten', '{RE1}', '{de:99999:1}', '{02000}', 'k1', 'h', '[]', now()),
 		        ('delfi_siri_sx', 'delfi_siri_sx', 'b1', 'Twin', '{RE1}', '{}', '{02000}', 'k1', 'h', '[{"start":"2000-01-01T00:00:00Z"}]', now()),
 		        ('delfi_siri_sx', 'delfi_siri_sx', 'b2', 'Stale', '{RE1}', '{de:99999:1}', '{02000}', 'k2', 'h', '[]', now() - interval '2 days'),
-		        ('delfi_rt_sa', 'delfi_rt_sa', 'a2', 'Over', '{RE1}', '{de:99999:1}', '{02000}', 'k3', 'h', '[{"end":"2000-01-01T00:00:00Z"}]', now())`)
+		        ('delfi_rt_sa', 'delfi_rt_sa', 'a2', 'Over', '{RE1}', '{de:99999:1}', '{02000}', 'k3', 'h', '[{"end":"2000-01-01T00:00:00Z"}]', now())`,
+		// Alerts the platform's live alerts view drops, a closed one and a
+		// confidential one, so a read that loses its filter lists them and
+		// the alerts and the parity replay turn red.
+		`insert into public.delfi_service_alerts (source_id, source_feed, alert_id, header, line_names, stop_ids, kreise, dedupe_key, content_hash, active_periods, last_seen_at, closed_at, confidentiality)
+		 values ('delfi_rt_sa', 'delfi_rt_sa', 'c1', 'Closed', '{RE1}', '{de:99999:1}', '{02000}', 'k4', 'h', '[]', now(), now() - interval '1 hour', null),
+		        ('delfi_rt_sa', 'delfi_rt_sa', 'c2', 'Restricted', '{RE1}', '{de:99999:1}', '{02000}', 'k5', 'h', '[]', now(), null, 'restricted')`)
 	fams := append(every(t), "delfi_rt_sa", "delfi_siri_sx")
 	for _, id := range []string{"99001", "8099002", "1:de:99999:1"} {
 		r, err := st.StationRecord(bounded(t), id, fams)

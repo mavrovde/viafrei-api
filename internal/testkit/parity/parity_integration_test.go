@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -475,7 +476,7 @@ func noteOwners(t *testing.T) parity.Owners {
 // compare asks every case of the bundle pinned under name and compares the
 // facts; it returns the bundle and the asker it used, whose store and
 // connections a caller reuses rather than opening a second one.
-func compare(t *testing.T, name string) (parity.Bundle, asker) {
+func compare(t *testing.T, name string, deferred []parity.Deferral) (parity.Bundle, asker) {
 	t.Helper()
 	b, err := parity.Load(os.DirFS(dir), name)
 	if err != nil {
@@ -494,6 +495,10 @@ func compare(t *testing.T, name string) (parity.Bundle, asker) {
 	a := open(t)
 	compared := map[string][]string{}
 	facts, differ := 0, 0
+	// The report of #245: the deferred differences per class and per tool,
+	// and the deferrals nothing in the bundle needs any more.
+	perClass := map[string]map[string]int{}
+	used := make([]bool, len(deferred))
 	// Each case is a subtest of its own: a case is a read (and a refresh it
 	// waits on), and the bundle's cases together outgrow one leaf's bound
 	// (TST-012).
@@ -503,7 +508,23 @@ func compare(t *testing.T, name string) (parity.Bundle, asker) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			d := parity.Diff(c.Facts, got)
+			var d []string
+			for _, line := range parity.Diff(c.Facts, got) {
+				i := parity.Defers(deferred, c.Operation, line)
+				if i < 0 {
+					d = append(d, line)
+					continue
+				}
+				used[i] = true
+				cl := deferred[i].Class
+				if deferred[i].BlindSpot() {
+					cl += " (blind spot)"
+				}
+				if perClass[cl] == nil {
+					perClass[cl] = map[string]int{}
+				}
+				perClass[cl][c.Operation]++
+			}
 			if len(d) > 0 {
 				t.Errorf("case %s (%s, MCP %q): %d of %d facts differ:\n  %s", c.ID, c.Operation, c.Counterpart, len(d), len(c.Facts), strings.Join(d, "\n  "))
 			}
@@ -515,7 +536,21 @@ func compare(t *testing.T, name string) (parity.Bundle, asker) {
 	for op, ids := range compared {
 		t.Logf("compared %s: %d case(s): %s", op, len(ids), strings.Join(ids, ", "))
 	}
-	t.Logf("bundle %s: %d case(s), %d fact(s) compared, %d difference(s)", name, len(b.Cases), facts, differ)
+	t.Logf("bundle %s: %d case(s), %d fact(s) compared, %d difference(s) open", name, len(b.Cases), facts, differ)
+	for _, cl := range slices.Concat(parity.DeferClasses, []string{"C (blind spot)"}) {
+		ops := slices.Sorted(maps.Keys(perClass[cl]))
+		n, by := 0, make([]string, 0, len(ops))
+		for _, op := range ops {
+			n += perClass[cl][op]
+			by = append(by, fmt.Sprintf("%s %d", op, perClass[cl][op]))
+		}
+		t.Logf("deferred class %s: %d difference(s): %s", cl, n, strings.Join(by, ", "))
+	}
+	for i, u := range used {
+		if !u {
+			t.Errorf("%s line %+v defers a difference the bundle %s no longer has: remove it", parity.DeferredFile, deferred[i], name)
+		}
+	}
 	return b, a
 }
 
@@ -524,7 +559,11 @@ func compare(t *testing.T, name string) (parity.Bundle, asker) {
 // evidence.
 func TestParity(t *testing.T) {
 	req.Covers(t, "TEST-009", "FR-GEN-002", "CON-007")
-	b, a := compare(t, platform())
+	deferred, err := parity.LoadDeferred(os.DirFS(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, a := compare(t, platform(), deferred)
 	switch b.Producer {
 	case parity.ProducerAPI:
 		t.Logf("bundle %s was recorded by the API itself: it is a regression lock, not parity evidence; parity needs a bundle the MCP side produced", platform())
@@ -570,7 +609,7 @@ func TestRegressionLock(t *testing.T) {
 	if *record {
 		recordBundle(t)
 	}
-	if b, _ := compare(t, buildinfo.Unsynced); b.Producer != parity.ProducerAPI {
+	if b, _ := compare(t, buildinfo.Unsynced, nil); b.Producer != parity.ProducerAPI {
 		t.Errorf("the regression lock %s is produced by %q; it is the API's own recording", buildinfo.Unsynced, b.Producer)
 	}
 }

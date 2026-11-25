@@ -1,0 +1,46 @@
+# The differences of the MCP side's bundle that are judged and deferred
+# (owner order 2026-11-25: the release blocks on class A only; B and C are
+# deferred and listed). Columns: class, operation, kind, fact pattern, reason.
+# [*] stands for any key; a pattern names the facts under it too.
+#
+# D: the producer's recording, to be fixed on the MCP side.
+D	listSources	changed	data[*].shareAlike	the producer's catalogue rows for these families state no share-alike flag; the register states it
+D	getStationPage	changed	data.pageUrl	the producer asks in English where the question names no language; the page link follows the asked language
+D	getStationPage	changed	data.sections[header].asOf	the producer stamps the header with its wall clock, not the fixture's clock
+D	getStationPage	*	data.sections[departures]	the question's key reads no DB Timetables, so the API withholds DB's board; the API-only question station-page-db asks with the key, and the regression lock records ICE 571, RE 1 and S 3 as the platform lists them
+D	getStationPage	*	data.sections[rail_ampel]	the lamp judges the board the key may read: without DB Timetables there is no train to judge; with it the lamp is red, 1 of 3 cancelled, as the platform's
+D	getStationPage	missing	meta.attribution[db_timetables]	DB Timetables is credited where the key reads it
+# C: correct extras the API states and credits.
+C	listSources	extra	data[*].staleAfterS	the register's stale threshold of a family
+C	getStationPage	extra	data.sections[lifts]	the page's lift section, as the site shows it
+C	getStationPage	extra	data.sections[platforms]	the page's platform section, as the site shows it
+C	getStationPage	extra	data.sections[step_free_now]	the page's step-free section, as the site shows it
+C	getStationPage	extra	data.sections[service_alerts]	the page's service-alert section, as the site shows it
+C	getStationPage	extra	data.sections[parking_charging]	the page's parking and charging section, as the site shows it
+C	listParkingOptions	extra	data[*].nearbyAmenities	the amenities near a site
+C	listMotorwayParking	extra	data[*].nearbyAmenities	the amenities near a site
+C	listMotorwayParking	extra	data[*].distanceM	a site's distance from the asked position
+C	getPlaceOverview	extra	data.parking.sites[*].nearbyAmenities	the amenities near a site
+C	listStationDepartures	extra	data.window.timetableLoadedAt	when the timetable read was loaded
+C	listStationDepartures	extra	data.window.timetableUntil	the last day the timetable covers
+C	getTrainBoard	extra	data.capped	whether the board was cut at the limit
+C	getTrainBoard	extra	data.degraded	whether the board is a degraded read
+C	getTrainBoard	extra	data.evaNumbers	the station's EVA numbers read
+C	getTrainBoard	extra	data.interchange	the interchange the board names
+C	getTrainBoard	extra	data.departures[*].stationPart	the part of the station a departure leaves from
+C	listFuelOptions	extra	data[*].openingHoursAsOf	when the opening hours were read
+C	listFuelOptions	extra	data[*].openingObservedAt	when the station was seen open
+C	getMotorwayConditions	extra	data.motorway	the motorway block of the answer
+C	getMotorwayConditions	extra	data.roadStatus	blind spot: the producer never projects the road status block, so these facts are not judged at all; the platform states the same rows in its answer text
+C	listStationFacilities	extra	data.facilities[*].nameShared	whether a unit's name is shared by another
+C	listStationFacilities	extra	data.facilities[*].stateExplanation	the operator's explanation of a unit's state
+C	listStationFacilities	extra	data.platforms	the station's platforms
+C	describeLocation	extra	data.gemeinde	the Gemeinde of the position
+C	describeLocation	extra	data.governmentRegion	the government region of the position
+C	describeLocation	extra	data.junction	the nearest junction
+C	listTransitDisruptions	extra	data.alertsCoverage	which Länder the alerts cover and when they were seen
+C	listNearby	extra	data.junctionsFrom	the junctions' source
+C	listNearby	extra	data.osmParking	the OSM parking near the position
+C	listStopBoards	extra	data.stops[*].location	a stop's position
+# B: the same meaning in another shape.
+B	resolvePlace	extra	data.name	the same name the resolved label carries

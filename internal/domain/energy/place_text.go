@@ -21,108 +21,26 @@ import (
 const German = "de"
 
 var (
-	houseDigit     = regexp.MustCompile(`[1-9]`)
-	starRun        = regexp.MustCompile(`\s*\*+\s*`)
-	fiveDigits     = regexp.MustCompile(`^\d{5}$`)
-	fourDigits     = regexp.MustCompile(`^\d{4}$`)
-	fiveDigitGroup = regexp.MustCompile(`\d+`)
-	postcodeIn     = regexp.MustCompile(`\b(\d{5})\b`)
-	trailingParen  = regexp.MustCompile(`\s*\([^()]*\)$`)
-	underscoreID   = regexp.MustCompile(`^[\p{L}\p{N}.-]+(?:_[\p{L}\p{N}.-]+)+$`)
-	upperIDChars   = regexp.MustCompile(`^[\p{Lu}\p{N}_;,.\s/#:-]+$`)
-	lowerLetter    = regexp.MustCompile(`\p{Ll}`)
-	digitOrUnder   = regexp.MustCompile(`[\d_]`)
-	anyDigit       = regexp.MustCompile(`\d`)
-	strWord        = regexp.MustCompile(`(strasse|str)( |$)`)
-	addressStr     = regexp.MustCompile(`str(?:\.|asse\b|\b)`)
-	nonWordRun     = regexp.MustCompile(`[^\p{L}\p{N}]+`)
-	domesticPlug   = regexp.MustCompile(`^domestic([a-p])$`)
+	postcodeIn    = regexp.MustCompile(`\b(\d{5})\b`)
+	trailingParen = regexp.MustCompile(`\s*\([^()]*\)$`)
+	underscoreID  = regexp.MustCompile(`^[\p{L}\p{N}.-]+(?:_[\p{L}\p{N}.-]+)+$`)
+	upperIDChars  = regexp.MustCompile(`^[\p{Lu}\p{N}_;,.\s/#:-]+$`)
+	lowerLetter   = regexp.MustCompile(`\p{Ll}`)
+	digitOrUnder  = regexp.MustCompile(`[\d_]`)
+	anyDigit      = regexp.MustCompile(`\d`)
+	strWord       = regexp.MustCompile(`(strasse|str)( |$)`)
+	addressStr    = regexp.MustCompile(`str(?:\.|asse\b|\b)`)
+	nonWordRun    = regexp.MustCompile(`[^\p{L}\p{N}]+`)
+	domesticPlug  = regexp.MustCompile(`^domestic([a-p])$`)
 )
 
-// houseNumberShown is a house number worth printing: one with a digit
-// other than 0.
-func houseNumberShown(raw *string) *string {
-	if raw == nil {
-		return nil
-	}
-	t := strings.TrimSpace(*raw)
-	if t == "" || !houseDigit.MatchString(t) {
-		return nil
-	}
-	return &t
-}
+func houseNumberShown(raw *string) *string { return places.HouseNumberShown(raw) }
 
-// streetLine is the street and its number as one line; a street that ends
-// in its own number already is not given it twice.
-func streetLine(street, houseNumber *string) *string {
-	name := ""
-	if street != nil {
-		name = strings.TrimSpace(starRun.ReplaceAllString(*street, " "))
-	}
-	if name == "" {
-		return nil
-	}
-	no := houseNumberShown(houseNumber)
-	if no == nil {
-		return &name
-	}
-	var spelled strings.Builder
-	for i, ch := range strings.Join(strings.Fields(*no), "") {
-		if i > 0 {
-			spelled.WriteString(`\s*`)
-		}
-		spelled.WriteString(regexp.QuoteMeta(string(ch)))
-	}
-	if regexp.MustCompile(`(?i)\S\s+` + spelled.String() + `$`).MatchString(name) {
-		return &name
-	}
-	out := name + " " + *no
-	return &out
-}
+func streetLine(street, houseNumber *string) *string { return places.StreetLine(street, houseNumber) }
 
-// postcodeEdge is the white space the platform trims off a postcode (not
-// the other Unicode spaces).
-func postcodeEdge(r rune) bool {
-	return r == ' ' || r == '\t' || r == '\n' || r == '\v' || r == '\f' || r == '\r' || r == ' '
-}
+func postcodeShown(raw *string) *string { return places.PostcodeShown(raw) }
 
-// postcodeShown is a postcode as printed: five digits, four given their
-// leading 0, or the one five-digit group of a longer text.
-func postcodeShown(raw *string) *string {
-	if raw == nil {
-		return nil
-	}
-	t := strings.TrimFunc(*raw, postcodeEdge)
-	if fiveDigits.MatchString(t) {
-		return &t
-	}
-	if fourDigits.MatchString(t) {
-		s := "0" + t
-		return &s
-	}
-	var groups []string
-	for _, g := range fiveDigitGroup.FindAllString(t, -1) {
-		if len(g) == 5 {
-			groups = append(groups, g)
-		}
-	}
-	if len(groups) == 1 {
-		return &groups[0]
-	}
-	return nil
-}
-
-// townLine is the postcode and the town as one line, or "".
-func townLine(postcode, town *string) string {
-	var parts []string
-	if p := postcodeShown(postcode); p != nil && *p != "" {
-		parts = append(parts, *p)
-	}
-	if town != nil && strings.TrimSpace(*town) != "" {
-		parts = append(parts, strings.TrimSpace(*town))
-	}
-	return strings.Join(parts, " ")
-}
+func townLine(postcode, town *string) string { return places.TownLine(postcode, town) }
 
 // isRecordIDName tells a name that is a record's id rather than a name.
 func isRecordIDName(name string) bool {

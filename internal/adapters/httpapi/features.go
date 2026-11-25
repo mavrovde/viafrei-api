@@ -51,6 +51,7 @@ type Features interface {
 	ParkingBays(ctx context.Context, key access.Record, q parking.BayQuery) (features.BaysAnswer, error)
 	TrainBoard(ctx context.Context, key access.Record, q features.TrainBoardQuery) (features.TrainBoardAnswer, error)
 	Places(ctx context.Context, key access.Record, q places.Query) (features.Answer[places.Place], error)
+	ResolvePlace(ctx context.Context, key access.Record, text string) (features.ResolveAnswer, error)
 	FuelStations(ctx context.Context, key access.Record, q energy.FuelQuery) (features.FuelStations, error)
 	FuelStation(ctx context.Context, key access.Record, id string, held time.Duration) (energy.FuelStationPage, features.Answer[struct{}], error)
 	ChargingSite(ctx context.Context, key access.Record, id string, statusMaxAge time.Duration) (features.Answer[energy.Site], error)

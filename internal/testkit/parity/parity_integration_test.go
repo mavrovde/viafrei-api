@@ -212,7 +212,7 @@ func principal(c parity.Case) auth.Principal {
 func (a asker) ask(t *testing.T, c parity.Case) []byte {
 	t.Helper()
 	now := func() time.Time { return c.Now }
-	svc := features.New(features.Repositories{Register: a.st, Charging: a.st, Parking: a.st, Places: a.st, Roads: a.st, Weather: a.st, Rules: a.st, Transit: a.st, Fuel: a.st, Hydrogen: a.st, Speed: a.st, Sharing: a.st, Addresses: a.st, Pois: a.st, Locations: a.st, Disruptions: a.st, Nearby: a.st, Lorry: a.st, Catalogue: a.st, National: a.st, Affected: a.st, Coverage: a.st, States: a.st, TrainBoards: a.st, Bays: a.st}, wire.FeatureSettings(a.cfg), now)
+	svc := features.New(features.Repositories{Register: a.st, Charging: a.st, Parking: a.st, Places: a.st, Resolver: a.st, Roads: a.st, Weather: a.st, Rules: a.st, Transit: a.st, Fuel: a.st, Hydrogen: a.st, Speed: a.st, Sharing: a.st, Addresses: a.st, Pois: a.st, Locations: a.st, Disruptions: a.st, Nearby: a.st, Lorry: a.st, Catalogue: a.st, National: a.st, Affected: a.st, Coverage: a.st, States: a.st, TrainBoards: a.st, Bays: a.st}, wire.FeatureSettings(a.cfg), now)
 	svc.WithRefreshes(a.refreshes)
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Config: a.cfg, Build: buildinfo.Info{Version: "parity", Commit: "parity"}, ContractVersion: dbcontract.ContractVersion, Now: now,

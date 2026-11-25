@@ -76,27 +76,29 @@ type Repositories struct {
 	ChargingPlaces ChargingPlaces
 	Parking        Parking
 	Places         Places
-	Roads          Roads
-	Weather        Weather
-	Rules          Rules
-	Transit        Transit
-	Fuel           Fuel
-	Hydrogen       Hydrogen
-	Speed          Speed
-	Sharing        Sharing
-	Addresses      Addresses
-	Pois           Pois
-	Locations      Locations
-	Disruptions    Disruptions
-	Nearby         Nearby
-	Lorry          Lorry
-	Catalogue      Catalogue
-	National       National
-	Affected       Affected
-	Coverage       Coverage
-	States         States
-	TrainBoards    TrainBoards
-	Bays           Bays
+	// Resolver is the place resolver's reads.
+	Resolver    Resolver
+	Roads       Roads
+	Weather     Weather
+	Rules       Rules
+	Transit     Transit
+	Fuel        Fuel
+	Hydrogen    Hydrogen
+	Speed       Speed
+	Sharing     Sharing
+	Addresses   Addresses
+	Pois        Pois
+	Locations   Locations
+	Disruptions Disruptions
+	Nearby      Nearby
+	Lorry       Lorry
+	Catalogue   Catalogue
+	National    National
+	Affected    Affected
+	Coverage    Coverage
+	States      States
+	TrainBoards TrainBoards
+	Bays        Bays
 }
 
 // Settings are the tunables of the use cases.

@@ -92,6 +92,8 @@ type fakeFeatures struct {
 	gotFuel       energy.FuelQuery
 	places        features.Answer[places.Place]
 	gotPlaces     places.Query
+	resolved      features.ResolveAnswer
+	gotResolve    string
 	facilities    features.StationFacilities
 	gotFacil      transit.FacilityQuery
 	hydrogen      features.HydrogenStations

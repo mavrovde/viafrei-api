@@ -8468,6 +8468,88 @@
         ],
         "type": "object"
       },
+      "ResolvePlaceEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "description": "The place; null when the text names no one place (none, or several alike).",
+            "properties": {
+              "alternatives": {
+                "description": "The other places of the same name the label names; empty when none.",
+                "items": {
+                  "$ref": "#/components/schemas/ResolvedAlternative"
+                },
+                "type": "array"
+              },
+              "districtCode": {
+                "description": "The municipality key (AGS) of a town; null for any other place.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kind": {
+                "description": "The kind of the place.",
+                "type": "string"
+              },
+              "label": {
+                "description": "What the answer says of the place, with its kind and the alternatives where the name is shared.",
+                "type": "string"
+              },
+              "location": {
+                "$ref": "#/components/schemas/Position"
+              },
+              "name": {
+                "description": "The place's name: the label without the other places of the same name.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "label",
+              "kind",
+              "location",
+              "districtCode",
+              "alternatives"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DataMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "ResolvedAlternative": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "description": "Its kind.",
+            "type": "string"
+          },
+          "name": {
+            "description": "How the label names it.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "kind"
+        ],
+        "type": "object"
+      },
       "ResponseMeta": {
         "additionalProperties": false,
         "properties": {
@@ -20226,6 +20308,297 @@
           }
         ],
         "x-example-request": "/v1/places/coverage",
+        "x-required-scope": "places"
+      }
+    },
+    "/v1/places/resolve": {
+      "get": {
+        "description": "The one place a free text names, as the platform's resolver reads it: a town by its gazetteer point, a stop, station, landmark or other place of interest, an address or a motorway junction where the text names one ('Berlin Alexanderplatz'), the other places of the same name said as alternatives ('Sylt (town), also: Sylt (island)'). The label is what the answer says; meta.attribution credits the sources the place came from. data is null when the text names no one place. Needs the scope places.",
+        "operationId": "resolvePlace",
+        "parameters": [
+          {
+            "description": "The place as typed: a town, a district, a station or stop, a landmark or other place of interest, an address, a motorway junction; case, umlauts written out (koeln for Köln), accents and punctuation do not matter; any of its names (an English one too) answers.",
+            "explode": false,
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "The place as typed: a town, a district, a station or stop, a landmark or other place of interest, an address, a motorway junction; case, umlauts written out (koeln for Köln), accents and punctuation do not matter; any of its names (an English one too) answers.",
+              "examples": [
+                "Neustadt"
+              ],
+              "maxLength": 80,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The one place a text names",
+                    "value": {
+                      "data": {
+                        "name": "Matfienland",
+                        "label": "Matfienland",
+                        "kind": "region",
+                        "location": {
+                          "lat": 48.24375,
+                          "lon": 7.01625
+                        },
+                        "districtCode": "01",
+                        "alternatives": []
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": null,
+                        "freshness": [
+                          {
+                            "family": "geonames",
+                            "dataAsOf": null,
+                            "ageS": null,
+                            "staleAfterS": 9007199254740991,
+                            "stale": false,
+                            "lastCheckedAt": null
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "geonames",
+                            "domain": "places",
+                            "publisher": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+                            "text": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://download.geonames.org/export/dump/",
+                            "sourceUrl": "https://download.geonames.org/export/dump/"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ]
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/places/resolve"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ResolvePlaceEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "$ref": "#/components/headers/Age"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/Cache-Control"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/Last-Modified"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              },
+              "Vary": {
+                "$ref": "#/components/headers/Vary"
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/Cache-Control"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/Last-Modified"
+              },
+              "Vary": {
+                "$ref": "#/components/headers/Vary"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not used by this operation.",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "The one place a text names",
+        "tags": [
+          "places"
+        ],
+        "x-attribution": "The place comes from the source families of the places domain the key is entitled to, and from the stop families of transit and the junctions of the roads domain where the key may read them. The answer lists each source family the place came from in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. When the text names no one place, data is null and nothing is credited.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/places/resolve?q=Matfienland\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/places/resolve?q=Matfienland",
+        "x-mcp-counterpart": "place resolver",
         "x-required-scope": "places"
       }
     },

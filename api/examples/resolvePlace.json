@@ -1,0 +1,72 @@
+{
+  "title": "The one place a text names",
+  "request": "/v1/places/resolve?q=Matfienland",
+  "attribution": "The place comes from the source families of the places domain the key is entitled to, and from the stop families of transit and the junctions of the roads domain where the key may read them. The answer lists each source family the place came from in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. When the text names no one place, data is null and nothing is credited.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "places"
+    ],
+    "sources": [
+      "bkg_gvisys",
+      "geonames"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": {
+      "name": "Matfienland",
+      "label": "Matfienland",
+      "kind": "region",
+      "location": {
+        "lat": 48.24375,
+        "lon": 7.01625
+      },
+      "districtCode": "01",
+      "alternatives": []
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": null,
+      "freshness": [
+        {
+          "family": "geonames",
+          "dataAsOf": null,
+          "ageS": null,
+          "staleAfterS": 9007199254740991,
+          "stale": false,
+          "lastCheckedAt": null
+        }
+      ],
+      "attribution": [
+        {
+          "family": "geonames",
+          "domain": "places",
+          "publisher": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+          "text": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://download.geonames.org/export/dump/",
+          "sourceUrl": "https://download.geonames.org/export/dump/"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ]
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/places/resolve"
+    }
+  }
+}

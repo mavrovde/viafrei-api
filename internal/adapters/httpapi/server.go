@@ -134,6 +134,7 @@ func operations() []operation {
 		{id: "listParkingBays", method: http.MethodGet, path: "/v1/parking-bays", tag: "parking", keyed: true, scope: "parking", register: registerParkingBays},
 		{id: "listParkingOptions", method: http.MethodGet, path: "/v1/parking-options", tag: "parking", keyed: true, scope: "parking", register: registerParking},
 		{id: "listPlaces", method: http.MethodGet, path: "/v1/places", tag: "places", keyed: true, scope: "places", register: registerPlaces},
+		{id: "resolvePlace", method: http.MethodGet, path: "/v1/places/resolve", tag: "places", keyed: true, scope: "places", register: registerResolvePlace},
 		{id: "getPlaceOverview", method: http.MethodGet, path: "/v1/places/{placeId}/overview", tag: "places", keyed: true, scope: "places", register: registerOverview},
 		{id: "listMotorwayParking", method: http.MethodGet, path: "/v1/motorways/{road}/parking-options", tag: "parking", keyed: true, scope: "parking", register: registerMotorwayParking},
 		{id: "getMotorwayConditions", method: http.MethodGet, path: "/v1/motorways/{road}/conditions", tag: "roads", keyed: true, scope: "roads", register: registerMotorwayConditions},

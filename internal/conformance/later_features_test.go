@@ -118,3 +118,7 @@ func (laterFeatures) StateWarnings(context.Context, access.Record, string) ([]we
 func (laterFeatures) StateAlerts(context.Context, access.Record, string, int) (features.StateAlertsAnswer, error) {
 	return features.StateAlertsAnswer{}, nil
 }
+
+func (laterFeatures) ResolvePlace(context.Context, access.Record, string) (features.ResolveAnswer, error) {
+	return features.ResolveAnswer{}, nil
+}

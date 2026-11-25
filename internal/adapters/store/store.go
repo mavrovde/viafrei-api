@@ -56,6 +56,7 @@ type Store struct {
 	lands   junctionLands
 	refs    references
 	regKept registerKept
+	cells   officialCells
 
 	// landsRead, when set (tests), is called before each road's junction
 	// read of the background read.

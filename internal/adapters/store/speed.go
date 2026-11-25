@@ -2,6 +2,9 @@ package store
 
 import (
 	"context"
+	"slices"
+	"strings"
+	"sync"
 
 	"github.com/jackc/pgx/v5"
 
@@ -72,33 +75,35 @@ func speedCellOf(point string) string {
   order by k.d, k.admin_code limit 1)`
 }
 
+// speedOfficialCells reads the Gemeinden an official list of the families
+// $1 covers, as today's statement keys them (SPEED_OFFICIAL_CELLS): the
+// Gemeinde of every open official fixed camera or section control, and the
+// key of every such camera with no point. They name no place: read once and
+// kept while the families and the gazetteer are unchanged (officialCells).
+var speedOfficialCells = named("api_speed_official_cells", `
+select `+speedCellOf("o.geom")+`
+from `+speedOfficialRows+` o
+where o.kind in ('fixed', 'section_control') and o.geom is not null and o.source_ref = any((select $1::text[])::text[])
+union
+select o.admin_code
+from `+speedOfficialRows+` o
+where o.kind in ('fixed', 'section_control') and o.geom is null
+  and o.admin_code ~ '^[0-9]{8}$' and o.source_ref = any((select $1::text[])::text[])`, "text[]")
+
 // speedOSM reads OpenStreetMap's cameras in the circle by name and then
 // the numeric OSM id (an empty name first, as today's statement orders them;
 // the text id would put node12230389900 before node1277236977), cut
 // as the platform cuts them: a camera is left out when its Gemeinde (the
-// nearest BKG municipality point) is one an official list covers, the
-// Gemeinde of an official fixed camera or section control, or the key of
-// one with no point; a camera no Gemeinde is named for is left out too. The
-// official cameras are those within 50 km of the circle: no Gemeinde point
-// lies farther than that from a camera whose nearest it is. The cameras in
+// nearest BKG municipality point) is one an official list covers ($7, the
+// Gemeinden speedOfficialCells reads, as today's SPEED_CUT_GIVEN takes
+// them); a camera no Gemeinde is named for is left out too. The cameras in
 // the circle are read first and each is located by itself, as today's
 // statement does (Hamburg, 10 km: 382 ms when every camera was matched
 // against the Gemeinden within 80 km, on prod 2026-11-25).
 //
 //nolint:misspell // materialized is the SQL keyword
 var speedOSM = named("api_speed_osm", `
-with official as (
-  select `+speedCellOf("o.geom")+` as cell
-  from `+speedOfficialRows+` o
-  where o.kind in ('fixed', 'section_control') and o.geom is not null
-    and st_dwithin(o.geom, st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography, $3::float8 + 50000)
-    and o.source_ref = `+speedFamilies+`
-  union
-  select o.admin_code
-  from `+speedOfficialRows+` o
-  where o.kind in ('fixed', 'section_control') and o.geom is null
-    and o.admin_code ~ '^[0-9]{8}$' and o.source_ref = `+speedFamilies+`
-), cand as materialized (
+with cand as materialized (
   select c.camera_id, c.kind, c.enforces, c.geom, c.max_speed_kmh, c.max_speed_hgv_kmh, c.direction, c.name, c.street,
          c.location_text, c.admin_code, c.data_as_of, c.valid_from, c.valid_to, c.source_ref, c.osm_id
   from `+speedOSMRows+` c
@@ -107,9 +112,90 @@ with official as (
 )
 select `+speedColumns+`
 from cand c
-where `+speedCellOf("c.geom")+` not in (select o.cell from official o where o.cell is not null)
+where `+speedCellOf("c.geom")+` <> all((select $7::text[])::text[])
 order by coalesce(c.name, ''), c.osm_id, c.camera_id
-limit $6::int`, "float8", "float8", "float8", "date", "text[]", "int")
+limit $6::int`, "float8", "float8", "float8", "date", "text[]", "int", "text[]")
+
+// gazetteerFamily is the gazetteer's family in the versions read: a write
+// of the gazetteer moves the Gemeinde a point lies in.
+const gazetteerFamily = "gazetteer"
+
+// officialCells keeps the Gemeinden the official lists cover, per set of
+// families, under the versions of those families and of the gazetteer as
+// the last versions read (FreshnessVersions, once a second) stated them, as
+// today's speed card keeps them under its sources' versions: the cut no
+// longer reads every official camera's Gemeinde on each request. Without a
+// versions read stating the gazetteer, the cells are read for the request.
+type officialCells struct {
+	mu       sync.Mutex
+	versions map[string]string
+	kept     map[string][]string
+}
+
+// noteVersions records the versions the last versions read stated.
+func (o *officialCells) noteVersions(families map[string]string) {
+	o.mu.Lock()
+	o.versions = families
+	o.mu.Unlock()
+}
+
+// key is the families and their versions (and the gazetteer's), "" while no
+// versions read has stated the gazetteer's.
+func (o *officialCells) key(families []string) string {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if _, ok := o.versions[gazetteerFamily]; !ok {
+		return ""
+	}
+	fams := append(slices.Clone(families), gazetteerFamily)
+	slices.Sort(fams)
+	var b strings.Builder
+	for _, f := range slices.Compact(fams) {
+		b.WriteString(f + "=" + o.versions[f] + ";")
+	}
+	return b.String()
+}
+
+// officialCellsOf answers the kept cells of the families, or reads them and
+// keeps them; with no key they are read every time.
+func (s *Store) officialCellsOf(ctx context.Context, tx pgx.Tx, families []string) ([]string, error) {
+	o := &s.cells
+	key := o.key(families)
+	if key != "" {
+		o.mu.Lock()
+		c, ok := o.kept[key]
+		o.mu.Unlock()
+		if ok {
+			return c, nil
+		}
+	}
+	rows, _ := run(ctx, tx, speedOfficialCells, families)
+	cells, err := pgx.CollectRows(rows, pgx.RowTo[*string])
+	if err != nil {
+		return nil, err
+	}
+	out := []string{}
+	for _, c := range cells {
+		if c != nil {
+			out = append(out, *c)
+		}
+	}
+	if key != "" {
+		o.keep(key, out)
+	}
+	return out, nil
+}
+
+// keep keeps the cells of key; the kept sets are dropped first once there
+// are 64.
+func (o *officialCells) keep(key string, cells []string) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.kept == nil || len(o.kept) >= 64 {
+		o.kept = map[string][]string{}
+	}
+	o.kept[key] = cells
+}
 
 func scanSpeed(osm bool) func(pgx.CollectableRow) (speedRow, error) {
 	return func(r pgx.CollectableRow) (speedRow, error) {
@@ -155,7 +241,11 @@ func (s *Store) SpeedCameras(ctx context.Context, q roads.SpeedQuery, families [
 		if err != nil {
 			return out, err
 		}
-		rows, _ = run(ctx, tx, speedOSM, q.At.Lon, q.At.Lat, float64(q.RadiusM), today, families, q.Limit)
+		cells, err := s.officialCellsOf(ctx, tx, families)
+		if err != nil {
+			return out, err
+		}
+		rows, _ = run(ctx, tx, speedOSM, q.At.Lon, q.At.Lat, float64(q.RadiusM), today, families, q.Limit, cells)
 		osm, err := pgx.CollectRows(rows, scanSpeed(true))
 		if err != nil {
 			return out, err

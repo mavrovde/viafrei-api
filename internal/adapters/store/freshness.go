@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"maps"
 	"sync"
 	"time"
 
@@ -234,6 +235,7 @@ func (s *Store) FreshnessVersions(ctx context.Context) (provenance.Versions, err
 		if err != nil {
 			return out, err
 		}
+		s.cells.noteVersions(maps.Clone(out.Families))
 		at := s.nowFn()
 		r := &s.refs
 		r.mu.Lock()

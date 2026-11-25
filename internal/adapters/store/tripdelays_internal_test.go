@@ -63,3 +63,19 @@ func TestThePunctualityAreaBoundRefusesADefinitionWithoutItsPlace(t *testing.T) 
 		})
 	}
 }
+
+// TestTheKeptOfficialCellsNeverGrowWithoutEnd: 64 families sets are kept;
+// the 65th drops them and is kept alone.
+func TestTheKeptOfficialCellsNeverGrowWithoutEnd(t *testing.T) {
+	var o officialCells
+	for i := range 64 {
+		o.keep(strings.Repeat("k", i+1), []string{"x"})
+	}
+	if len(o.kept) != 64 {
+		t.Fatalf("kept %d sets, want 64", len(o.kept))
+	}
+	o.keep("last", []string{"y"})
+	if len(o.kept) != 1 || o.kept["last"][0] != "y" {
+		t.Fatalf("after the 65th: %v", o.kept)
+	}
+}

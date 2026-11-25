@@ -135,3 +135,6 @@ vocabulary	internal/testkit/baseseed/base_seed.sql	gtfs	the platform's table and
 vocabulary	internal/testkit/baseseed/base_seed.sql	ingest	the platform's table and column names the test seed writes carry this word
 vocabulary	internal/testkit/baseseed/base_seed.sql	siri	the platform's table and column names the test seed writes carry this word
 vocabulary	internal/adapters/store/freshness.go	ingest	the schema name of the registered sources table whose row versions the register probe reads (ctid and xmin only); the platform's storage name, not the API's vocabulary
+denylist	internal/adapters/store/speed_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables (the official cameras and the status rows whose versions key the kept cells)
+vocabulary	internal/adapters/store/speed_integration_test.go	feed	the platform's status table and its ledger names, which this test writes to move a family's version
+vocabulary	internal/adapters/store/speed_integration_test.go	ingest	the platform's status ledger name, which this test writes to state the gazetteer's version

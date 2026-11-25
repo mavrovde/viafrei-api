@@ -351,6 +351,8 @@ func open(t *testing.T) *rig {
 	list("departures", "select stop_place_id from contract.stop_place where withdrawn_at is null order by 1 limit 40",
 		"/v1/stations/", "/departures?from="+r.now.Add(-2*time.Hour).UTC().Format(time.RFC3339)+"&duration_min=240")
 	list("facilities", "select distinct stop_place_id from contract.station_facility order by 1 limit 40", "/v1/stations/", "/facilities")
+	list("station-page", "select stop_place_id from contract.stop_place where withdrawn_at is null order by 1 limit 40", "/v1/stations/", "/page")
+	list("stop-boards", fmt.Sprintf(at, "stop_place"), "/v1/stop-boards?at=", "&radius_m=1000&limit=5")
 	list("disruptions", "select region_code from contract.admin_region order by 1 limit 40", "/v1/transit-disruptions?area=", "")
 	list("states", "select distinct region_code from contract.admin_region where region_level = 'state' order by 1 limit 40",
 		"/v1/states/", "/road-conditions?road_class=motorway")
@@ -542,6 +544,10 @@ func (r *rig) targetsOf(op string) []string {
 		return r.targets["departures"]
 	case "listStationFacilities":
 		return r.targets["facilities"]
+	case "getStationPage":
+		return r.targets["station-page"]
+	case "listStopBoards":
+		return r.targets["stop-boards"]
 	case "listTransitDisruptions":
 		return r.targets["disruptions"]
 	case "listStateRoadConditions":

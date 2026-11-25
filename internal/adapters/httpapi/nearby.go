@@ -19,8 +19,9 @@ const nearbyDefaultRadiusM = 5000
 // NearbyInput is the input of listNearby.
 type NearbyInput struct {
 	AtPosition
-	RadiusM    int      `query:"radius_m" minimum:"1000" maximum:"15000" doc:"The vehicle categories' radius in metres (1000 to 15000); default 5000. A need uses its own radius."`
-	Categories []string `query:"categories" enum:"fuel,charging,parking,station,junction,groceries,health,money,food,lodging,garage,police,toilets,safety" doc:"The categories, comma-separated. Default: fuel, charging, parking, station and junction. An everyday need (groceries to toilets) only when named, each in its own radius of 1 or 2 km, widened up to 5 km where fewer than three are near. safety, the former name of police and toilets, answers as both."`
+	RadiusM       int      `query:"radius_m" minimum:"1000" maximum:"15000" doc:"The vehicle categories' radius in metres (1000 to 15000); default 5000. A need uses its own radius."`
+	Categories    []string `query:"categories" enum:"fuel,charging,parking,station,junction,groceries,health,money,food,lodging,garage,police,toilets,safety" doc:"The categories, comma-separated. Default: fuel, charging, parking, station and junction. An everyday need (groceries to toilets) only when named, each in its own radius of 1 or 2 km, widened up to 5 km where fewer than three are near. safety, the former name of police and toilets, answers as both."`
+	ChargingGroup string   `query:"charging_group" enum:"place" doc:"place: the charging sites one item a place, as listChargingOptions with group=place answers them (item.place), and data.chargingRegister when a register row is among them. Default: one item a site record."`
 }
 
 // NearbyJunction is a motorway junction near the position.
@@ -77,7 +78,9 @@ type NeedBlock struct {
 type NearbyData struct {
 	Fuel     *[]NearbyFuelStation `json:"fuel,omitempty" doc:"The cheapest current E5 prices first, three at most, each with its E5 price only."`
 	Charging *[]ChargingSite      `json:"charging,omitempty" doc:"Public charging sites, nearest first, three at most."`
-	Parking  *[]ParkingListing    `json:"parking,omitempty" doc:"Parking sites, nearest first, three at most."`
+	// ChargingRegister names the register release of the charging places.
+	ChargingRegister *NearbyChargingRegister `json:"chargingRegister,omitempty" doc:"Only with charging_group=place, when a Bundesnetzagentur register row is among the charging places: the register's release."`
+	Parking          *[]ParkingListing       `json:"parking,omitempty" doc:"Parking sites, nearest first, three at most."`
 	// OSMParking are OpenStreetMap's car parks, beside the parking sites.
 	OSMParking *[]OSMCarPark     `json:"osmParking,omitempty" doc:"OpenStreetMap's car parks (ODbL; no capacity, no occupancy) in the radius that are none of the parking sites, nearest first, same-named ones as one, three at most; with parking, when the key may read OpenStreetMap."`
 	Stations   *[]Station        `json:"stations,omitempty" doc:"Stations, nearest first, three at most."`
@@ -85,6 +88,12 @@ type NearbyData struct {
 	// JunctionsFrom is the source the junctions came from.
 	JunctionsFrom *string      `json:"junctionsFrom,omitempty" enum:"osm,gazetteer" doc:"Where the junctions came from: osm, or gazetteer, when no OpenStreetMap junction node is within the radius. With junctions only."`
 	Needs         *[]NeedBlock `json:"needs,omitempty" doc:"The asked everyday needs, in the order asked."`
+}
+
+// NearbyChargingRegister is the release of the charging register rows
+// shown.
+type NearbyChargingRegister struct {
+	ReleasedOn string `json:"releasedOn" format:"date" doc:"The release (Berlin date) of the Bundesnetzagentur register file."`
 }
 
 // NearbyPartStatus is the outcome of one category.
@@ -140,7 +149,7 @@ func registerNearby(api huma.API, s *server, op huma.Operation) {
 			return nil, err
 		}
 		q := features.NearbyQuery{At: places.NearbyQuery{At: in.point, RadiusM: in.RadiusM}, Categories: nearbyCategories(in.Categories),
-			FuelWindow: s.cfg.Fuel.PriceCurrent}
+			FuelWindow: s.cfg.Fuel.PriceCurrent, ChargingByPlace: in.ChargingGroup == groupPlace}
 		if q.At.RadiusM == 0 {
 			q.At.RadiusM = nearbyDefaultRadiusM
 		}
@@ -164,6 +173,13 @@ func nearbyEnvelope(s *server, ctx context.Context, a features.NearbyAnswer, q f
 	if a.Charging != nil {
 		v := chargingSites(ctx, *a.Charging, s.cfg.Charging.StatusMaxAge)
 		data.Charging = &v
+	}
+	if a.ChargingPlaces != nil {
+		v, _ := chargingPlaces(ctx, *a.ChargingPlaces)
+		data.Charging = &v
+		if r := a.ChargingPlaces.RegisterReleasedOn; r != nil {
+			data.ChargingRegister = &NearbyChargingRegister{ReleasedOn: *r}
+		}
 	}
 	if a.Parking != nil {
 		v, _ := parkingSites(*a.Parking)

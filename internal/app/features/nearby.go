@@ -37,16 +37,21 @@ type NearbyQuery struct {
 	At         places.NearbyQuery
 	Categories []string
 	FuelWindow time.Duration
+	// ChargingByPlace answers the charging category one item a place
+	// (ChargingPlaces), as the platform's what-is-around answer.
+	ChargingByPlace bool
 }
 
 // NearbyAnswer is the what-is-around answer: each asked category's block,
 // nil when not asked or not ok, and each category's outcome.
 type NearbyAnswer struct {
-	Fuel      *FuelStations
-	Charging  *Answer[energy.Site]
-	Parking   *Answer[parking.Site]
-	Stations  *Answer[transit.Station]
-	Junctions *Answer[places.Junction]
+	Fuel     *FuelStations
+	Charging *Answer[energy.Site]
+	// ChargingPlaces is the charging category with ChargingByPlace.
+	ChargingPlaces *PlacesAnswer
+	Parking        *Answer[parking.Site]
+	Stations       *Answer[transit.Station]
+	Junctions      *Answer[places.Junction]
 	// JunctionsFrom is the source the junctions came from
 	// (places.JunctionsFromOSM or places.JunctionsFromGazetteer).
 	JunctionsFrom string
@@ -122,6 +127,13 @@ func (s *Service) nearbyPart(ctx context.Context, key access.Record, c string, q
 		}
 		return meta(a.Answer), err
 	case "charging":
+		if q.ChargingByPlace {
+			a, err := s.ChargingPlaces(ctx, key, PlaceQuery{At: at, RadiusM: r, Limit: n})
+			if err == nil {
+				out.ChargingPlaces = &a
+			}
+			return meta(a.Answer), err
+		}
 		a, err := s.Charging(ctx, key, energy.Query{At: at, RadiusM: r, Access: energy.FilterPublic, Limit: n})
 		if err == nil {
 			out.Charging = &a

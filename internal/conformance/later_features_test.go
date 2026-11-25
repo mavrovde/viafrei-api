@@ -23,6 +23,10 @@ import (
 // operations they name.
 type laterFeatures struct{}
 
+func (laterFeatures) ChargingPlaces(context.Context, access.Record, features.PlaceQuery) (features.PlacesAnswer, error) {
+	return features.PlacesAnswer{}, nil
+}
+
 func (laterFeatures) SpeedCameras(context.Context, access.Record, roads.SpeedQuery) (features.SpeedAnswer, error) {
 	return features.SpeedAnswer{}, nil
 }

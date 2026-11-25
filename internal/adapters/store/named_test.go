@@ -62,7 +62,36 @@ func withoutTrafficEvents(sql string) string {
 	for _, part := range append([]string{relTrafficEvent, before, after, landBefore, landAfter}, motorway...) {
 		sql = strings.ReplaceAll(sql, part, "")
 	}
-	return sql
+	return withoutTwinRule(sql)
+}
+
+// twinWords are the forms in which the place-grouped charging read reads
+// the operator's comparable words: compared between two sites (the
+// register's twin rule), and carried to that comparison in the column
+// lists of the sites read.
+var twinWords = regexp.MustCompile(`\b(?:[a-z_]+\.)?operator_tokens\s*&&\s*[a-z_]+\.operator_tokens\b|` +
+	`(?:\(c\.site\)|\bs)\.operator_tokens,|\bgeom, operator_tokens,`)
+
+// withoutTwinRule cuts the twin rule's reads of the operator's words from
+// the place-grouped charging read, whose answered columns (its last select
+// list) never name them.
+func withoutTwinRule(sql string) string {
+	if sql != chargingPlacesNear.SQL {
+		return sql
+	}
+	return twinWords.ReplaceAllString(sql, " ")
+}
+
+// TestTheTwinRuleAnswersNoOperatorWords: the place-grouped charging read
+// answers no operator words, and the cut leaves every other read of them.
+func TestTheTwinRuleAnswersNoOperatorWords(t *testing.T) {
+	head, _, _ := strings.Cut(chargingPlacesNear.SQL[strings.LastIndex(chargingPlacesNear.SQL, "select k.source_feed"):], "(select (select eps.slug")
+	if strings.Contains(head, "operator_tokens") {
+		t.Errorf("the answered columns name the operator words: %s", head)
+	}
+	if got := withoutTwinRule("select operator_tokens from s"); got != "select operator_tokens from s" {
+		t.Errorf("another statement was cut: %s", got)
+	}
 }
 
 // TestNamedStatementsReadNoRefusedColumn: no named statement reads a whole

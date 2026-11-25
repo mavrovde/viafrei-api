@@ -55,6 +55,8 @@ type fakeFeatures struct {
 	objects       objectsFake
 	states        statesFake
 	charging      features.Answer[energy.Site]
+	chargePlaces  features.PlacesAnswer
+	gotPlaceQ     features.PlaceQuery
 	parking       features.Answer[parking.Site]
 	overview      features.Overview
 	conditions    features.Conditions
@@ -115,6 +117,11 @@ func (f *fakeFeatures) Charging(_ context.Context, key access.Record, q energy.Q
 	f.gotKey, f.gotCharge = key, q
 	f.chargeCall++
 	return f.charging, f.err
+}
+
+func (f *fakeFeatures) ChargingPlaces(_ context.Context, key access.Record, q features.PlaceQuery) (features.PlacesAnswer, error) {
+	f.gotKey, f.gotPlaceQ = key, q
+	return f.chargePlaces, f.err
 }
 
 func (f *fakeFeatures) Parking(ctx context.Context, key access.Record, q parking.Query) (features.Answer[parking.Site], error) {

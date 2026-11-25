@@ -640,6 +640,70 @@
         ],
         "type": "object"
       },
+      "ChargingAddress": {
+        "additionalProperties": false,
+        "properties": {
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "postcode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "street": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "street",
+          "number",
+          "postcode",
+          "city"
+        ],
+        "type": "object"
+      },
+      "ChargingConnector": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "description": "Points with this plug.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "powerKw": {
+            "description": "The highest power of the points with this plug, in kW; null when none is published.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "type": {
+            "description": "The plug's name in the answer's language (CCS2, Typ 2 / Type 2, CHAdeMO, ...).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "powerKw",
+          "count"
+        ],
+        "type": "object"
+      },
       "ChargingDropped": {
         "additionalProperties": false,
         "properties": {
@@ -760,6 +824,10 @@
           "page": {
             "$ref": "#/components/schemas/Page"
           },
+          "pricesPublished": {
+            "$ref": "#/components/schemas/ChargingPricesPublished",
+            "description": "Only with group=place: how many of the places listed publish a price per kWh (\"published for 3 of 5 only\")."
+          },
           "query": {
             "$ref": "#/components/schemas/ChargingQuery"
           },
@@ -804,6 +872,209 @@
         ],
         "type": "object"
       },
+      "ChargingPlace": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "additionalProperties": false,
+            "description": "The first record's published address; null when it was filed under an address that is not where the place lies (see reportedAddress).",
+            "properties": {
+              "city": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "number": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "postcode": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "street": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "street",
+              "number",
+              "postcode",
+              "city"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "connectors": {
+            "items": {
+              "$ref": "#/components/schemas/ChargingConnector"
+            },
+            "type": "array"
+          },
+          "fromRegister": {
+            "description": "A Bundesnetzagentur register row is among the records.",
+            "type": "boolean"
+          },
+          "locatedNear": {
+            "description": "With reportedAddress: the town the place lies in, when one is known.",
+            "type": "string"
+          },
+          "price": {
+            "additionalProperties": false,
+            "description": "null: no record publishes a price per kWh (never 0).",
+            "properties": {
+              "amount": {
+                "description": "EUR per kWh, three decimals.",
+                "format": "double",
+                "type": "number"
+              },
+              "basis": {
+                "description": "gross: VAT included, as published or grossed up by the published rate; net: published without VAT and without a rate.",
+                "enum": [
+                  "net",
+                  "gross"
+                ],
+                "type": "string"
+              },
+              "currency": {
+                "enum": [
+                  "EUR"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "amount",
+              "basis",
+              "currency"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "registerReleasedOn": {
+            "description": "The release (Berlin date) of the register file the place's register rows come from; null when none is among them.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reportedAddress": {
+            "$ref": "#/components/schemas/ChargingAddress",
+            "description": "Only when the register row was filed under an address elsewhere (probably the operator's own): that address."
+          },
+          "reportedLocation": {
+            "$ref": "#/components/schemas/Position",
+            "description": "Only when the place was located by its address: the point the operator published."
+          },
+          "siteId": {
+            "description": "The platform's key of the place's first record: the site a charger watch (watch_situation, kind charger) takes.",
+            "type": "string"
+          },
+          "siteIds": {
+            "description": "Every record id of the place, siteId first.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "sourceEnded": {
+            "description": "The first record's source was ended by its publisher and answers until its window ends; its points carry no status.",
+            "type": "boolean"
+          },
+          "status": {
+            "additionalProperties": false,
+            "description": "null: no point has a status (unknown, never 0).",
+            "properties": {
+              "free": {
+                "description": "Points reported available.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "observedAt": {
+                "description": "When the newest status counted was last confirmed (UTC).",
+                "format": "date-time",
+                "type": "string"
+              },
+              "occupied": {
+                "description": "Points reported occupied.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "outOfOrder": {
+                "description": "Points reported out of order.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "stale": {
+                "description": "true: no point has a current status, and the counts are the last ones known, as of observedAt; possibly out of date.",
+                "type": "boolean"
+              },
+              "total": {
+                "description": "Every point of the place, those with no status included.",
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "free",
+              "occupied",
+              "outOfOrder",
+              "total",
+              "observedAt",
+              "stale"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "siteId",
+          "siteIds",
+          "address",
+          "fromRegister",
+          "registerReleasedOn",
+          "sourceEnded",
+          "status",
+          "price",
+          "connectors"
+        ],
+        "type": "object"
+      },
+      "ChargingPricesPublished": {
+        "additionalProperties": false,
+        "properties": {
+          "places": {
+            "description": "Places listed.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "priced": {
+            "description": "Places with a published price per kWh.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "priced",
+          "places"
+        ],
+        "type": "object"
+      },
       "ChargingQuery": {
         "additionalProperties": false,
         "properties": {
@@ -825,6 +1096,12 @@
             "type": "array"
           },
           "connector": {
+            "type": "string"
+          },
+          "group": {
+            "enum": [
+              "place"
+            ],
             "type": "string"
           },
           "maxKw": {
@@ -898,6 +1175,10 @@
               "string",
               "null"
             ]
+          },
+          "place": {
+            "$ref": "#/components/schemas/ChargingPlace",
+            "description": "Only with group=place: the place this item stands for. The item is then its first record, name is the place's label (its name and address, never a record id), and chargePoints are every record's points."
           },
           "sourceFamily": {
             "description": "The source family of the item; its attribution is in meta.attribution.",
@@ -5103,6 +5384,20 @@
         ],
         "type": "object"
       },
+      "NearbyChargingRegister": {
+        "additionalProperties": false,
+        "properties": {
+          "releasedOn": {
+            "description": "The release (Berlin date) of the Bundesnetzagentur register file.",
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "releasedOn"
+        ],
+        "type": "object"
+      },
       "NearbyData": {
         "additionalProperties": false,
         "properties": {
@@ -5112,6 +5407,10 @@
               "$ref": "#/components/schemas/ChargingSite"
             },
             "type": "array"
+          },
+          "chargingRegister": {
+            "$ref": "#/components/schemas/NearbyChargingRegister",
+            "description": "Only with charging_group=place, when a Bundesnetzagentur register row is among the charging places: the register's release."
           },
           "fuel": {
             "description": "The cheapest current E5 prices first, three at most, each with its E5 price only.",
@@ -12927,6 +13226,19 @@
             }
           },
           {
+            "description": "place: one item a place, as the MCP charging search answers: the records of one place (an operator's site, the Bundesnetzagentur register's rows of it, one building listed per charging unit) folded into one item named by its name and address, with item.place. Takes min_kw, connector and only_available; not max_kw, operator, conditions or access other than public. Default: one item a site record.",
+            "explode": false,
+            "in": "query",
+            "name": "group",
+            "schema": {
+              "description": "place: one item a place, as the MCP charging search answers: the records of one place (an operator's site, the Bundesnetzagentur register's rows of it, one building listed per charging unit) folded into one item named by its name and address, with item.place. Takes min_kw, connector and only_available; not max_kw, operator, conditions or access other than public. Default: one item a site record.",
+              "enum": [
+                "place"
+              ],
+              "type": "string"
+            }
+          },
+          {
             "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
             "example": "en",
             "in": "query",
@@ -17951,6 +18263,19 @@
                 "type": "string"
               },
               "type": "array"
+            }
+          },
+          {
+            "description": "place: the charging sites one item a place, as listChargingOptions with group=place answers them (item.place), and data.chargingRegister when a register row is among them. Default: one item a site record.",
+            "explode": false,
+            "in": "query",
+            "name": "charging_group",
+            "schema": {
+              "description": "place: the charging sites one item a place, as listChargingOptions with group=place answers them (item.place), and data.chargingRegister when a register row is among them. Default: one item a site record.",
+              "enum": [
+                "place"
+              ],
+              "type": "string"
             }
           },
           {

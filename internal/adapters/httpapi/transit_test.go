@@ -90,6 +90,17 @@ func TestStationsAnswer(t *testing.T) {
 		t.Errorf("a name in an area: asked %+v, query %v", g, q)
 	}
 
+	// The railway stations of a name: asked and echoed; without it, false.
+	if q["railway"] != false {
+		t.Errorf("no railway: query %v", q)
+	}
+	f = everyAnswer()
+	body = decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/stations?q=Frankfurt(Main)Hbf&railway=true", bearer))
+	q, _ = meta(t, body)["query"].(map[string]any)
+	if g := f.gotStation; g.Text != "Frankfurt(Main)Hbf" || !g.Railway || q["railway"] != true {
+		t.Errorf("railway stations: asked %+v, query %v", g, q)
+	}
+
 	// A position alone: the default radius.
 	f = everyAnswer()
 	body = decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/stations?at=50.94,6.96", bearer))

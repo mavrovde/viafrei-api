@@ -202,8 +202,12 @@ type Roads struct {
 
 // Weather holds the settings of the weather answers.
 type Weather struct {
-	MaxWarnings int           `koanf:"max_warnings" default:"100" validate:"min=1,max=500" desc:"Most warnings one weather answer lists, worst first; truncated says when more answer. The lamp reads every warning in force at the position, whatever this keeps."`
-	LookAhead   time.Duration `koanf:"lookahead" default:"24h" validate:"min=0s,max=72h" desc:"How far ahead the warnings at a position are listed beside those in force (inForce false), as the platform's weather check lists the next 24 hours; 0 lists only those in force. The lamp reads only those in force."`
+	MaxWarnings   int           `koanf:"max_warnings" default:"100" validate:"min=1,max=500" desc:"Most warnings one weather answer lists, worst first; truncated says when more answer. The lamp reads every warning in force at the position, whatever this keeps."`
+	LookAhead     time.Duration `koanf:"lookahead" default:"24h" validate:"min=0s,max=72h" desc:"How far ahead the warnings at a position are listed beside those in force (inForce false), as the platform's weather check lists the next 24 hours; 0 lists only those in force. The lamp reads only those in force."`
+	RoadStations  int           `koanf:"road_stations" default:"3" validate:"min=1,max=10" desc:"Most road-weather stations whose road-surface forecast a weather answer lists (data.roadForecast), nearest first, as the platform's weather check lists 3."`
+	RoadRadiusM   int           `koanf:"road_radius_m" default:"25000" validate:"min=1000,max=100000" desc:"How far from the position, in metres, a road-weather station is listed, as the platform's weather check lists those within 25 km."`
+	RoadCurrent   time.Duration `koanf:"road_current" default:"1h" validate:"min=0s,max=6h" desc:"How long before the answer's instant a forecast hour of a road-weather station is still listed, as the platform's weather check keeps the hour of the last 60 minutes."`
+	RoadLookAhead time.Duration `koanf:"road_lookahead" default:"24h" validate:"min=1h,max=72h" desc:"How far after the answer's instant the forecast hours of a road-weather station are listed, as the platform's weather check lists the next 24 hours."`
 }
 
 // Charging holds the settings of charging answers.

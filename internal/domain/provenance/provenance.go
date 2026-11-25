@@ -63,10 +63,10 @@ type Family struct {
 	// gives it no threshold): it is never stale, and an answer shows the age
 	// of its data only. StaleAfter is then unused.
 	NeverStale bool
-	// DataAsOf is the instant up to which the family's data was last known
-	// current. It advances when the data is confirmed unchanged, so it is not
-	// the instant of the last change in the data. Nil when the family's data
-	// has never been known current.
+	// DataAsOf is the instant the family's data last changed, as the platform
+	// status states it; nil when the family has published none. It does not
+	// advance when the data is confirmed unchanged: ReadAt does, and
+	// KnownCurrent is the later of the two.
 	DataAsOf *time.Time
 	// Version changes whenever the family's data changes; empty when the
 	// family has published none. An answer's ETag is built from it.
@@ -93,33 +93,48 @@ type Freshness struct {
 	Stale       bool
 }
 
-// Assess says how fresh the family is at now. A family with no instant is
-// stale and has no age, unless it is never stale. Data dated after now has
-// the age zero: the age is never negative.
+// KnownCurrent is the instant up to which the family's data is known
+// current: its newest confirmation (ReadAt) when that is later than the
+// instant of its last change (DataAsOf), as a confirmed unchanged copy is as
+// current as a new one; nil when the family's data has never been known
+// current. The platform judges a family's freshness by the same instant.
+func (f Family) KnownCurrent() *time.Time {
+	if f.ReadAt != nil && (f.DataAsOf == nil || f.ReadAt.After(*f.DataAsOf)) {
+		return f.ReadAt
+	}
+	return f.DataAsOf
+}
+
+// Assess says how fresh the family is at now, by the instant its data is
+// known current (KnownCurrent): data confirmed unchanged is not stale. A
+// family with no instant is stale and has no age, unless it is never stale.
+// Data dated after now has the age zero: the age is never negative.
 func (f Family) Assess(now time.Time) Freshness {
 	out := Freshness{Family: f.Source.Family, Stale: !f.NeverStale}
 	if !f.NeverStale {
 		s := int64(f.StaleAfter / time.Second)
 		out.StaleAfterS = &s
 	}
-	if f.DataAsOf == nil {
+	known := f.KnownCurrent()
+	if known == nil {
 		return out
 	}
-	asOf := f.DataAsOf.UTC()
+	asOf := known.UTC()
 	age := max(int64(now.Sub(asOf)/time.Second), 0)
 	out.DataAsOf, out.AgeS = &asOf, &age
 	out.Stale = out.StaleAfterS != nil && age > *out.StaleAfterS
 	return out
 }
 
-// TurnsStale is the instant the family's data turns stale: once its age
-// passes the threshold's whole seconds. False for a family that is never
-// stale or has no instant.
+// TurnsStale is the instant the family's data turns stale: once the age of
+// its known-current instant passes the threshold's whole seconds. False for
+// a family that is never stale or has no instant.
 func (f Family) TurnsStale() (time.Time, bool) {
-	if f.NeverStale || f.DataAsOf == nil {
+	known := f.KnownCurrent()
+	if f.NeverStale || known == nil {
 		return time.Time{}, false
 	}
-	return f.DataAsOf.Add((f.StaleAfter/time.Second + 1) * time.Second), true
+	return known.Add((f.StaleAfter/time.Second + 1) * time.Second), true
 }
 
 // AsOf is meta.asOf (ENV-004): the oldest instant among the entries, or nil

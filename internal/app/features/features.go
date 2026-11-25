@@ -110,6 +110,9 @@ type Settings struct {
 	// LookAhead is how far ahead a weather answer lists the warnings
 	// starting later (weather.lookahead).
 	LookAhead time.Duration
+	// Road is the reach of the road-surface forecast of a weather answer
+	// (weather.road_*).
+	Road RoadReach
 	// Disabled are the families the licence gate always denies.
 	Disabled []string
 	// IsTimeout reports whether a repository error means the time ran out.
@@ -529,4 +532,13 @@ func (s *Service) parking(ctx context.Context, reg []access.Terms, gate access.G
 		return Answer[parking.Site]{}, err
 	}
 	return Answer[parking.Site]{Items: sites, HasMore: more, Families: withholdConditions(fams, pending), Partial: partial, Withheld: pending, Terms: terms, At: now, NextReport: next}, nil
+}
+
+// RoadReach is the reach of the road-surface forecast of a weather answer:
+// the nearest Stations within RadiusM, their hours from Current before the
+// answer to LookAhead after it.
+type RoadReach struct {
+	Stations           int
+	RadiusM            float64
+	Current, LookAhead time.Duration
 }

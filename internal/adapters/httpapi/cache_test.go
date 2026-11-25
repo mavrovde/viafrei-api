@@ -905,3 +905,34 @@ func TestAFreshAnswerReplacesTheStaleOne(t *testing.T) {
 		t.Fatalf("the newer read was not the one served stale: %d, Age %q", w.Code, w.Header().Get("Age"))
 	}
 }
+
+func TestAConfirmationEndsAStaleAnswer(t *testing.T) {
+	req.Covers(t, "NFR-PERF-005")
+	r := newCacheRig(t, config.Defaults(), "v1")
+	r.versions.change(func(f *fakeVersions) { f.confirmed = map[string]string{"src-alpha-energy": "c1"} })
+	// The family's data is two hours old with nothing newer confirmed: the
+	// answer states it stale.
+	r.clock.add(2 * time.Hour)
+	first := r.get(t, nil)
+	if first.Code != http.StatusOK || !strings.Contains(first.Body.String(), `"stale":true`) {
+		t.Fatalf("first answer: %d %s", first.Code, first.Body)
+	}
+	etag := first.Header().Get("ETag")
+	if again := r.get(t, http.Header{"If-None-Match": {etag}}); again.Code != http.StatusNotModified {
+		t.Fatalf("with nothing new the stale answer is not kept: %d", again.Code)
+	}
+	// A run confirms the data unchanged: its data version stays, its
+	// confirmation moves, and the family reads fresh again.
+	r.versions.change(func(f *fakeVersions) { f.confirmed["src-alpha-energy"] = "c2" })
+	r.features.mu.Lock()
+	r.features.charging.Families[0].ReadAt = tp(r.clock.now())
+	r.features.mu.Unlock()
+	r.clock.add(2 * time.Second) // past the versions' reuse
+	next := r.get(t, http.Header{"If-None-Match": {etag}})
+	if next.Code != http.StatusOK || next.Header().Get("ETag") == etag || !strings.Contains(next.Body.String(), `"stale":false`) {
+		t.Fatalf("the confirmation did not end the stale answer: %d %q %s", next.Code, next.Header().Get("ETag"), next.Body)
+	}
+	if n := r.features.calls.Load(); n != 2 {
+		t.Fatalf("reads: %d, want 2", n)
+	}
+}

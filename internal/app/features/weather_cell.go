@@ -64,6 +64,9 @@ func (s *Service) WeatherCell(ctx context.Context, key access.Record, target str
 		contributed := slices.Clone(placeFams)
 		for _, w := range c.Warnings {
 			contributed = append(contributed, w.Family)
+			if w.English != nil {
+				contributed = append(contributed, w.English.Family)
+			}
 		}
 		return c, contributed, err
 	})

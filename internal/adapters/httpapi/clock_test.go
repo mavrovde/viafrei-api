@@ -75,3 +75,23 @@ func TestTheOverviewAssessesFreshnessAtTheAnswerClock(t *testing.T) {
 		t.Fatalf("overview freshness: %s", w.Body)
 	}
 }
+
+// A family whose data last changed 2 848 s ago but was confirmed unchanged
+// 169 s ago is current to its confirmation, as the platform judges it: its
+// freshness entry is dated at the confirmation, is not stale against its
+// 990 s threshold, and the answer carries no data_stale warning (#222).
+func TestConfirmedUnchangedDataDoesNotReadAsStale(t *testing.T) {
+	req.Covers(t, "ENV-003")
+	confirmed := fresh
+	confirmed.StaleAfter = 990 * time.Second
+	confirmed.DataAsOf, confirmed.ReadAt = tp(fixedNow.Add(-2848*time.Second)), tp(fixedNow.Add(-169*time.Second))
+	a := overviewAnswer()
+	a.Families = []provenance.Family{confirmed}
+	w := do(t, featureHandler(t, config.Defaults(), &fakeFeatures{overview: a}, nil), http.MethodGet, "/v1/places/pl-01-0001/overview", bearer)
+	if !bytes.Contains(w.Body.Bytes(), []byte(`"family":"src-alpha-energy","dataAsOf":"2026-03-29T01:27:11Z","ageS":169,"staleAfterS":990,"stale":false`)) {
+		t.Fatalf("overview freshness: %s", w.Body)
+	}
+	if bytes.Contains(w.Body.Bytes(), []byte(`"data_stale"`)) {
+		t.Fatalf("a confirmed family reads as stale: %s", w.Body)
+	}
+}

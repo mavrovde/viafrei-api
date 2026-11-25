@@ -14,7 +14,7 @@ import (
 // written, so the rewrite changes no parameter's type, and pgx encodes every
 // value as before.
 // wantOpaque is the count of statements the package rewrites opaquely.
-const wantOpaque = 58
+const wantOpaque = 59
 
 func TestEveryOpaqueReadDeclaresTheTypesPostgresInfers(t *testing.T) {
 	ctx := bounded(t)

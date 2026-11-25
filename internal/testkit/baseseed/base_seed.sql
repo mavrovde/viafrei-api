@@ -749,8 +749,10 @@ BEGIN
     VALUES (vf_test.after_colon(NEW.facility_id), NEW.facility_kind, vf_test.after_colon(NEW.stop_place_id), NEW.position_text,
             now(), now(), 'openstation_netex', 'DB');
     INSERT INTO public.station_equipment_state (equipment_id, status, state, status_since, last_seen_at, known_equipment, source_feed, source_publisher)
+    -- the state was last restated when the row says it was observed, as
+    -- FaSta's row above: stamped now(), every seeded state read as current
     VALUES (vf_test.after_colon(NEW.facility_id), upper(NEW.facility_status), NEW.facility_status, coalesce(NEW.status_observed_at, now()),
-            now(), true, coalesce(NEW.source_ref, 'openstation_siri_fm'), 'DB');
+            coalesce(NEW.status_observed_at, now()), true, coalesce(NEW.source_ref, 'openstation_siri_fm'), 'DB');
   END IF;
   PERFORM vf_test.seed_check(TG_TABLE_NAME, to_jsonb(NEW));
   RETURN NEW;

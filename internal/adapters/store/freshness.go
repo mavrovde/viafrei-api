@@ -116,11 +116,16 @@ var licenceRows = `select l.code licence_code, l.code licence_name, ` + licenceU
 const confirmationVersion = `coalesce(extract(epoch from f.confirmed_at)::text, '') || '@' || coalesce(f.confirm_interval_s::text, '') || '@' || f.updates_paused::text`
 
 // familyVersion is the version of a family's data that the HTTP cache
-// compares and an ETag is built from, over the feed status as f (freshnessRows):
-// the freshness version AND the instant the data is current to. An answer
-// renders dataAsOf, ageS, stale and Last-Modified from data_as_of, so a
-// moved data_as_of must end a cached answer even when the freshness version
+// compares and an ETag is built from, over the status row as f (freshnessRows):
+// the freshness version AND the instant of the data's last change
+// (data_as_of). An answer renders Last-Modified from data_as_of, so a moved
+// data_as_of must end a cached answer even when the freshness version
 // stayed the same (a source clock that was wrong and is corrected, say).
+// It does not move with a confirmation: an answer dates its freshness entry
+// at the later of the change and the newest confirmation
+// (provenance.Family.KnownCurrent), and a cached answer that states a family
+// stale is also ended by that family's next confirmation (its
+// confirmationVersion), while a fresh one ends when it turns stale.
 // Empty when the family has published nothing; Provenance reads the same
 // expression, so an answer is tagged with the version this read compares.
 const familyVersion = `coalesce(f.freshness_version || '@' || coalesce(extract(epoch from f.data_as_of)::text, ''), '')`

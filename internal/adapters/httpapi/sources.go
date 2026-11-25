@@ -57,14 +57,14 @@ func registerSources(api huma.API, s *server, op huma.Operation) {
 		for _, f := range fams {
 			r := SourceRow{Family: f.Source.Family, Domain: f.Source.Domain, Publisher: f.Source.Publisher, AttributionText: f.Source.AttributionText,
 				Licence: f.Source.Licence, LicenceURL: f.Source.LicenceURL, ShareAlike: f.Source.ShareAlike, TermsURL: f.Source.TermsURL, SourceURL: f.Source.SourceURL,
-				DataAsOf: f.DataAsOf, Status: "grey"}
+				DataAsOf: f.KnownCurrent(), Status: "grey"}
 			if !f.NeverStale {
 				sec := int64(f.StaleAfter / time.Second)
 				r.StaleAfterS = &sec
 			}
-			if f.DataAsOf != nil {
+			if r.DataAsOf != nil {
 				r.Status = "green"
-				if !f.NeverStale && a.At.Sub(*f.DataAsOf) > f.StaleAfter {
+				if !f.NeverStale && a.At.Sub(*r.DataAsOf) > f.StaleAfter {
 					r.Status = "red"
 				}
 			}

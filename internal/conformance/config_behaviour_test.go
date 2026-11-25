@@ -268,6 +268,18 @@ func behaviours() map[string]behaviour {
 		"weather.lookahead": {"6h0m0s", func(t *testing.T, c *config.Config) string {
 			return wire.FeatureSettings(c).LookAhead.String()
 		}},
+		"weather.road_stations": {"5", func(t *testing.T, c *config.Config) string {
+			return fmt.Sprint(wire.FeatureSettings(c).Road.Stations)
+		}},
+		"weather.road_radius_m": {"10000", func(t *testing.T, c *config.Config) string {
+			return fmt.Sprint(wire.FeatureSettings(c).Road.RadiusM)
+		}},
+		"weather.road_current": {"30m0s", func(t *testing.T, c *config.Config) string {
+			return wire.FeatureSettings(c).Road.Current.String()
+		}},
+		"weather.road_lookahead": {"12h0m0s", func(t *testing.T, c *config.Config) string {
+			return wire.FeatureSettings(c).Road.LookAhead.String()
+		}},
 		"clock.fixed_now": {"2001-02-03T04:05:06Z", func(t *testing.T, c *config.Config) string {
 			h, err := httpapi.NewHandler(httpapi.Deps{Config: c, ContractVersion: "0.1", At: wire.AnswerClock(c, slog.New(slog.DiscardHandler))})
 			if err != nil {

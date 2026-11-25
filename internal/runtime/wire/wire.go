@@ -52,8 +52,10 @@ func FeatureSettings(cfg *config.Config) features.Settings {
 		PlannedWorks:   cfg.Roads.PlannedFamilies,
 		MaxWarnings:    cfg.Weather.MaxWarnings,
 		LookAhead:      cfg.Weather.LookAhead,
-		Disabled:       cfg.Sources.Disabled,
-		IsTimeout:      store.IsDeadline,
+		Road: features.RoadReach{Stations: cfg.Weather.RoadStations, RadiusM: float64(cfg.Weather.RoadRadiusM),
+			Current: cfg.Weather.RoadCurrent, LookAhead: cfg.Weather.RoadLookAhead},
+		Disabled:  cfg.Sources.Disabled,
+		IsTimeout: store.IsDeadline,
 	}
 }
 

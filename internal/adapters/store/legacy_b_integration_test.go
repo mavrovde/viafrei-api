@@ -7,17 +7,19 @@ package store
 // its own.
 
 const legacyWarningPlaced = `from contract.weather_warning w
-where w.withdrawn_at is null and w.message_status <> 'cancelled'
+` + legacyWarningText + `where w.withdrawn_at is null and w.message_status <> 'cancelled'
   and w.source_ref = any($1::text[])
   and w.display_class <> 'withhold' and (w.audience = 'public' or ` + ownKeyOn + `)
   and (w.valid_to is null or w.valid_to > $2::timestamptz)
   and w.area is not null and w.area && st_setsrid(st_makepoint($4::float8, $3::float8), 4326)
   and st_intersects(w.area::geography, st_setsrid(st_makepoint($4::float8, $3::float8), 4326)::geography)`
 
-const legacyWarningColumns = `
+var legacyWarningColumns = `
 select w.warning_id, w.source_ref, w.hazard, w.warning_level, w.level_label, w.issuer_name, w.headline,
        w.text_lang, w.valid_from, w.valid_to, coalesce(w.area_name, ''),
-       w.warn_cell_id, w.event, w.identifier, w.published_at
+       w.warn_cell_id, w.event, w.identifier, w.published_at,
+       x.description, x.instruction, x.urgency, x.certainty, en.en_headline, en.en_description, en.en_instruction,
+       ` + descriptionUnaltered("x") + `, ` + englishUnaltered + `
 `
 
 const legacyZoneAlive = `(z.checked_at > $3::timestamptz - make_interval(secs => 3 * coalesce(z.cadence_s, 2592000))
@@ -49,7 +51,7 @@ limit 1`,
 		"api_weather_cell_named": `select exists (select 1 from contract.weather_warning w
   where w.area_name = $2::text and w.source_ref = any($1::text[]) and ` + permitted("w") + `)`,
 		"api_weather_cell_warnings": legacyWarningColumns + `from contract.weather_warning w
-where (w.warn_cell_id = $2::text or w.area_name = $2::text)
+` + legacyWarningText + `where (w.warn_cell_id = $2::text or w.area_name = $2::text)
   and w.source_ref = any($1::text[]) and ` + permitted("w") + `
   and w.withdrawn_at is null and w.message_status <> 'cancelled'
   and w.valid_from <= $3::timestamptz and (w.valid_to is null or w.valid_to > $3::timestamptz)

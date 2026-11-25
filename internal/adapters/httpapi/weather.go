@@ -25,21 +25,36 @@ type WeatherRiskInput struct {
 
 // WeatherWarning is one official weather warning, in the issuer's words.
 type WeatherWarning struct {
-	ID             string      `json:"id"`
-	Hazard         string      `json:"hazard" enum:"thunderstorm,wind,rain,snow,ice,fog,heat,frost,uv,flood,other" doc:"What it warns of. Open enumeration; treat an unknown value as other."`
-	Level          int         `json:"level" minimum:"0" maximum:"4" doc:"The official level, 1 (minor) to 4 (extreme), or 0 for an advance notice (Vorabinformation Unwetter), as issued; never re-graded. A level-0 notice does not light the lamp."`
-	LevelName      string      `json:"levelName" doc:"The issuer's name of the level, as issued."`
-	Issuer         string      `json:"issuer" doc:"The issuing service."`
-	Headline       string      `json:"headline" doc:"The official wording, in textLanguage."`
-	TextLanguage   string      `json:"textLanguage" doc:"The language of headline (BCP 47)."`
-	Validity       TimeWindow  `json:"validity"`
-	InForce        bool        `json:"inForce" doc:"Whether the warning is in force at the answer's instant; false for one that starts within weather.lookahead (24 hours by default), which is listed beside those in force as the platform lists it (the lamp reads only those in force)."`
-	Event          *string     `json:"event" nullable:"true" doc:"The issuer's event name, as issued (the DWD's EVENT, e.g. FROST); null when not given."`
-	Identifier     *string     `json:"identifier" nullable:"true" doc:"The issuer's message identifier, as issued; null when not given."`
-	Published      *time.Time  `json:"published" nullable:"true" format:"date-time" doc:"When the issuer published the warning (its sent time); null when not given."`
-	PublishedLocal *string     `json:"publishedLocal" nullable:"true" format:"date-time" doc:"published in Europe/Berlin time; null when published is."`
-	Area           WarningArea `json:"area"`
-	SourceFamily   string      `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
+	ID             string       `json:"id"`
+	Hazard         string       `json:"hazard" enum:"thunderstorm,wind,rain,snow,ice,fog,heat,frost,uv,flood,other" doc:"What it warns of. Open enumeration; treat an unknown value as other."`
+	Level          int          `json:"level" minimum:"0" maximum:"4" doc:"The official level, 1 (minor) to 4 (extreme), or 0 for an advance notice (Vorabinformation Unwetter), as issued; never re-graded. A level-0 notice does not light the lamp."`
+	LevelName      string       `json:"levelName" doc:"The issuer's name of the level, as issued."`
+	Issuer         string       `json:"issuer" doc:"The issuing service."`
+	Headline       string       `json:"headline" doc:"The official wording, in textLanguage."`
+	TextLanguage   string       `json:"textLanguage" doc:"The language of headline (BCP 47)."`
+	Validity       TimeWindow   `json:"validity"`
+	InForce        bool         `json:"inForce" doc:"Whether the warning is in force at the answer's instant; false for one that starts within weather.lookahead (24 hours by default), which is listed beside those in force as the platform lists it (the lamp reads only those in force)."`
+	Event          *string      `json:"event" nullable:"true" doc:"The issuer's event name, as issued (the DWD's EVENT, e.g. FROST); null when not given."`
+	Identifier     *string      `json:"identifier" nullable:"true" doc:"The issuer's message identifier, as issued; null when not given."`
+	Published      *time.Time   `json:"published" nullable:"true" format:"date-time" doc:"When the issuer published the warning (its sent time); null when not given."`
+	PublishedLocal *string      `json:"publishedLocal" nullable:"true" format:"date-time" doc:"published in Europe/Berlin time; null when published is."`
+	Area           WarningArea  `json:"area"`
+	SourceFamily   string       `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
+	Description    *string      `json:"description" nullable:"true" doc:"The issuer's full text of the warning, in textLanguage, unaltered; null when not given."`
+	Instruction    *string      `json:"instruction" nullable:"true" doc:"The issuer's advice on what to do, in textLanguage, unaltered; null when not given."`
+	Unaltered      bool         `json:"unaltered" doc:"Whether description is, provably, the text the issuer published: not empty, and its UTF-8 bytes still hash (SHA-256) to the hash taken over them when it was received, as the platform checks before it quotes the issuer's wording under the issuer's source note. False when description is null or changed since; such a text may not be passed on as the issuer's."`
+	Urgency        *string      `json:"urgency" nullable:"true" doc:"The issuer's CAP urgency (e.g. Immediate, Future), as issued; null when not given."`
+	Certainty      *string      `json:"certainty" nullable:"true" doc:"The issuer's CAP certainty (e.g. Observed, Likely), as issued; null when not given."`
+	English        *WarningText `json:"english" doc:"The issuer's own English text of the warning, its English message for the same alert, unaltered; null when the issuer gave none or its English source is not read for the key. The source is credited in meta.attribution when given."`
+}
+
+// WarningText is a warning's wording in one more language, as issued.
+type WarningText struct {
+	Headline     *string `json:"headline" nullable:"true" doc:"The headline, unaltered; null when not given."`
+	Description  *string `json:"description" nullable:"true" doc:"The full text, unaltered; null when not given."`
+	Instruction  *string `json:"instruction" nullable:"true" doc:"The advice on what to do, unaltered; null when not given."`
+	Unaltered    bool    `json:"unaltered" doc:"Whether the text is, provably, the issuer's own: a headline or a description given, and the headline, description and instruction, NUL-separated, still hash (SHA-256) to the hash taken when it was received, as the platform checks before it quotes the issuer's English. False else; such a text may not be passed on as the issuer's."`
+	SourceFamily string  `json:"sourceFamily" doc:"The source family of the text; its attribution is in meta.attribution."`
 }
 
 // WarningArea is the area a warning is issued for.
@@ -72,10 +87,48 @@ type RoadWeatherObservation struct {
 // states neither, and the /v1 contract keeps both (VER-001), so the parity
 // harness leaves them out (parity.Default).
 type WeatherRiskData struct {
-	Lamp        string                   `json:"lamp" enum:"green,amber,red" doc:"Over every warning in force at the position, whatever min_level and hazards keep (they filter only the list), first match: red when a warning of level 3 or 4 is in force; amber for a warning of level 1 or 2, or, with no warning in force, when the sight is limited: a weather family the key may not read was left out (meta.partial), or a weather family read has no data or stale data (meta.freshness), since no warning cannot then be told from none heard; green when no warning is in force and every family is fresh."`
-	Warnings    []WeatherWarning         `json:"warnings" doc:"The warnings min_level and hazards keep, ordered by level descending, then validity.from ascending, then id; at most weather.max_warnings."`
-	Truncated   bool                     `json:"truncated" doc:"True when more warnings answer than weather.max_warnings and only the first are listed; the lamp reads them all."`
-	RoadWeather []RoadWeatherObservation `json:"roadWeather" doc:"Road-weather observations near a corridor; present for along questions only, so always empty on a question about one position."`
+	Lamp               string                   `json:"lamp" enum:"green,amber,red" doc:"Over every warning in force at the position, whatever min_level and hazards keep (they filter only the list), first match: red when a warning of level 3 or 4 is in force; amber for a warning of level 1 or 2, or, with no warning in force, when the sight is limited: a weather family the key may not read was left out (meta.partial), or a weather family read has no data or stale data (meta.freshness), since no warning cannot then be told from none heard; green when no warning is in force and every family is fresh."`
+	Warnings           []WeatherWarning         `json:"warnings" doc:"The warnings min_level and hazards keep, ordered by level descending, then validity.from ascending, then id; at most weather.max_warnings."`
+	Truncated          bool                     `json:"truncated" doc:"True when more warnings answer than weather.max_warnings and only the first are listed; the lamp reads them all."`
+	RoadWeather        []RoadWeatherObservation `json:"roadWeather" doc:"Road-weather observations near a corridor; present for along questions only, so always empty on a question about one position."`
+	RoadForecast       []RoadForecastStation    `json:"roadForecast" doc:"The issuer's road-surface forecast near the position, as the platform's weather warnings check reads it: the nearest open, active road-weather stations within 25 km, at most 3, nearest first, each with its forecast hours from 60 minutes before the answer's instant to 24 hours after it, earliest first. A station with no hour in that window is not listed; empty when no station of a family the key may read answers. Its sources and their conditions are in meta.attribution and meta.notes when a station is listed."`
+	RoadForecastLoaded bool                     `json:"roadForecastLoaded" doc:"Whether the road-weather station catalogue is loaded and the key may read it and the forecast, as the platform's weather warnings check tells its two empty answers apart: with roadForecast empty, true means no station within 25 km answers (reason no_station_within_radius), false that the forecast is not offered here (reason not_loaded). True whenever a station is listed."`
+}
+
+// RoadForecastStation is a road-weather station and its forecast hours.
+type RoadForecastStation struct {
+	ID             string             `json:"id" doc:"The issuer's station id."`
+	Name           string             `json:"name" doc:"The issuer's station name."`
+	SegmentType    *int               `json:"segmentType" nullable:"true" doc:"The issuer's road segment type of the station, as issued; null when not given."`
+	PositionSource *string            `json:"positionSource" nullable:"true" doc:"How the issuer took the station's position, as issued; null when not given."`
+	Location       Position           `json:"location"`
+	DistanceM      int                `json:"distanceM" doc:"Distance from the position in metres, rounded."`
+	Hours          []RoadForecastHour `json:"hours" doc:"The forecast hours, earliest first."`
+	SourceFamily   string             `json:"sourceFamily" doc:"The source family of the station; its attribution is in meta.attribution."`
+	ForecastFamily string             `json:"forecastFamily" doc:"The source family of the forecast hours; its attribution is in meta.attribution."`
+}
+
+// RoadForecastHour is one forecast hour of a road-weather station.
+type RoadForecastHour struct {
+	ValidAt       time.Time `json:"validAt" format:"date-time" doc:"The hour the forecast is for (UTC)."`
+	ValidAtLocal  string    `json:"validAtLocal" format:"date-time" doc:"validAt in Europe/Berlin time."`
+	RunAt         time.Time `json:"runAt" format:"date-time" doc:"When the issuer's forecast run that gave this hour was made (UTC)."`
+	RoadCondition *int      `json:"roadCondition" nullable:"true" minimum:"1" maximum:"6" doc:"The issuer's road-condition class, as issued: 1 dry, 2 damp, 3 snow, 4 hoarfrost, 5 freezing wet, 6 black ice; 3 and above is slippery as the platform reads it. Null when not given."`
+	SurfaceTempC  *float64  `json:"surfaceTempC" nullable:"true" doc:"The forecast road-surface temperature in degrees Celsius, as issued; null when not given."`
+}
+
+// roadForecast is the answer of the road-surface forecast.
+func roadForecast(stations []weather.RoadStation) []RoadForecastStation {
+	out := make([]RoadForecastStation, len(stations))
+	for i, st := range stations {
+		hs := make([]RoadForecastHour, len(st.Hours))
+		for j, h := range st.Hours {
+			hs[j] = RoadForecastHour{ValidAt: h.ValidAt, ValidAtLocal: local(h.ValidAt), RunAt: h.RunAt, RoadCondition: h.Class, SurfaceTempC: h.SurfaceTempC}
+		}
+		out[i] = RoadForecastStation{ID: st.ID, Name: st.Name, SegmentType: st.Segment, PositionSource: st.PositionSource,
+			Location: position(st.Location), DistanceM: st.DistanceM, Hours: hs, SourceFamily: st.Family, ForecastFamily: st.ForecastFamily}
+	}
+	return out
 }
 
 // WeatherRiskQuery is meta.query of getWeatherRisk.
@@ -126,7 +179,8 @@ func registerWeatherRisk(api huma.API, s *server, op huma.Operation) {
 		noteWeatherLamp(ctx, a)
 		ws := weatherWarnings(a.Items, a.At)
 		return &WeatherRiskOutput{CacheControl: noStore, Body: WeatherRiskEnvelope{
-			Data: WeatherRiskData{Lamp: string(a.Lamp), Warnings: ws, Truncated: a.HasMore, RoadWeather: []RoadWeatherObservation{}},
+			Data: WeatherRiskData{Lamp: string(a.Lamp), Warnings: ws, Truncated: a.HasMore, RoadWeather: []RoadWeatherObservation{},
+				RoadForecast: roadForecast(a.Road.Stations), RoadForecastLoaded: a.Road.Loaded},
 			Meta: WeatherRiskMeta{
 				DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
 				Query:    WeatherRiskQuery{At: position(q.At), MinLevel: in.MinLevel, Hazards: hazards},
@@ -333,6 +387,10 @@ func weatherWarnings(items []weather.Warning, at time.Time) []WeatherWarning {
 			Headline: w.Headline, TextLanguage: w.TextLanguage, Validity: timeWindow(w.From, w.Until),
 			InForce: !w.From.After(at), Area: WarningArea{Name: w.AreaName, CellID: w.CellID}, SourceFamily: w.Family,
 			Event: w.Event, Identifier: w.Identifier,
+			Description: w.Description, Instruction: w.Instruction, Urgency: w.Urgency, Certainty: w.Certainty, Unaltered: w.Unaltered,
+		}
+		if e := w.English; e != nil {
+			ws[i].English = &WarningText{Headline: e.Headline, Description: e.Description, Instruction: e.Instruction, SourceFamily: e.Family, Unaltered: e.Unaltered}
 		}
 		if w.Published != nil {
 			p, l := w.Published.UTC(), local(*w.Published)

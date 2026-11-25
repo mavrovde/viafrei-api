@@ -14697,6 +14697,556 @@
       ]
     },
     {
+      "id": "station-page-db",
+      "operation": "getStationPage",
+      "counterpart": "station page",
+      "request": "/v1/stations/8001001/page?departures=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit",
+          "accessibility"
+        ],
+        "sources": [
+          "db_stada",
+          "delfi_static",
+          "delfi_rt_tu",
+          "openstation_siri_fm",
+          "delfi_sa_alpha",
+          "db_timetables"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "apiOnly": "Until the MCP side records the station page with a key that reads DB Timetables (the 2.6.52 bundle's key reads none): the API's own lock proves the page's DB board and lamp meanwhile.",
+      "facts": [
+        {
+          "name": "data.pageUrl",
+          "value": "https://viafrei.de/de/station/seed-ijaijceeccig"
+        },
+        {
+          "name": "data.sections[departures].asOf",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].cancelled",
+          "value": "false"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].category",
+          "value": "ICE"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].delayMin",
+          "value": "5"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].destination",
+          "value": "Schömpingbach"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].expectedAt",
+          "value": "2026-03-30T00:08:50Z"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].id",
+          "value": "db_timetables:2026-03-30t00:03:50z:ice 571/0"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].journeyId",
+          "value": "db_timetables:2026-03-30T00:03:50Z:ICE 571"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].line",
+          "value": "ICE 571"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].mode",
+          "value": "rail"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].noForecast",
+          "value": "false"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].plannedAt",
+          "value": "2026-03-30T00:03:50Z"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].plannedAtLocal",
+          "value": "2026-03-30T00:03:50Z"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].plannedPlatform",
+          "value": "5"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].platform",
+          "value": "7"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].platformChanged",
+          "value": "true"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].realtime",
+          "value": "true"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].realtimeSource",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].routeType",
+          "value": "2"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].sourceFamily",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].trainNumber",
+          "value": "571"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].cancelled",
+          "value": "true"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].category",
+          "value": "RE"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].delayMin",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].destination",
+          "value": "Schömpingbach"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].expectedAt",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].id",
+          "value": "db_timetables:2026-03-30t00:11:50z:re 1/0"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].journeyId",
+          "value": "db_timetables:2026-03-30T00:11:50Z:RE 1"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].line",
+          "value": "RE 1"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].mode",
+          "value": "rail"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].noForecast",
+          "value": "false"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].plannedAt",
+          "value": "2026-03-30T00:11:50Z"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].plannedAtLocal",
+          "value": "2026-03-30T00:11:50Z"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].plannedPlatform",
+          "value": "2"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].platform",
+          "value": "2"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].platformChanged",
+          "value": "false"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].realtime",
+          "value": "true"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].realtimeSource",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].routeType",
+          "value": "2"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].sourceFamily",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].trainNumber",
+          "value": "4713"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].cancelled",
+          "value": "false"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].category",
+          "value": "S"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].delayMin",
+          "value": "0"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].destination",
+          "value": "Schömpingbach"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].expectedAt",
+          "value": "2026-03-30T00:19:50Z"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].id",
+          "value": "db_timetables:2026-03-30t00:19:50z:s 3/0"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].journeyId",
+          "value": "db_timetables:2026-03-30T00:19:50Z:S 3"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].line",
+          "value": "S 3"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].mode",
+          "value": "sbahn"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].noForecast",
+          "value": "false"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].plannedAt",
+          "value": "2026-03-30T00:19:50Z"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].plannedAtLocal",
+          "value": "2026-03-30T00:19:50Z"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].plannedPlatform",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].platform",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].platformChanged",
+          "value": "false"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].realtime",
+          "value": "true"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].realtimeSource",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].routeType",
+          "value": "2"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].sourceFamily",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].trainNumber",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[departures].id",
+          "value": "departures"
+        },
+        {
+          "name": "data.sections[departures].sources",
+          "value": "[\"db_timetables\",\"delfi_static\"]"
+        },
+        {
+          "name": "data.sections[header].asOf",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.sections[header].header.category",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[header].header.city",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[header].header.eva",
+          "value": "8001001"
+        },
+        {
+          "name": "data.sections[header].header.evaNumbers",
+          "value": "[\"8001001\",\"8001002\",\"8001003\"]"
+        },
+        {
+          "name": "data.sections[header].header.land",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[header].header.name",
+          "value": "Schömpingbach Hbf"
+        },
+        {
+          "name": "data.sections[header].header.slug",
+          "value": "seed-ijaijceeccig"
+        },
+        {
+          "name": "data.sections[header].header.stationNo",
+          "value": "822292607"
+        },
+        {
+          "name": "data.sections[header].header.street",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[header].header.zipcode",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[header].id",
+          "value": "header"
+        },
+        {
+          "name": "data.sections[header].sources",
+          "value": "[\"db_stada\"]"
+        },
+        {
+          "name": "data.sections[lifts].asOf",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[lifts].id",
+          "value": "lifts"
+        },
+        {
+          "name": "data.sections[lifts].lifts",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[lifts].sources",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[parking_charging].asOf",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.sections[parking_charging].facilities.flags",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[parking_charging].facilities.location",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[parking_charging].id",
+          "value": "parking_charging"
+        },
+        {
+          "name": "data.sections[parking_charging].sources",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[platforms].asOf",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[platforms].id",
+          "value": "platforms"
+        },
+        {
+          "name": "data.sections[platforms].sources",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[rail_ampel].asOf",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.sections[rail_ampel].id",
+          "value": "rail_ampel"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lamp",
+          "value": "red"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[0].lamp",
+          "value": "unknown"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[0].line",
+          "value": "ICE 571"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[0].long",
+          "value": "true"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[0].reasons",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[0].trips",
+          "value": "1"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[1].lamp",
+          "value": "yellow"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[1].line",
+          "value": "RE 1"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[1].long",
+          "value": "false"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[1].reasons[0].kind",
+          "value": "cancelled"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[1].reasons[0].lamp",
+          "value": "yellow"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[1].reasons[0].n",
+          "value": "1"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[1].reasons[0].of",
+          "value": "1"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[1].trips",
+          "value": "1"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[2].lamp",
+          "value": "unknown"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[2].line",
+          "value": "S 3"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[2].long",
+          "value": "false"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[2].reasons",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[2].trips",
+          "value": "1"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.reasons[0].kind",
+          "value": "cancelled"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.reasons[0].lamp",
+          "value": "red"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.reasons[0].n",
+          "value": "1"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.reasons[0].of",
+          "value": "3"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.trips",
+          "value": "3"
+        },
+        {
+          "name": "data.sections[rail_ampel].sources",
+          "value": "[\"db_timetables\",\"delfi_static\"]"
+        },
+        {
+          "name": "data.sections[service_alerts].alerts",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[service_alerts].asOf",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.sections[service_alerts].id",
+          "value": "service_alerts"
+        },
+        {
+          "name": "data.sections[service_alerts].sources",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[step_free_now].asOf",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.sections[step_free_now].id",
+          "value": "step_free_now"
+        },
+        {
+          "name": "data.sections[step_free_now].sources",
+          "value": "[\"db_stada\"]"
+        },
+        {
+          "name": "data.sections[step_free_now].stepFreeNow.blocked",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[step_free_now].stepFreeNow.platforms",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[step_free_now].stepFreeNow.steplessAccess",
+          "value": "null"
+        },
+        {
+          "name": "meta.attribution[db_stada].family",
+          "value": "db_stada"
+        },
+        {
+          "name": "meta.attribution[db_timetables].family",
+          "value": "db_timetables"
+        },
+        {
+          "name": "meta.attribution[delfi_static].family",
+          "value": "delfi_static"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
       "id": "stop-boards",
       "operation": "listStopBoards",
       "counterpart": "departures around a place",
@@ -14723,8 +15273,32 @@
           "value": "7.79000"
         },
         {
-          "name": "data.stops",
+          "name": "data.stops[1:de:01002:0].departures",
           "value": "[]"
+        },
+        {
+          "name": "data.stops[1:de:01002:0].distanceM",
+          "value": "371"
+        },
+        {
+          "name": "data.stops[1:de:01002:0].id",
+          "value": "1:de:01002:0"
+        },
+        {
+          "name": "data.stops[1:de:01002:0].location.lat",
+          "value": "49.14816"
+        },
+        {
+          "name": "data.stops[1:de:01002:0].location.lon",
+          "value": "7.78575"
+        },
+        {
+          "name": "data.stops[1:de:01002:0].name",
+          "value": "Namüningen Süd"
+        },
+        {
+          "name": "data.stops[1:de:01002:0].stopId",
+          "value": "de:01002:0"
         },
         {
           "name": "data.window.from",
@@ -14785,7 +15359,7 @@
         },
         {
           "name": "data.kind",
-          "value": "region"
+          "value": "state"
         },
         {
           "name": "data.label",

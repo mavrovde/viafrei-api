@@ -2269,6 +2269,30 @@
       "now": "2026-03-30T00:00:00Z"
     },
     {
+      "id": "station-page-db",
+      "operation": "getStationPage",
+      "counterpart": "station page",
+      "request": "/v1/stations/8001001/page?departures=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit",
+          "accessibility"
+        ],
+        "sources": [
+          "db_stada",
+          "delfi_static",
+          "delfi_rt_tu",
+          "openstation_siri_fm",
+          "delfi_sa_alpha",
+          "db_timetables"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "apiOnly": "Until the MCP side records the station page with a key that reads DB Timetables (the 2.6.52 bundle's key reads none): the API's own lock proves the page's DB board and lamp meanwhile."
+    },
+    {
       "id": "stop-boards",
       "operation": "listStopBoards",
       "counterpart": "departures around a place",

@@ -25,8 +25,9 @@ func TestLocationAnswer(t *testing.T) {
 	req.Covers(t, "ENV-040")
 	f := everyAnswer()
 	f.location = features.LocationAnswer{
-		Location: places.Location{Address: &places.Address{ID: "osm:node1", DistanceM: ip(40)}, District: &places.Place{ID: "d1", Name: "Kreis", DistanceM: ip(9000)}},
-		Meta:     features.Answer[struct{}]{Families: []provenance.Family{transitFamily}, At: fixedNow},
+		Location: places.Location{Address: &places.Address{ID: "osm:node1", DistanceM: ip(40)}, District: &places.Place{ID: "d1", Name: "Kreis", DistanceM: ip(9000)},
+			Gemeinde: &places.Gemeinde{Name: "Köln", Code: "05315000", Inside: true, Kreis: sp("Köln"), Bezirk: sp("Köln"), Family: "f1"}},
+		Meta: features.Answer[struct{}]{Families: []provenance.Family{transitFamily}, At: fixedNow},
 	}
 	h := featureHandler(t, config.Defaults(), f, nil)
 	w := do(t, h, http.MethodGet, "/v1/location?at=50.94,6.96", bearer)
@@ -34,7 +35,8 @@ func TestLocationAnswer(t *testing.T) {
 	if w.Code != http.StatusOK || f.gotLoc.At.Lat != 50.94 {
 		t.Fatalf("status %d: %s", w.Code, body)
 	}
-	for _, want := range []string{`"distanceM":40`, `"municipality":null`, `"name":"Kreis"`, `"state":null`, `"mayLieOutsideGermany":false`, `"lowEmissionZone":null`} {
+	for _, want := range []string{`"distanceM":40`, `"municipality":null`, `"name":"Kreis"`, `"state":null`, `"mayLieOutsideGermany":false`, `"lowEmissionZone":null`,
+		`"gemeinde":{"name":"Köln","code":"05315000","inside":true,"kreis":"Köln","bezirk":"Köln","sourceFamily":"f1"},"governmentRegion":"Köln"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("answer lacks %s: %s", want, body)
 		}

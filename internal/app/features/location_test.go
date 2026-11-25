@@ -70,7 +70,7 @@ func locationService(f *locationFake) *features.Service {
 func TestLocation(t *testing.T) {
 	req.Covers(t, "SEC-030")
 	full := key("commercial", []access.Scope{"places"}, "f1")
-	v := places.Location{Address: &places.Address{Family: "f1"}, District: &places.Place{Family: "f1"}, State: &places.Place{Family: "f1"}}
+	v := places.Location{Address: &places.Address{Family: "f1"}, District: &places.Place{Family: "f1"}, State: &places.Place{Family: "f1"}, Gemeinde: &places.Gemeinde{Family: "f1"}}
 	a, err := locationService(&locationFake{v: v}).Location(context.Background(), full, places.LocationQuery{})
 	if err != nil || a.Address == nil || a.Municipality != nil || !a.Meta.At.Equal(now) || a.Zone != nil || !slices.Equal(names(a.Meta.Families), []string{"f1"}) {
 		t.Errorf("answer %+v %v", a, err)
@@ -93,6 +93,7 @@ func TestLocation(t *testing.T) {
 		"no places":  {&locationFake{fake: &fake{}}, access.ErrNonePermitted},
 		"read":       {&locationFake{err: errStore}, errStore},
 		"post-check": {&locationFake{v: places.Location{Municipality: &places.Place{Family: "f2"}}}, features.ErrGateViolation},
+		"gemeinde":   {&locationFake{v: places.Location{Gemeinde: &places.Gemeinde{Family: "f2"}}}, features.ErrGateViolation},
 		"zones":      {&locationFake{roads: true, zoneErr: errStore}, errStore},
 		"zone check": {&locationFake{roads: true, zones: []rules.Zone{{Role: "zone", Inside: true, Family: "z2"}}}, features.ErrGateViolation},
 		"provenance": {&locationFake{fake: &fake{provErr: errStore}}, errStore},

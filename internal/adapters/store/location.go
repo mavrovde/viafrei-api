@@ -176,7 +176,8 @@ func (s *Store) Location(ctx context.Context, q places.LocationQuery, families [
 		}
 		out.State = first(ps)
 		if out.Address != nil && *out.Address.DistanceM <= places.AbroadNearestM {
-			return out, nil
+			out.Gemeinde, err = gemeinde(ctx, tx, q, out.Address, families)
+			return out, err
 		}
 		rows, _ = run(ctx, tx, addressSectors, places.SectorWedges(q.At, places.AbroadScanM, places.AbroadSectors), families)
 		hits, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (bool, error) {
@@ -187,7 +188,11 @@ func (s *Store) Location(ctx context.Context, q places.LocationQuery, families [
 			err := r.Scan(&i, &hit)
 			return hit, err
 		})
-		if err != nil || places.LongestEmptyRun(hits) < places.AbroadEmptyRun {
+		if err != nil {
+			return out, err
+		}
+		if places.LongestEmptyRun(hits) < places.AbroadEmptyRun {
+			out.Gemeinde, err = gemeinde(ctx, tx, q, out.Address, families)
 			return out, err
 		}
 		out.MayLieAbroad = true
@@ -198,4 +203,60 @@ func (s *Store) Location(ctx context.Context, q places.LocationQuery, families [
 		}
 		return out, err
 	})
+}
+
+// gemeindeAt reads the Gemeinde the position ($2, $3) lies in, as today's
+// GEMEINDE_AT_POINT: $1 the nearest address's town folded (nil for none),
+// named within $4 metres, else the nearest within $5, of the families $6;
+// with its Kreis and Regierungsbezirk by key.
+var gemeindeAt = named("api_location_gemeinde", `
+with pt as (select st_setsrid(st_makepoint((select $2::float8), (select $3::float8)), 4326)::geography g),
+gem as (
+  select x.pref, x.admin_code, x.name, x.source_id from (
+    (select 1 pref, g.admin_code, g.name, g.source_id
+       from gazetteer_places g, pt
+      where (select $1::text) is not null
+        and `+keyedGemeinde+` and g.name_norm = (select $1::text)
+        and st_dwithin(g.geom, pt.g, (select $4::float8))
+      order by g.geom <-> pt.g
+      limit 1)
+    union all
+    (select 2 pref, g.admin_code, g.name, g.source_id
+       from gazetteer_places g, pt
+      where `+keyedGemeinde+`
+        and st_dwithin(g.geom, pt.g, (select $5::float8))
+      order by g.geom <-> pt.g
+      limit 1)
+  ) x
+  order by pref
+  limit 1)
+select gem.pref = 1, gem.admin_code, gem.name,
+       (select d.name from gazetteer_places d
+         where d.closed_at is null and d.source_id = 'bkg_gvisys' and d.kind = 'district' and d.admin_code = left(gem.admin_code, 5)
+         limit 1),
+       (select r.name from gazetteer_places r
+         where r.closed_at is null and r.source_id = 'bkg_gvisys' and r.kind = 'admin' and r.admin_code = left(gem.admin_code, 3)
+         limit 1),
+       gem.source_id
+from gem
+where gem.source_id = any((select $6::text[])::text[])`, "text", "float8", "float8", "float8", "float8", "text[]")
+
+// keyedGemeinde is an open BKG Gemeinde row g with its eight-digit key, as
+// the platform's keyedGemeinde.
+const keyedGemeinde = `g.closed_at is null and g.source_id = 'bkg_gvisys' and g.kind = 'city' and g.admin_code ~ '^[0-9]{8}$'`
+
+// gemeinde reads the Gemeinde the position lies in, by the nearest
+// address's town; nil when none.
+func gemeinde(ctx context.Context, tx pgx.Tx, q places.LocationQuery, addr *places.Address, families []string) (*places.Gemeinde, error) {
+	var town *string
+	if addr != nil {
+		town = places.GemeindeFold(addr.Place)
+	}
+	rows, _ := run(ctx, tx, gemeindeAt, town, q.At.Lon, q.At.Lat, float64(places.GemeindeByNameM), float64(places.GemeindeNearestM), families)
+	gs, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.Gemeinde, error) {
+		var g places.Gemeinde
+		err := r.Scan(&g.Inside, &g.Code, &g.Name, &g.Kreis, &g.Bezirk, &g.Family)
+		return g, err
+	})
+	return first(gs), err
 }

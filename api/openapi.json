@@ -3034,6 +3034,59 @@
               "null"
             ]
           },
+          "gemeinde": {
+            "additionalProperties": false,
+            "description": "The Gemeinde the position lies in: the one the nearest German address names as its town (inside true), else the nearest Gemeinde within 15 km (inside false); null when none, or when the position may lie outside Germany. It decides the Kreis and the Regierungsbezirk, by its key.",
+            "properties": {
+              "bezirk": {
+                "description": "The Regierungsbezirk its key names; null where there is none.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "code": {
+                "description": "Its eight-digit official key (AGS).",
+                "type": "string"
+              },
+              "inside": {
+                "description": "True when the nearest German address names it as its town; false when it is only the nearest Gemeinde.",
+                "type": "boolean"
+              },
+              "kreis": {
+                "description": "The Kreis its key names; null when the gazetteer holds none.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "sourceFamily": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "code",
+              "inside",
+              "kreis",
+              "bezirk",
+              "sourceFamily"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "governmentRegion": {
+            "description": "The Regierungsbezirk the Gemeinde lies in; null where its Land has none, or with no Gemeinde.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "lowEmissionZone": {
             "additionalProperties": false,
             "description": "The low-emission zone the position lies in, as the platform's description of a position states it; null when the key may read no zone source.",
@@ -3264,6 +3317,8 @@
           "district",
           "state",
           "mayLieOutsideGermany",
+          "gemeinde",
+          "governmentRegion",
           "lowEmissionZone"
         ],
         "type": "object"

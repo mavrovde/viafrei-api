@@ -183,4 +183,7 @@ type Location struct {
 	// the nearest address, the table it is read from.
 	MayLieAbroad bool
 	AbroadFamily string
+	// Gemeinde is the Gemeinde the position lies in; nil when the position
+	// may lie abroad or none is read.
+	Gemeinde *Gemeinde
 }

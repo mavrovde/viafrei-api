@@ -60,6 +60,9 @@ func (s *Service) Location(ctx context.Context, key access.Record, q places.Loca
 	if v.MayLieAbroad && v.AbroadFamily != "" {
 		contributed = append(contributed, v.AbroadFamily)
 	}
+	if v.Gemeinde != nil {
+		contributed = append(contributed, v.Gemeinde.Family)
+	}
 	if err := gate.Check(contributed); err != nil {
 		return LocationAnswer{}, err
 	}

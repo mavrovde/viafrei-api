@@ -151,7 +151,7 @@ func TestTheOfficialCellsAreKeptUnderTheirFamiliesVersions(t *testing.T) {
 	if _, err := st.FreshnessVersions(bounded(t)); err != nil {
 		t.Fatal(err)
 	}
-	exec(`revoke select on speed_enforcement from api_reader`)
+	revoke(t, cp, "speed_enforcement")
 	if _, err := st.SpeedCameras(bounded(t), q, fams); err == nil {
 		t.Fatal("a cameras read whose official cells cannot be read succeeded")
 	}

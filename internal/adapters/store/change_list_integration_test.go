@@ -22,6 +22,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
+	"github.com/mavrovde/viafrei-api/internal/testkit/pgtest"
 )
 
 // A price a poll confirmed unchanged is restated in fuel_price_latest, and
@@ -271,7 +272,7 @@ func TestTheReferenceFingerprintsAreReadWhenTheirRowsMove(t *testing.T) {
 	if _, err := read(); err != nil {
 		t.Fatal(err)
 	}
-	exec(`revoke select on gazetteer_places from api_reader`)
+	revoke(t, cp, "gazetteer_places")
 	if kept, err := read(); err != nil || kept.LampReference != base.LampReference {
 		t.Fatalf("a kept read failed or moved: %q, %v", kept.LampReference, err)
 	}
@@ -281,10 +282,32 @@ func TestTheReferenceFingerprintsAreReadWhenTheirRowsMove(t *testing.T) {
 	}
 	// The versions read itself failing fails the answer, kept or not.
 	st.WithReferenceVersions(5 * time.Minute)
-	exec(`revoke select on licence_texts from api_reader`)
+	revoke(t, cp, "licence_texts")
 	if _, err := read(); err == nil {
 		t.Fatal("a versions read whose probe cannot be read succeeded")
 	}
+}
+
+// revoke takes api_reader's SELECT on the table away, for a read that must
+// fail, and gives it back when the test ends, before the reads it ran are
+// replayed beside their view statements (-args -parity): the cleanup is
+// registered after theirs, so it runs first.
+func revoke(t *testing.T, cp *pgtest.DB, table string) {
+	t.Helper()
+	grant := func(sql string) {
+		ctx, cancel := context.WithTimeout(context.Background(), testBound)
+		defer cancel()
+		conn, err := cp.Owner(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = conn.Close(context.Background()) }()
+		if _, err := conn.Exec(ctx, sql); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+	grant(`revoke select on ` + table + ` from api_reader`)
+	t.Cleanup(func() { grant(`grant select on ` + table + ` to api_reader`) })
 }
 
 // The register is read again only when the probe of the rows it is read
@@ -330,7 +353,7 @@ func TestTheRegisterIsReadAgainOnlyWhenItsRowsMove(t *testing.T) {
 	if err != nil || moved == base {
 		t.Fatalf("a register row changed and the register read %q, still %q (%v)", moved, base, err)
 	}
-	exec(`revoke select on contract_sources from api_reader`)
+	revoke(t, cp, "contract_sources")
 	if kept, err := version(fam); err != nil || kept != moved {
 		t.Fatalf("with the probe unchanged the register read %q, %v; want the kept %q", kept, err, moved)
 	}
@@ -339,7 +362,7 @@ func TestTheRegisterIsReadAgainOnlyWhenItsRowsMove(t *testing.T) {
 		t.Fatal("a due register read that cannot read the register succeeded")
 	}
 	exec(`grant select on contract_sources to api_reader`)
-	exec(`revoke select on source_register from api_reader`)
+	revoke(t, cp, "source_register")
 	if _, err := st.Register(bounded(t)); err == nil {
 		t.Fatal("a register read whose probe cannot be read succeeded")
 	}

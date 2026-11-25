@@ -9,7 +9,11 @@ func init() {
 	// The junctions' part of the 'l' row fingerprints what their states are
 	// derived from (junctionLandInputs), not each derived state: on purpose,
 	// the derived states took the read to 0.6 to 1.5 s on prod (fault 2).
-	legacyReads["api_freshness_versions"] = `
+	// The reference rows (r, l, u) moved to their own read (#227), which a
+	// due reference read runs; the freshness read keeps the family rows and
+	// states the reference probe, the row versions of what they are read
+	// from (no view states row versions: the probe is the statement's own).
+	legacyReads["api_reference_versions"] = `
 select 'r', '', md5(concat_ws('|',
   (select string_agg(t::text, ',' order by t::text) from contract.source t),
   (select string_agg(t::text, ',' order by t::text) from contract.source_note t),
@@ -22,14 +26,17 @@ select 'l', '', md5(concat_ws('|',
 union all
 select 'u', '', md5(concat_ws('|',
   (select string_agg(t::text, ',' order by t::text) from contract.rule_topic t),
-  (select string_agg(t::text, ',' order by t::text) from contract.rule_statement t)))
+  (select string_agg(t::text, ',' order by t::text) from contract.rule_statement t)))`
+	legacyReads["api_freshness_versions"] = `
+with fresh as (select * from contract.source_freshness)
+select 'f', f.source_ref::text, ` + familyVersion + ` from fresh f
 union all
-select 'f', f.source_ref::text, ` + familyVersion + ` from contract.source_freshness f
+select 'c', f.source_ref::text, ` + confirmationVersion + ` from fresh f
 union all
-select 'c', f.source_ref::text, ` + confirmationVersion + ` from contract.source_freshness f`
+select 'p', '', ` + referenceProbe
 	legacyReads["api_provenance"] = `
 select s.source_ref, s.domain, p.display_name, s.attribution_text, l.licence_name, l.licence_url,
-       l.share_alike, s.share_alike_offer_url, s.terms_url, p.website, s.stale_after_s, f.data_as_of, f.confirmed_at,
+       l.share_alike, s.share_alike_offer_url, ` + legacyTermsPage + `, p.website, s.stale_after_s, f.data_as_of, f.confirmed_at,
        ` + familyVersion + `,
        array(select n.note_kind from contract.source_note n
              where n.source_ref = s.source_ref and n.lang = $2::text order by n.note_kind, n.body),

@@ -33,7 +33,10 @@ func init() {
 	for need := range places.NeedKinds {
 		namedCases["api_nearby_need_"+need] = nearbyNeedCases
 	}
-	namedCases["api_nearby_junctions"] = nearbyJunctionCases
+	// api_nearby_junctions_osm: the shared fixture holds no junction node;
+	// the junction tests plant them and replay the read (-parity).
+	namedCases["api_nearby_junctions_gazetteer"] = nearbyJunctionCases
+	namedCases["api_junction_roads_lcl"] = junctionRoadCases
 	namedCases["api_state_warnings"] = stateWarningCases
 	namedCases["api_state_alerts"] = stateAlertCases
 	namedCases["api_road_shapes"] = func(*testing.T, context.Context, *pgx.Conn) [][]any { return [][]any{{}} }
@@ -226,10 +229,35 @@ func nearbyNeedCases(t *testing.T, ctx context.Context, c *pgx.Conn) [][]any {
 
 func nearbyJunctionCases(t *testing.T, ctx context.Context, c *pgx.Conn) [][]any {
 	var out [][]any
-	for _, fams := range [][]string{{"bast_lcl"}, {"osm"}, {}} {
-		for _, p := range positions(t, ctx, c, `select st_y(geom::geometry), st_x(geom::geometry) from public.tmc_locations where geom is not null order by cid, tabcd, lcd`) {
+	held := column(t, ctx, c, `select coalesce(array_agg(distinct source_id order by source_id), '{}')::text from public.gazetteer_places where kind = 'junction'`)
+	fams := [][]string{{"bast_lcl"}, {"osm"}, {}}
+	if len(held) == 1 && held[0] != "{}" {
+		fams = append(fams, strings.Split(strings.Trim(held[0], "{}"), ","))
+	}
+	for _, fams := range fams {
+		for _, p := range positions(t, ctx, c, `select st_y(geom::geometry), st_x(geom::geometry) from public.tmc_locations where geom is not null
+		  union all select st_y(geom::geometry), st_x(geom::geometry) from public.gazetteer_places where kind = 'junction' and geom is not null order by 1, 2`) {
 			out = append(out, []any{p[1], p[0], 25000, fams, 40}, []any{p[1], p[0], 2000, fams, 1})
 		}
+	}
+	return out
+}
+
+// junctionRoadCases are every LCL point and OpenStreetMap junction node at
+// once (lon[], lat[]), one point alone and none, under the LCL's family and
+// none.
+func junctionRoadCases(t *testing.T, ctx context.Context, c *pgx.Conn) [][]any {
+	var lon, lat []float64
+	for _, p := range positions(t, ctx, c, `select st_y(geom::geometry), st_x(geom::geometry) from public.tmc_locations where geom is not null
+	  union all select st_y(geom::geometry), st_x(geom::geometry) from public.osm_pois where category_value = 'motorway_junction' order by 1, 2`) {
+		lat, lon = append(lat, p[0]), append(lon, p[1])
+	}
+	if len(lon) == 0 {
+		t.Fatal("no LCL point or junction node in the fixture")
+	}
+	var out [][]any
+	for _, fams := range [][]string{{"bast_lcl"}, {}} {
+		out = append(out, []any{lon, lat, fams}, []any{lon[:1], lat[:1], fams}, []any{[]float64{}, []float64{}, fams})
 	}
 	return out
 }

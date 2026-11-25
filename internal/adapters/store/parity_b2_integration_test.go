@@ -22,7 +22,7 @@ select pt.lon, pt.lat, v.r, v.l, v.fs from pt, fam,
 select pt.lon, pt.lat, 100000::float8, v.fs from (select st_x(geom::geometry) lon, st_y(geom::geometry) lat from public.gbfs_stations where geom is not null
   union all values (13.405::float8, 52.52::float8), (6.0, 47.0)) pt, fam, lateral (values (fam.f), ('{}'::text[])) v(fs)`,
 		"api_speed_official": speedCases,
-		"api_speed_osm":      speedCases,
+		"api_speed_osm":      speedOSMCases,
 		"api_register":       `select`,
 		"api_sources": `select f from (select array_agg(source_ref) f from public.contract_sources union all select '{}'::text[]
        union all select array_agg(source_ref) from (select source_ref from public.contract_sources order by source_ref limit 3) x) v`,
@@ -90,6 +90,12 @@ pt as (select st_x(geom::geometry) lon, st_y(geom::geometry) lat from public.spe
 d as (select coalesce(max(valid_from), current_date) d from public.speed_enforcement union select current_date)
 select pt.lon, pt.lat, v.r, d.d, v.fs, v.l from pt, fam, d,
   lateral (values (2000::float8, fam.f, 50), (20000, fam.f, 3), (2000, '{}'::text[], 50)) v(r, fs, l)`
+
+// speedOSMCases are speedCases with the official lists' Gemeinden the cut
+// is given ($7): none, and the first municipalities of the gazetteer.
+const speedOSMCases = `with c as (select '{}'::text[] cells
+  union all select array(select admin_code from public.gazetteer_places where kind = 'municipality' and admin_code ~ '^[0-9]{8}$' order by admin_code limit 3))
+select s.*, c.cells from (` + speedCases + `) s, c`
 
 // chargingCases are a point at every site and in Berlin (by id: every
 // site's id and one no site holds), now and before and after every report,

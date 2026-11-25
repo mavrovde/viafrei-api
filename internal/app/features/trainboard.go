@@ -10,45 +10,116 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 )
 
-// TrainBoards reads the newest stored board of a station.
+// TrainBoards reads a station's boards: the newest one the live refresher
+// recorded, the one the stored-boards worker wrote, and the interchange
+// under them.
 type TrainBoards interface {
 	// TrainBoard returns the newest board of the station recorded under
 	// the families, nil when none is.
 	TrainBoard(ctx context.Context, eva string, families []string) (*transit.TrainBoard, error)
+	// StoredTrainBoard returns the board the stored-boards worker wrote
+	// for the station of eva under the families, nil when none is.
+	StoredTrainBoard(ctx context.Context, eva string, families []string) (*transit.StoredBoard, error)
+	// TrainInterchange reads the lines and the departing calls in
+	// [from, to) of the timetable stops of the station of evas.
+	TrainInterchange(ctx context.Context, evas []string, from, to time.Time, families []string) (transit.InterchangeRead, error)
 }
 
 // ErrOwnKeyOnly refuses an ask by a key that is not one of ViaFrei's own.
 var ErrOwnKeyOnly = errors.New("features: only ViaFrei's own keys may call this operation")
 
-// TrainBoardAnswer is a station's newest board while it is fresh: Board is
-// nil when none is stored or the newest is older than
-// transit.TrainBoardFreshFor, and AsOf then states the newest fetch held,
-// if any.
+// TrainBoardQuery asks a station's board: its EVA number, how far ahead
+// (minutes) and how many departures.
+type TrainBoardQuery struct {
+	EVA         string
+	DurationMin int
+	Limit       int
+}
+
+// TrainBoardAnswer is a station's board while one is fresh: Board is the
+// board served (a recorded one while fresh, else the stored one while
+// fresh) with the departures of the window shown, Cap what the limit cut,
+// and AsOf the newest read held, if any; Board is nil when none is fresh.
+// Interchange is the U-Bahn and tram block, nil when the station has none.
 type TrainBoardAnswer struct {
-	Board *transit.TrainBoard
-	AsOf  *time.Time
-	Meta  Answer[struct{}]
+	Board       *transit.TrainBoard
+	Cap         *transit.BoardCap
+	AsOf        *time.Time
+	Interchange *transit.Interchange
+	Meta        Answer[struct{}]
 }
 
 // TrainBoard answers a station's board as the MCP server shows it, from
-// the boards the live refresher stored: DB Timetables alone, never a share-alike family.
-func (s *Service) TrainBoard(ctx context.Context, key access.Record, eva string) (TrainBoardAnswer, error) {
+// the boards the live refresher recorded or the stored-boards worker
+// wrote: DB Timetables alone, never a share-alike family; the interchange
+// is the DELFI timetable's, with its own families.
+func (s *Service) TrainBoard(ctx context.Context, key access.Record, q TrainBoardQuery) (TrainBoardAnswer, error) {
 	now := s.now()
-	var asOf *time.Time
-	b, meta, err := listedOwn(ctx, s, key, "transit", func(permitted []string) (*transit.TrainBoard, []string, error) {
+	var out TrainBoardAnswer
+	_, meta, err := listedOwn(ctx, s, key, "transit", func(permitted []string) (struct{}, []string, error) {
 		if !slices.Contains(permitted, transit.TrainBoardFamily) {
-			return nil, nil, access.ErrNonePermitted
+			return struct{}{}, nil, access.ErrNonePermitted
 		}
-		b, err := s.repos.TrainBoards.TrainBoard(ctx, eva, []string{transit.TrainBoardFamily})
-		if err != nil || b == nil {
-			return nil, nil, err
+		fams := []string{transit.TrainBoardFamily}
+		rec, err := s.repos.TrainBoards.TrainBoard(ctx, q.EVA, fams)
+		if err != nil {
+			return struct{}{}, nil, err
 		}
-		at := b.FetchedAt
-		asOf = &at
-		if now.Sub(b.FetchedAt) > transit.TrainBoardFreshFor {
-			return nil, nil, nil
+		stored, err := s.repos.TrainBoards.StoredTrainBoard(ctx, q.EVA, fams)
+		if err != nil {
+			return struct{}{}, nil, err
 		}
-		return b, []string{transit.TrainBoardFamily}, nil
+		for _, at := range []*time.Time{fetched(rec), readAt(stored)} {
+			if at != nil && (out.AsOf == nil || at.After(*out.AsOf)) {
+				out.AsOf = at
+			}
+		}
+		var b *transit.TrainBoard
+		switch {
+		case rec != nil && now.Sub(rec.FetchedAt) <= transit.TrainBoardFreshFor:
+			b = rec
+		case stored != nil && now.Sub(stored.ReadAt) <= transit.StoredBoardFreshFor:
+			v := transit.TrainBoardOf(q.EVA, *stored)
+			b = &v
+		}
+		contributed := []string{}
+		evas := []string{q.EVA}
+		if b != nil {
+			contributed = fams
+			b.Departures, out.Cap = transit.BoardWindow(*b, now, q.DurationMin, q.Limit)
+			out.Board = b
+			if len(b.EVAs) > 0 {
+				evas = b.EVAs
+			}
+		}
+		r, err := s.repos.TrainBoards.TrainInterchange(ctx, evas, now.Add(-transit.InterchangeBackMin*time.Minute),
+			now.Add(time.Duration(q.DurationMin)*time.Minute), permitted)
+		if err != nil {
+			return struct{}{}, nil, err
+		}
+		if out.Interchange = transit.InterchangeOf(r, now, now); out.Interchange != nil {
+			contributed = appendNew(contributed, transit.InterchangeFamily)
+			for _, d := range out.Interchange.Departures {
+				contributed = appendNew(contributed, d.Families...)
+			}
+		}
+		return struct{}{}, contributed, nil
 	})
-	return TrainBoardAnswer{Board: b, AsOf: asOf, Meta: meta}, err
+	out.Meta = meta
+	return out, err
+}
+
+func fetched(b *transit.TrainBoard) *time.Time {
+	if b == nil {
+		return nil
+	}
+	return &b.FetchedAt
+}
+
+func readAt(b *transit.StoredBoard) *time.Time {
+	if b == nil {
+		return nil
+	}
+	at := b.ReadAt.UTC()
+	return &at
 }

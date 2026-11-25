@@ -39,7 +39,7 @@ func (laterFeatures) Refresh(context.Context, access.Record, string) (refresh.Re
 	return refresh.Request{State: refresh.NoneDue}, nil
 }
 
-func (laterFeatures) TrainBoard(context.Context, access.Record, string) (features.TrainBoardAnswer, error) {
+func (laterFeatures) TrainBoard(context.Context, access.Record, features.TrainBoardQuery) (features.TrainBoardAnswer, error) {
 	return features.TrainBoardAnswer{}, nil
 }
 

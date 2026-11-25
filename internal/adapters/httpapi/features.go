@@ -48,7 +48,7 @@ type Features interface {
 	RequestRefresh(ctx context.Context, key access.Record, a refresh.Ask) (refresh.Request, error)
 	Refresh(ctx context.Context, key access.Record, id string) (refresh.Request, error)
 	ParkingBays(ctx context.Context, key access.Record, q parking.BayQuery) (features.BaysAnswer, error)
-	TrainBoard(ctx context.Context, key access.Record, eva string) (features.TrainBoardAnswer, error)
+	TrainBoard(ctx context.Context, key access.Record, q features.TrainBoardQuery) (features.TrainBoardAnswer, error)
 	Places(ctx context.Context, key access.Record, q places.Query) (features.Answer[places.Place], error)
 	FuelStations(ctx context.Context, key access.Record, q energy.FuelQuery) (features.FuelStations, error)
 	FuelStation(ctx context.Context, key access.Record, id string, held time.Duration) (energy.FuelStationPage, features.Answer[struct{}], error)
@@ -116,6 +116,8 @@ var nullableObjects = []struct{ schema, member string }{
 	{"ParkingSite", "occupancy"},
 	{"ParkingListing", "occupancy"},
 	{"ParkingMeta", "around"},
+	{"TrainBoardData", "capped"},
+	{"TrainBoardData", "interchange"},
 	{"RoadSituation", "location"},
 	{"RoadSituation", "lanes"},
 	{"RoadSituation", "position"},

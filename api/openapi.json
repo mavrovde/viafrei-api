@@ -2641,6 +2641,108 @@
         ],
         "type": "object"
       },
+      "InterchangeDeparture": {
+        "additionalProperties": false,
+        "properties": {
+          "cancelled": {
+            "type": "boolean"
+          },
+          "delayMin": {
+            "description": "Minutes late (negative early); null when cancelled or no live figure stands.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "destination": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expectedAt": {
+            "description": "The time a live figure expects; null without one.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "line": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "live": {
+            "description": "Whether a live figure stands for it; false: the timetable's time.",
+            "type": "boolean"
+          },
+          "mode": {
+            "enum": [
+              "subway",
+              "tram"
+            ],
+            "type": "string"
+          },
+          "plannedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "platform": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "routeType": {
+            "description": "The timetable's route type code.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "sourceFamily": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "line",
+          "routeType",
+          "destination",
+          "platform",
+          "plannedAt",
+          "expectedAt",
+          "delayMin",
+          "cancelled",
+          "live",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
+      "InterchangeLines": {
+        "additionalProperties": false,
+        "properties": {
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "modes": {
+            "description": "subway, tram or bus; several when the name could be either.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "modes",
+          "lines"
+        ],
+        "type": "object"
+      },
       "KeyData": {
         "additionalProperties": false,
         "properties": {
@@ -10859,8 +10961,36 @@
               "null"
             ]
           },
+          "capped": {
+            "additionalProperties": false,
+            "description": "What the limit cut; null when nothing was.",
+            "properties": {
+              "more": {
+                "description": "How many more departures the window holds.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "until": {
+                "description": "The planned time of the last of them.",
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "more",
+              "until"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "degraded": {
+            "description": "Whether the board served was read in part (a plan hour or the changes missing): its rows are what it read.",
+            "type": "boolean"
+          },
           "departures": {
-            "description": "The fresh board's departures by planned time; empty without a fresh board.",
+            "description": "The departures of the window, the next to leave first up to the limit, in planned order; empty without a fresh board.",
             "items": {
               "$ref": "#/components/schemas/TrainBoardDeparture"
             },
@@ -10869,8 +10999,15 @@
           "eva": {
             "type": "string"
           },
+          "evaNumbers": {
+            "description": "The station's EVA numbers the board merges, the asked one first.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "fetchedAt": {
-            "description": "When the newest board held was fetched, fresh or not; null when none is held.",
+            "description": "When the board served was read; without one, when the newest board held was, fresh or not; null when none is held.",
             "format": "date-time",
             "type": [
               "string",
@@ -10878,16 +11015,48 @@
             ]
           },
           "fresh": {
-            "description": "Whether a board fetched no longer ago than the MCP server's cache lifetime (30 s) is held: false is no fresh board.",
+            "description": "Whether a fresh board is held: one the live refresher fetched no longer ago than the MCP server's cache lifetime (30 s), or one the stored-boards worker wrote no longer ago than 20 minutes. False is no fresh board.",
             "type": "boolean"
+          },
+          "interchange": {
+            "additionalProperties": false,
+            "description": "The U-Bahn and tram at the station, from the DELFI timetable and its realtime; null when the station has neither a departure nor a line to name.",
+            "properties": {
+              "departures": {
+                "description": "The next U-Bahn and tram departures, in planned order, at most 10.",
+                "items": {
+                  "$ref": "#/components/schemas/InterchangeDeparture"
+                },
+                "type": "array"
+              },
+              "lines": {
+                "description": "The U-Bahn, tram and bus lines here.",
+                "items": {
+                  "$ref": "#/components/schemas/InterchangeLines"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "departures",
+              "lines"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
           }
         },
         "required": [
           "eva",
+          "evaNumbers",
           "fresh",
           "fetchedAt",
           "ageSeconds",
-          "departures"
+          "degraded",
+          "departures",
+          "capped",
+          "interchange"
         ],
         "type": "object"
       },
@@ -10929,7 +11098,7 @@
             ]
           },
           "number": {
-            "description": "The train number.",
+            "description": "The train number; null when the board stated none (a stored board states the number in the line).",
             "type": [
               "string",
               "null"
@@ -10958,6 +11127,13 @@
           },
           "sourceFamily": {
             "type": "string"
+          },
+          "stationPart": {
+            "description": "The part of the station it leaves from, when the station's EVA numbers name several (Frankfurt (Main) Hbf (tief)); null for the main part, and on a board that does not state the part.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -10972,6 +11148,7 @@
           "plannedPlatform",
           "platformChanged",
           "cancelled",
+          "stationPart",
           "sourceFamily"
         ],
         "type": "object"
@@ -26370,7 +26547,7 @@
     },
     "/v1/train-boards/{eva}": {
       "get": {
-        "description": "The newest DB Timetables departure board the live refresher fetched for the station, while it was fetched no longer ago than the MCP server's own cache lifetime (30 s): DB Timetables alone, CC BY 4.0, never blended with a share-alike source. Without one, fresh is false and the answer states when the newest board held was fetched. Needs the scope transit.",
+        "description": "A station's DB Timetables departure board while a fresh one is held, without a refresh: the newest board the live refresher fetched (no older than the MCP server's cache lifetime, 30 s), else the board the stored-boards worker wrote for the station (no older than 20 minutes), its EVA numbers merged into one list. DB Timetables alone, CC BY 4.0, never blended with a share-alike source; the interchange under it is the DELFI timetable's, with its own sources in meta. Without a fresh board, fresh is false and the answer states when the newest board held was read. Needs the scope transit.",
         "operationId": "getTrainBoard",
         "parameters": [
           {
@@ -26385,6 +26562,34 @@
               ],
               "pattern": "^[0-9]{7}$",
               "type": "string"
+            }
+          },
+          {
+            "description": "How many departures to show, the next to leave first (1 to 50).",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 5,
+              "description": "How many departures to show, the next to leave first (1 to 50).",
+              "format": "int64",
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "How far ahead to look, in minutes (5 to 120).",
+            "explode": false,
+            "in": "query",
+            "name": "duration_min",
+            "schema": {
+              "default": 60,
+              "description": "How far ahead to look, in minutes (5 to 120).",
+              "format": "int64",
+              "maximum": 120,
+              "minimum": 5,
+              "type": "integer"
             }
           },
           {
@@ -26411,9 +26616,13 @@
                     "value": {
                       "data": {
                         "eva": "8001001",
+                        "evaNumbers": [
+                          "8001001"
+                        ],
                         "fresh": true,
                         "fetchedAt": "2026-03-30T00:00:00Z",
                         "ageSeconds": 0,
+                        "degraded": false,
                         "departures": [
                           {
                             "line": null,
@@ -26427,9 +26636,12 @@
                             "plannedPlatform": "4",
                             "platformChanged": false,
                             "cancelled": false,
+                            "stationPart": null,
                             "sourceFamily": "db_timetables"
                           }
-                        ]
+                        ],
+                        "capped": null,
+                        "interchange": null
                       },
                       "meta": {
                         "requestId": "example-request-0001",

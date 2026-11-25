@@ -177,16 +177,7 @@ func TestDeparturesAndAnUnknownStation(t *testing.T) {
 	if _, err := st.Station(bounded(t), "no-such-station", fams); !errors.Is(err, transit.ErrNotFound) {
 		t.Fatalf("an unknown station: %v", err)
 	}
-	var (
-		station string
-		at      time.Time
-	)
-	if !fixtureRow(t, `select d.stop_place_id, d.planned_departure_at from contract.departure d
-		where d.boarding and exists (select 1 from contract.scheduled_call nx join contract.stop_point np on np.stop_point_id = nx.stop_point_id
-		  where nx.journey_id = d.journey_id and nx.call_order > d.call_order and np.stop_place_id <> d.stop_place_id)
-		order by d.planned_departure_at, d.journey_id limit 1`, &station, &at) {
-		dbAsk(t, "contract.departure holds no boarding call with a later stop: no board lists a call")
-	}
+	station, at := boardingCall(t, "")
 	ds, err := st.Departures(bounded(t), transit.DepartureQuery{StationID: station, From: at, Window: time.Minute, Limit: 5}, fams)
 	if err != nil || len(ds) == 0 {
 		t.Fatalf("%+v %v", ds, err)
@@ -379,4 +370,19 @@ func TestStationRecordAndAlerts(t *testing.T) {
 		!slices.Equal(rows[0].CarriedBy, []string{"delfi_rt_sa", "delfi_siri_sx"}) {
 		t.Errorf("%+v %v", rows, err)
 	}
+}
+
+// boardingCall is the fixture's first boarding call with a later stop (of
+// the route types where adds a predicate on d.route_type): its station and
+// planned time.
+func boardingCall(t *testing.T, where string) (station string, at time.Time) {
+	t.Helper()
+	if !fixtureRow(t, `select d.stop_place_id, d.planned_departure_at from contract.departure d
+		where d.boarding and exists (select 1 from contract.scheduled_call nx join contract.stop_point np on np.stop_point_id = nx.stop_point_id
+		  where nx.journey_id = d.journey_id and nx.call_order > d.call_order and np.stop_place_id <> d.stop_place_id)
+		`+where+`
+		order by d.planned_departure_at, d.journey_id limit 1`, &station, &at) {
+		dbAsk(t, "contract.departure holds no boarding call with a later stop: no board lists a call")
+	}
+	return station, at
 }

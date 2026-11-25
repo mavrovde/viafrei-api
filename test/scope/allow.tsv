@@ -153,3 +153,8 @@ denylist	internal/adapters/store/parking_around.go	-	owner decision 2026-11-23: 
 vocabulary	internal/adapters/store/parking_around.go	feed	the platform's column and check names of a road-context row's source
 denylist	internal/adapters/store/parking_around_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
 vocabulary	internal/adapters/store/parking_around_integration_test.go	feed	the platform's register and status ledger names, which this test writes to state a source's last check
+denylist	internal/adapters/store/trainboard_stored.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+vocabulary	internal/adapters/store/trainboard_stored.go	feed	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/trainboard_stored.go	feeds	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/trainboard_stored.go	gtfs	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+denylist	internal/adapters/store/trainboard_stored_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables

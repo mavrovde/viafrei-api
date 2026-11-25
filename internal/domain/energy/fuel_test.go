@@ -19,11 +19,11 @@ func TestRankFuelIsThePlatformsSearch(t *testing.T) {
 	yes := true
 	allDay, saturday := Hours{WholeDay: &yes}, Hours{Times: []OpeningTime{{Text: "Sa", Start: "08:00", End: "12:00"}}}
 	stations := []FuelStation{
-		{ID: "a", Name: s("ARAL Nord"), Brand: s("ARAL"), DistanceM: 100, Open: "open", Hours: allDay, Prices: []FuelPrice{{"e5", 1.9, cur}, {"diesel", 1.7, cur}}},
-		{ID: "b", Name: s("Shell Mitte"), Brand: s("Shell"), DistanceM: 200, Open: "open", Hours: saturday, Prices: []FuelPrice{{"e5", 1.8, cur}}},
-		{ID: "c", Brand: s("Jet"), DistanceM: 300, Open: "open", Prices: []FuelPrice{{"e5", 1.5, old}}},
-		{ID: "d", Name: s("Aral Süd"), Brand: s("ARAL"), DistanceM: 400, Open: "open", Hours: allDay, Prices: []FuelPrice{{"e5", 1.8, cur}}},
-		{ID: "e", DistanceM: 500, Open: "closed", Hours: allDay, Prices: []FuelPrice{{"e5", 1.4, old}}},
+		{ID: "a", Name: s("ARAL Nord"), Brand: s("ARAL"), DistanceM: 100, Open: "open", Hours: allDay, Prices: []FuelPrice{{"e5", 1.9, cur, nil}, {"diesel", 1.7, cur, nil}}},
+		{ID: "b", Name: s("Shell Mitte"), Brand: s("Shell"), DistanceM: 200, Open: "open", Hours: saturday, Prices: []FuelPrice{{"e5", 1.8, cur, nil}}},
+		{ID: "c", Brand: s("Jet"), DistanceM: 300, Open: "open", Prices: []FuelPrice{{"e5", 1.5, old, nil}}},
+		{ID: "d", Name: s("Aral Süd"), Brand: s("ARAL"), DistanceM: 400, Open: "open", Hours: allDay, Prices: []FuelPrice{{"e5", 1.8, cur, nil}}},
+		{ID: "e", DistanceM: 500, Open: "closed", Hours: allDay, Prices: []FuelPrice{{"e5", 1.4, old, nil}}},
 		{ID: "f", Name: s(""), DistanceM: 600, Hours: allDay},
 	}
 	ids := func(a FuelAnswer) []string {
@@ -84,3 +84,26 @@ func TestFuelCoverageState(t *testing.T) {
 		}
 	}
 }
+
+// The reported state is the newest observation's that stated one.
+func TestReportedIsTheNewestObservationsState(t *testing.T) {
+	yes, no := true, false
+	t0 := time.Date(2026, 3, 29, 1, 0, 0, 0, time.UTC)
+	for _, c := range []struct {
+		prices []FuelPrice
+		state  string
+		at     *time.Time
+	}{
+		{nil, "unknown", nil},
+		{[]FuelPrice{{ObservedAt: t0}}, "unknown", nil},
+		{[]FuelPrice{{ObservedAt: t0, Open: &yes}, {ObservedAt: t0.Add(time.Minute), Open: &no}}, "closed", ptr(t0.Add(time.Minute))},
+		{[]FuelPrice{{ObservedAt: t0.Add(time.Minute), Open: &yes}, {ObservedAt: t0, Open: &no}, {ObservedAt: t0.Add(time.Hour)}}, "open", ptr(t0.Add(time.Minute))},
+	} {
+		s, at := Reported(c.prices)
+		if s != c.state || (at == nil) != (c.at == nil) || (at != nil && !at.Equal(*c.at)) {
+			t.Errorf("%v: %s %v, want %s %v", c.prices, s, at, c.state, c.at)
+		}
+	}
+}
+
+func ptr[T any](v T) *T { return &v }

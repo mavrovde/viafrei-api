@@ -42,7 +42,10 @@ order by l.observed_at desc, 1, 3 limit 1`, &id, &fam, &product, &lat, &lon, &ti
 	restated := tick.Add(6 * time.Hour).Truncate(time.Second)
 	st, _ := private(t,
 		`update fuel_price_latest set observed_at = '`+restated.Format(time.RFC3339)+`' where station_id = '`+id+`' and product = '`+product+`'`,
-		`update fuel_price_latest set deleted_at = now() where station_id = '`+id+`' and product <> '`+product+`'`)
+		`update fuel_price_latest set deleted_at = now() where station_id = '`+id+`' and product <> '`+product+`'`,
+		`update fuel_price_latest set is_open = false where station_id = '`+id+`' and product = '`+product+`'`,
+		// hours never read from the provider are none: no 24 h claim
+		`update fuel_stations set whole_day = true, detail_refreshed_at = null where id = '`+id+`'`)
 	ctx := access.WithAudience(bounded(t), access.AudienceOwn)
 	near, err := st.FuelNear(ctx, energy.FuelQuery{At: geo.Point{Lat: lat, Lon: lon}, RadiusM: 50, Limit: 10}, []string{fam})
 	if err != nil {
@@ -57,6 +60,10 @@ order by l.observed_at desc, 1, 3 limit 1`, &id, &fam, &product, &lat, &lon, &ti
 	if got == nil || len(got.Prices) != 1 || got.Prices[0].Product != product || !got.Prices[0].ObservedAt.Equal(restated) {
 		t.Fatalf("station %s: %+v", id, got)
 	}
+	// the state reported with the price, at its time
+	if got.Open != "closed" || got.OpenObservedAt == nil || !got.OpenObservedAt.Equal(restated) || got.Hours.WholeDay != nil || got.Hours.AsOf != nil {
+		t.Errorf("opening: %s %v, hours %+v", got.Open, got.OpenObservedAt, got.Hours)
+	}
 	p := got.Prices[0]
 	for _, c := range []struct {
 		age     time.Duration
@@ -69,6 +76,9 @@ order by l.observed_at desc, 1, 3 limit 1`, &id, &fam, &product, &lat, &lon, &ti
 	page, err := st.FuelStation(ctx, id, []string{fam}, restated.Add(29*time.Minute), 30*time.Minute)
 	if err != nil || len(page.Prices) != 1 || !page.Prices[0].ObservedAt.Equal(restated) {
 		t.Fatalf("by id, 29 min after the confirmation: %+v %v", page.Prices, err)
+	}
+	if page.Open != "closed" || page.Hours.WholeDay != nil {
+		t.Errorf("by id, opening: %s, hours %+v", page.Open, page.Hours)
 	}
 	// Past the held window the price is not held; the station is.
 	if late, err := st.FuelStation(ctx, id, []string{fam}, restated.Add(31*time.Minute), 30*time.Minute); err != nil || len(late.Prices) != 0 {

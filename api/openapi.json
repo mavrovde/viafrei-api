@@ -2271,6 +2271,22 @@
               "null"
             ]
           },
+          "openingHoursAsOf": {
+            "description": "When the station's published opening hours were last read from the provider. Null when never: then the station has no published hours and no claim of being open around the clock is made.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "openingObservedAt": {
+            "description": "When the station reported the open state it reported, with a price (under sort=price, with the asked grade's price): the state openingState states under sort=price. Null when no observation stated one.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "openingState": {
             "description": "open, closed or unknown at the answer's instant (open_at's, when asked), read from the published opening hours: unknown when there are none or they cannot be read. Under sort=price, the state the station reported, as the platform's cheapest-fuel search states it. Open enumeration.",
             "type": "string"
@@ -2294,6 +2310,8 @@
           "location",
           "distanceM",
           "openingState",
+          "openingObservedAt",
+          "openingHoursAsOf",
           "prices",
           "sourceFamily"
         ],

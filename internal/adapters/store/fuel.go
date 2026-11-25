@@ -24,15 +24,16 @@ var fuelNear = named("api_fuel_near", `
 with here as (select st_setsrid(st_makepoint((select $1::float8), (select $2::float8)), 4326)::geography g),
 fam as (`+ruledFamilies("(select $4::text[])")+`)
 select f.id, f.name, f.brand, st_y(f.geom::geometry), st_x(f.geom::geometry),
-       round(st_distance(f.geom, here.g))::int, coalesce(f.state, 'unknown'), coalesce(f.source_feed, f.source), f.whole_day, f.opening_times,
-       coalesce(p.products, '{}'), coalesce(p.prices, '{}'), coalesce(p.observed, '{}')
+       round(st_distance(f.geom, here.g))::int, coalesce(f.source_feed, f.source), `+fuelHours+`,
+       coalesce(p.products, '{}'), coalesce(p.prices, '{}'), coalesce(p.observed, '{}'), coalesce(p.open, '{}')
 from fuel_stations f
 cross join here
 cross join fam
 left join lateral (
   select array_agg(l.product order by l.product) products,
          array_agg(l.price::float8 order by l.product) prices,
-         array_agg(l.observed_at order by l.product) observed
+         array_agg(l.observed_at order by l.product) observed,
+         array_agg(l.is_open order by l.product) open
   from fuel_price_latest l
   where l.station_id = f.id and l.deleted_at is null and l.price is not null and l.source_feed = any(fam.f)) p on true
 where f.deleted_at is null and f.geom is not null
@@ -40,6 +41,23 @@ where f.deleted_at is null and f.geom is not null
   and st_dwithin(f.geom, here.g, (select $3::float8))
 order by st_distance(f.geom, here.g), f.id
 limit (select $5::bigint)`, "float8", "float8", "float8", "text[]", "bigint")
+
+// fuelHours are a station's published hours with the time they were last
+// read from the provider, as today's fuel reads take them: hours never read
+// (no detail_refreshed_at) are none, so no 24 h claim is made without its
+// date.
+const fuelHours = `case when f.detail_refreshed_at is not null then f.whole_day end,
+       case when f.detail_refreshed_at is not null then f.opening_times end, f.detail_refreshed_at`
+
+// fuelPrices are a station's newest prices per grade, each with the open
+// state the station reported with it.
+func fuelPrices(products []string, prices []float64, observed []time.Time, open []*bool) []energy.FuelPrice {
+	var out []energy.FuelPrice
+	for i := range products {
+		out = append(out, energy.FuelPrice{Product: products[i], Price: prices[i], ObservedAt: observed[i], Open: open[i]})
+	}
+	return out
+}
 
 // FuelNear reads the filling stations within q's radius (features.Fuel).
 func (s *Store) FuelNear(ctx context.Context, q energy.FuelQuery, families []string) ([]energy.FuelStation, error) {
@@ -51,12 +69,12 @@ func (s *Store) FuelNear(ctx context.Context, q energy.FuelQuery, families []str
 				products []string
 				prices   []float64
 				observed []time.Time
+				open     []*bool
 			)
-			err := r.Scan(&v.ID, &v.Name, &v.Brand, &v.Location.Lat, &v.Location.Lon, &v.DistanceM, &v.Open, &v.Family,
-				&v.Hours.WholeDay, &v.Hours.Times, &products, &prices, &observed)
-			for i := range products {
-				v.Prices = append(v.Prices, energy.FuelPrice{Product: products[i], Price: prices[i], ObservedAt: observed[i]})
-			}
+			err := r.Scan(&v.ID, &v.Name, &v.Brand, &v.Location.Lat, &v.Location.Lon, &v.DistanceM, &v.Family,
+				&v.Hours.WholeDay, &v.Hours.Times, &v.Hours.AsOf, &products, &prices, &observed, &open)
+			v.Prices = fuelPrices(products, prices, observed, open)
+			v.Open, v.OpenObservedAt = energy.Reported(v.Prices)
 			return v, err
 		})
 	})
@@ -120,15 +138,16 @@ func (s *Store) FuelCoverage(ctx context.Context, q energy.FuelQuery, families [
 // families. Withdrawn, it is not found.
 var fuelByID = named("api_fuel_by_id", `
 with fam as (`+ruledFamilies("(select $2::text[])")+`)
-select f.id, f.name, f.brand, st_y(f.geom::geometry), st_x(f.geom::geometry), coalesce(f.state, 'unknown'), coalesce(f.source_feed, f.source),
-       f.whole_day, f.opening_times, f.street, f.house_no, f.postcode, f.city,
-       coalesce(p.products, '{}'), coalesce(p.prices, '{}'), coalesce(p.observed, '{}')
+select f.id, f.name, f.brand, st_y(f.geom::geometry), st_x(f.geom::geometry), coalesce(f.source_feed, f.source),
+       `+fuelHours+`, f.street, f.house_no, f.postcode, f.city,
+       coalesce(p.products, '{}'), coalesce(p.prices, '{}'), coalesce(p.observed, '{}'), coalesce(p.open, '{}')
 from fuel_stations f
 cross join fam
 left join lateral (
   select array_agg(l.product order by l.product) products,
          array_agg(l.price::float8 order by l.product) prices,
-         array_agg(l.observed_at order by l.product) observed
+         array_agg(l.observed_at order by l.product) observed,
+         array_agg(l.is_open order by l.product) open
   from fuel_price_latest l
   where l.station_id = f.id and l.deleted_at is null and l.price is not null
     and l.observed_at > (select $4::timestamptz) - make_interval(secs => (select $3::int)) and l.observed_at <= (select $4::timestamptz)
@@ -146,20 +165,20 @@ func (s *Store) FuelStation(ctx context.Context, id string, families []string, n
 			products []string
 			prices   []float64
 			observed []time.Time
+			open     []*bool
 		)
 		rows, _ := run(ctx, tx, fuelByID, id, families, int(held.Seconds()), now)
 		_, err := pgx.CollectOneRow(rows, func(r pgx.CollectableRow) (struct{}, error) {
 			return struct{}{}, r.Scan(
-				&v.ID, &v.Name, &v.Brand, &v.Location.Lat, &v.Location.Lon, &v.Open, &v.Family, &v.Hours.WholeDay, &v.Hours.Times,
-				&v.Address.Street, &v.Address.HouseNumber, &v.Address.Postcode, &v.Address.City, &products, &prices, &observed)
+				&v.ID, &v.Name, &v.Brand, &v.Location.Lat, &v.Location.Lon, &v.Family, &v.Hours.WholeDay, &v.Hours.Times, &v.Hours.AsOf,
+				&v.Address.Street, &v.Address.HouseNumber, &v.Address.Postcode, &v.Address.City, &products, &prices, &observed, &open)
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
 			// No such station is an answer, not a failure of storage.
 			return energy.FuelStationPage{}, nil
 		}
-		for i := range products {
-			v.Prices = append(v.Prices, energy.FuelPrice{Product: products[i], Price: prices[i], ObservedAt: observed[i]})
-		}
+		v.Prices = fuelPrices(products, prices, observed, open)
+		v.Open, v.OpenObservedAt = energy.Reported(v.Prices)
 		return v, err
 	})
 	if err == nil && out.ID == "" {

@@ -27,12 +27,12 @@ func TestFuelStationsAnswer(t *testing.T) {
 	// The station reports closed, and its published hours have it open
 	// around the clock: the answer states the hours' state, as the platform
 	// does. A price is current inside fuel.price_fresh (30 minutes).
-	allDay := true
+	allDay, closed := true, false
 	fam := provenance.Family{Source: access.Source{Family: "src-gamma-energy", Domain: "energy", Publisher: "P", AttributionText: "T", Licence: "L", LicenceURL: "https://licences.example/f"}, StaleAfter: time.Hour}
 	f.fuel = features.FuelStations{
 		Answer: features.Answer[energy.FuelStation]{Items: []energy.FuelStation{
 			{ID: "f1", Name: sp("ARAL Nord"), Brand: sp("ARAL"), Location: geo.Point{Lat: 50.1, Lon: 8.6}, DistanceM: 300, Open: "closed", Hours: energy.Hours{WholeDay: &allDay},
-				Prices: []energy.FuelPrice{{Product: "e5", Price: 1.859, ObservedAt: fixedNow.Add(-10 * time.Minute)}, {Product: "diesel", Price: 1.7, ObservedAt: fixedNow.Add(-48 * time.Hour)}},
+				Prices: []energy.FuelPrice{{Product: "e5", Price: 1.859, ObservedAt: fixedNow.Add(-10 * time.Minute), Open: &closed}, {Product: "diesel", Price: 1.7, ObservedAt: fixedNow.Add(-48 * time.Hour)}},
 				Family: "src-gamma-energy"},
 		}, HasMore: true, Families: []provenance.Family{fam}, At: fixedNow},
 		Matched: 3, DroppedClosed: 1, DroppedUnknown: 2,
@@ -69,13 +69,21 @@ func TestFuelStationsAnswer(t *testing.T) {
 	data, _ = decode(t, w)["data"].([]any)
 	s0, _ = data[0].(map[string]any)
 	prices, _ = s0["prices"].([]any)
-	if p0, _ := prices[0].(map[string]any); len(prices) != 1 || p0["fuel"] != "e5" || s0["openingState"] != "closed" || f.gotFuel.Sort != "price" {
+	if p0, _ := prices[0].(map[string]any); len(prices) != 1 || p0["fuel"] != "e5" || s0["openingState"] != "closed" || f.gotFuel.Sort != "price" ||
+		s0["openingObservedAt"] != fixedNow.Add(-10*time.Minute).UTC().Format(time.RFC3339) {
 		t.Errorf("by price %v", s0)
 	}
-	f.fuel.Items[0].Open = ""
+	// the asked grade's price stated no state
+	f.fuel.Items[0].Prices[0].Open = nil
 	data, _ = decode(t, do(t, h, http.MethodGet, "/v1/fuel-options?at=50.1,8.6&fuel=e5&sort=price&limit=1", bearer))["data"].([]any)
-	if s0, _ = data[0].(map[string]any); s0["openingState"] != "unknown" {
+	if s0, _ = data[0].(map[string]any); s0["openingState"] != "unknown" || s0["openingObservedAt"] != nil {
 		t.Errorf("by price, no reported state: %v", s0)
+	}
+	// no price of the asked grade: no reported state
+	f.fuel.Items[0].Prices = f.fuel.Items[0].Prices[1:]
+	data, _ = decode(t, do(t, h, http.MethodGet, "/v1/fuel-options?at=50.1,8.6&fuel=e5&sort=price&limit=1", bearer))["data"].([]any)
+	if s0, _ = data[0].(map[string]any); s0["openingState"] != "unknown" || s0["openingObservedAt"] != nil {
+		t.Errorf("by price, no price of the grade: %v", s0)
 	}
 	f.fuel = features.FuelStations{}
 	if w = do(t, h, http.MethodGet, "/v1/fuel-options?at=50.1,8.6", bearer); w.Code != http.StatusOK {

@@ -65,12 +65,17 @@ type FuelPrice struct {
 
 // FuelStation is a filling station of an answer.
 type FuelStation struct {
-	ID           string      `json:"id"`
-	Name         *string     `json:"name" nullable:"true" doc:"The station's name; null when not published."`
-	Brand        *string     `json:"brand" nullable:"true" doc:"The brand; null when not published."`
-	Location     Position    `json:"location"`
-	DistanceM    int         `json:"distanceM" doc:"Distance from the asked position in metres, to the nearest 100 m: the platform's filling-station search states it in kilometres to one decimal (0.1 km). The order is by the exact distance."`
-	OpenState    string      `json:"openingState" doc:"open, closed or unknown at the answer's instant (open_at's, when asked), read from the published opening hours: unknown when there are none or they cannot be read. Under sort=price, the state the station reported, as the platform's cheapest-fuel search states it. Open enumeration."`
+	ID        string   `json:"id"`
+	Name      *string  `json:"name" nullable:"true" doc:"The station's name; null when not published."`
+	Brand     *string  `json:"brand" nullable:"true" doc:"The brand; null when not published."`
+	Location  Position `json:"location"`
+	DistanceM int      `json:"distanceM" doc:"Distance from the asked position in metres, to the nearest 100 m: the platform's filling-station search states it in kilometres to one decimal (0.1 km). The order is by the exact distance."`
+	OpenState string   `json:"openingState" doc:"open, closed or unknown at the answer's instant (open_at's, when asked), read from the published opening hours: unknown when there are none or they cannot be read. Under sort=price, the state the station reported, as the platform's cheapest-fuel search states it. Open enumeration."`
+	// OpenObservedAt is when the station reported the state openingState
+	// states under sort=price.
+	OpenObservedAt *time.Time `json:"openingObservedAt" nullable:"true" doc:"When the station reported the open state it reported, with a price (under sort=price, with the asked grade's price): the state openingState states under sort=price. Null when no observation stated one."`
+	// HoursAsOf is when the published hours were last read.
+	HoursAsOf    *time.Time  `json:"openingHoursAsOf" nullable:"true" doc:"When the station's published opening hours were last read from the provider. Null when never: then the station has no published hours and no claim of being open around the clock is made."`
 	Prices       []FuelPrice `json:"prices" doc:"The newest price per grade the station reported, by grade; empty when it reported none. Under sort=price, the asked grade's only."`
 	SourceFamily string      `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
 }
@@ -193,30 +198,27 @@ func fuelStations(a features.FuelStations, window time.Duration) []FuelStation {
 				ReportedAtLocal: local(p.ObservedAt), Current: p.Current(a.At, window)}
 		}
 		data[i] = FuelStation{ID: st.ID, Name: st.Name, Brand: st.Brand, Location: position(st.Location),
-			DistanceM: tenthKm(st.DistanceM), OpenState: st.OpenStateAt(openStateInstant(a)), Prices: prices, SourceFamily: st.Family}
+			DistanceM: tenthKm(st.DistanceM), OpenState: st.OpenStateAt(openStateInstant(a)), OpenObservedAt: utc(st.OpenObservedAt),
+			HoursAsOf: utc(st.Hours.AsOf), Prices: prices, SourceFamily: st.Family}
 	}
 	return data
 }
 
 // cheapest restates a price-ordered answer as the platform's cheapest-fuel
-// search states it: each station with the asked grade's price only, and its
-// reported opening state (the price row's), not the published hours'. The
+// search states it: each station with the asked grade's price only, and the
+// opening state the station reported with that price and when, not the
+// published hours'. The
 // cheapest-fuel search reads no hours.
 func cheapest(a features.FuelStations, data []FuelStation, fuel string) []FuelStation {
 	for i, st := range a.Items {
 		data[i].Prices = slices.DeleteFunc(data[i].Prices, func(p FuelPrice) bool { return p.Fuel != fuel })
-		data[i].OpenState = reportedOpenState(st.Open)
+		data[i].OpenState, data[i].OpenObservedAt = "unknown", nil
+		if p := st.Price(fuel); p != nil {
+			s, at := energy.Reported([]energy.FuelPrice{*p})
+			data[i].OpenState, data[i].OpenObservedAt = s, utc(at)
+		}
 	}
 	return data
-}
-
-// reportedOpenState is a station's reported state as an opening state: open,
-// closed, or unknown when the station reported neither.
-func reportedOpenState(open string) string {
-	if open == "open" || open == "closed" {
-		return open
-	}
-	return "unknown"
 }
 
 // tenthKm states a distance as the platform's filling-station search states

@@ -46,6 +46,20 @@ type trFake struct {
 	gotFacFams  []string
 	reach       transit.Reach
 	reachErr    error
+	record      transit.StationRecord
+	recErr      error
+	alertRows   []transit.StationAlertRow
+	alertErr    error
+	gotAlerts   transit.StationAlertsQuery
+}
+
+func (f *trFake) StationRecord(context.Context, string, []string) (transit.StationRecord, error) {
+	return f.record, f.recErr
+}
+
+func (f *trFake) StationAlerts(_ context.Context, q transit.StationAlertsQuery, _ []string) ([]transit.StationAlertRow, error) {
+	f.gotAlerts = q
+	return f.alertRows, f.alertErr
 }
 
 func (f *trFake) TimetableReach(context.Context) (transit.Reach, error) {

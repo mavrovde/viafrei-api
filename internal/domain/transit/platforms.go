@@ -60,6 +60,7 @@ type StationPlatforms struct {
 	Station        *PlatformFacts
 	Platforms      []Platform
 	StepFreeCounts map[string]int
+	Family         string
 }
 
 // Limitation folds an inventory word: true yes, false no, partial
@@ -156,7 +157,7 @@ func PlatformsOf(rows []PlatformRow) []StationPlatforms {
 			}
 			members[t.ElementID] = append(members[t.ElementID], r)
 		}
-		sp := StationPlatforms{StopPlaceID: id, StationName: mine[0].StationName, StepFreeCounts: map[string]int{"yes": 0, "partial": 0, "no": 0, "unknown": 0}}
+		sp := StationPlatforms{StopPlaceID: id, StationName: mine[0].StationName, Family: mine[0].Family, StepFreeCounts: map[string]int{"yes": 0, "partial": 0, "no": 0, "unknown": 0}}
 		if stop != nil {
 			sp.Station = factsOf(*stop)
 			if stop.StationName != nil {

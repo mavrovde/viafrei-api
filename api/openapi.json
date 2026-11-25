@@ -4861,6 +4861,473 @@
         ],
         "type": "object"
       },
+      "PageAlert": {
+        "additionalProperties": false,
+        "properties": {
+          "atStation": {
+            "description": "It names one of the station's stops, not only one of its lines.",
+            "type": "boolean"
+          },
+          "header": {
+            "description": "The publisher's headline, verbatim.",
+            "type": "string"
+          },
+          "lines": {
+            "description": "The station's lines the alert names.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "until": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "header",
+          "lines",
+          "atStation",
+          "until"
+        ],
+        "type": "object"
+      },
+      "PageFacilities": {
+        "additionalProperties": false,
+        "properties": {
+          "flags": {
+            "description": "The facilities DB's register states the station has.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "location": {
+            "additionalProperties": false,
+            "description": "The station's point; null when the register gives none.",
+            "properties": {
+              "lat": {
+                "description": "Latitude in decimal degrees.",
+                "format": "double",
+                "maximum": 90,
+                "minimum": -90,
+                "type": "number"
+              },
+              "lon": {
+                "description": "Longitude in decimal degrees.",
+                "format": "double",
+                "maximum": 180,
+                "minimum": -180,
+                "type": "number"
+              }
+            },
+            "required": [
+              "lat",
+              "lon"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "flags",
+          "location"
+        ],
+        "type": "object"
+      },
+      "PageHeader": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "description": "DB's station category, 1 to 7.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "eva": {
+            "description": "The main EVA number; null when the register gives none.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evaNumbers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "land": {
+            "description": "The Land, named in the language asked.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "description": "The page's slug on viafrei.de.",
+            "type": "string"
+          },
+          "stationNo": {
+            "description": "DB's register number.",
+            "type": "string"
+          },
+          "street": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zipcode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "stationNo",
+          "eva",
+          "evaNumbers",
+          "slug",
+          "street",
+          "zipcode",
+          "city",
+          "land",
+          "category"
+        ],
+        "type": "object"
+      },
+      "PageLift": {
+        "additionalProperties": false,
+        "properties": {
+          "equipmentNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "position": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "enum": [
+              "active",
+              "inactive",
+              "unknown"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "position",
+          "state",
+          "equipmentNo"
+        ],
+        "type": "object"
+      },
+      "PageRailAmpel": {
+        "additionalProperties": false,
+        "properties": {
+          "lamp": {
+            "description": "Over the next hour's trains (no bus): red when a fifth is cancelled, two fifths are more than 5 minutes late or the median delay is 15 minutes; yellow on a cancellation, a tenth late, three platform changes, an alert or a source not read; green with three trains and none of that; else unknown.",
+            "enum": [
+              "green",
+              "yellow",
+              "red",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "lines": {
+            "description": "The lamp per line, long-distance trains as one, long-distance first, then by name.",
+            "items": {
+              "$ref": "#/components/schemas/PageRailLine"
+            },
+            "type": "array"
+          },
+          "reasons": {
+            "description": "Red reasons first.",
+            "items": {
+              "$ref": "#/components/schemas/PageRailReason"
+            },
+            "type": "array"
+          },
+          "trips": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lamp",
+          "trips",
+          "reasons",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "PageRailLine": {
+        "additionalProperties": false,
+        "properties": {
+          "lamp": {
+            "enum": [
+              "green",
+              "yellow",
+              "red",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "line": {
+            "type": "string"
+          },
+          "long": {
+            "type": "boolean"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/PageRailReason"
+            },
+            "type": "array"
+          },
+          "trips": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "line",
+          "long",
+          "lamp",
+          "trips",
+          "reasons"
+        ],
+        "type": "object"
+      },
+      "PageRailReason": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "cancelled",
+              "late",
+              "median",
+              "platform",
+              "alert",
+              "sight",
+              "line"
+            ],
+            "type": "string"
+          },
+          "lamp": {
+            "enum": [
+              "red",
+              "yellow"
+            ],
+            "type": "string"
+          },
+          "line": {
+            "description": "The line whose lamp raised the station's (line).",
+            "type": "string"
+          },
+          "long": {
+            "type": "boolean"
+          },
+          "min": {
+            "description": "The median delay in minutes.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "n": {
+            "description": "How many trains (cancelled, late, platform) or alerts.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "of": {
+            "description": "Of how many trains.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "sources": {
+            "description": "What could not be read (sight).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "lamp"
+        ],
+        "type": "object"
+      },
+      "PageSection": {
+        "additionalProperties": false,
+        "properties": {
+          "alerts": {
+            "items": {
+              "$ref": "#/components/schemas/PageAlert"
+            },
+            "type": "array"
+          },
+          "asOf": {
+            "description": "The instant the section's data stands at (UTC); null when its read had no data, its content then empty.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "departures": {
+            "items": {
+              "$ref": "#/components/schemas/Departure"
+            },
+            "type": "array"
+          },
+          "facilities": {
+            "$ref": "#/components/schemas/PageFacilities"
+          },
+          "header": {
+            "$ref": "#/components/schemas/PageHeader"
+          },
+          "id": {
+            "enum": [
+              "header",
+              "rail_ampel",
+              "step_free_now",
+              "lifts",
+              "platforms",
+              "departures",
+              "service_alerts",
+              "parking_charging"
+            ],
+            "type": "string"
+          },
+          "lifts": {
+            "description": "The station's lifts and escalators, out of service first.",
+            "items": {
+              "$ref": "#/components/schemas/PageLift"
+            },
+            "type": "array"
+          },
+          "platforms": {
+            "$ref": "#/components/schemas/Platforms"
+          },
+          "railAmpel": {
+            "$ref": "#/components/schemas/PageRailAmpel"
+          },
+          "sources": {
+            "description": "The source families the section was read from; each is credited once in meta.attribution.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "stepFreeNow": {
+            "$ref": "#/components/schemas/PageStepFree"
+          }
+        },
+        "required": [
+          "id",
+          "asOf",
+          "sources"
+        ],
+        "type": "object"
+      },
+      "PageStepFree": {
+        "additionalProperties": false,
+        "properties": {
+          "blocked": {
+            "description": "Those whose lift is out of service now.",
+            "items": {
+              "$ref": "#/components/schemas/PageStepFreePlatform"
+            },
+            "type": "array"
+          },
+          "platforms": {
+            "description": "The platforms the inventory calls step-free whose lift is not out of service.",
+            "items": {
+              "$ref": "#/components/schemas/PageStepFreePlatform"
+            },
+            "type": "array"
+          },
+          "steplessAccess": {
+            "description": "The register's stepless access word (yes, no, partial); null when it states none.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "platforms",
+          "blocked",
+          "steplessAccess"
+        ],
+        "type": "object"
+      },
+      "PageStepFreePlatform": {
+        "additionalProperties": false,
+        "properties": {
+          "lift": {
+            "description": "The state of the lifts serving its tracks; none when no lift names them.",
+            "enum": [
+              "ok",
+              "out",
+              "unknown",
+              "none"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tracks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "tracks",
+          "name",
+          "lift"
+        ],
+        "type": "object"
+      },
       "PagedMeta": {
         "additionalProperties": false,
         "properties": {
@@ -6001,6 +6468,31 @@
           "wheelchair",
           "tactileGuidance",
           "levelBoarding"
+        ],
+        "type": "object"
+      },
+      "Platforms": {
+        "additionalProperties": false,
+        "properties": {
+          "releasedOn": {
+            "description": "The Berlin date of DB's newest publication of them; null when none is stated.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stations": {
+            "description": "One per stop place of the inventory.",
+            "items": {
+              "$ref": "#/components/schemas/PlatformsStation"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "releasedOn",
+          "stations"
         ],
         "type": "object"
       },
@@ -8457,6 +8949,48 @@
           "equipmentNo",
           "stateExplanation",
           "nameShared"
+        ],
+        "type": "object"
+      },
+      "StationPageEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "description": "Null when no station of DB's register has that id.",
+            "properties": {
+              "pageUrl": {
+                "description": "The station's page on viafrei.de, in the language asked.",
+                "type": "string"
+              },
+              "sections": {
+                "description": "header, rail_ampel, step_free_now, lifts, platforms, departures, service_alerts, parking_charging, in this order, each present.",
+                "items": {
+                  "$ref": "#/components/schemas/PageSection"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "pageUrl",
+              "sections"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DataMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
         ],
         "type": "object"
       },
@@ -23592,6 +24126,405 @@
         ],
         "x-example-request": "/v1/stations/1:de:04002:2/facilities?limit=3",
         "x-mcp-counterpart": "station facilities",
+        "x-required-scope": "transit"
+      }
+    },
+    "/v1/stations/{stationId}/page": {
+      "get": {
+        "description": "A station's page as the platform's station page shows it, section by section: the register's record, the rail lamp, the step-free platforms now, the lifts, the platforms, the next departures, the service alerts and DB's facility flags. Needs the scope transit.",
+        "operationId": "getStationPage",
+        "parameters": [
+          {
+            "description": "The station: its id as listStations answers it, DB's register number or an EVA number.",
+            "in": "path",
+            "name": "stationId",
+            "required": true,
+            "schema": {
+              "description": "The station: its id as listStations answers it, DB's register number or an EVA number.",
+              "examples": [
+                "1:de:02000:10950"
+              ],
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Most departures the departures section lists, earliest first; default 10.",
+            "explode": false,
+            "in": "query",
+            "name": "departures",
+            "schema": {
+              "description": "Most departures the departures section lists, earliest first; default 10.",
+              "format": "int64",
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "A station's page",
+                    "value": {
+                      "data": {
+                        "pageUrl": "https://viafrei.de/en/station/seed-ijaijceeccig",
+                        "sections": [
+                          {
+                            "id": "header",
+                            "asOf": "2026-03-30T00:00:00Z",
+                            "sources": [
+                              "db_stada"
+                            ],
+                            "header": {
+                              "name": "Schömpingbach Hbf",
+                              "stationNo": "822292607",
+                              "eva": "8001001",
+                              "evaNumbers": [
+                                "8001001",
+                                "8001002",
+                                "8001003"
+                              ],
+                              "slug": "seed-ijaijceeccig",
+                              "street": null,
+                              "zipcode": null,
+                              "city": null,
+                              "land": null,
+                              "category": null
+                            }
+                          },
+                          {
+                            "id": "rail_ampel",
+                            "asOf": "2026-03-30T00:00:00Z",
+                            "sources": [
+                              "delfi_static"
+                            ],
+                            "railAmpel": {
+                              "lamp": "unknown",
+                              "trips": 0,
+                              "reasons": [],
+                              "lines": []
+                            }
+                          },
+                          {
+                            "id": "step_free_now",
+                            "asOf": "2026-03-30T00:00:00Z",
+                            "sources": [
+                              "db_stada"
+                            ],
+                            "stepFreeNow": {
+                              "platforms": [],
+                              "blocked": [],
+                              "steplessAccess": null
+                            }
+                          },
+                          {
+                            "id": "lifts",
+                            "asOf": null,
+                            "sources": [],
+                            "lifts": []
+                          },
+                          {
+                            "id": "platforms",
+                            "asOf": null,
+                            "sources": []
+                          },
+                          {
+                            "id": "departures",
+                            "asOf": "2026-03-30T00:00:00Z",
+                            "sources": [
+                              "delfi_static"
+                            ],
+                            "departures": []
+                          },
+                          {
+                            "id": "service_alerts",
+                            "asOf": "2026-03-30T00:00:00Z",
+                            "sources": [],
+                            "alerts": []
+                          },
+                          {
+                            "id": "parking_charging",
+                            "asOf": "2026-03-30T00:00:00Z",
+                            "sources": [],
+                            "facilities": {
+                              "flags": [],
+                              "location": null
+                            }
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": null,
+                        "freshness": [
+                          {
+                            "family": "db_stada",
+                            "dataAsOf": null,
+                            "ageS": null,
+                            "staleAfterS": 9007199254740991,
+                            "stale": false,
+                            "lastCheckedAt": null
+                          },
+                          {
+                            "family": "delfi_static",
+                            "dataAsOf": "2026-03-29T12:00:00Z",
+                            "ageS": 43200,
+                            "staleAfterS": 259200,
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T12:00:00Z"
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "db_stada",
+                            "domain": "transit",
+                            "publisher": "Bahnhofsdaten: Deutsche Bahn AG, DB API Marketplace, CC BY 4.0, bearbeitet",
+                            "text": "Bahnhofsdaten: Deutsche Bahn AG, DB API Marketplace, CC BY 4.0, bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://developers.deutschebahn.com",
+                            "sourceUrl": "https://developers.deutschebahn.com"
+                          },
+                          {
+                            "family": "delfi_static",
+                            "domain": "transit",
+                            "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://www.opendata-oepnv.de",
+                            "sourceUrl": "https://www.opendata-oepnv.de"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ]
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/stations/8001001/page"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/StationPageEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "$ref": "#/components/headers/Age"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/Cache-Control"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/Last-Modified"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              },
+              "Vary": {
+                "$ref": "#/components/headers/Vary"
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/Cache-Control"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/Last-Modified"
+              },
+              "Vary": {
+                "$ref": "#/components/headers/Vary"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not used by this operation.",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "A station's page",
+        "tags": [
+          "transit"
+        ],
+        "x-attribution": "Each section names the source families it was read from in its sources, and the answer credits each of them once in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/stations/8001001/page?departures=3\u0026lang=en\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/stations/8001001/page?departures=3\u0026lang=en",
+        "x-mcp-counterpart": "station page",
         "x-required-scope": "transit"
       }
     },

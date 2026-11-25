@@ -68,6 +68,14 @@ func (f *nbFake) Platforms(context.Context, []string, []string) ([]transit.Platf
 	return nil, nil
 }
 
+func (f *nbFake) StationRecord(context.Context, string, []string) (transit.StationRecord, error) {
+	return transit.StationRecord{}, nil
+}
+
+func (f *nbFake) StationAlerts(context.Context, transit.StationAlertsQuery, []string) ([]transit.StationAlertRow, error) {
+	return nil, nil
+}
+
 func (f *nbFake) StopBoards(context.Context, transit.StopBoardsQuery, []string) ([]transit.StopBoard, error) {
 	return nil, nil
 }

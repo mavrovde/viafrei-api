@@ -31,6 +31,11 @@ type Transit interface {
 	// Platforms returns DB's station inventory of the station numbered
 	// evas, of the given families.
 	Platforms(ctx context.Context, evas, families []string) ([]transit.PlatformRow, error)
+	// StationRecord returns DB's register row of the station id names;
+	// transit.ErrNotFound when none.
+	StationRecord(ctx context.Context, id string, families []string) (transit.StationRecord, error)
+	// StationAlerts returns the alerts in force near a station.
+	StationAlerts(ctx context.Context, q transit.StationAlertsQuery, families []string) ([]transit.StationAlertRow, error)
 	TimetableReach(ctx context.Context) (transit.Reach, error)
 	// Facilities returns the lifts and escalators of a station, of the
 	// given families, each with its state at now.

@@ -160,6 +160,7 @@ func operations() []operation {
 		{id: "describeLocation", method: http.MethodGet, path: "/v1/location", tag: "places", keyed: true, scope: "places", register: registerLocation},
 		{id: "listStations", method: http.MethodGet, path: "/v1/stations", tag: "transit", keyed: true, scope: "transit", register: registerStations},
 		{id: "listStationDepartures", method: http.MethodGet, path: "/v1/stations/{stationId}/departures", tag: "transit", keyed: true, scope: "transit", register: registerDepartures},
+		{id: "getStationPage", method: http.MethodGet, path: "/v1/stations/{stationId}/page", tag: "transit", keyed: true, scope: "transit", register: registerStationPage},
 		{id: "listStopBoards", method: http.MethodGet, path: "/v1/stop-boards", tag: "transit", keyed: true, scope: "transit", register: registerStopBoards},
 		{id: "getTrainBoard", method: http.MethodGet, path: "/v1/train-boards/{eva}", tag: "transit", keyed: true, scope: "transit", register: registerTrainBoard},
 		{id: "createRefresh", method: http.MethodPost, path: "/v1/refreshes", tag: "live", keyed: true, register: registerCreateRefresh},

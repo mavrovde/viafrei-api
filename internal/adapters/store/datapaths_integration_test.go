@@ -347,3 +347,36 @@ func baseOf(view, column string) string {
 		join pg_attribute a on a.attrelid = c.oid and a.attname = '` + column + `'
 		where r.ev_class = '` + view + `'::regclass limit 1`
 }
+
+// A station page's record is DB's register row with its newest slug, named
+// by register number, EVA number or stop place id; its alerts are the
+// alerts in force naming its stops, or its lines in its Kreis.
+func TestStationRecordAndAlerts(t *testing.T) {
+	st, _ := private(t,
+		`insert into public.db_stations (station_no, name, eva_no, eva_nos, ifopt, category, federal_state, municipality_code, street, zipcode, city,
+		   geom, stepless_access, has_wifi, has_parking, content_hash, first_seen_at, last_seen_at, updated_at)
+		 values ('99001', 'Teststadt Hbf', '8099001', '{8099001,8099002}', 'de:99999:1', 2, 'Hamburg', '02000000', 'Am Bahnhof 1', '20099', 'Teststadt',
+		   'SRID=4326;POINT(10 53.5)', 'yes', true, false, 'h', now(), now(), now())`,
+		`insert into public.station_slugs (slug, station_no, name, assigned_at) values ('teststadt-alt', '99001', 'x', now() - interval '1 day'), ('teststadt-hbf', '99001', 'x', now())`,
+		`insert into public.delfi_service_alerts (source_id, source_feed, alert_id, header, line_names, stop_ids, kreise, dedupe_key, content_hash, active_periods, last_seen_at)
+		 values ('delfi_rt_sa', 'delfi_rt_sa', 'a1', 'Bauarbeiten', '{RE1}', '{de:99999:1}', '{02000}', 'k1', 'h', '[]', now()),
+		        ('delfi_siri_sx', 'delfi_siri_sx', 'b1', 'Twin', '{RE1}', '{}', '{02000}', 'k1', 'h', '[{"start":"2000-01-01T00:00:00Z"}]', now()),
+		        ('delfi_siri_sx', 'delfi_siri_sx', 'b2', 'Stale', '{RE1}', '{de:99999:1}', '{02000}', 'k2', 'h', '[]', now() - interval '2 days'),
+		        ('delfi_rt_sa', 'delfi_rt_sa', 'a2', 'Over', '{RE1}', '{de:99999:1}', '{02000}', 'k3', 'h', '[{"end":"2000-01-01T00:00:00Z"}]', now())`)
+	fams := append(every(t), "delfi_rt_sa", "delfi_siri_sx")
+	for _, id := range []string{"99001", "8099002", "1:de:99999:1"} {
+		r, err := st.StationRecord(bounded(t), id, fams)
+		if err != nil || r.StationNo != "99001" || *r.Slug != "teststadt-hbf" || *r.Category != 2 || r.At == nil || !slices.Equal(r.Flags, []string{"wifi"}) ||
+			r.Family != "db_stada" || *r.Land != "Hamburg" {
+			t.Fatalf("%s: %+v %v", id, r, err)
+		}
+	}
+	if _, err := st.StationRecord(bounded(t), "99001", []string{"x"}); !errors.Is(err, transit.ErrNotFound) {
+		t.Errorf("another family: %v", err)
+	}
+	rows, err := st.StationAlerts(bounded(t), transit.StationAlertsQuery{Now: time.Now(), IDs: []string{"de:99999:1"}, Lines: []string{"RE1"}, Kreis: []string{"02000"}}, fams)
+	if err != nil || len(rows) != 2 || rows[0].ID != "delfi_rt_sa:a1" || rows[1].MessageKey != "delfi_rt_sa:a1" ||
+		!slices.Equal(rows[0].CarriedBy, []string{"delfi_rt_sa", "delfi_siri_sx"}) {
+		t.Errorf("%+v %v", rows, err)
+	}
+}

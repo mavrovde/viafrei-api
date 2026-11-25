@@ -43,6 +43,7 @@ type Features interface {
 	Stations(ctx context.Context, key access.Record, q transit.Query) (features.Answer[transit.Station], error)
 	Departures(ctx context.Context, key access.Record, q transit.DepartureQuery) (features.Board, error)
 	StopBoards(ctx context.Context, key access.Record, q transit.StopBoardsQuery) (features.StopBoards, error)
+	StationPage(ctx context.Context, key access.Record, q features.StationPageQuery) (features.StationPage, error)
 	Facilities(ctx context.Context, key access.Record, q transit.FacilityQuery) (features.StationFacilities, error)
 	RequestRefresh(ctx context.Context, key access.Record, a refresh.Ask) (refresh.Request, error)
 	Refresh(ctx context.Context, key access.Record, id string) (refresh.Request, error)
@@ -92,6 +93,8 @@ var nullableObjects = []struct{ schema, member string }{
 	{"LocationData", "gemeinde"},
 	{"LocationData", "junction"},
 	{"StationFacilitiesData", "platforms"},
+	{"StationPageEnvelope", "data"},
+	{"PageFacilities", "location"},
 	{"PlatformsStation", "station"},
 	{"PlatformAccess", "heightCm"},
 	{"DisruptionData", "line"},

@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 )
 
@@ -1056,6 +1057,95 @@ func (s *Store) Platforms(ctx context.Context, evas, families []string) ([]trans
 			var v transit.PlatformRow
 			err := r.Scan(&v.ElementID, &v.StopPlace, &v.StopPlaceID, &v.StationName, &v.QuayName, &v.PlateCode, &v.ParentQuayID,
 				&v.HeightCm, &v.HasAssessment, &v.StepFree, &v.Wheelchair, &v.Tactile, &v.LevelBoarding, &v.UpdatedAt, &v.Family)
+			return v, err
+		})
+	})
+}
+
+// stationRecord is DB's register row (today's STATION_RECORD_SQL over
+// station_index_live, on its tables) of the station $1 names: by register
+// number, by EVA number or by the DHID of a stop place id; $2 the families.
+// Each test is an index's (the main EVA number is one of eva_nos, an IFOPT
+// is a bare DHID: both hold for every open row on prod, 2026-11-25); a
+// regular expression over every row took 150 ms.
+// A row with no page slug is not on the index, as the live view joins it.
+//
+//nolint:misspell // has_travel_center is the column
+var stationRecord = named("api_station_record", `
+with k as (select substring(regexp_replace((select $1::text), '^[0-9]+:', ''), '`+dhidOf+`') d)
+select s.station_no, s.name, s.eva_no, s.eva_nos, g.slug, s.street, s.zipcode, s.city, s.federal_state, s.municipality_code,
+       s.category::int, s.stepless_access, contract_stop_place_of(s.ifopt), st_y(s.geom::geometry), st_x(s.geom::geometry),
+       s.last_seen_at, s.source_id,
+       array_remove(array[case when s.has_parking then 'parking' end, case when s.has_bicycle_parking then 'bicycleParking' end,
+         case when s.has_local_public_transport then 'localPublicTransport' end, case when s.has_public_facilities then 'publicFacilities' end,
+         case when s.has_locker_system then 'lockerSystem' end, case when s.has_taxi_rank then 'taxiRank' end,
+         case when s.has_travel_necessities then 'travelNecessities' end, case when s.has_wifi then 'wifi' end,
+         case when s.has_travel_center then 'travelCentre' end, case when s.has_railway_mission then 'railwayMission' end,
+         case when s.has_db_lounge then 'dbLounge' end, case when s.has_lost_and_found then 'lostAndFound' end,
+         case when s.has_car_rental then 'carRental' end], null)
+from db_stations s
+join lateral (select g.slug from station_slugs g where g.station_no = s.station_no order by g.assigned_at desc, g.slug limit 1) g on true
+where s.closed_at is null and s.source_id = any((select $2::text[])::text[])
+  and (s.station_no = (select $1::text) or s.eva_nos @> array[(select $1::text)] or s.ifopt = (select k.d from k))
+order by (s.station_no = (select $1::text)) desc, (s.eva_no = (select $1::text)) desc, (s.source_id = 'db_stada') desc, s.station_no
+limit 1`, "text", "text[]")
+
+// StationRecord reads DB's register row of the station id names
+// (features.Transit); transit.ErrNotFound when none.
+func (s *Store) StationRecord(ctx context.Context, id string, families []string) (transit.StationRecord, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (transit.StationRecord, error) {
+		var (
+			v        transit.StationRecord
+			lat, lon *float64
+		)
+		err := runRow(ctx, tx, stationRecord, id, families).Scan(&v.StationNo, &v.Name, &v.EVANo, &v.EVANumbers, &v.Slug, &v.Street, &v.Zipcode,
+			&v.City, &v.Land, &v.Municipality, &v.Category, &v.SteplessAccess, &v.StopPlaceID, &lat, &lon, &v.SeenAt, &v.Family, &v.Flags)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return v, transit.ErrNotFound
+		}
+		if lat != nil && lon != nil {
+			v.At = &geo.Point{Lat: *lat, Lon: *lon}
+		}
+		return v, err
+	})
+}
+
+// stationAlerts are the alerts in force at $1 of the families $2 naming a
+// stop of $3, or a line of $4 within a Kreis of $5, at most $6: today's
+// STATION_ALERTS_NEAR_SQL on its table (the live view's rule: open,
+// unrestricted), the secondary feed's alert only when seen within a day.
+//
+//nolint:misspell // materialized is the SQL keyword
+var stationAlerts = named("api_station_alerts", `
+with in_force as materialized (
+  select a.source_id, a.source_feed, a.alert_id, a.header, a.active_from, a.active_to, a.line_names, a.stop_ids, a.kreise, a.dedupe_key, a.message_ref
+  from delfi_service_alerts a
+  where a.closed_at is null and coalesce(a.confidentiality, 'noRestriction') = 'noRestriction'
+    and a.source_feed = any((select $2::text[])::text[])
+    and (a.source_id <> 'delfi_siri_sx' or a.last_seen_at > (select $1::timestamptz) - interval '1 day')
+    and (jsonb_array_length(a.active_periods) = 0
+         or exists (select 1 from jsonb_array_elements(a.active_periods) p
+                    where (p->>'start' is null or (p->>'start')::timestamptz <= (select $1::timestamptz))
+                      and (p->>'end' is null or (p->>'end')::timestamptz > (select $1::timestamptz)))))
+select o.source_id || ':' || o.alert_id, o.header, o.active_to, o.line_names, o.stop_ids,
+       (select g.source_id || ':' || g.alert_id from in_force g
+         where g.dedupe_key = o.dedupe_key or (o.message_ref is not null and g.message_ref = o.message_ref)
+         order by (g.source_id <> 'delfi_rt_sa'), g.source_id, g.alert_id limit 1),
+       (select array_agg(distinct g.source_feed order by g.source_feed) from in_force g
+         where g.dedupe_key = o.dedupe_key or (o.message_ref is not null and g.message_ref = o.message_ref)),
+       o.source_feed
+from in_force o
+where o.stop_ids && (select $3::text[])::text[] or (o.line_names && (select $4::text[])::text[] and o.kreise && (select $5::text[])::text[])
+order by (case when o.stop_ids && (select $3::text[])::text[] then 0 else 1 end), o.active_from desc nulls last, o.source_id, o.alert_id
+limit (select $6::int)`, "timestamptz", "text[]", "text[]", "text[]", "text[]", "int")
+
+// StationAlerts reads the alerts in force near a station (features.Transit).
+func (s *Store) StationAlerts(ctx context.Context, q transit.StationAlertsQuery, families []string) ([]transit.StationAlertRow, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.StationAlertRow, error) {
+		rows, _ := run(ctx, tx, stationAlerts, q.Now, families, q.IDs, q.Lines, q.Kreis, transit.StationAlertsLimit)
+		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.StationAlertRow, error) {
+			var v transit.StationAlertRow
+			err := r.Scan(&v.ID, &v.Header, &v.Until, &v.Lines, &v.StopIDs, &v.MessageKey, &v.CarriedBy, &v.Family)
 			return v, err
 		})
 	})

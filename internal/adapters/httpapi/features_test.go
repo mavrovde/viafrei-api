@@ -82,6 +82,9 @@ type fakeFeatures struct {
 	gotBoard   transit.DepartureQuery
 	stops      features.StopBoards
 	gotStops   transit.StopBoardsQuery
+	page       features.StationPage
+	pageErr    error
+	gotPage    features.StationPageQuery
 	fuel       features.FuelStations
 	gotFuel    energy.FuelQuery
 	places     features.Answer[places.Place]
@@ -191,7 +194,7 @@ func overviewAnswer() features.Overview {
 }
 
 func everyAnswer() *fakeFeatures {
-	return &fakeFeatures{charging: chargingAnswer(), parking: parkingAnswer(), overview: overviewAnswer(), conditions: conditionsAnswer(), situation: situationAnswer(), risk: riskAnswer(), topic: topicAnswer(), stations: stationsAnswer(),
+	return &fakeFeatures{charging: chargingAnswer(), parking: parkingAnswer(), overview: overviewAnswer(), conditions: conditionsAnswer(), situation: situationAnswer(), risk: riskAnswer(), topic: topicAnswer(), stations: stationsAnswer(), page: pageAnswer(),
 		refresh: refresh.Request{ID: "42", Source: "fuel-prices-de", State: refresh.NoneDue}}
 }
 

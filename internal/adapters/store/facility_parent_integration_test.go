@@ -129,7 +129,8 @@ func TestARailwaySearchByNameKeepsTheDBStations(t *testing.T) {
 			t.Errorf("%s, every stop: %+v, %v", text, all, err)
 		}
 		rail, _, err := st.Stations(bounded(t), transit.Query{Text: text, Limit: 1, Railway: true}, fams)
-		if err != nil || len(rail) != 1 || rail[0].ID != "1:de:09998:930" || rail[0].EVA == nil || *rail[0].EVA != "9999930" {
+		if err != nil || len(rail) != 1 || rail[0].ID != "1:de:09998:930" || rail[0].EVA == nil || *rail[0].EVA != "9999930" ||
+			rail[0].RegisterName == nil || *rail[0].RegisterName != "Lindenhof Hbf" || rail[0].RegisterBy == nil || *rail[0].RegisterBy != "db_stada" {
 			t.Errorf("%s, railway: %+v, %v", text, rail, err)
 		}
 	}

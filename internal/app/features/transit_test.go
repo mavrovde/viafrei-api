@@ -248,3 +248,29 @@ func TestFacilitiesAreListedGatedAndAttributed(t *testing.T) {
 		}
 	}
 }
+
+// A railway station is named as DB's register names it where the key may
+// read the register, which is then credited; else, and off railway, the
+// stop's name stands.
+func TestARailwayStationIsNamedAsTheRegisterNamesIt(t *testing.T) {
+	req.Covers(t, "FR-TRANSIT-001")
+	reg, other, nm := "t1", "t2", "Frankfurt (Main) Hbf"
+	k := key("commercial", []access.Scope{"transit"}, "t1")
+	for _, c := range []struct {
+		name    string
+		by      *string
+		railway bool
+		want    string
+	}{
+		{"railway", &reg, true, nm},
+		{"register not readable", &other, true, "Frankfurt Hbf"},
+		{"no register family", nil, true, "Frankfurt Hbf"},
+		{"not railway", &reg, false, "Frankfurt Hbf"},
+	} {
+		f := &trFake{stations: []transit.Station{{ID: "a", Name: "Frankfurt Hbf", Family: "t1", RegisterName: &nm, RegisterBy: c.by}}}
+		a, err := trService(f).Stations(context.Background(), k, transit.Query{Railway: c.railway, Limit: 5})
+		if err != nil || a.Items[0].Name != c.want {
+			t.Errorf("%s: %v %v", c.name, a.Items, err)
+		}
+	}
+}

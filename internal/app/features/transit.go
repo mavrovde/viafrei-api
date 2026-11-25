@@ -50,6 +50,12 @@ func (s *Service) Stations(ctx context.Context, key access.Record, q transit.Que
 	contributed := make([]string, len(stations))
 	for i, st := range stations {
 		contributed[i] = st.Family
+		// A railway station is named as DB's station register names it
+		// ("Frankfurt (Main) Hbf"), where the key may read the register.
+		if q.Railway && st.RegisterName != nil && st.RegisterBy != nil && slices.Contains(permitted, *st.RegisterBy) {
+			stations[i].Name = *st.RegisterName
+			contributed = append(contributed, *st.RegisterBy)
+		}
 	}
 	if err := gate.Check(contributed); err != nil {
 		return Answer[transit.Station]{}, err

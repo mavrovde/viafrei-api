@@ -130,7 +130,7 @@ var stationsPage = func() map[stationShape]stmt {
 select s.stop_place_id, s.name, st_y(s.location) lat, st_x(s.location) lon, s.national_stop_code, s.region_code,
        coalesce(s.modes, '{}') modes, s.source_ref,
        case when here.g is null then null else round(st_distance(s.location::geography, here.g))::int end dist,
-       s.placement_source_ref, s.eva_no, s.eva_numbers
+       s.placement_source_ref, s.eva_no, s.eva_numbers, s.register_name, s.register_ref
 from (` + relStopPlace + `) s, here
 where s.withdrawn_at is null
   and s.location is not null
@@ -240,10 +240,11 @@ limit ` + limit + `::bigint)`
 // limit at most, each read by its key.
 func keyedPage(name, order, limit string) string {
 	return `select p.stop_place_id, p.name, st_y(p.location) lat, st_x(p.location) lon, p.national_stop_code, p.region_code,
-       coalesce(p.modes, '{}') modes, p.source_ref, k.dist, p.placement_source_ref, p.eva_no, p.eva_numbers
+       coalesce(p.modes, '{}') modes, p.source_ref, k.dist, p.placement_source_ref, p.eva_no, p.eva_numbers,
+       p.register_name, p.register_ref
 from ` + name + ` k
 cross join lateral (select s.stop_place_id, s.name, s.location, s.national_stop_code, s.region_code, s.modes, s.source_ref,
-                           s.placement_source_ref, s.eva_no, s.eva_numbers
+                           s.placement_source_ref, s.eva_no, s.eva_numbers, s.register_name, s.register_ref
                       from (` + relStopPlace + `) s
                      where s.stop_place_id = k.stop_place_id
                      limit 1) p
@@ -516,7 +517,7 @@ func stationRow(r pgx.CollectableRow) (transit.Station, error) {
 		modes []string
 	)
 	err := r.Scan(&v.ID, &v.Name, &v.Location.Lat, &v.Location.Lon, &v.NationalCode, &v.RegionCode,
-		&modes, &v.Family, &v.DistanceM, &v.PlacedBy, &v.EVA, &v.EVANumbers)
+		&modes, &v.Family, &v.DistanceM, &v.PlacedBy, &v.EVA, &v.EVANumbers, &v.RegisterName, &v.RegisterBy)
 	v.Modes = transit.MapModes(modes)
 	return v, err
 }

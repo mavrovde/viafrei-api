@@ -645,7 +645,9 @@ const relStopPlace = `
            FROM unnest(ARRAY[d.eva_no] || d.eva_nos) WITH ORDINALITY u(e, o)
           WHERE u.e IS NOT NULL
           GROUP BY u.e
-          ORDER BY (min(u.o))), '{}'::text[]) AS eva_numbers
+          ORDER BY (min(u.o))), '{}'::text[]) AS eva_numbers,
+    d.name AS register_name,
+    d.source_id AS register_ref
    FROM stops s
      JOIN feeds f ON f.gtfs_feed_key = s.gtfs_feed_key
      LEFT JOIN transit_stop_modes m ON m.gtfs_feed_key = s.gtfs_feed_key AND m.root_id = s.id
@@ -653,7 +655,9 @@ const relStopPlace = `
             x.city,
             x.eva_no,
             x.eva_nos,
-            x.ifopt
+            x.ifopt,
+            x.name,
+            x.source_id
            FROM db_stations x
           WHERE x.ifopt = s.id AND x.closed_at IS NULL
           ORDER BY (x.source_id = 'db_stada'::text) DESC, x.station_no

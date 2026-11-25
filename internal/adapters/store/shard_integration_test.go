@@ -78,9 +78,6 @@ func setShard(dir string) error {
 // shard's.
 func inShard(i int) bool { return i%shardN == shardK-1 }
 
-// sharded reports whether the run is one shard of several.
-func sharded() bool { return shardN > 1 }
-
 // topLevelTests are the names, sorted, of the Test functions of the test
 // files in dir that an integration build compiles.
 func topLevelTests(dir string) ([]string, error) {

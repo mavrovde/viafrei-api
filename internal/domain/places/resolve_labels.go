@@ -463,7 +463,7 @@ func nameSays(c GazetteerRow, word string) bool {
 
 func placeRow(c located, lang, asked, land string, kreise map[string]string) distinguishable {
 	var word *string
-	if !(c.Kind == "admin" && c.AdminCode != nil && len(*c.AdminCode) == 2) {
+	if c.Kind != "admin" || c.AdminCode == nil || len(*c.AdminCode) != 2 {
 		word = landWord(c.GazetteerRow, lang, land)
 	}
 	var context []*string

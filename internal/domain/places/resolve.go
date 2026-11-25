@@ -55,7 +55,7 @@ func germanNameOf(query string) (name, rewritten string, ok bool) {
 	return de, de + query[comma:], true
 }
 
-var centreSuffix = regexp.MustCompile(`(?i)^(.+?)[\s,]+(innenstadt|stadtmitte|stadtzentrum|zentrum|city\s+centre|city\s+center|centre|center|downtown)$`)
+var centreSuffix = regexp.MustCompile(`(?i)^(.+?)[\s,]+(innenstadt|stadtmitte|stadtzentrum|zentrum|city\s+centre|city\s+center|centre|center|downtown)$`) //nolint:misspell // the words a person may type: "center" too
 
 // splitCentreHint is a text and the centre word it ends with.
 func splitCentreHint(query string) (base, hint string, ok bool) {

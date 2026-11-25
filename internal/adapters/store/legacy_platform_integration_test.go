@@ -30,6 +30,7 @@ func init() {
           and g.source_id in ('bkg_gvisys', 'geonames')
           and (g.name_norm = q.town or lower(g.name_en) = q.town)
           and ST_DWithin(g.geom, ST_SetSRID(ST_MakePoint(q.lon, q.lat), 4326)::geography, $4::float8))`
+	//nolint:misspell // materialized is the SQL keyword
 	legacyReads["api_charging_places_near"] = `  with near as materialized (
     select s.source_feed, s.site_id, s.name, s.operator, s.street, s.house_number, s.postcode, s.city,
            s.source_version, s.geom, s.operator_tokens, s.street_key, s.house_key,
@@ -1232,6 +1233,7 @@ func init() {
           and o.house_number_norm = $5::text
         order by literal_score desc, o.osm_type, o.osm_id
         limit $7::int)) a`
+	//nolint:misspell // materialized is the SQL keyword
 	legacyReads["api_charging_status_liveness"] = `  with extent as materialized (
     select f.feed_key,
            greatest(
@@ -1977,6 +1979,7 @@ func init() {
    order by literal_score desc, osm_type, osm_id
    limit 2000`
 	legacyReads["api_place_addresses_loaded"] = `select exists (select 1 from osm_addresses where closed_at is null) as loaded`
+	//nolint:misspell // materialized is the SQL keyword
 	legacyReads["api_place_candidates"] = `  -- #1215 review: the largest Gemeinde named exactly as asked — a prefix-
   -- qualified namesake is promoted only when it is at least as large, so
   -- "Homburg" asks about Bad Homburg v.d. Hoehe while "Ulm" (Neu-Ulm) and
@@ -2114,6 +2117,7 @@ func init() {
              order by g.geom <-> ST_SetSRID(ST_MakePoint(p.lon, p.lat), 4326)::geography
              limit 1)) as land
     from unnest($1::float8[], $2::float8[], $4::text[]) with ordinality as p(lon, lat, id, i)`
+	//nolint:misspell // materialized is the SQL keyword
 	legacyReads["api_place_poi_anywhere"] = `with p0 as materialized (
   select p.id::text as id, p.name, p.category, p.category_value, p.brand, p.operator,
          p.street, p.house_number, p.postcode, p.place, p.land,
@@ -2146,6 +2150,7 @@ select h.id, h.name, h.category, h.category_value, h.brand, h.operator,
   from h
  order by h.tier desc, h.score desc, vicinity desc, h.name, h.osm_type, h.osm_id
  limit $4`
+	//nolint:misspell // materialized is the SQL keyword
 	legacyReads["api_place_poi_by_place"] = `with p0 as materialized (
   select p.id::text as id, p.name, p.category, p.category_value, p.brand, p.operator,
          p.street, p.house_number, p.postcode, p.place, p.land,
@@ -2178,6 +2183,7 @@ select h.id, h.name, h.category, h.category_value, h.brand, h.operator,
   from h
  order by h.tier desc, h.score desc, vicinity desc, h.name, h.osm_type, h.osm_id
  limit $6`
+	//nolint:misspell // materialized is the SQL keyword
 	legacyReads["api_place_poi_by_place_fuzzy"] = `with p0 as materialized (
   select p.id::text as id, p.name, p.category, p.category_value, p.brand, p.operator,
          p.street, p.house_number, p.postcode, p.place, p.land,
@@ -3074,6 +3080,7 @@ select h.id, h.name, h.category, h.category_value, h.brand, h.operator,
    FROM speed_enforcement
   WHERE (closed_at IS NULL)) s
    where s.kind in ('fixed', 'section_control') and s.geom is null and s.source_feed = any($1::text[]) and s.ags ~ '^[0-9]{8}$'`
+	//nolint:misspell // materialized is the SQL keyword
 	legacyReads["api_station_alerts"] = `select m.source_id || ':' || m.alert_id, m.header, m.active_to, m.line_names, m.stop_ids, m.message_key, m.carried_by, m.feed from (
   with in_force as materialized (
     select a.source_id, a.source_feed, a.alert_id, a.header, a.active_from, a.active_to,
@@ -3113,6 +3120,7 @@ select h.id, h.name, h.category, h.category_value, h.brand, h.operator,
       or (o.line_names && $4::text[] and o.kreise && $5::text[])
    order by (case when o.stop_ids && $3::text[] then 0 else 1 end), o.active_from desc nulls last, o.source_id, o.alert_id
    limit $6) m`
+	//nolint:misspell // the platform's names spell it so (has_travel_center, city center)
 	legacyReads["api_station_record"] = `select m.station_no, m.name, m.eva_no, m.eva_nos, m.slug, m.street, m.zipcode, m.city, m.federal_state, m.municipality_code, m.category::int, m.stepless_access, contract_stop_place_of(m.ifopt), m.lat, m.lon, m.last_seen_at, m.source_id, array_remove(array[case when m.has_parking then 'parking' end, case when m.has_bicycle_parking then 'bicycleParking' end, case when m.has_local_public_transport then 'localPublicTransport' end, case when m.has_public_facilities then 'publicFacilities' end, case when m.has_locker_system then 'lockerSystem' end, case when m.has_taxi_rank then 'taxiRank' end, case when m.has_travel_necessities then 'travelNecessities' end, case when m.has_wifi then 'wifi' end, case when m.has_travel_center then 'travelCentre' end, case when m.has_railway_mission then 'railwayMission' end, case when m.has_db_lounge then 'dbLounge' end, case when m.has_lost_and_found then 'lostAndFound' end, case when m.has_car_rental then 'carRental' end], null) from (
   select s.station_no, s.slug, s.name, s.eva_no, s.eva_nos, s.ds100, s.ifopt, s.category, s.federal_state,
          s.municipality_code, s.street, s.zipcode, s.city,
@@ -3479,6 +3487,7 @@ select b.eva_nos, b.read_at, b.degraded, b.covers_until, b.departures
      and s.external_id = any(($1)::text[])) d))::text[])
     ) x) t))::text[])))
    order by f.root_id) l`
+	//nolint:misspell // route_color is the column; materialized is the SQL keyword
 	legacyReads["api_train_interchange_plan"] = `select m.trip_id, m.stop_id, m.stop_sequence, m.at, m.service_date, m.route_type::int, m.line, m.trip_short_name, m.destination, m.platform, m.route_color from (
   with fam as materialized (
     select f.stop_id, f.grp

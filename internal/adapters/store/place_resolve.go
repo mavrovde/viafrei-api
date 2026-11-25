@@ -24,6 +24,8 @@ const gazetteerCols = `g.id::text as id, g.kind, g.name, g.name_norm, g.name_en,
 // its umlaut-expanded form, $3 the transliteration penalty, $4 the limit, $5
 // the Gemeinde rule, $6/$7 a kind and source the final rows are narrowed to,
 // $8/$9 the prefix-qualified patterns of $1 and $2; $10 the families.
+//
+//nolint:misspell // materialized is the SQL keyword
 var placeCandidates = named("api_place_candidates", `
 with exact as materialized (
   select coalesce(max(population), 0) as population

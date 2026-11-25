@@ -145,8 +145,8 @@ var categoryHints = func() []categoryHint {
 		hint([]string{"schwimmbad", "hallenbad", "freibad", "spassbad", "erlebnisbad", "stadtbad", "therme", "swimming pool", "swimming baths", "indoor pool", "outdoor pool", "lido", "pool"}, []tag{{"leisure", "swimming_pool"}, {"leisure", "water_park"}, {"amenity", "public_bath"}, {"leisure", "sports_centre"}}),
 		hint([]string{"zoo", "tierpark"}, []tag{{"tourism", "zoo"}}),
 		hint([]string{"bibliothek", "bucherei", "library"}, []tag{{"amenity", "library"}}),
-		hint([]string{"theater", "theatre"}, []tag{{"amenity", "theatre"}}),
-		hint([]string{"kino", "cinema", "movie theater", "movie theatre"}, []tag{{"amenity", "cinema"}}),
+		hint([]string{"theater", "theatre"}, []tag{{"amenity", "theatre"}}),                              //nolint:misspell // the words a person may type, German and English spellings both
+		hint([]string{"kino", "cinema", "movie theater", "movie theatre"}, []tag{{"amenity", "cinema"}}), //nolint:misspell // the words a person may type, German and English spellings both
 		hint([]string{"stadion", "stadium"}, []tag{{"leisure", "stadium"}}),
 		hint([]string{"apotheke", "pharmacy"}, []tag{{"amenity", "pharmacy"}, {"healthcare", "pharmacy"}}),
 		hint([]string{"polizei", "polizeiprasidium", "polizeirevier", "police", "police station"}, []tag{{"amenity", "police"}}),
@@ -155,17 +155,17 @@ var categoryHints = func() []categoryHint {
 		hint([]string{"kirche", "dom", "munster", "kathedrale", "moschee", "synagoge", "church", "cathedral", "mosque", "synagogue"}, []tag{{"amenity", "place_of_worship"}}),
 		hint([]string{"schloss", "burg", "castle"}, []tag{{"historic", "castle"}}),
 		hint([]string{"friedhof", "cemetery", "graveyard"}, []tag{{"amenity", "grave_yard"}}),
-		hint([]string{"messe", "messegelande", "messezentrum", "ausstellungsgelande", "trade fair", "trade fair grounds", "trade fair ground", "fairground", "fairgrounds", "exhibition centre", "exhibition center", "exhibition grounds"}, []tag{{"amenity", "exhibition_centre"}}),
+		hint([]string{"messe", "messegelande", "messezentrum", "ausstellungsgelande", "trade fair", "trade fair grounds", "trade fair ground", "fairground", "fairgrounds", "exhibition centre", "exhibition center", "exhibition grounds"}, []tag{{"amenity", "exhibition_centre"}}), //nolint:misspell // the words a person may type: "center" too
 		hint([]string{"werk", "werke", "werksgelande", "fabrik", "factory", "plant", "works", "car plant"}, []tag{{"industrial", "factory"}}),
 		hint([]string{"hotel", "hotels"}, []tag{{"tourism", "hotel"}, {"building", "hotel"}}),
-		hint([]string{"kinderarzt", "kinderarztin", "kinderarzte", "kinderarztpraxis", "kinder und jugendarzt", "paediatrician", "pediatrician", "children s doctor"}, []tag{{"amenity", "doctors"}, {"healthcare", "doctor"}}),
+		hint([]string{"kinderarzt", "kinderarztin", "kinderarzte", "kinderarztpraxis", "kinder und jugendarzt", "paediatrician", "pediatrician", "children s doctor"}, []tag{{"amenity", "doctors"}, {"healthcare", "doctor"}}), //nolint:misspell // the words a person may type, German and English spellings both
 		hint([]string{"zahnarzt", "zahnarztin", "zahnarzte", "zahnarztpraxis", "zahnklinik", "dentist", "dentists", "dental practice"}, []tag{{"amenity", "dentist"}, {"healthcare", "dentist"}}),
 		hint([]string{"tierarzt", "tierarztin", "tierarzte", "tierarztpraxis", "tierklinik", "vet", "vets", "veterinary", "veterinarian", "animal hospital"}, []tag{{"amenity", "veterinary"}}),
 		hint([]string{"arzt", "arztin", "arzte", "arztpraxis", "hausarzt", "hausarztin", "allgemeinmediziner", "doctor", "doctors", "gp", "general practitioner", "medical practice"}, []tag{{"amenity", "doctors"}, {"healthcare", "doctor"}}),
 		hint([]string{"toilette", "toiletten", "wc", "offentliche toilette", "toilet", "toilets", "public toilet", "public toilets", "restroom", "restrooms"}, []tag{{"amenity", "toilets"}}),
 		hint([]string{"geldautomat", "geldautomaten", "bankautomat", "atm", "atms", "cash machine", "cashpoint"}, []tag{{"amenity", "atm"}, {"amenity", "bank"}}),
 		hint([]string{"post", "postamt", "postfiliale", "postagentur", "postbank", "hauptpost", "post office", "postoffice"}, []tag{{"amenity", "post_office"}}),
-		hint([]string{"supermarkt", "supermarkte", "lebensmittelgeschaft", "lebensmittelmarkt", "discounter", "supermarket", "supermarkets", "grocery", "grocery store"}, []tag{{"shop", "supermarket"}}),
+		hint([]string{"supermarkt", "supermarkte", "lebensmittelgeschaft", "lebensmittelmarkt", "discounter", "supermarket", "supermarkets", "grocery", "grocery store"}, []tag{{"shop", "supermarket"}}), //nolint:misspell // the words a person may type, German and English spellings both
 		hint([]string{"schuhgeschaft", "schuhladen", "schuhhaus", "shoe shop", "shoe store", "shoes"}, []tag{{"shop", "shoes"}}),
 		hint([]string{"schuhe"}, []tag{{"shop", "shoes"}}),
 		hint([]string{"backerei", "backer", "backstube", "bakery", "bakeries", "baker"}, []tag{{"shop", "bakery"}}),
@@ -327,7 +327,7 @@ func (rv *resolver) hintedKinds(raw string, townName *string) (*kindRead, error)
 	}
 	places := setOf(found...)
 	if townName == nil {
-		for len(ws) > 0 && places[ws[len(ws)-1]] && !(isWholeHead(ws[len(ws)-1]) && kindOf(ws[:len(ws)-1]) == nil) {
+		for len(ws) > 0 && places[ws[len(ws)-1]] && (!isWholeHead(ws[len(ws)-1]) || kindOf(ws[:len(ws)-1]) != nil) {
 			ws = ws[:len(ws)-1]
 		}
 	}
@@ -415,7 +415,7 @@ func (rv *resolver) findPois(name string, scope poiScope, limit int, opts poiOpt
 	}
 	var kind *kindRead
 	anywhere := scope.place == nil && !scope.near
-	if !opts.noFuzzy && !(anywhere && !asksNamedKindAnywhere(raw, opts)) {
+	if !opts.noFuzzy && (!anywhere || asksNamedKindAnywhere(raw, opts)) {
 		town := opts.town
 		if scope.place != nil {
 			town = scope.place

@@ -228,7 +228,7 @@ func organisationOf(hits []PoiHit, thing string, townName *string) *Resolution {
 		return h.Brand != nil && slices.ContainsFunc(strings.Split(*h.Brand, ";"), func(b string) bool { return legalCore(normalizeName(b)) == core })
 	}
 	names := func(h PoiHit) bool { return legalCore(normalizeName(h.Name)) == core || byBrand(h) }
-	if !names(best) || !(organisationKeys[best.Category] || byBrand(best)) {
+	if !names(best) || (!organisationKeys[best.Category] && !byBrand(best)) {
 		return nil
 	}
 	if slices.ContainsFunc(hits, func(h PoiHit) bool { return names(h) && haversineM(best.Lat, best.Lon, h.Lat, h.Lon) > oneSiteM }) {

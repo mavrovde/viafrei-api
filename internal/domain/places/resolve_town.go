@@ -105,7 +105,7 @@ func ofThePart(r Resolution, part string) *Resolution {
 	return &r
 }
 
-var centreWords = regexp.MustCompile(`(?i)^(city|centre|center|city\s+centre|city\s+center|downtown|zentrum|innenstadt|stadtmitte|stadtzentrum|ortsmitte|ortskern|stadtkern)$`)
+var centreWords = regexp.MustCompile(`(?i)^(city|centre|center|city\s+centre|city\s+center|downtown|zentrum|innenstadt|stadtmitte|stadtzentrum|ortsmitte|ortskern|stadtkern)$`) //nolint:misspell // the words a person may type: "center" too
 
 func thingOf(town commaTown) string {
 	ws := strings.Fields(town.reading.part)
@@ -437,7 +437,7 @@ func spellsOutTownName(lead GazetteerRow, query string) bool {
 
 const spaceTownReach = 2
 
-var townPartWords = regexp.MustCompile(`(?i)^(altstadt|mitte|stadtkern|ortskern|ortsmitte|old\s+town|historic\s+(?:centre|center))$`)
+var townPartWords = regexp.MustCompile(`(?i)^(altstadt|mitte|stadtkern|ortskern|ortsmitte|old\s+town|historic\s+(?:centre|center))$`) //nolint:misspell // the words a person may type: "center" too
 
 func townPart(town commaTown) Resolution {
 	return townPoint(town, placeName(town.area.best.GazetteerRow)+", "+strings.TrimSpace(town.reading.part))

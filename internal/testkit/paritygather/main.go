@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -53,7 +54,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	shards := make([]shard, len(args))
 	for i, p := range args {
-		b, err := os.ReadFile(p) // #nosec G304 -- a path the caller names
+		b, err := os.ReadFile(filepath.Clean(p)) // #nosec G304 G703 -- a path the caller names
 		if err == nil {
 			err = json.Unmarshal(b, &shards[i])
 		}

@@ -330,6 +330,7 @@ type MotorwayData struct {
 	Stamps      []SourceStamp   `json:"sourceStamps" doc:"The Stand of every attributed source family, as the platform's road status states each source's beside its credit, in family order: when it was last checked, when its data last changed, and whether it is possibly out of date. A family with neither instant has none."`
 	Coverage    *RoadCoverage   `json:"coverage" doc:"Null for a road the road register holds. For a road it does not hold (a federal or Land road, or a motorway it lacks), the answer is read from the situations whose reference names the road, none placed along a line and no state named; coverage then says what was read, as the platform's roadworks-ahead answer says it: an empty list is no sites on what the named families publish, never a road with no works."`
 	Situations  []RoadSituation `json:"situations" doc:"In the platform's motorway status order: jams, closures, the other reports, then roadworks; within each, by traffic type (queuing, stationary, heavy, slow), delay descending, headline, then the publisher's id."`
+	Motorway    *MotorwayBlock  `json:"motorway" doc:"The platform's motorway traffic answer for a motorway the road register holds, asked now, with a sweep of the road operator in the last 30 minutes: the road-wide counts, the measured state, the plan's works in force and the operator's entries with each jam's detail. Null for any other road, a window ahead, or a key that may not read the operator's events."`
 }
 
 // RoadCoverage is what a conditions answer about a road the road register
@@ -408,6 +409,7 @@ func registerMotorwayConditions(api huma.API, s *server, op huma.Operation) {
 				Counts:      familyCounts(c.Counts),
 				Stamps:      sourceStamps(c.Stamps, c.At),
 				Situations:  roadSituations(c.Items),
+				Motorway:    motorwayBlock(c.Motorway),
 			},
 			Meta: MotorwayMeta{
 				DataMeta: s.dataMeta(ctx, c.Families, c.At, c.Partial, partialDetail),

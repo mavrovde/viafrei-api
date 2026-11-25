@@ -29,6 +29,9 @@ type roadFake struct {
 	*fake
 	road             roads.Road
 	roadErr, readErr error
+	motorway         roads.MotorwayRead
+	motorwayErr      error
+	gotMotorway      *roads.MotorwayQuery
 	sits             []roads.Situation
 	counts           map[string]int
 	msgs             []roads.Message
@@ -104,6 +107,11 @@ func (f *roadFake) page(fams roads.Families, more bool) roads.Page {
 		}
 	}
 	return p
+}
+
+func (f *roadFake) Motorway(_ context.Context, q roads.MotorwayQuery) (roads.MotorwayRead, error) {
+	f.gotMotorway = &q
+	return f.motorway, f.motorwayErr
 }
 
 func (f *roadFake) SituationsOnRoad(_ context.Context, q roads.CorridorQuery, fams roads.Families, at time.Time) (roads.Page, error) {
@@ -679,5 +687,63 @@ func TestMotorwayCatalogueLamps(t *testing.T) {
 	f.reg = nil
 	if _, err := s.Motorways(context.Background(), key("consumer", []access.Scope{"roads"}, "e1"), roads.CatalogueQuery{Limit: 3}); err == nil {
 		t.Error("a key that may read no roads family answered")
+	}
+}
+
+// TestMotorwayConditionsCarryTheMotorwayAnswer: a registered motorway asked
+// now by a key that may read the road operator's events carries the
+// platform's motorway answer, with the measured state's and the plan's
+// families credited beside the situations'; any other road, a window ahead,
+// a key without the operator's events or a road without a sweep carries none.
+func TestMotorwayConditionsCarryTheMotorwayAnswer(t *testing.T) {
+	req.Covers(t, "FR-ROAD-003", "FR-ROAD-004")
+	ctx := context.Background()
+	reg := append(slices.Clone(roadRegister), access.Terms{Family: "autobahn", Domain: "roads", UseClasses: all, Version: "v1"},
+		access.Terms{Family: "los_nrw", Domain: "roads", UseClasses: all, Version: "v1"}, access.Terms{Family: "los_nrw_sites", Domain: "roads", UseClasses: all, Version: "v1"},
+		access.Terms{Family: "roadworks_akd", Domain: "roads", UseClasses: all, Version: "v1"})
+	jam := roads.MotorwayEventRow{Kind: "warning", TrafficType: ptr("STATIONARY_TRAFFIC"), Segments: 2, DelayS: ptr(1800)}
+	f := &roadFake{road: roads.Road{Ref: "A8", Class: roads.ClassMotorway}, sits: []roads.Situation{{ID: "a", Family: "r1"}},
+		msgs: []roads.Message{msg(roads.KindJam, "Stau"), msg(roads.KindJam, "Stau")},
+		motorway: roads.MotorwayRead{Tick: now, Events: []roads.MotorwayEventRow{jam}, Lamp: []roads.MotorwayEventRow{jam},
+			Measured: &roads.Measured{Sites: 1}, Plans: []roads.PlanNow{{Family: "roadworks_akd"}}}}
+	s := roadService(f)
+	f.reg = reg
+	k := key("commercial", roadsScope, "r1", "autobahn", "los_nrw", "los_nrw_sites", "roadworks_akd")
+	c, err := s.MotorwayConditions(ctx, k, roads.CorridorQuery{Road: "A8", Limit: 3})
+	if err != nil || c.Motorway == nil || len(c.Motorway.Entries) != 1 {
+		t.Fatalf("%+v %v", c.Motorway, err)
+	}
+	total := 0
+	for _, r := range c.Reasons {
+		total += r.Count
+	}
+	if c.Motorway.LampReasonsTotal != total-1 {
+		t.Errorf("reasons %d of %d", c.Motorway.LampReasonsTotal, total)
+	}
+	if q := f.gotMotorway; q.Road != "A8" || q.Limit != 3 || !q.Measured || q.Lanes || !slices.Equal(q.Plans, []string{"roadworks_akd"}) {
+		t.Errorf("asked %+v", q)
+	}
+	if got := names(c.Families); !slices.Equal(got, []string{"autobahn", "los_nrw", "los_nrw_sites", "r1", "roadworks_akd"}) {
+		t.Errorf("families %v", got)
+	}
+	// No sweep; a failed read; no operator's events; a window ahead; another road.
+	f.motorway = roads.MotorwayRead{}
+	if c, err = s.MotorwayConditions(ctx, k, roads.CorridorQuery{Road: "A8"}); err != nil || c.Motorway != nil {
+		t.Errorf("no sweep: %+v %v", c.Motorway, err)
+	}
+	f.motorwayErr = errStore
+	if _, err = s.MotorwayConditions(ctx, k, roads.CorridorQuery{Road: "A8"}); !errors.Is(err, errStore) {
+		t.Errorf("failed read: %v", err)
+	}
+	f.gotMotorway = nil
+	if c, err = s.MotorwayConditions(ctx, key("commercial", roadsScope, "r1"), roads.CorridorQuery{Road: "A8"}); err != nil || c.Motorway != nil || f.gotMotorway != nil {
+		t.Errorf("no operator: %+v %v", c.Motorway, err)
+	}
+	if c, err = s.MotorwayConditions(ctx, k, roads.CorridorQuery{Road: "A8", Ahead: true}); err != nil || c.Motorway != nil || f.gotMotorway != nil {
+		t.Errorf("ahead: %+v %v", c.Motorway, err)
+	}
+	f.road = roads.Road{Ref: "B6", Class: roads.ClassFederal}
+	if c, err = s.MotorwayConditions(ctx, k, roads.CorridorQuery{Road: "B6"}); err != nil || c.Motorway != nil || f.gotMotorway != nil {
+		t.Errorf("federal: %+v %v", c.Motorway, err)
 	}
 }

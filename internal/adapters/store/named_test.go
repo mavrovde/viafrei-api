@@ -53,7 +53,9 @@ func withoutTrafficEvents(sql string) string {
 	before, after, _ := strings.Cut(relTrafficEvent, rulesPerRow("b.source_ref"))
 	// the form that reads the stored Land, cut around its rules (their $1 is made opaque)
 	landBefore, landAfter, _ := strings.Cut(trafficEventsOfFamilies, rulesOfFamilies("b.source_ref"))
-	for _, part := range []string{relTrafficEvent, before, after, landBefore, landAfter} {
+	// the motorway answer's sweep rows and plan rule, which derive fields from the payload
+	motorway := []string{motorwaySweepRows("$3"), motorwaySweepRows("$6"), planInForce}
+	for _, part := range append([]string{relTrafficEvent, before, after, landBefore, landAfter}, motorway...) {
 		sql = strings.ReplaceAll(sql, part, "")
 	}
 	return sql
@@ -63,7 +65,8 @@ func withoutTrafficEvents(sql string) string {
 // row, a contract view or a column the platform keeps from the API.
 //
 // The traffic events relation alone (and its form with the rules matched
-// per family) reads the Autobahn payload, to derive an event's fields from
+// per family, and the motorway answer's sweep rows and plan rule) reads the
+// Autobahn payload, to derive an event's fields from
 // it as the platform does; it never answers it.
 func TestNamedStatementsReadNoRefusedColumn(t *testing.T) {
 	// One statement a subtest, side by side: each one's patterns are its

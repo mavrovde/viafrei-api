@@ -57,6 +57,8 @@ type Store struct {
 	refs    references
 	regKept registerKept
 	cells   officialCells
+	// jamHist keeps the oldest hour of the jam history (jamHistoryTTL).
+	jamHist jamHistory
 
 	// landsRead, when set (tests), is called before each road's junction
 	// read of the background read.

@@ -3679,6 +3679,38 @@
         ],
         "type": "object"
       },
+      "MotorwayAnnounced": {
+        "additionalProperties": false,
+        "properties": {
+          "closures": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "from": {
+            "description": "The earliest start of an announced entry; null when none.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reports": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "roadworks": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "closures",
+          "roadworks",
+          "reports",
+          "from"
+        ],
+        "type": "object"
+      },
       "MotorwayData": {
         "additionalProperties": false,
         "properties": {
@@ -3766,6 +3798,111 @@
             },
             "type": "array"
           },
+          "motorway": {
+            "additionalProperties": false,
+            "description": "The platform's motorway traffic answer for a motorway the road register holds, asked now, with a sweep of the road operator in the last 30 minutes: the road-wide counts, the measured state, the plan's works in force and the operator's entries with each jam's detail. Null for any other road, a window ahead, or a key that may not read the operator's events.",
+            "properties": {
+              "asOf": {
+                "description": "The road operator's newest sweep of the road, which every entry and count is of.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "events": {
+                "description": "The road operator's warnings, roadworks and closures at the sweep, one entry per site, in the platform's order (jams first), up to limit.",
+                "items": {
+                  "$ref": "#/components/schemas/MotorwayEntryView"
+                },
+                "type": "array"
+              },
+              "lampReasonsTotal": {
+                "description": "The lamp's reasons when a measure published as several sections is one reason, as the platform counts them.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "measured": {
+                "additionalProperties": false,
+                "description": "The measured state at the road's counting sites in the last 30 minutes; null when the key may not read it or no site measured.",
+                "properties": {
+                  "free": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "heavy": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "laneSites": {
+                    "description": "The sites whose state is measured per lane; 0 when the key may not read it.",
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "measuredAt": {
+                    "format": "date-time",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "sites": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "slow": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "slowNear": {
+                    "description": "The places near the slow or standing sites, as the location register names them.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "standstill": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "sites",
+                  "standstill",
+                  "slow",
+                  "heavy",
+                  "free",
+                  "laneSites",
+                  "measuredAt",
+                  "slowNear"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "plannedNow": {
+                "description": "The plan's short-duration works in force on the road now (at most 20); empty when none or the key may not read the plan.",
+                "items": {
+                  "$ref": "#/components/schemas/MotorwayPlan"
+                },
+                "type": "array"
+              },
+              "roadWide": {
+                "$ref": "#/components/schemas/MotorwayRoadWide",
+                "description": "The counts of the whole road at the sweep, whatever direction, kinds, limit or cursor ask."
+              }
+            },
+            "required": [
+              "asOf",
+              "roadWide",
+              "measured",
+              "lampReasonsTotal",
+              "plannedNow",
+              "events"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "sight": {
             "description": "The sight of every group the lamp read; any group not fresh keeps the lamp from green (limited_sight).",
             "items": {
@@ -3797,7 +3934,339 @@
           "counts",
           "sourceStamps",
           "coverage",
-          "situations"
+          "situations",
+          "motorway"
+        ],
+        "type": "object"
+      },
+      "MotorwayEntryView": {
+        "additionalProperties": false,
+        "properties": {
+          "averageSpeedKmh": {
+            "description": "The publisher's average speed; null when it states none.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "blocked": {
+            "type": "boolean"
+          },
+          "congestion": {
+            "description": "The publisher's state of the traffic (queuing, stationary, heavy, slow); set marks a jam.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "delayMinutes": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "description": {
+            "description": "The description's lines the platform shows: without its start line and its since clauses (marked with an ellipsis in brackets), at most two, each clipped at a word to 200 characters.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "extent": {
+            "description": "The publisher's extent of the site: lat,lon of its start then of its end.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "jam": {
+            "additionalProperties": false,
+            "description": "A jam's detail; null for any other entry.",
+            "properties": {
+              "causes": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "detours": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "endKm": {
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "endPlace": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "endSide": {
+                "enum": [
+                  "past",
+                  "before",
+                  "at",
+                  null
+                ],
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "endText": {
+                "description": "Where the jam ends, as its description words it.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "howLong": {
+                "additionalProperties": false,
+                "description": "How long a jam here lasts, the middle half of its runs; null under eight runs.",
+                "properties": {
+                  "cases": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "dayKind": {
+                    "enum": [
+                      "weekday",
+                      "weekend"
+                    ],
+                    "type": "string"
+                  },
+                  "fromHours": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "toHours": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "weeks": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "cases",
+                  "fromHours",
+                  "toHours",
+                  "dayKind",
+                  "weeks"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "lengthM": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "trend": {
+                "additionalProperties": false,
+                "description": "Its length, else its delay, over the last 30 minutes; null under three sweeps.",
+                "properties": {
+                  "direction": {
+                    "enum": [
+                      "growing",
+                      "shrinking",
+                      "stable"
+                    ],
+                    "type": "string"
+                  },
+                  "earlier": {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  "earlierAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "latest": {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  "latestAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "metric": {
+                    "enum": [
+                      "length",
+                      "delay"
+                    ],
+                    "type": "string"
+                  },
+                  "ticks": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "direction",
+                  "metric",
+                  "earlierAt",
+                  "earlier",
+                  "latestAt",
+                  "latest",
+                  "ticks"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "usual": {
+                "additionalProperties": false,
+                "description": "Whether it stands here at this Berlin weekday and hour in most of the last eight weeks; null under four weeks observed.",
+                "properties": {
+                  "hour": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "jamWeeks": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "verdict": {
+                    "enum": [
+                      "usual",
+                      "unusual"
+                    ],
+                    "type": "string"
+                  },
+                  "weekday": {
+                    "description": "ISO weekday in Berlin, Monday 1.",
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "weeks": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "verdict",
+                  "weeks",
+                  "jamWeeks",
+                  "weekday",
+                  "hour"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "lengthM",
+              "endText",
+              "endKm",
+              "endSide",
+              "endPlace",
+              "causes",
+              "detours",
+              "trend",
+              "usual",
+              "howLong"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "warning",
+              "roadworks",
+              "closure"
+            ],
+            "type": "string"
+          },
+          "lat": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "lon": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "phase": {
+            "$ref": "#/components/schemas/MotorwayPhase"
+          },
+          "segments": {
+            "description": "The sections the publisher gives the site as.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "since": {
+            "description": "The start the in-force rule used: the publisher's start, or the first phase its description states.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "siteIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "subtitle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "subtitle",
+          "congestion",
+          "delayMinutes",
+          "averageSpeedKmh",
+          "blocked",
+          "lat",
+          "lon",
+          "extent",
+          "since",
+          "segments",
+          "siteIds",
+          "description",
+          "phase",
+          "jam"
         ],
         "type": "object"
       },
@@ -4069,6 +4538,96 @@
         ],
         "type": "object"
       },
+      "MotorwayPhase": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "measureEnd": {
+            "description": "The end of the whole measure.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "measureEnd"
+        ],
+        "type": "object"
+      },
+      "MotorwayPlan": {
+        "additionalProperties": false,
+        "properties": {
+          "cause": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "family": {
+            "type": "string"
+          },
+          "from": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "section": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "family",
+          "id",
+          "kind",
+          "name",
+          "section",
+          "cause",
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
       "MotorwayQuery": {
         "additionalProperties": false,
         "properties": {
@@ -4104,6 +4663,39 @@
           "direction",
           "kinds",
           "minSeverity"
+        ],
+        "type": "object"
+      },
+      "MotorwayRoadWide": {
+        "additionalProperties": false,
+        "properties": {
+          "announced": {
+            "$ref": "#/components/schemas/MotorwayAnnounced",
+            "description": "Entries not yet in force: their counts and the earliest start."
+          },
+          "closures": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "jams": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "roadworks": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "warnings": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "jams",
+          "warnings",
+          "closures",
+          "roadworks",
+          "announced"
         ],
         "type": "object"
       },

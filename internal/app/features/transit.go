@@ -25,6 +25,7 @@ type Transit interface {
 	// window, of the given families: calls a passenger can board, of trips
 	// that call outside the station after them, by planned instant.
 	Departures(ctx context.Context, q transit.DepartureQuery, families []string) ([]transit.Departure, error)
+	TimetableReach(ctx context.Context) (transit.Reach, error)
 	// Facilities returns the lifts and escalators of a station, of the
 	// given families, each with its state at now.
 	Facilities(ctx context.Context, station string, families []string, now time.Time) ([]transit.Facility, error)
@@ -87,6 +88,8 @@ type Board struct {
 	Matched    int
 	MatchedAll int
 	Dropped    map[int]int
+	// Reach is how far the loaded timetable reaches.
+	Reach transit.Reach
 }
 
 // Departures answers "what leaves this station" for key: the departures
@@ -109,6 +112,10 @@ func (s *Service) Departures(ctx context.Context, key access.Record, q transit.D
 	if err != nil {
 		return Board{}, err
 	}
+	reach, err := s.repos.Transit.TimetableReach(ctx)
+	if err != nil {
+		return Board{}, err
+	}
 	b := transit.Board(calls, q)
 	contributed := []string{st.Family}
 	for _, d := range b.Rows {
@@ -123,7 +130,7 @@ func (s *Service) Departures(ctx context.Context, key access.Record, q transit.D
 	}
 	return Board{
 		Answer:  Answer[transit.Departure]{Items: b.Rows, HasMore: b.Matched > len(b.Rows), Families: fams, Partial: partial, At: s.now()},
-		Station: st, Matched: b.Matched, MatchedAll: b.MatchedAll, Dropped: b.Dropped,
+		Station: st, Matched: b.Matched, MatchedAll: b.MatchedAll, Dropped: b.Dropped, Reach: reach,
 	}, nil
 }
 

@@ -54,6 +54,10 @@ func (f *nbFake) Station(context.Context, string, []string) (transit.Station, er
 	return transit.Station{}, nil
 }
 
+func (f *nbFake) TimetableReach(context.Context) (transit.Reach, error) {
+	return transit.Reach{}, nil
+}
+
 func (f *nbFake) Departures(context.Context, transit.DepartureQuery, []string) ([]transit.Departure, error) {
 	return nil, nil
 }

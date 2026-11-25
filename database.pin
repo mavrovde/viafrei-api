@@ -15,5 +15,5 @@
 # A <name>:<X.Y.Z>-local line names a locally built, unpublished release:
 # the tests and the local stack run it, and internal/release/pinguard
 # refuses it, so CI and the release workflow stop on it.
-viafrei-database:0.6.0-local
+viafrei-database:0.6.1-local
 schema-head 348

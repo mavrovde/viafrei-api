@@ -37,6 +37,12 @@ type trFake struct {
 	facilities  []transit.Facility
 	facErr      error
 	gotFacFams  []string
+	reach       transit.Reach
+	reachErr    error
+}
+
+func (f *trFake) TimetableReach(context.Context) (transit.Reach, error) {
+	return f.reach, f.reachErr
 }
 
 func (f *trFake) Facilities(_ context.Context, _ string, fams []string, _ time.Time) ([]transit.Facility, error) {
@@ -139,7 +145,7 @@ func TestStationsRefusals(t *testing.T) {
 func TestDeparturesAreTheBoardGatedAndAttributed(t *testing.T) {
 	req.Covers(t, "FR-TRANSIT-002", "SEC-030")
 	at := now.Add(time.Minute)
-	f := &trFake{station: transit.Station{ID: "s", Family: "t1"}, calls: []transit.Departure{
+	f := &trFake{station: transit.Station{ID: "s", Family: "t1"}, reach: transit.Reach{Until: &at}, calls: []transit.Departure{
 		{JourneyID: "a", PlannedAt: at, Mode: "bus", RouteType: 3, Family: "t1", Families: []string{"t1"}},
 		{JourneyID: "b", PlannedAt: at.Add(time.Minute), Mode: "bus", RouteType: 3, Family: "t1", Families: []string{"t1"}},
 		{JourneyID: "c", StopPointID: "p2", PlannedAt: at, Mode: "tram", RouteType: 0, Family: "t1", Families: []string{"t1"}},
@@ -153,7 +159,7 @@ func TestDeparturesAreTheBoardGatedAndAttributed(t *testing.T) {
 		t.Errorf("asked %+v of %v", f.gotBoard, f.gotFamilies)
 	}
 	if b.Station.ID != "s" || len(b.Items) != 1 || b.Items[0].JourneyID != "a" || !b.HasMore || !b.Partial || b.Matched != 2 ||
-		b.MatchedAll != 3 || b.Dropped[0] != 1 || !b.At.Equal(now) || !slices.Equal(names(b.Families), []string{"t1"}) {
+		b.MatchedAll != 3 || b.Dropped[0] != 1 || !b.At.Equal(now) || b.Reach.Until != &at || !slices.Equal(names(b.Families), []string{"t1"}) {
 		t.Errorf("board %+v", b)
 	}
 }
@@ -198,6 +204,7 @@ func TestDeparturesRefusals(t *testing.T) {
 		"none":       {&trFake{}, key("commercial", []access.Scope{"transit"}, "t2"), access.ErrNonePermitted},
 		"station":    {&trFake{stErr: transit.ErrNotFound}, full, transit.ErrNotFound},
 		"read":       {&trFake{station: st, depErr: errStore}, full, errStore},
+		"reach":      {&trFake{station: st, reachErr: errStore}, full, errStore},
 		"post-check": {&trFake{station: st, calls: []transit.Departure{{Families: []string{"t2"}}}}, full, features.ErrGateViolation},
 		"provenance": {&trFake{fake: &fake{provErr: errStore}, station: st}, full, errStore},
 	} {

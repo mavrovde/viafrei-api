@@ -34,7 +34,7 @@ func TestDeparturesAnswer(t *testing.T) {
 			{JourneyID: "t2@2026-03-29", Mode: "rail", PlannedAt: fixedNow, Family: "src-alpha-transit"},
 		}, HasMore: true, Families: []provenance.Family{transitFamily}, At: fixedNow},
 		Station: transit.Station{ID: "sp-05-0001", Name: "Köln Hbf", Location: geo.Point{Lat: 50.943, Lon: 6.959}, StopIDs: []string{"sp-05-0001", "sp-05-0001:1"}},
-		Matched: 4, MatchedAll: 9, Dropped: map[int]int{3: 4, 0: 1},
+		Matched: 4, MatchedAll: 9, Dropped: map[int]int{3: 4, 0: 1}, Reach: transit.Reach{Until: &exp},
 	}
 	h := featureHandler(t, config.Defaults(), f, nil)
 	w := do(t, h, http.MethodGet,
@@ -62,7 +62,7 @@ func TestDeparturesAnswer(t *testing.T) {
 	d, _ := drop[0].(map[string]any)
 	if d0["id"] != "t1@2026-03-29/4" || d0["destination"] != "Köln" || d0["delayMin"] != 3.0 || d0["platform"] != "3" ||
 		d0["platformChanged"] != true || win["matched"] != 4.0 || win["matchedAll"] != 9.0 || d["code"] != "0" ||
-		win["until"] != "2026-03-29T02:30:00Z" {
+		win["until"] != "2026-03-29T02:30:00Z" || win["timetableUntil"] != exp.UTC().Format(time.RFC3339) || win["timetableLoadedAt"] != nil {
 		t.Errorf("board %v", data)
 	}
 	meta, _ := body["meta"].(map[string]any)

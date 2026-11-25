@@ -532,6 +532,22 @@
             "format": "int64",
             "type": "integer"
           },
+          "timetableLoadedAt": {
+            "description": "When the timetable was loaded; null when no load is recorded.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timetableUntil": {
+            "description": "End of the loaded timetable's last service day (the Berlin midnight after it, excluded): no planned departure is known from then on. Null when no timetable is loaded.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "until": {
             "description": "End of the window (excluded).",
             "format": "date-time",
@@ -550,7 +566,9 @@
           "untilLocal",
           "matched",
           "matchedAll",
-          "dropped"
+          "dropped",
+          "timetableUntil",
+          "timetableLoadedAt"
         ],
         "type": "object"
       },

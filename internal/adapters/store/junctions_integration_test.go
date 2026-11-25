@@ -40,6 +40,11 @@ func TestJunctionsNearArePlacedOnTheirMotorway(t *testing.T) {
 	if err != nil || js.From != places.JunctionsFromGazetteer || len(js.Rows) != 1 || js.Rows[0].Road == nil || *js.Rows[0].Road != "A9" || js.Rows[0].Family != "autobahn" {
 		t.Errorf("gazetteer: %+v %v", js, err)
 	}
+	// A location names the nearest one, on its road.
+	if l, err := st.Location(bounded(t), places.LocationQuery{At: geo.Point{Lat: 49.4, Lon: 11.0399}}, fams); err != nil || l.Junction == nil ||
+		l.Junction.Name != "Kreuz Nürnberg-Hafen" || l.JunctionFrom != places.JunctionsFromOSM || l.Junction.Road == nil || *l.Junction.Road != "A73" {
+		t.Errorf("location: %+v %v", l.Junction, err)
+	}
 	js, err = st.Junctions(bounded(t), places.NearbyQuery{At: geo.Point{Lat: 54.9, Lon: 5.0}, RadiusM: 5000, Limit: 3}, fams)
 	if err != nil || js.From != places.JunctionsFromOSM || len(js.Rows) != 0 {
 		t.Errorf("none: %+v %v", js, err)

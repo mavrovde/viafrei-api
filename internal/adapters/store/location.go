@@ -142,66 +142,82 @@ func first[T any](v []T) *T {
 // position may lie outside Germany.
 func (s *Store) Location(ctx context.Context, q places.LocationQuery, families []string) (places.Location, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (places.Location, error) {
-		var out places.Location
-		rows, _ := run(ctx, tx, nearestAddress, q.At.Lon, q.At.Lat, places.AddressReachM, families)
-		addr, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.Address, error) {
-			var v places.Address
-			err := r.Scan(&v.ID, &v.Street, &v.HouseNumber, &v.Postcode, &v.Place, &v.Land, &v.Location.Lat, &v.Location.Lon, &v.DataAsOf, &v.Family, &v.DistanceM)
-			return v, err
-		})
+		out, err := locationFacts(ctx, tx, q, families)
 		if err != nil {
 			return out, err
 		}
-		out.Address = first(addr)
-		for _, k := range []struct {
-			kind  string
-			reach int
-			into  **places.Place
-		}{{"municipality", places.MunicipalityReachM, &out.Municipality}, {"district", places.DistrictReachM, &out.District}} {
-			rows, _ = run(ctx, tx, nearestPlace, q.At.Lon, q.At.Lat, k.kind, k.reach, families)
-			ps, err := pgx.CollectRows(rows, scanPlace)
-			if err != nil {
-				return out, err
-			}
-			*k.into = first(ps)
+		// The nearest motorway junction, as today's description names it
+		// (nearestJunctions, one within 100 km).
+		js, err := junctionsNearTx(ctx, tx, places.NearbyQuery{At: q.At, RadiusM: places.JunctionReachM, Limit: 1}, families)
+		if len(js.Rows) > 0 {
+			out.Junction, out.JunctionFrom = &js.Rows[0], js.From
 		}
-		if out.District != nil && out.District.RegionCode != nil {
-			rows, _ = run(ctx, tx, stateOf, *out.District.RegionCode, families)
-		} else {
-			rows, _ = run(ctx, tx, nearestPlace, q.At.Lon, q.At.Lat, "state", places.StateReachM, families)
-		}
+		return out, err
+	})
+}
+
+// locationFacts reads the address, the places, the Land, the judgement
+// that the position may lie abroad and the Gemeinde of a position.
+func locationFacts(ctx context.Context, tx pgx.Tx, q places.LocationQuery, families []string) (places.Location, error) {
+	var out places.Location
+	rows, _ := run(ctx, tx, nearestAddress, q.At.Lon, q.At.Lat, places.AddressReachM, families)
+	addr, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.Address, error) {
+		var v places.Address
+		err := r.Scan(&v.ID, &v.Street, &v.HouseNumber, &v.Postcode, &v.Place, &v.Land, &v.Location.Lat, &v.Location.Lon, &v.DataAsOf, &v.Family, &v.DistanceM)
+		return v, err
+	})
+	if err != nil {
+		return out, err
+	}
+	out.Address = first(addr)
+	for _, k := range []struct {
+		kind  string
+		reach int
+		into  **places.Place
+	}{{"municipality", places.MunicipalityReachM, &out.Municipality}, {"district", places.DistrictReachM, &out.District}} {
+		rows, _ = run(ctx, tx, nearestPlace, q.At.Lon, q.At.Lat, k.kind, k.reach, families)
 		ps, err := pgx.CollectRows(rows, scanPlace)
 		if err != nil {
 			return out, err
 		}
-		out.State = first(ps)
-		if out.Address != nil && *out.Address.DistanceM <= places.AbroadNearestM {
+		*k.into = first(ps)
+	}
+	if out.District != nil && out.District.RegionCode != nil {
+		rows, _ = run(ctx, tx, stateOf, *out.District.RegionCode, families)
+	} else {
+		rows, _ = run(ctx, tx, nearestPlace, q.At.Lon, q.At.Lat, "state", places.StateReachM, families)
+	}
+	ps, err := pgx.CollectRows(rows, scanPlace)
+	if err != nil {
+		return out, err
+	}
+	out.State = first(ps)
+	if out.Address != nil && *out.Address.DistanceM <= places.AbroadNearestM {
+		out.Gemeinde, err = gemeinde(ctx, tx, q, out.Address, families)
+		return out, err
+	}
+	rows, _ = run(ctx, tx, addressSectors, places.SectorWedges(q.At, places.AbroadScanM, places.AbroadSectors), families)
+	hits, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (bool, error) {
+		var (
+			i   int
+			hit bool
+		)
+		err := r.Scan(&i, &hit)
+		return hit, err
+	})
+	if err != nil || places.LongestEmptyRun(hits) < places.AbroadEmptyRun {
+		if err == nil {
 			out.Gemeinde, err = gemeinde(ctx, tx, q, out.Address, families)
-			return out, err
-		}
-		rows, _ = run(ctx, tx, addressSectors, places.SectorWedges(q.At, places.AbroadScanM, places.AbroadSectors), families)
-		hits, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (bool, error) {
-			var (
-				i   int
-				hit bool
-			)
-			err := r.Scan(&i, &hit)
-			return hit, err
-		})
-		if err != nil || places.LongestEmptyRun(hits) < places.AbroadEmptyRun {
-			if err == nil {
-				out.Gemeinde, err = gemeinde(ctx, tx, q, out.Address, families)
-			}
-			return out, err
-		}
-		out.MayLieAbroad = true
-		rows, _ = run(ctx, tx, nearestAddressFamily, q.At.Lon, q.At.Lat, families)
-		fam, err := pgx.CollectRows(rows, pgx.RowTo[string])
-		if v := first(fam); v != nil {
-			out.AbroadFamily = *v
 		}
 		return out, err
-	})
+	}
+	out.MayLieAbroad = true
+	rows, _ = run(ctx, tx, nearestAddressFamily, q.At.Lon, q.At.Lat, families)
+	fam, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if v := first(fam); v != nil {
+		out.AbroadFamily = *v
+	}
+	return out, err
 }
 
 // gemeindeAt reads the Gemeinde the position ($2, $3) lies in, as today's

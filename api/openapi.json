@@ -3087,6 +3087,52 @@
               "null"
             ]
           },
+          "junction": {
+            "additionalProperties": false,
+            "description": "The nearest motorway junction within 100 km, as listNearby reads junctions (OpenStreetMap's node on the road the LCL places it on, else the gazetteer's point); null when none.",
+            "properties": {
+              "distanceM": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "from": {
+                "description": "osm, or gazetteer when no OpenStreetMap junction node is within reach: the gazetteer's points are sparse, so one beyond 15 km may not be the nearest there is.",
+                "enum": [
+                  "osm",
+                  "gazetteer"
+                ],
+                "type": "string"
+              },
+              "location": {
+                "$ref": "#/components/schemas/Position"
+              },
+              "name": {
+                "type": "string"
+              },
+              "road": {
+                "description": "The motorway it lies on; null for a junction off any motorway that can be named.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sourceFamily": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "road",
+              "location",
+              "distanceM",
+              "from",
+              "sourceFamily"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "lowEmissionZone": {
             "additionalProperties": false,
             "description": "The low-emission zone the position lies in, as the platform's description of a position states it; null when the key may read no zone source.",
@@ -3318,6 +3364,7 @@
           "state",
           "mayLieOutsideGermany",
           "gemeinde",
+          "junction",
           "governmentRegion",
           "lowEmissionZone"
         ],

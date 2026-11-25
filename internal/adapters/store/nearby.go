@@ -137,43 +137,48 @@ func (s *Store) NeedPlaces(ctx context.Context, q places.NearbyQuery, families [
 // with neither, none from OpenStreetMap (features.Nearby).
 func (s *Store) Junctions(ctx context.Context, q places.NearbyQuery, families []string) (places.Junctions, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (places.Junctions, error) {
-		out := places.Junctions{From: places.JunctionsFromOSM, Rows: []places.Junction{}}
-		rows, _ := run(ctx, tx, junctionsOSM, q.At.Lon, q.At.Lat, float64(q.RadiusM), families, q.Limit*junctionOverfetch)
-		js, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.Junction, error) {
-			var j places.Junction
-			err := r.Scan(&j.ID, &j.Name, &j.Location.Lat, &j.Location.Lon, &j.DistanceM, &j.Family)
-			return j, err
-		})
-		if err != nil {
-			return out, err
-		}
-		var nodes []places.Junction
-		for _, j := range js {
-			if !places.IsRestAreaName(j.Name) {
-				nodes = append(nodes, j)
-			}
-		}
-		if len(nodes) > 0 {
-			nodes = places.FoldSameNamed(nodes, places.SameJunctionM)
-			out.Rows = nodes[:min(len(nodes), q.Limit)]
-			return out, junctionRoadsOf(ctx, tx, out.Rows, families)
-		}
-		rows, _ = run(ctx, tx, junctionsGazetteer, q.At.Lon, q.At.Lat, float64(q.RadiusM), families, q.Limit*junctionOverfetch)
-		gs, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.Junction, error) {
-			var j places.Junction
-			err := r.Scan(&j.ID, &j.Name, &j.Road, &j.Location.Lat, &j.Location.Lon, &j.DistanceM, &j.Family)
-			return j, err
-		})
-		for _, j := range gs {
-			if !places.IsRestAreaName(j.Name) && len(out.Rows) < q.Limit {
-				out.Rows = append(out.Rows, j)
-			}
-		}
-		if len(out.Rows) > 0 {
-			out.From = places.JunctionsFromGazetteer
-		}
-		return out, err
+		return junctionsNearTx(ctx, tx, q, families)
 	})
+}
+
+// junctionsNearTx reads the junctions near q.At in tx (Junctions).
+func junctionsNearTx(ctx context.Context, tx pgx.Tx, q places.NearbyQuery, families []string) (places.Junctions, error) {
+	out := places.Junctions{From: places.JunctionsFromOSM, Rows: []places.Junction{}}
+	rows, _ := run(ctx, tx, junctionsOSM, q.At.Lon, q.At.Lat, float64(q.RadiusM), families, q.Limit*junctionOverfetch)
+	js, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.Junction, error) {
+		var j places.Junction
+		err := r.Scan(&j.ID, &j.Name, &j.Location.Lat, &j.Location.Lon, &j.DistanceM, &j.Family)
+		return j, err
+	})
+	if err != nil {
+		return out, err
+	}
+	var nodes []places.Junction
+	for _, j := range js {
+		if !places.IsRestAreaName(j.Name) {
+			nodes = append(nodes, j)
+		}
+	}
+	if len(nodes) > 0 {
+		nodes = places.FoldSameNamed(nodes, places.SameJunctionM)
+		out.Rows = nodes[:min(len(nodes), q.Limit)]
+		return out, junctionRoadsOf(ctx, tx, out.Rows, families)
+	}
+	rows, _ = run(ctx, tx, junctionsGazetteer, q.At.Lon, q.At.Lat, float64(q.RadiusM), families, q.Limit*junctionOverfetch)
+	gs, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.Junction, error) {
+		var j places.Junction
+		err := r.Scan(&j.ID, &j.Name, &j.Road, &j.Location.Lat, &j.Location.Lon, &j.DistanceM, &j.Family)
+		return j, err
+	})
+	for _, j := range gs {
+		if !places.IsRestAreaName(j.Name) && len(out.Rows) < q.Limit {
+			out.Rows = append(out.Rows, j)
+		}
+	}
+	if len(out.Rows) > 0 {
+		out.From = places.JunctionsFromGazetteer
+	}
+	return out, err
 }
 
 // junctionRoadsOf sets the road each OpenStreetMap node lies on, read from

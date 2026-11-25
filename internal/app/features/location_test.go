@@ -23,6 +23,7 @@ type locationFake struct {
 	zoneErr error
 	gotZone []rules.ZoneQuery
 	roads   bool
+	gotFams []string
 	// entries the zone list holds, the codes asked and its error.
 	entries  []rules.ListEntry
 	gotCodes []string
@@ -51,7 +52,8 @@ func (f *locationFake) GemeindeAt(context.Context, geo.Point, int, []string) (*p
 	return nil, nil
 }
 
-func (f *locationFake) Location(context.Context, places.LocationQuery, []string) (places.Location, error) {
+func (f *locationFake) Location(_ context.Context, _ places.LocationQuery, fams []string) (places.Location, error) {
+	f.gotFams = fams
 	return f.v, f.err
 }
 
@@ -85,6 +87,13 @@ func TestLocation(t *testing.T) {
 	if err != nil || len(a.Meta.Families) != 2 {
 		t.Errorf("abroad %+v %v", a.Meta.Families, err)
 	}
+	// The nearest junction is read of the places and the roads families and
+	// credits its node's family and its road's.
+	jf := &locationFake{roads: true, v: places.Location{Junction: &places.Junction{Family: "f1", RoadBy: "z1"}}}
+	a, err = locationService(jf).Location(context.Background(), key("commercial", []access.Scope{"places"}, "f1", "z1"), places.LocationQuery{})
+	if err != nil || !slices.Equal(jf.gotFams, []string{"f1", "z1"}) || !slices.Contains(names(a.Meta.Families), "z1") {
+		t.Errorf("junction: read %v, credited %v, %v", jf.gotFams, names(a.Meta.Families), err)
+	}
 	for name, c := range map[string]struct {
 		f    *locationFake
 		want error
@@ -94,6 +103,7 @@ func TestLocation(t *testing.T) {
 		"read":       {&locationFake{err: errStore}, errStore},
 		"post-check": {&locationFake{v: places.Location{Municipality: &places.Place{Family: "f2"}}}, features.ErrGateViolation},
 		"gemeinde":   {&locationFake{v: places.Location{Gemeinde: &places.Gemeinde{Family: "f2"}}}, features.ErrGateViolation},
+		"junction":   {&locationFake{v: places.Location{Junction: &places.Junction{Family: "f1", RoadBy: "z2"}}}, features.ErrGateViolation},
 		"zones":      {&locationFake{roads: true, zoneErr: errStore}, errStore},
 		"zone check": {&locationFake{roads: true, zones: []rules.Zone{{Role: "zone", Inside: true, Family: "z2"}}}, features.ErrGateViolation},
 		"provenance": {&locationFake{fake: &fake{provErr: errStore}}, errStore},

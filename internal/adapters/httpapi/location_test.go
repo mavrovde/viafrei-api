@@ -26,7 +26,8 @@ func TestLocationAnswer(t *testing.T) {
 	f := everyAnswer()
 	f.location = features.LocationAnswer{
 		Location: places.Location{Address: &places.Address{ID: "osm:node1", DistanceM: ip(40)}, District: &places.Place{ID: "d1", Name: "Kreis", DistanceM: ip(9000)},
-			Gemeinde: &places.Gemeinde{Name: "Köln", Code: "05315000", Inside: true, Kreis: sp("Köln"), Bezirk: sp("Köln"), Family: "f1"}},
+			Gemeinde: &places.Gemeinde{Name: "Köln", Code: "05315000", Inside: true, Kreis: sp("Köln"), Bezirk: sp("Köln"), Family: "f1"},
+			Junction: &places.Junction{Name: "Köln-Ost", Road: sp("A3"), DistanceM: 3700, Family: "osm"}, JunctionFrom: "osm"},
 		Meta: features.Answer[struct{}]{Families: []provenance.Family{transitFamily}, At: fixedNow},
 	}
 	h := featureHandler(t, config.Defaults(), f, nil)
@@ -36,7 +37,8 @@ func TestLocationAnswer(t *testing.T) {
 		t.Fatalf("status %d: %s", w.Code, body)
 	}
 	for _, want := range []string{`"distanceM":40`, `"municipality":null`, `"name":"Kreis"`, `"state":null`, `"mayLieOutsideGermany":false`, `"lowEmissionZone":null`,
-		`"gemeinde":{"name":"Köln","code":"05315000","inside":true,"kreis":"Köln","bezirk":"Köln","sourceFamily":"f1"},"governmentRegion":"Köln"`} {
+		`"gemeinde":{"name":"Köln","code":"05315000","inside":true,"kreis":"Köln","bezirk":"Köln","sourceFamily":"f1"}`, `"governmentRegion":"Köln"`,
+		`"junction":{"name":"Köln-Ost","road":"A3","location":{"lat":0,"lon":0},"distanceM":3700,"from":"osm","sourceFamily":"osm"}`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("answer lacks %s: %s", want, body)
 		}

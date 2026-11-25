@@ -42,7 +42,12 @@ func (s *Service) Location(ctx context.Context, key access.Record, q places.Loca
 	if err != nil {
 		return LocationAnswer{}, err
 	}
-	v, err := s.repos.Locations.Location(ctx, q, permitted)
+	// The nearest junction's road is the LCL's, a roads family.
+	read := permitted
+	if roads, _, err := gate.Answer(access.Answering(reg, "roads")); err == nil {
+		read = append(slices.Clone(permitted), roads...)
+	}
+	v, err := s.repos.Locations.Location(ctx, q, read)
 	if err != nil {
 		return LocationAnswer{}, err
 	}
@@ -62,6 +67,12 @@ func (s *Service) Location(ctx context.Context, key access.Record, q places.Loca
 	}
 	if v.Gemeinde != nil {
 		contributed = append(contributed, v.Gemeinde.Family)
+	}
+	if j := v.Junction; j != nil {
+		contributed = append(contributed, j.Family)
+		if j.RoadBy != "" {
+			contributed = append(contributed, j.RoadBy)
+		}
 	}
 	if err := gate.Check(contributed); err != nil {
 		return LocationAnswer{}, err

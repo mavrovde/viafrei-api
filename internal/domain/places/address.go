@@ -186,4 +186,12 @@ type Location struct {
 	// Gemeinde is the Gemeinde the position lies in; nil when the position
 	// may lie abroad or none is read.
 	Gemeinde *Gemeinde
+	// Junction is the nearest motorway junction within JunctionReachM and
+	// JunctionFrom the source it came from; nil when none.
+	Junction     *Junction
+	JunctionFrom string
 }
+
+// JunctionReachM is how far the nearest junction a location description
+// names may lie, as today's (AROUND_MAX_M.junction).
+const JunctionReachM = 100_000

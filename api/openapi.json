@@ -6417,6 +6417,115 @@
         ],
         "type": "object"
       },
+      "RoadForecastHour": {
+        "additionalProperties": false,
+        "properties": {
+          "roadCondition": {
+            "description": "The issuer's road-condition class, as issued: 1 dry, 2 damp, 3 snow, 4 hoarfrost, 5 freezing wet, 6 black ice; 3 and above is slippery as the platform reads it. Null when not given.",
+            "format": "int64",
+            "maximum": 6,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "runAt": {
+            "description": "When the issuer's forecast run that gave this hour was made (UTC).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "surfaceTempC": {
+            "description": "The forecast road-surface temperature in degrees Celsius, as issued; null when not given.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "validAt": {
+            "description": "The hour the forecast is for (UTC).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "validAtLocal": {
+            "description": "validAt in Europe/Berlin time.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "validAt",
+          "validAtLocal",
+          "runAt",
+          "roadCondition",
+          "surfaceTempC"
+        ],
+        "type": "object"
+      },
+      "RoadForecastStation": {
+        "additionalProperties": false,
+        "properties": {
+          "distanceM": {
+            "description": "Distance from the position in metres, rounded.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "forecastFamily": {
+            "description": "The source family of the forecast hours; its attribution is in meta.attribution.",
+            "type": "string"
+          },
+          "hours": {
+            "description": "The forecast hours, earliest first.",
+            "items": {
+              "$ref": "#/components/schemas/RoadForecastHour"
+            },
+            "type": "array"
+          },
+          "id": {
+            "description": "The issuer's station id.",
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "name": {
+            "description": "The issuer's station name.",
+            "type": "string"
+          },
+          "positionSource": {
+            "description": "How the issuer took the station's position, as issued; null when not given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "segmentType": {
+            "description": "The issuer's road segment type of the station, as issued; null when not given.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "sourceFamily": {
+            "description": "The source family of the station; its attribution is in meta.attribution.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "segmentType",
+          "positionSource",
+          "location",
+          "distanceM",
+          "hours",
+          "sourceFamily",
+          "forecastFamily"
+        ],
+        "type": "object"
+      },
       "RoadSituation": {
         "additionalProperties": false,
         "properties": {
@@ -7820,6 +7929,13 @@
       "StationFacility": {
         "additionalProperties": false,
         "properties": {
+          "equipmentNo": {
+            "description": "DB's equipment number of the unit, as its source lists it, the number the platform's station facilities check names a unit by; null when the source gives none (the unit is then named by its id).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "type": "string"
           },
@@ -7847,7 +7963,8 @@
           "kind",
           "position",
           "state",
-          "sourceFamily"
+          "sourceFamily",
+          "equipmentNo"
         ],
         "type": "object"
       },
@@ -8005,6 +8122,10 @@
               "integer",
               "null"
             ]
+          },
+          "railway": {
+            "description": "Whether only the railway stations were kept.",
+            "type": "boolean"
           }
         },
         "required": [
@@ -8012,7 +8133,8 @@
           "code",
           "at",
           "radiusM",
-          "area"
+          "area",
+          "railway"
         ],
         "type": "object"
       },
@@ -8560,6 +8682,17 @@
             ],
             "type": "string"
           },
+          "roadForecast": {
+            "description": "The issuer's road-surface forecast near the position, as the platform's weather warnings check reads it: the nearest open, active road-weather stations within 25 km, at most 3, nearest first, each with its forecast hours from 60 minutes before the answer's instant to 24 hours after it, earliest first. A station with no hour in that window is not listed; empty when no station of a family the key may read answers. Its sources and their conditions are in meta.attribution and meta.notes when a station is listed.",
+            "items": {
+              "$ref": "#/components/schemas/RoadForecastStation"
+            },
+            "type": "array"
+          },
+          "roadForecastLoaded": {
+            "description": "Whether the road-weather station catalogue is loaded and the key may read it and the forecast, as the platform's weather warnings check tells its two empty answers apart: with roadForecast empty, true means no station within 25 km answers (reason no_station_within_radius), false that the forecast is not offered here (reason not_loaded). True whenever a station is listed.",
+            "type": "boolean"
+          },
           "roadWeather": {
             "description": "Road-weather observations near a corridor; present for along questions only, so always empty on a question about one position.",
             "items": {
@@ -8583,7 +8716,9 @@
           "lamp",
           "warnings",
           "truncated",
-          "roadWeather"
+          "roadWeather",
+          "roadForecast",
+          "roadForecastLoaded"
         ],
         "type": "object"
       },
@@ -8703,6 +8838,66 @@
           "area": {
             "$ref": "#/components/schemas/WarningArea"
           },
+          "certainty": {
+            "description": "The issuer's CAP certainty (e.g. Observed, Likely), as issued; null when not given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "description": "The issuer's full text of the warning, in textLanguage, unaltered; null when not given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "english": {
+            "additionalProperties": false,
+            "description": "The issuer's own English text of the warning, its English message for the same alert, unaltered; null when the issuer gave none or its English source is not read for the key. The source is credited in meta.attribution when given.",
+            "properties": {
+              "description": {
+                "description": "The full text, unaltered; null when not given.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "headline": {
+                "description": "The headline, unaltered; null when not given.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "instruction": {
+                "description": "The advice on what to do, unaltered; null when not given.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sourceFamily": {
+                "description": "The source family of the text; its attribution is in meta.attribution.",
+                "type": "string"
+              },
+              "unaltered": {
+                "description": "Whether the text is, provably, the issuer's own: a headline or a description given, and the headline, description and instruction, NUL-separated, still hash (SHA-256) to the hash taken when it was received, as the platform checks before it quotes the issuer's English. False else; such a text may not be passed on as the issuer's.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "headline",
+              "description",
+              "instruction",
+              "unaltered",
+              "sourceFamily"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "event": {
             "description": "The issuer's event name, as issued (the DWD's EVENT, e.g. FROST); null when not given.",
             "type": [
@@ -8745,6 +8940,13 @@
             "description": "Whether the warning is in force at the answer's instant; false for one that starts within weather.lookahead (24 hours by default), which is listed beside those in force as the platform lists it (the lamp reads only those in force).",
             "type": "boolean"
           },
+          "instruction": {
+            "description": "The issuer's advice on what to do, in textLanguage, unaltered; null when not given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "issuer": {
             "description": "The issuing service.",
             "type": "string"
@@ -8784,6 +8986,17 @@
             "description": "The language of headline (BCP 47).",
             "type": "string"
           },
+          "unaltered": {
+            "description": "Whether description is, provably, the text the issuer published: not empty, and its UTF-8 bytes still hash (SHA-256) to the hash taken over them when it was received, as the platform checks before it quotes the issuer's wording under the issuer's source note. False when description is null or changed since; such a text may not be passed on as the issuer's.",
+            "type": "boolean"
+          },
+          "urgency": {
+            "description": "The issuer's CAP urgency (e.g. Immediate, Future), as issued; null when not given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "validity": {
             "$ref": "#/components/schemas/TimeWindow"
           }
@@ -8803,7 +9016,13 @@
           "published",
           "publishedLocal",
           "area",
-          "sourceFamily"
+          "sourceFamily",
+          "description",
+          "instruction",
+          "unaltered",
+          "urgency",
+          "certainty",
+          "english"
         ],
         "type": "object"
       },
@@ -21554,6 +21773,16 @@
             }
           },
           {
+            "description": "Only the railway stations: those of the DB station register, which carry an EVA number (eva), as the platform's train departures and station facilities checks resolve a station name. Without it a stop of the same name and no EVA number may come first (Frankfurt (Main) Hauptbahnhof is a bus stop's name too). It narrows q, code or at, and is no search of its own; when q is read as a town and a stop in it, only the town's DB stations are listed and paged.",
+            "explode": false,
+            "in": "query",
+            "name": "railway",
+            "schema": {
+              "description": "Only the railway stations: those of the DB station register, which carry an EVA number (eva), as the platform's train departures and station facilities checks resolve a station name. Without it a stop of the same name and no EVA number may come first (Frankfurt (Main) Hauptbahnhof is a bus stop's name too). It narrows q, code or at, and is no search of its own; when q is read as a town and a stop in it, only the town's DB stations are listed and paged.",
+              "type": "boolean"
+            }
+          },
+          {
             "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
             "example": "en",
             "in": "query",
@@ -21673,7 +21902,8 @@
                           "code": null,
                           "at": null,
                           "radiusM": null,
-                          "area": "01002"
+                          "area": "01002",
+                          "railway": false
                         }
                       },
                       "links": {
@@ -21786,7 +22016,8 @@
                           "code": null,
                           "at": null,
                           "radiusM": null,
-                          "area": null
+                          "area": null,
+                          "railway": false
                         }
                       },
                       "links": {
@@ -22436,24 +22667,26 @@
                           "name": "Pienköckheim Nord"
                         },
                         "counts": {
-                          "active": 0,
+                          "active": 2,
                           "inactive": 0,
-                          "unknown": 2
+                          "unknown": 0
                         },
                         "facilities": [
                           {
                             "id": "equipment:100003",
                             "kind": "escalator",
                             "position": "zu Gleis 1",
-                            "state": "unknown",
-                            "sourceFamily": "openstation_siri_fm"
+                            "state": "active",
+                            "sourceFamily": "openstation_siri_fm",
+                            "equipmentNo": null
                           },
                           {
                             "id": "equipment:100004",
                             "kind": "escalator",
                             "position": "zu Gleis 2",
-                            "state": "unknown",
-                            "sourceFamily": "openstation_siri_fm"
+                            "state": "active",
+                            "sourceFamily": "openstation_siri_fm",
+                            "equipmentNo": null
                           }
                         ]
                       },
@@ -23941,11 +24174,19 @@
                               "cellId": "805002000",
                               "geometry": null
                             },
-                            "sourceFamily": "dwd_eta"
+                            "sourceFamily": "dwd_eta",
+                            "description": null,
+                            "instruction": null,
+                            "unaltered": false,
+                            "urgency": null,
+                            "certainty": null,
+                            "english": null
                           }
                         ],
                         "truncated": false,
-                        "roadWeather": []
+                        "roadWeather": [],
+                        "roadForecast": [],
+                        "roadForecastLoaded": false
                       },
                       "meta": {
                         "requestId": "example-request-0001",

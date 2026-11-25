@@ -103,6 +103,7 @@ var nullableObjects = []struct{ schema, member string }{
 	{"RoadSituation", "position"},
 	{"StationsQuery", "at"},
 	{"WarningArea", "geometry"},
+	{"WeatherWarning", "english"},
 	{"ZoneVerdict", "plaque"},
 }
 
@@ -347,11 +348,12 @@ func (s *server) dataMeta(ctx context.Context, fams []provenance.Family, at time
 // at counts from its own instant (Assess gives it the age zero until then).
 func noteFreshness(ctx context.Context, f provenance.Family, fr provenance.Freshness, at time.Time) {
 	noteShown(ctx, "freshness "+fr.Family+" stale="+strconv.FormatBool(fr.Stale))
-	if fr.Stale || f.DataAsOf == nil {
+	known := f.KnownCurrent()
+	if fr.Stale || known == nil {
 		return
 	}
-	if f.DataAsOf.After(at) {
-		noteChangesAt(ctx, *f.DataAsOf)
+	if known.After(at) {
+		noteChangesAt(ctx, *known)
 	}
 	if t, ok := f.TurnsStale(); ok {
 		noteChangesAt(ctx, t)

@@ -117,7 +117,8 @@
         "code": null,
         "at": null,
         "radiusM": null,
-        "area": null
+        "area": null,
+        "railway": false
       }
     },
     "links": {

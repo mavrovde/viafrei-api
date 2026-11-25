@@ -22,24 +22,26 @@
         "name": "Pienköckheim Nord"
       },
       "counts": {
-        "active": 0,
+        "active": 2,
         "inactive": 0,
-        "unknown": 2
+        "unknown": 0
       },
       "facilities": [
         {
           "id": "equipment:100003",
           "kind": "escalator",
           "position": "zu Gleis 1",
-          "state": "unknown",
-          "sourceFamily": "openstation_siri_fm"
+          "state": "active",
+          "sourceFamily": "openstation_siri_fm",
+          "equipmentNo": null
         },
         {
           "id": "equipment:100004",
           "kind": "escalator",
           "position": "zu Gleis 2",
-          "state": "unknown",
-          "sourceFamily": "openstation_siri_fm"
+          "state": "active",
+          "sourceFamily": "openstation_siri_fm",
+          "equipmentNo": null
         }
       ]
     },

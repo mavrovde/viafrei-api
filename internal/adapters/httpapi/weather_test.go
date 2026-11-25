@@ -53,11 +53,16 @@ func riskAnswer() features.WeatherRisk {
 		Answer: features.Answer[weather.Warning]{Items: []weather.Warning{
 			{ID: "w-1", Family: "src-alpha-weather", Hazard: "snow", Level: 3, LevelName: "Unwetter", Issuer: "Wetterdienst",
 				Headline: "Schneefall", TextLanguage: "de", From: fixedNow.Add(-time.Hour), Until: tp(fixedNow.Add(26 * time.Hour)), AreaName: "Kreis A",
-				CellID: sp("814626000"), Event: sp("FROST"), Identifier: sp("2.49.0.0.276.0.DWD.PVW.1"), Published: tp(fixedNow.Add(-2 * time.Hour))},
+				CellID: sp("814626000"), Event: sp("FROST"), Identifier: sp("2.49.0.0.276.0.DWD.PVW.1"), Published: tp(fixedNow.Add(-2 * time.Hour)),
+				Description: sp("Es fällt Schnee."), Instruction: sp("Fahren Sie vorsichtig."), Urgency: sp("Immediate"), Certainty: sp("Likely"), Unaltered: true,
+				English: &weather.Text{Family: "src-beta-weather", Headline: sp("Snowfall"), Description: sp("Snow is falling.")}},
 			{ID: "w-2", Family: "src-alpha-weather", Hazard: weather.Other, Level: 1, LevelName: "Wetterwarnung", Issuer: "Wetterdienst",
 				Headline: "Hinweis", TextLanguage: "de", From: fixedNow, AreaName: "Kreis A"},
 		}, HasMore: true, Families: []provenance.Family{weatherFamily}, At: fixedNow},
 		Lamp: weather.LampRed,
+		Road: weather.RoadForecast{Loaded: true, Stations: []weather.RoadStation{{ID: "10427", Name: "A7 Kassel", Segment: ip(2), Location: geo.Point{Lat: 51.3, Lon: 9.5}, DistanceM: 4210,
+			Family: "src-alpha-weather", ForecastFamily: "src-beta-weather",
+			Hours: []weather.RoadHour{{ValidAt: fixedNow, RunAt: fixedNow.Add(-time.Hour), Class: ip(5), SurfaceTempC: fp(-1.5)}, {ValidAt: fixedNow.Add(time.Hour), RunAt: fixedNow.Add(-time.Hour)}}}}},
 	}
 }
 
@@ -97,12 +102,40 @@ func TestWeatherRiskAnswer(t *testing.T) {
 	if w0["event"] != "FROST" || w0["identifier"] != "2.49.0.0.276.0.DWD.PVW.1" || w0["published"] != "2026-03-28T23:30:00Z" || w0["publishedLocal"] != "2026-03-29T00:30:00+01:00" {
 		t.Errorf("issued %v %v %v %v", w0["event"], w0["identifier"], w0["published"], w0["publishedLocal"])
 	}
+	if w0["description"] != "Es fällt Schnee." || w0["instruction"] != "Fahren Sie vorsichtig." || w0["urgency"] != "Immediate" || w0["certainty"] != "Likely" {
+		t.Errorf("text %v %v %v %v", w0["description"], w0["instruction"], w0["urgency"], w0["certainty"])
+	}
+	if en, _ := w0["english"].(map[string]any); en["headline"] != "Snowfall" || en["description"] != "Snow is falling." ||
+		en["instruction"] != nil || en["sourceFamily"] != "src-beta-weather" || en["unaltered"] != false {
+		t.Errorf("english %v", w0["english"])
+	}
+	// Whether each text is the issuer's, unaltered, as the platform checks before it quotes one.
+	if w0["unaltered"] != true {
+		t.Errorf("unaltered %v", w0["unaltered"])
+	}
 	if rw, ok := data["roadWeather"].([]any); !ok || len(rw) != 0 {
 		t.Errorf("roadWeather %v", data["roadWeather"])
 	}
+	rf, _ := data["roadForecast"].([]any)
+	st0, _ := rf[0].(map[string]any)
+	hs, _ := st0["hours"].([]any)
+	h0, _ := hs[0].(map[string]any)
+	h1, _ := hs[1].(map[string]any)
+	if len(rf) != 1 || st0["id"] != "10427" || st0["segmentType"] != 2.0 || st0["positionSource"] != nil || st0["distanceM"] != 4210.0 ||
+		st0["sourceFamily"] != "src-alpha-weather" || st0["forecastFamily"] != "src-beta-weather" || len(hs) != 2 ||
+		h0["roadCondition"] != 5.0 || h0["surfaceTempC"] != -1.5 || h0["validAtLocal"] == nil || h1["roadCondition"] != nil || h1["surfaceTempC"] != nil {
+		t.Errorf("roadForecast %v", data["roadForecast"])
+	}
+	if data["roadForecastLoaded"] != true {
+		t.Errorf("roadForecastLoaded %v", data["roadForecastLoaded"])
+	}
 	w1, _ := ws[1].(map[string]any)
 	v1, _ := w1["validity"].(map[string]any)
-	if w1["hazard"] != "other" || v1["until"] != nil || w1["event"] != nil || w1["published"] != nil || w1["publishedLocal"] != nil {
+	if w1["hazard"] != "other" || v1["until"] != nil || w1["event"] != nil || w1["published"] != nil || w1["publishedLocal"] != nil ||
+		w1["description"] != nil || w1["instruction"] != nil || w1["urgency"] != nil || w1["certainty"] != nil {
+		t.Errorf("second warning %v", w1)
+	}
+	if v, has := w1["english"]; !has || v != nil {
 		t.Errorf("second warning %v", w1)
 	}
 	q, _ := meta(t, body)["query"].(map[string]any)
@@ -121,6 +154,17 @@ func TestWeatherRiskAnswer(t *testing.T) {
 	}
 	if hz, _ := q["hazards"].([]any); hz == nil || len(hz) != 0 {
 		t.Errorf("an empty hazard list is [] in meta.query: %v", q)
+	}
+	// No station and no catalogue: the forecast is not offered here, which
+	// an empty list alone cannot tell from no station within 25 km.
+	if rf, _ := data["roadForecast"].([]any); rf == nil || len(rf) != 0 || data["roadForecastLoaded"] != false {
+		t.Errorf("not loaded: %v, %v", data["roadForecast"], data["roadForecastLoaded"])
+	}
+	f.risk.Road.Loaded = true
+	body = decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/weather-risk?at=52.52,13.405", bearer))
+	data, _ = body["data"].(map[string]any)
+	if rf, _ := data["roadForecast"].([]any); rf == nil || len(rf) != 0 || data["roadForecastLoaded"] != true {
+		t.Errorf("no station within 25 km: %v, %v", data["roadForecast"], data["roadForecastLoaded"])
 	}
 
 	// A warning is in force from its start, at the answer's instant

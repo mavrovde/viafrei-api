@@ -47,7 +47,7 @@ var warnCellNamed = named("api_weather_cell_named", `select exists (select from 
 // newest start: the platform's weather watch read.
 var cellWarnings = named("api_weather_cell_warnings", warningColumns+`
 from weather_warnings w
-where (w.warncell_id = (select $2::text) or w.area_desc = (select $2::text))
+`+warningEnglish+`where (w.warncell_id = (select $2::text) or w.area_desc = (select $2::text))
   and w.source_feed = any((select $1::text[])::text[])
   and w.closed_at is null and w.deleted_at is null and w.closed_reason is distinct from 'withdrawn'
   and w.valid_from <= (select $3::timestamptz) and (w.valid_to is null or w.valid_to > (select $3::timestamptz))

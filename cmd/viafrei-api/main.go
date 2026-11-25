@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -194,9 +195,27 @@ func serve(environ []string, stderr io.Writer) int {
 		log.Warn("callers.allow_cidr is empty: the public listener refuses every caller (fail closed)")
 	}
 	errc := make(chan error, 2)
-	go func() { errc <- srv.ListenAndServe() }()
-	go func() { errc <- hsrv.ListenAndServe() }()
-	log.Info("listening", "addr", cfg.Server.ListenAddr, "health", cfg.Health.ListenAddr, "version", buildinfo.Get().Version)
+	// Each listener is bound here, before anything is served or logged: once
+	// the health listener answers, the public one is bound too, and
+	// "listening" is logged only when both are. ListenAndServe bound each on
+	// its own goroutine, so /healthz could answer while the public address
+	// still refused connections (#216). A bind that fails ends serve below.
+	// The bind is not cancelled with ctx: a stop that comes meanwhile is
+	// answered by the select below, with the shutdown path and exit 0.
+	bindCtx := context.WithoutCancel(ctx)
+	var lc net.ListenConfig
+	listen := func(s *http.Server) bool {
+		l, err := lc.Listen(bindCtx, "tcp", s.Addr)
+		if err != nil {
+			errc <- err
+			return false
+		}
+		go func() { errc <- s.Serve(l) }()
+		return true
+	}
+	if listen(srv) && listen(hsrv) {
+		log.Info("listening", "addr", cfg.Server.ListenAddr, "health", cfg.Health.ListenAddr, "version", buildinfo.Get().Version)
+	}
 
 	select {
 	case err := <-errc:

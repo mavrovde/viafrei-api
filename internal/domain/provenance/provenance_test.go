@@ -59,6 +59,41 @@ func TestAssess(t *testing.T) {
 	}
 }
 
+// TestConfirmedUnchangedDataIsNotStale: a family whose data last changed
+// long ago but was confirmed unchanged a moment ago is current to its
+// confirmation (as the platform judges it): the warnings' copy unchanged
+// for 2 848 s, confirmed 169 s ago, at a threshold of 990 s, is fresh. A
+// confirmation older than the change does not move the instant back.
+func TestConfirmedUnchangedDataIsNotStale(t *testing.T) {
+	req.Covers(t, "ENV-003")
+	cases := []struct {
+		name          string
+		changed, read *time.Time
+		want          *time.Time
+		stale         bool
+	}{
+		{"confirmed after the change", at(2848 * time.Second), at(169 * time.Second), at(169 * time.Second), false},
+		{"confirmation lapsed too", at(2848 * time.Second), at(991 * time.Second), at(991 * time.Second), true},
+		{"confirmation before the change", at(100 * time.Second), at(2000 * time.Second), at(100 * time.Second), false},
+		{"confirmed, never changed", nil, at(10 * time.Second), at(10 * time.Second), false},
+		{"never known", nil, nil, nil, true},
+	}
+	for _, c := range cases {
+		f := provenance.Family{Source: access.Source{Family: "dwd_warnings"}, StaleAfter: 990 * time.Second, DataAsOf: c.changed, ReadAt: c.read}
+		if got := f.KnownCurrent(); !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s: KnownCurrent = %v, want %v", c.name, got, c.want)
+		}
+		got := f.Assess(now)
+		if got.Stale != c.stale || !reflect.DeepEqual(got.DataAsOf, c.want) {
+			t.Errorf("%s: %+v", c.name, got)
+		}
+		turns, ok := f.TurnsStale()
+		if ok != (c.want != nil) || (ok && !turns.Equal(c.want.Add(991*time.Second))) {
+			t.Errorf("%s: TurnsStale = %v %v", c.name, turns, ok)
+		}
+	}
+}
+
 // TestAFamilyWithoutAnIntervalIsNeverStale: the read contract gives a family
 // with no fixed interval no threshold; it is never stale, with or without an
 // instant, its age is shown, and it never turns stale.

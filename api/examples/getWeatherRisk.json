@@ -41,11 +41,19 @@
             "cellId": "805002000",
             "geometry": null
           },
-          "sourceFamily": "dwd_eta"
+          "sourceFamily": "dwd_eta",
+          "description": null,
+          "instruction": null,
+          "unaltered": false,
+          "urgency": null,
+          "certainty": null,
+          "english": null
         }
       ],
       "truncated": false,
-      "roadWeather": []
+      "roadWeather": [],
+      "roadForecast": [],
+      "roadForecastLoaded": false
     },
     "meta": {
       "requestId": "example-request-0001",

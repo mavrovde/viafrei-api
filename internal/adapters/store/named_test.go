@@ -24,9 +24,12 @@ var refusedReads = map[string]*regexp.Regexp{
 // allowedReads are the forms of a refused name a statement may read, cut
 // from its text before refusedReads is applied: a named field of a provider
 // payload (a jsonb path of literal keys, never the payload whole), whether
-// one is stored (is [not] null), the comparison of two payloads' hashes, and
-// the platform's data status (the freshness the read contract publishes).
+// one is stored (is [not] null), the comparison of two payloads' hashes, a
+// jsonb path query of a literal path (the fields it names, never the payload
+// whole), and the platform's data status (the freshness the read contract
+// publishes).
 var allowedReads = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)\bjsonb_path_(?:query|query_first|query_array|exists)\(\s*(?:[a-z_][a-z0-9_]*\.)?[a-z_][a-z0-9_]*\s*,\s*'[^']*'`),
 	regexp.MustCompile(`(?i)\b(?:[a-z_][a-z0-9_]*\.)?(?:raw|payload)(?:\s*(?:->>?|#>>?)\s*'[^']*')+`),
 	regexp.MustCompile(`(?i)\b(?:[a-z_][a-z0-9_]*\.)?(?:raw|payload)\s+is\s+(?:not\s+)?null\b`),
 	regexp.MustCompile(`(?i)\b[a-z_][a-z0-9_]*\.raw_hash\s*=\s*[a-z_][a-z0-9_]*\.raw_hash\b`),
@@ -54,7 +57,8 @@ func withoutTrafficEvents(sql string) string {
 	// the form that reads the stored Land, cut around its rules (their $1 is made opaque)
 	landBefore, landAfter, _ := strings.Cut(trafficEventsOfFamilies, rulesOfFamilies("b.source_ref"))
 	// the motorway answer's sweep rows and plan rule, which derive fields from the payload
-	motorway := []string{motorwaySweepRows("$3"), motorwaySweepRows("$6"), planInForce}
+	motorway := []string{motorwaySweepRows("$3", "true"), motorwaySweepRows("$6", "true"), planInForce,
+		motorwaySweepRows("$10", "$11::boolean"), planSuspended, strategyPayloadColumn, strategyPayloadOnce}
 	for _, part := range append([]string{relTrafficEvent, before, after, landBefore, landAfter}, motorway...) {
 		sql = strings.ReplaceAll(sql, part, "")
 	}

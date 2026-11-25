@@ -180,7 +180,8 @@
           "sourceFamily": "roads_alpha"
         }
       ],
-      "motorway": null
+      "motorway": null,
+      "roadStatus": null
     },
     "meta": {
       "requestId": "example-request-0001",

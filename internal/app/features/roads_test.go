@@ -32,6 +32,9 @@ type roadFake struct {
 	motorway         roads.MotorwayRead
 	motorwayErr      error
 	gotMotorway      *roads.MotorwayQuery
+	roadStatus       roads.RoadStatusRead
+	roadStatusErr    error
+	gotRoadStatus    *roads.RoadStatusQuery
 	sits             []roads.Situation
 	counts           map[string]int
 	msgs             []roads.Message
@@ -112,6 +115,11 @@ func (f *roadFake) page(fams roads.Families, more bool) roads.Page {
 func (f *roadFake) Motorway(_ context.Context, q roads.MotorwayQuery) (roads.MotorwayRead, error) {
 	f.gotMotorway = &q
 	return f.motorway, f.motorwayErr
+}
+
+func (f *roadFake) RoadStatus(_ context.Context, q roads.RoadStatusQuery) (roads.RoadStatusRead, error) {
+	f.gotRoadStatus = &q
+	return f.roadStatus, f.roadStatusErr
 }
 
 func (f *roadFake) SituationsOnRoad(_ context.Context, q roads.CorridorQuery, fams roads.Families, at time.Time) (roads.Page, error) {
@@ -745,5 +753,55 @@ func TestMotorwayConditionsCarryTheMotorwayAnswer(t *testing.T) {
 	f.road = roads.Road{Ref: "B6", Class: roads.ClassFederal}
 	if c, err = s.MotorwayConditions(ctx, k, roads.CorridorQuery{Road: "B6"}); err != nil || c.Motorway != nil || f.gotMotorway != nil {
 		t.Errorf("federal: %+v %v", c.Motorway, err)
+	}
+}
+
+// TestMotorwayConditionsCarryTheRoadStatus: the road's status is read over
+// the sources the key may read, the strategies on a motorway only, over the
+// window asked or the tool's three days; its answered sources and
+// strategies are credited, a strategy of a source the key may not read
+// ends the answer, and a key that may read none of its sources carries none.
+func TestMotorwayConditionsCarryTheRoadStatus(t *testing.T) {
+	req.Covers(t, "FR-ROAD-003", "SEC-030")
+	ctx := context.Background()
+	reg := append(slices.Clone(roadRegister), access.Terms{Family: "autobahn", Domain: "roads", UseClasses: all, Version: "v1"},
+		access.Terms{Family: "routing_bab", Domain: "roads", UseClasses: all, Version: "v1"})
+	f := &roadFake{road: roads.Road{Ref: "A8", Class: roads.ClassMotorway}, sits: []roads.Situation{{ID: "a", Family: "r1"}},
+		roadStatus: roads.RoadStatusRead{Tick: now, Live: []roads.RoadStatusLiveRow{{Family: "autobahn", Road: "A8", Kind: "closure", ID: "x", Total: 1, Closed: 1}},
+			Strategies: []roads.StrategyRow{{Family: "routing_bab", NowInForce: true, EventType: ptr("generalNetworkManagement")}}}}
+	s := roadService(f)
+	f.reg = reg
+	k := key("commercial", roadsScope, "r1", "autobahn", "routing_bab")
+	f.regCalls = 0
+	c, err := s.MotorwayConditions(ctx, k, roads.CorridorQuery{Road: "A8", Limit: 3})
+	if err != nil || c.RoadStatus == nil || len(c.RoadStatus.Items) != 1 || len(c.RoadStatus.Strategies) != 1 {
+		t.Fatalf("%+v %v", c.RoadStatus, err)
+	}
+	if q := f.gotRoadStatus; q.Road != "A8" || q.Limit != 3 || !slices.Equal(q.Open, []string{"autobahn"}) || !slices.Equal(q.Strategies, []string{"routing_bab"}) || !q.WindowEnd.Equal(now.Add(72*time.Hour)) {
+		t.Errorf("asked %+v", q)
+	}
+	if got := names(c.Families); !slices.Contains(got, "routing_bab") || !slices.Contains(got, "autobahn") || !slices.Contains(got, "r1") {
+		t.Errorf("families %v", got)
+	}
+	calls := f.regCalls
+	until := now.Add(time.Hour)
+	if _, err = s.MotorwayConditions(ctx, k, roads.CorridorQuery{Road: "A8", Ahead: true, Until: until}); err != nil || !f.gotRoadStatus.WindowEnd.Equal(until) {
+		t.Errorf("ahead: %v %+v", err, f.gotRoadStatus)
+	}
+	f.roadStatus.Strategies[0].Family = "routing_bayern"
+	if _, err = s.MotorwayConditions(ctx, k, roads.CorridorQuery{Road: "A8"}); !errors.Is(err, features.ErrGateViolation) {
+		t.Errorf("foreign strategy: %v", err)
+	}
+	f.roadStatusErr = errStore
+	if _, err = s.MotorwayConditions(ctx, k, roads.CorridorQuery{Road: "A8"}); !errors.Is(err, errStore) {
+		t.Errorf("failed read: %v", err)
+	}
+	f.roadStatusErr, f.gotRoadStatus = nil, nil
+	if c, err = s.MotorwayConditions(ctx, key("commercial", roadsScope, "r1"), roads.CorridorQuery{Road: "A8"}); err != nil || c.RoadStatus != nil || f.gotRoadStatus != nil {
+		t.Errorf("none readable: %+v %v", c.RoadStatus, err)
+	}
+	f.regCalls, f.regFailAt = 0, calls
+	if _, err = s.MotorwayConditions(ctx, k, roads.CorridorQuery{Road: "A8"}); !errors.Is(err, errStore) || f.gotRoadStatus != nil {
+		t.Errorf("failed register: %v", err)
 	}
 }

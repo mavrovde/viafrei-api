@@ -87,6 +87,7 @@ const schemaPrefix = "#/components/schemas/"
 var nullableObjects = []struct{ schema, member string }{
 	{"ChargePoint", "availability"},
 	{"MotorwayData", "motorway"},
+	{"MotorwayData", "roadStatus"},
 	{"MotorwayBlock", "measured"},
 	{"MotorwayEntryView", "jam"},
 	{"MotorwayJam", "trend"},

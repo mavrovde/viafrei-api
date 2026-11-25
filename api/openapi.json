@@ -3903,6 +3903,82 @@
               "null"
             ]
           },
+          "roadStatus": {
+            "additionalProperties": false,
+            "description": "The platform's road status by road number: the totals by bucket, the entries listed and hidden, the sources that answered with when each was last seen current, and on a motorway the road operator's switched strategies. Null when the key may read none of its sources.",
+            "properties": {
+              "canRaise": {
+                "description": "Whether a higher limit would list every entry.",
+                "type": "boolean"
+              },
+              "counts": {
+                "$ref": "#/components/schemas/RoadStatusCounts"
+              },
+              "guidance": {
+                "description": "The road operator's switched strategies in force on the motorway, said as its recommendation; empty when none or not a motorway.",
+                "items": {
+                  "$ref": "#/components/schemas/RoadStatusGuidance"
+                },
+                "type": "array"
+              },
+              "guidanceNotCurrent": {
+                "description": "The strategy sources not checked within three of their cycles, whose strategies are not said.",
+                "items": {
+                  "$ref": "#/components/schemas/RoadStatusStaleCheck"
+                },
+                "type": "array"
+              },
+              "hidden": {
+                "description": "The entries counted and not listed: items plus hidden is counts.total.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "hiddenClosures": {
+                "description": "The closures among hidden.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "items": {
+                "description": "The entries listed, closures first, at most the limit (and eleven), in the platform's order.",
+                "items": {
+                  "$ref": "#/components/schemas/RoadStatusItem"
+                },
+                "type": "array"
+              },
+              "plannedWorksHaveNoCoordinates": {
+                "description": "The planning data carries no coordinates: planned works are filed by road and section.",
+                "type": "boolean"
+              },
+              "sourcesAnswered": {
+                "description": "The sources that answered, in the register's order; a source that did not answer is not listed.",
+                "items": {
+                  "$ref": "#/components/schemas/RoadStatusSource"
+                },
+                "type": "array"
+              },
+              "windowEnd": {
+                "description": "The end of the window the status covers: the window asked, else three days from now.",
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "windowEnd",
+              "counts",
+              "items",
+              "hidden",
+              "hiddenClosures",
+              "canRaise",
+              "sourcesAnswered",
+              "guidance",
+              "guidanceNotCurrent",
+              "plannedWorksHaveNoCoordinates"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "sight": {
             "description": "The sight of every group the lamp read; any group not fresh keeps the lamp from green (limited_sight).",
             "items": {
@@ -3935,7 +4011,8 @@
           "sourceStamps",
           "coverage",
           "situations",
-          "motorway"
+          "motorway",
+          "roadStatus"
         ],
         "type": "object"
       },
@@ -8322,6 +8399,451 @@
         ],
         "type": "object"
       },
+      "RoadStatusCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "closed": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "current": {
+            "description": "Plan works in force on a road the live sweep answers.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "currentFamilies": {
+            "description": "The plan sources behind current, over every counted entry.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "planned": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "programme": {
+            "description": "Started records of a works programme, no restriction in force.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "restricted": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "closed",
+          "restricted",
+          "planned",
+          "programme",
+          "current",
+          "total",
+          "currentFamilies"
+        ],
+        "type": "object"
+      },
+      "RoadStatusGuidance": {
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "detour",
+              "guidance"
+            ],
+            "type": "string"
+          },
+          "road": {
+            "type": "string"
+          },
+          "since": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceFamily": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "titleEnglish": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "until": {
+            "description": "Null when the publisher states none, or its stated end is its next pull.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "via": {
+            "description": "The roads of the alternative route.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "words": {
+            "description": "The publisher's words of the route, as published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "wordsEnglish": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "road",
+          "sourceFamily",
+          "id",
+          "kind",
+          "via",
+          "words",
+          "title",
+          "titleEnglish",
+          "wordsEnglish",
+          "from",
+          "to",
+          "since",
+          "until"
+        ],
+        "type": "object"
+      },
+      "RoadStatusItem": {
+        "additionalProperties": false,
+        "properties": {
+          "cause": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "closureFrom": {
+            "description": "A closure ahead within a restriction's validity: its start.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "closureTo": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "description": "The road operator's description lines, without its start line and since clauses; empty for another source's entry.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "detour": {
+            "description": "A rerouting record.",
+            "type": "boolean"
+          },
+          "detourForSomeVehicles": {
+            "description": "The rerouting applies to some vehicles only.",
+            "type": "boolean"
+          },
+          "detourVia": {
+            "description": "The roads a rerouting record's alternative route takes.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "eventType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "extent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "from": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "description": "The road operator's kind (closure, roadworks); null for another source's entry.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lat": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "lon": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "measureTo": {
+            "description": "The end of the whole measure the description states.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "place": {
+            "description": "The place a message's words name.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publicationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publisher": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "referentFrom": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "referentTo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "road": {
+            "description": "The road the entry is on: for the road operator's entry, the motorway its title names first.",
+            "type": "string"
+          },
+          "sectionName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "segments": {
+            "description": "The sections the road operator publishes the site as; 0 for another source's entry.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "siteName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceFamily": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "closed",
+              "restricted",
+              "current",
+              "programme",
+              "planned"
+            ],
+            "type": "string"
+          },
+          "subtitle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "term": {
+            "description": "What the entry is called.",
+            "enum": [
+              "closure",
+              "roadworks",
+              "restriction"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "windowCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "windowEnds": {
+            "items": {
+              "format": "date-time",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": "array"
+          },
+          "windowStarts": {
+            "description": "The starts of the validity windows touching the window.",
+            "items": {
+              "format": "date-time",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "status",
+          "term",
+          "sourceFamily",
+          "road",
+          "id",
+          "kind",
+          "title",
+          "subtitle",
+          "extent",
+          "description",
+          "segments",
+          "eventType",
+          "publisher",
+          "publicationId",
+          "place",
+          "detail",
+          "siteName",
+          "sectionName",
+          "cause",
+          "referentFrom",
+          "referentTo",
+          "detour",
+          "detourVia",
+          "detourForSomeVehicles",
+          "windowStarts",
+          "windowEnds",
+          "windowCount",
+          "closureFrom",
+          "closureTo",
+          "from",
+          "to",
+          "measureTo",
+          "lat",
+          "lon"
+        ],
+        "type": "object"
+      },
+      "RoadStatusSource": {
+        "additionalProperties": false,
+        "properties": {
+          "asOf": {
+            "description": "When the source was last seen current: the live sweep, else the newest of its listed entries (its last good run when as new); null when none of its entries is listed.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceFamily": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceFamily",
+          "asOf"
+        ],
+        "type": "object"
+      },
+      "RoadStatusStaleCheck": {
+        "additionalProperties": false,
+        "properties": {
+          "lastChecked": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceFamily": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceFamily",
+          "lastChecked"
+        ],
+        "type": "object"
+      },
       "RoadWeatherObservation": {
         "additionalProperties": false,
         "properties": {
@@ -11251,7 +11773,8 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -11571,7 +12094,8 @@
                             "dataAsOf": "2026-03-29T23:52:30Z",
                             "ageS": 450,
                             "staleAfterS": 2700,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:52:30Z"
                           }
                         ],
                         "attribution": [
@@ -12073,7 +12597,8 @@
                             "dataAsOf": "2026-03-29T23:55:00Z",
                             "ageS": 300,
                             "staleAfterS": 1800,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:55:00Z"
                           }
                         ],
                         "attribution": [
@@ -12417,7 +12942,8 @@
                             "dataAsOf": "2026-03-29T23:55:00Z",
                             "ageS": 300,
                             "staleAfterS": 1800,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:55:00Z"
                           }
                         ],
                         "attribution": [
@@ -12755,7 +13281,8 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -13140,6 +13667,8 @@
                           },
                           "distanceM": 100,
                           "openingState": "open",
+                          "openingObservedAt": "2026-03-30T00:00:00Z",
+                          "openingHoursAsOf": null,
                           "prices": [
                             {
                               "fuel": "e10",
@@ -13152,6 +13681,7 @@
                           "sourceFamily": "tankerkoenig_gamma"
                         }
                       ],
+                      "osmWithoutPrice": [],
                       "meta": {
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
@@ -13163,7 +13693,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -13503,7 +14034,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -13923,42 +14455,48 @@
                             "dataAsOf": "2026-03-29T23:55:00Z",
                             "ageS": 300,
                             "staleAfterS": 1800,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:55:00Z"
                           },
                           {
                             "family": "dwd_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           },
                           {
                             "family": "openstation_siri_fm",
                             "dataAsOf": "2026-03-29T23:52:30Z",
                             "ageS": 450,
                             "staleAfterS": 2700,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:52:30Z"
                           },
                           {
                             "family": "park_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           },
                           {
                             "family": "roads_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           },
                           {
                             "family": "tankerkoenig_gamma",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -14352,7 +14890,8 @@
                             "dataAsOf": "2026-03-29T23:55:00Z",
                             "ageS": 300,
                             "staleAfterS": 1800,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:55:00Z"
                           }
                         ],
                         "attribution": [
@@ -14834,6 +15373,9 @@
                           "sourceFamily": "geonames"
                         },
                         "mayLieOutsideGermany": true,
+                        "gemeinde": null,
+                        "junction": null,
+                        "governmentRegion": null,
                         "lowEmissionZone": null
                       },
                       "meta": {
@@ -14847,14 +15389,16 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           },
                           {
                             "family": "osm",
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -15224,7 +15768,8 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -15657,7 +16202,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -16205,7 +16751,9 @@
                             "position": null,
                             "sourceFamily": "roads_alpha"
                           }
-                        ]
+                        ],
+                        "motorway": null,
+                        "roadStatus": null
                       },
                       "meta": {
                         "requestId": "example-request-0001",
@@ -16218,14 +16766,16 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           },
                           {
                             "family": "roads_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -16640,7 +17190,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -17007,7 +17558,8 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -17413,14 +17965,16 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           },
                           {
                             "family": "frankfurt_behindertenparkplaetze",
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -17842,7 +18396,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -18207,7 +18762,8 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -18614,21 +19170,24 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           },
                           {
                             "family": "geonames",
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           },
                           {
                             "family": "osm",
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -19004,7 +19563,8 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -19401,7 +19961,8 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -20692,14 +21253,16 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           },
                           {
                             "family": "roads_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -21034,7 +21597,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -21356,7 +21920,8 @@
                             "dataAsOf": "2026-03-29T23:59:30Z",
                             "ageS": 30,
                             "staleAfterS": 180,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:59:30Z"
                           }
                         ],
                         "attribution": [
@@ -21679,21 +22244,24 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           },
                           {
                             "family": "geonames",
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           },
                           {
                             "family": "osm",
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -21986,11 +22554,11 @@
                         "officialTotal": 0,
                         "osm": [
                           {
-                            "id": "osm:node800005",
+                            "id": "osm:node800029",
                             "kind": "fixed",
                             "enforces": "speed",
                             "street": null,
-                            "locationLabel": "Blitzer Kansilkamp",
+                            "locationLabel": "Blitzer Halschüßau",
                             "municipality": null,
                             "direction": null,
                             "limitKmh": 50,
@@ -22000,17 +22568,17 @@
                             "dataAsOf": "2026-02-28",
                             "staleYear": null,
                             "location": {
-                              "lat": 47.655653,
-                              "lon": 7.799556
+                              "lat": 50.260982,
+                              "lon": 6.401139
                             },
                             "sourceFamily": "osm_speed_cameras"
                           },
                           {
-                            "id": "osm:node800006",
+                            "id": "osm:node800030",
                             "kind": "fixed",
                             "enforces": "speed",
                             "street": null,
-                            "locationLabel": "Blitzer Kansilkamp",
+                            "locationLabel": "Blitzer Halschüßau",
                             "municipality": null,
                             "direction": null,
                             "limitKmh": 50,
@@ -22020,8 +22588,8 @@
                             "dataAsOf": "2026-02-28",
                             "staleYear": null,
                             "location": {
-                              "lat": 47.653764,
-                              "lon": 7.829412
+                              "lat": 50.29929,
+                              "lon": 6.308556
                             },
                             "sourceFamily": "osm_speed_cameras"
                           }
@@ -22039,7 +22607,8 @@
                             "dataAsOf": "2026-03-29T12:00:00Z",
                             "ageS": 43200,
                             "staleAfterS": 259200,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T12:00:00Z"
                           }
                         ],
                         "attribution": [
@@ -22262,10 +22831,10 @@
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/speed-cameras?at=47.655,7.81\u0026radius_m=5000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/speed-cameras?at=50.28,6.355\u0026radius_m=10000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/speed-cameras?at=47.655,7.81\u0026radius_m=5000\u0026limit=2",
+        "x-example-request": "/v1/speed-cameras?at=50.28,6.355\u0026radius_m=10000\u0026limit=2",
         "x-mcp-counterpart": "speed camera search",
         "x-required-scope": "roads"
       }
@@ -22599,14 +23168,16 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           },
                           {
                             "family": "roads_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -22936,7 +23507,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -23231,7 +23803,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -23619,14 +24192,16 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           },
                           {
                             "family": "delfi_static",
                             "dataAsOf": "2026-03-29T12:00:00Z",
                             "ageS": 43200,
                             "staleAfterS": 259200,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T12:00:00Z"
                           }
                         ],
                         "attribution": [
@@ -23733,14 +24308,16 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           },
                           {
                             "family": "delfi_static",
                             "dataAsOf": "2026-03-29T12:00:00Z",
                             "ageS": 43200,
                             "staleAfterS": 259200,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T12:00:00Z"
                           }
                         ],
                         "attribution": [
@@ -24117,7 +24694,9 @@
                           "untilLocal": "2026-03-30T03:00:00+02:00",
                           "matched": 0,
                           "matchedAll": 0,
-                          "dropped": []
+                          "dropped": [],
+                          "timetableUntil": "2026-03-29T22:00:00Z",
+                          "timetableLoadedAt": null
                         },
                         "departures": []
                       },
@@ -24132,7 +24711,8 @@
                             "dataAsOf": "2026-03-29T12:00:00Z",
                             "ageS": 43200,
                             "staleAfterS": 259200,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T12:00:00Z"
                           }
                         ],
                         "attribution": [
@@ -24439,28 +25019,33 @@
                           "name": "Pienköckheim Nord"
                         },
                         "counts": {
-                          "active": 2,
+                          "active": 0,
                           "inactive": 0,
-                          "unknown": 0
+                          "unknown": 2
                         },
                         "facilities": [
                           {
                             "id": "equipment:100003",
                             "kind": "escalator",
                             "position": "zu Gleis 1",
-                            "state": "active",
+                            "state": "unknown",
                             "sourceFamily": "openstation_siri_fm",
-                            "equipmentNo": null
+                            "equipmentNo": null,
+                            "stateExplanation": null,
+                            "nameShared": false
                           },
                           {
                             "id": "equipment:100004",
                             "kind": "escalator",
                             "position": "zu Gleis 2",
-                            "state": "active",
+                            "state": "unknown",
                             "sourceFamily": "openstation_siri_fm",
-                            "equipmentNo": null
+                            "equipmentNo": null,
+                            "stateExplanation": null,
+                            "nameShared": false
                           }
-                        ]
+                        ],
+                        "platforms": null
                       },
                       "meta": {
                         "requestId": "example-request-0001",
@@ -24473,14 +25058,16 @@
                             "dataAsOf": "2026-03-29T12:00:00Z",
                             "ageS": 43200,
                             "staleAfterS": 259200,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T12:00:00Z"
                           },
                           {
                             "family": "openstation_siri_fm",
                             "dataAsOf": "2026-03-29T23:52:30Z",
                             "ageS": 450,
                             "staleAfterS": 2700,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:52:30Z"
                           }
                         ],
                         "attribution": [
@@ -25563,7 +26150,8 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -25887,7 +26475,18 @@
                         "duplicatesOmitted": 0,
                         "punctuality": null,
                         "windowMin": 60,
-                        "line": null
+                        "line": null,
+                        "alertsCoverage": {
+                          "covered": true,
+                          "lookbackDays": 14,
+                          "lands": [
+                            {
+                              "land": "08",
+                              "alertsSeen": 2,
+                              "newestAlertSeenAt": "2026-03-29T23:57:30Z"
+                            }
+                          ]
+                        }
                       },
                       "meta": {
                         "requestId": "example-request-0001",
@@ -25900,7 +26499,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -25951,7 +26551,8 @@
                           "key": "RE45",
                           "checked": true,
                           "inTimetable": true
-                        }
+                        },
+                        "alertsCoverage": null
                       },
                       "meta": {
                         "requestId": "example-request-0001",
@@ -25964,7 +26565,8 @@
                             "dataAsOf": "2026-03-29T12:00:00Z",
                             "ageS": 43200,
                             "staleAfterS": 259200,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T12:00:00Z"
                           }
                         ],
                         "attribution": [
@@ -26381,7 +26983,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -26720,6 +27323,7 @@
                             "unaltered": false,
                             "urgency": null,
                             "certainty": null,
+                            "levelSource": null,
                             "english": null
                           }
                         ],
@@ -26739,7 +27343,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [

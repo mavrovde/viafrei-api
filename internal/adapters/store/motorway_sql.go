@@ -11,9 +11,12 @@ import "strings"
 // state is read only when $3 says the key may read it.
 // motorwaySweepRows are the road operator's events of the asked roads at
 // their sweeps up to the instant now names, their payload resolved: the statements derive an event's
-// fields from it, as the platform does, and never answer it.
-func motorwaySweepRows(now string) string {
-	return strings.ReplaceAll(`
+// fields from it, as the platform does, and never answer it. byRoad, true,
+// lists under an asked road the event whose title names it though another
+// road files it, and keeps from a road's own the event its title gives to
+// another (the road path).
+func motorwaySweepRows(now, byRoad string) string {
+	return strings.NewReplacer("{now}", now+"::timestamptz", "{byRoad}", byRoad).Replace(`
       select distinct on (u.road, u.ext_id)
              u.source, u.road, u.filed_road, u.kind, u.ext_id, u.title, u.subtitle, u.abnormal_traffic_type,
              u.delay_s, u.extent, u.geom, u.raw, u.raw_hash, u.observed_at
@@ -23,7 +26,7 @@ func motorwaySweepRows(now string) string {
             from autobahn_events a
             join unnest($1::text[], $2::timestamptz[]) as p(road, t) on p.road = a.road and p.t = a.observed_at
            where a.road = any($1::text[])
-             and (true is not true or (select p is null or p ~ ('(^|[^0-9])' || substr(a.road, 2) || '([^0-9]|$)') from substring(coalesce(a.title, '') from '^\s*(A\s?[0-9]{1,3}[a-z]?(?:(?:\s*[-,/_&+]\s*|\s+(?:und\s+)?)A\s?[0-9]{1,3}[a-z]?)*)') as p))
+             and ({byRoad} is not true or (select p is null or p ~ ('(^|[^0-9])' || substr(a.road, 2) || '([^0-9]|$)') from substring(coalesce(a.title, '') from '^\s*(A\s?[0-9]{1,3}[a-z]?(?:(?:\s*[-,/_&+]\s*|\s+(?:und\s+)?)A\s?[0-9]{1,3}[a-z]?)*)') as p))
           union all
           select a.source, q.road, a.road as filed_road, a.kind, a.ext_id, a.title, a.subtitle, a.abnormal_traffic_type,
                  a.delay_s, a.extent, a.geom, a.raw, a.raw_hash, a.observed_at, 1 as foreign_rank
@@ -35,14 +38,14 @@ func motorwaySweepRows(now string) string {
                             join (select lt0.road, max(lt0.observed_at) as t from autobahn_events lt0
                                    where lt0.observed_at > {now} - interval '30 minutes' and lt0.observed_at <= {now}
                                    group by lt0.road) lt on lt.road = c0.road and lt.t = c0.observed_at
-                           where true is true
+                           where {byRoad} is true
                              and exists (select 1 from unnest($1::text[]) as q0(road)
                                           where q0.road <> c0.road and (select p is not null and p ~ ('(^|[^0-9])' || substr(q0.road, 2) || '([^0-9]|$)') from substring(coalesce(c0.title, '') from '^\s*(A\s?[0-9]{1,3}[a-z]?(?:(?:\s*[-,/_&+]\s*|\s+(?:und\s+)?)A\s?[0-9]{1,3}[a-z]?)*)') as p))) c) ft
             join autobahn_events a on a.road = ft.road and a.observed_at = ft.t
             join unnest($1::text[]) as q(road) on q.road <> a.road and (select p is not null and p ~ ('(^|[^0-9])' || substr(q.road, 2) || '([^0-9]|$)') from substring(coalesce(a.title, '') from '^\s*(A\s?[0-9]{1,3}[a-z]?(?:(?:\s*[-,/_&+]\s*|\s+(?:und\s+)?)A\s?[0-9]{1,3}[a-z]?)*)') as p)
         ) u
        order by u.road, u.ext_id, u.foreign_rank, u.filed_road) e
-  cross join lateral (select autobahn_raw_resolve(e.raw, e.raw_hash, e.ext_id, e.observed_at) as raw offset 0) rr`, "{now}", now+"::timestamptz")
+  cross join lateral (select autobahn_raw_resolve(e.raw, e.raw_hash, e.ext_id, e.observed_at) as raw offset 0) rr`)
 }
 
 // planInForce is the platform's rule of a plan entry in force now, which
@@ -62,7 +65,7 @@ var (
          (count(distinct k.site) filter (where nf.off and ((s.future or coalesce(s.starts_at > $3::timestamptz, false)) or not coalesce(not autobahn_validity_overlaps(rr.raw->'description', $3::timestamptz, 'infinity'::timestamptz), false))))::int as announced,
          min(s.starts_at) filter (where s.starts_at > $3::timestamptz) as announced_from
   from (
-`+motorwaySweepRows("$3")+`
+`+motorwaySweepRows("$3", "true")+`
   cross join lateral (
     select coalesce(
              case when rr.raw->>'startTimestamp' is not null and pg_input_is_valid(rr.raw->>'startTimestamp', 'timestamptz')
@@ -117,7 +120,7 @@ var (
            array_agg(e.extent) over (partition by k.site) as site_extents,
            rr.raw->'routeRecommendation' as route_recommendation
     from (
-`+motorwaySweepRows("$6")+`
+`+motorwaySweepRows("$6", "true")+`
     cross join lateral (
     select coalesce(
              case when rr.raw->>'startTimestamp' is not null and pg_input_is_valid(rr.raw->>'startTimestamp', 'timestamptz')

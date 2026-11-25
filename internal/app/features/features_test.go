@@ -37,6 +37,8 @@ var errStore = errors.New("store down")
 
 type fake struct {
 	regErr, provErr, chErr, pkErr, plErr error
+	// regFailAt fails the register's read from that call on.
+	regFailAt                            int
 	provCalls                            int
 	provErrOnCall                        int
 	sites                                []energy.Site
@@ -86,6 +88,9 @@ func (f *fake) Feeding(_ context.Context, d provenance.Dataset, fams []string) (
 
 func (f *fake) Register(context.Context) ([]access.Terms, error) {
 	f.regCalls++
+	if f.regFailAt > 0 && f.regCalls >= f.regFailAt {
+		return nil, errStore
+	}
 	if f.reg != nil {
 		return f.reg, f.regErr
 	}

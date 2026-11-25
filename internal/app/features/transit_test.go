@@ -13,9 +13,11 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
-// trRegister: two transit families, one consumer only.
+// trRegister: two accessibility families, two transit families, one
+// consumer only.
 var trRegister = []access.Terms{
 	{Family: "a1", Domain: "accessibility", UseClasses: all, Version: "v1"},
+	{Family: "a2", Domain: "accessibility", UseClasses: all, Version: "v1"},
 	{Family: "t1", Domain: "transit", UseClasses: all, Version: "v1"},
 	{Family: "t2", Domain: "transit", UseClasses: []access.UseClass{"consumer"}, Version: "v1"},
 }
@@ -89,7 +91,7 @@ func TestStationsAreGatedAndAttributed(t *testing.T) {
 
 func TestANameSeveralStationsAnswerCreditsTheirPlacement(t *testing.T) {
 	req.Covers(t, "FR-TRANSIT-001")
-	p := "p1"
+	p, g := "p1", "g1"
 	two := []transit.Station{{ID: "a", Family: "t1", PlacedBy: &p}, {ID: "b", Family: "t1"}}
 	consumer := key("commercial", []access.Scope{"transit"}, "t1")
 	for _, c := range []struct {
@@ -104,6 +106,8 @@ func TestANameSeveralStationsAnswerCreditsTheirPlacement(t *testing.T) {
 		// One station found in the town the text names: its district
 		// placed it there.
 		{"one station in the town", []transit.Station{{ID: "a", Family: "t1", PlacedBy: &p, InTown: true}}, transit.Query{Text: "town nam", Limit: 5}, []string{"p1", "t1"}},
+		// A town a Gemeinde of the gazetteer named: the gazetteer is credited.
+		{"a town the gazetteer named", []transit.Station{{ID: "a", Family: "t1", PlacedBy: &p, InTown: true, TownBy: &g}}, transit.Query{Text: "town nam", Limit: 5}, []string{"g1", "p1", "t1"}},
 	} {
 		a, err := trService(&trFake{stations: c.stations}).Stations(context.Background(), consumer, c.q)
 		if err != nil || !slices.Equal(names(a.Families), c.want) {
@@ -206,14 +210,15 @@ func TestDeparturesRefusals(t *testing.T) {
 func TestFacilitiesAreListedGatedAndAttributed(t *testing.T) {
 	req.Covers(t, "FR-TRANSIT-003", "SEC-030")
 	f := &trFake{station: transit.Station{ID: "s", Family: "t1"}, facilities: []transit.Facility{
-		{ID: "x", State: "active", Family: "a1"}, {ID: "y", State: "inactive", Family: "a1"},
+		{ID: "x", State: "active", Family: "a1"}, {ID: "y", State: "inactive", Family: "a1", Listing: "a2"},
 	}}
-	a, err := trService(f).Facilities(context.Background(), key("commercial", []access.Scope{"transit"}, "t1", "t2", "a1"), transit.FacilityQuery{StationID: "s", Limit: 1})
+	a, err := trService(f).Facilities(context.Background(), key("commercial", []access.Scope{"transit"}, "t1", "t2", "a1", "a2"), transit.FacilityQuery{StationID: "s", Limit: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(f.gotFacFams, []string{"a1"}) || len(a.Items) != 1 || a.Items[0].ID != "y" || !a.HasMore || !a.Partial ||
-		a.Active != 1 || a.Inactive != 1 || !slices.Equal(names(a.Families), []string{"a1", "t1"}) {
+	// the unit's listing family is credited beside its state's
+	if !slices.Equal(f.gotFacFams, []string{"a1", "a2"}) || len(a.Items) != 1 || a.Items[0].ID != "y" || !a.HasMore || !a.Partial ||
+		a.Active != 1 || a.Inactive != 1 || !slices.Equal(names(a.Families), []string{"a1", "a2", "t1"}) {
 		t.Errorf("answer %+v", a)
 	}
 	full := key("commercial", []access.Scope{"transit"}, "t1", "a1")

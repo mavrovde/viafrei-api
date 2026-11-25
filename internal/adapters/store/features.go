@@ -27,7 +27,7 @@ var provenanceRead = named("api_provenance", `
 with `+sourceCTE(true)+`,
 fresh as (`+freshnessRows+`)
 select s.source_ref, s.domain, s.publisher_name, s.attribution_text, s.licence_code, `+licenceURL("s.licence_code")+`,
-       s.licence_code ~* '(BY-SA|ODbL|Open Database License)', s.share_alike_offer_url, s.terms_url, s.website, s.stale_after_s,
+       s.licence_code ~* '(BY-SA|ODbL|Open Database License)', s.share_alike_offer_url, s.terms_page, s.website, s.stale_after_s,
        f.data_as_of, f.confirmed_at, `+familyVersion+`,
        array(select n.note_kind from contract_sources c join source_register_notes n on n.source_id = c.register_id
              where c.source_ref = s.source_ref and n.lang = (select $2::text) order by n.note_kind, n.body),

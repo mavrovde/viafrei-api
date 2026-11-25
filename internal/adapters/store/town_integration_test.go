@@ -62,6 +62,18 @@ func TestAStationIsFoundAsAStopInTheTownTheTextNames(t *testing.T) {
 			t.Errorf("%q: %+v, %v", asked, ss, err)
 		}
 	}
+	// A town a Gemeinde of the gazetteer named credits the gazetteer; a
+	// district's own name credits none.
+	for asked, want := range map[string]string{"Rosenstadt Dornenplatz": "", "Kleinrosen Dornenplatz": "bkg_gvisys", "Frankfurt Konstablerwache": "bkg_gvisys"} {
+		ss, _, err := st.Stations(bounded(t), transit.Query{Text: asked, Limit: 5}, []string{fam})
+		got := ""
+		if err == nil && len(ss) == 1 && ss[0].TownBy != nil {
+			got = *ss[0].TownBy
+		}
+		if err != nil || len(ss) != 1 || got != want {
+			t.Errorf("%q: credited %q, want %q (%v)", asked, got, want, err)
+		}
+	}
 	for asked, want := range map[string]string{"Frankfurt Konstablerwache": "1:de:06412:99001", "Halle Marktplatz": "1:de:15002:99001", "Kreis Rosenstadt, Dornenplatz": "1:de:09998:901"} {
 		if ss, _, err := st.Stations(bounded(t), transit.Query{Text: asked, Limit: 5}, []string{fam}); err != nil || !slices.Equal(ids(ss), []string{want}) {
 			t.Errorf("%q: %v, %v", asked, ids(ss), err)

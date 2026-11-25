@@ -64,6 +64,10 @@ func (s *Service) Stations(ctx context.Context, key access.Record, q transit.Que
 			if st.PlacedBy != nil && (len(stations) > 1 || st.InTown) {
 				contributed = append(contributed, *st.PlacedBy)
 			}
+			// the gazetteer whose Gemeinde named the town
+			if st.TownBy != nil {
+				contributed = append(contributed, *st.TownBy)
+			}
 		}
 	}
 	fams, err := s.provenanceOf(ctx, contributed, permitted)
@@ -159,6 +163,9 @@ func (s *Service) Facilities(ctx context.Context, key access.Record, q transit.F
 	contributed := []string{st.Family}
 	for _, f := range l.Rows {
 		contributed = append(contributed, f.Family)
+		if f.Listing != "" {
+			contributed = append(contributed, f.Listing)
+		}
 	}
 	if err := gate.Check(contributed); err != nil {
 		return StationFacilities{}, err

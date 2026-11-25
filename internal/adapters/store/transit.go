@@ -387,22 +387,24 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 // the district its key starts with, for every run $1 of the text
 // (transit.TownRuns); and, flagged not exact, a Gemeinde whose name starts
 // with a prefix $2 and a space (transit.TownPrefixes): "Frankfurt" for
-// "Frankfurt am Main". Exact rows first; sixty at most.
+// "Frankfurt am Main". Exact rows first; sixty at most. Each row names the
+// family whose places named it: the gazetteer's for a Gemeinde, none for a
+// district's own name.
 var stationTownKreise = namedOpaque("api_station_town_kreise", `
-select distinct k.ags, k.run, k.exact from (
-  select a.ags, r.run, true exact
+select distinct k.ags, k.run, k.exact, k.via from (
+  select a.ags, r.run, true exact, null::text via
     from unnest($1::text[]) r(run)
     join ags_regions a on a.level = 'kreis' and (a.name_norm = r.run or a.name_en_norm = r.run)
   union all
-  select left(g.admin_code, 5), g.name_norm, true from gazetteer_places g
+  select left(g.admin_code, 5), g.name_norm, true, g.source_id from gazetteer_places g
    where g.closed_at is null and g.source_id = 'bkg_gvisys' and g.kind = 'city' and g.admin_code ~ '^[0-9]{8}$'
      and g.name_norm = any($1::text[])
   union all
-  select left(g.admin_code, 5), p.w, false
+  select left(g.admin_code, 5), p.w, false, g.source_id
     from unnest($2::text[]) p(w)
     join gazetteer_places g on left(g.name_norm, length(p.w) + 1) = p.w || ' '
    where g.closed_at is null and g.source_id = 'bkg_gvisys' and g.kind = 'city' and g.admin_code ~ '^[0-9]{8}$') k
-order by k.exact desc, k.ags, k.run
+order by k.exact desc, k.ags, k.run, k.via nulls first
 limit 60`, "text[]", "text[]")
 
 // stationsInTowns are the stations of the districts $4 whose name holds the
@@ -439,24 +441,30 @@ order by s.name, s.stop_place_id`, "$5")+`
 // its town names (stationTownKreise: the exact names where there are any,
 // else the Gemeinden its prefix starts), and the stations of those districts
 // whose name holds the rest of the text (transit.TownRest). Two statements,
-// whatever the text.
+// whatever the text. A station found where a Gemeinde of the gazetteer
+// named the town is credited to the gazetteer (TownBy), as today's resolver
+// credits BKG's map when it took part.
 func (s *Store) stationsInTown(ctx context.Context, q transit.Query, families []string) ([]transit.Station, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.Station, error) {
 		rows, _ := run(ctx, tx, stationTownKreise, transit.TownRuns(q.Text), transit.TownPrefixes(q.Text))
 		towns, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (townRow, error) {
 			var v townRow
-			return v, r.Scan(&v.ags, &v.run, &v.exact)
+			return v, r.Scan(&v.ags, &v.run, &v.exact, &v.via)
 		})
 		if err != nil || len(towns) == 0 {
 			return nil, err
 		}
 		var kreise, runs []string
+		var via *string
 		for _, tw := range towns {
 			if tw.exact == towns[0].exact {
 				if !slices.Contains(kreise, tw.ags) {
 					kreise = append(kreise, tw.ags)
 				}
 				runs = append(runs, tw.run)
+				if tw.via != nil {
+					via = tw.via
+				}
 			}
 		}
 		rest := transit.TownRest(q.Text, runs)
@@ -468,14 +476,20 @@ func (s *Store) stationsInTown(ctx context.Context, q transit.Query, families []
 			read = railwayInTowns
 		}
 		rows, _ = run(ctx, tx, read, families, transit.Fold(rest), townSpellings(rest), kreise, q.Limit+1)
-		return pgx.CollectRows(rows, inTown)
+		out, err := pgx.CollectRows(rows, inTown)
+		for i := range out {
+			out[i].TownBy = via
+		}
+		return out, err
 	})
 }
 
-// townRow is one district a town names.
+// townRow is one district a town names, and the family whose places named
+// it (nil for a district's own name).
 type townRow struct {
 	ags, run string
 	exact    bool
+	via      *string
 }
 
 // townSpellings are the spellings a town reading's stop name is searched
@@ -588,7 +602,10 @@ func (s *Store) Departures(ctx context.Context, q transit.DepartureQuery, famili
 // the families, $3 now. A state last observed (last restated by its feed)
 // longer ago than its family's stale_after_s, or never observed, is
 // unknown: a state is current while its feed restates it, whenever it
-// began. Judged on when the state began, every lift in service for more
+// began. A unit whose state comes from one family (OpenStation's status)
+// and its listing, kind and position from another (OpenStation's inventory)
+// names both, the listing's when the key may read it, as today's credit
+// line credits both. Judged on when the state began, every lift in service for more
 // than three of its feed's cadences read as unknown (Hamburg Hbf: 49 of 49,
 // prod 2026-11-24, where the platform states 26 with 1 out of service).
 var stationFacilities = namedOpaque("api_station_facilities", `
@@ -596,7 +613,8 @@ select f.facility_id, f.facility_kind, f.position_text,
        case when f.status_observed_at is null then 'unknown'
             when s.stale_after_s is not null and f.status_observed_at < $3::timestamptz - make_interval(secs => s.stale_after_s) then 'unknown'
             else f.facility_status end,
-       f.status_observed_at, f.source_ref, f.equipment_no
+       f.status_observed_at, f.source_ref, f.equipment_no,
+       case when f.listed_ref <> f.source_ref and f.listed_ref = any($2) then f.listed_ref else '' end
 from (`+stationFacilityOf+`) f
 join (`+relSource+`) s on s.source_ref = f.source_ref
 where f.source_ref = any($2) and `+permitted("f")+`
@@ -626,7 +644,7 @@ n as (select d.station_no from db_stations d where substring(d.ifopt, '` + dhidO
 select 'equipment:' || e.equipment_id facility_id, contract_stop_place_of(e.stop_place_id) stop_place_id, e.kind facility_kind,
        e.description position_text, coalesce(st.state, 'unknown') facility_status,
        coalesce(st.last_seen_at, e.last_seen_at) status_observed_at, coalesce(st.source_feed, e.source_feed) source_ref,
-       'open' display_class, 'public' audience, e.equipment_no
+       'open' display_class, 'public' audience, e.equipment_no, e.source_feed listed_ref
 from station_equipment e
 left join station_equipment_state st on st.equipment_id = e.equipment_id
 where e.closed_at is null and substring(e.stop_place_id, '` + dhidOf + `') in (select k.d from k)
@@ -634,7 +652,7 @@ where e.closed_at is null and substring(e.stop_place_id, '` + dhidOf + `') in (s
                    and x.source_feed = any($2))
 union all
 select 'fasta:' || f.equipment_no, (select contract_stop_place_of(d.ifopt) from db_stations d where d.station_no = f.station_no),
-       f.kind, f.description, f.state, f.last_seen_at, f.source_feed, 'open', 'public', f.equipment_no
+       f.kind, f.description, f.state, f.last_seen_at, f.source_feed, 'open', 'public', f.equipment_no, f.source_feed
 from db_facilities f
 where f.station_no in (select n.station_no from n)`
 
@@ -647,7 +665,7 @@ func (s *Store) Facilities(ctx context.Context, station string, families []strin
 		rows, _ := run(ctx, tx, stationFacilities, station, families, now)
 		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.Facility, error) {
 			var v transit.Facility
-			err := r.Scan(&v.ID, &v.Kind, &v.Position, &v.State, &v.ObservedAt, &v.Family, &v.EquipmentNo)
+			err := r.Scan(&v.ID, &v.Kind, &v.Position, &v.State, &v.ObservedAt, &v.Family, &v.EquipmentNo, &v.Listing)
 			return v, err
 		})
 	})

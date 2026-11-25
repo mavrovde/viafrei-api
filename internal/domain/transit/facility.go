@@ -21,6 +21,9 @@ type Facility struct {
 	State      string
 	ObservedAt *time.Time
 	Family     string
+	// Listing is the family the unit's listing (its kind and position)
+	// comes from when its state is another family's; "" when they are one.
+	Listing string
 	// EquipmentNo is DB's equipment number of the unit, as its source
 	// lists it; nil when the source gives none.
 	EquipmentNo *string

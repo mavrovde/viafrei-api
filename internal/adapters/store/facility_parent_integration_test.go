@@ -71,9 +71,14 @@ func TestAFacilityStateIsCurrentWhileRestatedAndAUnitIsListedOnce(t *testing.T) 
 			no = *f.EquipmentNo
 		}
 		got[f.ID] = f.State + " " + f.Family + " " + no
+		// a unit whose state is the status family's names its listing's
+		// family (the inventory) beside it, as today's credit line does
+		if f.Listing != "" {
+			got[f.ID] += " listed " + f.Listing
+		}
 	}
 	want := map[string]string{"fasta:9990020": "active db_fasta 9990020", "fasta:9990021": "unknown db_fasta 9990021",
-		"equipment:diid:9990022": "active openstation_siri_fm 9990022", "equipment:diid:9990023": "active openstation_siri_fm -"}
+		"equipment:diid:9990022": "active openstation_siri_fm 9990022 listed openstation_netex", "equipment:diid:9990023": "active openstation_siri_fm - listed openstation_netex"}
 	if err != nil || len(got) != len(want) || len(fs) != len(want) {
 		t.Fatalf("the station's facilities: %v, %v", got, err)
 	}
@@ -85,6 +90,16 @@ func TestAFacilityStateIsCurrentWhileRestatedAndAUnitIsListedOnce(t *testing.T) 
 	fs, err = st.Facilities(bounded(t), "1:de:09998:920", []string{"openstation_siri_fm", "openstation_netex"}, time.Now())
 	if err != nil || len(fs) != 3 || fs[0].ID != "equipment:diid:9990020" || fs[0].State != "inactive" {
 		t.Errorf("without FaSta, OpenStation answers alone: %+v, %v", fs, err)
+	}
+	// a key that may not read the inventory is not credited with it
+	fs, err = st.Facilities(bounded(t), "1:de:09998:920", []string{"openstation_siri_fm"}, time.Now())
+	for _, f := range fs {
+		if f.Listing != "" {
+			t.Errorf("%s: credited %q to a key that may not read it", f.ID, f.Listing)
+		}
+	}
+	if err != nil {
+		t.Error(err)
 	}
 }
 

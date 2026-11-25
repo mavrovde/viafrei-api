@@ -389,3 +389,32 @@ func TestAnAreasPunctualityIsItsLandsAlone(t *testing.T) {
 		t.Errorf("punctuality of Bavaria %+v, want 3 trips observed, 2 late", d.Punctuality)
 	}
 }
+
+// A family with no terms link of its own links its register row's source
+// page, as today's credit line does (the FlixBus and FlixTrain parts link
+// the dataset's page): in its attribution and in its provenance alike.
+func TestAFamilyWithoutATermsLinkLinksItsRegistersSourcePage(t *testing.T) {
+	st, cp := private(t)
+	var fam, page string
+	ownerOf(t, cp, `select c.feed_key, g.source_url from feed_catalog c join contract_sources s on s.source_ref = c.feed_key
+	                 join source_register g on g.source_id = s.register_id
+	                 where g.source_url is not null and s.licence_code !~* '^pending' and s.publisher_name is not null
+	                   and not coalesce((select k.excluded or k.terms_gate is not null from contract_source_rules k where c.feed_key ~ k.pattern order by k.priority limit 1), false)
+	                 order by 1 limit 1`, &fam, &page)
+	conn, err := cp.Owner(bounded(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(context.Background()) }()
+	if _, err := conn.Exec(bounded(t), `update feed_catalog set offer_url = null where feed_key = $1`, fam); err != nil {
+		t.Fatal(err)
+	}
+	src, err := st.Sources(bounded(t), []string{fam})
+	if err != nil || len(src) != 1 || src[0].TermsURL == nil || *src[0].TermsURL != page {
+		t.Fatalf("%s: sources %+v, %v; want the terms link %s", fam, src, err, page)
+	}
+	prov, err := st.Provenance(bounded(t), []string{fam}, "de")
+	if err != nil || len(prov) != 1 || prov[0].Source.TermsURL == nil || *prov[0].Source.TermsURL != page {
+		t.Fatalf("%s: provenance %+v, %v; want the terms link %s", fam, prov, err, page)
+	}
+}

@@ -210,6 +210,9 @@ func (r *snapshot[T]) start(ctx context.Context, now func() time.Time, read func
 // (contract_source_rules, the first by priority); an excluded family and
 // one whose licence is pending are not published. A family's use classes
 // are its register's, only consumer when its rule does not give it openly.
+// A family's terms page is its own terms link, else its register row's
+// source page, as today's credit line links it (the FlixBus and FlixTrain
+// parts link the dataset's page, the register row they share).
 // full adds what the register's own read does not need: the changes
 // statement, the freshness target (the register's cadence, else the
 // feed status's) and the stale bound (three of it), the review date, the
@@ -226,6 +229,7 @@ func sourceCTE(full bool) string {
 	}
 	return `src as (
   select s.source_ref, d.domain, s.licence_code, s.attribution_text, s.terms_url, s.publisher_name,
+         coalesce(nullif(s.terms_url, ''), g.source_url) terms_page,
          case when g.share_alike or s.licence_code ~* '(BY-SA|ODbL|Open Database License)' then 'https://viafrei.de/impressum' end share_alike_offer_url,
          s.acceptance_required,
          case when coalesce(k.display_class, 'open') = 'open' then coalesce(g.use_classes, '{}')
@@ -275,7 +279,7 @@ var sourcesRead = named("api_sources", `
 with `+sourceRows+`
 select s.source_ref, s.domain, s.publisher_name, s.attribution_text, s.licence_code,
        `+licenceURL("s.licence_code")+`,
-       s.licence_code ~* '(BY-SA|ODbL|Open Database License)', s.share_alike_offer_url, s.terms_url
+       s.licence_code ~* '(BY-SA|ODbL|Open Database License)', s.share_alike_offer_url, s.terms_page
 from src s
 where s.source_ref = any((select $1::text[])::text[]) and s.publisher_name is not null and s.licence_code is not null
 order by s.source_ref`, "text[]")

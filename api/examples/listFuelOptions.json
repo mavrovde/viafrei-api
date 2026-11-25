@@ -25,6 +25,8 @@
         },
         "distanceM": 100,
         "openingState": "open",
+        "openingObservedAt": "2026-03-30T00:00:00Z",
+        "openingHoursAsOf": null,
         "prices": [
           {
             "fuel": "e10",
@@ -37,6 +39,7 @@
         "sourceFamily": "tankerkoenig_gamma"
       }
     ],
+    "osmWithoutPrice": [],
     "meta": {
       "requestId": "example-request-0001",
       "generatedAt": "2026-03-30T00:00:00Z",
@@ -48,7 +51,8 @@
           "dataAsOf": "2026-03-29T23:57:30Z",
           "ageS": 150,
           "staleAfterS": 900,
-          "stale": false
+          "stale": false,
+          "lastCheckedAt": "2026-03-29T23:57:30Z"
         }
       ],
       "attribution": [

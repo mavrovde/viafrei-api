@@ -22,28 +22,33 @@
         "name": "Pienköckheim Nord"
       },
       "counts": {
-        "active": 2,
+        "active": 0,
         "inactive": 0,
-        "unknown": 0
+        "unknown": 2
       },
       "facilities": [
         {
           "id": "equipment:100003",
           "kind": "escalator",
           "position": "zu Gleis 1",
-          "state": "active",
+          "state": "unknown",
           "sourceFamily": "openstation_siri_fm",
-          "equipmentNo": null
+          "equipmentNo": null,
+          "stateExplanation": null,
+          "nameShared": false
         },
         {
           "id": "equipment:100004",
           "kind": "escalator",
           "position": "zu Gleis 2",
-          "state": "active",
+          "state": "unknown",
           "sourceFamily": "openstation_siri_fm",
-          "equipmentNo": null
+          "equipmentNo": null,
+          "stateExplanation": null,
+          "nameShared": false
         }
-      ]
+      ],
+      "platforms": null
     },
     "meta": {
       "requestId": "example-request-0001",
@@ -56,14 +61,16 @@
           "dataAsOf": "2026-03-29T12:00:00Z",
           "ageS": 43200,
           "staleAfterS": 259200,
-          "stale": false
+          "stale": false,
+          "lastCheckedAt": "2026-03-29T12:00:00Z"
         },
         {
           "family": "openstation_siri_fm",
           "dataAsOf": "2026-03-29T23:52:30Z",
           "ageS": 450,
           "staleAfterS": 2700,
-          "stale": false
+          "stale": false,
+          "lastCheckedAt": "2026-03-29T23:52:30Z"
         }
       ],
       "attribution": [

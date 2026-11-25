@@ -184,3 +184,4 @@ vocabulary	internal/adapters/store/legacy_platform_integration_test.go	gtfs	owne
 vocabulary	internal/adapters/store/legacy_platform_integration_test.go	ingest	owner decision 2026-11-23: the platform's own reads, frozen beside the named statements for the parity, name its tables and columns, which carry this word
 vocabulary	internal/adapters/store/trainboard_stored_integration_test.go	gtfs	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
 vocabulary	internal/adapters/store/export_integration_test.go	feed	the name of a named statement of the store (charging_places.go), written as the store names it to say why it has no platform read to compare with
+vocabulary	internal/testkit/parity/parity_integration_test.go	gtfs	owner decision 2026-11-23: the platform's derived views the harness refreshes after its load, as the platform's workers do, carry this word in their names

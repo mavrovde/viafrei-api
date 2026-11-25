@@ -133,8 +133,33 @@ func load(fx parity.Fixture) (string, error) {
 	} else if err := db.Seed(ctx, buf.String()); err != nil {
 		return "", err
 	}
+	if err := derive(ctx); err != nil {
+		return "", err
+	}
 	seeded[fx] = parity.Checksum(buf.Bytes())
 	return seeded[fx], nil
+}
+
+// derived are the platform's views its workers refresh after every load
+// (the stops' modes the stop boards pick by, the routes' districts, the
+// untimed trips, the street tiles): the fixture is the platform's state
+// only once they are refreshed, as the platform's side of the kit
+// refreshes them after its load.
+var derived = []string{"gtfs_route_kreise", "gtfs_untimed_trips", "transit_stop_modes", "osm_street_tiles", "osm_street_tiles_lo"}
+
+// derive refreshes the derived views over the questions' database.
+func derive(ctx context.Context) error {
+	conn, err := pgx.Connect(ctx, db.OwnerURL)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = conn.Close(ctx) }()
+	for _, v := range derived {
+		if _, err := conn.Exec(ctx, "refresh materialized view public."+v); err != nil { //nolint:misspell // the SQL keyword
+			return fmt.Errorf("refresh %s: %w", v, err)
+		}
+	}
+	return nil
 }
 
 // The repository's refresh registry and the fake live refresher's script

@@ -21,6 +21,13 @@ import (
 // part-way.
 func (s *Store) HoldJunctionRead(hold func()) { s.landsRead = hold }
 
+// WithReferenceVersions keeps the reference fingerprints of the versions read
+// for ttl while their probe stays (db.reference_versions_ttl).
+func (s *Store) WithReferenceVersions(ttl time.Duration) *Store { s.refs.ttl = ttl; return s }
+
+// PunctualityOfArea is the punctuality of the Land of the area $1 alone.
+func PunctualityOfArea() string { return punctualityOfArea }
+
 // OpaqueRead is a statement opaque rewrote: as sent, as written, and the
 // types it declares.
 type OpaqueRead struct {

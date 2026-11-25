@@ -2,26 +2,28 @@ package store
 
 import (
 	"context"
+	"sync"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/provenance"
 )
 
-// freshnessVersions reads, in one statement, a row per source family with its
-// version (kind f, familyVersion) and with the version of its newest
-// confirmation (kind c, confirmationVersion); one row (kind r) carrying the
+// referenceVersions reads, in one statement, one row (kind r) carrying the
 // register fingerprint: a digest of every row the licence gate, the
-// attribution and the notes of an answer are read from; and one row (kind l)
+// attribution and the notes of an answer are read from; one row (kind l)
 // carrying the fingerprint of the road lamp's reference rows: which families
 // cover each state's traffic messages, and each junction's state; and one row
 // (kind u) carrying the fingerprint of the curated rule rows, every topic and
 // every rule. The register and the reference rows are small tables, never an
-// observation, so they are read whole. One statement means one failure path.
-var freshnessVersions = named("api_freshness_versions", `
+// observation, so they are read whole: about 200 ms on prod (2026-11-25), so
+// the versions read reads them only when one of the tables they are read
+// from has a changed row (referenceProbe) or the last read is
+// db.reference_versions_ttl old.
+var referenceVersions = named("api_reference_versions", `
 with `+sourceCTE(true)+`,
-lic as (`+licenceRows+`),
-fresh as (`+freshnessRows+`)
+lic as (`+licenceRows+`)
 select 'r', '', md5(concat_ws('|',
   (select string_agg(t::text, ',' order by t::text) from (
      select row(s.source_ref, s.domain, s.source_ref, s.licence_code, s.attribution_text, s.changes_statement, s.terms_url,
@@ -47,11 +49,58 @@ select 'u', '', md5(concat_ws('|',
      select row(f.fact_key, f.topic_code, f.position, f.body_de, f.source_name, f.body_en, f.source_url, f.source_note_de,
                 f.source_note_en, f.to_verify_de, f.to_verify_en, f.reviewed_on, f.headline, 'viafrei_rules'::text,
                 array['viafrei_rules'::text], 'open'::text, 'public'::text) t
-     from driving_rule_facts f) t)))
-union all
+     from driving_rule_facts f) t)))`)
+
+// rowVersions is a digest of the row versions (ctid and xmin: a row written
+// anew has another, the columns are never read) of the table t.
+func rowVersions(t string) string {
+	return `(select string_agg(t.ctid::text || ':' || t.xmin::text, ',' order by t.ctid) from ` + t + ` t)`
+}
+
+// registerProbe is a digest of the row versions of every table the source
+// families of the register are read from (sourceCTE: the feed catalogue, the
+// registered sources and the register) and of the definitions of the views
+// in between (their rewrite rows: a view replaced has a new one), so a
+// register read that would read the same rows is not run again.
+var registerProbe = `md5(concat_ws('|',
+  ` + rowVersions("feed_catalog") + `,
+  ` + rowVersions("ingestor.sources") + `,
+  ` + rowVersions("source_register") + `,
+  (select string_agg(c.relname || ':' || r.xmin::text, ',' order by c.relname, r.oid)
+     from pg_rewrite r join pg_class c on c.oid = r.ev_class join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relname = any(array['contract_sources', 'registered_sources', 'contract_source_rules', 'contract_source_domains']))))`
+
+// referenceProbe is the probe of the rows referenceVersions reads: the
+// register's (registerProbe), the row versions of the notes, the licence
+// texts, the coverage of traffic messages and the curated rules, and each
+// family's interval, which the register's freshness target is derived from.
+// A row that changes changes the probe, so the reference fingerprints are
+// read again; a row rewritten unchanged (a vacuum full, an update to the
+// same values) only reads them once more. The location code list and the
+// gazetteer the junctions' states are derived from are not probed, too
+// large to probe on every versions read (11 000 rows): a reload of them
+// reaches the lamp's fingerprint within db.reference_versions_ttl.
+var referenceProbe = `md5(concat_ws('|', ` + registerProbe + `,
+  ` + rowVersions("source_register_notes") + `,
+  ` + rowVersions("licence_texts") + `,
+  ` + rowVersions("message_coverage_sources") + `,
+  ` + rowVersions("driving_rule_topics") + `,
+  ` + rowVersions("driving_rule_facts") + `,
+  (select string_agg(f.source_ref || '=' || coalesce(f.confirm_interval_s::text, ''), ',' order by f.source_ref) from fresh f)))`
+
+// freshnessVersions reads, in one statement, a row per source family with its
+// version (kind f, familyVersion) and with the version of its newest
+// confirmation (kind c, confirmationVersion), and one row (kind p) carrying
+// the probe of the reference rows (referenceProbe). It reads the feed status
+// and the row versions of small tables only: the versions read the cache
+// waits for once a second (cache.versions_ttl).
+var freshnessVersions = named("api_freshness_versions", `
+with fresh as (`+freshnessRows+`)
 select 'f', f.source_ref::text, `+familyVersion+` from fresh f
 union all
-select 'c', f.source_ref::text, `+confirmationVersion+` from fresh f`)
+select 'c', f.source_ref::text, `+confirmationVersion+` from fresh f
+union all
+select 'p', '', `+referenceProbe)
 
 // junctionLandInputs fingerprints what each junction's state is derived
 // from, not the derived states: contract_junction_land gives a junction the
@@ -74,11 +123,18 @@ const junctionLandInputs = `(select md5(string_agg(t.cid || ':' || t.tabcd || ':
 // platform's feed status view) whose source rule does not exclude it: the
 // instant its data last changed and its version, its last confirmation,
 // the interval and whether its updates are paused.
+// A family's rule is the first matching one by priority (the priorities are
+// distinct): it excludes the family when an excluding rule matches and no
+// rule before it does, so each key is matched against the excluding rules
+// first and against the others only then (one rule of six excludes:
+// 304 keys took 10.9 ms matched against all six, 3.9 ms so, on prod
+// 2026-11-25).
 const freshnessRows = `select d.key source_ref, d.last_changed_at data_as_of,
        coalesce(extract(epoch from d.last_changed_at)::bigint::text, '0') freshness_version,
        d.held_since confirmed_at, d.cadence_s confirm_interval_s, d.paused updates_paused
   from control.data_status d
- where not coalesce((select k.excluded from contract_source_rules k where d.key ~ k.pattern order by k.priority limit 1), false)`
+ where not exists (select from contract_source_rules k where k.excluded and d.key ~ k.pattern
+                      and not exists (select from contract_source_rules j where j.priority < k.priority and d.key ~ j.pattern))`
 
 // sourceNotes are the register notes of every family its rule does not
 // exclude, as rows (family, kind, language, text).
@@ -130,28 +186,44 @@ const confirmationVersion = `coalesce(extract(epoch from f.confirmed_at)::text, 
 // expression, so an answer is tagged with the version this read compares.
 const familyVersion = `coalesce(f.freshness_version || '@' || coalesce(extract(epoch from f.data_as_of)::text, ''), '')`
 
+// references is the last read of the reference fingerprints
+// (referenceVersions): the probe it was read under and when it was read.
+type references struct {
+	ttl time.Duration
+
+	mu       sync.Mutex
+	read     bool
+	probe    string
+	at       time.Time
+	register string
+	lamp     string
+	rules    string
+}
+
+// ReferenceVersions reports how long the reference fingerprints are kept
+// while their probe stays (db.reference_versions_ttl).
+func (s *Store) ReferenceVersions() time.Duration { return s.refs.ttl }
+
 // FreshnessVersions reads the freshness version and the confirmation version
-// of every source family, the register fingerprint and the lamp's reference
-// fingerprint, in one snapshot. Both are small tables, never an
-// aggregate over observations, so the HTTP cache can read them while requests
-// arrive and answer If-None-Match before any feature read
+// of every source family, the register fingerprint and the lamp's and the
+// rules' reference fingerprints, in one snapshot. The family rows are read
+// every time, from the feed status, a small table; the fingerprints, an
+// aggregate over every register row, are read again in the same snapshot
+// only when the probe of the rows they are read from moved or the last read
+// is db.reference_versions_ttl old, and are the last read's otherwise
 // (Performance-and-Caching).
 func (s *Store) FreshnessVersions(ctx context.Context) (provenance.Versions, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (provenance.Versions, error) {
 		// Built inside the read and handed back only to a caller still
 		// waiting: nothing the caller holds is written past its deadline.
 		out := provenance.Versions{Families: map[string]string{}, Confirmations: map[string]string{}}
-		var kind, family, version string
+		var kind, family, version, probe string
 		// A failed query surfaces through ForEachRow.
 		rows, _ := run(ctx, tx, freshnessVersions)
 		_, err := pgx.ForEachRow(rows, []any{&kind, &family, &version}, func() error {
 			switch kind {
-			case "r":
-				out.Register = version
-			case "l":
-				out.LampReference = version
-			case "u":
-				out.RulesReference = version
+			case "p":
+				probe = version
 			case "f":
 				out.Families[family] = version
 			default:
@@ -159,6 +231,36 @@ func (s *Store) FreshnessVersions(ctx context.Context) (provenance.Versions, err
 			}
 			return nil
 		})
-		return out, err
+		if err != nil {
+			return out, err
+		}
+		at := s.nowFn()
+		r := &s.refs
+		r.mu.Lock()
+		kept := r.read && r.probe == probe && at.Sub(r.at) < r.ttl
+		out.Register, out.LampReference, out.RulesReference = r.register, r.lamp, r.rules
+		r.mu.Unlock()
+		if kept {
+			return out, nil
+		}
+		rows, _ = run(ctx, tx, referenceVersions)
+		_, err = pgx.ForEachRow(rows, []any{&kind, &family, &version}, func() error {
+			switch kind {
+			case "r":
+				out.Register = version
+			case "l":
+				out.LampReference = version
+			default:
+				out.RulesReference = version
+			}
+			return nil
+		})
+		if err != nil {
+			return out, err
+		}
+		r.mu.Lock()
+		r.read, r.probe, r.at, r.register, r.lamp, r.rules = true, probe, at, out.Register, out.LampReference, out.RulesReference
+		r.mu.Unlock()
+		return out, nil
 	})
 }

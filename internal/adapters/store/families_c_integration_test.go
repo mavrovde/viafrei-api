@@ -103,6 +103,10 @@ func TestTheLampsReferenceMovesWithWhatAJunctionsStateIsDerivedFrom(t *testing.T
 	const city = `(select g.id from public.gazetteer_places g where g.closed_at is null and g.source_id = 'bkg_gvisys'
 		and g.kind = 'city' and g.admin_code ~ '^[0-9]{8}$' and g.geom is not null order by g.id limit 1)`
 	st, cp := private(t)
+	// The fingerprint read on every versions read: the location code list
+	// and the gazetteer are not probed, and reach it within
+	// db.reference_versions_ttl (TestTheReferenceFingerprintsAreReadWhenTheirRowsMove).
+	st.WithReferenceVersions(0)
 	conn, err := cp.Owner(bounded(t))
 	if err != nil {
 		t.Fatal(err)

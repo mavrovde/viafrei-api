@@ -125,6 +125,9 @@ func behaviours() map[string]behaviour {
 			_, staleFor := store.New(nil, c).RoadSnapshot()
 			return staleFor.String()
 		}},
+		"db.reference_versions_ttl": {"7m", func(t *testing.T, c *config.Config) string {
+			return store.New(nil, c).ReferenceVersions().String()
+		}},
 		"db.feeding_snapshot_ttl": {"20m", func(t *testing.T, c *config.Config) string {
 			ttl, _ := store.New(nil, c).FeedingSnapshot()
 			return ttl.String()

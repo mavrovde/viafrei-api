@@ -134,3 +134,4 @@ vocabulary	internal/testkit/baseseed/base_seed.sql	feeds	the platform's table an
 vocabulary	internal/testkit/baseseed/base_seed.sql	gtfs	the platform's table and column names the test seed writes carry this word
 vocabulary	internal/testkit/baseseed/base_seed.sql	ingest	the platform's table and column names the test seed writes carry this word
 vocabulary	internal/testkit/baseseed/base_seed.sql	siri	the platform's table and column names the test seed writes carry this word
+vocabulary	internal/adapters/store/freshness.go	ingest	the schema name of the registered sources table whose row versions the register probe reads (ctid and xmin only); the platform's storage name, not the API's vocabulary

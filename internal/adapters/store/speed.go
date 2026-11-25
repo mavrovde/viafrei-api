@@ -59,10 +59,17 @@ order by array_position(array['fixed', 'section_control', 'mobile_announced', 'm
 limit $6::int`, "float8", "float8", "float8", "date", "text[]", "int")
 
 // speedCellOf is the Gemeinde of a point (a geography expression) as the
-// platform's speed cut keys it: the nearest BKG municipality point with its
-// eight-digit key, a distance tie broken by key, among the cut's Gemeinden.
+// platform's speed cut keys it: the nearest open BKG municipality point with
+// its eight-digit key, a distance tie broken by key. As today's statement
+// reads it: a nearest-neighbour scan of the municipality points' partial
+// index takes the four nearest, and only they are sorted by distance and key.
 func speedCellOf(point string) string {
-	return `(select g.cell from cut_gemeinde g order by g.at <-> ` + point + `, g.cell limit 1)`
+	return `(select k.admin_code from (
+    select g.admin_code, g.geom <-> ` + point + ` d from gazetteer_places g
+    where g.source_id = 'bkg_gvisys' and g.kind = 'city' and g.closed_at is null and g.geom is not null
+      and g.admin_code ~ '^[0-9]{8}$'
+    order by g.geom <-> ` + point + ` limit 4) k
+  order by k.d, k.admin_code limit 1)`
 }
 
 // speedOSM reads OpenStreetMap's cameras in the circle by name and then
@@ -72,19 +79,15 @@ func speedCellOf(point string) string {
 // nearest BKG municipality point) is one an official list covers, the
 // Gemeinde of an official fixed camera or section control, or the key of
 // one with no point; a camera no Gemeinde is named for is left out too. The
-// Gemeinden are those within 80 km of the circle and the official cameras
-// those within 50 km: no Gemeinde point lies farther than that from a camera
-// whose nearest it is.
+// official cameras are those within 50 km of the circle: no Gemeinde point
+// lies farther than that from a camera whose nearest it is. The cameras in
+// the circle are read first and each is located by itself, as today's
+// statement does (Hamburg, 10 km: 382 ms when every camera was matched
+// against the Gemeinden within 80 km, on prod 2026-11-25).
 //
 //nolint:misspell // materialized is the SQL keyword
 var speedOSM = named("api_speed_osm", `
-with cut_gemeinde as materialized (
-  select g.admin_code as cell, st_pointonsurface(g.geom::geometry)::geography as at
-  from gazetteer_places g
-  where g.source_id = 'bkg_gvisys' and g.kind = 'city' and g.closed_at is null and g.geom is not null
-    and g.admin_code ~ '^[0-9]{8}$'
-    and st_dwithin(st_pointonsurface(g.geom::geometry)::geography, st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography, $3::float8 + 80000)
-), official as (
+with official as (
   select `+speedCellOf("o.geom")+` as cell
   from `+speedOfficialRows+` o
   where o.kind in ('fixed', 'section_control') and o.geom is not null
@@ -95,12 +98,16 @@ with cut_gemeinde as materialized (
   from `+speedOfficialRows+` o
   where o.kind in ('fixed', 'section_control') and o.geom is null
     and o.admin_code ~ '^[0-9]{8}$' and o.source_ref = `+speedFamilies+`
+), cand as materialized (
+  select c.camera_id, c.kind, c.enforces, c.geom, c.max_speed_kmh, c.max_speed_hgv_kmh, c.direction, c.name, c.street,
+         c.location_text, c.admin_code, c.data_as_of, c.valid_from, c.valid_to, c.source_ref, c.osm_id
+  from `+speedOSMRows+` c
+  where `+speedNear+`
+    and c.source_ref = `+speedFamilies+`
 )
 select `+speedColumns+`
-from `+speedOSMRows+` c
-where `+speedNear+`
-  and c.source_ref = `+speedFamilies+`
-  and `+speedCellOf("c.geom")+` not in (select o.cell from official o where o.cell is not null)
+from cand c
+where `+speedCellOf("c.geom")+` not in (select o.cell from official o where o.cell is not null)
 order by coalesce(c.name, ''), c.osm_id, c.camera_id
 limit $6::int`, "float8", "float8", "float8", "date", "text[]", "int")
 

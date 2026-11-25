@@ -288,24 +288,67 @@ join source_terms_texts x on x.terms_gate = t.terms_gate
 where t.terms_gate = any((select $1::text[])::text[])
 order by t.terms_gate, x.binding desc, x.lang`, "text[]")
 
+// registerProbeRead is the probe of the rows the register is read from
+// (registerProbe).
+var registerProbeRead = named("api_register_probe", `select `+registerProbe)
+
+// registerKept is the last register read and the probe it was read under.
+type registerKept struct {
+	mu    sync.Mutex
+	probe string
+	at    time.Time
+	items []access.Terms
+}
+
+// readRegister reads the register, about 40 to 70 ms on prod (2026-11-25),
+// once a second (db.register_snapshot_ttl) in the background: the probe of
+// the rows it is read from (about 1 ms) decides first, and while it stays
+// and the last read is younger than db.reference_versions_ttl the last read
+// is the answer, as a read would return the same rows.
 func (s *Store) readRegister(ctx context.Context) ([]access.Terms, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]access.Terms, error) {
-		// A failed query surfaces through CollectRows (pgx returns it from
-		// rows.Err as well).
-		rows, _ := run(ctx, tx, registerRead)
-		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (access.Terms, error) {
-			var (
-				t       access.Terms
-				classes []string
-			)
-			var audience string
-			err := r.Scan(&t.Family, &t.Domain, &classes, &t.AcceptanceRequired, &t.Version, &audience, &t.HoldReason)
-			t.Audience = access.Audience(audience)
-			for _, c := range classes {
-				t.UseClasses = append(t.UseClasses, access.UseClass(c))
-			}
-			return t, err
-		})
+		var probe string
+		if err := scanOne(run(ctx, tx, registerProbeRead))(&probe); err != nil {
+			return nil, err
+		}
+		at := s.nowFn()
+		k := &s.regKept
+		k.mu.Lock()
+		if k.items != nil && k.probe == probe && at.Sub(k.at) < s.refs.ttl {
+			items := slices.Clone(k.items)
+			k.mu.Unlock()
+			return items, nil
+		}
+		k.mu.Unlock()
+		items, err := s.readRegisterRows(ctx, tx)
+		if err != nil {
+			return nil, err
+		}
+		k.mu.Lock()
+		k.probe, k.at, k.items = probe, at, slices.Clone(items)
+		k.mu.Unlock()
+		return items, nil
+	})
+}
+
+// readRegisterRows reads every published family's licence terms and
+// envelope (registerRead).
+func (s *Store) readRegisterRows(ctx context.Context, tx pgx.Tx) ([]access.Terms, error) {
+	// A failed query surfaces through CollectRows (pgx returns it from
+	// rows.Err as well).
+	rows, _ := run(ctx, tx, registerRead)
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (access.Terms, error) {
+		var (
+			t       access.Terms
+			classes []string
+		)
+		var audience string
+		err := r.Scan(&t.Family, &t.Domain, &classes, &t.AcceptanceRequired, &t.Version, &audience, &t.HoldReason)
+		t.Audience = access.Audience(audience)
+		for _, c := range classes {
+			t.UseClasses = append(t.UseClasses, access.UseClass(c))
+		}
+		return t, err
 	})
 }
 

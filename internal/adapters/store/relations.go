@@ -983,3 +983,234 @@ const relWeatherWarning = `
     last_seen_at AS seen_at
    FROM weather_warnings w
   WHERE deleted_at IS NULL AND valid_from IS NOT NULL`
+
+// punctualityView is transit_punctuality_area_live's definition
+// (pg_get_viewdef at schema head 348).
+//
+//nolint:misspell // MATERIALIZED is the SQL keyword
+const punctualityView = `
+ WITH per_land AS MATERIALIZED (
+         SELECT l.land,
+            x.level,
+            x.area,
+            x.trip_id,
+            x.trips_observed,
+            x.trips_late,
+            x.trips_skipped_stop,
+            x.trips_untimed,
+            x.median_worst_delay_s,
+            x.stops_seen,
+            x.newest,
+            x.late,
+            x.worst,
+            x.skipped,
+            x.timed,
+            x.untimed
+           FROM ( VALUES ('01'::text), ('02'::text), ('03'::text), ('04'::text), ('05'::text), ('06'::text), ('07'::text), ('08'::text), ('09'::text), ('10'::text), ('11'::text), ('12'::text), ('13'::text), ('14'::text), ('15'::text), ('16'::text)) l(land)
+             CROSS JOIN LATERAL ( WITH w AS MATERIALIZED (
+                         SELECT d0.trip_id,
+                            d0.stop_id,
+                            d0.delay_s,
+                            d0.schedule_relationship,
+                            d0.observed_at,
+                            "left"(split_part(d0.stop_id, ':'::text, 2), 5) AS kreis
+                           FROM transit_delays d0
+                          WHERE "left"(
+                                CASE
+                                    WHEN d0.stop_id ~* '^de:[0-9]+(:|$)'::text AND (length(split_part(d0.stop_id, ':'::text, 2)) = ANY (ARRAY[2, 3, 5, 8])) THEN split_part(d0.stop_id, ':'::text, 2)
+                                    ELSE NULL::text
+                                END, 2) = l.land AND d0.observed_at >= (now() - '00:30:00'::interval) AND d0.observed_at <= now() AND d0.source = 'delfi_rt_tu'::text AND (d0.delay_s IS NOT NULL OR d0.schedule_relationship = 'SKIPPED'::text)
+                        ), tk AS (
+                         SELECT w.trip_id,
+                            w.kreis,
+                            bool_or(w.delay_s > 300) AS late,
+                            max(w.delay_s) AS worst,
+                            bool_or(w.schedule_relationship = 'SKIPPED'::text) AS skipped,
+                            bool_or(w.delay_s IS NOT NULL) AS timed,
+                            max(w.observed_at) AS newest
+                           FROM w
+                          GROUP BY w.trip_id, w.kreis
+                        ), t0 AS (
+                         SELECT tk.trip_id,
+                            bool_or(tk.late) AS late,
+                            max(tk.worst) AS worst,
+                            bool_or(tk.skipped) AS skipped,
+                            bool_or(tk.timed) AS timed,
+                            max(tk.newest) AS newest
+                           FROM tk
+                          GROUP BY tk.trip_id
+                        ), t AS (
+                         SELECT t.trip_id,
+                            t.late,
+                            t.worst,
+                            t.skipped,
+                            t.timed,
+                            t.newest,
+                                CASE
+                                    WHEN t.timed THEN (EXISTS ( SELECT 1
+                                       FROM gtfs_untimed_trips u
+                                      WHERE u.gtfs_feed_key = 1 AND u.trip_id = t.trip_id))
+                                    ELSE false
+                                END AS untimed
+                           FROM t0 t
+                        ), st AS (
+                         SELECT ds.kreis,
+                            count(*)::integer AS stops
+                           FROM ( SELECT DISTINCT w.kreis,
+                                    w.stop_id
+                                   FROM w
+                                  WHERE w.stop_id IS NOT NULL) ds
+                          GROUP BY ds.kreis
+                        )
+                 SELECT 'land'::text AS level,
+                    l.land AS area,
+                    NULL::text AS trip_id,
+                    count(*) FILTER (WHERE t.timed AND NOT t.untimed)::integer AS trips_observed,
+                    count(*) FILTER (WHERE t.timed AND t.late AND NOT t.untimed)::integer AS trips_late,
+                    count(*) FILTER (WHERE t.skipped)::integer AS trips_skipped_stop,
+                    count(*) FILTER (WHERE t.untimed)::integer AS trips_untimed,
+                    percentile_cont(0.5::double precision) WITHIN GROUP (ORDER BY (t.worst::double precision)) FILTER (WHERE NOT t.untimed)::integer AS median_worst_delay_s,
+                    COALESCE(( SELECT sum(s.stops) AS sum
+                           FROM st s), 0::bigint)::integer AS stops_seen,
+                    max(t.newest) AS newest,
+                    NULL::boolean AS late,
+                    NULL::integer AS worst,
+                    NULL::boolean AS skipped,
+                    NULL::boolean AS timed,
+                    NULL::boolean AS untimed
+                   FROM t
+                UNION ALL
+                 SELECT 'kreis'::text AS text,
+                    tk.kreis,
+                    NULL::text AS text,
+                    count(*) FILTER (WHERE tk.timed AND NOT tu.untimed)::integer AS count,
+                    count(*) FILTER (WHERE tk.timed AND tk.late AND NOT tu.untimed)::integer AS count,
+                    count(*) FILTER (WHERE tk.skipped)::integer AS count,
+                    count(*) FILTER (WHERE tu.untimed)::integer AS count,
+                    percentile_cont(0.5::double precision) WITHIN GROUP (ORDER BY (tk.worst::double precision)) FILTER (WHERE NOT tu.untimed)::integer AS percentile_cont,
+                    COALESCE(( SELECT s.stops
+                           FROM st s
+                          WHERE s.kreis = tk.kreis), 0) AS "coalesce",
+                    max(tk.newest) AS max,
+                    NULL::boolean AS bool,
+                    NULL::integer AS int4,
+                    NULL::boolean AS bool,
+                    NULL::boolean AS bool,
+                    NULL::boolean AS bool
+                   FROM tk
+                     JOIN t tu ON tu.trip_id = tk.trip_id
+                  GROUP BY tk.kreis
+                UNION ALL
+                 SELECT 'trip'::text AS text,
+                    l.land,
+                    t.trip_id,
+                    NULL::integer AS int4,
+                    NULL::integer AS int4,
+                    NULL::integer AS int4,
+                    NULL::integer AS int4,
+                    NULL::integer AS int4,
+                    NULL::integer AS int4,
+                    t.newest,
+                    t.late,
+                    t.worst,
+                    t.skipped,
+                    t.timed,
+                    t.untimed
+                   FROM t) x
+        ), nation AS (
+         SELECT bool_or(p.late) AS late,
+            max(p.worst) AS worst,
+            bool_or(p.skipped) AS skipped,
+            bool_or(p.timed) AS timed,
+            bool_or(p.untimed) AS untimed,
+            max(p.newest) AS newest
+           FROM per_land p
+          WHERE p.level = 'trip'::text
+          GROUP BY p.trip_id
+        ), kreis_rows AS MATERIALIZED (
+         SELECT p.land,
+            p.level,
+            p.area,
+            p.trip_id,
+            p.trips_observed,
+            p.trips_late,
+            p.trips_skipped_stop,
+            p.trips_untimed,
+            p.median_worst_delay_s,
+            p.stops_seen,
+            p.newest,
+            p.late,
+            p.worst,
+            p.skipped,
+            p.timed,
+            p.untimed
+           FROM per_land p
+          WHERE p.level = 'kreis'::text
+        ), cities AS MATERIALIZED (
+         SELECT "left"(g.admin_code, 5) AS kreis,
+            min(g.name) AS name
+           FROM gazetteer_places g
+          WHERE g.source_id = 'bkg_gvisys'::text AND g.kind = 'city'::text AND g.closed_at IS NULL AND g.admin_code ~ '^[0-9]{5}000$'::text
+          GROUP BY ("left"(g.admin_code, 5))
+        ), districts AS MATERIALIZED (
+         SELECT g.admin_code AS kreis,
+            min(g.name) AS name
+           FROM gazetteer_places g
+          WHERE g.source_id = 'bkg_gvisys'::text AND g.kind = 'district'::text AND g.closed_at IS NULL AND g.admin_code ~ '^[0-9]{5}$'::text
+          GROUP BY g.admin_code
+        )
+ SELECT 'all'::text AS level,
+    'de'::text AS area,
+    NULL::text AS name,
+    count(*) FILTER (WHERE n.timed AND NOT n.untimed)::integer AS trips_observed,
+    count(*) FILTER (WHERE n.timed AND n.late AND NOT n.untimed)::integer AS trips_late,
+    count(*) FILTER (WHERE n.skipped)::integer AS trips_skipped_stop,
+    count(*) FILTER (WHERE n.untimed)::integer AS trips_untimed,
+    percentile_cont(0.5::double precision) WITHIN GROUP (ORDER BY (n.worst::double precision)) FILTER (WHERE NOT n.untimed)::integer AS median_worst_delay_s,
+    ( SELECT COALESCE(sum(p.stops_seen), 0::bigint)::integer AS "coalesce"
+           FROM per_land p
+          WHERE p.level = 'land'::text) AS stops_seen,
+    max(n.newest) AS newest
+   FROM nation n
+UNION ALL
+ SELECT 'land'::text AS level,
+    p.area,
+    NULL::text AS name,
+    p.trips_observed,
+    p.trips_late,
+    p.trips_skipped_stop,
+    p.trips_untimed,
+    p.median_worst_delay_s,
+    p.stops_seen,
+    p.newest
+   FROM per_land p
+  WHERE p.level = 'land'::text
+UNION ALL
+ SELECT 'city'::text AS level,
+    p.area,
+    c.name,
+    p.trips_observed,
+    p.trips_late,
+    p.trips_skipped_stop,
+    p.trips_untimed,
+    p.median_worst_delay_s,
+    p.stops_seen,
+    p.newest
+   FROM kreis_rows p
+     JOIN cities c ON c.kreis = p.area
+UNION ALL
+ SELECT 'kreis'::text AS level,
+    p.area,
+    d.name,
+    p.trips_observed,
+    p.trips_late,
+    p.trips_skipped_stop,
+    p.trips_untimed,
+    p.median_worst_delay_s,
+    p.stops_seen,
+    p.newest
+   FROM kreis_rows p
+     JOIN districts d ON d.kreis = p.area
+  WHERE NOT (EXISTS ( SELECT 1
+           FROM cities c
+          WHERE c.kreis = p.area))`

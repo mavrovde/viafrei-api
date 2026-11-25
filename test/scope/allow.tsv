@@ -158,3 +158,4 @@ vocabulary	internal/adapters/store/trainboard_stored.go	feed	owner decision 2026
 vocabulary	internal/adapters/store/trainboard_stored.go	feeds	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
 vocabulary	internal/adapters/store/trainboard_stored.go	gtfs	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
 denylist	internal/adapters/store/trainboard_stored_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+vocabulary	internal/adapters/store/trainboard_stored_integration_test.go	feed	owner decision 2026-11-23: the platform's table and column names this test's seed rows write carry this word

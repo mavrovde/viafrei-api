@@ -950,25 +950,13 @@ order by m.ord, n.metres`, "float8", "float8", "float8", "text[]", "int", "text[
 // $5 the families. Each call is its stop's (the first listed whose
 // station family holds its stop point); a trip must call somewhere outside
 // that stop after it.
-var stopBoardsCalls = named("api_stop_boards_calls", stopCallsSQL(""), "text[]", "int[]", "timestamptz", "timestamptz", "text[]")
-
-// urbanRailCalls is stopBoardsCalls of the U-Bahn and tram calls alone
-// (route types 0, 1, 400 to 405 and 900 to 906), as today's
-// URBAN_RAIL_AT_STOPS reads a station's interchange: the predicate reaches
-// the routes the calls are read from, so a station's buses are never read.
-var urbanRailCalls = named("api_train_interchange_calls",
-	stopCallsSQL("\n  and (d.route_type in (0, 1) or d.route_type between 400 and 405 or d.route_type between 900 and 906)"),
-	"text[]", "int[]", "timestamptz", "timestamptz", "text[]")
-
-// stopCallsSQL is the text of stopBoardsCalls, extra added to its filter.
 //
 //nolint:misspell // materialized is the SQL keyword
-func stopCallsSQL(extra string) string {
-	return `
+var stopBoardsCalls = named("api_stop_boards_calls", `
 with grp as materialized (
   select g.ord, m.id member
   from unnest((select $1::text[]), (select $2::int[])) g(root, ord)
-  cross join lateral (` + stationFamily("g.root") + `) m(id)),
+  cross join lateral (`+stationFamily("g.root")+`) m(id)),
 fam as materialized (select array(select distinct g.member from grp g) ids)
 select k.ord, d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transport_mode, d.route_type,
        d.train_number, d.train_category, nullif(btrim(d.board_headsign), ''),
@@ -980,7 +968,7 @@ select k.ord, d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transp
                   order by lc.stop_sequence desc limit 1)),
        d.planned_departure_at, d.platform, d.planned_platform, d.platform_changed, d.realtime, d.realtime_source,
        d.cancelled, d.delay_s, d.expected_departure_at, d.no_forecast, d.source_ref, d.source_refs
-from (` + departuresOfTrips + `) d
+from (`+departuresOfTrips+`) d
 cross join lateral (select min(g.ord) ord from grp g where g.member = d.stop_point_id) k
 where d.board_stop_feed = any(array(select split_part(x, ':', 1)::smallint from unnest((select f.ids from fam f)) x))
   and d.board_stop = any(array(select substr(x, strpos(x, ':') + 1) from unnest((select f.ids from fam f)) x))
@@ -989,14 +977,13 @@ where d.board_stop_feed = any(array(select split_part(x, ':', 1)::smallint from 
   and d.boarding
   and d.source_ref = any((select $5::text[])::text[])
   and d.source_refs <@ (select $5::text[])
-  and ` + permitted("d") + extra + `
+  and `+permitted("d")+`
   and exists (select 1 from stop_times nx
                 join stops np on np.gtfs_feed_key = nx.gtfs_feed_key and np.id = nx.stop_id
                where nx.gtfs_feed_key = d.board_feed and nx.trip_id = d.board_trip and nx.stop_sequence > d.call_order
                  and nx.deleted_at is null and np.deleted_at is null and coalesce(np.location_type::integer, 0) = 0
                  and (np.gtfs_feed_key || ':') || np.id not in (select g.member from grp g where g.ord = k.ord))
-order by d.planned_departure_at, d.journey_id, d.call_order`
-}
+order by d.planned_departure_at, d.journey_id, d.call_order`, "text[]", "int[]", "timestamptz", "timestamptz", "text[]")
 
 // StopBoards reads the stops around q.At with their departures
 // (features.Transit): today's stop pick (transit.PickStops over stopsNear),
@@ -1021,46 +1008,31 @@ func (s *Store) StopBoards(ctx context.Context, q transit.StopBoardsQuery, famil
 				roots, ords = append(roots, r), append(ords, int32(i))
 			}
 		}
-		calls, err := stopCallsOf(ctx, tx, stopBoardsCalls, roots, ords, len(stops), q.From, q.From.Add(q.Window), families)
+		calls := make([][]transit.Departure, len(stops))
+		rows, _ = run(ctx, tx, stopBoardsCalls, roots, ords, q.From, q.From.Add(q.Window), families)
+		var (
+			ord    int32
+			v      transit.Departure
+			mode   string
+			delayS *int
+		)
+		_, err = pgx.ForEachRow(rows, []any{&ord, &v.JourneyID, &v.StopPointID, &v.CallOrder, &v.Line, &mode, &v.RouteType, &v.TrainNumber,
+			&v.Category, &v.Headsign, &v.Destination, &v.PlannedAt, &v.Platform, &v.PlannedPlatform,
+			&v.PlatformChanged, &v.Live, &v.Source, &v.Cancelled, &delayS, &v.ExpectedAt, &v.NoForecast,
+			&v.Family, &v.Families}, func() error {
+			d := v
+			d.DelayMin, d.Mode = transit.DelayMinOf(delayS), transit.MapMode(mode)
+			calls[ord] = append(calls[ord], d)
+			// Each row scans into fresh pointers and slices.
+			v, delayS = transit.Departure{}, nil
+			return nil
+		})
 		out := make([]transit.StopBoard, len(stops))
 		for i, st := range stops {
 			out[i] = transit.StopBoard{Stop: st, Board: transit.Board(calls[i], transit.DepartureQuery{From: q.From, Window: q.Window, Modes: q.Modes, Limit: q.PerStop})}
 		}
 		return out, err
 	})
-}
-
-// stopCallsOf reads the departing calls of the stops' roots in [from, to)
-// (st: stopBoardsCalls or urbanRailCalls), each root's under its listed
-// stop ords[i] of n.
-func stopCallsOf(ctx context.Context, tx pgx.Tx, st stmt, roots []string, ords []int32, n int, from, to time.Time, families []string) ([][]transit.Departure, error) {
-	calls := make([][]transit.Departure, n)
-	rows, _ := run(ctx, tx, st, roots, ords, from, to, families)
-	var (
-		ord    int32
-		v      transit.Departure
-		mode   string
-		delayS *int
-	)
-	_, err := pgx.ForEachRow(rows, []any{&ord, &v.JourneyID, &v.StopPointID, &v.CallOrder, &v.Line, &mode, &v.RouteType, &v.TrainNumber,
-		&v.Category, &v.Headsign, &v.Destination, &v.PlannedAt, &v.Platform, &v.PlannedPlatform,
-		&v.PlatformChanged, &v.Live, &v.Source, &v.Cancelled, &delayS, &v.ExpectedAt, &v.NoForecast,
-		&v.Family, &v.Families}, func() error {
-		d := v
-		d.DelayMin, d.Mode = transit.DelayMinOf(delayS), transit.MapMode(mode)
-		calls[ord] = append(calls[ord], d)
-		// Each row scans into fresh pointers and slices.
-		v, delayS = transit.Departure{}, nil
-		return nil
-	})
-	return calls, err
-}
-
-// urbanRailCallsOf reads the U-Bahn and tram calls of the roots in
-// [from, to) as one stop's (stopCallsOf of urbanRailCalls).
-func urbanRailCallsOf(ctx context.Context, tx pgx.Tx, roots []string, from, to time.Time, families []string) ([]transit.Departure, error) {
-	calls, err := stopCallsOf(ctx, tx, urbanRailCalls, roots, make([]int32, len(roots)), 1, from, to, families)
-	return calls[0], err
 }
 
 // platformAccess reads DB's station inventory (OpenStation) of the

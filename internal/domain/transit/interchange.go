@@ -157,12 +157,15 @@ func NumericCompare(a, b string) int {
 const StationPairingM = 300
 
 // InterchangeRead is what the store read of a station's interchange: the
-// stop families' lines, the departing calls of its timetable stops, and
+// stop families' lines, the U-Bahn and tram calls of its timetable stops,
+// the Trip Updates rows of their trips and whether that source is live, and
 // whether the station has any timetable stop.
 type InterchangeRead struct {
-	Lines []StopFamilyLines
-	Calls []Departure
-	Stops bool
+	Lines           []StopFamilyLines
+	Plan            []PlannedCall
+	TripUpdates     []TripUpdateRow
+	TripUpdatesLive bool
+	Stops           bool
 }
 
 // Interchange is the block under a train board: the U-Bahn and tram
@@ -172,34 +175,14 @@ type Interchange struct {
 	Lines      []LineGroup
 }
 
-// InterchangeOf is today's readInterchange over the read calls: the calls
-// not yet departed at now whose planned or expected time is from or later,
-// in planned order, the first InterchangeMax, those of the U-Bahn and the
-// tram; nil when the station has no stop, or neither a departure nor a
-// line to name.
+// InterchangeOf is today's readInterchange over the reads
+// (ComposeInterchange from from at now); nil when the station has no
+// stop, or neither a departure nor a line to name.
 func InterchangeOf(r InterchangeRead, from, now time.Time) *Interchange {
 	if !r.Stops {
 		return nil
 	}
-	var kept []Departure
-	for _, d := range r.Calls {
-		at := d.PlannedAt
-		if d.ExpectedAt != nil {
-			at = *d.ExpectedAt
-		}
-		if at.Before(now) || (d.PlannedAt.Before(from) && at.Before(from)) {
-			continue
-		}
-		kept = append(kept, d)
-	}
-	slices.SortStableFunc(kept, func(a, b Departure) int { return a.PlannedAt.Compare(b.PlannedAt) })
-	out := &Interchange{Departures: []Departure{}, Lines: StationLineGroups(r.Lines)}
-	for _, d := range kept[:min(InterchangeMax, len(kept))] {
-		rt := d.RouteType
-		if BoardModeOf(&rt) != "rail" {
-			out.Departures = append(out.Departures, d)
-		}
-	}
+	out := &Interchange{Departures: ComposeInterchange(r.Plan, r.TripUpdates, r.TripUpdatesLive, from, now), Lines: StationLineGroups(r.Lines)}
 	if len(out.Departures) == 0 && len(out.Lines) == 0 {
 		return nil
 	}

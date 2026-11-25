@@ -36,7 +36,7 @@ func (b *boards) StoredTrainBoard(_ context.Context, _ string, _ []string) (*tra
 	return b.stored, b.storedErr
 }
 
-func (b *boards) TrainInterchange(_ context.Context, evas []string, from, to time.Time, _ []string) (transit.InterchangeRead, error) {
+func (b *boards) TrainInterchange(_ context.Context, evas []string, from, to, _ time.Time, _ []string) (transit.InterchangeRead, error) {
 	b.gotEVAs, b.gotFrom, b.gotTo = evas, from, to
 	return b.ic, b.icErr
 }
@@ -126,15 +126,17 @@ func TestTrainBoardServesTheStoredBoardWithoutARefresh(t *testing.T) {
 
 func TestTrainBoardCarriesTheInterchange(t *testing.T) {
 	req.Covers(t, "FR-TRANSIT-002")
-	u := "U2"
+	u, one := "U2", 1
 	b := &boards{ic: transit.InterchangeRead{Stops: true,
-		Lines: []transit.StopFamilyLines{{Modes: []string{"subway"}, Lines: []string{"U2"}}},
-		Calls: []transit.Departure{{Line: &u, RouteType: 400, PlannedAt: now.Add(time.Minute), Family: "delfi_rt_tu", Families: []string{"delfi_rt_tu"}}}}}
+		Lines:           []transit.StopFamilyLines{{Modes: []string{"subway"}, Lines: []string{"U2"}}},
+		Plan:            []transit.PlannedCall{{TripID: "t", StopSequence: 1, Line: &u, RouteType: 400, At: now.Add(time.Minute)}},
+		TripUpdates:     []transit.TripUpdateRow{{TripID: "t", StopSequence: &one, DelayS: &one, Relationship: "SCHEDULED", ObservedAt: now}},
+		TripUpdatesLive: true}}
 	if _, err := boardService(&fake{}, b).TrainBoard(context.Background(), transitKey, boardQ); !errors.Is(err, features.ErrGateViolation) {
 		t.Errorf("a realtime row the key may not read: %v", err)
 	}
-	rt := access.Terms{Family: "delfi_rt_tu", Domain: "transit", UseClasses: all, Version: "v1"}
-	k := key("commercial", []access.Scope{"transit"}, transit.TrainBoardFamily, transit.InterchangeFamily, "delfi_rt_tu", "st")
+	rt := access.Terms{Family: transit.TripUpdatesFamily, Domain: "transit", UseClasses: all, Version: "v1"}
+	k := key("commercial", []access.Scope{"transit"}, transit.TrainBoardFamily, transit.InterchangeFamily, transit.TripUpdatesFamily, "st")
 	a, err := boardService(&fake{}, b, rt).TrainBoard(context.Background(), k, boardQ)
 	if err != nil || a.Interchange == nil || len(a.Interchange.Departures) != 1 || len(a.Interchange.Lines) != 1 || len(a.Meta.Families) != 2 {
 		t.Fatalf("interchange %+v %v", a, err)

@@ -67,24 +67,45 @@ func TestTrainInterchangeReadsThePairedStops(t *testing.T) {
 		  select 'station', 'Hbf', 'hbf', 'db_stada', '8099777', s.geom from public.stops s where s.id = '%[1]s' and s.deleted_at is null limit 1`, dhid),
 		fmt.Sprintf(`insert into public.gazetteer_places (kind, name, name_norm, source_id, external_id, geom)
 		  select 'stop', 'Hbf', 'hbf', 'delfi_zhv', '%[1]s', st_project(s.geom, 100, 0) from public.stops s where s.id = '%[1]s' and s.deleted_at is null limit 1`, dhid),
-		`refresh materialized view public.transit_stop_modes`) //nolint:misspell // the SQL keyword
-	fams := every(t)
-	r, err := st.TrainInterchange(bounded(t), []string{"8099777"}, at.Add(-time.Minute), at.Add(time.Minute), fams)
-	if err != nil || !r.Stops || len(r.Calls) == 0 || len(r.Lines) == 0 {
+		`refresh materialized view public.transit_stop_modes`, //nolint:misspell // the SQL keyword
+		// The Trip Updates checked now, a trip-level row for each trip at the station.
+		`insert into public.feed_catalog (feed_key, provider, display_name, licence_id, cadence_s)
+		   select 'tripupdates', 'p', 'tripupdates', (select licence_id from public.feed_catalog limit 1), 60
+		   on conflict (feed_key) do update set cadence_s = 60, closed_at = null`,
+		`insert into control.feed_state (ledger, key, updated_at, last_success_at) values ('feed', 'tripupdates', now(), now())
+		   on conflict (ledger, key) do update set last_success_at = excluded.last_success_at`,
+		fmt.Sprintf(`insert into public.transit_delays (observed_at, feed_ts, trip_id, stop_id, stop_sequence, delay_s, schedule_relationship, source)
+		   select distinct now() - interval '2 minutes', now() - interval '2 minutes', st.trip_id, null::text, null::int, null::int, 'CANCELED', 'delfi_rt_tu'
+		   from public.stop_times st where st.stop_id like '%[1]s%%' and st.deleted_at is null`, dhid))
+	// The fixture's register files no Trip Updates family; a board adds it
+	// (boardFamilies).
+	fams := append(every(t), transit.TripUpdatesFamily)
+	r, err := st.TrainInterchange(bounded(t), []string{"8099777"}, at.Add(-time.Minute), at.Add(time.Minute), at, fams)
+	if err != nil || !r.Stops || len(r.Plan) == 0 || len(r.Lines) == 0 || !r.TripUpdatesLive || len(r.TripUpdates) == 0 {
 		t.Fatalf("%+v %v", r, err)
+	}
+	// An hour after the check it is stale: the timetable alone; a key without
+	// the Trip Updates reads none.
+	for _, c := range []struct {
+		now  time.Time
+		fams []string
+	}{{time.Now().Add(time.Hour), fams}, {at, slices.DeleteFunc(slices.Clone(fams), func(f string) bool { return f == transit.TripUpdatesFamily })}} {
+		if r, err = st.TrainInterchange(bounded(t), []string{"8099777"}, at.Add(-time.Minute), at.Add(time.Minute), c.now, c.fams); err != nil || r.TripUpdatesLive || r.TripUpdates != nil || len(r.Plan) == 0 {
+			t.Errorf("%v: %+v %v", c.now, r, err)
+		}
 	}
 	// No pairing, no stop; a key without the timetable reads none.
 	for _, c := range []struct {
 		eva  string
 		fams []string
 	}{{"8099778", fams}, {"8099777", []string{transit.TrainBoardFamily}}} {
-		if r, err = st.TrainInterchange(bounded(t), []string{c.eva}, at, at.Add(time.Minute), c.fams); err != nil || r.Stops || r.Calls != nil || r.Lines != nil {
+		if r, err = st.TrainInterchange(bounded(t), []string{c.eva}, at, at.Add(time.Minute), at, c.fams); err != nil || r.Stops || r.Plan != nil || r.Lines != nil {
 			t.Errorf("%s: %+v %v", c.eva, r, err)
 		}
 	}
 	fst, f := faultyOn(t, pdb.ReaderURL)
 	failEach(t, fst, f, "TrainInterchange", func(ctx context.Context, s *store.Store) error {
-		_, err := s.TrainInterchange(ctx, []string{"8099777"}, at.Add(-time.Minute), at.Add(time.Minute), fams)
+		_, err := s.TrainInterchange(ctx, []string{"8099777"}, at.Add(-time.Minute), at.Add(time.Minute), at, fams)
 		return err
 	})
 }

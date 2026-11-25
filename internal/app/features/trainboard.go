@@ -20,9 +20,10 @@ type TrainBoards interface {
 	// StoredTrainBoard returns the board the stored-boards worker wrote
 	// for the station of eva under the families, nil when none is.
 	StoredTrainBoard(ctx context.Context, eva string, families []string) (*transit.StoredBoard, error)
-	// TrainInterchange reads the lines and the departing calls in
-	// [from, to) of the timetable stops of the station of evas.
-	TrainInterchange(ctx context.Context, evas []string, from, to time.Time, families []string) (transit.InterchangeRead, error)
+	// TrainInterchange reads the lines, the U-Bahn and tram calls in
+	// [from, to) around now and their Trip Updates of the timetable stops
+	// of the station of evas.
+	TrainInterchange(ctx context.Context, evas []string, from, to, now time.Time, families []string) (transit.InterchangeRead, error)
 }
 
 // ErrOwnKeyOnly refuses an ask by a key that is not one of ViaFrei's own.
@@ -52,11 +53,12 @@ type TrainBoardAnswer struct {
 // TrainBoard answers a station's board as the MCP server shows it, from
 // the boards the live refresher recorded or the stored-boards worker
 // wrote: DB Timetables alone, never a share-alike family; the interchange
-// is the DELFI timetable's, with its own families.
+// is the DELFI timetable's, with the Trip Updates where the key reads them
+// (a board's families, boardFamilies).
 func (s *Service) TrainBoard(ctx context.Context, key access.Record, q TrainBoardQuery) (TrainBoardAnswer, error) {
 	now := s.now()
 	var out TrainBoardAnswer
-	_, meta, err := listedOwn(ctx, s, key, "transit", func(permitted []string) (struct{}, []string, error) {
+	_, meta, err := listedBoard(ctx, s, key, func(permitted []string) (struct{}, []string, error) {
 		if !slices.Contains(permitted, transit.TrainBoardFamily) {
 			return struct{}{}, nil, access.ErrNonePermitted
 		}
@@ -93,7 +95,7 @@ func (s *Service) TrainBoard(ctx context.Context, key access.Record, q TrainBoar
 			}
 		}
 		r, err := s.repos.TrainBoards.TrainInterchange(ctx, evas, now.Add(-transit.InterchangeBackMin*time.Minute),
-			now.Add(time.Duration(q.DurationMin)*time.Minute), permitted)
+			now.Add(time.Duration(q.DurationMin)*time.Minute), now, permitted)
 		if err != nil {
 			return struct{}{}, nil, err
 		}

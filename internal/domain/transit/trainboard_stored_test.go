@@ -90,24 +90,16 @@ func TestStationLineGroupsAsThePlatform(t *testing.T) {
 
 func TestInterchangeOfAsThePlatform(t *testing.T) {
 	now := time.Date(2026, 11, 25, 10, 0, 0, 0, time.UTC)
-	call := func(m, rt int, late *int) Departure {
-		d := Departure{PlannedAt: now.Add(time.Duration(m) * time.Minute), RouteType: rt}
-		if late != nil {
-			e := d.PlannedAt.Add(time.Duration(*late) * time.Minute)
-			d.ExpectedAt = &e
-		}
-		return d
-	}
-	five := 5
 	if InterchangeOf(InterchangeRead{}, now, now) != nil || InterchangeOf(InterchangeRead{Stops: true}, now, now) != nil {
 		t.Error("no stop, or nothing to name, is no block")
 	}
-	calls := []Departure{call(-10, 400, nil), call(-3, 0, &five), call(1, 2, nil)}
+	var plan []PlannedCall
 	for i := range 12 {
-		calls = append(calls, call(i+2, 900, nil))
+		plan = append(plan, PlannedCall{TripID: string(rune('a' + i)), At: now.Add(time.Duration(i+1) * time.Minute), RouteType: 900})
 	}
-	ic := InterchangeOf(InterchangeRead{Stops: true, Calls: calls}, now, now)
-	if ic == nil || len(ic.Departures) != 9 || ic.Departures[0].RouteType != 0 || len(ic.Lines) != 0 {
+	plan = append(plan, PlannedCall{TripID: "r", At: now.Add(30 * time.Second), RouteType: 2})
+	ic := InterchangeOf(InterchangeRead{Stops: true, Plan: plan}, now, now)
+	if ic == nil || len(ic.Departures) != 9 || ic.Departures[0].JourneyID != "a" || len(ic.Lines) != 0 {
 		t.Errorf("interchange %+v", ic)
 	}
 	for rt, want := range map[int]Mode{1: "subway", 405: "subway", 0: "tram", 906: "tram", 2: "rail", 700: "rail"} {

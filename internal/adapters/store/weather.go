@@ -51,7 +51,7 @@ var warningColumns = `select 'dwd:' || w.id warning_id, w.source_feed, ` + warni
        coalesce(w.severity, w.level::text), 'Deutscher Wetterdienst', coalesce(w.headline, w.event),
        'de', w.valid_from, w.valid_to, coalesce(w.area_desc, ''), w.warncell_id, w.event, w.identifier, w.published_at,
        w.description, w.instruction, w.urgency, w.certainty, en.en_headline, en.en_description, en.en_instruction,
-       ` + descriptionUnaltered("w") + `, ` + englishUnaltered
+       ` + descriptionUnaltered("w") + `, ` + englishUnaltered + `, w.level_source`
 
 // descriptionUnaltered is whether the description of the warning aliased a
 // is, provably, the text the issuer published, as the platform judges it
@@ -126,7 +126,7 @@ func scanWarning(r pgx.CollectableRow) (weather.Warning, error) {
 	err := r.Scan(&v.ID, &v.Family, &hazard, &level, &v.LevelName, &v.Issuer, &v.Headline,
 		&v.TextLanguage, &v.From, &until, &v.AreaName, &v.CellID, &v.Event, &v.Identifier, &v.Published,
 		&v.Description, &v.Instruction, &v.Urgency, &v.Certainty, &en.Headline, &en.Description, &en.Instruction,
-		&v.Unaltered, &en.Unaltered)
+		&v.Unaltered, &en.Unaltered, &v.LevelSource)
 	if en.Headline != nil || en.Description != nil || en.Instruction != nil {
 		en.Family, v.English = englishWarnings, &en
 	}

@@ -78,6 +78,10 @@ type Warning struct {
 	// in TextLanguage, as issued; Urgency and Certainty its CAP urgency and
 	// certainty, as issued. Each is nil when not given.
 	Description, Instruction, Urgency, Certainty *string
+	// LevelSource says where Level came from, as stored: published (the
+	// issuer's number) or derived_from_severity (the issuer gave no number;
+	// the platform mapped its CAP severity word); nil when not stored.
+	LevelSource *string
 	// Unaltered is whether Description is, provably, the text the issuer
 	// published (its hash taken when it was received still matches); false when there
 	// is none.

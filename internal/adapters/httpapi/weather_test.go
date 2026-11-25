@@ -55,7 +55,8 @@ func riskAnswer() features.WeatherRisk {
 				Headline: "Schneefall", TextLanguage: "de", From: fixedNow.Add(-time.Hour), Until: tp(fixedNow.Add(26 * time.Hour)), AreaName: "Kreis A",
 				CellID: sp("814626000"), Event: sp("FROST"), Identifier: sp("2.49.0.0.276.0.DWD.PVW.1"), Published: tp(fixedNow.Add(-2 * time.Hour)),
 				Description: sp("Es fällt Schnee."), Instruction: sp("Fahren Sie vorsichtig."), Urgency: sp("Immediate"), Certainty: sp("Likely"), Unaltered: true,
-				English: &weather.Text{Family: "src-beta-weather", Headline: sp("Snowfall"), Description: sp("Snow is falling.")}},
+				LevelSource: sp("derived_from_severity"),
+				English:     &weather.Text{Family: "src-beta-weather", Headline: sp("Snowfall"), Description: sp("Snow is falling.")}},
 			{ID: "w-2", Family: "src-alpha-weather", Hazard: weather.Other, Level: 1, LevelName: "Wetterwarnung", Issuer: "Wetterdienst",
 				Headline: "Hinweis", TextLanguage: "de", From: fixedNow, AreaName: "Kreis A"},
 		}, HasMore: true, Families: []provenance.Family{weatherFamily}, At: fixedNow},
@@ -104,6 +105,10 @@ func TestWeatherRiskAnswer(t *testing.T) {
 	}
 	if w0["description"] != "Es fällt Schnee." || w0["instruction"] != "Fahren Sie vorsichtig." || w0["urgency"] != "Immediate" || w0["certainty"] != "Likely" {
 		t.Errorf("text %v %v %v %v", w0["description"], w0["instruction"], w0["urgency"], w0["certainty"])
+	}
+	// The level's source as stored; null when not stored.
+	if w1, _ := ws[1].(map[string]any); w0["levelSource"] != "derived_from_severity" || w1["levelSource"] != nil {
+		t.Errorf("level sources %v %v", w0["levelSource"], w1["levelSource"])
 	}
 	if en, _ := w0["english"].(map[string]any); en["headline"] != "Snowfall" || en["description"] != "Snow is falling." ||
 		en["instruction"] != nil || en["sourceFamily"] != "src-beta-weather" || en["unaltered"] != false {

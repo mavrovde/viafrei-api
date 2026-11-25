@@ -1978,6 +1978,14 @@
             "description": "The source family.",
             "type": "string"
           },
+          "lastCheckedAt": {
+            "description": "When the family's source was last asked and its data found current, whether it brought a new copy or confirmed the data unchanged (UTC); null when it never was. Beside dataAsOf it says how recently an unchanged answer was confirmed.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "stale": {
             "description": "True when ageS is above staleAfterS, or dataAsOf is unknown; never for a family with no fixed interval.",
             "type": "boolean"
@@ -1993,7 +2001,8 @@
           "dataAsOf",
           "ageS",
           "staleAfterS",
-          "stale"
+          "stale",
+          "lastCheckedAt"
         ],
         "type": "object"
       },
@@ -8962,6 +8971,18 @@
             "description": "The issuer's name of the level, as issued.",
             "type": "string"
           },
+          "levelSource": {
+            "description": "Where level came from: published (the issuer's number) or derived_from_severity (the issuer published no number; level is mapped from its CAP severity word, the platform's mapping, and is not the issuer's own figure); null when unknown.",
+            "enum": [
+              "published",
+              "derived_from_severity",
+              null
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "published": {
             "description": "When the issuer published the warning (its sent time); null when not given.",
             "format": "date-time",
@@ -9022,6 +9043,7 @@
           "unaltered",
           "urgency",
           "certainty",
+          "levelSource",
           "english"
         ],
         "type": "object"

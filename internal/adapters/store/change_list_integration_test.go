@@ -4,14 +4,18 @@ package store_test
 
 import (
 	"context"
+	"fmt"
+	"maps"
 	"slices"
 	"testing"
 	"time"
 
+	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
 	"github.com/mavrovde/viafrei-api/internal/domain/energy"
 	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/parking"
+	"github.com/mavrovde/viafrei-api/internal/domain/weather"
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
 )
 
@@ -114,6 +118,79 @@ where deleted_at is null and closed_at is null and geom is not null order by id 
 			t.Errorf("planted %s (%s) not read", p.id, p.kind)
 		} else if sites[i].Kind != want[p.kind] {
 			t.Errorf("stored %s reads as %s, want %s", p.kind, sites[i].Kind, want[p.kind])
+		}
+	}
+}
+
+// A warning says where its level came from, as stored: published (the
+// DWD's number), derived_from_severity (mapped from its CAP severity
+// word), or nothing when not stored.
+func TestWarningLevelSourceIsAsStored(t *testing.T) {
+	type ask struct {
+		cell string
+		at   time.Time
+	}
+	conn, err := db.Owner(bounded(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := conn.Query(bounded(t), `select distinct warncell_id, valid_from from weather_warnings where warncell_id is not null order by 2, 1 limit 40`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var asks []ask
+	for rows.Next() {
+		var a ask
+		if err := rows.Scan(&a.cell, &a.at); err != nil {
+			t.Fatal(err)
+		}
+		asks = append(asks, a)
+	}
+	_ = conn.Close(context.Background())
+	// Three warnings the cell read answers, each with the ask that reads it.
+	read := func(st *store.Store, a ask) []weather.Warning {
+		t.Helper()
+		got, err := st.CellWarnings(bounded(t), weather.CellQuery{Cell: a.cell}, families(t, st, "weather"), a.at)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got.Warnings
+	}
+	seed := seeded(t)
+	picked := map[string]ask{}
+	for _, a := range asks {
+		for _, w := range read(seed, a) {
+			if _, ok := picked[w.ID]; !ok && len(picked) < 3 {
+				picked[w.ID] = a
+			}
+		}
+	}
+	if len(picked) != 3 {
+		t.Fatalf("the cell read answers %d warnings", len(picked))
+	}
+	ids := slices.Sorted(maps.Keys(picked))
+	values := []string{"published", "derived_from_severity", ""}
+	var plants []string
+	for i, id := range ids {
+		v := "null"
+		if values[i] != "" {
+			v = "'" + values[i] + "'"
+		}
+		plants = append(plants, fmt.Sprintf(`update weather_warnings set level_source = %s where 'dwd:' || id = '%s'`, v, id))
+	}
+	st, _ := private(t, plants...)
+	for i, id := range ids {
+		var got *weather.Warning
+		for _, w := range read(st, picked[id]) {
+			if w.ID == id {
+				got = &w
+			}
+		}
+		switch {
+		case got == nil:
+			t.Errorf("%s not read", id)
+		case values[i] == "" && got.LevelSource != nil, values[i] != "" && (got.LevelSource == nil || *got.LevelSource != values[i]):
+			t.Errorf("%s: level source %v, want %q", id, got.LevelSource, values[i])
 		}
 	}
 }

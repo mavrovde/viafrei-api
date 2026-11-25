@@ -323,7 +323,7 @@ func TestChargingOptionsWarnsOfStaleAndWithheldData(t *testing.T) {
 	m = meta(t, decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/charging-options?at=52.52,13.405", bearer)))
 	fr, _ := m["freshness"].([]any)
 	f0, _ := fr[0].(map[string]any)
-	if m["asOf"] != nil || f0["dataAsOf"] != nil || f0["ageS"] != nil || f0["stale"] != true {
+	if m["asOf"] != nil || f0["dataAsOf"] != nil || f0["ageS"] != nil || f0["stale"] != true || f0["lastCheckedAt"] != nil {
 		t.Errorf("a family that published nothing: %v", m)
 	}
 }

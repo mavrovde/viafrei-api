@@ -255,6 +255,9 @@ type FreshnessEntry struct {
 	AgeS        *int64     `json:"ageS" nullable:"true" doc:"generatedAt minus dataAsOf, in whole seconds; null when dataAsOf is."`
 	StaleAfterS int64      `json:"staleAfterS" doc:"The family's design threshold: data older than this is stale. A family with no fixed interval, which is never stale, has 9007199254740991 (2^53 - 1, the largest integer every JSON reader holds exactly), which no age passes: its age is shown only."`
 	Stale       bool       `json:"stale" doc:"True when ageS is above staleAfterS, or dataAsOf is unknown; never for a family with no fixed interval."`
+	// LastCheckedAt is the family's newest read: when its source was last
+	// asked and its data found current, a new or a confirmed unchanged copy.
+	LastCheckedAt *time.Time `json:"lastCheckedAt" nullable:"true" doc:"When the family's source was last asked and its data found current, whether it brought a new copy or confirmed the data unchanged (UTC); null when it never was. Beside dataAsOf it says how recently an unchanged answer was confirmed."`
 }
 
 // neverStaleS is staleAfterS of a family with no fixed interval: the /v1
@@ -322,7 +325,8 @@ func (s *server) dataMeta(ctx context.Context, fams []provenance.Family, at time
 		fr := f.Assess(at)
 		noteFreshness(ctx, f, fr, at)
 		fs = append(fs, fr)
-		m.Freshness = append(m.Freshness, FreshnessEntry{Family: fr.Family, DataAsOf: fr.DataAsOf, AgeS: fr.AgeS, StaleAfterS: staleAfterS(fr), Stale: fr.Stale})
+		m.Freshness = append(m.Freshness, FreshnessEntry{Family: fr.Family, DataAsOf: fr.DataAsOf, AgeS: fr.AgeS, StaleAfterS: staleAfterS(fr), Stale: fr.Stale,
+			LastCheckedAt: utcOrNil(f.ReadAt)})
 		m.Attribution = append(m.Attribution, attribution(f.Source))
 		if !f.FilledUntil.IsZero() {
 			// A filled year is wrong from the next new year on: no stored

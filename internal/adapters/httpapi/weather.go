@@ -45,6 +45,7 @@ type WeatherWarning struct {
 	Unaltered      bool         `json:"unaltered" doc:"Whether description is, provably, the text the issuer published: not empty, and its UTF-8 bytes still hash (SHA-256) to the hash taken over them when it was received, as the platform checks before it quotes the issuer's wording under the issuer's source note. False when description is null or changed since; such a text may not be passed on as the issuer's."`
 	Urgency        *string      `json:"urgency" nullable:"true" doc:"The issuer's CAP urgency (e.g. Immediate, Future), as issued; null when not given."`
 	Certainty      *string      `json:"certainty" nullable:"true" doc:"The issuer's CAP certainty (e.g. Observed, Likely), as issued; null when not given."`
+	LevelSource    *string      `json:"levelSource" nullable:"true" enum:"published,derived_from_severity" doc:"Where level came from: published (the issuer's number) or derived_from_severity (the issuer published no number; level is mapped from its CAP severity word, the platform's mapping, and is not the issuer's own figure); null when unknown."`
 	English        *WarningText `json:"english" doc:"The issuer's own English text of the warning, its English message for the same alert, unaltered; null when the issuer gave none or its English source is not read for the key. The source is credited in meta.attribution when given."`
 }
 
@@ -388,6 +389,7 @@ func weatherWarnings(items []weather.Warning, at time.Time) []WeatherWarning {
 			InForce: !w.From.After(at), Area: WarningArea{Name: w.AreaName, CellID: w.CellID}, SourceFamily: w.Family,
 			Event: w.Event, Identifier: w.Identifier,
 			Description: w.Description, Instruction: w.Instruction, Urgency: w.Urgency, Certainty: w.Certainty, Unaltered: w.Unaltered,
+			LevelSource: w.LevelSource,
 		}
 		if e := w.English; e != nil {
 			ws[i].English = &WarningText{Headline: e.Headline, Description: e.Description, Instruction: e.Instruction, SourceFamily: e.Family, Unaltered: e.Unaltered}

@@ -5900,6 +5900,195 @@
         ],
         "type": "object"
       },
+      "PlatformAccess": {
+        "additionalProperties": false,
+        "properties": {
+          "facts": {
+            "$ref": "#/components/schemas/PlatformFacts"
+          },
+          "heightCm": {
+            "additionalProperties": false,
+            "description": "The lowest and highest height published over the platform, its edges and their sectors; null when none is.",
+            "properties": {
+              "max": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "min": {
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "min",
+              "max"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "The platform's own name (Bahnsteig Gleis 6/7); null when the publisher gives none.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stated": {
+            "description": "False when the platform carries no assessment: its facts are then unknown, not no.",
+            "type": "boolean"
+          },
+          "tracks": {
+            "description": "The numbers of its track edges, in number order.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "tracks",
+          "stated",
+          "facts",
+          "heightCm"
+        ],
+        "type": "object"
+      },
+      "PlatformFacts": {
+        "additionalProperties": false,
+        "properties": {
+          "levelBoarding": {
+            "enum": [
+              "yes",
+              "partial",
+              "no",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "stepFree": {
+            "enum": [
+              "yes",
+              "partial",
+              "no",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "tactileGuidance": {
+            "enum": [
+              "yes",
+              "partial",
+              "no",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "wheelchair": {
+            "enum": [
+              "yes",
+              "partial",
+              "no",
+              "unknown"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "stepFree",
+          "wheelchair",
+          "tactileGuidance",
+          "levelBoarding"
+        ],
+        "type": "object"
+      },
+      "PlatformsStation": {
+        "additionalProperties": false,
+        "properties": {
+          "list": {
+            "description": "By the number of the first track, then by name.",
+            "items": {
+              "$ref": "#/components/schemas/PlatformAccess"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "station": {
+            "additionalProperties": false,
+            "description": "The stop place's own assessment; null when it carries none.",
+            "properties": {
+              "levelBoarding": {
+                "enum": [
+                  "yes",
+                  "partial",
+                  "no",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              "stepFree": {
+                "enum": [
+                  "yes",
+                  "partial",
+                  "no",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              "tactileGuidance": {
+                "enum": [
+                  "yes",
+                  "partial",
+                  "no",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              "wheelchair": {
+                "enum": [
+                  "yes",
+                  "partial",
+                  "no",
+                  "unknown"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "stepFree",
+              "wheelchair",
+              "tactileGuidance",
+              "levelBoarding"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "stepFreeCounts": {
+            "$ref": "#/components/schemas/StepFreeCounts"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "station",
+          "stepFreeCounts",
+          "total",
+          "list"
+        ],
+        "type": "object"
+      },
       "Poi": {
         "additionalProperties": false,
         "properties": {
@@ -8175,6 +8364,35 @@
             },
             "type": "array"
           },
+          "platforms": {
+            "additionalProperties": false,
+            "description": "The station's platforms as DB's station inventory (OpenStation) states them, as the platform's facilities check lists them; null for a stop with no EVA number or none the inventory lists.",
+            "properties": {
+              "releasedOn": {
+                "description": "The Berlin date of DB's newest publication of them; null when none is stated.",
+                "format": "date",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "stations": {
+                "description": "One per stop place of the inventory.",
+                "items": {
+                  "$ref": "#/components/schemas/PlatformsStation"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "releasedOn",
+              "stations"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "station": {
             "$ref": "#/components/schemas/FacilityStation"
           }
@@ -8182,7 +8400,8 @@
         "required": [
           "station",
           "counts",
-          "facilities"
+          "facilities",
+          "platforms"
         ],
         "type": "object"
       },
@@ -8408,6 +8627,34 @@
           "radiusM",
           "area",
           "railway"
+        ],
+        "type": "object"
+      },
+      "StepFreeCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "no": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "partial": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "unknown": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "yes": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "yes",
+          "partial",
+          "no",
+          "unknown"
         ],
         "type": "object"
       },

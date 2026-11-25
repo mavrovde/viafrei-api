@@ -64,6 +64,10 @@ func (f *nbFake) Departures(context.Context, transit.DepartureQuery, []string) (
 	return nil, nil
 }
 
+func (f *nbFake) Platforms(context.Context, []string, []string) ([]transit.PlatformRow, error) {
+	return nil, nil
+}
+
 func (f *nbFake) StopBoards(context.Context, transit.StopBoardsQuery, []string) ([]transit.StopBoard, error) {
 	return nil, nil
 }

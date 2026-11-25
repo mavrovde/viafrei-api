@@ -28,6 +28,9 @@ type Transit interface {
 	// StopBoards returns the stops around q.At, as today's departures
 	// around a place pick them, each with its board.
 	StopBoards(ctx context.Context, q transit.StopBoardsQuery, families []string) ([]transit.StopBoard, error)
+	// Platforms returns DB's station inventory of the station numbered
+	// evas, of the given families.
+	Platforms(ctx context.Context, evas, families []string) ([]transit.PlatformRow, error)
 	TimetableReach(ctx context.Context) (transit.Reach, error)
 	// Facilities returns the lifts and escalators of a station, of the
 	// given families, each with its state at now.
@@ -186,6 +189,11 @@ type StationFacilities struct {
 	Answer[transit.Facility]
 	Station                   transit.Station
 	Active, Inactive, Unknown int
+	// Platforms are the station's platforms as DB's inventory states them
+	// and PlatformsAt its newest publication; none for a station with no
+	// EVA number or none listed.
+	Platforms   []transit.StationPlatforms
+	PlatformsAt *time.Time
 }
 
 // Facilities answers "do the lifts work at this station" for key, as
@@ -215,6 +223,19 @@ func (s *Service) Facilities(ctx context.Context, key access.Record, q transit.F
 	}
 	l := transit.ListFacilities(all, q)
 	contributed := []string{st.Family}
+	var plat []transit.PlatformRow
+	if len(st.EVANumbers) > 0 {
+		if plat, err = s.repos.Transit.Platforms(ctx, st.EVANumbers, permitted); err != nil {
+			return StationFacilities{}, err
+		}
+	}
+	var platAt *time.Time
+	for _, p := range plat {
+		contributed = append(contributed, p.Family)
+		if p.UpdatedAt != nil && (platAt == nil || p.UpdatedAt.After(*platAt)) {
+			platAt = p.UpdatedAt
+		}
+	}
 	for _, f := range l.Rows {
 		contributed = append(contributed, f.Family)
 		if f.Listing != "" {
@@ -231,6 +252,7 @@ func (s *Service) Facilities(ctx context.Context, key access.Record, q transit.F
 	return StationFacilities{
 		Answer:  Answer[transit.Facility]{Items: l.Rows, HasMore: l.Active+l.Inactive+l.Unknown > len(l.Rows), Families: fams, Partial: partial || stPartial, At: now},
 		Station: st, Active: l.Active, Inactive: l.Inactive, Unknown: l.Unknown,
+		Platforms: transit.PlatformsOf(plat), PlatformsAt: platAt,
 	}, nil
 }
 

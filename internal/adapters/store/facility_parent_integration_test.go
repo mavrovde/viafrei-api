@@ -135,3 +135,26 @@ func TestARailwaySearchByNameKeepsTheDBStations(t *testing.T) {
 		}
 	}
 }
+
+// A DB station's platforms are DB's inventory's open rows of its EVA
+// numbers, of a family the key reads; a closed row is not read.
+func TestPlatformsOfTheEVANumbers(t *testing.T) {
+	row := func(id, kind, parent, plate string, closed bool) string {
+		c := "null"
+		if closed {
+			c = "now()"
+		}
+		return `insert into public.station_accessibility (element_id, element_kind, stop_place_id, eva_nos, parent_quay_id, plate_code, has_assessment,
+		  step_free_access, platform_height_cm, first_seen_at, last_seen_at, source_feed, source_publisher, closed_at)
+		  values ('` + id + `', '` + kind + `', 'sp-9', '{8099001}', ` + parent + `, ` + plate + `, true, 'true', 76, now(), now(), 'openstation_netex', 'DB', ` + c + `)`
+	}
+	st, _ := private(t, row("q1", "quay", "null", "null", false), row("q1a", "quay", "'q1'", "'7'", false),
+		row("q2", "quay", "null", "'9'", true), row("sp-9", "stop_place", "null", "null", false))
+	rows, err := st.Platforms(bounded(t), []string{"8099001"}, append(every(t), "openstation_netex"))
+	if err != nil || len(rows) != 3 || rows[1].ElementID != "q1" || !rows[0].StopPlace || *rows[1].HeightCm != 76 || rows[1].Family != "openstation_netex" {
+		t.Fatalf("%+v %v", rows, err)
+	}
+	if rows, err := st.Platforms(bounded(t), []string{"8099001"}, []string{"db_fasta"}); err != nil || len(rows) != 0 {
+		t.Errorf("another family: %+v %v", rows, err)
+	}
+}

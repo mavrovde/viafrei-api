@@ -27,7 +27,7 @@ const (
 var StopModes = []string{"rail", "sbahn", "subway", "tram", "bus"}
 
 // StopNear is one stop family a mode's probe found: its root stop
-// (feed:id), name, modes, distance and point, and its feed's family.
+// (source:id), name, modes, distance and point, and its source family.
 type StopNear struct {
 	Root   string
 	Name   string

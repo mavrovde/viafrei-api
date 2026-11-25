@@ -30,6 +30,9 @@ type trFake struct {
 	gotQuery    transit.Query
 	gotFamilies []string
 	stopBoards  []transit.StopBoard
+	platforms   []transit.PlatformRow
+	platErr     error
+	gotEvas     []string
 	stopErr     error
 	gotStops    transit.StopBoardsQuery
 	gotStopFams []string
@@ -57,6 +60,11 @@ func (f *trFake) Facilities(_ context.Context, _ string, fams []string, _ time.T
 func (f *trFake) Station(_ context.Context, id string, fams []string) (transit.Station, error) {
 	f.gotFamilies = fams
 	return f.station, f.stErr
+}
+
+func (f *trFake) Platforms(_ context.Context, evas, _ []string) ([]transit.PlatformRow, error) {
+	f.gotEvas = evas
+	return f.platforms, f.platErr
 }
 
 func (f *trFake) StopBoards(_ context.Context, q transit.StopBoardsQuery, fams []string) ([]transit.StopBoard, error) {
@@ -267,6 +275,16 @@ func TestFacilitiesAreListedGatedAndAttributed(t *testing.T) {
 		a.Active != 1 || a.Inactive != 1 || !slices.Equal(names(a.Families), []string{"a1", "a2", "t1"}) {
 		t.Errorf("answer %+v", a)
 	}
+	// A DB station's platforms are DB's inventory's, credited, with its
+	// newest publication.
+	at := now.Add(-time.Hour)
+	pf := &trFake{station: transit.Station{ID: "s", Family: "t1", EVANumbers: []string{"8000001"}}, platforms: []transit.PlatformRow{
+		{ElementID: "q1", StopPlaceID: "x", Family: "a2", UpdatedAt: &at}, {ElementID: "q2", StopPlaceID: "x", Family: "a2"}}}
+	a, err = trService(pf).Facilities(context.Background(), key("commercial", []access.Scope{"transit"}, "t1", "a1", "a2"), transit.FacilityQuery{StationID: "s", Limit: 1})
+	if err != nil || !slices.Equal(pf.gotEvas, []string{"8000001"}) || len(a.Platforms) != 1 || len(a.Platforms[0].Platforms) != 2 ||
+		a.PlatformsAt != &at || !slices.Equal(names(a.Families), []string{"a2", "t1"}) {
+		t.Errorf("platforms %+v: %v", a, err)
+	}
 	full := key("commercial", []access.Scope{"transit"}, "t1", "a1")
 	st := transit.Station{ID: "s", Family: "t1"}
 	for name, c := range map[string]struct {
@@ -281,6 +299,7 @@ func TestFacilitiesAreListedGatedAndAttributed(t *testing.T) {
 		"read":       {&trFake{station: st, facErr: errStore}, full, errStore},
 		"post-check": {&trFake{station: st, facilities: []transit.Facility{{Family: "t2"}}}, full, features.ErrGateViolation},
 		"provenance": {&trFake{fake: &fake{provErr: errStore}, station: st}, full, errStore},
+		"platforms":  {&trFake{station: transit.Station{ID: "s", Family: "t1", EVANumbers: []string{"8000001"}}, platErr: errStore}, full, errStore},
 	} {
 		if _, err := trService(c.f).Facilities(context.Background(), c.k, transit.FacilityQuery{Limit: 5}); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)

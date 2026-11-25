@@ -1033,3 +1033,30 @@ func (s *Store) StopBoards(ctx context.Context, q transit.StopBoardsQuery, famil
 		return out, err
 	})
 }
+
+// platformAccess reads DB's station inventory (OpenStation) of the
+// EVA numbers $1, of the families $2, as today's PLATFORM_ACCESS_AT_EVAS
+// (its open rows, the live view's rule, on the table).
+var platformAccess = named("api_platform_access", `
+select a.element_id, a.element_kind = 'stop_place', a.stop_place_id, a.station_name, a.quay_name, a.plate_code,
+       a.parent_quay_id, a.platform_height_cm::int, a.has_assessment, a.step_free_access, a.wheelchair_access,
+       a.tactile_guidance, a.level_access_into_vehicle, a.provider_updated_at, a.source_feed
+from station_accessibility a
+where a.closed_at is null and a.source_feed = 'openstation_netex' and a.source_feed = any((select $2::text[])::text[])
+  and a.eva_nos && (select $1::text[])::text[]
+order by a.stop_place_id, a.element_kind desc, a.element_id
+limit 2000`, "text[]", "text[]")
+
+// Platforms reads the platforms of the station numbered evas
+// (features.Transit), as DB's station inventory states them.
+func (s *Store) Platforms(ctx context.Context, evas, families []string) ([]transit.PlatformRow, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.PlatformRow, error) {
+		rows, _ := run(ctx, tx, platformAccess, evas, families)
+		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.PlatformRow, error) {
+			var v transit.PlatformRow
+			err := r.Scan(&v.ElementID, &v.StopPlace, &v.StopPlaceID, &v.StationName, &v.QuayName, &v.PlateCode, &v.ParentQuayID,
+				&v.HeightCm, &v.HasAssessment, &v.StepFree, &v.Wheelchair, &v.Tactile, &v.LevelBoarding, &v.UpdatedAt, &v.Family)
+			return v, err
+		})
+	})
+}

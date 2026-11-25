@@ -7886,411 +7886,411 @@
           "value": "0"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].cause",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].cause",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].closureFrom",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].closureFrom",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].closureTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].closureTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].description",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].description",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].detail",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].detail",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].detour",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].detour",
           "value": "false"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].detourForSomeVehicles",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].detourForSomeVehicles",
           "value": "false"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].detourVia",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].detourVia",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].eventType",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].eventType",
           "value": "MaintenanceWorks"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].extent",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].extent",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].from",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].from",
           "value": "2026-03-28T00:00:00Z"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].id",
-          "value": "roadworks_bast:?bast-0001"
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].id",
+          "value": "roadworks_bast:bast-0001"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].kind",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].kind",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].lat",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].lat",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].lon",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].lon",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].measureTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].measureTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].place",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].place",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].publicationId",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].publicationId",
           "value": "bast-0001"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].publisher",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].publisher",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].referentFrom",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].referentFrom",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].referentTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].referentTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].road",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].road",
           "value": "A101"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].sectionName",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].sectionName",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].segments",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].segments",
           "value": "0"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].siteName",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].siteName",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].sourceFamily",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].sourceFamily",
           "value": "roadworks_bast"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].status",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].status",
           "value": "restricted"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].subtitle",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].subtitle",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].term",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].term",
           "value": "roadworks"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].title",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].title",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].to",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].to",
           "value": "2026-04-04T00:00:00Z"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].windowCount",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].windowCount",
           "value": "0"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].windowEnds",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].windowEnds",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].windowStarts",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].windowStarts",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].cause",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].cause",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].closureFrom",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].closureFrom",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].closureTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].closureTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].description",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].description",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].detail",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].detail",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].detour",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].detour",
           "value": "false"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].detourForSomeVehicles",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].detourForSomeVehicles",
           "value": "false"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].detourVia",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].detourVia",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].eventType",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].eventType",
           "value": "MaintenanceWorks"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].extent",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].extent",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].from",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].from",
           "value": "2026-04-02T00:00:00Z"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].id",
-          "value": "roadworks_bast:?bast-0002"
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].id",
+          "value": "roadworks_bast:bast-0002"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].kind",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].kind",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].lat",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].lat",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].lon",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].lon",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].measureTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].measureTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].place",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].place",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].publicationId",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].publicationId",
           "value": "bast-0002"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].publisher",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].publisher",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].referentFrom",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].referentFrom",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].referentTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].referentTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].road",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].road",
           "value": "A101"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].sectionName",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].sectionName",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].segments",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].segments",
           "value": "0"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].siteName",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].siteName",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].sourceFamily",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].sourceFamily",
           "value": "roadworks_bast"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].status",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].status",
           "value": "planned"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].subtitle",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].subtitle",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].term",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].term",
           "value": "roadworks"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].title",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].title",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].to",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].to",
           "value": "2026-04-03T00:00:00Z"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].windowCount",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].windowCount",
           "value": "0"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].windowEnds",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].windowEnds",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].windowStarts",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].windowStarts",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].cause",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].cause",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].closureFrom",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].closureFrom",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].closureTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].closureTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].description",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].description",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].detail",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].detail",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].detour",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].detour",
           "value": "false"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].detourForSomeVehicles",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].detourForSomeVehicles",
           "value": "false"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].detourVia",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].detourVia",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].eventType",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].eventType",
           "value": "MaintenanceWorks"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].extent",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].extent",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].from",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].from",
           "value": "2026-04-09T06:00:00Z"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].id",
-          "value": "roadworks_bast:?bast-0003"
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].id",
+          "value": "roadworks_bast:bast-0003"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].kind",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].kind",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].lat",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].lat",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].lon",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].lon",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].measureTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].measureTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].place",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].place",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].publicationId",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].publicationId",
           "value": "bast-0003"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].publisher",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].publisher",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].referentFrom",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].referentFrom",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].referentTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].referentTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].road",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].road",
           "value": "A101"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].sectionName",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].sectionName",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].segments",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].segments",
           "value": "0"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].siteName",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].siteName",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].sourceFamily",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].sourceFamily",
           "value": "roadworks_bast"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].status",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].status",
           "value": "planned"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].subtitle",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].subtitle",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].term",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].term",
           "value": "roadworks"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].title",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].title",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].to",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].to",
           "value": "2026-04-11T00:00:00Z"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].windowCount",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].windowCount",
           "value": "0"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].windowEnds",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].windowEnds",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].windowStarts",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].windowStarts",
           "value": "[]"
         },
         {
@@ -8299,7 +8299,7 @@
         },
         {
           "name": "data.roadStatus.sourcesAnswered[0].asOf",
-          "value": "2026-11-25T19:07:07.880275Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.roadStatus.sourcesAnswered[0].sourceFamily",
@@ -8701,547 +8701,547 @@
           "value": "0"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].cause",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].cause",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].closureFrom",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].closureFrom",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].closureTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].closureTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].description",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].description",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].detail",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].detail",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].detour",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].detour",
           "value": "false"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].detourForSomeVehicles",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].detourForSomeVehicles",
           "value": "false"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].detourVia",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].detourVia",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].eventType",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].eventType",
           "value": "MaintenanceWorks"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].extent",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].extent",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].from",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].from",
           "value": "2026-03-28T00:00:00Z"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].id",
-          "value": "roadworks_bast:?bast-0001"
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].id",
+          "value": "roadworks_bast:bast-0001"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].kind",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].kind",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].lat",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].lat",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].lon",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].lon",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].measureTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].measureTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].place",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].place",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].publicationId",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].publicationId",
           "value": "bast-0001"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].publisher",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].publisher",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].referentFrom",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].referentFrom",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].referentTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].referentTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].road",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].road",
           "value": "A101"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].sectionName",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].sectionName",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].segments",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].segments",
           "value": "0"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].siteName",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].siteName",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].sourceFamily",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].sourceFamily",
           "value": "roadworks_bast"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].status",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].status",
           "value": "restricted"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].subtitle",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].subtitle",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].term",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].term",
           "value": "roadworks"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].title",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].title",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].to",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].to",
           "value": "2026-04-04T00:00:00Z"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].windowCount",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].windowCount",
           "value": "0"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].windowEnds",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].windowEnds",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0001].windowStarts",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].windowStarts",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].cause",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].cause",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].closureFrom",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].closureFrom",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].closureTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].closureTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].description",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].description",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].detail",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].detail",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].detour",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].detour",
           "value": "false"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].detourForSomeVehicles",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].detourForSomeVehicles",
           "value": "false"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].detourVia",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].detourVia",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].eventType",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].eventType",
           "value": "MaintenanceWorks"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].extent",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].extent",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].from",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].from",
           "value": "2026-04-02T00:00:00Z"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].id",
-          "value": "roadworks_bast:?bast-0002"
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].id",
+          "value": "roadworks_bast:bast-0002"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].kind",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].kind",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].lat",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].lat",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].lon",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].lon",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].measureTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].measureTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].place",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].place",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].publicationId",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].publicationId",
           "value": "bast-0002"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].publisher",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].publisher",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].referentFrom",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].referentFrom",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].referentTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].referentTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].road",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].road",
           "value": "A101"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].sectionName",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].sectionName",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].segments",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].segments",
           "value": "0"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].siteName",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].siteName",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].sourceFamily",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].sourceFamily",
           "value": "roadworks_bast"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].status",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].status",
           "value": "planned"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].subtitle",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].subtitle",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].term",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].term",
           "value": "roadworks"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].title",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].title",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].to",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].to",
           "value": "2026-04-03T00:00:00Z"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].windowCount",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].windowCount",
           "value": "0"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].windowEnds",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].windowEnds",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0002].windowStarts",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].windowStarts",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].cause",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].cause",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].closureFrom",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].closureFrom",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].closureTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].closureTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].description",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].description",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].detail",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].detail",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].detour",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].detour",
           "value": "false"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].detourForSomeVehicles",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].detourForSomeVehicles",
           "value": "false"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].detourVia",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].detourVia",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].eventType",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].eventType",
           "value": "MaintenanceWorks"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].extent",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].extent",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].from",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].from",
           "value": "2026-04-09T06:00:00Z"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].id",
-          "value": "roadworks_bast:?bast-0003"
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].id",
+          "value": "roadworks_bast:bast-0003"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].kind",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].kind",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].lat",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].lat",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].lon",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].lon",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].measureTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].measureTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].place",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].place",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].publicationId",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].publicationId",
           "value": "bast-0003"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].publisher",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].publisher",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].referentFrom",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].referentFrom",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].referentTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].referentTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].road",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].road",
           "value": "A101"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].sectionName",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].sectionName",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].segments",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].segments",
           "value": "0"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].siteName",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].siteName",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].sourceFamily",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].sourceFamily",
           "value": "roadworks_bast"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].status",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].status",
           "value": "planned"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].subtitle",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].subtitle",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].term",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].term",
           "value": "roadworks"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].title",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].title",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].to",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].to",
           "value": "2026-04-11T00:00:00Z"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].windowCount",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].windowCount",
           "value": "0"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].windowEnds",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].windowEnds",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0003].windowStarts",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].windowStarts",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].cause",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].cause",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].closureFrom",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].closureFrom",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].closureTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].closureTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].description",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].description",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].detail",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].detail",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].detour",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].detour",
           "value": "false"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].detourForSomeVehicles",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].detourForSomeVehicles",
           "value": "false"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].detourVia",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].detourVia",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].eventType",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].eventType",
           "value": "MaintenanceWorks"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].extent",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].extent",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].from",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].from",
           "value": "2026-04-19T00:00:00Z"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].id",
-          "value": "roadworks_bast:?bast-0004"
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].id",
+          "value": "roadworks_bast:bast-0004"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].kind",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].kind",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].lat",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].lat",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].lon",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].lon",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].measureTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].measureTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].place",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].place",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].publicationId",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].publicationId",
           "value": "bast-0004"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].publisher",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].publisher",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].referentFrom",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].referentFrom",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].referentTo",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].referentTo",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].road",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].road",
           "value": "A101"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].sectionName",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].sectionName",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].segments",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].segments",
           "value": "0"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].siteName",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].siteName",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].sourceFamily",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].sourceFamily",
           "value": "roadworks_bast"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].status",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].status",
           "value": "planned"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].subtitle",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].subtitle",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].term",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].term",
           "value": "roadworks"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].title",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].title",
           "value": "null"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].to",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].to",
           "value": "2026-04-21T00:00:00Z"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].windowCount",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].windowCount",
           "value": "0"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].windowEnds",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].windowEnds",
           "value": "[]"
         },
         {
-          "name": "data.roadStatus.items[roadworks_bast:?bast-0004].windowStarts",
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].windowStarts",
           "value": "[]"
         },
         {
@@ -9250,7 +9250,7 @@
         },
         {
           "name": "data.roadStatus.sourcesAnswered[0].asOf",
-          "value": "2026-11-25T19:07:07.880275Z"
+          "value": "2026-03-29T23:57:30Z"
         },
         {
           "name": "data.roadStatus.sourcesAnswered[0].sourceFamily",

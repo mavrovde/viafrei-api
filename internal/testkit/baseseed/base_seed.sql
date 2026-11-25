@@ -361,10 +361,10 @@ BEGIN
       WHEN 'weather' THEN 'WeatherRelatedRoadConditions' WHEN 'closure' THEN 'Straßensperrung'
       WHEN 'restriction' THEN 'SpeedManagement' WHEN 'hazard' THEN 'GeneralObstruction' ELSE 'Other' END);
     INSERT INTO public.road_events (feed_key, source_id, publication_id, version, payload, event_type, road_number, geom,
-                                    overall_start, overall_end, source_feed, feed_ts, first_seen_at, updated_at, closed_at, confidentiality)
+                                    overall_start, overall_end, source_feed, feed_ts, first_seen_at, updated_at, last_seen_at, closed_at, confidentiality)
     VALUES (NEW.source_ref, split_part(NEW.event_id, ':', 2), coalesce(NEW.origin_key, substr(NEW.event_id, length(split_part(NEW.event_id, ':', 2)) + 8)),
             1, '{}', dtype, NEW.road_ref, NEW.location, NEW.valid_from, NEW.valid_to, NEW.source_ref, NEW.published_at,
-            coalesce(NEW.recorded_at, now()), coalesce(NEW.changed_at, now()), NEW.withdrawn_at, NEW.confidentiality);
+            coalesce(NEW.recorded_at, now()), coalesce(NEW.changed_at, now()), coalesce(NEW.changed_at, NEW.recorded_at, now()), NEW.withdrawn_at, NEW.confidentiality);
   END IF;
   PERFORM vf_test.seed_check(TG_TABLE_NAME, to_jsonb(NEW));
   RETURN NEW;

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -317,6 +318,12 @@ func replay(ctx context.Context, conn *pgx.Conn, c parityCheck, onMiss func(Pari
 		parityMisses = append(parityMisses, m)
 	}
 	if _, err := tx.Exec(ctx, "select set_config('viafrei_api.own_key', $1, true)", c.own); err != nil {
+		return err
+	}
+	// The replay runs outside the request's budget, under replayBound: the
+	// role's per-read statement timeout would cancel the frozen statement
+	// whenever the machine is loaded (four parity shards side by side).
+	if _, err := tx.Exec(ctx, "select set_config('statement_timeout', $1, true)", strconv.FormatInt(replayBound.Milliseconds(), 10)); err != nil {
 		return err
 	}
 	sp, err := tx.Begin(ctx)

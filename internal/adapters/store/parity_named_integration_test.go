@@ -10,6 +10,7 @@ import (
 	"os"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -196,6 +197,12 @@ func namedParity(t *testing.T, ctx context.Context, byName map[string]store.Name
 		}
 		defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 		if _, err := tx.Exec(ctx, "select set_config('viafrei_api.own_key', $1, true)", own); err != nil {
+			t.Fatal(err)
+		}
+		// The comparison runs outside any request's budget: the role's
+		// per-read statement timeout would cancel a read whenever the
+		// machine is loaded (four parity shards side by side).
+		if _, err := tx.Exec(ctx, "select set_config('statement_timeout', $1, true)", strconv.FormatInt(time.Minute.Milliseconds(), 10)); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := tx.Conn().Prepare(ctx, r.Name, r.SQL); err != nil {

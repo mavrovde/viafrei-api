@@ -12,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/httpapi"
@@ -336,18 +337,21 @@ func TestAFollowerWithAMatchingValidatorGetsANotModified(t *testing.T) {
 // but the first wait on its flight, and returns their answers.
 func followTheLeader(t *testing.T, r *cacheRig, n int, h http.Header) []*httptest.ResponseRecorder {
 	t.Helper()
-	r.features.hold = make(chan struct{})
 	ws := make([]*httptest.ResponseRecorder, n)
-	var wg sync.WaitGroup
-	for i := range ws {
-		wg.Go(func() { ws[i] = r.get(t, h) })
-	}
-	for r.features.calls.Load() == 0 {
-		time.Sleep(time.Millisecond)
-	}
-	time.Sleep(20 * time.Millisecond)
-	close(r.features.hold)
-	wg.Wait()
+	// In a bubble, the leader's read is released only once every request
+	// is blocked: the leader on its read, each other one on the flight. A
+	// pause instead let a request that started late, on a loaded host,
+	// find the flight landed and read again.
+	synctest.Test(t, func(t *testing.T) {
+		r.features.hold = make(chan struct{})
+		var wg sync.WaitGroup
+		for i := range ws {
+			wg.Go(func() { ws[i] = r.get(t, h) })
+		}
+		synctest.Wait()
+		close(r.features.hold)
+		wg.Wait()
+	})
 	return ws
 }
 

@@ -117,14 +117,21 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-  parity:
+  parity-shard:
     # The named statements against the frozen view statements they replaced:
     # a verification set of its own (as the benchmark and internal/perf are),
     # whose replays are not a test's time (TST-012 judges the integration
-    # step only); it lives until the views are dropped.
-    name: Store parity against the frozen views (PostGIS)
+    # step only); it lives until the views are dropped. The set runs in four
+    # shards side by side, each well inside the job cap: shard k runs every
+    # fourth test of the package and its part of the synthetic world, fails
+    # on a miss, and writes what it compared for the parity job to judge.
+    name: Store parity against the frozen views (PostGIS, shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -146,9 +153,50 @@ jobs:
           docker pull testcontainers/ryuk:0.14.0@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0
           docker tag testcontainers/ryuk:0.14.0@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0 testcontainers/ryuk:0.14.0
       - name: go test -tags integration (store parity against the frozen views)
+        env:
+          SHARD: ${{ matrix.shard }}
         run: |
           set -o pipefail
-          go test -race -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-parity.out -json ./internal/adapters/store -args -parity | tee test-parity.json | go run ./internal/testkit/gotestsum-lite
+          go test -race -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-parity.out -json ./internal/adapters/store -args -parity -parity.shard="$SHARD/4" -parity.ran="$PWD/parity-ran.json" | tee test-parity.json | go run ./internal/testkit/gotestsum-lite
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: test-parity-shard-${{ matrix.shard }}
+          path: |
+            test-parity.json
+            coverage-parity.out
+            parity-ran.json
+          retention-days: 30
+          if-no-files-found: error
+
+  parity:
+    # The four shards judged together: every named statement ran in some
+    # shard and compared rows in some shard (no shard alone can say), and
+    # their profiles merged into the one the coverage gate reads.
+    name: Store parity against the frozen views (PostGIS)
+    needs: [parity-shard]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: test-parity-shard-*
+          path: parity-shards
+      - name: Every named statement ran and compared rows, over the shards
+        run: |
+          set -o pipefail
+          go run ./internal/testkit/paritygather parity-shards/test-parity-shard-{1,2,3,4}/parity-ran.json
+      - name: The shards' profiles, merged
+        run: |
+          set -o pipefail
+          go run ./internal/testkit/covergate -min 0 -exclusions test/coverage-exclusions.txt -o coverage-parity.out parity-shards/test-parity-shard-{1,2,3,4}/coverage-parity.out
+          cat parity-shards/test-parity-shard-{1,2,3,4}/test-parity.json > test-parity.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

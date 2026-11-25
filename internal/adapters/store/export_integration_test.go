@@ -124,6 +124,49 @@ func WithTest(ctx context.Context, t testing.TB) context.Context {
 	return context.WithValue(ctx, testKey{}, t)
 }
 
+// batchKey carries, in a test's context, the batch its reads' checks join.
+type batchKey struct{}
+
+// parityBatch is the checks of reads under one WithBatch context.
+type parityBatch struct {
+	mu     sync.Mutex
+	checks []parityCheck
+}
+
+// batchReplays is how many of a batch's checks replay side by side, each on
+// a connection of its own.
+const batchReplays = 4
+
+// WithBatch is ctx carrying t, for a test that reads many statements after
+// planting its rows: the checks of the reads under it are compared side by
+// side, batchReplays at a time, in one cleanup of t registered now, so
+// before the cleanups registered earlier (the rows planted before this
+// call are still there). A read under it must come after every row it
+// reads is planted and before t plants rows of another database.
+func WithBatch(ctx context.Context, t testing.TB) context.Context {
+	b := &parityBatch{}
+	t.Cleanup(func() {
+		b.mu.Lock()
+		checks := slices.Clone(b.checks)
+		b.mu.Unlock()
+		next := make(chan parityCheck)
+		var wg sync.WaitGroup
+		for range batchReplays {
+			wg.Go(func() {
+				for c := range next {
+					replayInTest(ctx, t, c)
+				}
+			})
+		}
+		for _, c := range checks {
+			next <- c
+		}
+		close(next)
+		wg.Wait()
+	})
+	return context.WithValue(WithTest(ctx, t), batchKey{}, b)
+}
+
 // replayBound is the ceiling on one check's replay: three reads, outside
 // the request's budget.
 const replayBound = time.Minute
@@ -205,6 +248,12 @@ func EnableParity() {
 		parityKeys[key] = true
 		if inTest {
 			c.url = tx.Conn().Config().ConnString()
+			if b, ok := ctx.Value(batchKey{}).(*parityBatch); ok {
+				b.mu.Lock()
+				b.checks = append(b.checks, c)
+				b.mu.Unlock()
+				return
+			}
 			// Registered now, so it runs before the cleanups of the rows
 			// planted before this read.
 			t.Cleanup(func() { replayInTest(ctx, t, c) })

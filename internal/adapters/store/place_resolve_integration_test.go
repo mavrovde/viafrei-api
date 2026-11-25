@@ -63,14 +63,16 @@ func TestResolveTheWorldOverTheStatements(t *testing.T) {
 		}
 		return r
 	}
+	// Every read under the test's batch, so the parity replay reads the
+	// world too, its checks side by side after the questions.
+	batch := store.WithBatch(context.Background(), t)
 	var wg sync.WaitGroup
 	next := make(chan int)
 	for range 8 {
 		wg.Go(func() {
 			for i := range next {
 				e := w.Expect[i]
-				// Under the test's context, so the parity replay reads the world too.
-				ctx, cancel := context.WithTimeout(store.WithTest(context.Background(), t), 30*time.Second)
+				ctx, cancel := context.WithTimeout(batch, 30*time.Second)
 				got, err := places.Resolve(ctx, reads, e.Q, e.Lang)
 				cancel()
 				if err != nil || !reflect.DeepEqual(norm(got), norm(e.R)) {
@@ -79,8 +81,11 @@ func TestResolveTheWorldOverTheStatements(t *testing.T) {
 			}
 		})
 	}
+	// A shard of the parity set asks its part of the questions (shard).
 	for i := range w.Expect {
-		next <- i
+		if inShard(i) {
+			next <- i
+		}
 	}
 	close(next)
 	wg.Wait()

@@ -63,27 +63,11 @@ func (s *Service) TrainBoard(ctx context.Context, key access.Record, q TrainBoar
 			return struct{}{}, nil, access.ErrNonePermitted
 		}
 		fams := []string{transit.TrainBoardFamily}
-		rec, err := s.repos.TrainBoards.TrainBoard(ctx, q.EVA, fams)
+		b, asOf, err := s.freshTrainBoard(ctx, q.EVA, now)
 		if err != nil {
 			return struct{}{}, nil, err
 		}
-		stored, err := s.repos.TrainBoards.StoredTrainBoard(ctx, q.EVA, fams)
-		if err != nil {
-			return struct{}{}, nil, err
-		}
-		for _, at := range []*time.Time{fetched(rec), readAt(stored)} {
-			if at != nil && (out.AsOf == nil || at.After(*out.AsOf)) {
-				out.AsOf = at
-			}
-		}
-		var b *transit.TrainBoard
-		switch {
-		case rec != nil && now.Sub(rec.FetchedAt) <= transit.TrainBoardFreshFor:
-			b = rec
-		case stored != nil && now.Sub(stored.ReadAt) <= transit.StoredBoardFreshFor:
-			v := transit.TrainBoardOf(q.EVA, *stored)
-			b = &v
-		}
+		out.AsOf = asOf
 		contributed := []string{}
 		evas := []string{q.EVA}
 		if b != nil {
@@ -109,6 +93,35 @@ func (s *Service) TrainBoard(ctx context.Context, key access.Record, q TrainBoar
 	})
 	out.Meta = meta
 	return out, err
+}
+
+// freshTrainBoard is the station's board while one is fresh: the board the
+// live refresher recorded while fresh, else the one the stored-boards
+// worker wrote while fresh, nil when neither is; asOf is the newest read
+// held, if any.
+func (s *Service) freshTrainBoard(ctx context.Context, eva string, now time.Time) (b *transit.TrainBoard, asOf *time.Time, err error) {
+	fams := []string{transit.TrainBoardFamily}
+	rec, err := s.repos.TrainBoards.TrainBoard(ctx, eva, fams)
+	if err != nil {
+		return nil, nil, err
+	}
+	stored, err := s.repos.TrainBoards.StoredTrainBoard(ctx, eva, fams)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, at := range []*time.Time{fetched(rec), readAt(stored)} {
+		if at != nil && (asOf == nil || at.After(*asOf)) {
+			asOf = at
+		}
+	}
+	switch {
+	case rec != nil && now.Sub(rec.FetchedAt) <= transit.TrainBoardFreshFor:
+		b = rec
+	case stored != nil && now.Sub(stored.ReadAt) <= transit.StoredBoardFreshFor:
+		v := transit.TrainBoardOf(eva, *stored)
+		b = &v
+	}
+	return b, asOf, nil
 }
 
 func fetched(b *transit.TrainBoard) *time.Time {

@@ -101,6 +101,21 @@ func (s *Service) StationPage(ctx context.Context, key access.Record, q StationP
 			return StationPage{}, err
 		}
 	}
+	// DB's board of the station speaks for the trains it lists, as the
+	// platform's station page reads it, where the key reads DB Timetables.
+	if rec.EVANo != nil && slices.Contains(stations, transit.TrainBoardFamily) {
+		db, _, err := s.freshTrainBoard(ctx, *rec.EVANo, now)
+		if err != nil {
+			return StationPage{}, err
+		}
+		var spoke bool
+		if board.Items, spoke = transit.WithTrainBoard(board.Items, db, now, now.Add(time.Duration(transit.RailWindowMin)*time.Minute)); spoke {
+			if !read {
+				board.At, board.Station.Family = now, rec.Family
+			}
+			read = true
+		}
+	}
 	boardFams := []string{}
 	if read {
 		boardFams = append(boardFams, board.Station.Family)

@@ -116,3 +116,52 @@ func TestStationPageFailsAsItsReads(t *testing.T) {
 		t.Errorf("no board %+v: %v", p, err)
 	}
 }
+
+// DB's board speaks for the trains it lists on the page, where the key
+// reads DB Timetables: the timetable's train it is takes DB's figure, a
+// train only DB lists is added, and DB is credited on the departures.
+func TestStationPageReadsDBsBoard(t *testing.T) {
+	eva, re, s3 := "8000001", "RE1", "S 3"
+	late := now.Add(4 * time.Minute)
+	db := &transit.TrainBoard{EVA: eva, FetchedAt: now.Add(-10 * time.Second), Departures: []transit.TrainDeparture{
+		{PlannedAt: now.Add(time.Minute), ChangedAt: &late, Line: &re},
+		{PlannedAt: now.Add(10 * time.Minute), Line: &s3, Cancelled: true},
+	}}
+	svc := func(f *trFake, b *boards) *features.Service {
+		if f.fake == nil {
+			f.fake = &fake{}
+		}
+		f.reg = append(slices.Clone(trRegister), access.Terms{Family: transit.TrainBoardFamily, Domain: "transit", UseClasses: all, Version: "v1"})
+		return features.New(features.Repositories{Register: f, Transit: f, TrainBoards: b}, features.Settings{Language: "en"}, func() time.Time { return now })
+	}
+	k := key("commercial", []access.Scope{"transit"}, "t1", "a1", "a2", transit.TrainBoardFamily)
+	f := pageFake()
+	f.record.EVANo = &eva
+	p, err := svc(f, &boards{board: db}).StationPage(context.Background(), k, features.StationPageQuery{StationID: eva, Departures: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Departures) != 3 || p.Departures[0].Family != transit.TrainBoardFamily || *p.Departures[0].DelayMin != 3 || p.Departures[1].Family != "t1" ||
+		!p.Departures[2].Cancelled || !slices.Contains(p.Sections["departures"].Sources, transit.TrainBoardFamily) || p.Ampel.Trips != 3 {
+		t.Errorf("%+v %+v", p.Departures, p.Sections["departures"])
+	}
+	// A station with no stop place is read by DB's board alone.
+	f = pageFake()
+	f.record.EVANo, f.record.StopPlaceID = &eva, nil
+	p, err = svc(f, &boards{board: db}).StationPage(context.Background(), k, features.StationPageQuery{StationID: eva, Departures: 10})
+	if err != nil || len(p.Departures) != 2 || p.Sections["departures"].At == nil || p.Ampel.Trips != 2 {
+		t.Errorf("DB alone %+v %+v: %v", p.Departures, p.Sections["departures"], err)
+	}
+	// A key that may not read DB Timetables is not answered from it.
+	f = pageFake()
+	f.record.EVANo = &eva
+	p, err = svc(f, &boards{board: db}).StationPage(context.Background(), pageKey, features.StationPageQuery{StationID: eva, Departures: 10})
+	if err != nil || len(p.Departures) != 2 || slices.Contains(p.Sections["departures"].Sources, transit.TrainBoardFamily) {
+		t.Errorf("not permitted %+v: %v", p.Departures, err)
+	}
+	f = pageFake()
+	f.record.EVANo = &eva
+	if _, err := svc(f, &boards{err: errStore}).StationPage(context.Background(), k, features.StationPageQuery{StationID: eva, Departures: 10}); !errors.Is(err, errStore) {
+		t.Errorf("board read: %v", err)
+	}
+}

@@ -292,6 +292,12 @@ func refresh(t *testing.T, h http.Handler, c parity.Case) func() {
 		for _, tb := range tables {
 			stmts = append(stmts, stmt{`delete from ` + pgx.Identifier(strings.Split(tb, ".")).Sanitize() + ` where observed_at = $1`, []any{c.Now}}) //nolint:misspell // the pgx method's name
 		}
+		if latest, ok := restatedLatest[c.Refresh.Source]; ok {
+			ticks := pgx.Identifier(strings.Split(tables[len(tables)-1], ".")).Sanitize() //nolint:misspell // the pgx method's name
+			stmts = append(stmts, stmt{`update ` + latest + ` l set observed_at = t.at
+  from (select station_id, product, max(observed_at) at from ` + ticks + ` group by 1, 2) t
+  where l.observed_at = $1 and t.station_id = l.station_id and t.product = l.product`, []any{c.Now}})
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), testBound)
 		defer cancel()
 		conn, err := db.Owner(ctx)
@@ -312,6 +318,12 @@ func refresh(t *testing.T, h http.Handler, c parity.Case) func() {
 // partitions (no platform table is named in the tree): the undo removes the
 // rows of the partitioned table under the view.
 var tickViews = map[string]string{"fuel-prices-de": "contract.fuel_price_observation"}
+
+// restatedLatest are the newest-price tables a source's refresh restates
+// (a confirmed price's observed time set to the refresh's, as the
+// platform's price poll does, with no new tick): the undo sets each row it
+// restated back to its newest remaining tick, the time the seed gave it.
+var restatedLatest = map[string]string{"fuel-prices-de": "public.fuel_price_latest"}
 
 // baseTable is the partitioned table under the view $1, as schema.table,
 // found from the view's own dependencies.

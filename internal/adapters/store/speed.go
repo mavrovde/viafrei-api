@@ -28,7 +28,7 @@ const speedOfficialRows = `(
 const speedOSMRows = `(
   select 'osm:' || o.osm_type || o.osm_id camera_id, 'fixed' kind, o.enforces, o.geom, o.max_speed_kmh, null::smallint max_speed_hgv_kmh,
          o.direction, o.name, null::text street, null::text location_text, null::text admin_code, o.extract_date data_as_of,
-         null::date valid_from, null::date valid_to, o.source_id source_ref
+         null::date valid_from, null::date valid_to, o.source_id source_ref, o.osm_id
   from osm_speed_cameras o where o.closed_at is null)`
 
 // speedColumns are a location's columns, $4 the Berlin day asked; the
@@ -65,7 +65,9 @@ func speedCellOf(point string) string {
 	return `(select g.cell from cut_gemeinde g order by g.at <-> ` + point + `, g.cell limit 1)`
 }
 
-// speedOSM reads OpenStreetMap's cameras in the circle by name and id, cut
+// speedOSM reads OpenStreetMap's cameras in the circle by name and then
+// the numeric OSM id (an empty name first, as today's statement orders them;
+// the text id would put node12230389900 before node1277236977), cut
 // as the platform cuts them: a camera is left out when its Gemeinde (the
 // nearest BKG municipality point) is one an official list covers, the
 // Gemeinde of an official fixed camera or section control, or the key of
@@ -99,7 +101,7 @@ from `+speedOSMRows+` c
 where `+speedNear+`
   and c.source_ref = `+speedFamilies+`
   and `+speedCellOf("c.geom")+` not in (select o.cell from official o where o.cell is not null)
-order by coalesce(c.name, ''), c.camera_id
+order by coalesce(c.name, ''), c.osm_id, c.camera_id
 limit $6::int`, "float8", "float8", "float8", "date", "text[]", "int")
 
 func scanSpeed(osm bool) func(pgx.CollectableRow) (speedRow, error) {

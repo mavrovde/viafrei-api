@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -54,6 +55,20 @@ func TestParkingBaysAnswer(t *testing.T) {
 	if do(t, h, http.MethodGet, "/v1/parking-bays?at=51.51,7.46&kind=ev_charging", bearer); f.gotBays.Kind != "ev_charging" || f.gotBays.RadiusM != 10000 ||
 		f.gotBays.Limit != 5 || f.gotBays.OnlyFree {
 		t.Errorf("defaults %+v", f.gotBays)
+	}
+	// The radius bounds, each at the limit and one beyond: today's bays read
+	// asks 300 m, the minimum is 100.
+	for _, c := range []struct {
+		radius string
+		code   int
+	}{{"100", 200}, {"300", 200}, {"25000", 200}, {"99", 400}, {"25001", 400}} {
+		w := do(t, h, http.MethodGet, "/v1/parking-bays?at=51.51,7.46&radius_m="+c.radius, bearer)
+		if w.Code != c.code {
+			t.Errorf("radius_m=%s: status %d, want %d: %s", c.radius, w.Code, c.code, w.Body)
+		}
+		if c.code == 400 && !strings.Contains(w.Body.String(), "radius_m") {
+			t.Errorf("radius_m=%s: the problem names no parameter: %s", c.radius, w.Body)
+		}
 	}
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/parking-bays?at=51.51,7.46&kind=regular", bearer), 400, "invalid-parameter")
 	assertProblem(t, do(t, featureHandler(t, config.Defaults(), nil, nil), http.MethodGet, "/v1/parking-bays?at=51.51,7.46", bearer), 404, "feature-disabled")

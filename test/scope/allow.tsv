@@ -81,6 +81,9 @@ denylist	internal/adapters/store/parity_b2_integration_test.go	-	owner decision 
 denylist	internal/adapters/store/parity_b_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
 denylist	internal/adapters/store/legacy_text_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
 denylist	internal/adapters/store/weather_text_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/change_list_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	test/live/fakelive.json	-	owner decision 2026-11-23: the store reads the platform's tables directly; the fake refresher restates the newest fuel prices in the table the store reads, as the platform's price poll does
+denylist	internal/testkit/parity/parity_integration_test.go	-	owner decision 2026-11-23: the store reads the platform's tables directly; a refresh question's undo sets back the newest fuel prices the fake refresher restated, in the table the store reads
 denylist	internal/adapters/store/parity_c_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
 denylist	internal/adapters/store/parity_events_c_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
 denylist	internal/adapters/store/parity_named_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables

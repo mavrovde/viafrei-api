@@ -11323,12 +11323,12 @@
             }
           },
           {
-            "description": "Most stations to return; default 5.",
+            "description": "Most stations to return (1 to 10, the provider's terms cap a consumer list at 10; a client clamps a larger wish to 10); default 5.",
             "explode": false,
             "in": "query",
             "name": "limit",
             "schema": {
-              "description": "Most stations to return; default 5.",
+              "description": "Most stations to return (1 to 10, the provider's terms cap a consumer list at 10; a client clamps a larger wish to 10); default 5.",
               "format": "int64",
               "maximum": 10,
               "minimum": 1,
@@ -15501,15 +15501,15 @@
             }
           },
           {
-            "description": "Search radius in metres (1000 to 25000); default 10000.",
+            "description": "Search radius in metres (100 to 25000); default 10000.",
             "explode": false,
             "in": "query",
             "name": "radius_m",
             "schema": {
-              "description": "Search radius in metres (1000 to 25000); default 10000.",
+              "description": "Search radius in metres (100 to 25000); default 10000.",
               "format": "int64",
               "maximum": 25000,
-              "minimum": 1000,
+              "minimum": 100,
               "type": "integer"
             }
           },

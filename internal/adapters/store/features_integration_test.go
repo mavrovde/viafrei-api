@@ -354,8 +354,14 @@ where o.occupancy_status = 'other' order by o.observed_at limit 1`, &id, &at.Lat
 	if err != nil || len(sites) == 0 || more {
 		t.Fatalf("read %d sites, more %v: %v", len(sites), more, err)
 	}
-	if o := sites[0].Occupancy; sites[0].ID != id || o == nil || o.State != parking.StateOther || o.Free != nil || !o.ObservedAt.Equal(unknown) {
-		t.Errorf("an unmapped status reads as other: %+v", sites[0])
+	// A report with an unmapped status and no count says nothing (today's
+	// newest-reading rule): it is a heartbeat, and the site's reading at
+	// that instant stays its newest report that states a count.
+	var stated time.Time
+	owner(t, `select max(o.observed_at) from contract.occupancy_observation o
+where o.facility_id = '`+id+`' and o.observed_at <= '`+unknown.Format(time.RFC3339Nano)+`' and o.free_spaces is not null`, &stated)
+	if o := sites[0].Occupancy; sites[0].ID != id || o == nil || o.State == parking.StateOther || o.Free == nil || !o.ObservedAt.Equal(stated) {
+		t.Errorf("a status-only report hid the last count (%v): %+v %+v", stated, sites[0], sites[0].Occupancy)
 	}
 	for i, s := range sites {
 		if !slices.Contains(listed, s.Family) || i > 0 && s.DistanceM < sites[i-1].DistanceM {
@@ -653,5 +659,44 @@ from contract.parking_facility where facility_id = any('{`+strings.Join(statedID
 		if !strings.HasPrefix(s.ID, "p:") || s.DistanceM != 0 || i > 0 && s.Name != nil && sites[i-1].Name != nil && *s.Name < *sites[i-1].Name {
 			t.Errorf("along %s: %+v", road, s)
 		}
+	}
+}
+
+// A site's reading is one of the two days up to the request's instant:
+// past that it has none (null, never 0), its newest report is not shown
+// however old (today's parking read's occupancy window).
+func TestParkingOccupancyIsTwoDaysOfTheRequest(t *testing.T) {
+	st := seeded(t)
+	var (
+		id     string
+		at     geo.Point
+		newest time.Time
+	)
+	owner(t, `select f.facility_id, st_y(f.location), st_x(f.location), max(o.observed_at)
+from contract.parking_facility f join contract.occupancy_observation o using (facility_id)
+where o.free_spaces is not null and f.facility_id like 'p:%' group by 1, 2, 3 order by 4 desc, 1 limit 1`, &id, &at.Lat, &at.Lon, &newest)
+	listed := families(t, st, "parking")
+	read := func(now time.Time) *parking.Occupancy {
+		t.Helper()
+		sites, _, _, err := st.ParkingNear(bounded(t), parking.Query{At: at, RadiusM: 1, Limit: 10}, listed, listed, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, s := range sites {
+			if s.ID == id {
+				return s.Occupancy
+			}
+		}
+		t.Fatalf("site %s not read at %v", id, now)
+		return nil
+	}
+	if o := read(newest.Add(48*time.Hour - time.Second)); o == nil || !o.ObservedAt.Equal(newest) {
+		t.Errorf("just inside two days: %+v", o)
+	}
+	if o := read(newest.Add(48 * time.Hour)); o != nil {
+		t.Errorf("two days after its newest report the site still reads %+v", o)
+	}
+	if o := read(newest.Add(182 * time.Hour)); o != nil {
+		t.Errorf("182 h after: %+v", o)
 	}
 }

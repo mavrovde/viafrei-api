@@ -158,3 +158,21 @@ func TestFuelCoverageIsStated(t *testing.T) {
 		t.Errorf("empty, unknown: %v", q)
 	}
 }
+
+// TestFuelLimitBound: the contract's maximum (10) is answered, one beyond it
+// is a 400 naming the parameter; the minimum likewise.
+func TestFuelLimitBound(t *testing.T) {
+	h := featureHandler(t, config.Defaults(), everyAnswer(), nil)
+	for _, c := range []struct {
+		limit string
+		code  int
+	}{{"1", 200}, {"10", 200}, {"0", 400}, {"11", 400}, {"100", 400}} {
+		w := do(t, h, http.MethodGet, "/v1/fuel-options?at=50.1,8.6&limit="+c.limit, bearer)
+		if w.Code != c.code {
+			t.Errorf("limit=%s: status %d, want %d: %s", c.limit, w.Code, c.code, w.Body)
+		}
+		if c.code == 400 && (!strings.Contains(w.Body.String(), "limit") || !strings.Contains(w.Body.String(), "10") && c.limit != "0") {
+			t.Errorf("limit=%s: the problem names neither the parameter nor the maximum: %s", c.limit, w.Body)
+		}
+	}
+}

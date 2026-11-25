@@ -32,7 +32,7 @@ type FuelInput struct {
 	OpenAt   string `query:"open_at" maxLength:"16" pattern:"^([0-9]{4}-[0-9]{2}-[0-9]{2}[T ])?[0-9]{1,2}:[0-9]{2}$" example:"23:30" doc:"Only stations whose published opening hours have them open at that time in Germany (Europe/Berlin): 23:30 is the next time the clock shows 23:30, 2026-09-30 06:15 that date and time. Not with open_now. A station whose hours are unknown or unreadable is counted in meta.query.droppedUnknown, never guessed open."`
 	WholeDay bool   `query:"whole_day" doc:"Only stations the provider flags as open around the clock; meta.query.droppedNotWholeDay counts the others."`
 	Sort     string `query:"sort" enum:"distance,price,name" doc:"distance (default, nearest first), price (every current price cheapest first, then the last known prices nearest first; needs fuel) or name (alphabetical, as German sorts it)."`
-	Limit    int    `query:"limit" minimum:"1" maximum:"10" doc:"Most stations to return; default 5."`
+	Limit    int    `query:"limit" minimum:"1" maximum:"10" doc:"Most stations to return (1 to 10, the provider's terms cap a consumer list at 10; a client clamps a larger wish to 10); default 5."`
 }
 
 // Resolve reads the position and requires fuel with sort=price.

@@ -292,6 +292,24 @@ const parkingStale = `select 3 * coalesce(c.cadence_s, (select max(x.cadence_s) 
         where c.source_ref = o.source_ref and coalesce(c.licence_code, '') !~* '^pending'
           and not coalesce((select k.excluded from contract_source_rules k where c.source_ref ~ k.pattern order by k.priority limit 1), false)`
 
+// parkingReading is today's rule of a site's newest reading over the
+// reports t at the request's instant at: one of the two days up to at (a
+// report older than that is not the site's reading, and the site answers
+// none; the parking read's occupancy window), and one that says something.
+// A stated total of 0 with no free count is no reading unless it reports
+// the site closed; a reading states a free count, a percentage, a status
+// word of occupancy (closed, or one that lights the parking lamp) or an
+// implausible figure, which the answer shows in place of the figure. An
+// open or unknown status with no count is a heartbeat, never the reading,
+// so it cannot hide the last real count.
+func parkingReading(t, at string) string {
+	return t + `.observed_at > ` + at + ` - interval '2 days' and ` + t + `.observed_at <= ` + at + `
+    and not (` + t + `.spaces_total is not distinct from 0 and coalesce(` + t + `.spaces_free, 0) = 0 and ` + t + `.status is distinct from 'closed')
+    and (` + t + `.spaces_free is not null or ` + t + `.occupancy_pct is not null
+         or coalesce(` + t + `.status in ('closed', 'spacesAvailable', 'almostFull', 'full', 'fullAtEntrance', 'overcrowded'), false)
+         or coalesce(` + t + `.implausible_fields && array['occupancy_pct', 'spaces_free', 'spaces_total']::text[], false))`
+}
+
 // parkingNext is the earliest report after now of a facility the read
 // keeps; parkingList the facilities, each with its newest report.
 func parkingStatements(road bool) (next, list stmt) {
@@ -313,7 +331,7 @@ where f.closed_at is null and f.geom is not null
   and ` + where
 	listSQL := parkingHere + `
 select f.facility_id, f.source_feed, f.name, f.operator,
-       case f.kind when 'rest_area' then 'rest_area' when 'park_and_ride' then 'park_and_ride' when 'truck' then 'truck_parking' else 'other' end,
+       case f.kind when 'car_park' then 'garage' when 'rest_area' then 'rest_area' when 'park_and_ride' then 'park_and_ride' when 'truck' then 'truck_parking' else 'other' end,
        st_y(` + parkingLocation + `), st_x(` + parkingLocation + `),
        ` + parkingDistance(q) + `,
        o.free_spaces, o.total_spaces, o.occupancy_status, o.observed_at, o.source_ref,
@@ -322,7 +340,7 @@ from ` + parkingFacilities + ` f
 cross join here
 left join lateral (
   select o.spaces_free free_spaces, o.spaces_total total_spaces, ` + parkingStatus + ` occupancy_status, o.observed_at, o.source_feed source_ref
-  from ` + parkingOccupancy(parkingKept("t", "source_feed", "$4")+` and t.observed_at <= $7`, true) + ` o
+  from ` + parkingOccupancy(parkingKept("t", "source_feed", "$4")+` and `+parkingReading("t", "$7"), true) + ` o
   order by o.observed_at desc
   limit 1) o on true
 where f.closed_at is null and f.geom is not null

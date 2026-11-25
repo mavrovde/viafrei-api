@@ -54,3 +54,32 @@ func TestOSMCamerasAreCutByGemeindeAsThePlatformCutsThem(t *testing.T) {
 		t.Errorf("without the official list: %+v %v", got.OSM, err)
 	}
 }
+
+// OpenStreetMap's cameras come by name (none first) and then by the
+// numeric OSM id, as today's statement orders them: ids of different digit
+// counts in numeric order (the text id would put node12230389900 before
+// node1277236977), ids beyond 32 bits among them.
+func TestOSMCamerasComeByNameThenNumericID(t *testing.T) {
+	st := seeded(t)
+	plant(t, `insert into vf_seed.place (place_id, place_kind, name, location, official_key, prominence, source_ref, origin_key, recorded_at, changed_at)
+values ('99000004', 'municipality', 'Nordfeld', st_setsrid(st_makepoint(-19.65, 76.0), 4326), '99000004', 1, 'bkg_gvisys', 'order:n', '2026-03-28T00:00:00Z', '2026-03-28T00:00:00Z')`)
+	plant(t, `insert into vf_seed.speed_camera (camera_id, camera_kind, enforces, location, max_speed_kmh, name, street, data_as_of, valid_from, valid_to, source_ref, recorded_at)
+values ('osm:node12230389900', 'fixed', 'speed', st_setsrid(st_makepoint(-19.651, 76.0), 4326), 50, 'Blitzer', null, '2026-03-01', null, null, 'osm_speed_cameras', '2026-03-28T00:00:00Z'),
+       ('osm:node1277236977', 'fixed', 'speed', st_setsrid(st_makepoint(-19.652, 76.0), 4326), 50, 'Blitzer', null, '2026-03-01', null, null, 'osm_speed_cameras', '2026-03-28T00:00:00Z'),
+       ('osm:node4294967296', 'fixed', 'speed', st_setsrid(st_makepoint(-19.653, 76.0), 4326), 50, null, null, '2026-03-01', null, null, 'osm_speed_cameras', '2026-03-28T00:00:00Z'),
+       ('osm:node99', 'fixed', 'speed', st_setsrid(st_makepoint(-19.654, 76.0), 4326), 50, null, null, '2026-03-01', null, null, 'osm_speed_cameras', '2026-03-28T00:00:00Z'),
+       ('osm:node5', 'fixed', 'speed', st_setsrid(st_makepoint(-19.655, 76.0), 4326), 50, null, null, '2026-03-01', null, null, 'osm_speed_cameras', '2026-03-28T00:00:00Z')`)
+	q := roads.SpeedQuery{At: geo.Point{Lat: 76.0, Lon: -19.65}, RadiusM: 2000, Today: time.Date(2026, 3, 30, 0, 0, 0, 0, time.UTC), Limit: 10}
+	got, err := st.SpeedCameras(bounded(t), q, families(t, st, "roads"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var osm []string
+	for _, c := range got.OSM {
+		osm = append(osm, c.ID)
+	}
+	want := []string{"osm:node5", "osm:node99", "osm:node4294967296", "osm:node1277236977", "osm:node12230389900"}
+	if !slices.Equal(osm, want) {
+		t.Errorf("order %v, want %v", osm, want)
+	}
+}

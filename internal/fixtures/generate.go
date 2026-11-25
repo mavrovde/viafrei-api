@@ -17,7 +17,7 @@ import (
 
 // GeneratorVersion changes whenever the output for a given seed and profile
 // changes.
-const GeneratorVersion = "0.3.7"
+const GeneratorVersion = "0.3.8"
 
 // TrainBoardRef is the one source of the train boards.
 const TrainBoardRef = "db_timetables"
@@ -1310,17 +1310,19 @@ func (g *gen) pois() {
 func (g *gen) alerts() {
 	const ref = "delfi_sa_alpha"
 	g.w.begin("service_alert", "alert_id", "header", "description", "cause", "effect", "active_from", "active_to", "active_periods",
-		"line_names", "district_codes", "state_codes", "placed_by", "source_ref", "recorded_at", "changed_at")
+		"line_names", "district_codes", "state_codes", "placed_by", "source_ref", "recorded_at", "changed_at", "seen_at")
+	// Seen at the family's sweep, as every other row of a timed source.
+	seen := ts(g.sweep(ref))
 	for i, l := range g.lands {
 		kreis := l.code + "001"
 		from, to := g.day(0), g.day(1)
 		g.w.row(str(fmt.Sprintf("%s:%d", ref, 700000+3*i)), str("Bauarbeiten auf der Linie RE 1"), str("Ersatzverkehr mit Bussen."), str("CONSTRUCTION"),
-			str("DETOUR"), ts(from), null, str("[]"), array("RE 1"), array(kreis), array(l.code), str("route"), str(ref), ts(from), ts(from))
+			str("DETOUR"), ts(from), null, str("[]"), array("RE 1"), array(kreis), array(l.code), str("route"), str(ref), ts(from), ts(from), seen)
 		g.w.row(str(fmt.Sprintf("%s:%d", ref, 700000+3*i+1)), str("Streik im Netz"), null, str("STRIKE"), str("REDUCED_SERVICE"),
-			null, null, str("[]"), array(), array(), array(l.code), str("network"), str(ref), ts(from), ts(from))
+			null, null, str("[]"), array(), array(), array(l.code), str("network"), str(ref), ts(from), ts(from), seen)
 		g.w.row(str(fmt.Sprintf("%s:%d", ref, 700000+3*i+2)), str("Weichenstörung"), null, null, null, ts(from), ts(to),
 			str(`[{"start":"`+from.Format(time.RFC3339)+`","end":"`+to.Format(time.RFC3339)+`"}]`), array("S1"), array(kreis), array(l.code),
-			str("stop"), str(ref), ts(from), ts(from))
+			str("stop"), str(ref), ts(from), ts(from), seen)
 		for range 3 {
 			g.counted(l.code, ref)
 		}

@@ -2,6 +2,7 @@ package places
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"slices"
 	"testing"
@@ -70,20 +71,24 @@ func TestPlaceLabelsAsThePlatformGivesThem(t *testing.T) {
 	if err := json.Unmarshal(b, &all); err != nil {
 		t.Fatal(err)
 	}
+	// One subtest a case, side by side, each a leaf within the 2 s bound (TST-012).
 	for k, c := range all.Cases {
-		cands := locate(c.Cands)
-		if got := placeOptionLabels(cands, c.Lang, c.Asked, c.Lands, all.Kreise); !slices.Equal(got, c.Labels) {
-			t.Errorf("case %d: got %q, want %q", k, got, c.Labels)
-		}
-		for i, r := range c.Readings {
-			want := ""
-			if r.Reading != nil {
-				want = *r.Reading
+		t.Run(fmt.Sprintf("%04d", k), func(t *testing.T) {
+			t.Parallel()
+			cands := locate(c.Cands)
+			if got := placeOptionLabels(cands, c.Lang, c.Asked, c.Lands, all.Kreise); !slices.Equal(got, c.Labels) {
+				t.Errorf("case %d: got %q, want %q", k, got, c.Labels)
 			}
-			if got := placeReading(cands[i], r.Label, c.Lands[cands[i].ID], all.Kreise); got != want {
-				t.Errorf("case %d row %d %q: got %q, want %q", k, i, r.Label, got, want)
+			for i, r := range c.Readings {
+				want := ""
+				if r.Reading != nil {
+					want = *r.Reading
+				}
+				if got := placeReading(cands[i], r.Label, c.Lands[cands[i].ID], all.Kreise); got != want {
+					t.Errorf("case %d row %d %q: got %q, want %q", k, i, r.Label, got, want)
+				}
 			}
-		}
+		})
 	}
 }
 

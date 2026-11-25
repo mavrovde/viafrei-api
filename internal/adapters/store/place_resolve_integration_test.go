@@ -6,10 +6,10 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"reflect"
-	"sync"
 	"testing"
 	"time"
 
@@ -66,27 +66,20 @@ func TestResolveTheWorldOverTheStatements(t *testing.T) {
 	// Every read under the test's batch, so the parity replay reads the
 	// world too, its checks side by side after the questions.
 	batch := store.WithBatch(context.Background(), t)
-	var wg sync.WaitGroup
-	next := make(chan int)
-	for range 8 {
-		wg.Go(func() {
-			for i := range next {
-				e := w.Expect[i]
-				ctx, cancel := context.WithTimeout(batch, 30*time.Second)
-				got, err := places.Resolve(ctx, reads, e.Q, e.Lang)
-				cancel()
-				if err != nil || !reflect.DeepEqual(norm(got), norm(e.R)) {
-					t.Errorf("%s %q:\n got  %+v %v\n want %+v", e.Lang, e.Q, got, err, e.R)
-				}
+	// One subtest a text, side by side, each a leaf within the 2 s bound
+	// (TST-012); a shard of the parity set asks its part of the questions.
+	for i, e := range w.Expect {
+		if !inShard(i) {
+			continue
+		}
+		t.Run(fmt.Sprintf("%04d-%s", i, e.Lang), func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithTimeout(batch, 30*time.Second)
+			defer cancel()
+			got, err := places.Resolve(ctx, reads, e.Q, e.Lang)
+			if err != nil || !reflect.DeepEqual(norm(got), norm(e.R)) {
+				t.Errorf("%s %q:\n got  %+v %v\n want %+v", e.Lang, e.Q, got, err, e.R)
 			}
 		})
 	}
-	// A shard of the parity set asks its part of the questions (shard).
-	for i := range w.Expect {
-		if inShard(i) {
-			next <- i
-		}
-	}
-	close(next)
-	wg.Wait()
 }

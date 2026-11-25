@@ -45,7 +45,7 @@ services:
   # gives the API's read-only role its password. It runs on every start and
   # changes nothing on a database already at the head.
   db-migrate:
-    image: ghcr.io/mavrovde/viafrei-database:0.6.0@sha256:7617d74da86ef09f56adbbe33fb8473abb2a9d87194f1c0886c7effc68e98d22
+    image: ghcr.io/mavrovde/viafrei-database:0.7.0@sha256:617c85fcb0acae7d1d6a4e52c469d1dcfd9e4646f369256cfc77bdea2c43f85a
     depends_on:
       db:
         condition: service_healthy
@@ -89,7 +89,7 @@ services:
   # (`make reset` starts over). Not the source register: the migrations
   # write that themselves. The image must equal db-migrate's.
   db-seed:
-    image: ghcr.io/mavrovde/viafrei-database:0.6.0@sha256:7617d74da86ef09f56adbbe33fb8473abb2a9d87194f1c0886c7effc68e98d22
+    image: ghcr.io/mavrovde/viafrei-database:0.7.0@sha256:617c85fcb0acae7d1d6a4e52c469d1dcfd9e4646f369256cfc77bdea2c43f85a
     depends_on:
       db-migrate:
         condition: service_completed_successfully

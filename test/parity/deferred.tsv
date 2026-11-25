@@ -4,9 +4,6 @@
 # [*] stands for any key; a pattern names the facts under it too.
 #
 # D: the producer's recording, to be fixed on the MCP side.
-D	listSources	changed	data[*].shareAlike	the producer's catalogue rows for these families state no share-alike flag; the register states it
-D	getStationPage	changed	data.pageUrl	the producer asks in English where the question names no language; the page link follows the asked language
-D	getStationPage	changed	data.sections[header].asOf	the producer stamps the header with its wall clock, not the fixture's clock
 D	getStationPage	*	data.sections[departures]	the question's key reads no DB Timetables, so the API withholds DB's board; the API-only question station-page-db asks with the key, and the regression lock records ICE 571, RE 1 and S 3 as the platform lists them
 D	getStationPage	*	data.sections[rail_ampel]	the lamp judges the board the key may read: without DB Timetables there is no train to judge; with it the lamp is red, 1 of 3 cancelled, as the platform's
 D	getStationPage	missing	meta.attribution[db_timetables]	DB Timetables is credited where the key reads it

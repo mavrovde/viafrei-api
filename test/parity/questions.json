@@ -2289,8 +2289,7 @@
         ],
         "accepted": null
       },
-      "now": "2026-03-30T00:00:00Z",
-      "apiOnly": "Until the MCP side records the station page with a key that reads DB Timetables (the 2.6.52 bundle's key reads none): the API's own lock proves the page's DB board and lamp meanwhile."
+      "now": "2026-03-30T00:00:00Z"
     },
     {
       "id": "stop-boards",

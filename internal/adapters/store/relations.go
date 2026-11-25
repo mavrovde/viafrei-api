@@ -1214,3 +1214,17 @@ UNION ALL
   WHERE NOT (EXISTS ( SELECT 1
            FROM cities c
           WHERE c.kreis = p.area))`
+
+// relTimetableReach is the timetable's reach read (timetableReach): the
+// newest loaded run of the timetable and the calendar's last day.
+const relTimetableReach = `
+with run as (
+  select r.started_at,
+         substring(r.note from '"w":"[0-9]{4}-[0-9]{2}-[0-9]{2}[.][.]([0-9]{4}-[0-9]{2}-[0-9]{2})"')::date wrote_to
+  from ingest_runs r
+  where r.provider = 'delfi_static' and r.status in ('ok', 'degraded')
+  order by r.started_at desc
+  limit 1),
+bounds as (select max(d.service_date) last_date from gtfs_service_dates d where d.gtfs_feed_key = 1)
+select (coalesce((select wrote_to from run), b.last_date) + 1)::timestamp at time zone 'Europe/Berlin', (select started_at from run)
+from bounds b`

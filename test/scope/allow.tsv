@@ -138,3 +138,6 @@ vocabulary	internal/adapters/store/freshness.go	ingest	the schema name of the re
 denylist	internal/adapters/store/speed_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables (the official cameras and the status rows whose versions key the kept cells)
 vocabulary	internal/adapters/store/speed_integration_test.go	feed	the platform's status table and its ledger names, which this test writes to move a family's version
 vocabulary	internal/adapters/store/speed_integration_test.go	ingest	the platform's status ledger name, which this test writes to state the gazetteer's version
+denylist	internal/adapters/store/reach_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them writes the run ledger they read
+vocabulary	internal/adapters/store/reach_integration_test.go	ingest	the platform's run ledger, which this test writes to state the timetable's load
+vocabulary	internal/adapters/store/relations.go	ingest	the platform's run ledger (ingest_runs), which the timetable reach reads

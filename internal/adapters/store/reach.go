@@ -14,17 +14,7 @@ import (
 // else the last day the calendar holds; the reach ends at the Berlin
 // midnight after that day. With no run recorded, the calendar alone, and
 // no load time; with no calendar, nothing.
-var timetableReach = named("api_timetable_reach", `
-with run as (
-  select r.started_at,
-         substring(r.note from '"w":"[0-9]{4}-[0-9]{2}-[0-9]{2}[.][.]([0-9]{4}-[0-9]{2}-[0-9]{2})"')::date wrote_to
-  from ingest_runs r
-  where r.provider = 'delfi_static' and r.status in ('ok', 'degraded')
-  order by r.started_at desc
-  limit 1),
-bounds as (select max(d.service_date) last_date from gtfs_service_dates d where d.gtfs_feed_key = 1)
-select (coalesce((select wrote_to from run), b.last_date) + 1)::timestamp at time zone 'Europe/Berlin', (select started_at from run)
-from bounds b`)
+var timetableReach = named("api_timetable_reach", relTimetableReach)
 
 // TimetableReach reads how far the loaded timetable reaches
 // (features.Departures).

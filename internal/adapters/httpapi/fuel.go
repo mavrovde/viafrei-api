@@ -96,6 +96,16 @@ type FuelQueryMeta struct {
 	WithoutCurrent     int        `json:"stationsWithoutCurrentPrice" doc:"Under sort=price, the stations we hold within the radius with no price for the grade reported within the price cache window (fuel.price_fresh); else the listed stations without such a price (for the grade asked, else for any grade)."`
 }
 
+// OSMFuelStation is an OpenStreetMap filling station without a price.
+type OSMFuelStation struct {
+	Name         string        `json:"name"`
+	Brand        *string       `json:"brand" nullable:"true" doc:"The brand; null when not mapped."`
+	Address      PostalAddress `json:"address"`
+	Location     Position      `json:"location"`
+	DistanceM    int           `json:"distanceM" doc:"Distance from the asked position in metres, to the nearest 100 m, as the stations' distanceM."`
+	SourceFamily string        `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
+}
+
 // FuelMeta is the meta member of listFuelOptions.
 type FuelMeta struct {
 	DataMeta
@@ -105,9 +115,11 @@ type FuelMeta struct {
 
 // FuelEnvelope is the enveloped answer of listFuelOptions.
 type FuelEnvelope struct {
-	Data  []FuelStation `json:"data"`
-	Meta  FuelMeta      `json:"meta"`
-	Links Links         `json:"links"`
+	Data []FuelStation `json:"data"`
+	// OSMWithoutPrice are OpenStreetMap's stations without a price.
+	OSMWithoutPrice []OSMFuelStation `json:"osmWithoutPrice" doc:"More filling stations mapped by OpenStreetMap with no station we hold within 300 m: no price for these stations yet. Nearest first, at most the limit and 5; empty when there are none or the key may not read OpenStreetMap's places. Credited in meta.attribution (ODbL)."`
+	Meta            FuelMeta         `json:"meta"`
+	Links           Links            `json:"links"`
 }
 
 // FuelOutput is the response of listFuelOptions.
@@ -148,8 +160,13 @@ func registerFuel(api huma.API, s *server, op huma.Operation) {
 		query := FuelQueryMeta{At: position(q.At), RadiusM: q.RadiusM, Sort: q.Sort, Matched: a.Matched,
 			DroppedClosed: a.DroppedClosed, DroppedUnknown: a.DroppedUnknown, DroppedNotWholeDay: a.DroppedNotWholeDay, OpenAt: a.OpenAt}
 		fuelCoverage(&query, a.Coverage, data, q.Fuel)
+		osm := make([]OSMFuelStation, len(a.OSMWithoutPrice))
+		for i, o := range a.OSMWithoutPrice {
+			osm[i] = OSMFuelStation{Name: o.Name, Brand: o.Brand, Address: PostalAddress{Street: o.Address.Street, Number: o.Address.HouseNumber,
+				Postcode: o.Address.Postcode, Place: o.Address.City}, Location: position(o.Location), DistanceM: tenthKm(o.DistanceM), SourceFamily: o.Family}
+		}
 		return &FuelOutput{CacheControl: noStore, Body: FuelEnvelope{
-			Data: data,
+			Data: data, OSMWithoutPrice: osm,
 			Meta: FuelMeta{
 				DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
 				Page:     Page{Limit: q.Limit, HasMore: a.HasMore},

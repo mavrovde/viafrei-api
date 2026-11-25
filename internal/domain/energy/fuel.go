@@ -279,3 +279,18 @@ func Reported(prices []FuelPrice) (string, *time.Time) {
 	}
 	return state, at
 }
+
+// MaxOSMFuel is the most OpenStreetMap stations without a price an answer
+// lists, as today's (OSM_FUEL_MAX).
+const MaxOSMFuel = 5
+
+// OSMFuelStation is an OpenStreetMap filling station no priced station stands
+// hold: no id, no state, no grade, no price.
+type OSMFuelStation struct {
+	Name      string
+	Brand     *string
+	Address   Address
+	Location  geo.Point
+	DistanceM int
+	Family    string
+}

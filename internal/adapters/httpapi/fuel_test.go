@@ -36,11 +36,18 @@ func TestFuelStationsAnswer(t *testing.T) {
 				Family: "src-gamma-energy"},
 		}, HasMore: true, Families: []provenance.Family{fam}, At: fixedNow},
 		Matched: 3, DroppedClosed: 1, DroppedUnknown: 2,
+		OSMWithoutPrice: []energy.OSMFuelStation{{Name: "Tank Süd", Address: energy.Address{City: sp("Leipzig")}, Location: geo.Point{Lat: 50.2, Lon: 8.7}, DistanceM: 1260, Family: "src-gamma-energy"}},
 	}
 	h := featureHandler(t, config.Defaults(), f, nil)
 	w := do(t, h, http.MethodGet, "/v1/fuel-options?at=50.1,8.6&radius_m=10000&fuel=e5&brand=aral&name=nord&open_now=true&sort=name&limit=1", bearer)
 	if w.Code != http.StatusOK || w.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("status %d: %s", w.Code, w.Body)
+	}
+	// OpenStreetMap's stations without a price, beside the list
+	if osm, _ := decode(t, w)["osmWithoutPrice"].([]any); len(osm) != 1 {
+		t.Errorf("osmWithoutPrice %v", osm)
+	} else if o0, _ := osm[0].(map[string]any); o0["name"] != "Tank Süd" || o0["distanceM"] != 1300.0 || o0["brand"] != nil {
+		t.Errorf("osmWithoutPrice %v", o0)
 	}
 	if g := f.gotFuel; g.At != (geo.Point{Lat: 50.1, Lon: 8.6}) || g.RadiusM != 10000 || g.Fuel != "e5" || g.Brand != "aral" || g.Name != "nord" ||
 		!g.OpenNow || g.Sort != "name" || g.Limit != 1 {

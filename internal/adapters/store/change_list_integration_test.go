@@ -428,3 +428,57 @@ func TestAFamilyWithoutATermsLinkLinksItsRegistersSourcePage(t *testing.T) {
 		t.Fatalf("%s: provenance %+v, %v; want the terms link %s", fam, prov, err, page)
 	}
 }
+
+// OpenStreetMap's filling stations no priced station stands beside are read as
+// today's list reads them: fuel amenities in Germany's boundary, a gas
+// dealer's name left out, one with a held station within 300 m left out,
+// nearest first, at most the limit; the brand and name filters as the
+// station search spells them.
+func TestTheOSMStationsWithoutAPriceAreTheUnheldFuelAmenities(t *testing.T) {
+	const at = `st_setsrid(st_makepoint(-19.5, 74.5), 4326)`
+	poi := func(id int, name string, east, north float64) string {
+		return fmt.Sprintf(`insert into public.osm_pois (osm_type, osm_id, name, name_norm, category, category_value, brand, geom, source_id, extract_date, first_seen_at, last_seen_at)
+		 values ('node', %d, '%s', lower('%s'), 'amenity', 'fuel', 'Nordtank', st_setsrid(st_makepoint(-19.5 + %f, 74.5 + %f), 4326)::geography, 'osm', current_date, now(), now())`,
+			id, name, name, east, north)
+	}
+	st, _ := private(t,
+		`insert into public.osm_boundary_de (land, osm_id, osm_version, part, geom, extract_date)
+		 values ('bremen', 990001, 1, 1, st_buffer(`+at+`, 0.2), current_date)`,
+		poi(9970000001, "Tank Nah", 0, 0.01),       // about 1.1 km
+		poi(9970000002, "Tank Weit", 0, 0.03),      // about 3.3 km
+		poi(9970000003, "Gashandel Nord", 0, 0.02), // a gas dealer
+		poi(9970000004, "Tank Zwilling", 0.01, 0),  // a held station 100 m away
+		poi(9970000005, "Tank Draussen", 0, 0.25),  // outside the boundary
+		`insert into public.fuel_stations (id, name, geom, source, source_feed) values
+		 ('99700000-0000-4000-8000-000000000001', 'Held', st_setsrid(st_makepoint(-19.5 + 0.01, 74.5 + 0.0009), 4326)::geography, 'tankerkoenig', 'tankerkoenig')`)
+	q := energy.FuelQuery{At: geo.Point{Lat: 74.5, Lon: -19.5}, RadiusM: 30000}
+	names := func(limit int, q energy.FuelQuery) []string {
+		t.Helper()
+		got, err := st.OSMFuelNear(bounded(t), q, []string{"osm"}, limit)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := []string{}
+		for _, o := range got {
+			out = append(out, o.Name)
+		}
+		return out
+	}
+	if got := names(5, q); !slices.Equal(got, []string{"Tank Nah", "Tank Weit"}) {
+		t.Errorf("unheld: %v", got)
+	}
+	if got := names(1, q); !slices.Equal(got, []string{"Tank Nah"}) {
+		t.Errorf("at the limit: %v", got)
+	}
+	q.Name = "weit"
+	if got := names(5, q); !slices.Equal(got, []string{"Tank Weit"}) {
+		t.Errorf("by name: %v", got)
+	}
+	q.Name, q.Brand = "", "südtank"
+	if got := names(5, q); len(got) != 0 {
+		t.Errorf("by another brand: %v", got)
+	}
+	if got, err := st.OSMFuelNear(bounded(t), q, []string{"other"}, 5); err != nil || len(got) != 0 {
+		t.Errorf("another family: %v %v", got, err)
+	}
+}

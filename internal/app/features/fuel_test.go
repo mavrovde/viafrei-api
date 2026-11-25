@@ -16,6 +16,7 @@ import (
 var fuRegister = []access.Terms{
 	{Family: "f1", Domain: "energy", UseClasses: all, Version: "v1"},
 	{Family: "f2", Domain: "energy", UseClasses: []access.UseClass{"consumer"}, Version: "v1"},
+	{Family: "o1", Domain: "places", UseClasses: all, Version: "v1"},
 }
 
 type fuFake struct {
@@ -27,6 +28,15 @@ type fuFake struct {
 	coverErr error
 	covered  int
 	coverAt  time.Time
+	osm      []energy.OSMFuelStation
+	osmErr   error
+	osmFams  []string
+	osmLimit int
+}
+
+func (f *fuFake) OSMFuelNear(_ context.Context, _ energy.FuelQuery, fams []string, limit int) ([]energy.OSMFuelStation, error) {
+	f.osmFams, f.osmLimit = fams, limit
+	return f.osm, f.osmErr
 }
 
 func (f *fuFake) FuelCoverage(_ context.Context, _ energy.FuelQuery, _ []string, at time.Time) (energy.FuelCoverage, error) {
@@ -82,6 +92,7 @@ func TestFuelStationsRefusals(t *testing.T) {
 		"read":       {&fuFake{readErr: errStore}, full, errStore},
 		"post-check": {&fuFake{stations: []energy.FuelStation{{Family: "f2"}}}, full, features.ErrGateViolation},
 		"provenance": {&fuFake{fake: &fake{provErr: errStore}}, full, errStore},
+		"osm read":   {&fuFake{osmErr: errStore}, key("commercial", []access.Scope{"energy", "places"}, "f1", "o1"), errStore},
 	} {
 		if _, err := fuService(c.f).FuelStations(context.Background(), c.k, energy.FuelQuery{Limit: 5}); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)
@@ -118,5 +129,22 @@ func TestFuelCoverageIsReadWhereThePlatformReadsIt(t *testing.T) {
 	f := &fuFake{coverErr: errors.New("boom")}
 	if _, err := fuService(f).FuelStations(context.Background(), k, energy.FuelQuery{Coverage: true, Limit: 5}); err == nil {
 		t.Error("a failed coverage read answered")
+	}
+}
+
+// OpenStreetMap's stations without a price are listed where the key may
+// read its places, at most the limit and five, and credited.
+func TestTheOSMStationsWithoutAPriceAreListedAndCredited(t *testing.T) {
+	req.Covers(t, "FR-ENERGY-001")
+	f := &fuFake{stations: []energy.FuelStation{{ID: "a", Family: "f1"}}, osm: []energy.OSMFuelStation{{Name: "Tank", Family: "o1"}}}
+	a, err := fuService(f).FuelStations(context.Background(), key("commercial", []access.Scope{"energy", "places"}, "f1", "o1"), energy.FuelQuery{Limit: 10})
+	if err != nil || len(a.OSMWithoutPrice) != 1 || f.osmLimit != energy.MaxOSMFuel || !slices.Equal(f.osmFams, []string{"o1"}) ||
+		!slices.Equal(names(a.Families), []string{"f1", "o1"}) {
+		t.Errorf("answer %+v %v", a, err)
+	}
+	f = &fuFake{stations: []energy.FuelStation{{ID: "a", Family: "f1"}}, osm: []energy.OSMFuelStation{{Name: "Tank", Family: "o1"}}}
+	a, err = fuService(f).FuelStations(context.Background(), key("commercial", []access.Scope{"energy"}, "f1"), energy.FuelQuery{Limit: 2})
+	if err != nil || len(a.OSMWithoutPrice) != 0 || f.osmFams != nil {
+		t.Errorf("a key without places: %+v %v", a, err)
 	}
 }

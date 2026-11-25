@@ -15,6 +15,7 @@ type Fuel interface {
 	// q's radius, nearest first, at most energy.MaxFuelScan, each with its newest
 	// price per grade.
 	FuelNear(ctx context.Context, q energy.FuelQuery, families []string) ([]energy.FuelStation, error)
+	OSMFuelNear(ctx context.Context, q energy.FuelQuery, families []string, limit int) ([]energy.OSMFuelStation, error)
 	// FuelStation returns the filling station with this id of the given
 	// families, with its newest price per grade reported in the held window
 	// up to now, or energy.ErrNotFound.
@@ -37,6 +38,9 @@ type FuelStations struct {
 	// Coverage is the coverage read, where the query asked for it
 	// (energy.FuelQuery.Coverage); nil else.
 	Coverage *energy.FuelCoverage
+	// OSMWithoutPrice are the OpenStreetMap stations with no held station
+	// hold, where the key may read OpenStreetMap's places.
+	OSMWithoutPrice []energy.OSMFuelStation
 }
 
 // FuelStations answers "where can I fill up near here" for key (FR-ENERGY),
@@ -68,6 +72,18 @@ func (s *Service) FuelStations(ctx context.Context, key access.Record, q energy.
 	for _, st := range a.Stations {
 		contributed = append(contributed, st.Family)
 	}
+	// The OpenStreetMap stations without a price, as today's list adds them,
+	// at most the answer's limit and five, of the places families the key
+	// may read; none when it may read none.
+	var osm []energy.OSMFuelStation
+	if places, _, err := gate.Answer(access.Answering(reg, "places")); err == nil {
+		if osm, err = s.repos.Fuel.OSMFuelNear(ctx, q, places, min(q.Limit, energy.MaxOSMFuel)); err != nil {
+			return FuelStations{}, err
+		}
+	}
+	for _, o := range osm {
+		contributed = append(contributed, o.Family)
+	}
 	if err := gate.Check(contributed); err != nil {
 		return FuelStations{}, err
 	}
@@ -86,7 +102,7 @@ func (s *Service) FuelStations(ctx context.Context, key access.Record, q energy.
 	return FuelStations{
 		Answer:  Answer[energy.FuelStation]{Items: a.Stations, HasMore: a.Matched > len(a.Stations), Families: fams, Partial: partial, At: now},
 		Matched: a.Matched, DroppedClosed: a.DroppedClosed, DroppedUnknown: a.DroppedUnknown,
-		DroppedNotWholeDay: a.DroppedNotWholeDay, OpenAt: a.OpenAt, Coverage: cover,
+		DroppedNotWholeDay: a.DroppedNotWholeDay, OpenAt: a.OpenAt, Coverage: cover, OSMWithoutPrice: osm,
 	}, nil
 }
 

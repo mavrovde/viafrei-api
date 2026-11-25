@@ -33,6 +33,10 @@ type nbFake struct {
 	gotFuel    energy.FuelQuery
 }
 
+func (f *nbFake) OSMFuelNear(context.Context, energy.FuelQuery, []string, int) ([]energy.OSMFuelStation, error) {
+	return nil, nil
+}
+
 func (f *nbFake) FuelNear(_ context.Context, q energy.FuelQuery, _ []string) ([]energy.FuelStation, error) {
 	f.gotFuel = q
 	return nil, nil

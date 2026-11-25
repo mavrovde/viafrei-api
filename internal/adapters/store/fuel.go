@@ -186,3 +186,54 @@ func (s *Store) FuelStation(ctx context.Context, id string, families []string, n
 	}
 	return out, err
 }
+
+// osmFuelUnpriced reads the OpenStreetMap filling stations of the families
+// $4 within $3 metres of ($1, $2) that no station the prices are held for
+// stands within 300 m of, nearest first, $5 at most, as today's
+// OSM_FUEL_STATIONS_NEAR and its twin filter read them: the forty nearest
+// fuel amenities in Germany's boundary whose name is not a gas dealer's
+// ($6 the brand, $7 the name filter, as the station search spells them),
+// then those without a held twin. No id, no state, no grade, no price.
+//
+//nolint:misspell // materialized is the SQL keyword
+var osmFuelUnpriced = named("api_osm_fuel_unpriced", `
+with cand as materialized (
+  select p.name, p.brand, p.street, p.house_number, p.postcode, p.place, p.geom, p.source_id,
+         st_distance(p.geom, `+atPosition+`) d
+  from osm_pois p
+  where p.closed_at is null and p.category = 'amenity' and p.category_value = 'fuel'
+    and exists (select 1 from osm_boundary_de de_b where st_covers(de_b.geom, p.geom::geometry))
+    and p.name !~* '(propan|fl(ü|ue)ssiggas(handel|vertrieb)|gashandel|gasflaschen)'
+    and st_dwithin(p.geom, `+atPosition+`, (select $3::float8))
+    and p.source_id = any((select $4::text[])::text[])
+    and ((select $6::text) is null or coalesce(p.brand, '') ilike '%' || (select $6::text) || '%' or p.name ilike '%' || (select $6::text) || '%')
+    and ((select $7::text) is null or p.name ilike '%' || (select $7::text) || '%' or coalesce(p.brand, '') ilike '%' || (select $7::text) || '%')
+  order by p.geom <-> `+atPosition+`
+  limit 40)
+select c.name, c.brand, c.street, c.house_number, c.postcode, c.place, st_y(c.geom::geometry), st_x(c.geom::geometry), round(c.d)::int, c.source_id
+from cand c
+where not exists (select 1 from fuel_stations s where s.deleted_at is null and s.geom is not null and st_dwithin(s.geom, c.geom, 300))
+order by c.d
+limit (select $5::bigint)`, "float8", "float8", "float8", "text[]", "bigint", "text", "text")
+
+// OSMFuelNear reads the OpenStreetMap filling stations without a price
+// within q's radius (features.FuelStations).
+func (s *Store) OSMFuelNear(ctx context.Context, q energy.FuelQuery, families []string, limit int) ([]energy.OSMFuelStation, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]energy.OSMFuelStation, error) {
+		rows, _ := run(ctx, tx, osmFuelUnpriced, q.At.Lon, q.At.Lat, float64(q.RadiusM), families, limit, nonEmpty(q.Brand), nonEmpty(q.Name))
+		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (energy.OSMFuelStation, error) {
+			var v energy.OSMFuelStation
+			err := r.Scan(&v.Name, &v.Brand, &v.Address.Street, &v.Address.HouseNumber, &v.Address.Postcode, &v.Address.City,
+				&v.Location.Lat, &v.Location.Lon, &v.DistanceM, &v.Family)
+			return v, err
+		})
+	})
+}
+
+// nonEmpty is s, or nil when it is empty.
+func nonEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}

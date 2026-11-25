@@ -2020,10 +2020,18 @@
           },
           "meta": {
             "$ref": "#/components/schemas/FuelMeta"
+          },
+          "osmWithoutPrice": {
+            "description": "More filling stations mapped by OpenStreetMap with no station we hold within 300 m: no price for these stations yet. Nearest first, at most the limit and 5; empty when there are none or the key may not read OpenStreetMap's places. Credited in meta.attribution (ODbL).",
+            "items": {
+              "$ref": "#/components/schemas/OSMFuelStation"
+            },
+            "type": "array"
           }
         },
         "required": [
           "data",
+          "osmWithoutPrice",
           "meta",
           "links"
         ],
@@ -4464,6 +4472,45 @@
         "required": [
           "condition",
           "purpose"
+        ],
+        "type": "object"
+      },
+      "OSMFuelStation": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/PostalAddress"
+          },
+          "brand": {
+            "description": "The brand; null when not mapped.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "distanceM": {
+            "description": "Distance from the asked position in metres, to the nearest 100 m, as the stations' distanceM.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sourceFamily": {
+            "description": "The source family of the item; its attribution is in meta.attribution.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "brand",
+          "address",
+          "location",
+          "distanceM",
+          "sourceFamily"
         ],
         "type": "object"
       },

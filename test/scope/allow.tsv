@@ -149,3 +149,7 @@ denylist	internal/adapters/store/roadstatus_sql.go	-	owner decision 2026-11-23: 
 denylist	internal/adapters/store/motorway_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
 denylist	internal/adapters/store/roadstatus_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
 vocabulary	internal/adapters/store/roadstatus_integration_test.go	feed	the platform's status ledger name, which this test writes to state when a strategy source was last checked
+denylist	internal/adapters/store/parking_around.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+vocabulary	internal/adapters/store/parking_around.go	feed	the platform's column and check names of a road-context row's source
+denylist	internal/adapters/store/parking_around_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+vocabulary	internal/adapters/store/parking_around_integration_test.go	feed	the platform's register and status ledger names, which this test writes to state a source's last check

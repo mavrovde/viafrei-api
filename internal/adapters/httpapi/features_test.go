@@ -340,7 +340,7 @@ func TestParkingOptionsAnswer(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", w.Code, w.Body)
 	}
-	if !reflect.DeepEqual(f.gotPark, parking.Query{At: geo.Point{Lat: 52.52, Lon: 13.405}, RadiusM: 2000, FreeMin: 2, Kind: "truck", Amenities: []string{"shower", "toilet"}, Limit: 5}) {
+	if !reflect.DeepEqual(f.gotPark, parking.Query{At: geo.Point{Lat: 52.52, Lon: 13.405}, RadiusM: 2000, FreeMin: 2, Kind: "truck", Amenities: []string{"shower", "toilet"}, Limit: 5, CarParks: true, Around: true}) {
 		t.Errorf("asked %+v", f.gotPark)
 	}
 	body := decode(t, w)
@@ -769,7 +769,7 @@ func TestMotorwayParkingAnswer(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", w.Code, w.Body)
 	}
-	if !reflect.DeepEqual(f.gotPark, parking.Query{Road: "A7", Kind: "rest_area", Amenities: []string{"shower"}, Limit: 3}) {
+	if !reflect.DeepEqual(f.gotPark, parking.Query{Road: "A7", Kind: "rest_area", Amenities: []string{"shower"}, Limit: 3, Around: true}) {
 		t.Errorf("asked %+v", f.gotPark)
 	}
 	body := decode(t, w)

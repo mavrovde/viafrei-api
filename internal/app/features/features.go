@@ -52,6 +52,9 @@ type Parking interface {
 	// the free-space filter, if any. Occupancy is read from the occupancy
 	// families only and never after now.
 	ParkingNear(ctx context.Context, q parking.Query, listed, occupancy []string, now time.Time) ([]parking.Site, bool, *time.Time, error)
+	// ParkingAround reads what q asks beside a parking list: the amenities
+	// near each site, OpenStreetMap's car parks and the road context.
+	ParkingAround(ctx context.Context, q parking.AroundQuery) (parking.AroundRead, error)
 }
 
 // Places is the port to the places store.
@@ -161,6 +164,9 @@ type Answer[T any] struct {
 	ChangesAt *time.Time
 	// Dropped counts the sites an only-available charging answer left out.
 	Dropped *energy.Dropped
+	// Around is, for a parking answer, what it carries beside its list; nil
+	// when nothing beside it was asked.
+	Around *parking.Around
 	// InRadius is, for a charging answer that lists no site, how many sites
 	// the key may read within the radius, every filter dropped; nil otherwise.
 	InRadius *int
@@ -518,6 +524,11 @@ func (s *Service) parking(ctx context.Context, reg []access.Terms, gate access.G
 			return Answer[parking.Site]{}, err
 		}
 	}
+	around, aroundFams, err := s.parkingAround(ctx, gate, permitted, q, sites, now)
+	if err != nil {
+		return Answer[parking.Site]{}, err
+	}
+	credited = append(slices.Clone(credited), aroundFams...)
 	if q.Road != "" && gate.Permits(CorridorFamily) {
 		// The corridor is a use of the location-code points, whatever it
 		// found: the platform credits their register on every road search.
@@ -531,7 +542,64 @@ func (s *Service) parking(ctx context.Context, reg []access.Terms, gate access.G
 	if err != nil {
 		return Answer[parking.Site]{}, err
 	}
-	return Answer[parking.Site]{Items: sites, HasMore: more, Families: withholdConditions(fams, pending), Partial: partial, Withheld: pending, Terms: terms, At: now, NextReport: next}, nil
+	// A publisher's warning about its live figures goes with a figure of
+	// its: without one, its condition is not shown.
+	unshown := slices.DeleteFunc(slices.Clone(parking.OccupancyCaveatFamilies), func(f string) bool { return slices.Contains(occupancy, f) })
+	fams = withholdConditions(withholdConditions(fams, pending), unshown)
+	return Answer[parking.Site]{Items: sites, HasMore: more, Families: fams, Partial: partial, Withheld: pending, Terms: terms, At: now, NextReport: next, Around: around}, nil
+}
+
+// parkingAround reads and composes what q asks beside the listed sites:
+// the amenities near each (none its publisher states), OpenStreetMap's car
+// parks that are no listed site, and the road context near the place; with
+// the families of the rows it names, each checked against the gate.
+func (s *Service) parkingAround(ctx context.Context, gate access.Gate, permitted []string, q parking.Query, sites []parking.Site, now time.Time) (*parking.Around, []string, error) {
+	pattern, carParks := parking.OSMQuery(q)
+	carParks = carParks && q.CarParks
+	nearby := q.Around && len(sites) > 0
+	roadContext := q.Around && parking.ContextAsked(q)
+	if !carParks && !nearby && !roadContext {
+		return nil, nil, nil
+	}
+	aq := parking.AroundQuery{At: q.At, Now: now, CarParks: carParks, CarParkRadiusM: float64(q.RadiusM), Pattern: pattern,
+		CarParkFetch: q.Limit * parking.OSMOverfetch, Context: roadContext, ContextFamilies: permitted}
+	if gate.Permits(parking.OSMFamily) {
+		aq.OSMFamilies = []string{parking.OSMFamily}
+	}
+	if nearby {
+		for _, site := range sites {
+			aq.Sites = append(aq.Sites, site.Location)
+			aq.Radii = append(aq.Radii, float64(parking.NearbyRadiusM(site.Kind, q.Road != "")))
+		}
+	}
+	read, err := s.repos.Parking.ParkingAround(ctx, aq)
+	if err != nil {
+		return nil, nil, err
+	}
+	out := &parking.Around{OSMAsked: carParks && len(aq.OSMFamilies) > 0, ContextRead: roadContext, Context: read.Context}
+	var fams []string
+	if nearby {
+		out.Nearby = make([][]parking.Nearby, len(sites))
+		for i, site := range sites {
+			out.Nearby[i] = parking.NearbyOf(read.Nearby, i+1, site.Amenities)
+			if len(out.Nearby[i]) > 0 {
+				fams = append(fams, parking.OSMFamily)
+			}
+		}
+	}
+	if out.OSMAsked {
+		out.OSMCarParks = parking.FoldOSM(read.CarParks, sites, q.Limit)
+		if len(out.OSMCarParks) > 0 {
+			fams = append(fams, parking.OSMFamily)
+		}
+	}
+	for _, r := range read.Context {
+		fams = append(fams, r.Family)
+	}
+	if err := gate.Check(fams); err != nil {
+		return nil, nil, ErrGateViolation
+	}
+	return out, fams, nil
 }
 
 // RoadReach is the reach of the road-surface forecast of a weather answer:

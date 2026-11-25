@@ -41,7 +41,8 @@
             "shower"
           ],
           "absent": []
-        }
+        },
+        "nearbyAmenities": []
       }
     ],
     "meta": {
@@ -94,6 +95,11 @@
         },
         "radiusM": 50000,
         "freeMin": 0
+      },
+      "around": {
+        "osmCarParks": null,
+        "osmDataAsOf": null,
+        "roadContext": []
       }
     },
     "links": {

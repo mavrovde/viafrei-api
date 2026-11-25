@@ -75,11 +75,13 @@ type NeedBlock struct {
 
 // NearbyData is the data of listNearby: each asked category that is ok.
 type NearbyData struct {
-	Fuel      *[]NearbyFuelStation `json:"fuel,omitempty" doc:"The cheapest current E5 prices first, three at most, each with its E5 price only."`
-	Charging  *[]ChargingSite      `json:"charging,omitempty" doc:"Public charging sites, nearest first, three at most."`
-	Parking   *[]ParkingListing    `json:"parking,omitempty" doc:"Parking sites, nearest first, three at most."`
-	Stations  *[]Station           `json:"stations,omitempty" doc:"Stations, nearest first, three at most."`
-	Junctions *[]NearbyJunction    `json:"junctions,omitempty" doc:"Motorway junctions, nearest first, three at most; services areas and car parks are none. OpenStreetMap's junction nodes, same-named ones within 1.5 km as one; with none, the gazetteer's junction points."`
+	Fuel     *[]NearbyFuelStation `json:"fuel,omitempty" doc:"The cheapest current E5 prices first, three at most, each with its E5 price only."`
+	Charging *[]ChargingSite      `json:"charging,omitempty" doc:"Public charging sites, nearest first, three at most."`
+	Parking  *[]ParkingListing    `json:"parking,omitempty" doc:"Parking sites, nearest first, three at most."`
+	// OSMParking are OpenStreetMap's car parks, beside the parking sites.
+	OSMParking *[]OSMCarPark     `json:"osmParking,omitempty" doc:"OpenStreetMap's car parks (ODbL; no capacity, no occupancy) in the radius that are none of the parking sites, nearest first, same-named ones as one, three at most; with parking, when the key may read OpenStreetMap."`
+	Stations   *[]Station        `json:"stations,omitempty" doc:"Stations, nearest first, three at most."`
+	Junctions  *[]NearbyJunction `json:"junctions,omitempty" doc:"Motorway junctions, nearest first, three at most; services areas and car parks are none. OpenStreetMap's junction nodes, same-named ones within 1.5 km as one; with none, the gazetteer's junction points."`
 	// JunctionsFrom is the source the junctions came from.
 	JunctionsFrom *string      `json:"junctionsFrom,omitempty" enum:"osm,gazetteer" doc:"Where the junctions came from: osm, or gazetteer, when no OpenStreetMap junction node is within the radius. With junctions only."`
 	Needs         *[]NeedBlock `json:"needs,omitempty" doc:"The asked everyday needs, in the order asked."`
@@ -166,6 +168,9 @@ func nearbyEnvelope(s *server, ctx context.Context, a features.NearbyAnswer, q f
 	if a.Parking != nil {
 		v, _ := parkingSites(*a.Parking)
 		data.Parking = &v
+		if p := parkingAround(a.Parking.Around); p != nil && p.OSMCarParks != nil {
+			data.OSMParking = &p.OSMCarParks
+		}
 	}
 	if a.Stations != nil {
 		v := stations(*a.Stations)

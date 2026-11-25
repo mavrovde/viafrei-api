@@ -4956,6 +4956,51 @@
         ],
         "type": "object"
       },
+      "NearbyAmenity": {
+        "additionalProperties": false,
+        "properties": {
+          "distanceM": {
+            "description": "Distance from the site, in metres.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "kind": {
+            "description": "Open enumeration; treat an unknown value as other.",
+            "enum": [
+              "toilet",
+              "shower",
+              "restaurant",
+              "snack",
+              "cafe",
+              "shop",
+              "drinking_water"
+            ],
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "name": {
+            "type": "string"
+          },
+          "osmDataAsOf": {
+            "description": "The day of the OpenStreetMap extract the entry comes from.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "distanceM",
+          "location",
+          "osmDataAsOf"
+        ],
+        "type": "object"
+      },
       "NearbyData": {
         "additionalProperties": false,
         "properties": {
@@ -4992,6 +5037,13 @@
             "description": "The asked everyday needs, in the order asked.",
             "items": {
               "$ref": "#/components/schemas/NeedBlock"
+            },
+            "type": "array"
+          },
+          "osmParking": {
+            "description": "OpenStreetMap's car parks (ODbL; no capacity, no occupancy) in the radius that are none of the parking sites, nearest first, same-named ones as one, three at most; with parking, when the key may read OpenStreetMap.",
+            "items": {
+              "$ref": "#/components/schemas/OSMCarPark"
             },
             "type": "array"
           },
@@ -5327,6 +5379,71 @@
         "required": [
           "condition",
           "purpose"
+        ],
+        "type": "object"
+      },
+      "OSMCarPark": {
+        "additionalProperties": false,
+        "properties": {
+          "distanceM": {
+            "description": "Distance from the asked position, in metres.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "houseNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "The OpenStreetMap element (node/1, way/2, relation/3).",
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "operator": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "street": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "town": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zip": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "operator",
+          "street",
+          "houseNo",
+          "zip",
+          "town",
+          "location",
+          "distanceM"
         ],
         "type": "object"
       },
@@ -6309,6 +6426,109 @@
         ],
         "type": "object"
       },
+      "ParkingContextItem": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "distanceM": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "facts": {
+            "additionalProperties": {},
+            "description": "The publisher's facts as published (its period, a coach count, the bays' rules).",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "description": "Open enumeration; treat an unknown value as other.",
+            "enum": [
+              "coach_parking",
+              "street_parking"
+            ],
+            "type": "string"
+          },
+          "kindTotal": {
+            "description": "The entries of this kind in its radius (2 km for coach places, 300 m for bays), the bays counted one per bay inside it.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "kindVariants": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "description": "kindTotal by variant.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position",
+            "description": "The point of the entry nearest the asked position."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "partsInside": {
+            "description": "The entry's own bays inside the radius; 1 for an entry not counted by bay.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "publishedSeenAt": {
+            "description": "When the source last published the entry.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceFamily": {
+            "type": "string"
+          },
+          "variant": {
+            "description": "The publisher's variant of the kind.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "sourceFamily",
+          "id",
+          "variant",
+          "name",
+          "ref",
+          "detail",
+          "facts",
+          "location",
+          "distanceM",
+          "publishedSeenAt",
+          "kindTotal",
+          "kindVariants",
+          "partsInside"
+        ],
+        "type": "object"
+      },
       "ParkingEnvelope": {
         "additionalProperties": false,
         "properties": {
@@ -6369,6 +6589,16 @@
           "name": {
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "nearbyAmenities": {
+            "description": "What OpenStreetMap maps near the site (500 m around a city car park, park and ride or other site, else 300 m; along a motorway 300 m): the nearest named entry of each amenity, none the site's publisher states, nearest first, five at most; null when not read (a nearby search, a place overview).",
+            "items": {
+              "$ref": "#/components/schemas/NearbyAmenity"
+            },
+            "type": [
+              "array",
               "null"
             ]
           },
@@ -6446,13 +6676,56 @@
           "occupancy",
           "termsRequired",
           "sourceFamily",
-          "amenities"
+          "amenities",
+          "nearbyAmenities"
         ],
         "type": "object"
       },
       "ParkingMeta": {
         "additionalProperties": false,
         "properties": {
+          "around": {
+            "additionalProperties": false,
+            "properties": {
+              "osmCarParks": {
+                "description": "OpenStreetMap's car parks (ODbL; no capacity, no occupancy) within the radius that are none of the listed sites, nearest first, same-named ones as one, at most the limit; null when not read: a lorry or rest-area question, or a key that may not read OpenStreetMap. Credited in meta.attribution, with its share-alike offer, only when one is listed.",
+                "items": {
+                  "$ref": "#/components/schemas/OSMCarPark"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "osmDataAsOf": {
+                "description": "The newest OpenStreetMap extract day of the car parks listed; null when none is listed.",
+                "format": "date",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "roadContext": {
+                "description": "The city's coach places within 2 km and on-street bay rules within 300 m, three of each at most, the coach places for parking first; empty where no city publishes them; null when not read: a question with a kind, free_min or facilities.",
+                "items": {
+                  "$ref": "#/components/schemas/ParkingContextItem"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "osmCarParks",
+              "osmDataAsOf",
+              "roadContext"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "asOf": {
             "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
             "format": "date-time",
@@ -6515,6 +6788,7 @@
         "required": [
           "page",
           "query",
+          "around",
           "asOf",
           "freshness",
           "attribution",
@@ -6612,6 +6886,16 @@
               "null"
             ]
           },
+          "nearbyAmenities": {
+            "description": "What OpenStreetMap maps near the site (500 m around a city car park, park and ride or other site, else 300 m; along a motorway 300 m): the nearest named entry of each amenity, none the site's publisher states, nearest first, five at most; null when not read (a nearby search, a place overview).",
+            "items": {
+              "$ref": "#/components/schemas/NearbyAmenity"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
           "occupancy": {
             "additionalProperties": false,
             "description": "The last report; null when none is published, or while the terms are not accepted.",
@@ -6686,7 +6970,8 @@
           "occupancy",
           "termsRequired",
           "sourceFamily",
-          "amenities"
+          "amenities",
+          "nearbyAmenities"
         ],
         "type": "object"
       },
@@ -17176,7 +17461,8 @@
                               "shower"
                             ],
                             "absent": []
-                          }
+                          },
+                          "nearbyAmenities": []
                         }
                       ],
                       "meta": {
@@ -18382,7 +18668,8 @@
                               "shower"
                             ],
                             "absent": []
-                          }
+                          },
+                          "nearbyAmenities": []
                         }
                       ],
                       "meta": {
@@ -18435,6 +18722,11 @@
                           },
                           "radiusM": 50000,
                           "freeMin": 0
+                        },
+                        "around": {
+                          "osmCarParks": null,
+                          "osmDataAsOf": null,
+                          "roadContext": []
                         }
                       },
                       "links": {

@@ -128,7 +128,7 @@ func (s *Service) nearbyPart(ctx context.Context, key access.Record, c string, q
 		}
 		return meta(a), err
 	case "parking":
-		a, err := s.Parking(ctx, key, parking.Query{At: at, RadiusM: r, Limit: n})
+		a, err := s.Parking(ctx, key, parking.Query{At: at, RadiusM: r, Limit: n, CarParks: true})
 		if err == nil {
 			out.Parking = &a
 		}

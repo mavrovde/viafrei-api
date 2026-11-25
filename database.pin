@@ -16,4 +16,4 @@
 # the tests and the local stack run it, and internal/release/pinguard
 # refuses it, so CI and the release workflow stop on it.
 viafrei-database:0.6.1-local
-schema-head 348
+schema-head 349

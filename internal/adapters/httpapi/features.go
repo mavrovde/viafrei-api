@@ -115,6 +115,7 @@ var nullableObjects = []struct{ schema, member string }{
 	{"MotorwayData", "coverage"},
 	{"ParkingSite", "occupancy"},
 	{"ParkingListing", "occupancy"},
+	{"ParkingMeta", "around"},
 	{"RoadSituation", "location"},
 	{"RoadSituation", "lanes"},
 	{"RoadSituation", "position"},
@@ -725,16 +726,17 @@ type Occupancy struct {
 // without a distance: an item of listMotorwayParking and of the nearby
 // answer.
 type ParkingListing struct {
-	ID            string           `json:"id"`
-	Name          *string          `json:"name" nullable:"true"`
-	Operator      *string          `json:"operator" nullable:"true"`
-	Kind          string           `json:"kind" enum:"garage,lot,park_and_ride,on_street,rest_area,truck_parking,other" doc:"Open enumeration; treat an unknown value as other."`
-	Location      Position         `json:"location"`
-	DistanceM     *int             `json:"distanceM" nullable:"true" doc:"Distance from the asked position, in metres; null along a motorway (no point was asked) and for a site whose terms need accepting (a Toll Collect site), which the platform names without a distance."`
-	Occupancy     *Occupancy       `json:"occupancy" doc:"The last report; null when none is published, or while the terms are not accepted."`
-	TermsRequired bool             `json:"termsRequired" doc:"True when the occupancy is withheld until the family's terms are accepted."`
-	SourceFamily  string           `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
-	Amenities     ParkingAmenities `json:"amenities" doc:"The amenities the site's own publisher states it has and states it lacks; an amenity in neither is unknown, never absent."`
+	ID              string           `json:"id"`
+	Name            *string          `json:"name" nullable:"true"`
+	Operator        *string          `json:"operator" nullable:"true"`
+	Kind            string           `json:"kind" enum:"garage,lot,park_and_ride,on_street,rest_area,truck_parking,other" doc:"Open enumeration; treat an unknown value as other."`
+	Location        Position         `json:"location"`
+	DistanceM       *int             `json:"distanceM" nullable:"true" doc:"Distance from the asked position, in metres; null along a motorway (no point was asked) and for a site whose terms need accepting (a Toll Collect site), which the platform names without a distance."`
+	Occupancy       *Occupancy       `json:"occupancy" doc:"The last report; null when none is published, or while the terms are not accepted."`
+	TermsRequired   bool             `json:"termsRequired" doc:"True when the occupancy is withheld until the family's terms are accepted."`
+	SourceFamily    string           `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
+	Amenities       ParkingAmenities `json:"amenities" doc:"The amenities the site's own publisher states it has and states it lacks; an amenity in neither is unknown, never absent."`
+	NearbyAmenities []NearbyAmenity  `json:"nearbyAmenities" nullable:"true" doc:"What OpenStreetMap maps near the site (500 m around a city car park, park and ride or other site, else 300 m; along a motorway 300 m): the nearest named entry of each amenity, none the site's publisher states, nearest first, five at most; null when not read (a nearby search, a place overview)."`
 }
 
 // ParkingAmenities are a site's stated amenities, in the platform's order.
@@ -778,6 +780,8 @@ type ParkingMeta struct {
 	Page  Page         `json:"page"`
 	Query ParkingQuery `json:"query"`
 	Terms []TermsOffer `json:"terms,omitempty" doc:"The terms of the sites marked termsRequired, with their text: show it to the end user, and pass accept_terms only once the user accepts."`
+	// Around is what the platform's parking search shows beside its list.
+	Around *ParkingAround `json:"around"`
 }
 
 // ParkingEnvelope is the enveloped answer of listParkingOptions.
@@ -799,7 +803,7 @@ func parkingSites(a features.Answer[parking.Site]) ([]ParkingListing, bool) {
 	for i, v := range a.Items {
 		item := ParkingListing{
 			ID: v.ID, Name: v.Name, Operator: v.Operator, Kind: string(v.Kind), Location: position(v.Location),
-			TermsRequired: v.TermsRequired, SourceFamily: v.Family, Amenities: parkingAmenities(v.Amenities),
+			TermsRequired: v.TermsRequired, SourceFamily: v.Family, Amenities: parkingAmenities(v.Amenities), NearbyAmenities: siteNearby(a.Around, i),
 		}
 		if !v.Unranged {
 			d := v.DistanceM
@@ -854,12 +858,13 @@ func registerParking(api huma.API, s *server, op huma.Operation) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
-		q := in.query(parking.Query{At: in.point, RadiusM: s.radius(in.RadiusM), Limit: s.limit(in.Limit)})
+		q := in.query(parking.Query{At: in.point, RadiusM: s.radius(in.RadiusM), Limit: s.limit(in.Limit), CarParks: true, Around: true})
 		a, meta, err := s.parkingAnswer(in.with(ctx), q)
 		if err != nil {
 			return nil, err
 		}
 		meta.Query = ParkingQuery{NearQuery: NearQuery{At: position(q.At), RadiusM: q.RadiusM}, ParkingFilterQuery: parkingFilterQuery(q)}
+		meta.Around = parkingAround(a.Around)
 		data, _ := rangedParkingSites(a)
 		return &ParkingOutput{CacheControl: noStore, Body: ParkingEnvelope{Data: data, Meta: meta, Links: s.selfLink(ctx)}}, nil
 	})
@@ -937,7 +942,7 @@ func registerMotorwayParking(api huma.API, s *server, op huma.Operation) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
-		q := in.query(parking.Query{Road: in.road, Limit: s.limit(in.Limit)})
+		q := in.query(parking.Query{Road: in.road, Limit: s.limit(in.Limit), Around: true})
 		a, meta, err := s.parkingAnswer(in.with(ctx), q)
 		if err != nil {
 			return nil, err
@@ -986,16 +991,17 @@ type ParkingPart struct {
 // distance: the /v1 contract states one for each (VER-001), a Toll Collect
 // site's too, which the platform names without one.
 type ParkingSite struct {
-	ID            string           `json:"id"`
-	Name          *string          `json:"name" nullable:"true"`
-	Operator      *string          `json:"operator" nullable:"true"`
-	Kind          string           `json:"kind" enum:"garage,lot,park_and_ride,on_street,rest_area,truck_parking,other" doc:"Open enumeration; treat an unknown value as other."`
-	Location      Position         `json:"location"`
-	DistanceM     int              `json:"distanceM" doc:"Distance from the asked position, in metres."`
-	Occupancy     *Occupancy       `json:"occupancy" doc:"The last report; null when none is published, or while the terms are not accepted."`
-	TermsRequired bool             `json:"termsRequired" doc:"True when the occupancy is withheld until the family's terms are accepted."`
-	SourceFamily  string           `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
-	Amenities     ParkingAmenities `json:"amenities" doc:"The amenities the site's own publisher states it has and states it lacks; an amenity in neither is unknown, never absent."`
+	ID              string           `json:"id"`
+	Name            *string          `json:"name" nullable:"true"`
+	Operator        *string          `json:"operator" nullable:"true"`
+	Kind            string           `json:"kind" enum:"garage,lot,park_and_ride,on_street,rest_area,truck_parking,other" doc:"Open enumeration; treat an unknown value as other."`
+	Location        Position         `json:"location"`
+	DistanceM       int              `json:"distanceM" doc:"Distance from the asked position, in metres."`
+	Occupancy       *Occupancy       `json:"occupancy" doc:"The last report; null when none is published, or while the terms are not accepted."`
+	TermsRequired   bool             `json:"termsRequired" doc:"True when the occupancy is withheld until the family's terms are accepted."`
+	SourceFamily    string           `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
+	Amenities       ParkingAmenities `json:"amenities" doc:"The amenities the site's own publisher states it has and states it lacks; an amenity in neither is unknown, never absent."`
+	NearbyAmenities []NearbyAmenity  `json:"nearbyAmenities" nullable:"true" doc:"What OpenStreetMap maps near the site (500 m around a city car park, park and ride or other site, else 300 m; along a motorway 300 m): the nearest named entry of each amenity, none the site's publisher states, nearest first, five at most; null when not read (a nearby search, a place overview)."`
 }
 
 // rangedParkingSites are the sites of an answer around a position, each
@@ -1005,7 +1011,8 @@ func rangedParkingSites(a features.Answer[parking.Site]) ([]ParkingSite, bool) {
 	out := make([]ParkingSite, len(listed))
 	for i, v := range listed {
 		out[i] = ParkingSite{ID: v.ID, Name: v.Name, Operator: v.Operator, Kind: v.Kind, Location: v.Location,
-			DistanceM: a.Items[i].DistanceM, Occupancy: v.Occupancy, TermsRequired: v.TermsRequired, SourceFamily: v.SourceFamily, Amenities: v.Amenities}
+			DistanceM: a.Items[i].DistanceM, Occupancy: v.Occupancy, TermsRequired: v.TermsRequired, SourceFamily: v.SourceFamily, Amenities: v.Amenities,
+			NearbyAmenities: v.NearbyAmenities}
 	}
 	return out, withheld
 }

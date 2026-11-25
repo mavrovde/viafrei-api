@@ -37,6 +37,11 @@ var errStore = errors.New("store down")
 
 type fake struct {
 	regErr, provErr, chErr, pkErr, plErr error
+	// around is what ParkingAround reads; aroundErr fails it; gotAround is
+	// the query it was asked.
+	around    parking.AroundRead
+	aroundErr error
+	gotAround *parking.AroundQuery
 	// regFailAt fails the register's read from that call on.
 	regFailAt                            int
 	provCalls                            int
@@ -137,6 +142,11 @@ func (f *fake) ChargingInRadius(_ context.Context, q energy.Query, fams []string
 func (f *fake) ParkingNear(_ context.Context, _ parking.Query, listed, occ []string, at time.Time) ([]parking.Site, bool, *time.Time, error) {
 	f.gotListed, f.gotOccupancy, f.gotNow = listed, occ, at
 	return slices.Clone(f.parks), false, f.next, f.pkErr
+}
+
+func (f *fake) ParkingAround(_ context.Context, q parking.AroundQuery) (parking.AroundRead, error) {
+	f.gotAround = &q
+	return f.around, f.aroundErr
 }
 
 func (f *fake) Place(context.Context, string, []string) (places.Place, error) {

@@ -27,7 +27,7 @@ type NearbyInput struct {
 type NearbyJunction struct {
 	ID           string   `json:"id"`
 	Name         string   `json:"name"`
-	Road         *string  `json:"road" nullable:"true" doc:"The motorway; null when not published."`
+	Road         *string  `json:"road" nullable:"true" doc:"The motorway: the gazetteer point's own, or for an OpenStreetMap node the one the BASt Location Code List places it on (two for an interchange named on both, A3/A46); null for a junction off any motorway that can be named."`
 	Number       *string  `json:"number" nullable:"true" doc:"The junction's number; null when not published."`
 	Location     Position `json:"location"`
 	DistanceM    int      `json:"distanceM"`
@@ -79,8 +79,10 @@ type NearbyData struct {
 	Charging  *[]ChargingSite      `json:"charging,omitempty" doc:"Public charging sites, nearest first, three at most."`
 	Parking   *[]ParkingListing    `json:"parking,omitempty" doc:"Parking sites, nearest first, three at most."`
 	Stations  *[]Station           `json:"stations,omitempty" doc:"Stations, nearest first, three at most."`
-	Junctions *[]NearbyJunction    `json:"junctions,omitempty" doc:"Motorway junctions, nearest first, three at most; services areas and car parks are none."`
-	Needs     *[]NeedBlock         `json:"needs,omitempty" doc:"The asked everyday needs, in the order asked."`
+	Junctions *[]NearbyJunction    `json:"junctions,omitempty" doc:"Motorway junctions, nearest first, three at most; services areas and car parks are none. OpenStreetMap's junction nodes, same-named ones within 1.5 km as one; with none, the gazetteer's junction points."`
+	// JunctionsFrom is the source the junctions came from.
+	JunctionsFrom *string      `json:"junctionsFrom,omitempty" enum:"osm,gazetteer" doc:"Where the junctions came from: osm, or gazetteer, when no OpenStreetMap junction node is within the radius. With junctions only."`
+	Needs         *[]NeedBlock `json:"needs,omitempty" doc:"The asked everyday needs, in the order asked."`
 }
 
 // NearbyPartStatus is the outcome of one category.
@@ -176,6 +178,7 @@ func nearbyEnvelope(s *server, ctx context.Context, a features.NearbyAnswer, q f
 				Location: position(j.Location), DistanceM: j.DistanceM, SourceFamily: j.Family})
 		}
 		data.Junctions = &js
+		data.JunctionsFrom = &a.JunctionsFrom
 	}
 	var needs []NeedBlock
 	for _, c := range q.Categories {

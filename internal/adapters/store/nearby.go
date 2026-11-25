@@ -57,19 +57,46 @@ order by p.geom <-> `+atPosition+`, 'osm:' || p.osm_type || p.osm_id
 limit (select $5::int8)`, "float8", "float8", "float8", "text[]", "int8")
 }
 
-// junctionsNear reads the LCL's German motorway points with a name within $3
-// metres of ($1, $2), of the families $4, nearest first by the whole metre,
-// a tie broken by id, at most $5.
-var junctionsNear = named("api_nearby_junctions", `
-select t.cid || ':' || t.tabcd || ':' || t.lcd, t.road_number, t.junction_no, t.name,
-       st_y(t.geom::geometry), st_x(t.geom::geometry),
-       round(st_distance(t.geom::geometry(Point,4326)::geography, `+atPosition+`))::int, 'bast_lcl'
-from tmc_locations t
-where t.cid = 58 and t.tabcd = 1 and t.tcd = 1 and t.road_number ~ '^A[1-9][0-9]{0,2}$'
-  and t.geom is not null and t.name is not null
-  and 'bast_lcl' = any((select $4::text[])::text[])
-  and st_dwithin(t.geom::geometry(Point,4326)::geography, `+atPosition+`, (select $3::float8))
-order by 7, 1
+// junctionsOSM reads OpenStreetMap's motorway junction nodes within $3
+// metres of ($1, $2), of the families $4, nearest first, at most $5, as
+// today's JUNCTIONS_OSM_NEAR.
+var junctionsOSM = named("api_nearby_junctions_osm", `
+select 'osm:' || o.osm_type || o.osm_id, coalesce(o.name, ''), st_y(o.geom::geometry), st_x(o.geom::geometry),
+       round(st_distance(o.geom, `+atPosition+`))::int, o.source_id
+from osm_pois o
+where o.closed_at is null and o.category = 'highway' and o.category_value = 'motorway_junction'
+  and o.source_id = any((select $4::text[])::text[])
+  and st_dwithin(o.geom, `+atPosition+`, (select $3::float8))
+order by st_distance(o.geom, `+atPosition+`), o.id
+limit (select $5::int8)`, "float8", "float8", "float8", "text[]", "int8")
+
+// junctionRoads reads, for each node ($1 longitudes, $2 latitudes), the
+// five nearest LCL motorway points within places.LCLReachM, of the family
+// bast_lcl where $3 holds it, as today's JUNCTION_ROAD_LCL.
+var junctionRoads = named("api_junction_roads_lcl", `
+select u.ord::int, p.road, p.name, p.d
+from unnest((select $1::float8[]), (select $2::float8[])) with ordinality u(lon, lat, ord)
+cross join lateral (
+  select m.road_number road, m.name, st_distance(m.geom::geometry(Point,4326)::geography, st_setsrid(st_makepoint(u.lon, u.lat), 4326)::geography) d
+  from tmc_locations m
+  where m.cid = 58 and m.tabcd = 1 and m.road_number ~ '^A[1-9][0-9]{0,2}$' and m.geom is not null
+    and 'bast_lcl' = any((select $3::text[])::text[])
+    and st_dwithin(m.geom::geometry(Point,4326)::geography, st_setsrid(st_makepoint(u.lon, u.lat), 4326)::geography, 1500)
+  order by m.geom::geometry(Point,4326)::geography <-> st_setsrid(st_makepoint(u.lon, u.lat), 4326)::geography
+  limit 5) p
+order by u.ord, p.d`, "float8[]", "float8[]", "text[]")
+
+// junctionsGazetteer reads the gazetteer's junction points within $3
+// metres of ($1, $2), of the families $4, nearest first, at most $5, as
+// today's findPlacesAround of kind junction.
+var junctionsGazetteer = named("api_nearby_junctions_gazetteer", `
+select g.id::text, g.name, g.road, st_y(g.geom::geometry), st_x(g.geom::geometry),
+       round(st_distance(g.geom, `+atPosition+`))::int, g.source_id
+from gazetteer_places g
+where g.closed_at is null and g.geom is not null and g.kind = 'junction'
+  and g.source_id = any((select $4::text[])::text[])
+  and st_dwithin(g.geom, `+atPosition+`, (select $3::float8))
+order by g.geom <-> `+atPosition+`
 limit (select $5::int8)`, "float8", "float8", "float8", "text[]", "int8")
 
 // junctionOverfetch is how many more junctions are read than shown, so the
@@ -103,22 +130,73 @@ func (s *Store) NeedPlaces(ctx context.Context, q places.NearbyQuery, families [
 	})
 }
 
-// Junctions reads the junctions within q's radius, rest areas left out, at
-// most q.Limit (features.Nearby).
-func (s *Store) Junctions(ctx context.Context, q places.NearbyQuery, families []string) ([]places.Junction, error) {
-	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]places.Junction, error) {
-		rows, _ := run(ctx, tx, junctionsNear, q.At.Lon, q.At.Lat, q.RadiusM, families, q.Limit*junctionOverfetch)
+// Junctions reads the junctions within q's radius, as today's
+// nearestJunctions: OpenStreetMap's nodes, rest areas left out, same-named
+// ones within places.SameJunctionM folded, at most q.Limit, each with the
+// road the LCL places it on; with none, the gazetteer's junction points;
+// with neither, none from OpenStreetMap (features.Nearby).
+func (s *Store) Junctions(ctx context.Context, q places.NearbyQuery, families []string) (places.Junctions, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (places.Junctions, error) {
+		out := places.Junctions{From: places.JunctionsFromOSM, Rows: []places.Junction{}}
+		rows, _ := run(ctx, tx, junctionsOSM, q.At.Lon, q.At.Lat, float64(q.RadiusM), families, q.Limit*junctionOverfetch)
 		js, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.Junction, error) {
 			var j places.Junction
-			err := r.Scan(&j.ID, &j.Road, &j.Number, &j.Name, &j.Location.Lat, &j.Location.Lon, &j.DistanceM, &j.Family)
+			err := r.Scan(&j.ID, &j.Name, &j.Location.Lat, &j.Location.Lon, &j.DistanceM, &j.Family)
 			return j, err
 		})
-		out := []places.Junction{}
+		if err != nil {
+			return out, err
+		}
+		var nodes []places.Junction
 		for _, j := range js {
-			if !places.IsRestAreaName(j.Name) && len(out) < q.Limit {
-				out = append(out, j)
+			if !places.IsRestAreaName(j.Name) {
+				nodes = append(nodes, j)
 			}
+		}
+		if len(nodes) > 0 {
+			nodes = places.FoldSameNamed(nodes, places.SameJunctionM)
+			out.Rows = nodes[:min(len(nodes), q.Limit)]
+			return out, junctionRoadsOf(ctx, tx, out.Rows, families)
+		}
+		rows, _ = run(ctx, tx, junctionsGazetteer, q.At.Lon, q.At.Lat, float64(q.RadiusM), families, q.Limit*junctionOverfetch)
+		gs, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (places.Junction, error) {
+			var j places.Junction
+			err := r.Scan(&j.ID, &j.Name, &j.Road, &j.Location.Lat, &j.Location.Lon, &j.DistanceM, &j.Family)
+			return j, err
+		})
+		for _, j := range gs {
+			if !places.IsRestAreaName(j.Name) && len(out.Rows) < q.Limit {
+				out.Rows = append(out.Rows, j)
+			}
+		}
+		if len(out.Rows) > 0 {
+			out.From = places.JunctionsFromGazetteer
 		}
 		return out, err
 	})
+}
+
+// junctionRoadsOf sets the road each OpenStreetMap node lies on, read from
+// the LCL points near it (places.JunctionRoad).
+func junctionRoadsOf(ctx context.Context, tx pgx.Tx, js []places.Junction, families []string) error {
+	lons, lats := make([]float64, len(js)), make([]float64, len(js))
+	for i, j := range js {
+		lons[i], lats[i] = j.Location.Lon, j.Location.Lat
+	}
+	rows, _ := run(ctx, tx, junctionRoads, lons, lats, families)
+	near := make([][]places.LCLPoint, len(js))
+	var (
+		ord int
+		p   places.LCLPoint
+	)
+	_, err := pgx.ForEachRow(rows, []any{&ord, &p.Road, &p.Name, &p.DistanceM}, func() error {
+		near[ord-1] = append(near[ord-1], p)
+		return nil
+	})
+	for i := range js {
+		if r := places.JunctionRoad(js[i].Name, near[i]); r != nil {
+			js[i].Road, js[i].RoadBy = r, "bast_lcl"
+		}
+	}
+	return err
 }

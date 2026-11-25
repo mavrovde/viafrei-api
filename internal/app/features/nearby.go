@@ -17,7 +17,7 @@ import (
 type Nearby interface {
 	// Junctions returns the junctions within q's radius, nearest first, rest
 	// areas left out, at most q.Limit.
-	Junctions(ctx context.Context, q places.NearbyQuery, families []string) ([]places.Junction, error)
+	Junctions(ctx context.Context, q places.NearbyQuery, families []string) (places.Junctions, error)
 	// NeedPlaces returns, per need of q, the nearest places.NeedRows places
 	// of its kinds within places.NeedMaxM.
 	NeedPlaces(ctx context.Context, q places.NearbyQuery, families []string) (map[string][]places.NeedPlace, error)
@@ -47,9 +47,12 @@ type NearbyAnswer struct {
 	Parking   *Answer[parking.Site]
 	Stations  *Answer[transit.Station]
 	Junctions *Answer[places.Junction]
-	Needs     map[string]places.NeedPick
-	Parts     []PartResult
-	Meta      Answer[struct{}]
+	// JunctionsFrom is the source the junctions came from
+	// (places.JunctionsFromOSM or places.JunctionsFromGazetteer).
+	JunctionsFrom string
+	Needs         map[string]places.NeedPick
+	Parts         []PartResult
+	Meta          Answer[struct{}]
 }
 
 // nearbyScope is the scope each category needs; a need needs places. The
@@ -139,16 +142,28 @@ func (s *Service) nearbyPart(ctx context.Context, key access.Record, c string, q
 	}
 	jq := q.At
 	jq.Limit = n
-	js, m, err := listedOwn(ctx, s, key, "roads", func(permitted []string) ([]places.Junction, []string, error) {
+	// The junctions are OpenStreetMap's nodes or the gazetteer's points
+	// (places families) and the LCL's roads (roads families), as today's.
+	js, m, err := listedOwn(ctx, s, key, "roads", func(permitted []string) (places.Junctions, []string, error) {
+		// The register and gate were read a moment ago by listedOwn.
+		if reg, gate, err := s.gate(ctx, key); err == nil {
+			if fams, _, err := gate.Answer(access.Answering(reg, "places")); err == nil {
+				permitted = append(slices.Clone(permitted), fams...)
+			}
+		}
 		js, err := s.repos.Nearby.Junctions(ctx, jq, permitted)
 		var contributed []string
-		for _, j := range js {
+		for _, j := range js.Rows {
 			contributed = append(contributed, j.Family)
+			if j.RoadBy != "" {
+				contributed = append(contributed, j.RoadBy)
+			}
 		}
 		return js, contributed, err
 	})
 	if err == nil {
-		out.Junctions = &Answer[places.Junction]{Items: js, Families: m.Families, Partial: m.Partial, At: m.At}
+		out.Junctions = &Answer[places.Junction]{Items: js.Rows, Families: m.Families, Partial: m.Partial, At: m.At}
+		out.JunctionsFrom = js.From
 	}
 	return m, err
 }

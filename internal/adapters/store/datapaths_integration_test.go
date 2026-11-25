@@ -165,7 +165,7 @@ func TestJunctionsAtAJunction(t *testing.T) {
 		dbAsk(t, "contract.junction holds no named junction: no junction is near anything")
 	}
 	js, err := seeded(t).Junctions(bounded(t), places.NearbyQuery{At: at, RadiusM: 1000, Limit: 1}, every(t))
-	if err != nil || len(js) != 1 {
+	if err != nil || len(js.Rows) != 1 {
 		t.Fatalf("%+v %v", js, err)
 	}
 }

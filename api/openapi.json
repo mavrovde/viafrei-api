@@ -4258,11 +4258,19 @@
             "type": "array"
           },
           "junctions": {
-            "description": "Motorway junctions, nearest first, three at most; services areas and car parks are none.",
+            "description": "Motorway junctions, nearest first, three at most; services areas and car parks are none. OpenStreetMap's junction nodes, same-named ones within 1.5 km as one; with none, the gazetteer's junction points.",
             "items": {
               "$ref": "#/components/schemas/NearbyJunction"
             },
             "type": "array"
+          },
+          "junctionsFrom": {
+            "description": "Where the junctions came from: osm, or gazetteer, when no OpenStreetMap junction node is within the radius. With junctions only.",
+            "enum": [
+              "osm",
+              "gazetteer"
+            ],
+            "type": "string"
           },
           "needs": {
             "description": "The asked everyday needs, in the order asked.",
@@ -4382,7 +4390,7 @@
             ]
           },
           "road": {
-            "description": "The motorway; null when not published.",
+            "description": "The motorway: the gazetteer point's own, or for an OpenStreetMap node the one the BASt Location Code List places it on (two for an interchange named on both, A3/A46); null for a junction off any motorway that can be named.",
             "type": [
               "string",
               "null"

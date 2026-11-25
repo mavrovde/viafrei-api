@@ -141,3 +141,4 @@ vocabulary	internal/adapters/store/speed_integration_test.go	ingest	the platform
 denylist	internal/adapters/store/reach_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them writes the run ledger they read
 vocabulary	internal/adapters/store/reach_integration_test.go	ingest	the platform's run ledger, which this test writes to state the timetable's load
 vocabulary	internal/adapters/store/relations.go	ingest	the platform's run ledger (ingest_runs), which the timetable reach reads
+denylist	internal/adapters/store/gemeinde_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them plants their rows

@@ -188,11 +188,10 @@ func (s *Store) Location(ctx context.Context, q places.LocationQuery, families [
 			err := r.Scan(&i, &hit)
 			return hit, err
 		})
-		if err != nil {
-			return out, err
-		}
-		if places.LongestEmptyRun(hits) < places.AbroadEmptyRun {
-			out.Gemeinde, err = gemeinde(ctx, tx, q, out.Address, families)
+		if err != nil || places.LongestEmptyRun(hits) < places.AbroadEmptyRun {
+			if err == nil {
+				out.Gemeinde, err = gemeinde(ctx, tx, q, out.Address, families)
+			}
 			return out, err
 		}
 		out.MayLieAbroad = true

@@ -32,7 +32,7 @@ func TestNearbyAnswer(t *testing.T) {
 		Charging:  &ch,
 		Parking:   &pk,
 		Stations:  &st,
-		Junctions: &features.Answer[places.Junction]{Items: []places.Junction{{ID: "j:1", Name: "Köln-Ost", Location: geo.Point{Lat: 50.9, Lon: 7}, Family: "src-alpha-places"}}},
+		Junctions: &features.Answer[places.Junction]{Items: []places.Junction{{ID: "j:1", Name: "Köln-Ost", Location: geo.Point{Lat: 50.9, Lon: 7}, Family: "src-alpha-places"}}}, JunctionsFrom: "osm",
 		Needs: map[string]places.NeedPick{"food": {Need: "food", RadiusM: 3000, Widened: true,
 			Places: []places.NeedPlace{{ID: "osm:1", Name: "Café", Kind: "amenity=cafe", DistanceM: 2500, Family: "src-alpha-places"}}}},
 		Parts: []features.PartResult{{Part: "fuel", Status: features.StatusOK}, {Part: "needs", Status: features.StatusOK}},
@@ -59,7 +59,7 @@ func TestNearbyAnswer(t *testing.T) {
 			t.Errorf("answer lacks %s: %s", want, body)
 		}
 	}
-	f.nearby = features.NearbyAnswer{Junctions: &features.Answer[places.Junction]{}, Meta: features.Answer[struct{}]{At: fixedNow},
+	f.nearby = features.NearbyAnswer{Junctions: &features.Answer[places.Junction]{}, JunctionsFrom: "osm", Meta: features.Answer[struct{}]{At: fixedNow},
 		Parts: []features.PartResult{{Part: "fuel", Status: features.StatusUnavailable, Err: errors.New("down")}, {Part: "junction", Status: features.StatusOK}}}
 	w = do(t, h, http.MethodGet, "/v1/nearby?at=50.94,6.96&radius_m=15000", bearer)
 	if body = w.Body.String(); w.Code != http.StatusOK || !slices.Equal(f.gotNearby.Categories, features.VehicleCategories) ||

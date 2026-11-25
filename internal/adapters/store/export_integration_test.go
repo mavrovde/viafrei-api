@@ -153,6 +153,17 @@ func replayInTest(ctx context.Context, t testing.TB, c parityCheck) {
 // no test pays for the comparison.
 var parity = flag.Bool("parity", false, "compare every named statement with the frozen view statement it replaced")
 
+// noPlatformRead are the named statements the platform has no statement
+// of, so none to compare with, each with its reason.
+var noPlatformRead = map[string]string{
+	"api_register_probe":         "the API's own probe of the row versions its register cache is read from; it answers no question",
+	"api_charging_feed_register": "the platform holds the charging feed register as code, not as a table it reads",
+}
+
+// NoPlatformRead is why a named statement has no platform statement to
+// compare with; empty when it has one.
+func NoPlatformRead(name string) string { return noPlatformRead[name] }
+
 // ParityOn reports whether the run compares the named statements with the
 // frozen view statements (-parity); the flags are parsed.
 func ParityOn() bool { return *parity }
@@ -164,6 +175,9 @@ func ParityOn() bool { return *parity }
 func EnableParity() {
 	beside = func(ctx context.Context, tx pgx.Tx, s stmt, args []any) {
 		legacy, ok := legacyReads[s.Name]
+		if !ok && noPlatformRead[s.Name] != "" {
+			return
+		}
 		if !ok {
 			parityMu.Lock()
 			defer parityMu.Unlock()

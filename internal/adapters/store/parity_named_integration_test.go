@@ -326,6 +326,7 @@ func parityHeld() bool {
 	if flag.Lookup("test.run").Value.String() == "" {
 		for _, r := range store.NamedReads() {
 			switch {
+			case store.NoPlatformRead(r.Name) != "":
 			case runs[r.Name] == 0:
 				fmt.Fprintf(os.Stderr, "parity: %s never ran beside its view statement\n", r.Name)
 				unrun++

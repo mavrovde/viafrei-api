@@ -64,6 +64,37 @@ type Disruptions struct {
 	// Line is what the static timetable says of the line asked; nil when
 	// the query names none.
 	Line *LineCheck
+	// Coverage is whether an alert source covers the area's Land at all;
+	// nil without an area.
+	Coverage *AlertsCoverage
+}
+
+// AlertsLookbackDays is how far back an alert placed in a Land shows that a
+// publisher covers it, as today's (ALERT_COVERAGE_LOOKBACK_DAYS).
+const AlertsLookbackDays = 14
+
+// AlertsCoverage is whether any alert source read covers the area, per Land
+// of it, as today's disruption check measures it: "none in force" is an
+// answer only where somebody publishes. Covered holds when an alert is
+// listed now or one was placed in a Land by a stop or a route within the
+// lookback.
+type AlertsCoverage struct {
+	Covered      bool
+	LookbackDays int
+	Lands        []LandCoverage
+}
+
+// LandCoverage is one Land's alerts seen within the lookback and when the
+// newest one placed there was last seen, at any age; nil when never.
+type LandCoverage struct {
+	Land       string
+	AlertsSeen int
+	LastSeenAt *time.Time
+}
+
+// LandOf is the Land key of an area code: its first two digits.
+func LandOf(area string) string {
+	return area[:min(2, len(area))]
 }
 
 // LineCheck is whether the static timetable knows a line of the asked

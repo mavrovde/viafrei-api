@@ -1232,3 +1232,18 @@ with run as (
 bounds as (select max(d.service_date) last_date from gtfs_service_dates d where d.gtfs_feed_key = 1)
 select (coalesce((select wrote_to from run), b.last_date) + 1)::timestamp at time zone 'Europe/Berlin', (select started_at from run)
 from bounds b`
+
+// relAlertsCoverage is the alerts coverage of the Land of the area $1, of
+// the families $3, as today's ALERT_COVERAGE_BY_LAND reads it: the alerts a
+// publisher placed in the Land by a stop or a route, publishable ones only,
+// open or closed, counted since $2, and the newest one's last sighting at
+// any age.
+const relAlertsCoverage = `
+select l.land, (count(*) filter (where a.last_seen_at >= $2::timestamptz))::int, max(a.last_seen_at)
+from delfi_service_alerts a
+cross join lateral unnest(a.lands) l(land)
+where l.land = left($1::text, 2)
+  and a.placed_by in ('stop', 'route')
+  and coalesce(a.confidentiality, 'noRestriction') = 'noRestriction'
+  and a.source_feed = any($3::text[])
+group by l.land`

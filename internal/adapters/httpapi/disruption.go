@@ -78,6 +78,22 @@ type DisruptionData struct {
 	Punctuality       *DisruptionPunctuality `json:"punctuality" doc:"The area's punctuality; null without an area or when the source counted no trip in it."`
 	WindowMin         int                    `json:"windowMin" doc:"The window asked for, in minutes."`
 	Line              *DisruptionLine        `json:"line" doc:"What the static timetable says of the line asked; null without line."`
+	// AlertsCoverage is whether any alert source covers the area.
+	AlertsCoverage *AlertsCoverage `json:"alertsCoverage" doc:"Whether any alert source read covers the area's Land at all: no alert in force is an answer only where somebody publishes. Null without an area."`
+}
+
+// AlertsCoverage is the alerts coverage of the area.
+type AlertsCoverage struct {
+	Covered      bool           `json:"covered" doc:"An alert is listed now, or one was placed in a Land of the area by a stop or a route within lookbackDays."`
+	LookbackDays int            `json:"lookbackDays"`
+	Lands        []LandCoverage `json:"lands"`
+}
+
+// LandCoverage is one Land's alerts coverage.
+type LandCoverage struct {
+	Land       string     `json:"land" doc:"The Land's two-digit official key."`
+	AlertsSeen int        `json:"alertsSeen" doc:"Alerts placed in the Land by a stop or a route within lookbackDays."`
+	LastSeenAt *time.Time `json:"newestAlertSeenAt" nullable:"true" doc:"When the newest alert placed in the Land was last seen, at any age; null when none ever was."`
 }
 
 // DisruptionLine is whether the static timetable knows the line asked, so
@@ -138,6 +154,12 @@ func disruptionEnvelope(s *server, ctx context.Context, a features.DisruptionAns
 	}
 	if l := a.Line; l != nil {
 		data.Line = &DisruptionLine{Key: q.Line, Checked: l.Checked, InTimetable: l.InTimetable}
+	}
+	if c := a.Coverage; c != nil {
+		data.AlertsCoverage = &AlertsCoverage{Covered: c.Covered, LookbackDays: c.LookbackDays, Lands: make([]LandCoverage, len(c.Lands))}
+		for i, l := range c.Lands {
+			data.AlertsCoverage.Lands[i] = LandCoverage{Land: l.Land, AlertsSeen: l.AlertsSeen, LastSeenAt: utc(l.LastSeenAt)}
+		}
 	}
 	if p := a.Punctuality; p != nil {
 		data.Punctuality = &DisruptionPunctuality{AreaLevel: p.AreaLevel, AreaCode: p.AreaCode, AreaName: p.AreaName, WindowMin: punctualityWindowMin,

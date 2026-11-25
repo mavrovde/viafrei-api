@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -76,6 +77,10 @@ select exists (select 1 from (`+relServiceAlert+`) a where a.source_ref = any($2
 from o where $5::int >= 0 -- $5, the limit, is the list's alone`, "timestamp with time zone", "text[]", "text", "text", "integer")
 
 var alertsCTE = strings.NewReplacer("{live}", alertLive("a", "$1"), "{inforce}", alertInForce("a", "$1")).Replace(regionAlerts)
+
+// alertsCoverage reads the alerts coverage of the area's Land
+// (relAlertsCoverage).
+var alertsCoverage = named("api_alerts_coverage", relAlertsCoverage, "text", "timestamptz", "text[]")
 
 // areaPunctuality reads the punctuality of the area $1, of the families $2,
 // from the Land of the area alone (areaBound).
@@ -161,6 +166,14 @@ func (s *Store) Disruptions(ctx context.Context, q transit.DisruptionQuery, fami
 		if q.Area == "" {
 			return out, nil
 		}
+		cov := transit.AlertsCoverage{LookbackDays: transit.AlertsLookbackDays, Covered: len(alerts) > 0,
+			Lands: []transit.LandCoverage{{Land: transit.LandOf(q.Area)}}}
+		since := q.Now.Add(-time.Duration(transit.AlertsLookbackDays) * 24 * time.Hour)
+		if err := runRow(ctx, tx, alertsCoverage, q.Area, since, families).Scan(&cov.Lands[0].Land, &cov.Lands[0].AlertsSeen, &cov.Lands[0].LastSeenAt); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return out, err
+		}
+		cov.Covered = cov.Covered || cov.Lands[0].AlertsSeen > 0
+		out.Coverage = &cov
 		for _, f := range families {
 			if f == punctualityFamily {
 				out.PunctualityRead = append(out.PunctualityRead, f)

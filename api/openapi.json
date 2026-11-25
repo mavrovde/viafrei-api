@@ -1478,6 +1478,35 @@
             "description": "Whether an alert publication was alive to ask: alertsTotal 0 means none in force only when this is true, and that it could not be told when false.",
             "type": "boolean"
           },
+          "alertsCoverage": {
+            "additionalProperties": false,
+            "description": "Whether any alert source read covers the area's Land at all: no alert in force is an answer only where somebody publishes. Null without an area.",
+            "properties": {
+              "covered": {
+                "description": "An alert is listed now, or one was placed in a Land of the area by a stop or a route within lookbackDays.",
+                "type": "boolean"
+              },
+              "lands": {
+                "items": {
+                  "$ref": "#/components/schemas/LandCoverage"
+                },
+                "type": "array"
+              },
+              "lookbackDays": {
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "covered",
+              "lookbackDays",
+              "lands"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "alertsTotal": {
             "description": "Alerts in force before the limit, duplicates left out.",
             "format": "int64",
@@ -1615,7 +1644,8 @@
           "duplicatesOmitted",
           "punctuality",
           "windowMin",
-          "line"
+          "line",
+          "alertsCoverage"
         ],
         "type": "object"
       },
@@ -2837,6 +2867,34 @@
           "state",
           "family",
           "land"
+        ],
+        "type": "object"
+      },
+      "LandCoverage": {
+        "additionalProperties": false,
+        "properties": {
+          "alertsSeen": {
+            "description": "Alerts placed in the Land by a stop or a route within lookbackDays.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "land": {
+            "description": "The Land's two-digit official key.",
+            "type": "string"
+          },
+          "newestAlertSeenAt": {
+            "description": "When the newest alert placed in the Land was last seen, at any age; null when none ever was.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "land",
+          "alertsSeen",
+          "newestAlertSeenAt"
         ],
         "type": "object"
       },

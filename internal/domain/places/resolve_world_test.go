@@ -159,7 +159,8 @@ func TestResolveTheWorldAsThePlatformDoes(t *testing.T) {
 
 // Every read a resolution makes, failing, fails the resolution, but the
 // LCL read: a junction's road then stays unknown, as the platform reads it.
-// One subtest a text, side by side, each a leaf within the 2 s bound (TST-012).
+// One subtest a text, side by side, one leaf a failing read, each within the
+// 2 s bound (TST-012).
 func TestResolveTheWorldWithEachReadFailing(t *testing.T) {
 	w := loadWorld(t)
 	for i, e := range w.Expect {
@@ -169,11 +170,15 @@ func TestResolveTheWorldWithEachReadFailing(t *testing.T) {
 			if _, err := Resolve(context.Background(), count, e.Q, e.Lang); err != nil {
 				t.Fatal(err)
 			}
+			// One leaf a failing read: a text makes up to 25 reads, and all
+			// of them in one leaf passed the bound on a loaded runner.
 			for k := 1; k <= count.calls; k++ {
-				r := &replay{got: w.Reads, failAt: k}
-				if _, err := Resolve(context.Background(), r, e.Q, e.Lang); err == nil && r.failed != "LCLNear" {
-					t.Errorf("%q: read %d (%s) failing: no error", e.Q, k, r.failed)
-				}
+				t.Run(fmt.Sprintf("read%02d", k), func(t *testing.T) {
+					r := &replay{got: w.Reads, failAt: k}
+					if _, err := Resolve(context.Background(), r, e.Q, e.Lang); err == nil && r.failed != "LCLNear" {
+						t.Errorf("%q: read %d (%s) failing: no error", e.Q, k, r.failed)
+					}
+				})
 			}
 		})
 	}

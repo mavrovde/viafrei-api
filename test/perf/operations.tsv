@@ -46,3 +46,4 @@ getTrainBoard	lookup
 listParkingBays	near
 createRefresh	lookup
 getRefresh	lookup
+listStopBoards	near

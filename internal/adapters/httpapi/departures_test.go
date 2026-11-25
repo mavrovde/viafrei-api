@@ -17,6 +17,11 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
+func (f *fakeFeatures) StopBoards(_ context.Context, _ access.Record, q transit.StopBoardsQuery) (features.StopBoards, error) {
+	f.gotStops = q
+	return f.stops, f.err
+}
+
 func (f *fakeFeatures) Departures(_ context.Context, key access.Record, q transit.DepartureQuery) (features.Board, error) {
 	f.gotKey, f.gotBoard = key, q
 	return f.board, f.err

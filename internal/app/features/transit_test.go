@@ -29,6 +29,10 @@ type trFake struct {
 	readErr     error
 	gotQuery    transit.Query
 	gotFamilies []string
+	stopBoards  []transit.StopBoard
+	stopErr     error
+	gotStops    transit.StopBoardsQuery
+	gotStopFams []string
 	station     transit.Station
 	stErr       error
 	calls       []transit.Departure
@@ -53,6 +57,11 @@ func (f *trFake) Facilities(_ context.Context, _ string, fams []string, _ time.T
 func (f *trFake) Station(_ context.Context, id string, fams []string) (transit.Station, error) {
 	f.gotFamilies = fams
 	return f.station, f.stErr
+}
+
+func (f *trFake) StopBoards(_ context.Context, q transit.StopBoardsQuery, fams []string) ([]transit.StopBoard, error) {
+	f.gotStops, f.gotStopFams = q, fams
+	return f.stopBoards, f.stopErr
 }
 
 func (f *trFake) Departures(_ context.Context, q transit.DepartureQuery, _ []string) ([]transit.Departure, error) {
@@ -209,6 +218,36 @@ func TestDeparturesRefusals(t *testing.T) {
 		"provenance": {&trFake{fake: &fake{provErr: errStore}, station: st}, full, errStore},
 	} {
 		if _, err := trService(c.f).Departures(context.Background(), c.k, transit.DepartureQuery{Limit: 5}); !errors.Is(err, c.want) {
+			t.Errorf("%s: %v, want %v", name, err, c.want)
+		}
+	}
+}
+
+// The stops around a position are read of the board's families, gated on
+// every stop's family and every departure's, and credited.
+func TestStopBoardsAreGatedAndAttributed(t *testing.T) {
+	req.Covers(t, "FR-TRANSIT-002", "SEC-030")
+	f := &trFake{stopBoards: []transit.StopBoard{{Stop: transit.NearStop{StopNear: transit.StopNear{Root: "1:a", Family: "t1"}},
+		Board: transit.BoardAnswer{Rows: []transit.Departure{{Families: []string{"t1"}}}}}}}
+	q := transit.StopBoardsQuery{RadiusM: 5000, Limit: 8, PerStop: 4}
+	a, err := trService(f).StopBoards(context.Background(), key("commercial", []access.Scope{"transit"}, "t1", "t2"), q)
+	if err != nil || f.gotStops.Limit != 8 || !slices.Equal(f.gotStopFams, []string{"t1"}) || len(a.Items) != 1 || !a.Partial ||
+		!a.At.Equal(now) || !slices.Equal(names(a.Families), []string{"t1"}) {
+		t.Errorf("%+v %v of %v: %v", a, f.gotStops, f.gotStopFams, err)
+	}
+	full := key("commercial", []access.Scope{"transit"}, "t1")
+	for name, c := range map[string]struct {
+		f    *trFake
+		k    access.Record
+		want error
+	}{
+		"register":   {&trFake{fake: &fake{regErr: errStore}}, full, errStore},
+		"none":       {&trFake{}, key("commercial", []access.Scope{"transit"}, "t2"), access.ErrNonePermitted},
+		"read":       {&trFake{stopErr: errStore}, full, errStore},
+		"post-check": {&trFake{stopBoards: []transit.StopBoard{{Stop: transit.NearStop{StopNear: transit.StopNear{Family: "t2"}}}}}, full, features.ErrGateViolation},
+		"provenance": {&trFake{fake: &fake{provErr: errStore}}, full, errStore},
+	} {
+		if _, err := trService(c.f).StopBoards(context.Background(), c.k, q); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)
 		}
 	}

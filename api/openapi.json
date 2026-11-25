@@ -8411,6 +8411,119 @@
         ],
         "type": "object"
       },
+      "StopBoard": {
+        "additionalProperties": false,
+        "properties": {
+          "departures": {
+            "description": "Its departures as its board (listStationDepartures) shows them, at most per_stop; empty when none leaves in the window.",
+            "items": {
+              "$ref": "#/components/schemas/Departure"
+            },
+            "type": "array"
+          },
+          "distanceM": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "description": "The stop family's id, as listStations answers a station's.",
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "name": {
+            "type": "string"
+          },
+          "stopId": {
+            "description": "The stop id as the timetable spells it, without the prefix of the timetable it is read from: listStationDepartures takes id, and the timetable stop id is what a passenger information system prints.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "stopId",
+          "distanceM",
+          "location",
+          "departures"
+        ],
+        "type": "object"
+      },
+      "StopBoardsData": {
+        "additionalProperties": false,
+        "properties": {
+          "location": {
+            "$ref": "#/components/schemas/Position",
+            "description": "The position asked."
+          },
+          "stops": {
+            "description": "The stops, as today's departures around a place pick them: the nearest railway or S-Bahn station first wherever it lies in the radius, then the nearest stops by distance; a stop filed twice under one name within 300 m listed once. Empty when no stop lies in the radius.",
+            "items": {
+              "$ref": "#/components/schemas/StopBoard"
+            },
+            "type": "array"
+          },
+          "window": {
+            "$ref": "#/components/schemas/StopBoardsWindow"
+          }
+        },
+        "required": [
+          "location",
+          "window",
+          "stops"
+        ],
+        "type": "object"
+      },
+      "StopBoardsEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StopBoardsData"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DataMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "StopBoardsWindow": {
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "fromLocal": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "until": {
+            "description": "End of the window (excluded).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "untilLocal": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "fromLocal",
+          "until",
+          "untilLocal"
+        ],
+        "type": "object"
+      },
       "SummaryCount": {
         "additionalProperties": false,
         "properties": {
@@ -23232,6 +23345,375 @@
         ],
         "x-example-request": "/v1/stations/1:de:04002:2/facilities?limit=3",
         "x-mcp-counterpart": "station facilities",
+        "x-required-scope": "transit"
+      }
+    },
+    "/v1/stop-boards": {
+      "get": {
+        "description": "The stops around the position, as the platform's departures around a place list them, each with its next departures as its departure board shows them, all in one read. Needs the scope transit.",
+        "operationId": "listStopBoards",
+        "parameters": [
+          {
+            "description": "The position: lat,lon in decimal degrees (WGS 84).",
+            "explode": false,
+            "in": "query",
+            "name": "at",
+            "required": true,
+            "schema": {
+              "description": "The position: lat,lon in decimal degrees (WGS 84).",
+              "examples": [
+                "52.52,13.405"
+              ],
+              "pattern": "^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The radius in metres the stops lie within (100 to 5000); default 5000.",
+            "explode": false,
+            "in": "query",
+            "name": "radius_m",
+            "schema": {
+              "description": "The radius in metres the stops lie within (100 to 5000); default 5000.",
+              "format": "int64",
+              "maximum": 5000,
+              "minimum": 100,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Most stops to list; default 8.",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "description": "Most stops to list; default 8.",
+              "format": "int64",
+              "maximum": 20,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Most departures per stop, earliest first; default 4.",
+            "explode": false,
+            "in": "query",
+            "name": "per_stop",
+            "schema": {
+              "description": "Most departures per stop, earliest first; default 4.",
+              "format": "int64",
+              "maximum": 15,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Start of the window (RFC 3339 with an offset); default: now.",
+            "explode": false,
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "description": "Start of the window (RFC 3339 with an offset); default: now.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Length of the window in minutes; default 60.",
+            "explode": false,
+            "in": "query",
+            "name": "duration_min",
+            "schema": {
+              "description": "Length of the window in minutes; default 60.",
+              "format": "int64",
+              "maximum": 1440,
+              "minimum": 5,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Keep only departures of these modes (comma-separated): rail, sbahn, subway, tram, bus, ferry, other. Default: every mode. The stops listed are the same.",
+            "explode": false,
+            "in": "query",
+            "name": "modes",
+            "schema": {
+              "description": "Keep only departures of these modes (comma-separated): rail, sbahn, subway, tram, bus, ferry, other. Default: every mode. The stops listed are the same.",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 7,
+              "type": "array"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The stops around a position with their next departures",
+                    "value": {
+                      "data": {
+                        "location": {
+                          "lat": 47.4035,
+                          "lon": 14.5617
+                        },
+                        "window": {
+                          "from": "2026-03-30T00:00:00Z",
+                          "fromLocal": "2026-03-30T02:00:00+02:00",
+                          "until": "2026-03-30T01:00:00Z",
+                          "untilLocal": "2026-03-30T03:00:00+02:00"
+                        },
+                        "stops": []
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T12:00:00Z",
+                        "freshness": [
+                          {
+                            "family": "delfi_static",
+                            "dataAsOf": "2026-03-29T12:00:00Z",
+                            "ageS": 43200,
+                            "staleAfterS": 259200,
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T12:00:00Z"
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "delfi_static",
+                            "domain": "transit",
+                            "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://www.opendata-oepnv.de",
+                            "sourceUrl": "https://www.opendata-oepnv.de"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ]
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/stop-boards"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/StopBoardsEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "$ref": "#/components/headers/Age"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/Cache-Control"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/Last-Modified"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              },
+              "Vary": {
+                "$ref": "#/components/headers/Vary"
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/Cache-Control"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/Last-Modified"
+              },
+              "Vary": {
+                "$ref": "#/components/headers/Vary"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not used by this operation.",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "The stops around a position with their next departures",
+        "tags": [
+          "transit"
+        ],
+        "x-attribution": "The stops and their departures come from the source families of the transit domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/stop-boards?at=47.4035,14.5617\u0026limit=3\u0026per_stop=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/stop-boards?at=47.4035,14.5617\u0026limit=3\u0026per_stop=2",
+        "x-mcp-counterpart": "departures around a place",
         "x-required-scope": "transit"
       }
     },

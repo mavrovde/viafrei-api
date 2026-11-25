@@ -99,6 +99,10 @@ func (f *askedFeatures) Stations(_ context.Context, _ access.Record, q transit.Q
 	return features.Answer[transit.Station]{}, nil
 }
 
+func (f *askedFeatures) StopBoards(context.Context, access.Record, transit.StopBoardsQuery) (features.StopBoards, error) {
+	return features.StopBoards{}, nil
+}
+
 func (f *askedFeatures) Departures(_ context.Context, _ access.Record, q transit.DepartureQuery) (features.Board, error) {
 	f.asked = fmt.Sprintf("window=%s limit=%d", q.Window, q.Limit)
 	return features.Board{}, nil

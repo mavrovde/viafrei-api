@@ -25,6 +25,9 @@ type Transit interface {
 	// window, of the given families: calls a passenger can board, of trips
 	// that call outside the station after them, by planned instant.
 	Departures(ctx context.Context, q transit.DepartureQuery, families []string) ([]transit.Departure, error)
+	// StopBoards returns the stops around q.At, as today's departures
+	// around a place pick them, each with its board.
+	StopBoards(ctx context.Context, q transit.StopBoardsQuery, families []string) ([]transit.StopBoard, error)
 	TimetableReach(ctx context.Context) (transit.Reach, error)
 	// Facilities returns the lifts and escalators of a station, of the
 	// given families, each with its state at now.
@@ -138,6 +141,44 @@ func (s *Service) Departures(ctx context.Context, key access.Record, q transit.D
 		Answer:  Answer[transit.Departure]{Items: b.Rows, HasMore: b.Matched > len(b.Rows), Families: fams, Partial: partial, At: s.now()},
 		Station: st, Matched: b.Matched, MatchedAll: b.MatchedAll, Dropped: b.Dropped, Reach: reach,
 	}, nil
+}
+
+// StopBoards is the stops around a position with their next departures.
+type StopBoards struct {
+	Answer[transit.StopBoard]
+}
+
+// StopBoards answers "what leaves near here" for key: the stops around
+// q.At as today's departures around a place pick them, each with its
+// departures as its board shows them, in one read of all their calls.
+func (s *Service) StopBoards(ctx context.Context, key access.Record, q transit.StopBoardsQuery) (StopBoards, error) {
+	reg, gate, err := s.gate(ctx, key)
+	if err != nil {
+		return StopBoards{}, err
+	}
+	permitted, partial, err := gate.Answer(boardFamilies(reg))
+	if err != nil {
+		return StopBoards{}, err
+	}
+	bs, err := s.repos.Transit.StopBoards(ctx, q, permitted)
+	if err != nil {
+		return StopBoards{}, err
+	}
+	var contributed []string
+	for _, b := range bs {
+		contributed = append(contributed, b.Stop.Family)
+		for _, d := range b.Board.Rows {
+			contributed = append(contributed, d.Families...)
+		}
+	}
+	if err := gate.Check(contributed); err != nil {
+		return StopBoards{}, err
+	}
+	fams, err := s.provenanceOf(ctx, contributed, permitted)
+	if err != nil {
+		return StopBoards{}, err
+	}
+	return StopBoards{Answer[transit.StopBoard]{Items: bs, Families: fams, Partial: partial, At: s.now()}}, nil
 }
 
 // StationFacilities is a station's lifts and escalators (FR-TRANSIT-003).

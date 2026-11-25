@@ -207,6 +207,19 @@ func TestDeparturesAndAnUnknownStation(t *testing.T) {
 			t.Errorf("%s: %v min from %v s", d.JourneyID, d.DelayMin, s)
 		}
 	}
+	// The stops around it list it with the departures its board lists, read
+	// in one statement (the stop families are derived after a timetable's
+	// load); far from any stop, none.
+	pst, _ := private(t, `refresh materialized view public.transit_stop_modes`) //nolint:misspell // the SQL keyword
+	bs, err := pst.StopBoards(bounded(t), transit.StopBoardsQuery{At: sp.Location, RadiusM: 5000, Limit: 20, PerStop: 15, From: at, Window: time.Minute}, fams)
+	want := transit.Board(ds, transit.DepartureQuery{From: at, Window: time.Minute, Limit: 15})
+	i := slices.IndexFunc(bs, func(b transit.StopBoard) bool { return b.Stop.Root == station })
+	if err != nil || i < 0 || len(bs[i].Board.Rows) == 0 || len(bs[i].Board.Rows) > len(want.Rows) || bs[i].Board.Rows[0].JourneyID != want.Rows[0].JourneyID {
+		t.Errorf("%s around: %+v (its board %+v): %v", station, bs, want.Rows, err)
+	}
+	if bs, err := pst.StopBoards(bounded(t), transit.StopBoardsQuery{At: geo.Point{Lat: 54.9, Lon: 5}, RadiusM: 5000, Limit: 8, PerStop: 4, From: at, Window: time.Hour}, fams); err != nil || len(bs) != 0 {
+		t.Errorf("none: %+v %v", bs, err)
+	}
 }
 
 // A hydrogen read for a lorry or a car asks for that vehicle's refill codes.

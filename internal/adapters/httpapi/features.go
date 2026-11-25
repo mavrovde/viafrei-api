@@ -42,6 +42,7 @@ type Features interface {
 	Sources(ctx context.Context, key access.Record, domain string) ([]provenance.Family, features.Answer[struct{}], error)
 	Stations(ctx context.Context, key access.Record, q transit.Query) (features.Answer[transit.Station], error)
 	Departures(ctx context.Context, key access.Record, q transit.DepartureQuery) (features.Board, error)
+	StopBoards(ctx context.Context, key access.Record, q transit.StopBoardsQuery) (features.StopBoards, error)
 	Facilities(ctx context.Context, key access.Record, q transit.FacilityQuery) (features.StationFacilities, error)
 	RequestRefresh(ctx context.Context, key access.Record, a refresh.Ask) (refresh.Request, error)
 	Refresh(ctx context.Context, key access.Record, id string) (refresh.Request, error)

@@ -143,6 +143,9 @@ func first[T any](v []T) *T {
 func (s *Store) Location(ctx context.Context, q places.LocationQuery, families []string) (places.Location, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (places.Location, error) {
 		out, err := locationFacts(ctx, tx, q, families)
+		if err == nil && !out.MayLieAbroad {
+			out.Gemeinde, err = gemeinde(ctx, tx, q, out.Address, families)
+		}
 		if err != nil {
 			return out, err
 		}
@@ -156,8 +159,8 @@ func (s *Store) Location(ctx context.Context, q places.LocationQuery, families [
 	})
 }
 
-// locationFacts reads the address, the places, the Land, the judgement
-// that the position may lie abroad and the Gemeinde of a position.
+// locationFacts reads the address, the places, the Land and the judgement
+// that the position may lie abroad.
 func locationFacts(ctx context.Context, tx pgx.Tx, q places.LocationQuery, families []string) (places.Location, error) {
 	var out places.Location
 	rows, _ := run(ctx, tx, nearestAddress, q.At.Lon, q.At.Lat, places.AddressReachM, families)
@@ -193,8 +196,7 @@ func locationFacts(ctx context.Context, tx pgx.Tx, q places.LocationQuery, famil
 	}
 	out.State = first(ps)
 	if out.Address != nil && *out.Address.DistanceM <= places.AbroadNearestM {
-		out.Gemeinde, err = gemeinde(ctx, tx, q, out.Address, families)
-		return out, err
+		return out, nil
 	}
 	rows, _ = run(ctx, tx, addressSectors, places.SectorWedges(q.At, places.AbroadScanM, places.AbroadSectors), families)
 	hits, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (bool, error) {
@@ -206,9 +208,6 @@ func locationFacts(ctx context.Context, tx pgx.Tx, q places.LocationQuery, famil
 		return hit, err
 	})
 	if err != nil || places.LongestEmptyRun(hits) < places.AbroadEmptyRun {
-		if err == nil {
-			out.Gemeinde, err = gemeinde(ctx, tx, q, out.Address, families)
-		}
 		return out, err
 	}
 	out.MayLieAbroad = true

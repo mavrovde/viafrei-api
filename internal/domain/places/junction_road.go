@@ -1,7 +1,6 @@
 package places
 
 import (
-	"math"
 	"regexp"
 	"strings"
 
@@ -118,7 +117,7 @@ func FoldSameNamed(js []Junction, withinM float64) []Junction {
 		key := nameKey(j.Name)
 		twin := false
 		for _, k := range ks {
-			if key != "" && k.key == key && haversineM(k.j.Location, j.Location) <= withinM {
+			if key != "" && k.key == key && geo.MetresBetween(k.j.Location, j.Location) <= withinM {
 				twin = true
 				break
 			}
@@ -137,14 +136,4 @@ var notLetterOrDigit = regexp.MustCompile(`[^\p{L}\p{N}]+`)
 func nameKey(name string) string {
 	s := strings.NewReplacer("ä", "ae", "ö", "oe", "ü", "ue", "ß", "ss").Replace(strings.ToLower(strings.TrimSpace(name)))
 	return strings.TrimSpace(notLetterOrDigit.ReplaceAllString(s, " "))
-}
-
-// haversineM is the distance between two points on the sphere, in metres,
-// as the platform's haversineM.
-func haversineM(a, b geo.Point) float64 {
-	const r = 6_371_008.8
-	rad := math.Pi / 180
-	dLat, dLon := (b.Lat-a.Lat)*rad, (b.Lon-a.Lon)*rad
-	h := math.Sin(dLat/2)*math.Sin(dLat/2) + math.Cos(a.Lat*rad)*math.Cos(b.Lat*rad)*math.Sin(dLon/2)*math.Sin(dLon/2)
-	return 2 * r * math.Asin(math.Sqrt(h))
 }

@@ -534,15 +534,19 @@ func ChosenName(r Resolution, lang string) string {
 }
 
 // ResolvedKinds are the kinds a resolved place is said as.
-var ResolvedKinds = []string{"municipality", "district", "region", "island", "station_area", "stop", "poi", "address", "junction", "motorway", "other"}
+var ResolvedKinds = []string{"municipality", "district", "state", "region", "island", "station_area", "stop", "poi", "address", "junction", "motorway", "other"}
 
 // ResolvedKind is the kind a resolved place is said as: its gazetteer
-// kind's, else what it was read as (a POI, an address).
-func ResolvedKind(placeKind, via string) string {
+// kind's, else what it was read as (a POI, an address). An area whose key
+// is two digits is a Land, said as a state; any other area a region.
+func ResolvedKind(placeKind, via, ags string) string {
 	switch placeKind {
 	case "city":
 		return "municipality"
 	case "admin":
+		if len(ags) == 2 {
+			return "state"
+		}
 		return "region"
 	case "station":
 		return "station_area"

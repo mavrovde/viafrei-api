@@ -82,13 +82,13 @@ func resolvePlaceEnvelope(s *server, ctx context.Context, a features.ResolveAnsw
 	if r.Kind != places.ResolvedPoint {
 		return env
 	}
-	p := &ResolvedPlace{Name: places.ChosenName(r, a.Lang), Label: r.Label, Kind: places.ResolvedKind(r.PlaceKind, r.Via),
+	p := &ResolvedPlace{Name: places.ChosenName(r, a.Lang), Label: r.Label, Kind: places.ResolvedKind(r.PlaceKind, r.Via, r.AGS),
 		Location: position(geo.Point{Lat: r.Lat, Lon: r.Lon}), Alternatives: []ResolvedAlternative{}}
 	if r.AGS != "" {
 		p.DistrictCode = &r.AGS
 	}
 	for _, o := range r.Alternatives {
-		p.Alternatives = append(p.Alternatives, ResolvedAlternative{Name: o.Label, Kind: places.ResolvedKind(o.Kind, "")})
+		p.Alternatives = append(p.Alternatives, ResolvedAlternative{Name: o.Label, Kind: places.ResolvedKind(o.Kind, "", "")})
 	}
 	env.Data = NullablePlace{Place: p}
 	return env

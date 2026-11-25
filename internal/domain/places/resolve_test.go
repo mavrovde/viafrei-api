@@ -91,9 +91,12 @@ func TestResolvedKinds(t *testing.T) {
 		{"district", "", "district"}, {"island", "", "island"}, {"stop", "", "stop"}, {"junction", "", "junction"}, {"motorway", "", "motorway"},
 		{"", "poi", "poi"}, {"", "address", "address"}, {"", "gazetteer", "other"},
 	} {
-		if got := ResolvedKind(c[0], c[1]); got != c[2] {
+		if got := ResolvedKind(c[0], c[1], ""); got != c[2] {
 			t.Errorf("%v: %s", c, got)
 		}
+	}
+	if got := ResolvedKind("admin", "", "01"); got != "state" {
+		t.Errorf("a Land: %s", got)
 	}
 	if ChosenName(Resolution{Label: "Hamburg"}, "de") != "Hamburg" {
 		t.Error("no alternatives")

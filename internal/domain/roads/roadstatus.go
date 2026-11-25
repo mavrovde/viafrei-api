@@ -338,11 +338,21 @@ func plannedItem(r RoadStatusPlannedRow, now time.Time, live bool) RoadStatusIte
 	if r.Road != nil {
 		road = *r.Road
 	}
-	ref := "?"
-	if r.From != nil {
-		ref = *r.From
+	// A planned entry is keyed by its source and its first reference marker;
+	// one without a marker by its publication id (as the platform keys a
+	// local message), so none carries a placeholder. Every planned row is a
+	// stored road event, whose publication id the pinned viafrei-database
+	// release declares not null and unique within its source (the baseline's
+	// unique constraint on source and publication id): a row without a
+	// marker always has one.
+	ref := r.Family
+	switch {
+	case r.From != nil:
+		ref += ":" + *r.From
+	case r.PublicationID != nil:
+		ref += ":" + *r.PublicationID
 	}
-	return RoadStatusItem{Status: status, Term: term, Family: r.Family, Road: road, ID: r.Family + ":" + ref, EventType: r.EventType, Publisher: r.Publisher,
+	return RoadStatusItem{Status: status, Term: term, Family: r.Family, Road: road, ID: ref, EventType: r.EventType, Publisher: r.Publisher,
 		PublicationID: r.PublicationID, PlaceText: r.PlaceText, DetailText: r.DetailText, SiteName: r.SiteName, SectionName: r.SectionName, Cause: r.Cause,
 		RefFrom: r.From, RefTo: r.To, DetourVia: r.DetourVia, Detour: r.EventType != nil && *r.EventType == "reroutingManagement", DetourVehicles: isTrue(r.DetourVehicles),
 		WindowStarts: nonNil(r.WindowStarts), WindowEnds: nonNil(r.WindowEnds), WindowCount: deref(r.WindowCount), ClosureFrom: r.ClosureFrom, ClosureTo: r.ClosureTo,

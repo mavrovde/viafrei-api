@@ -142,10 +142,10 @@ func TestRoadStatusAnswer(t *testing.T) {
 	if i := by["roadworks_bast:k1current"]; i.Term != "roadworks" || i.WindowStarts == nil {
 		t.Errorf("current %+v", i)
 	}
-	if i := by["nms_events:?closed"]; i.Term != "closure" || (!i.Detour && !i.DetourVehicles) {
+	if i := by["nms_eventsclosed"]; i.Term != "closure" || (!i.Detour && !i.DetourVehicles) {
 		t.Errorf("message %+v", by)
 	}
-	if _, ok := by["roadworks_akd:?planned"]; !ok || by["roadworks_ald_ni:?programme"].Term != "roadworks" || len(all) != 9 {
+	if _, ok := by["roadworks_akdplanned"]; !ok || by["roadworks_ald_niprogramme"].Term != "roadworks" || len(all) != 9 {
 		t.Errorf("rest %+v", by)
 	}
 	// Nothing listed and no sweep: the sources that may answer, the road
@@ -202,5 +202,26 @@ func TestRoadStatusLiveDates(t *testing.T) {
 		if i.From != nil || i.To == nil || i.To.Month() != time.December || i.To.Day() != 30 {
 			t.Errorf("%s %v %v", i.ID, i.From, i.To)
 		}
+	}
+}
+
+// Two planned entries of one source without a reference marker keep apart:
+// the publication id keys each, so no two entries share an id.
+func TestPlannedEntriesWithoutMarkerKeepApart(t *testing.T) {
+	req.Covers(t, "FR-ROAD-003")
+	q, _ := roads.RoadStatusQueryOf("A9", roads.ClassMotorway, 20, rsNow, time.Time{}, []string{"roadworks_bast"})
+	seen := rsNow.Add(-time.Hour)
+	r := roads.RoadStatusRead{Tick: rsNow, Planned: []roads.RoadStatusPlannedRow{
+		{Family: "roadworks_bast", Road: sp("A9"), PublicationID: sp("p1"), LastSeenAt: seen},
+		{Family: "roadworks_bast", Road: sp("A9"), PublicationID: sp("p2"), LastSeenAt: seen},
+		{Family: "roadworks_bast", Road: sp("A9"), LastSeenAt: seen},
+	}}
+	ids := []string{}
+	for _, i := range roads.RoadStatusAnswerOf(q, r).Items {
+		ids = append(ids, i.ID)
+	}
+	slices.Sort(ids)
+	if !slices.Equal(ids, []string{"roadworks_bast", "roadworks_bast:p1", "roadworks_bast:p2"}) {
+		t.Errorf("ids %v", ids)
 	}
 }

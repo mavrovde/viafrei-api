@@ -71,10 +71,10 @@ func TestPlaceLabelsAsThePlatformGivesThem(t *testing.T) {
 	if err := json.Unmarshal(b, &all); err != nil {
 		t.Fatal(err)
 	}
-	// One subtest a case, side by side, each a leaf within the 2 s bound (TST-012).
+	// One subtest a case, each a leaf within the 2 s bound (TST-012), one after
+	// the other (#249).
 	for k, c := range all.Cases {
 		t.Run(fmt.Sprintf("%04d", k), func(t *testing.T) {
-			t.Parallel()
 			cands := locate(c.Cands)
 			if got := placeOptionLabels(cands, c.Lang, c.Asked, c.Lands, all.Kreise); !slices.Equal(got, c.Labels) {
 				t.Errorf("case %d: got %q, want %q", k, got, c.Labels)

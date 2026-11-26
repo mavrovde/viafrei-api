@@ -143,7 +143,7 @@ func TestWorkflowRulesCanSayNo(t *testing.T) {
 		"top-level permissions grant write-all":           strings.Replace(string(good), "permissions:\n  contents: read\n", "permissions: write-all\n", 1),
 		"top-level permissions grant contents: write":     strings.Replace(string(good), "permissions:\n  contents: read\n", "permissions:\n  contents: write\n", 1),
 		"top-level permissions grant packages: write":     strings.Replace(string(good), "permissions:\n  contents: read\n", "permissions:\n  contents: read\n  packages: write\n", 1),
-		"job lint has no timeout-minutes":                 strings.Replace(string(good), "    name: Lint\n    runs-on: ubuntu-24.04\n    timeout-minutes: 10\n", "    name: Lint\n    runs-on: ubuntu-24.04\n", 1),
+		"job lint has no timeout-minutes":                 strings.Replace(string(good), "    name: Lint\n    runs-on: ubuntu-24.04\n    timeout-minutes: 30\n", "    name: Lint\n    runs-on: ubuntu-24.04\n", 1),
 	} {
 		if bad == string(good) {
 			t.Fatalf("plant for %q changed nothing", want)

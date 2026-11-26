@@ -42,7 +42,7 @@ jobs:
   plan:
     name: One job per fuzz target
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 30
     outputs:
       targets: ${{ steps.matrix.outputs.targets }}
     steps:
@@ -61,7 +61,7 @@ jobs:
     # Evidence (run of 2026-11-22, one job): a target took its 10 min budget
     # plus 1 to 20 s of build; the job's setup 13 s. One target per job is
     # about 11 min.
-    timeout-minutes: 15
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -96,7 +96,7 @@ jobs:
     needs: [plan, native]
     if: ${{ !cancelled() && needs.plan.result == 'success' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -126,7 +126,7 @@ jobs:
     name: Schema-driven fuzzing (Schemathesis, nightly budget)
     runs-on: ubuntu-24.04
     # Evidence: 4.4 and 8.8 min in the runs of 2026-11-15 and 2026-11-22.
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

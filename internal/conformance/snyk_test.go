@@ -308,7 +308,7 @@ func TestSnykRunsWeeklyAndOncePerRelease(t *testing.T) {
 		"snyk.yml's scan step and SARIF upload are not exactly":      plant("snyk.yml", "--sarif-file-output=sarif/snyk.sarif\n", "--sarif-file-output=sarif/snyk.sarif || true\n"),
 		"the own-commit upload":                                      plant("snyk.yml", " && (inputs.ref == '' || inputs.ref == github.sha)", ""),
 		"snyk.yml does not check out":                                plant("snyk.yml", "ref: ${{ inputs.ref || github.sha }}", "ref: ${{ github.sha }}"),
-		"snyk.yml carries continue-on-error":                         plant("snyk.yml", "    timeout-minutes: 10\n", "    timeout-minutes: 10\n    continue-on-error: true\n"),
+		"snyk.yml carries continue-on-error":                         plant("snyk.yml", "    timeout-minutes: 30\n", "    timeout-minutes: 30\n    continue-on-error: true\n"),
 		"ci.yml references workflows/snyk.yml":                       plant("ci.yml", "\njobs:\n", "\njobs:\n  s:\n    uses: ./.github/workflows/snyk.yml\n"),
 		"release.yml passes secrets: inherit":                        plant("release.yml", "    secrets:\n      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}\n\n", "    secrets: inherit\n\n"),
 		"release-please.yml job release does not pass exactly":       plant("release-please.yml", "    secrets:\n      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}\n", "    secrets: inherit\n"),

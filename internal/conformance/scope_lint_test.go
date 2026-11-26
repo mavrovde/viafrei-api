@@ -7,11 +7,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -34,7 +36,8 @@ const scopeSelf = "internal/conformance/scope_lint_test.go"
 
 type vocabEntry struct {
 	re             *regexp.Regexp
-	prefix, reason string // prefix: the literal start of the pattern, a cheap filter before the expression runs
+	at             *regexp.Regexp // re anchored at the start of its input, without the leading \b
+	prefix, reason string         // prefix: the literal start of the pattern, a cheap filter before the expression runs
 }
 
 type allowEntry struct {
@@ -85,7 +88,11 @@ func parseVocabulary(src []byte) ([]vocabEntry, error) {
 		if prefix == "" || prefix != strings.ToLower(prefix) {
 			return nil, fmt.Errorf("vocabulary pattern %q must start with lower-case literal text", pattern)
 		}
-		out = append(out, vocabEntry{re: regexp.MustCompile(`(?i)\b(?:` + pattern + `)`), prefix: prefix, reason: reason})
+		out = append(out, vocabEntry{
+			re:     regexp.MustCompile(`(?i)\b(?:` + pattern + `)`),
+			at:     regexp.MustCompile(`^(?i)(?:` + pattern + `)`),
+			prefix: prefix, reason: reason,
+		})
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("the vocabulary is empty")
@@ -136,10 +143,11 @@ func isWordByte(b byte, first bool) bool {
 	return letter || (!first && ((b >= '0' && b <= '9') || b == '_' || b == '-'))
 }
 
-// words returns the words of a line: an ASCII letter followed by letters,
-// digits, underscores and hyphens.
-func words(line string) []string {
-	var out []string
+// words calls each for the words of a line in order: an ASCII letter
+// followed by letters, digits, underscores and hyphens, and its offset in
+// the line. It builds no slice: the lint reads every word of the tree
+// (TST-012).
+func words(line string, each func(at int, w string)) {
 	for i := 0; i < len(line); {
 		if !isWordByte(line[i], true) {
 			i++
@@ -149,56 +157,155 @@ func words(line string) []string {
 		for j < len(line) && isWordByte(line[j], false) {
 			j++
 		}
-		out = append(out, line[i:j])
+		each(i, line[i:j])
 		i = j
 	}
-	return out
 }
 
-// denyCache remembers the verdict for each word already hashed, so a word
-// that recurs across the tree is hashed once.
+// denyCache remembers the verdict for each word already hashed, keyed as the
+// word is written, so a word that recurs across the tree is lowered and
+// hashed once.
 type denyCache struct {
 	deny map[string]bool
 	seen map[string]bool
 }
 
 func (c *denyCache) denied(word string) bool {
-	low := strings.ToLower(word)
-	v, ok := c.seen[low]
+	v, ok := c.seen[word]
 	if !ok {
-		v = c.deny[nameHash(low)]
-		c.seen[low] = v
+		v = c.deny[nameHash(strings.ToLower(word))]
+		c.seen[word] = v
 	}
 	return v
 }
 
-// scanText applies the vocabulary and the denylist to one file. A word is
-// checked as written (lower case, a hyphen read as an underscore) and each of
-// its hyphen-separated parts.
-func scanText(path string, src []byte, vocab []vocabEntry, deny *denyCache) []scopeFinding {
-	var out []scopeFinding
-	for i, line := range strings.Split(string(src), "\n") {
-		lower := strings.ToLower(line)
-		for _, v := range vocab {
-			if !strings.Contains(lower, v.prefix) {
+// deniedPart returns the first denied candidate of a word: the word as
+// written with a hyphen read as an underscore, then each of its
+// hyphen-separated parts.
+func deniedPart(w string, deny *denyCache) (string, bool) {
+	if c := strings.ReplaceAll(w, "-", "_"); deny.denied(c) {
+		return c, true
+	}
+	if !strings.Contains(w, "-") {
+		return "", false
+	}
+	for c := range strings.SplitSeq(w, "-") {
+		if c != "" && deny.denied(c) {
+			return c, true
+		}
+	}
+	return "", false
+}
+
+func isASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 0x80 {
+			return false
+		}
+	}
+	return true
+}
+
+// foldEqual reports whether the ASCII a lowered is p.
+func foldEqual(a, p string) bool {
+	for i := 0; i < len(p); i++ {
+		c := a[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		if c != p[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// vocabHit is a vocabulary match on a line: the pattern's place in the
+// vocabulary and the text it matched.
+type vocabHit struct {
+	entry int
+	text  string
+}
+
+// scanText applies the vocabulary and the denylist to one file, line by
+// line, and reports per line the vocabulary matches (pattern by pattern, in
+// the line's order) before the denied words, as v.re.FindAllString over each
+// line would.
+//
+// A line is walked once. A pattern starts with lower-case literal text and
+// \b, which is ASCII, so on an ASCII line a match of a pattern that starts
+// with a letter can begin only at a word's start or after a hyphen inside
+// one: there its literal start is compared (case aside) and the pattern,
+// anchored, runs from that place, never the whole expression over the whole
+// line (a one-line JSON file is long). A pattern that starts otherwise, and
+// every pattern on a line with other characters, takes the whole expression
+// on the lowered line, as before. A word is checked as deniedPart says.
+func scanText(path, text string, vocab []vocabEntry, deny *denyCache) []scopeFinding {
+	var byFirst [256][]int // the patterns by the first letter of their literal start
+	var whole []int        // the patterns that start with something else
+	for i, v := range vocab {
+		if c := v.prefix[0]; c >= 'a' && c <= 'z' {
+			byFirst[c] = append(byFirst[c], i)
+		} else {
+			whole = append(whole, i)
+		}
+	}
+	end, endLine := make([]int, len(vocab)), make([]int, len(vocab)) // where a pattern's last match on line endLine ended
+	var out, denied []scopeFinding
+	var hits []vocabHit
+	n := 0
+	for line := range strings.SplitSeq(text, "\n") {
+		n++
+		hits, denied = hits[:0], denied[:0]
+		ascii := isASCII(line)
+		var lower string
+		for i, v := range vocab {
+			if ascii && !slices.Contains(whole, i) {
 				continue
 			}
-			for _, m := range v.re.FindAllString(line, -1) {
-				out = append(out, scopeFinding{rule: "vocabulary", path: path, line: i + 1, token: strings.ToLower(m)})
+			if lower == "" {
+				lower = strings.ToLower(line)
 			}
-		}
-		for _, w := range words(line) {
-			candidates := []string{strings.ReplaceAll(w, "-", "_")}
-			if strings.Contains(w, "-") {
-				candidates = append(candidates, strings.Split(w, "-")...)
-			}
-			for _, c := range candidates {
-				if c != "" && deny.denied(c) {
-					out = append(out, scopeFinding{rule: "denylist", path: path, line: i + 1, length: len(c), token: strings.ToLower(c)})
-					break
+			if strings.Contains(lower, v.prefix) {
+				for _, m := range v.re.FindAllString(line, -1) {
+					hits = append(hits, vocabHit{entry: i, text: m})
 				}
 			}
 		}
+		try := func(at int) {
+			c := line[at]
+			if c >= 'A' && c <= 'Z' {
+				c += 'a' - 'A'
+			}
+			for _, i := range byFirst[c] {
+				v := vocab[i]
+				if endLine[i] == n && at < end[i] || at+len(v.prefix) > len(line) || !foldEqual(line[at:at+len(v.prefix)], v.prefix) {
+					continue
+				}
+				if loc := v.at.FindStringIndex(line[at:]); loc != nil {
+					hits = append(hits, vocabHit{entry: i, text: line[at : at+loc[1]]})
+					end[i], endLine[i] = at+loc[1], n
+				}
+			}
+		}
+		words(line, func(at int, w string) {
+			if ascii {
+				try(at)
+				for k := 1; k < len(w); k++ {
+					if w[k-1] == '-' && isWordByte(w[k], true) {
+						try(at + k)
+					}
+				}
+			}
+			if c, ok := deniedPart(w, deny); ok {
+				denied = append(denied, scopeFinding{rule: "denylist", path: path, line: n, length: len(c), token: strings.ToLower(c)})
+			}
+		})
+		slices.SortStableFunc(hits, func(a, b vocabHit) int { return a.entry - b.entry })
+		for _, h := range hits {
+			out = append(out, scopeFinding{rule: "vocabulary", path: path, line: n, token: strings.ToLower(h.text)})
+		}
+		out = append(out, denied...)
 	}
 	return out
 }
@@ -336,6 +443,24 @@ func trackedFiles(t *testing.T) []string {
 	return out
 }
 
+// readWhole reads a file into a string without the copy a conversion of
+// os.ReadFile's bytes makes: the lint reads the whole tree (TST-012).
+func readWhole(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	var b strings.Builder
+	if info, err := f.Stat(); err == nil {
+		b.Grow(int(info.Size()))
+	}
+	if _, err := io.Copy(&b, f); err != nil {
+		return "", err
+	}
+	return b.String(), nil
+}
+
 func readScopeList(t *testing.T, name string) []byte {
 	t.Helper()
 	src, err := os.ReadFile(filepath.Join(root, scopeDir, name))
@@ -382,15 +507,15 @@ func TestScopeLint(t *testing.T) {
 		wg.Go(func() {
 			cache := &denyCache{deny: deny, seen: map[string]bool{}}
 			for i := range next {
-				src, err := os.ReadFile(filepath.Join(root, paths[i]))
+				src, err := readWhole(filepath.Join(root, paths[i]))
 				if err != nil {
 					per[i].err = err
 					continue
 				}
-				if bytes.IndexByte(src, 0) >= 0 {
+				if strings.IndexByte(src, 0) >= 0 {
 					continue // binary
 				}
-				per[i] = scanned1{found: scanText(paths[i], src, vocab, cache), lines: bytes.Count(src, []byte("\n")), text: true}
+				per[i] = scanned1{found: scanText(paths[i], src, vocab, cache), lines: strings.Count(src, "\n"), text: true}
 			}
 		})
 	}
@@ -453,7 +578,7 @@ func TestScopeLintCanSayNo(t *testing.T) {
 		t.Fatal(err)
 	}
 	src := []byte("a clean line\nthe Crawler job reads feeds\nselect * from Planted_Internal_Name\npath /planted-internal-name/x\nfeedback is fine\n")
-	got := scanText("x.md", src, vocab, &denyCache{deny: deny, seen: map[string]bool{}})
+	got := scanText("x.md", string(src), vocab, &denyCache{deny: deny, seen: map[string]bool{}})
 	var rendered []string
 	for _, f := range got {
 		rendered = append(rendered, f.String())
@@ -529,3 +654,51 @@ func TestScopeListsFailClosed(t *testing.T) {
 }
 
 func second[T any](_ T, err error) error { return err }
+
+// TestScopeScanFindsWhatTheWholeExpressionFinds: the scan's anchored search
+// from word starts finds, line by line and pattern by pattern, what each
+// pattern's whole expression finds over each line: cases, hyphens,
+// underscores and digits beside a word, matches back to back, a match over
+// two words, a match that holds the start of another, a long line, a line
+// with other characters and a pattern that does not start with a letter.
+func TestScopeScanFindsWhatTheWholeExpressionFinds(t *testing.T) {
+	req.Covers(t, "LIC-010", "DEV-044")
+	vocab, err := parseVocabulary([]byte("feeds?\\b\tr\ncrawl\tr\ndata[ -]collection\tr\npoll(er|ing)\\b\tr\n_raw\tr\nrow[ -]row\tr\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := []string{
+		"FEEDS feed Feeds feedback xfeed x_feed x2feed x-feed feed-x feed_x",
+		"data-feed--feed -feed feedfeed feed. (feed) \"Feed\"",
+		"crawlcrawl CRAWLER re-crawl crawl_ crawl",
+		"Data Collection data-collection data  collection datacollection",
+		"poller polling pollers poll-ing poller-feed",
+		"a_raw _raw x _RAW",
+		"row row row row-row Row-Row-row",
+		"Über feeds und Crawler, ſcrawl, Krawl",
+		strings.Repeat("feed data ", 5000) + "crawl",
+		"",
+	}
+	src := strings.Join(lines, "\n")
+	var want []string
+	for i, line := range lines {
+		lower := strings.ToLower(line)
+		for _, v := range vocab {
+			if strings.Contains(lower, v.prefix) {
+				for _, m := range v.re.FindAllString(line, -1) {
+					want = append(want, fmt.Sprintf("%d %s", i+1, strings.ToLower(m)))
+				}
+			}
+		}
+	}
+	var got []string
+	for _, f := range scanText("x.md", src, vocab, &denyCache{deny: map[string]bool{}, seen: map[string]bool{}}) {
+		got = append(got, fmt.Sprintf("%d %s", f.line, f.token))
+	}
+	if len(want) < 20 {
+		t.Fatalf("the reference found %d matches; the corpus does not exercise the scan", len(want))
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("scan:\n%s\nwhole expression:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}

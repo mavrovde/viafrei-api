@@ -68,9 +68,6 @@ func TestStateWarnings(t *testing.T) {
 	}
 }
 
-// An answer in English names an event by the issuer's English name,
-// credited to its family; one in German, or an event with no English name,
-// keeps the German name.
 // enService is the weather service whose register also holds the English
 // family the fake names.
 func enService(f *statesFake) *features.Service {
@@ -79,6 +76,9 @@ func enService(f *statesFake) *features.Service {
 	return svc
 }
 
+// An answer in English names an event by the issuer's English name,
+// credited to its family; one in German, or an event with no English name,
+// keeps the German name.
 func TestStateWarningsNameTheEventsInTheAskedLanguage(t *testing.T) {
 	k := key("commercial", []access.Scope{"weather"}, "f1", "f-en")
 	snow, frost := "SCHNEEFALL", "FROST"

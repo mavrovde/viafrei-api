@@ -13,9 +13,11 @@
 # (:edge, :sha-) image, and a release candidate publishes nothing: CI already
 # builds, lints, scans and smoke-tests the image of every commit without
 # pushing it.
-# Started by release-please.yml (workflow_call) after a release pull request
-# is merged, by a pushed vX.Y.Z tag, or by hand for a tag that exists. Tags
-# are never moved or deleted here, and a tag whose release is published, or
+# A run of its own, started by release-please.yml's tag job (a
+# workflow_dispatch on main with input tag, sent with the built-in
+# GITHUB_TOKEN) once the release commit is tagged, by a vX.Y.Z tag a
+# maintainer pushes, or by hand for a tag that exists. Tags are never moved
+# or deleted here, and a tag whose release is published, or
 # whose :X.Y.Z image exists, is refused before anything is built. Before
 # anything is built, Snyk (snyk.yml, called) tests the tagged commit's
 # dependencies, where a high or critical advisory stops the release, and the
@@ -24,15 +26,6 @@
 name: Release
 
 on:
-  workflow_call:
-    inputs:
-      tag:
-        description: Annotated tag to release (vX.Y.Z)
-        required: true
-        type: string
-    secrets:
-      SNYK_TOKEN:
-        required: true
   push:
     tags: ["v[0-9]+.[0-9]+.[0-9]+"]
   workflow_dispatch:
@@ -459,8 +452,9 @@ jobs:
     needs: [publish, verify]
     # The docs of the newest release only: a backported patch of an older
     # line never replaces them. The github-pages environment
-    # deploys from main only, which is the ref of a release started by
-    # release-please.yml or dispatched from main.
+    # deploys from main only, which is the ref of a release that
+    # release-please.yml's tag job dispatches, or that is dispatched from main
+    # by hand.
     if: needs.publish.outputs.highest == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30

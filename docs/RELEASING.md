@@ -16,19 +16,27 @@ and merge release pull requests.
    `BREAKING CHANGE:` footer for a breaking change). The title becomes the
    squash commit and the changelog line.
 2. Once CI has passed on a push to `main`, [release-please](https://github.com/googleapis/release-please)
-   (`.github/workflows/release-please.yml`, started by `workflow_run`) opens
-   or updates the **release pull request** `chore: release X.Y.Z` with the
-   built-in `GITHUB_TOKEN`. GitHub holds the pull request's CI and Security
-   runs as "action_required" because github-actions[bot] opened it, and
-   branch protection reads only pull-request runs (a `workflow_dispatch` run
-   on the same commit is not associated with the pull request), so the same
-   job approves them (`scripts/approve-release-runs.sh`, which fails when
-   either workflow has no run on the head commit). It bumps `version.txt`, updates
-   `.release-please-manifest.json` and adds the section to `CHANGELOG.md`
+   (`.github/workflows/release-please.yml`, started by `workflow_run`) runs
+   four jobs, each one step, with the built-in `GITHUB_TOKEN` and no other
+   credential: `release` ("Release (draft)", step 4), `tag` ("Annotated tag
+   and start the release", steps 4 and 5), `pull-request` ("Release pull
+   request") and `approve`. The `pull-request` job opens or updates the
+   **release pull request** `chore: release X.Y.Z`. It runs after `tag` (or
+   when no release was cut), so the next version is computed from the tag
+   just pushed, and it does not run after a failed `tag` job. GitHub holds
+   the pull request's CI and Security runs as "action_required" because
+   github-actions[bot] opened it, and branch protection reads only
+   pull-request runs (a `workflow_dispatch` run on the same commit is not
+   associated with the pull request), so the `approve` job approves them
+   (`scripts/approve-release-runs.sh`: it asks for the runs on the head
+   commit again every 10 seconds and fails when either workflow has no
+   pull-request run there after 600 seconds). The pull request bumps
+   `version.txt`, updates `.release-please-manifest.json` and adds the
+   section to `CHANGELOG.md`
    ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/) headings).
 3. A maintainer reviews and merges the release pull request (checklist below).
-4. release-please writes a **draft** release, which creates no tag. The `tag`
-   job runs `scripts/ci-gate.sh` on the release commit: the check runs
+4. The `release` job (release-please) writes a **draft** release, which
+   creates no tag. The `tag` job runs `scripts/ci-gate.sh` on the release commit: the check runs
    `Unit and handler tests`, `Integration tests (PostGIS)`,
    `Coverage gate (100 % per package)`, `Image (build, lint, scan, healthz)`,
    `govulncheck` and `Lint` must all have **completed with
@@ -38,8 +46,15 @@ and merge release pull requests.
    workflow holding `checks: write` can create a check run of any name, so a
    same-named run from elsewhere is not evidence. Only then does it create
    the **annotated** tag `vX.Y.Z` on the release commit and push it.
-5. The same run calls `.github/workflows/release.yml`, the only workflow
-   that pushes an image. Images exist for **confirmed releases only**: a push
+5. The `tag` job then starts `.github/workflows/release.yml` as a run of
+   its own (`gh workflow run release.yml --ref main -f tag=vX.Y.Z`): a tag
+   pushed with `GITHUB_TOKEN` starts no workflow, but a `workflow_dispatch`
+   sent with it does. It is dispatched on `main`, the ref the `github-pages`
+   environment deploys from, so the run's cosign identity is
+   `release.yml@refs/heads/main` (a release from a tag a maintainer pushes
+   carries `@refs/tags/vX.Y.Z`; the identity regexp accepts both). The
+   Release Please run ends there; the release has its own run in the Actions
+   tab. `release.yml` is the only workflow that pushes an image. Images exist for **confirmed releases only**: a push
    to `main` and a release candidate publish none. The workflow:
    - resolves the tag to its commit (an annotated tag is dereferenced; anything
      that is not a commit is refused) and runs Snyk (`.github/workflows/snyk.yml`,
@@ -74,7 +89,7 @@ and merge release pull requests.
      release that is still a draft, and makes a newly published release
      latest by default, so a backport published without `--latest=false`
      would become latest
-6. The `verify` job of the same run pulls the image by digest, runs
+6. The `verify` job of the release run pulls the image by digest, runs
    `cosign verify` and `gh attestation verify`, checks `SHA256SUMS` against
    the downloaded assets, and smoke-tests `/healthz` of the published image.
    It then closes the milestone whose title starts with `X.Y.Z` if no issue in
@@ -99,7 +114,13 @@ not in the code (a flaky runner, a registry outage), re-run the failed jobs
 of the CI run on the release commit (`gh run rerun <ci-run-id> --failed`);
 once it has succeeded, re-run the failed jobs of the Release Please run
 (`gh run rerun <release-please-run-id> --failed`), whose `tag` job runs the
-gate again. If the code is at fault, fix it through a pull request and
+gate again; the `pull-request` and `approve` jobs, skipped after the failed
+`tag` job, run with it.
+
+### When the release run was not started
+
+If the `tag` job pushed the tag but its last step failed, start the release
+by hand: `gh workflow run release.yml --ref main -f tag=vX.Y.Z`. If the code is at fault, fix it through a pull request and
 release the next patch; the draft release of the refused version is deleted
 by hand (it never had a tag).
 
@@ -239,7 +260,8 @@ After the run:
 ## Release candidates
 
 A release candidate publishes nothing: no image, no release page.
-`release.yml` starts only on a `vX.Y.Z` tag push and refuses any other tag,
+`release.yml` starts only on a `vX.Y.Z` tag push or a dispatch that names
+such a tag, and refuses any other tag,
 because an image exists for a confirmed release only. A candidate is the
 commit itself: CI's `Image (build, lint, scan, healthz)` job builds, lints,
 scans and smoke-tests the image of every commit on `main` without pushing
@@ -433,8 +455,8 @@ To withdraw one:
 |---|---|---|
 | `GITHUB_TOKEN` (built in) | every workflow | — |
 | `SONAR_TOKEN` | CI `sonar` job | the job fails and names the secret |
-| `SNYK_TOKEN` | the Snyk workflow (weekly on `main`, and called by Release; release-please hands it on by name) | the Snyk job fails and names the secret, and the release stops before anything is built |
+| `SNYK_TOKEN` | the Snyk workflow (weekly on `main`, and called by Release, which hands it on by name) | the Snyk job fails and names the secret, and the release stops before anything is built |
 | `SONAR_TOKEN` again as a **Dependabot secret** (Settings > Secrets and variables > Dependabot; **the owner adds it**) | the `sonar` job on a Dependabot pull request, which reads Dependabot secrets and never Actions secrets | the job fails on every Dependabot pull request, saying that the Dependabot secret is missing |
-| Workflow permission "Allow GitHub Actions to create and approve pull requests" (on) | release-please opens the release pull request with `GITHUB_TOKEN` | no release pull request: the job fails with "GitHub Actions is not permitted to create or approve pull requests" |
+| Workflow permission "Allow GitHub Actions to create and approve pull requests" (on) | release-please opens the release pull request with `GITHUB_TOKEN` | no release pull request: the `pull-request` job fails with "GitHub Actions is not permitted to create or approve pull requests" |
 | GHCR package visibility public, linked to this repository | image pulls | anonymous pulls fail |
 | GitHub Pages on, source "GitHub Actions"; the `github-pages` environment deploys from `main` | release `pages` job | the deploy step fails |

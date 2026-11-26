@@ -92,7 +92,14 @@ func (s *Service) Overview(ctx context.Context, key access.Record, q OverviewQue
 	if err != nil {
 		return Overview{}, err
 	}
-	place, err := s.repos.Places.Place(ctx, q.PlaceID, permitted)
+	// A station the place search lists is a row of the station register, a
+	// transit family: its id opens here as the search's description says,
+	// and no other row of a transit family does.
+	stops, _, serr := gate.Answer(access.Answering(reg, "transit"))
+	if serr != nil {
+		stops = nil
+	}
+	place, err := s.repos.Places.Place(ctx, q.PlaceID, permitted, stops)
 	if err != nil {
 		return Overview{}, err
 	}

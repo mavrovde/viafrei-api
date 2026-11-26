@@ -3,6 +3,7 @@
 package store_test
 
 import (
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -96,5 +97,48 @@ order by p.place_id limit 1`, &id, &name)
 	ps, _, err = st.Places(bounded(t), places.Query{Text: name, Limit: 50}, others, nil, roads)
 	if i := slices.IndexFunc(ps, func(p places.Place) bool { return p.ID == id }); err != nil || i >= 0 && (ps[i].Kreis != nil || ps[i].KreisFamily != "") {
 		t.Errorf("without %s: %+v, %v", places.KreisFamily, ps, err)
+	}
+}
+
+// A station of the station register answers the place search through the
+// stop families the key may read: the register is a transit family, not a
+// places one (prod 2.0.2: "Berlin Alexanderplatz" found nothing). Without a
+// stop family it does not answer.
+func TestPlacesListTheRegisterStationsOfTheStopFamilies(t *testing.T) {
+	req.Covers(t, "FR-PLACE-001")
+	st := seeded(t)
+	var fams []string
+	owner(t, `select array_agg(distinct source_ref) from contract.place where place_kind <> 'junction'`, &fams)
+	const name, fam = "Querweghausen Nordbahnhof", "db_stada"
+	fams = slices.DeleteFunc(fams, func(f string) bool { return f == fam })
+	var id string
+	owner(t, `insert into public.gazetteer_places (kind, name, name_norm, geom, source_id, external_id)
+values ('station', '`+name+`', lower('`+name+`'), st_setsrid(st_makepoint(9.5, 51.5), 4326), '`+fam+`', 'q1') returning id::text`, &id)
+	t.Cleanup(func() { change(t, `delete from public.gazetteer_places where id = `+id) })
+	// A row of another kind of the same stop family, with the same name, is
+	// no station of the register: neither the search nor the overview opens it.
+	var other string
+	owner(t, `insert into public.gazetteer_places (kind, name, name_norm, geom, source_id, external_id)
+values ('stop', '`+name+`', lower('`+name+`'), st_setsrid(st_makepoint(9.5, 51.5), 4326), '`+fam+`', 'q2') returning id::text`, &other)
+	t.Cleanup(func() { change(t, `delete from public.gazetteer_places where id = `+other) })
+
+	ps, _, err := st.Places(bounded(t), places.Query{Text: name, Limit: 5}, fams, []string{fam}, nil)
+	if err != nil || len(ps) == 0 || ps[0].ID != id || ps[0].Family != fam || ps[0].Kind != places.Kind("station_area") {
+		t.Errorf("station of a stop family: %+v, %v", ps, err)
+	}
+	if slices.ContainsFunc(ps, func(p places.Place) bool { return p.ID == other }) {
+		t.Errorf("a stop row of a stop family answered the search: %+v", ps)
+	}
+	if ps, _, err := st.Places(bounded(t), places.Query{Text: name, Limit: 5}, fams, nil, nil); err != nil || slices.ContainsFunc(ps, func(p places.Place) bool { return p.ID == id }) {
+		t.Errorf("station without a stop family: %+v, %v", ps, err)
+	}
+	if p, err := st.Place(bounded(t), id, fams, []string{fam}); err != nil || p.ID != id {
+		t.Errorf("the station's overview place: %+v, %v", p, err)
+	}
+	if p, err := st.Place(bounded(t), other, fams, []string{fam}); !errors.Is(err, places.ErrNotFound) {
+		t.Errorf("a stop row of a stop family opened: %+v, %v", p, err)
+	}
+	if p, err := st.Place(bounded(t), id, fams, nil); !errors.Is(err, places.ErrNotFound) {
+		t.Errorf("the station opened without its stop family: %+v, %v", p, err)
 	}
 }

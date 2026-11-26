@@ -552,7 +552,12 @@ func registerRoadConditions(api huma.API, s *server, op huma.Operation) {
 
 // SituationInput is the input of getRoadSituation.
 type SituationInput struct {
-	SituationID string `path:"situationId" maxLength:"64" pattern:"^[A-Za-z0-9_.:-]+$" example:"datex:syn:ev-00001" doc:"The situation's id."`
+	// The ids are the ones the list operations hand out, as the sources write
+	// them: a city's DATEX id carries spaces and slashes ("datex:SenMVKU
+	// Berlin/traffic_berlin:280/2026", percent-encoded in the path) and an
+	// Autobahn id runs to about 100 characters (prod 2026-11-26: 36-97). The
+	// old pattern ([A-Za-z0-9_.:-], 64) refused every such id with a 400.
+	SituationID string `path:"situationId" maxLength:"256" pattern:"^[^\\x00-\\x1F\\x7F]+$" example:"datex:syn:ev-00001" doc:"The situation's id, exactly as a list operation gave it (percent-encoded in the path)."`
 }
 
 // SituationEnvelope is the enveloped answer of getRoadSituation.

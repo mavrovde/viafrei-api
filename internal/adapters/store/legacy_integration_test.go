@@ -34,7 +34,11 @@ found as (
   join hit on hit.place_id = p.place_id
   where p.withdrawn_at is null
     and p.location is not null
-    and (p.source_ref = any($1) or (p.place_kind = 'junction' and p.source_ref = any($9)))
+    and (p.source_ref = any($1) or (p.place_kind = 'junction' and p.source_ref = any($9))
+         -- carried on purpose (#285): a station of the station register, a
+         -- stop family's row, answers as the platform's place search does
+         or (p.place_kind = 'station_area' and p.source_ref = any($8)
+             and exists (select from public.gazetteer_places g where g.id::text = p.place_id and g.kind = 'station')))
     and ` + permitted("p") + `
   union all
   select s.stop_place_id, s.name, 'station_area', s.location, s.region_code, s.source_ref,

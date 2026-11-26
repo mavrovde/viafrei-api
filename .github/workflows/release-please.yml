@@ -1,19 +1,33 @@
-# Keeps the release pull request up to date from the Conventional Commits on
-# main. When that pull request is merged, release-please writes a DRAFT
-# release (a draft creates no tag); the next job creates the annotated tag
-# vX.Y.Z on the release commit and runs release.yml, which builds, signs,
-# attests, attaches the assets, publishes the draft, verifies the result and
-# publishes the docs to GitHub Pages.
-# release.yml is called directly because a tag pushed with GITHUB_TOKEN does
-# not start other workflows.
+# Releases from the Conventional Commits on main, in four jobs, each a step of
+# its own in the run:
+#   release       when a release pull request was merged, release-please
+#                 writes a DRAFT release (a draft creates no tag); otherwise
+#                 it does nothing.
+#   tag           scripts/ci-gate.sh checks the release commit's CI result
+#                 again (REL-015), the annotated tag vX.Y.Z is created on the
+#                 release commit and pushed, and release.yml is started as a
+#                 run of its own (workflow_dispatch, input tag). That run
+#                 builds, signs, attests, attaches the assets, publishes the
+#                 draft, verifies the result and publishes the docs to GitHub
+#                 Pages.
+#   pull-request  release-please opens or updates the next release pull
+#                 request. It runs after tag, so the version it proposes is
+#                 computed from the tag just pushed; after a failed tag job it
+#                 does not run.
+#   approve       approves the pull_request runs of CI and Security on that
+#                 pull request (scripts/approve-release-runs.sh).
+# Every job uses the built-in GITHUB_TOKEN and nothing else, and none holds a
+# publishing grant: only release.yml publishes. A tag pushed with GITHUB_TOKEN
+# starts no workflow, but a workflow_dispatch sent with it does, so the tag job
+# dispatches release.yml. It is dispatched on main, the ref the github-pages
+# environment deploys from, so the release run's cosign identity stays
+# release.yml@refs/heads/main.
 #
-# It runs after CI has passed on a push to main, and scripts/ci-gate.sh checks
-# the release commit's CI result again before the tag is created (REL-015).
-# The release pull request is opened with the built-in GITHUB_TOKEN (the
-# repository allows GitHub Actions to create pull requests). GitHub holds the
-# pull_request runs of CI and Security for that pull request as
-# "action_required", and branch protection reads only pull_request runs, so the
-# next step approves them (scripts/approve-release-runs.sh).
+# It runs after CI has passed on a push to main, or by hand. The release pull
+# request is opened with GITHUB_TOKEN (the repository allows GitHub Actions to
+# create pull requests). GitHub holds the pull_request runs of CI and Security
+# for that pull request as "action_required", and branch protection reads only
+# pull_request runs, so the approve job approves them.
 name: Release Please
 
 on:
@@ -31,8 +45,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release-please:
-    name: Release pull request
+  release:
+    name: Release (draft)
     # A CI run on a push to this repository's main that succeeded, or a
     # maintainer by hand. The event and repository checks keep out a fork's
     # pull request from a branch named main.
@@ -42,7 +56,6 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      actions: write # approves CI and Security on the release pull request
     outputs:
       created: ${{ steps.rp.outputs.release_created }}
       tag: ${{ steps.rp.outputs.tag_name }}
@@ -54,31 +67,18 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-      # The approval script is read from main's checkout, not the release branch.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: steps.rp.outputs.pr != ''
-        with:
-          persist-credentials: false
-      - name: Approve CI and Security on the release pull request
-        if: steps.rp.outputs.pr != ''
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-          PR: ${{ steps.rp.outputs.pr }}
-        run: |
-          branch=$(jq -r '.headBranchName // empty' <<<"$PR")
-          scripts/approve-release-runs.sh "$branch"
+          skip-github-pull-request: true
 
   tag:
-    name: Annotated tag
-    needs: release-please
-    if: needs.release-please.outputs.created == 'true'
+    name: Annotated tag and start the release
+    needs: release
+    if: needs.release.outputs.created == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: write
       checks: read
-      actions: read
+      actions: write # the gate reads workflow runs; the last step dispatches release.yml
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -90,12 +90,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          SHA: ${{ needs.release-please.outputs.sha }}
+          SHA: ${{ needs.release.outputs.sha }}
         run: scripts/ci-gate.sh "$SHA"
       - name: Create and push the annotated tag
         env:
-          TAG: ${{ needs.release-please.outputs.tag }}
-          SHA: ${{ needs.release-please.outputs.sha }}
+          TAG: ${{ needs.release.outputs.tag }}
+          SHA: ${{ needs.release.outputs.sha }}
         run: |
           [[ $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::release-please produced tag '$TAG', not vX.Y.Z"; exit 1; }
           if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
@@ -106,24 +106,59 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "$TAG" "$SHA" -m "Release $TAG"
           git push origin "refs/tags/$TAG"
+      # GITHUB_TOKEN may send a workflow_dispatch (the one event of its own
+      # that starts a workflow). release.yml resolves the tag through the API,
+      # so it starts only after the push above.
+      - name: Start release.yml for the tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: |
+          gh workflow run release.yml --ref main -f tag="$TAG" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "release.yml dispatched for $TAG: $GITHUB_SERVER_URL/$GH_REPO/actions/workflows/release.yml" | tee -a "$GITHUB_STEP_SUMMARY"
 
-  release:
-    name: Release
-    needs: [release-please, tag]
-    # A called workflow gets at most what its caller grants: release.yml's
-    # gate reads check runs and workflow runs.
+  pull-request:
+    name: Release pull request
+    needs: [release, tag]
+    # After the tag job, or when no release was cut (tag skipped); never after
+    # a failed tag job, whose next version would be computed without the tag.
+    if: always() && needs.release.result == 'success' && (needs.tag.result == 'success' || needs.tag.result == 'skipped')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       contents: write
-      checks: read
-      actions: read
-      packages: write
-      id-token: write
-      attestations: write
-      issues: write
-      pages: write
-      security-events: write # release.yml's Snyk job uploads SARIF
-    uses: ./.github/workflows/release.yml
-    with:
-      tag: ${{ needs.release-please.outputs.tag }}
-    secrets:
-      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      pull-requests: write
+    outputs:
+      pr: ${{ steps.rp.outputs.pr }}
+    steps:
+      - id: rp
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          skip-github-release: true
+
+  approve:
+    name: Approve CI and Security on the release pull request
+    needs: pull-request
+    if: needs.pull-request.outputs.pr != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: write # approves CI and Security on the release pull request
+    steps:
+      # The approval script is read from main's checkout, not the release branch.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Approve CI and Security on the release pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ needs.pull-request.outputs.pr }}
+        run: |
+          branch=$(jq -r '.headBranchName // empty' <<<"$PR")
+          scripts/approve-release-runs.sh "$branch"

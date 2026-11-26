@@ -57,11 +57,10 @@ var gateRules = []gateRule{
 	{"release.yml", "publish", "cosign sign"},
 }
 
-// gateGrants: the jobs that run the gate, and the caller job that grants
-// release.yml its token, can read check runs and workflow runs.
+// gateGrants: the jobs that run the gate can read check runs and workflow
+// runs.
 var gateGrants = [][2]string{
 	{"release-please.yml", "tag"},
-	{"release-please.yml", "release"},
 	{"release.yml", "publish"},
 }
 
@@ -89,7 +88,10 @@ const (
 	approveScript = "approve-release-runs.sh"
 	approveStep   = `scripts/approve-release-runs.sh "$branch"`
 	approveRun    = `gh api -X POST "repos/$GH_REPO/actions/runs/$id/approve"`
-	dispatchGrant = "      actions: write"
+	approveWait   = "${APPROVE_WAIT_S:-600}"
+	dispatchRun   = `gh workflow run release.yml --ref main -f tag="$TAG"`
+	pullRequestIf = "always() && needs.release.result == 'success' && (needs.tag.result == 'success' || needs.tag.result == 'skipped')"
+	rpAction      = "googleapis/release-please-action@"
 	publishedRef  = `gh api "repos/$GH_REPO/releases/tags/$TAG"`
 	imageExists   = `docker buildx imagetools inspect "$IMAGE:$VERSION"`
 	notesOnce     = `if grep -q '^## Container image$' /tmp/notes.md; then`
@@ -106,6 +108,10 @@ const (
 // exists for a confirmed release only: release.yml is the one workflow that
 // pushes or signs one, it starts on a vX.Y.Z tag alone, and before it builds
 // it refuses a tag with a suffix and a tag that differs from version.txt.
+// release-please.yml runs on the built-in GITHUB_TOKEN alone, holds no
+// publishing grant, dispatches release.yml for the tag it pushed, opens the
+// next release pull request only after that, and approves its CI and
+// Security runs.
 func releaseGateFindings(files map[string][]byte, gateScript string) []string {
 	parsed := map[string]gatedWorkflow{}
 	for name, src := range files {
@@ -124,6 +130,7 @@ func releaseGateFindings(files map[string][]byte, gateScript string) []string {
 	out = append(out, gateGrantFindings(parsed)...)
 	out = append(out, workflowRunFindings("release-please.yml", parsed["release-please.yml"])...)
 	out = append(out, shellRuleFindings(files)...)
+	out = append(out, releasePleaseFindings(files, parsed["release-please.yml"])...)
 	out = append(out, confirmedReleaseFindings(files, parsed["release.yml"])...)
 	slices.Sort(out)
 	return out
@@ -193,13 +200,14 @@ func gateOrderFindings(parsed map[string]gatedWorkflow) []string {
 	return out
 }
 
-// gateGrantFindings: the gate's token can read check runs and workflow runs.
+// gateGrantFindings: the gate's token can read check runs and workflow runs
+// (a write grant reads too).
 func gateGrantFindings(parsed map[string]gatedWorkflow) []string {
 	var out []string
 	for _, g := range gateGrants {
 		perms := parsed[g[0]].Jobs[g[1]].Permissions
 		for _, scope := range []string{"checks", "actions"} {
-			if perms[scope] != "read" {
+			if perms[scope] != "read" && perms[scope] != "write" {
 				out = append(out, fmt.Sprintf("%s job %s does not grant %s: read, which the gate needs", g[0], g[1], scope))
 			}
 		}
@@ -213,16 +221,41 @@ func guarded(j gatedJob) bool {
 	return strings.Contains(j.If, ciSucceeded) && strings.Contains(j.If, sameRepo)
 }
 
+// statusCheck: a condition that runs the job whatever its needs did.
+var statusCheck = regexp.MustCompile(`\b(always|failure|cancelled)\(\)`)
+
+// guardedJob: the job requires a successful CI run of this repository, by its
+// own condition or through a job it needs, however far back. A job whose
+// condition calls always() (or failure(), cancelled()) runs whatever its needs
+// did, so it is guarded through a need only when it requires that need's
+// success itself and does not also accept it skipped (a need skipped by the
+// guard is skipped too).
+func guardedJob(w gatedWorkflow, id string, path map[string]bool) bool {
+	j, ok := w.Jobs[id]
+	if !ok || path[id] {
+		return false
+	}
+	if guarded(j) {
+		return true
+	}
+	path[id] = true
+	defer delete(path, id)
+	return slices.ContainsFunc(needs(j.Needs), func(n string) bool {
+		ok := !statusCheck.MatchString(j.If) || strings.Contains(j.If, "needs."+n+".result == 'success'") && !strings.Contains(j.If, "needs."+n+".result == 'skipped'")
+		return ok && guardedJob(w, n, path)
+	})
+}
+
 // workflowRunFindings: the workflow starts on a completed CI run, not a
-// push; every job either carries both conditions or needs a job that does;
-// and no checkout takes a ref from the event.
+// push; every job is guarded (guardedJob); and no checkout takes a ref from
+// the event.
 func workflowRunFindings(name string, w gatedWorkflow) []string {
 	var out []string
 	if _, onPush := w.On["push"]; onPush || w.On["workflow_run"] == nil {
 		out = append(out, name+" must follow a completed CI run (workflow_run), not a push")
 	}
 	for id, j := range w.Jobs {
-		if !guarded(j) && !slices.ContainsFunc(needs(j.Needs), func(n string) bool { return guarded(w.Jobs[n]) }) {
+		if !guardedJob(w, id, map[string]bool{}) {
 			out = append(out, name+" job "+id+" does not require a successful CI run of this repository")
 		}
 		for _, s := range j.Steps {
@@ -263,55 +296,103 @@ func shellRuleFindings(files map[string][]byte) []string {
 	if !strings.Contains(rel, minorGuard) {
 		out = append(out, "release.yml moves :X.Y without the highest-in-minor guard")
 	}
+	return out
+}
+
+// publishingGrants are the scopes only release.yml may hold: the image push,
+// the keyless signature and the attestations, the Pages deploy and the SARIF
+// upload of its Snyk job.
+var publishingGrants = []string{"packages", "id-token", "attestations", "pages", "security-events"}
+
+var secretRef = regexp.MustCompile(`secrets\.([A-Za-z0-9_]+)`)
+
+// stepIndex: the first step of the job that matches, or -1.
+func stepIndex(j gatedJob, match func(gatedStep) bool) int {
+	return slices.IndexFunc(j.Steps, match)
+}
+
+// releasePleaseFindings: the jobs of release-please.yml, each one step of the
+// release. release writes the draft release and opens no pull request; tag
+// runs the gate, pushes the tag and then dispatches release.yml for it;
+// pull-request opens the next release pull request after tag (or when no
+// release was cut), never after a failed tag; approve approves CI and
+// Security on it. The built-in GITHUB_TOKEN is the only credential, and no
+// job holds a publishing grant or calls another workflow: release.yml runs
+// on its own.
+func releasePleaseFindings(files map[string][]byte, w gatedWorkflow) []string {
+	var out []string
 	rp := string(files["release-please.yml"])
+	for _, m := range secretRef.FindAllStringSubmatch(rp, -1) {
+		if m[1] != "GITHUB_TOKEN" {
+			out = append(out, "release-please.yml does not run with the built-in GITHUB_TOKEN alone (secrets."+m[1]+")")
+		}
+	}
+	skip := map[string]string{"release": "skip-github-pull-request", "pull-request": "skip-github-release"}
+	for _, id := range []string{"release", "pull-request"} {
+		j := w.Jobs[id]
+		i := stepIndex(j, func(s gatedStep) bool { return strings.HasPrefix(s.Uses, rpAction) })
+		switch {
+		case i < 0:
+			out = append(out, "release-please.yml job "+id+" does not run release-please")
+		case j.Steps[i].With["token"] != "${{ secrets.GITHUB_TOKEN }}":
+			out = append(out, "release-please.yml job "+id+" does not run with the built-in GITHUB_TOKEN alone")
+		case j.Steps[i].With[skip[id]] != "true":
+			out = append(out, "release-please.yml job "+id+" does not set "+skip[id]+": true, so it does the other job's step")
+		}
+	}
+	for id, j := range w.Jobs {
+		for _, scope := range publishingGrants {
+			if j.Permissions[scope] == "write" {
+				out = append(out, "release-please.yml job "+id+" holds a publishing grant ("+scope+": write); only release.yml publishes")
+			}
+		}
+	}
+	if strings.Contains(rp, "uses: ./.github/workflows/") {
+		out = append(out, "release-please.yml calls a workflow; release.yml runs on its own, dispatched by the tag job")
+	}
+	tag := w.Jobs["tag"]
+	push := stepIndex(tag, func(s gatedStep) bool { return strings.Contains(s.Run, "git push origin") })
+	dispatch := stepIndex(tag, func(s gatedStep) bool { return strings.Contains(s.Run, dispatchRun) })
+	if dispatch < 0 || dispatch < push {
+		out = append(out, "release-please.yml job tag does not dispatch release.yml for the tag after pushing it")
+	}
+	if tag.Permissions["actions"] != "write" {
+		out = append(out, "release-please.yml job tag does not grant actions: write, which the dispatch needs")
+	}
+	pr := w.Jobs["pull-request"]
+	if n := needs(pr.Needs); !slices.Contains(n, "release") || !slices.Contains(n, "tag") || pr.If != pullRequestIf {
+		out = append(out, "release-please.yml job pull-request does not run after the tag job (needs [release, tag], not after a failed tag)")
+	}
 	approve := string(files[approveScript])
-	if !strings.Contains(rp, builtinToken) || strings.Contains(rp, "RELEASE_PLEASE_TOKEN") {
-		out = append(out, "release-please.yml does not open the release pull request with the built-in GITHUB_TOKEN alone")
+	ap := w.Jobs["approve"]
+	step := stepIndex(ap, func(s gatedStep) bool { return strings.Contains(s.Run, approveStep) })
+	if step < 0 || !slices.Contains(needs(ap.Needs), "pull-request") || ap.Permissions["actions"] != "write" || !strings.Contains(approve, approveRun) || !strings.Contains(approve, "for wf in CI Security; do") {
+		out = append(out, "release-please.yml does not approve CI and Security on the release pull request")
 	}
 	// The approval script is in the repository, so the job checks it out first.
-	co, step := strings.Index(rp, "actions/checkout@"), strings.Index(rp, approveStep)
-	if co < 0 || co > step {
+	if co := stepIndex(ap, func(s gatedStep) bool { return strings.HasPrefix(s.Uses, "actions/checkout@") }); co < 0 || co > step {
 		out = append(out, "release-please.yml runs the approval script without checking the repository out first")
 	}
-	if !strings.Contains(rp, approveStep) || !strings.Contains(rp, dispatchGrant) || !strings.Contains(approve, approveRun) || !strings.Contains(approve, "for wf in CI Security; do") {
-		out = append(out, "release-please.yml does not approve CI and Security on the release pull request")
+	if !strings.Contains(approve, approveWait) {
+		out = append(out, "approve-release-runs.sh does not wait "+approveWait+" seconds by default")
 	}
 	return out
 }
 
 // imagePushers are the texts that publish or sign an image, or that grant or
 // obtain what publishing needs (a registry login, packages: write). Only
-// release.yml and the job of release-please.yml that calls it may carry them.
+// release.yml may carry them.
 var imagePushers = []string{
 	"push: true", "push=true", "--push", "type=registry", "docker push", "docker login", "docker/login-action", "packages: write",
 	"cosign sign", "imagetools create", "oras push", "crane push", "crane copy",
 }
 
-// withoutJob returns a workflow's text with one top-level job's block cut
-// out, so the job allowed to grant publishing is exempt and its siblings are
-// still read.
-func withoutJob(src, job string) string {
-	lines := strings.SplitAfter(src, "\n")
-	var b strings.Builder
-	skip := false
-	for _, l := range lines {
-		if strings.HasPrefix(l, "  ") && !strings.HasPrefix(l, "   ") && strings.HasSuffix(strings.TrimRight(l, "\n"), ":") {
-			skip = strings.TrimSpace(l) == job+":"
-		} else if l != "" && l != "\n" && !strings.HasPrefix(l, " ") && !strings.HasPrefix(l, "#") {
-			skip = false
-		}
-		if !skip {
-			b.WriteString(l)
-		}
-	}
-	return b.String()
-}
-
 // confirmedReleaseFindings: images are published for confirmed releases only.
 // No workflow but release.yml pushes or signs an image (there is no main-line
-// image), release.yml starts on a pushed vX.Y.Z tag alone, and it refuses a
-// tag with a suffix (a release candidate) and a tag that differs from
-// version.txt before anything is built.
+// image), release.yml starts on a pushed vX.Y.Z tag or a dispatch that names
+// the tag, never as a called workflow, and it refuses a tag with a suffix (a
+// release candidate) and a tag that differs from version.txt before anything
+// is built.
 func confirmedReleaseFindings(files map[string][]byte, rel gatedWorkflow) []string {
 	var out []string
 	for name, src := range files {
@@ -319,9 +400,6 @@ func confirmedReleaseFindings(files map[string][]byte, rel gatedWorkflow) []stri
 			continue
 		}
 		text := string(src)
-		if name == "release-please.yml" {
-			text = withoutJob(text, "release")
-		}
 		for _, p := range imagePushers {
 			if strings.Contains(text, p) {
 				out = append(out, name+" publishes an image ("+p+"); only release.yml publishes, for a confirmed release")
@@ -332,6 +410,19 @@ func confirmedReleaseFindings(files map[string][]byte, rel gatedWorkflow) []stri
 	tags, _ := push["tags"].([]any)
 	if len(tags) != 1 || tags[0] != releaseTags {
 		out = append(out, fmt.Sprintf("release.yml starts on tags %v, not on %s alone", tags, releaseTags))
+	}
+	var triggers []string
+	for k := range rel.On {
+		triggers = append(triggers, k)
+	}
+	slices.Sort(triggers)
+	if !slices.Equal(triggers, []string{"push", "workflow_dispatch"}) {
+		out = append(out, fmt.Sprintf("release.yml runs on %v, not on a pushed tag and a dispatch alone", triggers))
+	}
+	dispatch, _ := rel.On["workflow_dispatch"].(map[string]any)
+	inputs, _ := dispatch["inputs"].(map[string]any)
+	if tag, _ := inputs["tag"].(map[string]any); tag["required"] != true {
+		out = append(out, "release.yml's dispatch does not require the input tag")
 	}
 	src := string(files["release.yml"])
 	build := strings.Index(src, "docker/build-push-action")
@@ -403,10 +494,36 @@ func TestReleaseGateIsWired(t *testing.T) {
 		"release-please.yml job tag reaches git push origin without":                                                                {plant("release-please.yml", gateStep, "        run: echo skipped\n"), s},
 		"release.yml job publish reaches docker/build-push-action without":                                                          {plant("release.yml", gateStep, "        run: echo skipped\n"), s},
 		"release-please.yml must follow a completed CI run":                                                                         {plant("release-please.yml", "  workflow_run:\n    workflows: [CI]\n    types: [completed]\n    branches: [main]\n", ""), s},
-		"release-please.yml job release-please does not require":                                                                    {plant("release-please.yml", "(github.event.workflow_run.conclusion == 'success' && ", "("), s},
-		"release-please.yml job release-please does not require a successful CI run of this":                                        {plant("release-please.yml", " && "+sameRepo, ""), s},
-		"release-please.yml job tag does not require":                                                                               {plant("release-please.yml", "    needs: release-please\n", "    needs: [other]\n"), s},
-		"release-please.yml job release does not grant checks: read":                                                                {plant("release-please.yml", "      checks: read\n      actions: read\n      packages: write\n", "      actions: read\n      packages: write\n"), s},
+		"release-please.yml job release does not require":                                                                           {plant("release-please.yml", "(github.event.workflow_run.conclusion == 'success' && ", "("), s},
+		"release-please.yml job release does not require a successful CI run of this":                                               {plant("release-please.yml", " && "+sameRepo, ""), s},
+		"release-please.yml job tag does not require":                                                                               {plant("release-please.yml", "    needs: release\n", "    needs: [other]\n"), s},
+		"release-please.yml job pull-request does not require":                                                                      {plant("release-please.yml", "always() && needs.release.result == 'success' && ", "always() && "), s},
+		"release-please.yml job tag does not grant checks: read":                                                                    {plant("release-please.yml", "      checks: read\n      actions: write # the gate", "      actions: write # the gate"), s},
+		"release-please.yml job tag does not grant actions: read":                                                                   {plant("release-please.yml", "      actions: write # the gate", "      actions: none # the gate"), s},
+		"release-please.yml publishes an image (packages: write)":                                                                   {plant("release-please.yml", "      pull-requests: write\n    outputs:\n      created:", "      pull-requests: write\n      packages: write\n    outputs:\n      created:"), s},
+		"release-please.yml job approve holds a publishing grant (id-token: write)":                                                 {plant("release-please.yml", "      contents: read\n      actions: write # approves", "      contents: read\n      id-token: write\n      actions: write # approves"), s},
+		"release-please.yml job tag holds a publishing grant (attestations: write)":                                                 {plant("release-please.yml", "      checks: read\n      actions: write # the gate", "      checks: read\n      attestations: write\n      actions: write # the gate"), s},
+		"release-please.yml calls a workflow":                                                                                       {plant("release-please.yml", "\n  approve:\n", "\n  release-yml:\n    needs: tag\n    uses: ./.github/workflows/release.yml\n\n  approve:\n"), s},
+		"does not run with the built-in GITHUB_TOKEN alone (other token)":                                                           {plant("release-please.yml", builtinToken, "token: ${{ secrets.RELEASE_PLEASE_TOKEN }}"), s},
+		"does not run with the built-in GITHUB_TOKEN alone (fallback)":                                                              {plant("release-please.yml", builtinToken, "token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}"), s},
+		"release-please.yml job pull-request does not run with the built-in GITHUB_TOKEN alone":                                     {plant("release-please.yml", builtinToken+"\n          config-file: release-please-config.json\n          manifest-file: .release-please-manifest.json\n          skip-github-release: true", "token: ${{ steps.app.outputs.token }}\n          skip-github-release: true"), s},
+		"does not run with the built-in GITHUB_TOKEN alone (app token)":                                                             {plant("release-please.yml", "    steps:\n      - id: rp\n", "    steps:\n      - uses: actions/create-github-app-token@x\n        with:\n          private-key: ${{ secrets.APP_PRIVATE_KEY }}\n      - id: rp\n"), s},
+		"release-please.yml job release does not run release-please":                                                                {plant("release-please.yml", "      - id: rp\n        uses: "+rpAction, "      - id: rp\n        uses: other/action@"), s},
+		"release-please.yml job release does not set skip-github-pull-request":                                                      {plant("release-please.yml", "          skip-github-pull-request: true\n", ""), s},
+		"release-please.yml job pull-request does not set skip-github-release":                                                      {plant("release-please.yml", "          skip-github-release: true\n", ""), s},
+		"release-please.yml job tag does not dispatch release.yml for the tag after pushing it (no tag)":                            {plant("release-please.yml", dispatchRun, "gh workflow run release.yml --ref main"), s},
+		"release-please.yml job tag does not dispatch release.yml for the tag after pushing it (no step)":                           {plant("release-please.yml", "          "+dispatchRun, "          echo"), s},
+		"release-please.yml job tag does not dispatch release.yml for the tag after pushing it (before)":                            {plant("release-please.yml", "      - name: Create and push the annotated tag\n", "      - name: Too early\n        run: "+dispatchRun+"\n      - name: Create and push the annotated tag\n"), s},
+		"release-please.yml job tag does not grant actions: write, which the dispatch needs":                                        {plant("release-please.yml", "      actions: write # the gate", "      actions: read # the gate"), s},
+		"release-please.yml job pull-request does not run after the tag job (needs)":                                                {plant("release-please.yml", "    needs: [release, tag]\n", "    needs: [release]\n"), s},
+		"release-please.yml job pull-request does not run after the tag job (skipped tag refused)":                                  {plant("release-please.yml", pullRequestIf, "always() && needs.release.result == 'success' && needs.tag.result == 'success'"), s},
+		"release-please.yml job pull-request does not run after the tag job (after a failed tag)":                                   {plant("release-please.yml", "(needs.tag.result == 'success' || needs.tag.result == 'skipped')", "needs.tag.result != 'cancelled'"), s},
+		"runs the approval script without checking the repository out first":                                                        {plant("release-please.yml", "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n        with:\n          persist-credentials: false\n      - name: Approve", "      - name: Approve"), s},
+		"does not approve CI and Security on the release pull request (no grant)":                                                   {plant("release-please.yml", "      actions: write # approves", "      actions: read # approves"), s},
+		"does not approve CI and Security on the release pull request (no need)":                                                    {plant("release-please.yml", "    needs: pull-request\n", "    needs: [release]\n"), s},
+		"approve-release-runs.sh does not wait":                                                                                     {plant(approveScript, approveWait, "${APPROVE_WAIT_S:-180}"), s},
+		"release.yml runs on":                                                                                                       {plant("release.yml", "on:\n  push:", "on:\n  workflow_call:\n  push:"), s},
+		"release.yml's dispatch does not require the input tag":                                                                     {plant("release.yml", "(an rc or a published one is refused)\n        required: true\n", "(an rc or a published one is refused)\n        required: false\n"), s},
 		"signs without first checking that the tag lies on main":                                                                    {plant("release.yml", onMain, "true"), s},
 		"signs a hotfix tag without checking that the hotfix ruleset (rules API)":                                                   {plant("release.yml", hotfixRules, "echo"), s},
 		"signs a hotfix tag without checking that the hotfix ruleset (rule list)":                                                   {plant("release.yml", hotfixNeeds, "for rule in; do"), s},
@@ -431,14 +548,9 @@ func TestReleaseGateIsWired(t *testing.T) {
 		"edge.yml publishes an image (docker login)":                                                                                {extra("edge.yml", "      - run: echo \"$T\" | docker login ghcr.io -u x --password-stdin\n"), s},
 		"edge.yml publishes an image (push=true)":                                                                                   {extra("edge.yml", "      - run: docker buildx build --output type=image,name=ghcr.io/x/y:edge,push=true .\n"), s},
 		"edge.yml publishes an image (packages: write)":                                                                             {extra("edge.yml", "    permissions:\n      packages: write\n"), s},
-		"release-please.yml publishes an image (packages: write)":                                                                   {plant("release-please.yml", "    timeout-minutes: 30\n    permissions:\n      contents: write\n      checks: read\n      actions: read\n    steps:", "    timeout-minutes: 30\n    permissions:\n      contents: write\n      checks: read\n      actions: read\n      packages: write\n    steps:"), s},
-		"does not open the release pull request with the built-in GITHUB_TOKEN alone (other token)":                                 {plant("release-please.yml", builtinToken, "token: ${{ secrets.RELEASE_PLEASE_TOKEN }}"), s},
-		"does not open the release pull request with the built-in GITHUB_TOKEN alone (fallback)":                                    {plant("release-please.yml", builtinToken, "token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}"), s},
 		"does not approve CI and Security on the release pull request (no step)":                                                    {plant("release-please.yml", approveStep, "echo"), s},
-		"runs the approval script without checking the repository out first":                                                        {plant("release-please.yml", "actions/checkout@", "actions/other@"), s},
 		"does not approve CI and Security on the release pull request (no approval)":                                                {plant(approveScript, approveRun, "echo"), s},
 		"does not approve CI and Security on the release pull request (no loop)":                                                    {plant(approveScript, "for wf in CI Security; do", "for wf in CI; do"), s},
-		"does not approve CI and Security on the release pull request (no grant)":                                                   {plant("release-please.yml", dispatchGrant+" #", "      actions: read #"), s},
 		"rebuilds a release without first checking that it is not published":                                                        {plant("release.yml", publishedRef, `echo "repos/$GH_REPO"`), s},
 		"rebuilds a release without first checking that :X.Y.Z does not exist":                                                      {plant("release.yml", imageExists, `echo "$IMAGE:$VERSION"`), s},
 		"appends the image section to notes that may already carry it":                                                              {plant("release.yml", notesOnce, "if false; then"), s},

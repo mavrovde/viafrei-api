@@ -262,7 +262,9 @@ func (d *Document) Check(method, target string, status int, h http.Header, body 
 	if err != nil {
 		return fmt.Errorf("oascheck: target %q: %w", target, err)
 	}
-	op := d.match(method, u.Path)
+	// The escaped path: a percent-encoded slash inside one id stays inside its
+	// segment, as the router reads it.
+	op := d.match(method, u.EscapedPath())
 	key, resp := "", response{Content: map[string]schemaHolder{ProblemMediaType: {Schema: d.problem}}}
 	name := method + " " + u.Path
 	if op != nil {

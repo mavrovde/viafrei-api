@@ -10,16 +10,16 @@ import (
 )
 
 // mutationShardFindings holds mutation.yml to the sharded full run: a
-// matrix of exactly shards 1 to 4, each mutating its shard of 4, fail-fast
+// matrix of exactly shards 1 to 20, each mutating its shard of 20, fail-fast
 // off, and a gate that runs unless cancelled, needs the shards, is red on
 // any shard result but success and gathers every report. The shards of the
-// scope are proved disjoint, complete and none empty by
-// internal/testkit/mutgate/shard_test.go, at the same count.
+// scope's units are proved disjoint, complete, none empty and within the
+// budget by internal/testkit/mutgate/shard_test.go, at the same count.
 func mutationShardFindings(wf string) []string {
 	var out []string
 	for _, want := range []struct{ text, finding string }{
-		{"\n    strategy:\n      fail-fast: false\n      matrix:\n        shard: [1, 2, 3, 4]\n", "the matrix is not shards [1, 2, 3, 4] with fail-fast off"},
-		{"\n        run: scripts/mutation.sh shard \"$SHARD/4\" mutation-shard\n", "a shard does not mutate its shard of 4"},
+		{"\n    strategy:\n      fail-fast: false\n      matrix:\n        shard: " + shardList + "\n", "the matrix is not shards " + shardList + " with fail-fast off"},
+		{"\n        run: scripts/mutation.sh shard \"$SHARD/20\" mutation-shard\n", "a shard does not mutate its shard of 20"},
 		{"\n    needs: [plan, shards]\n    if: ${{ !cancelled() }}\n", "the gate does not wait for the shards, or does not run when one failed"},
 		{"[[ $SHARDS == success ]] ||", "the gate does not stop on a shard that did not succeed"},
 		{"\n            scripts/mutation.sh gather mutation-shards mutation-report.md\n", "the full run's gate does not gather the shards' reports"},
@@ -37,7 +37,10 @@ func mutationShardFindings(wf string) []string {
 	return out
 }
 
-func TestMutationFullRunIsFourShardsAndAGate(t *testing.T) {
+// shardList is the matrix of the twenty shards.
+const shardList = "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]"
+
+func TestMutationFullRunIsTwentyShardsAndAGate(t *testing.T) {
 	req.Covers(t, "TST-002")
 	b, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "mutation.yml"))
 	if err != nil {
@@ -48,9 +51,10 @@ func TestMutationFullRunIsFourShardsAndAGate(t *testing.T) {
 		t.Fatalf("mutation.yml: %v", f)
 	}
 	for planted, want := range map[string][2]string{
-		"three shards":       {"        shard: [1, 2, 3, 4]\n", "        shard: [1, 2, 3]\n"},
+		"nineteen shards":    {", 19, 20]\n", ", 19]\n"},
+		"four shards":        {"        shard: " + shardList + "\n", "        shard: [1, 2, 3, 4]\n"},
 		"fail-fast":          {"      fail-fast: false\n", "      fail-fast: true\n"},
-		"a shard of 5":       {`shard "$SHARD/4"`, `shard "$SHARD/5"`},
+		"a shard of 4":       {`shard "$SHARD/20"`, `shard "$SHARD/4"`},
 		"a gate on success":  {"    if: ${{ !cancelled() }}\n", "    if: success()\n"},
 		"a lenient fan-in":   {"[[ $SHARDS == success ]] ||", "[[ $SHARDS != failure ]] ||"},
 		"no gather":          {"scripts/mutation.sh gather mutation-shards", "scripts/mutation.sh full"},

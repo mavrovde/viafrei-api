@@ -94,7 +94,7 @@ jobs:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
   # The full mutation run once per release, on the commit about to be
-  # published (mutation.yml, four shards); a red run stops the release before
+  # published (mutation.yml, twenty shards); a red run stops the release before
   # anything is built.
   mutation:
     name: Mutation

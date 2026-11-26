@@ -1,0 +1,9 @@
+# Seconds per mutant of a package directory on a ubuntu-24.04 runner (4
+# workers), for the shard balance of the full run only: a directory without
+# a row costs 0.6 (defaultCost of internal/testkit/mutgate/units.go). The
+# estimate is a local Gremlins run (8 workers, macOS arm64) times 3.0, the
+# ratio of the v1.2.0 release run of internal/adapters/httpapi (163 s in
+# Mutation shard 3) to the same run locally (54 s). A row may only name a
+# package directory of the scope (mutgate refuses a stale one).
+internal/domain/places	3.0	160 runnable mutants of resolve_inside.go in 162 s locally (1.01 s each), times 3.0
+internal/adapters/httpapi	2.3	70 runnable mutants of auth.go, key.go and limits.go in 54 s locally (0.77 s each), times 3.0

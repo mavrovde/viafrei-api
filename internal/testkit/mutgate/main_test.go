@@ -16,7 +16,11 @@ func files(t *testing.T, m map[string]string) string {
 	t.Helper()
 	dir := t.TempDir()
 	for name, content := range m {
-		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
+		p := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -44,13 +48,25 @@ var fourOfFive = gremlins("a.go",
 	mutation("INVERT_NEGATIVES", "NOT VIABLE", 10, 1),
 )
 
+// The sources the full mode cuts its units from: the scope roots d and h,
+// one unit each (d and h), h/server.go out of scope.
+const (
+	aGo      = "package d\n\nfunc A(x, y int) bool {\n\treturn x < y && x-y != 0\n}\n"
+	authGo   = "package h\n\nfunc Auth(k string) bool { return k == \"\" }\n"
+	serverGo = "package h\n\nfunc Serve(n int) int { return n + 1 }\n"
+)
+
 func base() map[string]string {
 	return map[string]string{
-		"scope.tsv": scope,
-		"eq.tsv":    "# location\tmutator\treason\treviewer\n",
-		"d.json":    fourOfFive,
-		"h.json":    gremlins("auth.go", mutation("CONDITIONALS_NEGATION", "KILLED", 7, 1)),
-		"chg.tsv":   "d/a.go\t1\t20\n",
+		"d/a.go":      aGo,
+		"d/a_test.go": "package d\n",
+		"h/auth.go":   authGo,
+		"h/server.go": serverGo,
+		"scope.tsv":   scope,
+		"eq.tsv":      "# location\tmutator\treason\treviewer\n",
+		"d.json":      fourOfFive,
+		"h.json":      gremlins("auth.go", mutation("CONDITIONALS_NEGATION", "KILLED", 7, 1)),
+		"chg.tsv":     "d/a.go\t1\t20\n",
 	}
 }
 
@@ -64,7 +80,7 @@ func with(over map[string]string) map[string]string {
 
 func runGate(dir string, args ...string) (int, string, string) {
 	var stdout, stderr bytes.Buffer
-	full := []string{"-scope", filepath.Join(dir, "scope.tsv"), "-equivalent", filepath.Join(dir, "eq.tsv")}
+	full := []string{"-scope", filepath.Join(dir, "scope.tsv"), "-equivalent", filepath.Join(dir, "eq.tsv"), "-tree", dir}
 	for _, a := range args {
 		if root, file, ok := strings.Cut(a, "="); ok && strings.HasSuffix(file, ".json") {
 			a = root + "=" + filepath.Join(dir, file)
@@ -287,10 +303,13 @@ func TestRefusals(t *testing.T) {
 		"no report":       {[]string{"-mode", "full", "-min", "70"}, "at least one ROOT=REPORT"},
 		"pr no changed":   {[]string{"-mode", "pr", "-min", "80", "d=d.json"}, "-changed is required"},
 		"full changed":    {[]string{"-mode", "full", "-min", "70", "-changed", "chg.tsv", "d=d.json"}, "refused in full mode"},
-		"not root=report": {[]string{"-mode", "full", "-min", "70", "d.json"}, "is not ROOT=REPORT"},
-		"unknown root":    {[]string{"-mode", "full", "-min", "70", "x=d.json"}, "is not a root"},
-		"missing root":    {[]string{"-mode", "full", "-min", "70", "d=d.json"}, "no report for the scope root h"},
+		"not root=report": {[]string{"-mode", "pr", "-min", "80", "-changed", "chg.tsv", "d.json"}, "is not ROOT=REPORT"},
+		"not unit=report": {[]string{"-mode", "full", "-min", "70", "d.json"}, "is not UNIT=REPORT"},
+		"unknown root":    {[]string{"-mode", "pr", "-min", "80", "-changed", "chg.tsv", "x=d.json"}, "is not a root"},
+		"unknown unit":    {[]string{"-mode", "full", "-min", "70", "x=d.json"}, "x is not a unit of the full run"},
+		"missing unit":    {[]string{"-mode", "full", "-min", "70", "d=d.json"}, "no report for the unit h"},
 		"bad json":        {[]string{"-mode", "full", "-min", "70", "d=bad.json"}, "bad.json"},
+		"bad json, pr":    {[]string{"-mode", "pr", "-min", "80", "-changed", "chg.tsv", "d=bad.json"}, "bad.json"},
 		"no files member": {[]string{"-mode", "full", "-min", "70", "d=nofiles.json"}, "not a Gremlins report"},
 		"unknown status":  {[]string{"-mode", "full", "-min", "70", "d=status.json"}, "unknown status"},
 		"missing file":    {[]string{"-mode", "full", "-min", "70", "d=absent.json"}, "absent.json"},

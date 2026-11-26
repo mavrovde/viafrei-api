@@ -33,12 +33,21 @@
 //
 // With -plan (pr mode) it reads no report and prints the scope roots that
 // the change list touches, so the caller mutates those and nothing else.
-// With -plan -shard K/N (full mode) it prints shard K of N of the scope
-// roots: the roots at the positions p of the scope file with p mod N = K-1,
-// so the N shards are disjoint and together every root. A full run cut into
-// N parallel jobs mutates one shard each and gathers the reports in one
-// full-mode gate, which refuses a root with no report. A -shard that is not
-// K/N with 1 <= K <= N, or a shard that selects no root, is exit 2.
+// Full mode works on units (units.go): one Gremlins run each, a package
+// under a scope root, or a group of its files or of one file's mutators
+// when the package is too costly for one run. They are cut from the sources
+// under -tree with the costs of -cost, are disjoint and together every
+// in-scope mutant. Its arguments are UNIT=REPORT, one for every unit, and a
+// report holding a mutant that is not its unit's is exit 2.
+//
+// With -plan -shard K/N (full mode) it prints shard K of N of the units, one
+// per line: the name, the directory and the Gremlins arguments of the unit,
+// tab-separated. The units are dealt costliest first, each to the shard
+// with the least estimated cost so far, so the N shards are disjoint,
+// together every unit and even in cost. A full run cut into N parallel jobs
+// mutates one shard each and gathers the reports in one full-mode gate,
+// which refuses a unit with no report. A -shard that is not K/N with
+// 1 <= K <= N, or a shard that selects no unit, is exit 2.
 //
 // Exit 0 when the score reaches -min, 1 below it, on zero scored mutants
 // for changed in-scope code, or on a bad equivalent entry, 2 on a usage
@@ -133,9 +142,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 	eqPath := fs.String("equivalent", "", "equivalents file (required; it may list nothing)")
 	changedPath := fs.String("changed", "", "changed lines (pr mode, required there)")
 	reportPath := fs.String("report", "", "write a Markdown report here")
-	plan := fs.Bool("plan", false, "pr mode: print the scope roots the change list touches, one per line, and exit; full mode: with -shard, the roots of that shard")
+	tree := fs.String("tree", ".", "full mode: the module root whose sources the units are cut from")
+	costPath := fs.String("cost", "", "full mode: seconds per mutant per package directory (optional)")
+	plan := fs.Bool("plan", false, "pr mode: print the scope roots the change list touches, one per line, and exit; full mode: with -shard, the units of that shard")
 	shardArg, hasShard := "", false
-	fs.Func("shard", "full mode with -plan: shard K/N of the scope roots", func(v string) error {
+	fs.Func("shard", "full mode with -plan: shard K/N of the units", func(v string) error {
 		shardArg, hasShard = v, true
 		return nil
 	})
@@ -186,16 +197,26 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return usageErr(stderr, "%v", err)
 		}
 	}
+	if *plan && *mode == "full" && !hasShard {
+		return usageErr(stderr, "-plan needs pr mode, or full mode with -shard K/N")
+	}
+	var units []unit
+	if *mode == "full" {
+		cost, err := readCost(*costPath)
+		if err != nil {
+			return usageErr(stderr, "%v", err)
+		}
+		if units, err = planUnits(*tree, roots, cost); err != nil {
+			return usageErr(stderr, "%v", err)
+		}
+	}
 	if *plan && *mode == "full" {
-		if !hasShard {
-			return usageErr(stderr, "-plan needs pr mode, or full mode with -shard K/N")
-		}
-		sel := shardOf(roots, sh)
+		sel := spread(units, sh.count)[sh.index-1]
 		if len(sel) == 0 {
-			return usageErr(stderr, "-shard %s selects no scope root of %s (%d root(s)): an empty shard is never a pass", shardArg, *scopePath, len(roots))
+			return usageErr(stderr, "-shard %s selects no unit of %s (%d unit(s)): an empty shard is never a pass", shardArg, *scopePath, len(units))
 		}
-		for _, r := range sel {
-			fmt.Fprintln(stdout, r.dir)
+		for _, u := range sel {
+			fmt.Fprintln(stdout, u.line())
 		}
 		return 0
 	}
@@ -210,7 +231,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		return 0
 	}
-	mutants, seen, err := readReports(fs.Args(), roots, *scopePath)
+	var mutants []mutant
+	var seen map[string]bool
+	if *mode == "full" {
+		mutants, seen, err = readUnitReports(fs.Args(), units)
+	} else {
+		mutants, seen, err = readReports(fs.Args(), roots, *scopePath)
+	}
 	if err != nil {
 		return usageErr(stderr, "%v", err)
 	}
@@ -219,9 +246,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return usageErr(stderr, "%v", err)
 	}
 	if *mode == "full" {
-		for _, r := range roots {
-			if !seen[r.dir] {
-				return usageErr(stderr, "full mode: no report for the scope root %s", r.dir)
+		for _, u := range units {
+			if !seen[u.name] {
+				return usageErr(stderr, "full mode: no report for the unit %s (directory %s)", u.name, u.dir)
 			}
 		}
 	}
@@ -443,8 +470,7 @@ func readScope(name string) ([]root, error) {
 	return out, nil
 }
 
-// readEquivalents reads LOCATION, MUTATOR, REASON and REVIEWER per line.
-// shard is slice index of count (1-based) of a list cut by position.
+// shard is shard index of count (1-based).
 type shard struct{ index, count int }
 
 var shardSyntax = regexp.MustCompile(`^([1-9][0-9]*)/([1-9][0-9]*)$`)
@@ -463,17 +489,7 @@ func parseShard(raw string) (shard, bool) {
 	return shard{index: k, count: n}, true
 }
 
-// shardOf keeps the items at the positions p with p mod count = index-1.
-func shardOf[T any](items []T, s shard) []T {
-	var out []T
-	for p, it := range items {
-		if p%s.count == s.index-1 {
-			out = append(out, it)
-		}
-	}
-	return out
-}
-
+// readEquivalents reads LOCATION, MUTATOR, REASON and REVIEWER per line.
 func readEquivalents(name string) ([]*equivalent, error) {
 	rows, err := lines(name, 4)
 	if err != nil {

@@ -9,13 +9,16 @@
 # stale equivalent entry; a manual run does the same on the chosen ref. The
 # report lists the counts and every mutant not detected.
 #
-# The full run is cut into four parallel shards (the viafrei-database
-# release split, mirrored): Mutation shard k mutates the scope roots at the
-# positions p of test/mutation/scope.tsv with p mod 4 = k - 1 (mutgate -plan
-# -shard k/4; the four are disjoint, together every root and none empty,
-# internal/testkit/mutgate/shard_test.go), and the Mutation testing job
-# gathers their reports into one full-mode gate, which refuses a root with
-# no report. Mutation testing is green only when every shard finished green.
+# The full run is cut into twenty parallel shards of about the same
+# estimated cost: mutgate cuts the scope into units, a package under a scope
+# root or, for a costly package, a group of its files or of one file's
+# mutators, and deals them to the shards by their cost (mutgate -plan -shard
+# k/20, internal/testkit/mutgate/units.go and test/mutation/cost.tsv; the
+# units are disjoint, together every in-scope mutant, the shards none empty
+# and the heaviest within the budget, internal/testkit/mutgate/shard_test.go).
+# The Mutation testing job gathers their reports into one full-mode gate,
+# which refuses a unit with no report. Mutation testing is green only when
+# every shard finished green.
 name: Mutation
 
 on:
@@ -68,7 +71,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -77,10 +80,10 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
-      - name: The scope roots of the shard
+      - name: The units of the shard
         env:
           SHARD: ${{ matrix.shard }}
-        run: scripts/mutation.sh shard "$SHARD/4" mutation-shard
+        run: scripts/mutation.sh shard "$SHARD/20" mutation-shard
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mutation-shard-${{ matrix.shard }}

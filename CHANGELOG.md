@@ -9,6 +9,15 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [2.0.1](https://github.com/mavrovde/viafrei-api/compare/v2.0.0...v2.0.1) (2026-11-26)
+
+
+### Fixed
+
+* national, motorway and location reads inside the deadline; meta.language, English warning events, OSM freshness, river station names ([#275](https://github.com/mavrovde/viafrei-api/issues/275)) ([567ea45](https://github.com/mavrovde/viafrei-api/commit/567ea45c6a3b898bcc90186f3dd45add324a58f0))
+* affected stations inside the deadline: each station ref is probed on its departure-time index, grouped by byte order ([#262](https://github.com/mavrovde/viafrei-api/issues/262))
+* the request log line also carries admissionWaitMs, storageMs (permit-held time, summed over the request's reads) and cutStatement, the named statement a deadline or its statement timeout cut ([#277](https://github.com/mavrovde/viafrei-api/issues/277))
+
 ## [2.0.0](https://github.com/mavrovde/viafrei-api/compare/v1.2.2...v2.0.0) (2026-11-26)
 
 

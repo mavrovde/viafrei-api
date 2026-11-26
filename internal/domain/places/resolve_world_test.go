@@ -142,13 +142,14 @@ func sameResolution(a, b Resolution) bool {
 	return reflect.DeepEqual(a, b)
 }
 
-// One subtest a text, side by side: each is a leaf within the 2 s bound
-// (TST-012), where the whole world in one test took 16 s.
+// One subtest a text, each a leaf within the 2 s bound (TST-012), where the
+// whole world in one test took 16 s. Not t.Parallel: thousands of parallel
+// leaves under -race took every CPU of the runner and starved other packages'
+// leaves past the bound (#249); one after the other they hold one CPU.
 func TestResolveTheWorldAsThePlatformDoes(t *testing.T) {
 	w := loadWorld(t)
 	for i, e := range w.Expect {
 		t.Run(fmt.Sprintf("%04d-%s", i, e.Lang), func(t *testing.T) {
-			t.Parallel()
 			got, err := Resolve(context.Background(), &replay{got: w.Reads}, e.Q, e.Lang)
 			if err != nil || !sameResolution(got, e.R) {
 				t.Errorf("%s %q:\n got  %+v %v\n want %+v", e.Lang, e.Q, got, err, e.R)
@@ -159,13 +160,12 @@ func TestResolveTheWorldAsThePlatformDoes(t *testing.T) {
 
 // Every read a resolution makes, failing, fails the resolution, but the
 // LCL read: a junction's road then stays unknown, as the platform reads it.
-// One subtest a text, side by side, one leaf a failing read, each within the
-// 2 s bound (TST-012).
+// One subtest a text, one leaf a failing read, each within the 2 s bound
+// (TST-012), one after the other for the reason above (#249).
 func TestResolveTheWorldWithEachReadFailing(t *testing.T) {
 	w := loadWorld(t)
 	for i, e := range w.Expect {
 		t.Run(fmt.Sprintf("%04d-%s", i, e.Lang), func(t *testing.T) {
-			t.Parallel()
 			count := &replay{got: w.Reads}
 			if _, err := Resolve(context.Background(), count, e.Q, e.Lang); err != nil {
 				t.Fatal(err)

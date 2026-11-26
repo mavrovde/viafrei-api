@@ -9,6 +9,13 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [2.0.2](https://github.com/mavrovde/viafrei-api/compare/v2.0.1...v2.0.2) (2026-11-26)
+
+
+### Changed
+
+* **store:** affected stations join each stop on its own id, so the stop and its modes are read by index ([#281](https://github.com/mavrovde/viafrei-api/issues/281)) ([dfbd940](https://github.com/mavrovde/viafrei-api/commit/dfbd94067d6718cec1e48531d2242e990baa0f7c))
+
 ## [2.0.1](https://github.com/mavrovde/viafrei-api/compare/v2.0.0...v2.0.1) (2026-11-26)
 
 

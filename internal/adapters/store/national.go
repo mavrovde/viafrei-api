@@ -20,7 +20,10 @@ import (
 // relations join, source || ':' || id, are the same pairs, a source name
 // holding no colon. The sources are the families ($1): the summary reads
 // only their sites, and a point only with its site (listing the sources of
-// every site and point took most of a second on prod).
+// every site and point took most of a second on prod). The sites and
+// points are counted family by family, each family's points grouped by
+// site and joined to its sites (one join of every site to every point,
+// both hashed, took a second on prod).
 const sourceRules = `
 select src.feed
 from (select distinct f as feed from unnest($1::text[]) f) src
@@ -64,19 +67,21 @@ select 'fuel', l.product_code, null::text, l.source_ref, count(*)::int, null::in
 from latest l
 group by 2, 4
 union all
-select 'charging', c.source_feed, null, c.source_feed, count(*)::int, coalesce(sum(p.n), 0)::int, null, null
-from charging_sites c
-join rules r on r.feed = c.source_feed
-left join (
-  select p.source_feed, p.site_id, count(*) filter (where p.evse_id is not null or p.point_key is not null) as n
-  from charging_points p
-  join rules r on r.feed = p.source_feed
-  where p.deleted_at is null and p.site_id is not null
-    and coalesce(p.confidentiality, 'noRestriction') = 'noRestriction'
-  group by 1, 2) p on p.source_feed = c.source_feed and p.site_id = c.site_id
-where c.deleted_at is null and c.geom is not null and c.closed_at is null and c.source_feed = any($1)
-  and coalesce(c.confidentiality, 'noRestriction') = 'noRestriction' and not coalesce(c.access_private, false)
-group by 2, 4
+select 'charging', r.feed, null, r.feed, x.n, x.m, null, null
+from rules r
+cross join lateral (
+  select count(*)::int as n, coalesce(sum(p.n), 0)::int as m
+  from (
+    select c.site_id from charging_sites c
+    where c.source_feed = r.feed and c.deleted_at is null and c.geom is not null and c.closed_at is null
+      and coalesce(c.confidentiality, 'noRestriction') = 'noRestriction' and not coalesce(c.access_private, false)) c
+  left join (
+    select p.site_id, count(*) filter (where p.evse_id is not null or p.point_key is not null) as n
+    from charging_points p
+    where p.source_feed = r.feed and p.deleted_at is null and p.site_id is not null
+      and coalesce(p.confidentiality, 'noRestriction') = 'noRestriction'
+    group by 1) p on p.site_id = c.site_id) x
+where x.n > 0 and r.feed = any($1)
 order by 1, 2, 4`, "text[]", "timestamp with time zone", "integer"),
 	"parking": namedOpaque("api_national_parking", `
 select 'parking', f.parking_kind, null::text, f.source_ref, count(*)::int, null::int, null::float8, null::float8
@@ -101,8 +106,9 @@ with f as (
   select x.kind, x.state, x.source_feed, (select d.ifopt from db_stations d where d.station_no = x.station_no)
   from db_facilities x
 ), places as materialized (
-  select u.station_ref, contract_stop_place_of(u.station_ref) as stop_place_id
+  select u.station_ref, sp.stop_place_id
   from (select distinct f.station_ref from f where f.station_ref is not null) u
+  left join lateral (`+stopPlaceOf("u.station_ref")+`) sp on true
 )
 select 'facilities', f.facility_kind || '/' || coalesce(f.facility_status, 'unknown'), null::text, f.source_ref,
        count(*)::int, count(distinct p.stop_place_id)::int, null::float8, null::float8

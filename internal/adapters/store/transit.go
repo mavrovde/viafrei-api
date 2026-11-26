@@ -1283,3 +1283,20 @@ func (s *Store) StationAlerts(ctx context.Context, q transit.StationAlertsQuery,
 		})
 	})
 }
+
+// stopPlaceOf is the platform's stop place of the station reference in ref
+// (contract_stop_place_of: the timetable's station, or the stop with no
+// parent, whose id is the reference's DHID or starts with it), as a
+// subquery of one column, stop_place_id, and at most one row: the same
+// lookup on the same index, without a call per station of the function,
+// which runs as its owner under its own search path (on prod a tenth of the
+// national accessibility summary).
+func stopPlaceOf(ref string) string {
+	return `select '1:' || s.id as stop_place_id
+    from (select substring(` + ref + `, '^(?:dhid:)?([a-z]{2}:[0-9]{5}:[0-9]+)') as r) q
+    join stops s on s.gtfs_feed_key = 1 and s.deleted_at is null
+      and (s.id = q.r or (s.id ~>=~ (q.r || ':') and s.id ~<~ (q.r || ';')))
+      and (s.location_type = 1 or (s.location_type = 0 and s.parent_id is null))
+    order by (s.id = q.r) desc, s.id
+    limit 1`
+}

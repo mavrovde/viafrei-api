@@ -9,6 +9,18 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [1.2.2](https://github.com/mavrovde/viafrei-api/compare/v1.2.1...v1.2.2) (2026-11-26)
+
+
+### Fixed
+
+* **release:** the API pins no live refresher release; the two meet only in the database ([#258](https://github.com/mavrovde/viafrei-api/issues/258)) ([12dc896](https://github.com/mavrovde/viafrei-api/commit/12dc896bbaf80d0fa05ed8d2d140c882741b543e))
+
+
+### Build and CI
+
+* every job's timeout-minutes is 30, the owner's cap for this repository ([#259](https://github.com/mavrovde/viafrei-api/issues/259)) ([ea71996](https://github.com/mavrovde/viafrei-api/commit/ea71996ac1bee0237e2b3e4f6bd44af9a7967884))
+
 ## [1.2.1](https://github.com/mavrovde/viafrei-api/compare/v1.2.0...v1.2.1) (2026-11-26)
 
 

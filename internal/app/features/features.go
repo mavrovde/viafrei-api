@@ -61,7 +61,7 @@ type Parking interface {
 type Places interface {
 	// Place returns the place of one of the given families, or
 	// places.ErrNotFound.
-	Place(ctx context.Context, id string, families []string) (places.Place, error)
+	Place(ctx context.Context, id string, families, stops []string) (places.Place, error)
 	// Places returns the places of the given families and the stops of the
 	// stop families and the motorway places of the roads families that answer
 	// q, best match first, and whether more answer.

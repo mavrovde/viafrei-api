@@ -33,8 +33,8 @@ select pt.lon, pt.lat, 100000::float8, v.fs from (select st_x(geom::geometry) lo
 select pt.lat, pt.lon, v.fs, v.r from (select st_y(geom::geometry) lat, st_x(geom::geometry) lon from public.charging_sites where geom is not null
   union all values (52.52::float8, 13.405::float8)) pt, fam, lateral (values (fam.f, 5000::float8), (fam.f, 50000), ('{}'::text[], 5000)) v(fs, r)`,
 		"api_place_by_id": `with fam as (select array_agg(distinct source_id) f from public.gazetteer_places)
-select i.id, v.fs from (select id::text id from public.gazetteer_places union all values ('0'), ('x1'), ('99999999999999999999'), ('')) i, fam,
-  lateral (values (fam.f), ('{}'::text[])) v(fs)`,
+select i.id, v.fs, v.ss from (select id::text id from public.gazetteer_places union all values ('0'), ('x1'), ('99999999999999999999'), ('')) i, fam,
+  lateral (values (fam.f, '{}'::text[]), ('{}'::text[], '{}'::text[]), ('{}'::text[], fam.f)) v(fs, ss)`,
 		"api_freshness_versions": `select`,
 		"api_provenance": `select v.fs, l.l from (select array_agg(source_ref) fs from public.contract_sources union all select '{}'::text[]
        union all select array_agg(source_ref) from (select source_ref from public.contract_sources order by source_ref limit 3) x) v,

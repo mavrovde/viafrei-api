@@ -94,8 +94,12 @@ order by f.rank, f.prominence desc nulls last, f.dist nulls last, f.name, f.id`,
 	"text[]", "text", "text", "float8", "float8", "int", "int", "text[]", "text[]", "text", "text[]")
 
 // placeHeld is a gazetteer row g the place search may answer with: placed,
-// open, and of a family of $1 or a junction of a roads family of $9.
-const placeHeld = `g.geom is not null and g.closed_at is null and (g.source_id = any((select $1::text[])::text[]) or g.kind = 'junction' and g.source_id = any((select $9::text[])::text[]))`
+// open, and of a family of $1, a junction of a roads family of $9, or a
+// station of a stop family of $8. The station register is a transit family,
+// not a places one, so without the last test "Berlin Alexanderplatz" found
+// nothing (prod 2.0.2, 2026-11-26), where the platform's place search answers
+// the register's station first.
+const placeHeld = `g.geom is not null and g.closed_at is null and (g.source_id = any((select $1::text[])::text[]) or g.kind = 'junction' and g.source_id = any((select $9::text[])::text[]) or g.kind = 'station' and g.source_id = any((select $8::text[])::text[]))`
 
 // notStartingPlace is a gazetteer row g none of whose names starts with the
 // folded text $2: a place one of whose names does is ranked by that name

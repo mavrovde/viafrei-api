@@ -549,14 +549,14 @@ func TestPlaceReadsOnePlaceOfTheGivenFamilies(t *testing.T) {
 		at            geo.Point
 	)
 	owner(t, `select place_id, source_ref, name, st_y(location), st_x(location) from contract.place order by place_id limit 1`, &id, &fam, &name, &at.Lat, &at.Lon)
-	p, err := st.Place(bounded(t), id, []string{fam})
+	p, err := st.Place(bounded(t), id, []string{fam}, nil)
 	if err != nil || p.ID != id || p.Family != fam || p.Name != name || p.Location != at || p.Kind == places.Other {
 		t.Errorf("place %+v, %v", p, err)
 	}
-	if _, err := st.Place(bounded(t), id, []string{"afir_alpha"}); !errors.Is(err, places.ErrNotFound) {
+	if _, err := st.Place(bounded(t), id, []string{"afir_alpha"}, nil); !errors.Is(err, places.ErrNotFound) {
 		t.Errorf("a place of another family: %v", err)
 	}
-	if _, err := st.Place(bounded(t), "999999", []string{fam}); !errors.Is(err, places.ErrNotFound) {
+	if _, err := st.Place(bounded(t), "999999", []string{fam}, nil); !errors.Is(err, places.ErrNotFound) {
 		t.Errorf("an unknown place: %v", err)
 	}
 }
@@ -574,7 +574,7 @@ func TestFeatureReadsReportStorageFaults(t *testing.T) {
 	if _, _, _, err := st.ParkingNear(ctx, parking.Query{Limit: 1}, []string{"x"}, nil, time.Now()); err == nil {
 		t.Error("ParkingNear on an ended context succeeded")
 	}
-	if _, err := st.Place(ctx, "x", []string{"x"}); err == nil || errors.Is(err, places.ErrNotFound) {
+	if _, err := st.Place(ctx, "x", []string{"x"}, nil); err == nil || errors.Is(err, places.ErrNotFound) {
 		t.Errorf("Place on an ended context: %v", err)
 	}
 	if !store.IsDeadline(store.ErrDeadlineExhausted) || store.IsDeadline(errors.New("other")) {

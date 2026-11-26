@@ -160,6 +160,7 @@ denylist	internal/adapters/store/trainboard_stored_integration_test.go	-	owner d
 vocabulary	internal/adapters/store/trainboard_stored_integration_test.go	feed	owner decision 2026-11-23: the platform's table and column names this test's seed rows write carry this word
 column	api/openapi.json	siteId	member name of a charging place fixed by the MCP charging answer (its sites[].siteId, the id a charger watch takes back); the resource vocabulary, not a storage name
 denylist	internal/adapters/store/charging_places_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/places_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 denylist	internal/adapters/store/charging_places_sql.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
 vocabulary	internal/adapters/store/charging_places.go	feed	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
 vocabulary	internal/adapters/store/charging_places.go	feeds	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
@@ -187,3 +188,4 @@ denylist	internal/adapters/store/stoppage_integration_test.go	-	owner decision 2
 vocabulary	internal/adapters/store/stoppage_integration_test.go	gtfs	owner decision 2026-11-23: the platform's table and column names this test's seed rows read carry this word
 denylist	internal/adapters/store/freshness_osm_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
 vocabulary	internal/adapters/store/freshness_osm_integration_test.go	ingest	owner decision 2026-11-23: the platform's feed status ledger this test plants a row in carries this word
+denylist	internal/adapters/store/legacy_b7_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables

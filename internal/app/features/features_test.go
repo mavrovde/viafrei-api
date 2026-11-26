@@ -54,6 +54,7 @@ type fake struct {
 	place                                places.Place
 	gotFamilies, gotListed, gotOccupancy []string
 	gotStops                             []string
+	gotPlaceFams, gotPlaceStops          []string
 	gotPlaceQ                            places.Query
 	gotPlaceRoads                        []string
 	gotNow                               time.Time
@@ -149,7 +150,8 @@ func (f *fake) ParkingAround(_ context.Context, q parking.AroundQuery) (parking.
 	return f.around, f.aroundErr
 }
 
-func (f *fake) Place(context.Context, string, []string) (places.Place, error) {
+func (f *fake) Place(_ context.Context, _ string, fams, stops []string) (places.Place, error) {
+	f.gotPlaceFams, f.gotPlaceStops = fams, stops
 	return f.place, f.plErr
 }
 
@@ -488,6 +490,22 @@ func TestOverviewComposesTheParts(t *testing.T) {
 	o, err = service(f, nil).Overview(accepted, key("consumer", allScopes, everything...), features.OverviewQuery{Needs: []features.Part{features.PartParking}})
 	if err != nil || !slices.Equal(statuses(o), []features.Status{features.StatusNotRequested, features.StatusOK}) || o.Charging != nil || o.Partial {
 		t.Errorf("needs parking: %v, %v, partial %v", statuses(o), err, o.Partial)
+	}
+}
+
+// A station the place search lists is of the station register, a transit
+// family: the overview reads its place with the transit families too, so the
+// search's id opens here.
+func TestOverviewOpensAStationOfTheSearch(t *testing.T) {
+	req.Covers(t, "FR-PLACE-001")
+	f := &fake{place: berlin}
+	if _, err := service(f, nil).Overview(context.Background(), key("commercial", allScopes, append(slices.Clone(everything), "st")...), features.OverviewQuery{PlaceID: "95658"}); err != nil {
+		t.Fatal(err)
+	}
+	// The transit families open a station only, so they go apart from the
+	// places families (a stop row of a transit family stays closed).
+	if !slices.Contains(f.gotPlaceStops, "st") || slices.Contains(f.gotPlaceFams, "st") || !slices.Contains(f.gotPlaceFams, "pl") {
+		t.Fatalf("place read with families %v and stops %v, want the places families and the transit ones apart", f.gotPlaceFams, f.gotPlaceStops)
 	}
 }
 

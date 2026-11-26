@@ -403,3 +403,18 @@ func TestAStatementTimeoutNotesTheStatementItCut(t *testing.T) {
 		t.Fatalf("cut %q, want api_register_probe", got)
 	}
 }
+
+// TestACanceledReadIsNoCut: a client that goes away cancels the read inside
+// its statement, and the request's line names no cut.
+func TestACanceledReadIsNoCut(t *testing.T) {
+	st := seeded(t)
+	ctx, cancel := context.WithCancel(admission.WithTally(bounded(t)))
+	defer cancel()
+	time.AfterFunc(200*time.Millisecond, cancel)
+	if err := store.CutRegisterProbe(ctx, st); !errors.Is(err, context.Canceled) {
+		t.Fatalf("err %v, want canceled", err)
+	}
+	if got := admission.CutStatement(ctx); got != "" {
+		t.Fatalf("a canceled read noted the cut %q", got)
+	}
+}

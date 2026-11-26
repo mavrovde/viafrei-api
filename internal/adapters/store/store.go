@@ -274,13 +274,14 @@ func ReadValue[T any](ctx context.Context, s *Store, fn func(context.Context, pg
 		// The statement timeout, set from the deadline less the reserve,
 		// usually cuts the statement before the context ends: that cut is
 		// the deadline's too.
-		if name := cur.Load(); name != nil && deadlineCut(o.err) {
+		if name := cur.Load(); name != nil && deadlineCut(ctx, o.err) {
 			admission.NoteCut(ctx, *name)
 		}
 		return o.value, o.err
 	case <-ctx.Done():
 		close(gone)
-		if name := cur.Load(); name != nil {
+		// A client that went away cancels the context: that is no cut.
+		if name := cur.Load(); name != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			admission.NoteCut(ctx, *name)
 		}
 		return zero, fmt.Errorf("%w: %w", ErrDeadlineExhausted, ctx.Err())
@@ -288,8 +289,12 @@ func ReadValue[T any](ctx context.Context, s *Store, fn func(context.Context, pg
 }
 
 // deadlineCut reports whether err is a read cut by its deadline: the
-// statement timeout (SQLSTATE 57014) or the context's deadline.
-func deadlineCut(err error) bool {
+// statement timeout (SQLSTATE 57014) or the context's deadline. A canceled
+// ctx is not: 57014 also answers a cancel the client's leaving sent.
+func deadlineCut(ctx context.Context, err error) bool {
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return false
+	}
 	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok && pgErr.Code == "57014" {
 		return true
 	}

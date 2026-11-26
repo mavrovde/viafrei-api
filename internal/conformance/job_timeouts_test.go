@@ -12,10 +12,11 @@ import (
 )
 
 // maxJobMinutes is the owner's rule for every GitHub Actions job of this
-// repository: it ends within 15 minutes, and longer work is split into
+// repository: it ends within 30 minutes (owner 2026-11-26, raised from 15),
+// and longer work is split into
 // parallel jobs (the fuzz targets, the load scenarios and the mutation
 // shards are matrices for that reason).
-const maxJobMinutes = 15
+const maxJobMinutes = 30
 
 // jobTimeoutFindings lists every job of a workflow that has no
 // timeout-minutes, one that is not a whole number of minutes (an expression
@@ -55,7 +56,7 @@ func jobTimeoutFindings(name string, src []byte) []string {
 	return out
 }
 
-func TestEveryWorkflowJobEndsWithinFifteenMinutes(t *testing.T) {
+func TestEveryWorkflowJobEndsWithinThirtyMinutes(t *testing.T) {
 	req.Covers(t, "TST-017")
 	files := readWorkflows(t)
 	jobs := 0
@@ -78,8 +79,8 @@ func TestJobTimeoutRuleCanSayNo(t *testing.T) {
 	}
 	native := "    runs-on: ubuntu-24.04\n    # Evidence (run of 2026-11-22, one job): a target took its 10 min budget\n    # plus 1 to 20 s of build; the job's setup 13 s. One target per job is\n    # about 11 min.\n    timeout-minutes: 15\n"
 	for want, bad := range map[string]string{
-		"job native has timeout-minutes 16, above 15":          strings.Replace(good, native, strings.Replace(native, ": 15\n", ": 16\n", 1), 1),
-		"job native has timeout-minutes 150, above 15":         strings.Replace(good, native, strings.Replace(native, ": 15\n", ": 150\n", 1), 1),
+		"job native has timeout-minutes 31, above 30":          strings.Replace(good, native, strings.Replace(native, ": 15\n", ": 31\n", 1), 1),
+		"job native has timeout-minutes 150, above 30":         strings.Replace(good, native, strings.Replace(native, ": 15\n", ": 150\n", 1), 1),
 		"job native has timeout-minutes 0":                     strings.Replace(good, native, strings.Replace(native, ": 15\n", ": 0\n", 1), 1),
 		"job native has no timeout-minutes":                    strings.Replace(good, native, strings.Replace(native, "    timeout-minutes: 15\n", "", 1), 1),
 		"job native has timeout-minutes ${{ inputs.minutes }}": strings.Replace(good, native, strings.Replace(native, ": 15\n", ": ${{ inputs.minutes }}\n", 1), 1),

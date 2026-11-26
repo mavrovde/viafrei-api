@@ -5,7 +5,7 @@
 # is a target (TST-010): the runner refuses every host not on
 # test/load/allow-list.txt.
 #
-# Every job ends within 15 minutes (owner rule): the catalogue runs as four
+# Every job ends within 15 minutes (the owner's cap is 30): the catalogue runs as four
 # shards in parallel, each on a runner and a stack of its own, and a gather
 # job merges them (loadrun merge): every scenario must have been run by
 # exactly one shard. The soak is 9 minutes of the nightly budget, not the

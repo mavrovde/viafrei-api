@@ -58,7 +58,7 @@ func TestMutationFullRunIsTwentyShardsAndAGate(t *testing.T) {
 		"a gate on success":  {"    if: ${{ !cancelled() }}\n", "    if: success()\n"},
 		"a lenient fan-in":   {"[[ $SHARDS == success ]] ||", "[[ $SHARDS != failure ]] ||"},
 		"no gather":          {"scripts/mutation.sh gather mutation-shards", "scripts/mutation.sh full"},
-		"an optional shard":  {"    timeout-minutes: 15\n    strategy:", "    timeout-minutes: 15\n    continue-on-error: true\n    strategy:"},
+		"an optional shard":  {"    timeout-minutes: 30\n    strategy:", "    timeout-minutes: 30\n    continue-on-error: true\n    strategy:"},
 		"no wait for shards": {"    needs: [plan, shards]\n", "    needs: plan\n"},
 	} {
 		bad := strings.Replace(wf, want[0], want[1], 1)

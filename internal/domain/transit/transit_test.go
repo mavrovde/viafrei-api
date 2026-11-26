@@ -86,3 +86,25 @@ func TestMainStationSpellings(t *testing.T) {
 		}
 	}
 }
+
+// The river form leaves out the words joining a town to its river, between
+// two words only; a text with none gives none.
+func TestRiverForm(t *testing.T) {
+	for in, want := range map[string]string{
+		"Frankfurt am Main":        "frankfurt main",
+		"Frankfurt am Main Hbf":    "frankfurt main hbf",
+		"Halle an der Saale":       "halle saale",
+		"Frankfurt a. d. Oder":     "frankfurt oder",
+		"Weil am Rhein, Bahnhof":   "weil rhein bahnhof",
+		"Frankfurt (Main)":         "",
+		"am Main":                  "",
+		"Frankfurt am":             "",
+		"An der Mühle":             "",
+		"Berlin":                   "",
+		"Rothenburg ob der Tauber": "",
+	} {
+		if got := transit.RiverForm(in); got != want {
+			t.Errorf("%q: %q, want %q", in, got, want)
+		}
+	}
+}

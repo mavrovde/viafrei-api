@@ -3,6 +3,7 @@ package features
 import (
 	"context"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
@@ -33,7 +34,14 @@ func (s *Service) National(ctx context.Context, key access.Record, fuelWindow ti
 		return NationalAnswer{}, err
 	}
 	now := s.now()
-	var rows []national.Row
+	type part struct {
+		domain    string
+		permitted []string
+		rows      []national.Row
+		err       error
+		panicked  any
+	}
+	var parts []*part
 	var consulted []string
 	partial, asked := false, false
 	for _, d := range national.Domains {
@@ -41,24 +49,60 @@ func (s *Service) National(ctx context.Context, key access.Record, fuelWindow ti
 			continue
 		}
 		asked = true
-		permitted, part, err := gate.Answer(access.Answering(reg, d))
+		permitted, withheld, err := gate.Answer(access.Answering(reg, d))
 		if err != nil {
 			partial = true
 			continue
 		}
-		partial = partial || part
+		partial = partial || withheld
 		consulted = append(consulted, permitted...)
-		got, err := s.repos.National.National(ctx, d, permitted, now, fuelWindow)
-		if err != nil {
-			return NationalAnswer{}, err
-		}
-		if err := gate.Check(national.Families(got)); err != nil {
-			return NationalAnswer{}, err
-		}
-		rows = append(rows, got...)
+		parts = append(parts, &part{domain: d, permitted: permitted})
 	}
 	if !asked || len(consulted) == 0 {
 		return NationalAnswer{}, access.ErrNonePermitted
+	}
+	// The domains' reads are independent: they run at the same time, each
+	// in a read of its own (its own connection) under the request's
+	// deadline, so the answer waits for the slowest ones, not for their sum.
+	// At most Settings.ReadsAtOnce run together: a read takes one of the
+	// key's admission permits, and a read past the key's share would wait
+	// in the tier's queue, counted ahead of every other caller and shed
+	// when its wait outlasts the budget, failing the whole answer. Their
+	// rows are taken in the domains' order, and the first failure in that
+	// order is the answer's.
+	n := s.set.ReadsAtOnce
+	if n <= 0 || n > len(parts) {
+		n = len(parts)
+	}
+	slots := make(chan struct{}, n)
+	var wg sync.WaitGroup
+	for _, p := range parts {
+		wg.Go(func() {
+			slots <- struct{}{}
+			defer func() { <-slots }()
+			// A panic of a read is taken here and raised again in the
+			// request's goroutine below, where the handler's recovery
+			// answers it (ERR-008): left in this goroutine it would end
+			// the process.
+			defer func() { p.panicked = recover() }()
+			p.rows, p.err = s.repos.National.National(ctx, p.domain, p.permitted, now, fuelWindow)
+		})
+	}
+	wg.Wait()
+	for _, p := range parts {
+		if p.panicked != nil {
+			panic(p.panicked)
+		}
+	}
+	var rows []national.Row
+	for _, p := range parts {
+		if p.err != nil {
+			return NationalAnswer{}, p.err
+		}
+		if err := gate.Check(national.Families(p.rows)); err != nil {
+			return NationalAnswer{}, err
+		}
+		rows = append(rows, p.rows...)
 	}
 	fams, err := s.provenanceOf(ctx, national.Families(rows), consulted)
 	if err != nil {

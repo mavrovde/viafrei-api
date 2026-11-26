@@ -88,11 +88,32 @@ func addressesAtNearest(n string) string {
 
 // nearestAddressFamily reads the family of the open address of the families
 // $3 nearest to ($1, $2) on the sphere, however far, a tie broken by id.
+// The nearest-neighbour scan reads the first nearestWindow addresses, and
+// those at the nearest one's distance come first; only when every one of
+// them ties is the tie read from around it (addressesAtNearest). Far from
+// any address (at sea) a metre around the nearest one is a box that, on
+// prod, held a hundred thousand addresses and took seconds cold.
+//
+//nolint:misspell // materialized is the SQL keyword
 var nearestAddressFamily = named("api_location_abroad_family", `
-select a.source_id from osm_addresses a
-where `+addressesAtNearest("3")+`
-order by 'osm:' || a.osm_type || a.osm_id
+with c as materialized (
+  select a.source_id, 'osm:' || a.osm_type || a.osm_id as id, a.geom <-> `+atPosition+` as d
+  from osm_addresses a
+  where a.closed_at is null and a.geom is not null and a.source_id = any((select $3::text[])::text[])
+  order by a.geom <-> `+atPosition+`
+  limit `+nearestWindow+`),
+t as (select c.source_id, c.id from c where c.d = (select min(c.d) from c))
+select x.source_id from (
+  select t.source_id, t.id from t where (select count(*) from t) < `+nearestWindow+`
+  union all
+  select a.source_id, 'osm:' || a.osm_type || a.osm_id from osm_addresses a
+  where (select count(*) from t) >= `+nearestWindow+` and `+addressesAtNearest("3")+`) x
+order by x.id
 limit 1`, "float8", "float8", "text[]")
+
+// nearestWindow is how many addresses nearestAddressFamily reads nearest
+// first.
+const nearestWindow = "100"
 
 // stateOf reads the Land whose key is the first two digits of the region
 // code $1, of the families $2: the open gazetteer row of kind admin keyed by

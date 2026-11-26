@@ -120,6 +120,12 @@ const junctionLandInputs = `(select md5(string_agg(t.cid || ':' || t.tabcd || ':
      from gazetteer_places g
      where g.closed_at is null and g.source_id = 'bkg_gvisys' and g.kind = 'city' and g.admin_code ~ '^[0-9]{8}$' and g.geom is not null)`
 
+// statusOf are the families whose freshness is the status row of the
+// extract they are loaded from, as (family, status row): the OpenStreetMap
+// places of interest (the car parks around a position among them) are the
+// POI extract's.
+const statusOf = `(values ('osm', 'osm_pois'))`
+
 // freshnessRows are each family's feed status (control.data_status, the
 // platform's feed status view) whose source rule does not exclude it: the
 // instant its data last changed and its version, its last confirmation,
@@ -130,10 +136,17 @@ const junctionLandInputs = `(select md5(string_agg(t.cid || ':' || t.tabcd || ':
 // first and against the others only then (one rule of six excludes:
 // 304 keys took 10.9 ms matched against all six, 3.9 ms so, on prod
 // 2026-11-25).
+// A family the platform keeps no status row of its own for reads the row
+// of the extract it is loaded from (statusOf).
 const freshnessRows = `select d.key source_ref, d.last_changed_at data_as_of,
        coalesce(extract(epoch from d.last_changed_at)::bigint::text, '0') freshness_version,
        d.held_since confirmed_at, d.cadence_s confirm_interval_s, d.paused updates_paused
-  from control.data_status d
+  from (select x.key, x.last_changed_at, x.held_since, x.cadence_s, x.paused from control.data_status x
+        union all
+        select a.family, x.last_changed_at, x.held_since, x.cadence_s, x.paused
+          from ` + statusOf + ` a(family, status)
+          join control.data_status x on x.key = a.status
+         where not exists (select from control.data_status y where y.key = a.family)) d
  where not exists (select from contract_source_rules k where k.excluded and d.key ~ k.pattern
                       and not exists (select from contract_source_rules j where j.priority < k.priority and d.key ~ j.pattern))`
 

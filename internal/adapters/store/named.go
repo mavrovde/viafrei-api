@@ -90,6 +90,7 @@ func namedList() []stmt {
 // A statement that cannot be prepared answers rows that carry the error, as
 // a query that fails does, so a caller reads one error either way.
 func run(ctx context.Context, tx pgx.Tx, s stmt, args ...any) (pgx.Rows, error) {
+	noteRunning(ctx, s)
 	if beside != nil {
 		beside(ctx, tx, s, args)
 	}

@@ -197,6 +197,23 @@ func spellingsOf(text string) []string {
 	return []string{}
 }
 
+// stationSpellingsOf are the spellings a station search reads beside its
+// text: the main station's (spellingsOf), and the text's river form with
+// its own main-station spellings, where it joins a town to its river
+// ("Frankfurt am Main" finds "Frankfurt (Main) Hbf", "Frankfurt am Main
+// Hauptbahnhof" finds it too).
+func stationSpellingsOf(text string) []string {
+	sp := spellingsOf(text)
+	if r := transit.RiverForm(text); r != "" {
+		for _, v := range append([]string{transit.Fold(r)}, spellingsOf(r)...) {
+			if !slices.Contains(sp, v) {
+				sp = append(sp, v)
+			}
+		}
+	}
+	return sp
+}
+
 // stationStarts and stationHolds are a stop place s whose name starts with
 // or holds the folded text $4, or one of the main-station spellings $10 the
 // text gives (transit.MainStationSpellings): "Berlin Hbf" finds "S+U Berlin
@@ -368,7 +385,7 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 	}
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.Station, error) {
 		text := transit.Fold(q.Text)
-		rows, _ := run(ctx, tx, stationsPage[shapeOf(q, text)], families, lat, lon, text, q.RadiusM, q.Limit+1, q.Code, q.Railway, q.Area, spellingsOf(q.Text))
+		rows, _ := run(ctx, tx, stationsPage[shapeOf(q, text)], families, lat, lon, text, q.RadiusM, q.Limit+1, q.Code, q.Railway, q.Area, stationSpellingsOf(q.Text))
 		return pgx.CollectRows(rows, stationRow)
 	})
 	if err == nil && len(out) == 0 && q.Code == "" && q.Area == "" {
@@ -764,21 +781,31 @@ select station_ifopt, sum(c)::int, sum(l)::int, array_agg(distinct src order by 
 from u group by 1 having sum(c) + sum(l) > 0`, "text[]")
 
 // stationDisruptionOfHour is the platform's station disruption relation
-// with the calls of the hour joined to the stations' refs, so the planner
-// picks how to read them: on prod it probes the refs' index per ref, about
-// seven times faster than one range read of the hour's 700 000 calls hashed
-// to the refs. The recently checked feeds and the source rules (per family
+// with the calls of the hour read by one probe of the refs' index per ref,
+// kept a probe by OFFSET 0 so the planner cannot turn it into a join: as a
+// join it estimated a few hundred of the hour's calls where prod holds
+// 800 000, and read them all in one range hashed to the refs (6.0 to 6.6 s
+// on prod, against 1.1 to 1.2 s per ref). The relation's limit of 500
+// calls per ref is left out, which the join never had: the most a ref
+// holds in an hour on prod is under a hundred. The recently checked feeds and the source rules (per family
 // of $1) are read once, not per call or per group, and the stations are the
 // open register rows with an ifopt and a slug, tested for the slug, not
 // sorted for the current one (the view's lateral, 90 to 380 ms on prod; the
-// semi join 12 ms). The relation's limit of 500 calls per ref changes
-// nothing: the most a ref holds in an hour on prod is under a hundred. The
-// calls are those of the families ($1): a statement reading it keeps only
-// those.
+// semi join 12 ms). The calls are those of the families ($1): a statement
+// reading it keeps only those. The hour's calls (about 30 000 on prod) are
+// sorted for the newest observation of each call and grouped per station,
+// minute and line by byte order (callsDistinctBytes and the two after it), not by the database's
+// en_US collation: its string comparisons made those sorts about 0.15 s of
+// a 0.85 s read on prod, and 0.5 s of 1.6 s under load (2026-11-26). The
+// groups are the same: the collation is deterministic, so two strings are
+// equal under it only when their bytes are.
 var stationDisruptionOfHour = strings.NewReplacer(
 	stationsOfIndex, stationsWithSlug,
 	callsPerRef, callsOfHour,
-	"\n                 LIMIT 500) c_1\n", ") c_1 ON c_1.stop_ref = r.ref\n",
+	callsDistinct, callsDistinctBytes,
+	callsNewestFirst, callsNewestFirstBytes,
+	callsLineKey, callsLineKeyBytes,
+	"\n                 LIMIT 500) c_1\n", "\n                 OFFSET 0) c_1\n",
 	freshPerCall, freshOnce,
 	rulesPerRow("c.source_feed"), rulesOfFamilies("c.source_feed"),
 ).Replace(relStationDisruption)
@@ -803,6 +830,21 @@ const (
 	freshOnce    = " AND x.source_feed = ANY (ARRAY( SELECT fr.feed_key FROM fresh fr))"
 )
 
+// The relation's one-per-call pick of the newest observation
+// (callsDistinct, callsNewestFirst) and the station and line key its groups
+// are formed by (callsLineKey), each compared by byte order ("C"): the
+// station's ifopt and the line key carry it into the groups; the family
+// keeps the database's order, which the sources' list of a station is
+// sorted by.
+const (
+	callsDistinct         = `SELECT DISTINCT ON (r.station_ifopt, c_1.source_feed, c_1.journey_ref, c_1.aimed_dep) r.station_ifopt,`
+	callsDistinctBytes    = `SELECT DISTINCT ON (r.station_ifopt COLLATE "C", c_1.source_feed COLLATE "C", c_1.journey_ref COLLATE "C", c_1.aimed_dep) r.station_ifopt COLLATE "C" AS station_ifopt,`
+	callsNewestFirst      = `ORDER BY r.station_ifopt, c_1.source_feed, c_1.journey_ref, c_1.aimed_dep, c_1.observed_at DESC`
+	callsNewestFirstBytes = `ORDER BY r.station_ifopt COLLATE "C", c_1.source_feed COLLATE "C", c_1.journey_ref COLLATE "C", c_1.aimed_dep, c_1.observed_at DESC`
+	callsLineKey          = `c_1.journey_ref) AS line_key,`
+	callsLineKeyBytes     = `c_1.journey_ref) COLLATE "C" AS line_key,`
+)
+
 // callsPerRef is the station disruption relation's read of the calls, one
 // probe per ref.
 const callsPerRef = `FROM refs r
@@ -817,10 +859,10 @@ const callsPerRef = `FROM refs r
                    FROM delfi_siri_et_calls_latest x
                   WHERE x.stop_ref = r.ref AND `
 
-// callsOfHour reads the same calls in one range, joined to the refs; the
-// relation's own conditions follow it unchanged.
+// callsOfHour reads the same calls, one probe per ref, of the families
+// ($1) only; the relation's own conditions follow it unchanged.
 const callsOfHour = `FROM refs r
-             JOIN ( SELECT x.stop_ref,
+             CROSS JOIN LATERAL ( SELECT x.stop_ref,
                     x.aimed_dep,
                     x.journey_ref,
                     x.line,
@@ -830,7 +872,7 @@ const callsOfHour = `FROM refs r
                     x.source_feed,
                     x.observed_at
                    FROM delfi_siri_et_calls_latest x
-                  WHERE x.source_feed = any($1::text[]) AND `
+                  WHERE x.stop_ref = r.ref AND x.source_feed = any($1::text[]) AND `
 
 // affectedPlaces are the stations of the families ($1) with these ids or
 // IFOPTs ($2), each with the ref it was named by.
@@ -1282,4 +1324,21 @@ func (s *Store) StationAlerts(ctx context.Context, q transit.StationAlertsQuery,
 			return v, err
 		})
 	})
+}
+
+// stopPlaceOf is the platform's stop place of the station reference in ref
+// (contract_stop_place_of: the timetable's station, or the stop with no
+// parent, whose id is the reference's DHID or starts with it), as a
+// subquery of one column, stop_place_id, and at most one row: the same
+// lookup on the same index, without a call per station of the function,
+// which runs as its owner under its own search path (on prod a tenth of the
+// national accessibility summary).
+func stopPlaceOf(ref string) string {
+	return `select '1:' || s.id as stop_place_id
+    from (select substring(` + ref + `, '^(?:dhid:)?([a-z]{2}:[0-9]{5}:[0-9]+)') as r) q
+    join stops s on s.gtfs_feed_key = 1 and s.deleted_at is null
+      and (s.id = q.r or (s.id ~>=~ (q.r || ':') and s.id ~<~ (q.r || ';')))
+      and (s.location_type = 1 or (s.location_type = 0 and s.parent_id is null))
+    order by (s.id = q.r) desc, s.id
+    limit 1`
 }

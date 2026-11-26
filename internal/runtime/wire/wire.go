@@ -54,14 +54,24 @@ func FeatureSettings(cfg *config.Config) features.Settings {
 		LookAhead:      cfg.Weather.LookAhead,
 		Road: features.RoadReach{Stations: cfg.Weather.RoadStations, RadiusM: float64(cfg.Weather.RoadRadiusM),
 			Current: cfg.Weather.RoadCurrent, LookAhead: cfg.Weather.RoadLookAhead},
-		Disabled:  cfg.Sources.Disabled,
-		IsTimeout: store.IsDeadline,
+		Disabled:    cfg.Sources.Disabled,
+		IsTimeout:   store.IsDeadline,
+		ReadsAtOnce: readsAtOnce(cfg),
 	}
+}
+
+// readsAtOnce is the smallest share of permits any key may hold, so an
+// answer's own reads never queue behind each other, whatever its tier.
+func readsAtOnce(cfg *config.Config) int {
+	if n := cfg.Tiers.Critical.PerKeyInflight; n > 0 {
+		return min(n, cfg.Tiers.PerKeyInflight)
+	}
+	return cfg.Tiers.PerKeyInflight
 }
 
 // Language is the language of every answer's texts until language
 // negotiation arrives.
-const Language = "en"
+const Language = features.DefaultLanguage
 
 // SharedBudget reads the db.shared_budget.* settings (NFR-CAP-002).
 func SharedBudget(cfg *config.Config) store.SharedBudget {

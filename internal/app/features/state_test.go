@@ -15,11 +15,19 @@ import (
 
 type statesFake struct {
 	*fake
-	warnings []weather.StateWarning
-	alerts   []transit.StateAlertRow
-	err      error
-	gotLand  string
-	gotFams  []string
+	warnings     []weather.StateWarning
+	alerts       []transit.StateAlertRow
+	err          error
+	gotLand      string
+	gotFams      []string
+	english      map[string]string
+	enErr        error
+	askedEnglish int
+}
+
+func (f *statesFake) StateEventsEnglish(_ context.Context, _ string, _ []string, _ time.Time) (map[string]string, string, error) {
+	f.askedEnglish++
+	return f.english, "f-en", f.enErr
 }
 
 func (f *statesFake) StateWarnings(_ context.Context, land string, fams []string, _ time.Time) ([]weather.StateWarning, error) {
@@ -57,6 +65,45 @@ func TestStateWarnings(t *testing.T) {
 		if _, _, err := statesService(c.f, "weather").StateWarnings(context.Background(), k, "09"); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)
 		}
+	}
+}
+
+// enService is the weather service whose register also holds the English
+// family the fake names.
+func enService(f *statesFake) *features.Service {
+	svc := statesService(f, "weather")
+	f.reg = append(f.reg, access.Terms{Family: "f-en", Domain: "weather", UseClasses: all, Version: "v1"})
+	return svc
+}
+
+// An answer in English names an event by the issuer's English name,
+// credited to its family; one in German, or an event with no English name,
+// keeps the German name.
+func TestStateWarningsNameTheEventsInTheAskedLanguage(t *testing.T) {
+	k := key("commercial", []access.Scope{"weather"}, "f1", "f-en")
+	snow, frost := "SCHNEEFALL", "FROST"
+	warnings := func() []weather.StateWarning {
+		return []weather.StateWarning{{Event: &snow, Level: 2, Families: []string{"f1"}}, {Event: &frost, Level: 1, Families: []string{"f1"}}, {Level: 1, Families: []string{"f1"}}}
+	}
+	en := map[string]string{"SCHNEEFALL": "snowfall"}
+	f := &statesFake{warnings: warnings(), english: en}
+	v, a, err := enService(f).StateWarnings(features.WithLanguage(context.Background(), "en"), k, "09")
+	if err != nil || *v[0].Event != "snowfall" || *v[1].Event != "FROST" || v[2].Event != nil ||
+		!slices.Equal(v[0].Families, []string{"f1", "f-en"}) || !slices.Equal(v[1].Families, []string{"f1"}) ||
+		!slices.Contains(names(a.Families), "f-en") {
+		t.Fatalf("en: %+v %v %v", v, names(a.Families), err)
+	}
+	f = &statesFake{warnings: warnings(), english: en}
+	if v, _, err := enService(f).StateWarnings(features.WithLanguage(context.Background(), "de"), k, "09"); err != nil || *v[0].Event != "SCHNEEFALL" || f.askedEnglish != 0 {
+		t.Errorf("de: %+v asked %d %v", v, f.askedEnglish, err)
+	}
+	f = &statesFake{warnings: warnings(), english: en, enErr: errStore}
+	if _, _, err := enService(f).StateWarnings(features.WithLanguage(context.Background(), "en"), k, "09"); !errors.Is(err, errStore) {
+		t.Errorf("english read: %v, want %v", err, errStore)
+	}
+	f = &statesFake{warnings: []weather.StateWarning{{Level: 1, Families: []string{"f1"}}}}
+	if _, _, err := enService(f).StateWarnings(features.WithLanguage(context.Background(), "en"), k, "09"); err != nil || f.askedEnglish != 0 {
+		t.Errorf("no event named: asked %d %v", f.askedEnglish, err)
 	}
 }
 

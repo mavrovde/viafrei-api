@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
+	"github.com/mavrovde/viafrei-api/internal/app/admission"
 	"github.com/mavrovde/viafrei-api/internal/app/health"
 	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
@@ -361,5 +362,59 @@ func TestUnreachableStorageIsNotReady(t *testing.T) {
 	r := health.NewChecker(st, expected, 300*time.Millisecond).Check(ctx)
 	if r.Ready || r.Checks[health.CheckStorage] != health.Fail {
 		t.Fatalf("unreachable storage reported %v", r.Checks)
+	}
+}
+
+// TestADeadlineNotesTheStatementItCut: a read the request's deadline cuts
+// notes the named statement it had started on the request's tally, which
+// the request's log line reports; a read that ends in time notes none.
+func TestADeadlineNotesTheStatementItCut(t *testing.T) {
+	st := seeded(t)
+	whole := admission.WithTally(bounded(t))
+	if _, err := st.ContractVersion(whole); err != nil {
+		t.Fatal(err)
+	}
+	if got := admission.CutStatement(whole); got != "" {
+		t.Fatalf("a read that ended in time noted %q", got)
+	}
+	ctx, cancel := context.WithTimeout(whole, 300*time.Millisecond)
+	defer cancel()
+	if err := store.CutRegisterProbe(ctx, st); !errors.Is(err, store.ErrDeadlineExhausted) {
+		t.Fatalf("err %v, want deadline exhausted", err)
+	}
+	if got := admission.CutStatement(ctx); got != "api_register_probe" {
+		t.Fatalf("cut %q, want api_register_probe", got)
+	}
+}
+
+// TestAStatementTimeoutNotesTheStatementItCut: the statement timeout the read
+// sets from the deadline fires before the context ends, and the cut names
+// the statement all the same.
+func TestAStatementTimeoutNotesTheStatementItCut(t *testing.T) {
+	// A reserve of 400 ms leaves the context 400 ms past the statement timeout.
+	st := openStore(t, bounded(t), "VFAPI_DEADLINE_RESERVE=400ms")
+	ctx, cancel := context.WithTimeout(admission.WithTally(bounded(t)), 900*time.Millisecond)
+	defer cancel()
+	err := store.SleepPastTheBudget(ctx, st, 1500*time.Millisecond)
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); !ok || pgErr.Code != "57014" || ctx.Err() != nil {
+		t.Fatalf("err %v (context %v), want the statement timeout before the deadline", err, ctx.Err())
+	}
+	if got := admission.CutStatement(ctx); got != "api_register_probe" {
+		t.Fatalf("cut %q, want api_register_probe", got)
+	}
+}
+
+// TestACanceledReadIsNoCut: a client that goes away cancels the read inside
+// its statement, and the request's line names no cut.
+func TestACanceledReadIsNoCut(t *testing.T) {
+	st := seeded(t)
+	ctx, cancel := context.WithCancel(admission.WithTally(bounded(t)))
+	defer cancel()
+	time.AfterFunc(200*time.Millisecond, cancel)
+	if err := store.CutRegisterProbe(ctx, st); !errors.Is(err, context.Canceled) {
+		t.Fatalf("err %v, want canceled", err)
+	}
+	if got := admission.CutStatement(ctx); got != "" {
+		t.Fatalf("a canceled read noted the cut %q", got)
 	}
 }

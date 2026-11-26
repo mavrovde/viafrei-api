@@ -155,6 +155,36 @@ func MainStationSpellings(s string) []string {
 	return []string{place.String() + "hbf", place.String() + "hauptbahnhof"}
 }
 
+// RiverForm is the text with the words that join a town to its river left
+// out ("am", "an der", "a. d."), as the timetables write the river, in
+// brackets after the town: "Frankfurt am Main" gives "frankfurt main",
+// which folds as "Frankfurt (Main) Hbf" starts, "Halle an der Saale" gives
+// "halle saale". "" when the text holds no such words between two others.
+func RiverForm(s string) string {
+	words := strings.FieldsFunc(strings.ToLower(s), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
+	out := make([]string, 0, len(words))
+	found := false
+	for i := 0; i < len(words); i++ {
+		n := 0
+		switch {
+		case words[i] == "am":
+			n = 1
+		case i+1 < len(words) && (words[i] == "an" && words[i+1] == "der" || words[i] == "a" && words[i+1] == "d"):
+			n = 2
+		}
+		if n > 0 && i > 0 && i+n < len(words) {
+			found = true
+			i += n - 1
+			continue
+		}
+		out = append(out, words[i])
+	}
+	if !found {
+		return ""
+	}
+	return strings.Join(out, " ")
+}
+
 // englishCityNames are the English names of German cities the platform
 // reads as the German (ENGLISH_FORMS).
 var englishCityNames = map[string]string{

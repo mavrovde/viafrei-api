@@ -7,6 +7,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/app/health"
 )
 
@@ -128,7 +129,7 @@ func registerMeta(api huma.API, s *server, op huma.Operation) {
 					ContractVersion: s.contractVersion,
 					PlatformVersion: platform,
 					OpenAPI:         s.cfg.Server.PublicBaseURL + "/v1/openapi.json",
-					Languages:       []string{defaultLanguage},
+					Languages:       []string{features.DefaultLanguage},
 				},
 				Meta:  s.envelopeMeta(ctx),
 				Links: s.selfLink(ctx),

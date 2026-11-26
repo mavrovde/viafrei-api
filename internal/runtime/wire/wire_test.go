@@ -35,6 +35,23 @@ func TestFeatureSettings(t *testing.T) {
 	}
 }
 
+// An answer reads no more domains at once than the smallest share any key
+// may hold: the critical tier's when it is set and smaller, else the general
+// one; a critical share of 0 inherits the general one.
+func TestFeatureSettingsReadsAtOnceIsTheSmallestKeyShare(t *testing.T) {
+	for _, c := range []struct{ general, critical, want int }{
+		{4, 0, 4},  // critical inherits
+		{4, 2, 2},  // the critical share is smaller
+		{4, 16, 4}, // the general share is smaller
+	} {
+		cfg := config.Defaults()
+		cfg.Tiers.PerKeyInflight, cfg.Tiers.Critical.PerKeyInflight = c.general, c.critical
+		if got := wire.FeatureSettings(cfg).ReadsAtOnce; got != c.want {
+			t.Errorf("general %d, critical %d: ReadsAtOnce %d, want %d", c.general, c.critical, got, c.want)
+		}
+	}
+}
+
 func TestSharedBudget(t *testing.T) {
 	cfg := config.Defaults()
 	if b := wire.SharedBudget(cfg); b.Slots != 0 || b.LockSpace != 7301 || b.CriticalReserved != 1 || b.MaxWait != 200*time.Millisecond ||

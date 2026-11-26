@@ -19095,7 +19095,7 @@
     },
     "/v1/parking-options": {
       "get": {
-        "description": "Parking sites within the radius of a position, nearest first, then by id, each with its last reported occupancy. A site whose terms are not accepted (accept_terms) is not listed; meta.terms offers its terms. Needs the scope parking.",
+        "description": "Parking sites within the radius of a position, nearest first, then by id, each with its last reported occupancy. A site whose terms are not accepted (accept_terms) is not listed; meta.terms offers its terms. The sites are those the parking publishers report, so the list can be empty where none covers the area (the centre of a city whose publishers report only park-and-ride sites on its edge); OpenStreetMap's car parks there are in meta.around.osmCarParks. Needs the scope parking.",
         "operationId": "listParkingOptions",
         "parameters": [
           {

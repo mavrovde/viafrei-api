@@ -75,8 +75,16 @@ group by 1, 2 order by 3 desc, 1 limit 1`, &id, &fam, &points)
 	}
 }
 
+// Every domain's part is read, each from rows the fixture fills: the
+// punctuality from delays planted now and removed after, as the seed's own
+// are older than the live view's half hour (a part read only when another
+// test had planted fresher delays in the shared database before it).
 func TestNationalReadsEveryDomainsPart(t *testing.T) {
 	st := seeded(t)
+	if n := change(t, freshDelays); n != 3 {
+		t.Fatalf("planted %d delays, want 3", n)
+	}
+	t.Cleanup(func() { change(t, freshDelaysGone) })
 	ctx := access.WithAudience(bounded(t), access.AudienceOwn)
 	var fams []string
 	owner(t, `select array_agg(distinct source_ref order by source_ref) from contract.source`, &fams)
@@ -99,7 +107,7 @@ func TestNationalReadsEveryDomainsPart(t *testing.T) {
 			}
 		}
 	}
-	for _, s := range []string{national.SectionFuel, national.SectionCharging, national.SectionParking} {
+	for _, s := range []string{national.SectionFuel, national.SectionCharging, national.SectionParking, national.SectionPunctuality} {
 		if !seen[s] {
 			t.Errorf("the fixture fills %s, the read gave none (%v)", s, seen)
 		}

@@ -94,7 +94,7 @@ func (s *Store) Motorways(ctx context.Context, q roads.CatalogueQuery, families 
 // a road of the register, of the families $1.
 var motorwayFamilies = opaqueNamed("api_motorway_families", `
 select coalesce(array_agg(distinct e.source_ref order by e.source_ref), '{}')
-from `+trafficEvents("")+` e
+from `+trafficEventsOf("")+` e
 join autobahn_roads r on r.road = e.road_ref
 where e.source_ref = any($1) and `+eventPermitted+`
   and e.withdrawn_at is null and e.valid_from <= $2 and (e.valid_to is null or e.valid_to > $2)`, "text[]", "timestamptz")
@@ -115,7 +115,7 @@ func motorwaysOf(name string, liveLand bool) stmt {
 	return opaqueNamed(name, `
 with es as (
   select e.road_ref, count(*)::int as n, array_agg(distinct e.source_ref order by e.source_ref) as sources
-  from `+trafficEvents("")+` e
+  from `+trafficEventsOf("")+` e
   where e.source_ref = any($1) and `+eventPermitted+`
     and e.withdrawn_at is null and e.valid_from <= $5 and (e.valid_to is null or e.valid_to > $5)
   group by e.road_ref)
@@ -203,6 +203,26 @@ cross join lateral (
                  where t.road_number = q.ref and `+motorwayJunctions+`)) w
 order by q.ref, w.level desc, 'dwd:' || w.id`, "text[]", "timestamptz", "text[]")
 
+// landsOf is, for each road of refs with a junction in a Land, the Länder
+// of its junctions, sorted, as roadStates reads them, from the junction
+// Länder lands; false when lands is not current (nil) or lacks a road.
+func landsOf(lands map[string]roadLands, refs []string) (map[string][]string, bool) {
+	if lands == nil {
+		return nil, false
+	}
+	out := make(map[string][]string, len(refs))
+	for _, ref := range refs {
+		l, ok := lands[ref]
+		if !ok {
+			return nil, false
+		}
+		if len(l.states) > 0 {
+			out[ref] = slices.Sorted(slices.Values(l.states))
+		}
+	}
+	return out, true
+}
+
 // RoadLamps reads, in one snapshot, what the lamp of each road (a stored
 // road reference) states over the whole road in both directions, as
 // SituationsOnRoad reads it for one road: the lamp's view of the
@@ -212,6 +232,9 @@ order by q.ref, w.level desc, 'dwd:' || w.id`, "text[]", "timestamptz", "text[]"
 // change. The catalogue reads each road's lamp in a handful of statements,
 // not a full conditions read per road.
 func (s *Store) RoadLamps(ctx context.Context, refs []string, fams roads.Families, now time.Time) (map[string]roads.Page, error) {
+	// The Länder of the roads' junctions, from the junction Länder while
+	// they are current and hold every road; else read live, in the snapshot.
+	warmStates, warm := landsOf(s.lands.current(s.nowFn(), s.roads.staleFor), refs)
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (map[string]roads.Page, error) {
 		messages, warnings := map[string][]storedMessage{}, map[string][]roads.Warning{}
 		states := map[string][]string{}
@@ -257,6 +280,10 @@ func (s *Store) RoadLamps(ctx context.Context, refs []string, fams roads.Familie
 				return err
 			},
 			func() error {
+				if warm {
+					states = warmStates
+					return nil
+				}
 				res, _ := run(ctx, tx, roadStates, refs)
 				var (
 					ref string

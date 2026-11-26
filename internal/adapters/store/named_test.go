@@ -260,16 +260,24 @@ func TestTrafficEventsOfFamiliesReadTheStoredLand(t *testing.T) {
 	}
 }
 
-// TestStationDisruptionOfHourReadsOneRange: the per-ref probe and its limit,
-// the stations' read through the index view and the per-call source test are
-// found in the station disruption relation and replaced.
-func TestStationDisruptionOfHourReadsOneRange(t *testing.T) {
+// TestStationDisruptionOfHourProbesEachRef: the per-ref probe (kept a probe
+// by OFFSET 0, of the families only) and its limit, the stations' read
+// through the index view and the per-call source test are found in the
+// station disruption relation and replaced, and the calls are picked and
+// grouped by byte order.
+func TestStationDisruptionOfHourProbesEachRef(t *testing.T) {
 	if strings.Count(relStationDisruption, callsPerRef) != 1 || strings.Contains(stationDisruptionOfHour, callsPerRef) ||
-		strings.Contains(stationDisruptionOfHour, "LIMIT 500") || !strings.Contains(stationDisruptionOfHour, "ON c_1.stop_ref = r.ref") ||
+		strings.Contains(stationDisruptionOfHour, "LIMIT 500") || !strings.Contains(stationDisruptionOfHour, "OFFSET 0) c_1") ||
+		!strings.Contains(stationDisruptionOfHour, "WHERE x.stop_ref = r.ref AND x.source_feed = any($1::text[]) AND ") ||
 		strings.Count(relStationDisruption, stationsOfIndex) != 1 || strings.Contains(stationDisruptionOfHour, stationsOfIndex) ||
 		!strings.Contains(stationDisruptionOfHour, stationsWithSlug) || strings.Count(relStationDisruption, freshPerCall) != 1 || strings.Contains(stationDisruptionOfHour, freshPerCall) ||
 		strings.Count(relStationDisruption, rulesPerRow("c.source_feed")) != 1 || strings.Contains(stationDisruptionOfHour, rulesPerRow("c.source_feed")) {
 		t.Fatal("the station disruption relation's read of the calls changed")
+	}
+	for from, to := range map[string]string{callsDistinct: callsDistinctBytes, callsNewestFirst: callsNewestFirstBytes, callsLineKey: callsLineKeyBytes} {
+		if strings.Count(relStationDisruption, from) != 1 || strings.Contains(stationDisruptionOfHour, from) || strings.Count(stationDisruptionOfHour, to) != 1 {
+			t.Fatalf("the calls are not compared by byte order: %q", from)
+		}
 	}
 }
 

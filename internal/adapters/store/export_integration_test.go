@@ -203,6 +203,7 @@ var noPlatformRead = map[string]string{
 	"api_register_probe":         "the API's own probe of the row versions its register cache is read from; it answers no question",
 	"api_charging_feed_register": "the platform holds the charging feed register as code, not as a table it reads",
 	"api_stop_stations":          "the platform's route lists a station page's stops from the page, not the station pages around a stop; its rows are asserted on their own (TestStopStationIsTheStationThatListsIt)",
+	"api_state_events_english":   "the platform names a Land's events in German only; the English names are the API's own (lang=en)",
 }
 
 // NoPlatformRead is why a named statement has no platform statement to
@@ -433,3 +434,33 @@ func textRows(ctx context.Context, tx pgx.Tx, sql string, args []any) ([]string,
 }
 
 func sorted(rows []string) []string { s := slices.Clone(rows); slices.Sort(s); return s }
+
+// CutRegisterProbe runs the register's probe (api_register_probe) in a read
+// and then waits in that read until ctx ends, as a read the deadline cuts
+// after its statement started.
+func CutRegisterProbe(ctx context.Context, s *Store) error {
+	_, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (struct{}, error) {
+		var probe string
+		if err := scanOne(run(ctx, tx, registerProbeRead))(&probe); err != nil {
+			return struct{}{}, err
+		}
+		<-ctx.Done()
+		return struct{}{}, ctx.Err()
+	})
+	return err
+}
+
+// SleepPastTheBudget runs the register's probe (api_register_probe) in a
+// read and then a sleep of sleep, which the read's statement timeout cuts
+// when sleep is past the read's budget.
+func SleepPastTheBudget(ctx context.Context, s *Store, sleep time.Duration) error {
+	_, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (struct{}, error) {
+		var probe string
+		if err := scanOne(run(ctx, tx, registerProbeRead))(&probe); err != nil {
+			return struct{}{}, err
+		}
+		_, err := tx.Exec(ctx, "select pg_sleep($1)", sleep.Seconds())
+		return struct{}{}, err
+	})
+	return err
+}

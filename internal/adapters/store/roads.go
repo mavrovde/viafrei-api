@@ -229,9 +229,24 @@ select b.event_id, b.event_kind, b.severity, b.road_ref, b.road_class, b.directi
             else coalesce(k.display_class, 'open') end display_class,
        coalesce(k.audience, 'public') audience, b.confidentiality, k.origin_restriction, ` + state + `
 from b
-left join lateral (select k.excluded, k.audience, k.display_class, k.origin_restriction from contract_source_rules k
-                   where b.source_ref ~ k.pattern order by k.priority limit 1) k on true
+` + eventRulePerRow + `
 where not coalesce(k.excluded, false))`
+}
+
+// eventRulePerRow is trafficEvents' match of the source rules for each
+// situation, by its source.
+const eventRulePerRow = `left join lateral (select k.excluded, k.audience, k.display_class, k.origin_restriction from contract_source_rules k
+                   where b.source_ref ~ k.pattern order by k.priority limit 1) k on true`
+
+// trafficEventsOf is trafficEvents for a statement that keeps only the
+// situations of the families $1 (text[]): the source rules are matched once
+// per family of $1 (rulesOfFamilies), not once per situation, and each
+// situation looks its source up there. A situation of another source finds
+// no rule and is left out by the statement's own filter on $1. On prod the
+// rule match per situation was most of the motorway list's and the lamps'
+// time (thousands of situations, a regular expression test each).
+func trafficEventsOf(in string) string {
+	return strings.Replace(trafficEvents(in), eventRulePerRow, rulesOfFamilies("b.source_ref"), 1)
 }
 
 // filterArgs are the arguments $1 to $7 of situationFilter.
@@ -269,7 +284,7 @@ const messagesAgg = `jsonb_agg(distinct jsonb_build_object('r', e.record_class, 
 // messagesFrom reads the situations of the families $1 that have not ended
 // at $2, with their Land when they may lie in the Land in (trafficEvents).
 func messagesFrom(in string) string {
-	return `from ` + trafficEvents(in) + ` e
+	return `from ` + trafficEventsOf(in) + ` e
 cross join lateral (select e.valid_from, e.valid_to) x
 where e.withdrawn_at is null
   and e.source_ref = any($1::text[])
@@ -661,7 +676,7 @@ line as (
   from parts group by road_ref),
 answering as (
   select `+eventRow+`, line.km road_km, line.total road_total
-  from `+trafficEvents("")+` e left join line on true
+  from `+trafficEventsOf("")+` e left join line on true
   where `+situationFilter(12)+`
     and ($15 or exists (select 1 from road))
     and `+fmt.Sprintf(canonicalRef, "e.road_ref")+` = $8
@@ -693,7 +708,7 @@ limit $11 offset $14`,
 with here as (select st_setsrid(st_makepoint($9, $8), 4326)::geography g),
 answering as (
   select `+eventRow+`, round(st_distance(e.location::geography, here.g))::int dist
-  from `+trafficEvents("")+` e, here
+  from `+trafficEventsOf("")+` e, here
   where `+situationFilter(15)+`
     and e.location is not null
     and st_dwithin(e.location::geography, here.g, $10)
@@ -707,7 +722,7 @@ limit $14 offset $17`,
 	situationsInStateList = opaqueNamed("api_state_situations", `
 with answering as (
   select `+eventRow+`
-  from `+trafficEvents("$8")+` e
+  from `+trafficEventsOf("$8")+` e
   where `+situationFilter(13)+`
     and ($8 = 'de' or e.state_code = $8)
     and (e.road_class = any($9) or ($10 and not e.road_class = any($11))))
@@ -735,7 +750,7 @@ var (
 	// placedInState are the families that placed the Land's situations in
 	// it (over the messages' arguments), none for de.
 	placedInState = opaqueNamed("api_state_placed", `select coalesce(array_agg(distinct e.placement_source_ref order by e.placement_source_ref) filter (where e.placement_source_ref is not null), '{}')
-from `+trafficEvents("$3")+` e
+from `+trafficEventsOf("$3")+` e
 where $3 <> 'de' and e.state_code = $3 and e.withdrawn_at is null and e.source_ref = any($1)
   and `+eventPermitted+` and (e.valid_to is null or e.valid_to > $2)`, "text[]", "timestamptz", "text")
 )

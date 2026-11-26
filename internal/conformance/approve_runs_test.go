@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -18,7 +19,9 @@ import (
 // approveStub answers the gh calls of approve-release-runs.sh: the branch's
 // head commit, the runs on it (none until the STUB_LISTED_FROM-th read, and a
 // failed read at the STUB_FAIL_ON-th), and the approvals, which it records.
-// It applies the --jq filter itself, as gh does.
+// It applies the --jq filter itself, as gh does. A script that reads more
+// than approveMaxReads times does not end: the stub marks it and ends the
+// script's process group, so no test waits on a wall clock (TST-012).
 const approveStub = `#!/bin/bash
 jqf=""
 prev=""
@@ -29,6 +32,7 @@ case "$*" in
   *actions/runs*)
     n=$(( $(cat "$STUB_DIR/reads" 2>/dev/null || echo 0) + 1 ))
     echo "$n" > "$STUB_DIR/reads"
+    if (( n > STUB_MAX_READS )); then : > "$STUB_DIR/runaway"; kill -TERM -- "-$(ps -o pgid= $$ | tr -d ' ')"; exit 1; fi
     [[ $n == "$STUB_FAIL_ON" ]] && { echo "HTTP 502" >&2; exit 1; }
     if (( n < STUB_LISTED_FROM )); then body='{"workflow_runs":[]}'; else body=$STUB_RUNS; fi
     jq "$jqf" <<<"$body"; exit 0 ;;
@@ -36,6 +40,9 @@ esac
 echo "unexpected gh call: $*" >&2
 exit 3
 `
+
+// approveMaxReads bounds the reads of one run: the slowest case needs 4.
+const approveMaxReads = 20
 
 // approveRuns: on the head commit, CI and Security each have a pull_request
 // run that waits for approval (1, 3). The push run of CI (2), a run of
@@ -64,8 +71,9 @@ var approveCases = []struct {
 }
 
 // runApprove runs the script on a release-please branch against the stub and
-// returns its exit status and the ids it approved. A run that does not end
-// within 5 s is reported as such.
+// returns its exit status and the ids it approved. A run that reads past
+// approveMaxReads, or (a backstop) does not end within 5 s, is reported as
+// not ending.
 func runApprove(script string, listedFrom, failOn int, waitS string) (int, []string, error) {
 	bash, err := exec.LookPath("bash")
 	if err != nil {
@@ -86,13 +94,14 @@ func runApprove(script string, listedFrom, failOn int, waitS string) (int, []str
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, bash, "--noprofile", "--norc", path, "release-please--branches--main") // #nosec G204 -- the repository's own script
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}                                                  // the stub ends this group alone, never the test's
 	cmd.Env = []string{
 		"PATH=" + dir + ":" + os.Getenv("PATH"), "GH_REPO=o/r", "STUB_DIR=" + dir, "STUB_RUNS=" + approveRuns,
-		"STUB_LISTED_FROM=" + fmt.Sprint(listedFrom), "STUB_FAIL_ON=" + fmt.Sprint(failOn), "APPROVE_WAIT_S=" + waitS, "APPROVE_POLL_S=0",
+		"STUB_MAX_READS=" + fmt.Sprint(approveMaxReads), "STUB_LISTED_FROM=" + fmt.Sprint(listedFrom), "STUB_FAIL_ON=" + fmt.Sprint(failOn), "APPROVE_WAIT_S=" + waitS, "APPROVE_POLL_S=0",
 	}
 	runErr := cmd.Run()
-	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return -1, nil, errors.New("the script did not end within 5 s")
+	if _, serr := os.Stat(filepath.Join(dir, "runaway")); serr == nil || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return -1, nil, errors.New("the script did not end")
 	}
 	code, err := bashExit(runErr)
 	b, _ := os.ReadFile(filepath.Join(dir, "approved")) // #nosec G304 -- the temp file the stub wrote
@@ -147,6 +156,7 @@ func TestApproveReleaseRunsFindsAndApprovesThePullRequestRuns(t *testing.T) {
 		"no run by the deadline: the script exits 0":                         plant(`$last_err}" >&2; exit 1; }`, `$last_err}" >&2; exit 0; }`),
 	} {
 		t.Run(want, func(t *testing.T) {
+			t.Parallel() // each run has its own temp dir and process group
 			if got := strings.Join(approveFindings(bad), "; "); !strings.Contains(got, want) {
 				t.Errorf("planted %q, the rules said %q", want, got)
 			}

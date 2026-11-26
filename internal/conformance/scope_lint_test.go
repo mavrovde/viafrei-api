@@ -220,6 +220,12 @@ func foldEqual(a, p string) bool {
 	return true
 }
 
+// isBoundaryWordChar is a word character of \b: an ASCII letter, digit or
+// underscore.
+func isBoundaryWordChar(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || b == '_'
+}
+
 // vocabHit is a vocabulary match on a line: the pattern's place in the
 // vocabulary and the text it matched.
 type vocabHit struct {
@@ -273,6 +279,11 @@ func scanText(path, text string, vocab []vocabEntry, deny *denyCache) []scopeFin
 			}
 		}
 		try := func(at int) {
+			// \b: a word start the walk finds after a digit or an
+			// underscore (2feed, _feed) is no word boundary.
+			if at > 0 && isBoundaryWordChar(line[at-1]) {
+				return
+			}
 			c := line[at]
 			if c >= 'A' && c <= 'Z' {
 				c += 'a' - 'A'
@@ -674,6 +685,7 @@ func TestScopeScanFindsWhatTheWholeExpressionFinds(t *testing.T) {
 		"Data Collection data-collection data  collection datacollection",
 		"poller polling pollers poll-ing poller-feed",
 		"a_raw _raw x _RAW",
+		"2feed _feed 1_feed __crawl 9crawl",
 		"row row row row-row Row-Row-row",
 		"Über feeds und Crawler, ſcrawl, Krawl",
 		strings.Repeat("feed data ", 5000) + "crawl",

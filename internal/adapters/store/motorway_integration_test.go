@@ -71,7 +71,7 @@ var motorwaySeed = []string{
 }
 
 func TestMotorwayReadsTheToolsStatements(t *testing.T) {
-	st, pdb := private(t, motorwaySeed...)
+	st, _ := private(t, motorwaySeed...)
 	now := time.Now()
 	q, ok := roads.MotorwayQueryOf("A99", 10, now, append(every(t), "autobahn", "roadworks_akd", "los_nrw", "los_nrw_sites", "los_nrw_lanes", "los_nrw_lane_sites"))
 	if !ok || !q.Lanes {
@@ -116,15 +116,24 @@ func TestMotorwayReadsTheToolsStatements(t *testing.T) {
 	if r, err = st.Motorway(bounded(t), q); err != nil || r.Measured != nil {
 		t.Errorf("no measured: %+v %v", r.Measured, err)
 	}
-	// Every statement's fault fails the read.
-	fst, f := faultyOn(t, pdb.ReaderURL)
-	all := q
-	all.Measured, all.Lanes, all.Plans, all.Limit = true, true, []string{"roadworks_akd"}, 10
-	failEach(t, fst, f, "Motorway", func(ctx context.Context, s *store.Store) error { _, err := s.Motorway(ctx, all); return err })
 	q.Road = "A98"
 	if r, err = st.Motorway(bounded(t), q); err != nil || !r.Tick.IsZero() {
 		t.Errorf("no sweep: %+v %v", r, err)
 	}
+}
+
+// Every statement's fault fails the read. The sweep reads the seed's first
+// rows only, a sweep, its jam and the jam history: each of the read's
+// statements is sent all the same (the measured state and the plans are
+// asked whatever they hold), and each fault replans the statements before
+// it on a new connection, so the full seed's other rows and the reads
+// before the sweep only added to the time (TST-012).
+func TestMotorwayFailsOnEachStatement(t *testing.T) {
+	_, pdb := private(t, motorwaySeed[:4]...)
+	q, _ := roads.MotorwayQueryOf("A99", 10, time.Now(), append(every(t), "autobahn", "roadworks_akd", "los_nrw", "los_nrw_sites", "los_nrw_lanes", "los_nrw_lane_sites"))
+	q.Measured, q.Lanes, q.Plans = true, true, []string{"roadworks_akd"}
+	fst, f := faultyOn(t, pdb.ReaderURL)
+	failEach(t, fst, f, "Motorway", func(ctx context.Context, s *store.Store) error { _, err := s.Motorway(ctx, q); return err })
 }
 
 // A motorway whose jam history is younger than the minimum is not asked its

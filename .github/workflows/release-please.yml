@@ -143,7 +143,10 @@ jobs:
   approve:
     name: Approve CI and Security on the release pull request
     needs: pull-request
-    if: needs.pull-request.outputs.pr != ''
+    # always(): without it the implicit success() also asks the tag job, which
+    # is skipped on every merge that cuts no release, so the approval never
+    # ran when a release pull request was opened (2.0.3, run of 262ab835).
+    if: always() && needs.pull-request.result == 'success' && needs.pull-request.outputs.pr != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:

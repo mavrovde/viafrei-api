@@ -57,9 +57,12 @@ jobs:
         with:
           go-version: "1.27.4" # must equal the toolchain line of go.mod (TestWorkflowsUseTheGoModToolchain)
       - name: go test (race, shuffled)
+        # -p 1: one package at a time, as the integration step (TST-012 judges
+        # each test's own wall time; TestFuzzInventory measured 0.96 s and
+        # 2.11 s on two runs of the same code, 2026-11-26).
         run: |
           set -o pipefail
-          go test -race -shuffle=on -count=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage-unit.out -json ./... | tee test-unit.json | go run ./internal/testkit/gotestsum-lite
+          go test -race -p 1 -shuffle=on -count=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage-unit.out -json ./... | tee test-unit.json | go run ./internal/testkit/gotestsum-lite
       - name: Fixture checksums recorded on another machine (TST-014)
         run: go run ./cmd/fixturegen -verify test/fixtures/checksums.tsv
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

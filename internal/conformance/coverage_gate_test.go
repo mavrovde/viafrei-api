@@ -91,6 +91,9 @@ func measureFindings(w ciJobs) []string {
 	if r := runOf(w.Jobs["integration"]); !strings.Contains(r, `go test -race -p 1 -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out -json "${pkgs[@]}"`) {
 		out = append(out, "job integration does not run its packages one at a time")
 	}
+	if r := runOf(w.Jobs["test"]); !strings.Contains(r, "go test -race -p 1 -shuffle=on -count=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage-unit.out -json ./...") {
+		out = append(out, "job test does not run its packages one at a time")
+	}
 	// internal/perf times the queries: it runs alone (-p 1), after the
 	// other integration packages, into a profile of its own.
 	if r := runOf(w.Jobs["integration"]); !strings.Contains(r, "grep -v '/internal/perf$'") ||
@@ -168,20 +171,21 @@ func TestCoverageGateIsWired(t *testing.T) {
 		t.Fatal(strings.Join(f, "; "))
 	}
 	for want, plant := range map[string][2]string{
-		"job coverage does not run covergate -min 100": {"covergate -min 100", "covergate -min 95"},
-		"job integration does not measure every":       {"-coverpkg=./... -coverprofile=coverage-integration.out", "-coverprofile=coverage-integration.out"},
-		"does not run internal/perf alone":             {"-race -p 1 -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-perf.out", "-race -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-perf.out"},
-		"does not run its packages one at a time":      {"-race -p 1 -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out", "-race -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out"},
-		"job coverage does not run scripts/boot":       {"scripts/boot-coverage.sh coverage-boot.out", "true"},
-		"job sonar does not need coverage":             {"needs: [test, coverage, docs-portal]", "needs: [test, docs-portal]"},
-		"job sonar does not need docs-portal":          {"needs: [test, coverage, docs-portal]", "needs: [test, coverage]"},
-		"ci.yml does not parse":                        {"jobs:\n", "jobs: ["},
-		"job coverage sets continue-on-error":          {"    name: Coverage gate (100 % per package)\n", "    name: Coverage gate (100 % per package)\n    continue-on-error: true\n"},
-		"(Merge and gate) sets continue-on-error":      {"      - name: Merge and gate\n", "      - name: Merge and gate\n        continue-on-error: ${{ true }}\n"},
-		"(Merge and gate) swallows a failure":          {"coverage-unit.out coverage-integration.out coverage-perf.out coverage-parity.out coverage-boot.out", "coverage-unit.out coverage-integration.out coverage-perf.out coverage-parity.out coverage-boot.out || true"},
-		"job parity-shard does not run a shard":        {"./internal/adapters/store -args -parity", "./internal/adapters/store"},
-		"job parity does not judge the shards":         {"go run ./internal/testkit/paritygather ", "true "},
-		"swallows a failure with || true":              {"-coverprofile=coverage-integration.out", "-coverprofile=coverage-integration.out || :"},
+		"job coverage does not run covergate -min 100":     {"covergate -min 100", "covergate -min 95"},
+		"job integration does not measure every":           {"-coverpkg=./... -coverprofile=coverage-integration.out", "-coverprofile=coverage-integration.out"},
+		"does not run internal/perf alone":                 {"-race -p 1 -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-perf.out", "-race -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-perf.out"},
+		"job test does not run its packages one at a time": {"go test -race -p 1 -shuffle=on", "go test -race -shuffle=on"},
+		"does not run its packages one at a time":          {"-race -p 1 -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out", "-race -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out"},
+		"job coverage does not run scripts/boot":           {"scripts/boot-coverage.sh coverage-boot.out", "true"},
+		"job sonar does not need coverage":                 {"needs: [test, coverage, docs-portal]", "needs: [test, docs-portal]"},
+		"job sonar does not need docs-portal":              {"needs: [test, coverage, docs-portal]", "needs: [test, coverage]"},
+		"ci.yml does not parse":                            {"jobs:\n", "jobs: ["},
+		"job coverage sets continue-on-error":              {"    name: Coverage gate (100 % per package)\n", "    name: Coverage gate (100 % per package)\n    continue-on-error: true\n"},
+		"(Merge and gate) sets continue-on-error":          {"      - name: Merge and gate\n", "      - name: Merge and gate\n        continue-on-error: ${{ true }}\n"},
+		"(Merge and gate) swallows a failure":              {"coverage-unit.out coverage-integration.out coverage-perf.out coverage-parity.out coverage-boot.out", "coverage-unit.out coverage-integration.out coverage-perf.out coverage-parity.out coverage-boot.out || true"},
+		"job parity-shard does not run a shard":            {"./internal/adapters/store -args -parity", "./internal/adapters/store"},
+		"job parity does not judge the shards":             {"go run ./internal/testkit/paritygather ", "true "},
+		"swallows a failure with || true":                  {"-coverprofile=coverage-integration.out", "-coverprofile=coverage-integration.out || :"},
 		"job parity-shard sets continue-on-error": {"    name: Store parity against the frozen views (PostGIS, shard ${{ matrix.shard }}/4)\n",
 			"    name: Store parity against the frozen views (PostGIS, shard ${{ matrix.shard }}/4)\n    continue-on-error: true\n"},
 		"job parity sets continue-on-error": {"    name: Store parity against the frozen views (PostGIS)\n", "    name: Store parity against the frozen views (PostGIS)\n    continue-on-error: true\n"},

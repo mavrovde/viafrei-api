@@ -10,6 +10,10 @@ import (
 // the platform's own, and English.
 var Languages = []string{"de", "en"}
 
+// DefaultLanguage is the language of an answer that asks none: the
+// instance's own (Settings.Language) and the envelope's meta.language.
+const DefaultLanguage = "en"
+
 type langKey struct{}
 
 // WithLanguage asks the answers read under ctx in lang, one of Languages,

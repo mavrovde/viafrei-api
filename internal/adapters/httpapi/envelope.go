@@ -21,16 +21,14 @@ type Links struct {
 	Self string `json:"self" format:"uri" doc:"This response's own URL."`
 }
 
-// defaultLanguage is the language of an answer that asks none (lang).
-const defaultLanguage = "en"
-
 // answerLanguage is the language the texts of the answer under ctx are
-// written in: the one its lang parameter asked, else defaultLanguage.
+// written in: the one its lang parameter asked, else the service's own
+// (features.DefaultLanguage, the language wire gives the service).
 func answerLanguage(ctx context.Context) string {
 	if l, ok := features.LanguageOf(ctx); ok {
 		return l
 	}
-	return defaultLanguage
+	return features.DefaultLanguage
 }
 
 func (s *server) envelopeMeta(ctx context.Context) ResponseMeta {

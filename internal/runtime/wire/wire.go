@@ -71,7 +71,7 @@ func readsAtOnce(cfg *config.Config) int {
 
 // Language is the language of every answer's texts until language
 // negotiation arrives.
-const Language = "en"
+const Language = features.DefaultLanguage
 
 // SharedBudget reads the db.shared_budget.* settings (NFR-CAP-002).
 func SharedBudget(cfg *config.Config) store.SharedBudget {

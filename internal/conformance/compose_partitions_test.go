@@ -35,6 +35,8 @@ func TestComposeMakesThePartitionsPgtestMakes(t *testing.T) {
 	for want, plant := range map[string]string{
 		"is not --days " + pgtest.PartitionDays + " alone": strings.Replace(compose, line, strings.TrimSuffix(line, "\n")+" --from 2026-03-27\n", 1),
 		"exactly once": strings.Replace(compose, line, "", 1),
+		// A longer window is the same failure as a fixed first day.
+		"alone, as pgtest's: --days 30": strings.Replace(compose, line, "node /app/dist/cli.js partitions ensure --days 30\n", 1),
 	} {
 		if plant == compose {
 			t.Fatalf("plant for %q changed nothing", want)

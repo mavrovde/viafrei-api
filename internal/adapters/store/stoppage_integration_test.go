@@ -12,20 +12,29 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/adapters/store"
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 )
 
-// walkKey reads every family the fixtures hold.
-func walkKey(t *testing.T) access.Record {
+// walkKey reads every family the fixtures hold, and DB's register.
+func walkKey(t *testing.T, st *store.Store) access.Record {
 	t.Helper()
-	return access.Record{Plan: access.Plan{Name: "t", UseClass: "commercial", Tier: "standard", Sources: append(every(t), "db_stada"),
-		Scopes: []access.Scope{"transit"}}}
+	reg, err := st.Register(bounded(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fams := []string{"db_stada"}
+	for _, r := range reg {
+		fams = append(fams, r.Family)
+	}
+	return access.Record{Plan: access.Plan{Name: "t", UseClass: "commercial", Tier: "standard", Sources: fams, Scopes: []access.Scope{"transit"}}}
 }
 
 // A stop's page is found as the platform's station page lists its stops:
-// a bus stop one metre from a register station is listed under it, the
-// same stop with the station gone is listed by none, and a stop the
-// station's own DHIDs hold is never listed around it.
+// a bus stop no station is near is listed by none, one metre from a
+// register station it is listed under it, and a stop the station's own
+// DHIDs hold is never listed around it. One copy of the fixture holds the
+// three cases in turn, its stations changed between them.
 func TestStopStationIsTheStationThatListsIt(t *testing.T) {
 	stop, _ := boardingCall(t, "and (d.route_type = 3 or d.route_type between 700 and 716)")
 	_, id, _ := strings.Cut(stop, ":")
@@ -36,66 +45,97 @@ func TestStopStationIsTheStationThatListsIt(t *testing.T) {
 			select '` + no + `', 'Walk ` + no + `', '{}', ` + ifopt + `, st_project(` + at + `, 1, 0), '` + src + `', 'h', now(), now(), now()`,
 			`insert into public.station_slugs (slug, station_no, name, assigned_at) values ('` + slug + `', '` + no + `', 'x', now())`}
 	}
-	refresh := `refresh materialized view public.transit_stop_modes` //nolint:misspell // the SQL keyword
-	st, pdb := private(t, append([]string{refresh}, station("99020", "walk-nord", "db_stada", "null")...)...)
+	st, pdb := private(t, `refresh materialized view public.transit_stop_modes`) //nolint:misspell // the SQL keyword
+	conn, err := pdb.Owner(bounded(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = conn.Close(context.Background()) })
+	exec := func(sqls ...string) {
+		t.Helper()
+		for _, q := range sqls {
+			if _, err := conn.Exec(bounded(t), q); err != nil {
+				t.Fatalf("%s: %v", q, err)
+			}
+		}
+	}
 	var root string
-	owner(t, `select coalesce(x.parent_id, x.id) from public.stops x where x.id = '`+id+`' and x.deleted_at is null limit 1`, &root)
+	var pt geo.Point
+	if err := conn.QueryRow(bounded(t), `select coalesce(x.parent_id, x.id), st_y(x.geom::geometry), st_x(x.geom::geometry) from public.stops x
+		where x.id = '`+id+`' and x.deleted_at is null limit 1`).Scan(&root, &pt.Lat, &pt.Lon); err != nil {
+		t.Fatal(err)
+	}
+	if l, err := st.StopStation(bounded(t), stop); err != nil || l != nil {
+		t.Errorf("no station near: %+v %v", l, err)
+	}
+	w := walkTo(t, st, stop, pt)
+	w.page(t, nil)
+	exec(station("99020", "walk-nord", "db_stada", "null")...)
 	l, err := st.StopStation(bounded(t), stop)
 	if err != nil || l == nil || *l != (transit.StopLink{Slug: "walk-nord", Key: transit.StopKey(root)}) {
 		t.Fatalf("%s listed under %+v: %v", stop, l, err)
 	}
+	if l, err := st.StopStation(bounded(t), "1:no-such-stop"); err != nil || l != nil {
+		t.Errorf("no stop: %+v %v", l, err)
+	}
+	w.page(t, &transit.StopLink{Slug: "walk-nord", Key: transit.StopKey(root)})
 	// The timetable station whose own DHID is the stop's level leaves it out.
 	level := transit.StationDHID(id)
 	if level == "" {
 		t.Fatalf("the fixture's stop %s is no DHID", id)
 	}
-	own, _ := private(t, append([]string{refresh}, station(level, "walk-own", "delfi_static", "'"+level+"'")...)...)
-	if l, err := own.StopStation(bounded(t), stop); err != nil || l != nil {
+	exec(append([]string{`update public.db_stations set closed_at = now() where station_no = '99020'`},
+		station(level, "walk-own", "delfi_static", "'"+level+"'")...)...)
+	if l, err := st.StopStation(bounded(t), stop); err != nil || l != nil {
 		t.Errorf("an own stop is listed under %+v: %v", l, err)
 	}
-	bare, _ := private(t, refresh)
-	if l, err := bare.StopStation(bounded(t), stop); err != nil || l != nil {
-		t.Errorf("no station near: %+v %v", l, err)
-	}
-	if l, err := st.StopStation(bounded(t), "1:no-such-stop"); err != nil || l != nil {
-		t.Errorf("no stop: %+v %v", l, err)
-	}
-	fst, f := faultyOn(t, pdb.ReaderURL)
+}
+
+// A failure of the read of the stations around a stop is the read's error,
+// whichever statement it struck.
+func TestStopStationFailsWithItsStatement(t *testing.T) {
+	stop, _ := boardingCall(t, "and (d.route_type = 3 or d.route_type between 700 and 716)")
+	fst, f := faultyOn(t, db.ReaderURL)
 	failEach(t, fst, f, "StopStation", func(ctx context.Context, s *store.Store) error {
 		_, err := s.StopStation(ctx, stop)
 		return err
 	})
-	walk(t, st, stop, &transit.StopLink{Slug: "walk-nord", Key: transit.StopKey(root)})
-	walk(t, bare, stop, nil)
 }
 
-// walk lists the stations near the stop and asks the page of the one that
-// is the stop: a stop the register does not hold is paged from its own
-// data, under the station that lists it (want) or none; a register station
-// is its register's page.
-func walk(t *testing.T, st *store.Store, stop string, want *transit.StopLink) {
+// walker asks a stop's pages: walkTo lists the stations near the stop and
+// finds it among them, page asks the page of the stop. A stop the register
+// does not hold is paged from its own data, under the station that lists it
+// (want) or none; with want, the register station's page is its register's.
+type walker struct {
+	svc        *features.Service
+	k          access.Record
+	stop, name string
+}
+
+func walkTo(t *testing.T, st *store.Store, stop string, pt geo.Point) walker {
 	t.Helper()
-	svc := features.New(features.Repositories{Register: st, Transit: st}, features.Settings{Language: "de"}, time.Now)
-	k := walkKey(t)
-	ctx := bounded(t)
-	b, err := svc.Departures(ctx, k, transit.DepartureQuery{StationID: stop, From: time.Now(), Window: time.Minute, Limit: 1})
-	if err != nil {
-		t.Fatal(err)
-	}
-	pt := b.Station.Location
-	list, err := svc.Stations(ctx, k, transit.Query{At: &pt, RadiusM: 50, Limit: 50})
-	if err != nil || !slices.ContainsFunc(list.Items, func(s transit.Station) bool { return s.ID == stop }) {
+	w := walker{svc: features.New(features.Repositories{Register: st, Transit: st}, features.Settings{Language: "de"}, time.Now), k: walkKey(t, st), stop: stop}
+	list, err := w.svc.Stations(bounded(t), w.k, transit.Query{At: &pt, RadiusM: 50, Limit: 50})
+	i := slices.IndexFunc(list.Items, func(s transit.Station) bool { return s.ID == stop })
+	if err != nil || i < 0 {
 		t.Fatalf("listStations near %v does not list %s: %v", pt, stop, err)
 	}
-	p, err := svc.StationPage(ctx, k, features.StationPageQuery{StationID: stop, Departures: 10})
-	if err != nil || !p.Stop || p.Record.Name != b.Station.Name || p.Record.At == nil || *p.Record.StopPlaceID != stop ||
+	w.name = list.Items[i].Name
+	return w
+}
+
+func (w walker) page(t *testing.T, want *transit.StopLink) {
+	t.Helper()
+	ctx := bounded(t)
+	p, err := w.svc.StationPage(ctx, w.k, features.StationPageQuery{StationID: w.stop, Departures: 10})
+	if err != nil || !p.Stop || p.Record.Name != w.name || p.Record.At == nil || *p.Record.StopPlaceID != w.stop ||
 		(want == nil) != (p.Link == nil) || (want != nil && *p.Link != *want) {
 		t.Fatalf("stop page %+v: %v", p, err)
 	}
 	if want == nil {
 		return
 	}
-	p, err = svc.StationPage(ctx, k, features.StationPageQuery{StationID: "99020", Departures: 10})
+	p, err = w.svc.StationPage(ctx, w.k, features.StationPageQuery{StationID: "99020", Departures: 10})
 	if err != nil || p.Stop || p.Record.StationNo != "99020" || *p.Record.Slug != want.Slug {
 		t.Fatalf("register page %+v: %v", p, err)
 	}

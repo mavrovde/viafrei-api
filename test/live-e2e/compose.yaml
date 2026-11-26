@@ -1,5 +1,6 @@
 # The pre-release refresh run (make live-e2e, scripts/live-e2e.sh): an overlay
-# on compose.yaml that adds the live refresher at the release live pin names,
+# on compose.yaml that adds the live refresher image LIVE_IMAGE names (one that
+# reads database.pin's viafrei-database release),
 # running as the database role viafrei_live_ingestor, and a provider stub in
 # place of every provider its sources call. The live refresher and the stub
 # sit on the stack's internal network alone, so no request leaves the stack.

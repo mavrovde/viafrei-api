@@ -1,4 +1,4 @@
-# source mcp 2.7.2 24952ee8c8a0adf320d43fa31c2cbaf46058c0df
+# source mcp 2.7.3 f26615ac37a2c2d05d0cd1ca4df121460c67f3b6
 # kind	entry	detail
 tool	check_autobahn_traffic	schema sha256:42222beb70f3f90402e6103a85c29219d53d533a102d7f5b54ef3d74cea77008
 argument	check_autobahn_traffic.roads	string[] optional
@@ -140,7 +140,7 @@ argument	get_train_departures.when	string optional
 argument	get_train_departures.duration_min	integer optional
 argument	get_train_departures.limit	integer optional
 argument	get_train_departures.categories	string[] optional
-tool	get_departures	schema sha256:f7dd75caeb3f2b08b79ef4be473174ed688ef28f01631a1572582e7e0a51bfad
+tool	get_departures	schema sha256:bdf991b693c8cd6a747697de86283dd5b7aa6605f709709f3bc0bc765cd778ad
 argument	get_departures.stop	string optional
 argument	get_departures.stop_id	string optional
 argument	get_departures.place	string optional

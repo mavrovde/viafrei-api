@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The pre-release refresh run (make live-e2e): the API built here, the
-# viafrei-database release database.pin names and the live refresher
-# release the live pin names (internal/release/livepin), together, with a
+# viafrei-database release database.pin names and a live refresher image
+# that reads that release (LIVE_IMAGE), together, with a
 # provider stub (test/live-e2e/stub.mjs) in place of every provider. It
 # proves, from the API's POST /v1/refreshes to the settled answer read back
 # with GET /v1/refreshes/{id}:
@@ -18,13 +18,15 @@
 # The live refresher's image is private: this runs on a maintainer's machine
 # before a release (docs/RELEASING.md), never in public CI.
 #
-#   LIVE_SOURCES  required: the source configs of the pinned live refresher
-#                 release, the sources/ directory of its checkout at that
+#   LIVE_SOURCES  required: the source configs of that live refresher
+#                 release, the sources/ directory of its checkout at its
 #                 tag. They are copied, and each copy's provider host is
 #                 rewritten to the stub; the run refuses a copy that still
 #                 names another host.
-#   LIVE_IMAGE    optional: the image to run instead of the pinned one, for
-#                 a run before the release exists (a local build).
+#   LIVE_IMAGE    required: the live refresher image to run, a release (or a
+#                 local build) that reads database.pin's viafrei-database
+#                 release. The API pins none: the two meet only in the
+#                 database.
 #   API_URL       optional: the API's loopback address (default
 #                 http://localhost:8080).
 set -euo pipefail
@@ -34,13 +36,10 @@ cd "$(dirname "$0")/.."
 API_URL="${API_URL:-http://localhost:8080}"
 SETTLE_S="${LIVE_E2E_SETTLE_S:-240}" # a second fuel refresh waits out the source's one request a minute
 [[ $API_URL =~ ^http://(localhost|127\.0\.0\.1|\[::1\]):[0-9]+$ ]] || { echo "FAIL: API_URL must be this machine's loopback, not $API_URL" >&2; exit 2; }
-[[ -n ${LIVE_SOURCES:-} && -d $LIVE_SOURCES ]] || { echo "FAIL: LIVE_SOURCES must name the source configs of the pinned live refresher release" >&2; exit 2; }
+[[ -n ${LIVE_SOURCES:-} && -d $LIVE_SOURCES ]] || { echo "FAIL: LIVE_SOURCES must name the source configs of the live refresher release LIVE_IMAGE runs" >&2; exit 2; }
 [[ $SETTLE_S =~ ^[1-9][0-9]*$ ]] || { echo "FAIL: LIVE_E2E_SETTLE_S must be a positive count of seconds" >&2; exit 2; }
 
-if [[ -z ${LIVE_IMAGE:-} ]]; then
-  # The pinned release, refused while it is unreleased or a placeholder.
-  LIVE_IMAGE=$(go run ./internal/release/pinguard -live) || exit 2
-fi
+[[ -n ${LIVE_IMAGE:-} ]] || { echo "FAIL: LIVE_IMAGE must name a live refresher image that reads the viafrei-database release database.pin names" >&2; exit 2; }
 export LIVE_IMAGE
 
 work=$(mktemp -d)

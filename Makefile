@@ -109,7 +109,7 @@ reset: ## Stop the stack and delete this project's database volume (fixtures rel
 compose-test: ## Smoke-test the stack: healthz, readyz, meta and a short Schemathesis pass, then tear down
 	scripts/compose-smoke.sh
 
-live-e2e: ## Before a release: fuel (ags:, anchor:) and train board refreshes settled by the pinned live refresher against a provider stub (LIVE_SOURCES=its sources/; private image, never CI)
+live-e2e: ## Before a release: fuel (ags:, anchor:) and train board refreshes settled by a live refresher of database.pin's release against a provider stub (LIVE_IMAGE=its image, LIVE_SOURCES=its sources/; private image, never CI)
 	scripts/live-e2e.sh
 
 clean:

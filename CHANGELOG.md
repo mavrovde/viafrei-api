@@ -9,6 +9,13 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [2.0.3](https://github.com/mavrovde/viafrei-api/compare/v2.0.2...v2.0.3) (2026-11-26)
+
+
+### Fixed
+
+* road situation ids, register stations in the place search, release pipeline in four jobs ([#286](https://github.com/mavrovde/viafrei-api/issues/286)) ([262ab83](https://github.com/mavrovde/viafrei-api/commit/262ab835027f0dd2af2b3e8e2ce356712f3d9a60))
+
 ## [2.0.2](https://github.com/mavrovde/viafrei-api/compare/v2.0.1...v2.0.2) (2026-11-26)
 
 

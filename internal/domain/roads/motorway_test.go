@@ -245,7 +245,10 @@ func TestMotorwayJamExtent(t *testing.T) {
 		"empty list": {[]*string{}, false, false},
 	} {
 		r := roads.MotorwayEventRow{Kind: "warning", TrafficType: ptr("x"), SiteExtents: c.ext}
-		j := roads.MotorwayAnswerOf(roads.MotorwayRead{Events: []roads.MotorwayEventRow{r}}, 0, now).Entries[0].Jam
+		var j *roads.JamDetail
+		returnsWithin(t, name, func() {
+			j = roads.MotorwayAnswerOf(roads.MotorwayRead{Events: []roads.MotorwayEventRow{r}}, 0, now).Entries[0].Jam
+		})
 		if (j.LengthM != nil) != c.length || (j.Tail != nil) != c.chain || (j.Head != nil) != c.chain || j.End != nil {
 			t.Errorf("%s: %+v", name, j)
 		}

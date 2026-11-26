@@ -15,18 +15,23 @@
 #            roots are mutated at the base too, so deleting an assertion is
 #            red whatever the score.
 #   full     every in-scope mutant (per minor release). Fails below 70 %,
-#            and on a stale equivalent entry.
+#            and on a stale equivalent entry. It runs the units of the full
+#            run one after another (mutgate -plan -shard 1/1).
 #   shard K/N OUTDIR
-#            the Gremlins runs of shard K of N of the scope roots (the roots
-#            at the positions p of the scope file with p mod N = K-1, mutgate
-#            -plan -shard), one JSON report per root into OUTDIR, and no
-#            score: mutation.yml runs the four shards of a full run as
-#            parallel jobs. Exit 2 on a bad K/N or a shard with no root.
+#            the Gremlins runs of shard K of N of the full run's units, one
+#            JSON report per unit (NAME.json) into OUTDIR, and no score:
+#            mutation.yml runs the shards of a full run as parallel jobs. A
+#            unit is a package under a scope root, or, for a costly package,
+#            a group of its files or of one file's mutators; the units are
+#            dealt to the shards by their estimated cost (mutgate -plan
+#            -shard, internal/testkit/mutgate/units.go, with the seconds per
+#            mutant of test/mutation/cost.tsv). Exit 2 on a bad K/N or a
+#            shard with no unit, 1 when a unit's run wrote no report.
 #   gather OUTDIR [REPORT]
 #            the full-mode gate over the reports the shards wrote into OUTDIR
 #            (it may hold subdirectories, one per shard): the same score and
-#            the same findings as full, and exit 2 when a scope root has no
-#            report or has two.
+#            the same findings as full, and exit 2 when a unit has no report
+#            or has two.
 #
 # A change that touches no in-scope code mutates nothing and passes, and
 # says so. The report (default mutation-report.md) carries the counts and
@@ -44,6 +49,7 @@ cd "$(dirname "$0")/.."
 mode=${1:-}
 scope=test/mutation/scope.tsv
 equivalent=test/mutation/equivalent.tsv
+cost=test/mutation/cost.tsv
 work=$(mktemp -d)
 cleanup() {
   if [[ -d $work/base ]]; then git worktree remove --force "$work/base" >/dev/null 2>&1 || true; fi
@@ -72,12 +78,32 @@ excludes() {
     printf '%s\n' -E "^${base//./\\.}\$"
   done
 }
+# -count=1: the timeout is 30 times Gremlins' coverage run, and a coverage
+# run answered from the test cache (a package run twice, as the units of one
+# package are, or tests run just before) takes milliseconds and times every
+# mutant out.
+unleash() {
+  GOFLAGS="${GOFLAGS:+$GOFLAGS }-count=1" "${gremlins[@]}" unleash --silent --invert-logical --invert-loopctrl --timeout-coefficient 30 "$@"
+}
 mutate() {
   local ex=() a
   while IFS= read -r a; do ex+=("$a"); done < <(excludes "${2#./}")
-  "${gremlins[@]}" unleash --silent --invert-logical --invert-loopctrl --timeout-coefficient 30 ${ex[@]+"${ex[@]}"} --output "$1" "$2"
+  unleash ${ex[@]+"${ex[@]}"} --output "$1" "$2"
 }
-gate() { go run ./internal/testkit/mutgate -scope "$scope" -equivalent "$equivalent" "$@"; }
+gate() { go run ./internal/testkit/mutgate -scope "$scope" -equivalent "$equivalent" -cost "$cost" "$@"; }
+# mutate_unit OUTDIR LINE: the Gremlins run of a plan line of mutgate (the
+# unit's name, its directory and its Gremlins arguments: the -E excludes and
+# the mutators switched off, tab-separated) into OUTDIR/NAME.json.
+mutate_unit() {
+  local u
+  IFS=$'\t' read -r -a u <<<"$2"
+  echo "mutation: ${u[0]} (${u[1]})"
+  unleash "${u[@]:2}" --output "$1/${u[0]}.json" "./${u[1]}"
+  if [[ ! -f $1/${u[0]}.json ]]; then
+    echo "mutation: the run of the unit ${u[0]} wrote no report" >&2
+    return 1
+  fi
+}
 
 case "$mode" in
   pr)
@@ -137,10 +163,18 @@ case "$mode" in
     ;;
   full)
     report=${2:-mutation-report.md}
-    min=70
-    roots=()
-    while IFS=$'\t' read -r r _; do roots+=("$r"); done < <(grep -v '^#' "$scope" | grep -v '^[[:space:]]*$')
-    flags=(-mode full -min "$min")
+    if ! planned=$(gate -mode full -min 70 -plan -shard 1/1); then
+      exit 2
+    fi
+    args=()
+    while IFS=$'\t' read -r name _; do
+      args+=("$name=$work/$name.json")
+    done <<<"$planned"
+    while IFS= read -r line; do
+      mutate_unit "$work" "$line"
+    done <<<"$planned"
+    gate -mode full -min 70 -report "$report" "${args[@]}"
+    exit $?
     ;;
   shard)
     spec=${2:-}
@@ -153,14 +187,11 @@ case "$mode" in
     if ! planned=$(gate -mode full -min 70 -plan -shard "$spec"); then
       exit 2
     fi
-    roots=()
-    while IFS= read -r r; do roots+=("$r"); done <<<"$planned"
     mkdir -p "$out"
-    echo "mutation: shard $spec: ${#roots[@]} scope root(s): ${roots[*]}"
-    for r in "${roots[@]}"; do
-      echo "mutation: $r"
-      mutate "$out/$(tr / _ <<<"$r").json" "./$r"
-    done
+    echo "mutation: shard $spec: $(wc -l <<<"$planned" | tr -d ' ') unit(s)"
+    while IFS= read -r line; do
+      mutate_unit "$out" "$line"
+    done <<<"$planned"
     exit 0
     ;;
   gather)
@@ -171,21 +202,20 @@ case "$mode" in
       echo "usage: mutation.sh pr BASE [REPORT] | full [REPORT] | shard K/N OUTDIR | gather OUTDIR [REPORT]" >&2
       exit 2
     fi
-    roots=()
-    while IFS=$'\t' read -r r _; do roots+=("$r"); done < <(grep -v '^#' "$scope" | grep -v '^[[:space:]]*$')
-    flags=(-mode full -min "$min")
+    if ! planned=$(gate -mode full -min "$min" -plan -shard 1/1); then
+      exit 2
+    fi
     args=()
-    for r in "${roots[@]}"; do
-      name="$(tr / _ <<<"$r").json"
+    while IFS=$'\t' read -r name _; do
       found=()
-      while IFS= read -r f; do found+=("$f"); done < <(find "$dir" -type f -name "$name")
+      while IFS= read -r f; do found+=("$f"); done < <(find "$dir" -type f -name "$name.json")
       if [[ ${#found[@]} -ne 1 ]]; then
-        echo "mutation: gather: ${#found[@]} report(s) for the scope root $r in $dir, not one: a shard did not finish, or two ran it" >&2
+        echo "mutation: gather: ${#found[@]} report(s) for the unit $name in $dir, not one: a shard did not finish, or two ran it" >&2
         exit 2
       fi
-      args+=("$r=${found[0]}")
-    done
-    gate "${flags[@]}" -report "$report" "${args[@]}"
+      args+=("$name=${found[0]}")
+    done <<<"$planned"
+    gate -mode full -min "$min" -report "$report" "${args[@]}"
     exit $?
     ;;
   *)

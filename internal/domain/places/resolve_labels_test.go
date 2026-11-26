@@ -39,7 +39,9 @@ func TestDistinctLabelsAsThePlatformGivesThem(t *testing.T) {
 		for i, r := range c.Rows {
 			rows[i] = distinguishable{name: r.Name, context: r.Context, always: r.Always, tiers: r.Tiers, asked: r.Asked, unkeyed: r.Unkeyed, ownTier: r.OwnTier}
 		}
-		if got := distinctLabels(rows, c.Answerable, c.Identifying); !slices.Equal(got, c.Labels) {
+		var got []string
+		returnsWithin(t, "distinctLabels", func() { got = distinctLabels(rows, c.Answerable, c.Identifying) })
+		if !slices.Equal(got, c.Labels) {
 			t.Errorf("case %d: got %q, want %q", k, got, c.Labels)
 		}
 	}

@@ -77,20 +77,40 @@ each survivor of the first run was either killed by a new test or removed
 by restructuring (a `switch`'s case expressions are reported as not covered,
 so the rules use `if` chains).
 
-The full run is cut into four parallel jobs. Mutation shard k (k = 1 to 4)
-mutates the scope roots at the positions p of `test/mutation/scope.tsv` with
-p mod 4 = k − 1 (`mutgate -plan -shard k/4`). The Mutation testing job then
-gathers the shards' reports into one full-mode gate, so the score and the
-findings are those of one full run. A bad `K/N` or a shard that selects no
-root is exit 2. The gather is exit 2 when a scope root has no report or has
-two, and the gate is red unless every shard ended green.
-`internal/testkit/mutgate/shard_test.go` proves the four shards of the real
-scope disjoint, together every root and none empty. A conformance test holds
-`mutation.yml` to the matrix and the fan-in.
+The full run is cut into twenty parallel jobs of about the same cost.
+`mutgate` cuts the scope into units, one Gremlins run each: a package under a
+scope root, or, for a package too costly for one run, a group of its files,
+and for a file too costly alone, a group of its mutators. A unit's run
+excludes the other files of its package and every subdirectory (`-E`) and
+switches the other mutators off, so the units are disjoint and together
+every in-scope mutant: each is mutated once. The cost of a unit is an
+estimate in runner seconds, its mutants (counted from the source the way
+Gremlins finds them) times the seconds per mutant of their mutator in their
+file, their file or their package (`test/mutation/cost.tsv`, the most
+specific row), plus the start of the run. The rows are the unit times of a
+real release run: a mutant that lives runs all its package's tests, one that
+never ends costs Gremlins' timeout, so the cost differs by file and mutator
+far more than by package. Mutation
+shard k (k = 1 to 20) mutates the units `mutgate -plan -shard k/20` deals
+it: the costliest first, each to the shard with the least so far. The
+Mutation testing job then gathers the shards' reports into one full-mode
+gate, so the score and the findings are those of one full run. A bad `K/N`
+or a shard that selects no unit is exit 2. The gather is exit 2 when a unit
+has no report or has two, and the gate is exit 2 on a report that holds a
+mutant of another unit; it is red unless every shard ended green.
+`internal/testkit/mutgate/shard_test.go` proves the units of the real scope
+disjoint and complete, the twenty shards none empty and each within the
+budget of 9 minutes of work. One mutator of one file is a unit nothing cuts
+further, so one above the budget is red with "its tests must get cheaper":
+a mutant that never ends costs Gremlins' timeout (30 times the coverage
+run), and the tests of a loop give it its own deadline instead
+(`internal/domain/places/loop_bounds_test.go`, #255). A conformance test
+holds `mutation.yml` to the
+matrix and the fan-in.
 
 Run it locally with `scripts/mutation.sh pr origin/main` or
 `scripts/mutation.sh full`; or run the shards side by side with
-`scripts/mutation.sh shard K/4 DIR/shard-K` and gather them with
+`scripts/mutation.sh shard K/20 DIR/shard-K` and gather them with
 `scripts/mutation.sh gather DIR`. The script runs Gremlins as
 `go run github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0`, as CI runs its
 other tools: the version is verified against the checksum database and never

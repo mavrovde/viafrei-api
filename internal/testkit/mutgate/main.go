@@ -143,7 +143,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	changedPath := fs.String("changed", "", "changed lines (pr mode, required there)")
 	reportPath := fs.String("report", "", "write a Markdown report here")
 	tree := fs.String("tree", ".", "full mode: the module root whose sources the units are cut from")
-	costPath := fs.String("cost", "", "full mode: seconds per mutant per package directory (optional)")
+	costPath := fs.String("cost", "", "full mode: seconds per mutant of a package directory, a file or a file's mutator (optional)")
 	plan := fs.Bool("plan", false, "pr mode: print the scope roots the change list touches, one per line, and exit; full mode: with -shard, the units of that shard")
 	shardArg, hasShard := "", false
 	fs.Func("shard", "full mode with -plan: shard K/N of the units", func(v string) error {
@@ -425,7 +425,7 @@ func onChangedLine(changed map[string][]span, m mutant) bool {
 // lines returns the non-comment, non-blank lines of a tab-separated file,
 // each split into exactly n fields.
 func lines(name string, n int) ([][]string, error) {
-	f, err := os.Open(name) // #nosec G304 -- a path the caller names
+	f, err := os.Open(name) // #nosec G304 G703 -- a path the caller names
 	if err != nil {
 		return nil, err
 	}

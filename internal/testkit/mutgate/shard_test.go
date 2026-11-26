@@ -18,10 +18,35 @@ import (
 const releaseShards = 20
 
 // shardBudget is the most estimated work a release shard may carry, in
-// seconds of a ubuntu-24.04 runner: with about a minute of checkout, Go
-// setup and the Gremlins build, a shard job stays near 10 minutes, well
-// inside its timeout-minutes: 15.
+// seconds of a ubuntu-24.04 runner: with the 8 to 23 s of checkout, Go setup
+// and upload that run 45751491495 measured around the units, a shard job
+// stays under 10 minutes, well inside its timeout-minutes: 15.
 const shardBudget = 540.0
+
+// pairBudget is the most one mutator of one file, the unit nothing cuts
+// further, may cost alone in a shard: 700 s and the job's start stay about
+// three minutes inside timeout-minutes: 15. Above it no shard count helps;
+// the unit's tests must get cheaper.
+const pairBudget = 700.0
+
+// budgetFindings are the shards over their budget. A unit whose mutants are
+// all of one mutator of one file (len(want) == 1) cannot be cut.
+func budgetFindings(shards [][]unit) []string {
+	var out []string
+	for k, s := range shards {
+		load := 0.0
+		for _, u := range s {
+			load += u.cost
+		}
+		switch pair := len(s) == 1 && len(s[0].want) == 1; {
+		case pair && load > pairBudget:
+			out = append(out, fmt.Sprintf("shard %d/%d is the one unit %s, one mutator of one file, estimated at %.0f s, above the budget of %.0f s: no shard count helps, its tests must get cheaper", k+1, len(shards), s[0].name, load, pairBudget))
+		case !pair && load > shardBudget:
+			out = append(out, fmt.Sprintf("shard %d/%d is estimated at %.0f s, above the budget of %.0f s: raise the shard count of mutation.yml and releaseShards", k+1, len(shards), load, shardBudget))
+		}
+	}
+	return out
+}
 
 func TestParseShardTakesKOfNAndNothingElse(t *testing.T) {
 	for raw, want := range map[string]shard{"1/4": {1, 4}, "4/4": {4, 4}, "1/1": {1, 1}, "12/12": {12, 12}} {
@@ -230,7 +255,7 @@ func big(pkg string, n int) string {
 
 func TestUnitsCutACostlyPackageByFilesThenMutators(t *testing.T) {
 	req.Covers(t, "TST-002")
-	// At 10 s a mutant a unit holds at most 21 mutants (unitCap): p's
+	// At 10 s a mutant a unit holds at most 22 mutants (unitCap): p's
 	// huge.go (24) is cut by mutator, large.go (18) is whole, the small
 	// ones share a unit, empty.go has no mutant, other.go is out of scope;
 	// p/sub and q are one unit each; e's only whole file has no mutant.
@@ -260,14 +285,14 @@ func TestUnitsCutACostlyPackageByFilesThenMutators(t *testing.T) {
 		lines = append(lines, fmt.Sprintf("%s %s %v %v %d %.0f", u.name, u.dir, u.files, u.mutators, u.sites, u.cost))
 	}
 	want := []string{
-		"p.1 p [empty.go large.go] [] 18 210",
-		"p.2 p [s1.go s2.go] [] 12 150",
-		"p.3 p [huge.go] [ARITHMETIC_BASE CONDITIONALS_BOUNDARY CONDITIONALS_NEGATION INCREMENT_DECREMENT] 20 230",
-		"p.4 p [huge.go] [INVERT_LOGICAL INVERT_LOOPCTRL INVERT_NEGATIVES] 4 70",
-		"p_sub p/sub [sub.go] [] 6 34",
-		"q q [q.go] [] 6 34",
-		"e.1 e [huge.go] [ARITHMETIC_BASE CONDITIONALS_BOUNDARY CONDITIONALS_NEGATION INCREMENT_DECREMENT] 20 230",
-		"e.2 e [huge.go] [INVERT_LOGICAL INVERT_LOOPCTRL INVERT_NEGATIVES] 4 70",
+		"p.1 p [empty.go large.go] [] 18 200",
+		"p.2 p [s1.go s2.go] [] 12 140",
+		"p.3 p [huge.go] [ARITHMETIC_BASE CONDITIONALS_BOUNDARY CONDITIONALS_NEGATION INCREMENT_DECREMENT] 20 220",
+		"p.4 p [huge.go] [INVERT_LOGICAL INVERT_LOOPCTRL INVERT_NEGATIVES] 4 60",
+		"p_sub p/sub [sub.go] [] 6 24",
+		"q q [q.go] [] 6 24",
+		"e.1 e [huge.go] [ARITHMETIC_BASE CONDITIONALS_BOUNDARY CONDITIONALS_NEGATION INCREMENT_DECREMENT] 20 220",
+		"e.2 e [huge.go] [INVERT_LOGICAL INVERT_LOOPCTRL INVERT_NEGATIVES] 4 60",
 	}
 	if !slices.Equal(lines, want) {
 		t.Errorf("units:\n%s\nwant:\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
@@ -304,6 +329,34 @@ func TestUnitsCutACostlyPackageByFilesThenMutators(t *testing.T) {
 	}
 }
 
+func TestACostRowOfAFileOrAMutantBeatsItsDirectory(t *testing.T) {
+	req.Covers(t, "TST-002")
+	cost := map[string]float64{"d": 2, "d/f.go": 3, "d/f.go:INVERT_LOGICAL": 5}
+	for _, c := range []struct {
+		f, m string
+		want float64
+	}{
+		{"f.go", "INVERT_LOGICAL", 5}, {"f.go", "ARITHMETIC_BASE", 3}, {"g.go", "INVERT_LOGICAL", 2},
+	} {
+		if got := rate(cost, "d", c.f, c.m); got != c.want {
+			t.Errorf("rate of d/%s %s: %v, want %v", c.f, c.m, got, c.want)
+		}
+	}
+	if got := rate(cost, "e", "f.go", "INVERT_LOGICAL"); got != defaultCost {
+		t.Errorf("a directory without a row: %v", got)
+	}
+	// In a plan: big("p", 1) is 2 CONDITIONALS_BOUNDARY, 3 CONDITIONALS_NEGATION
+	// and 1 INVERT_LOGICAL mutants (6).
+	dir := files(t, map[string]string{"p/a.go": big("p", 1), "p/b.go": big("p", 1)})
+	units, err := planUnits(dir, []root{{dir: "p"}}, map[string]float64{"p": 1, "p/a.go": 2, "p/a.go:INVERT_LOGICAL": 10})
+	if err != nil || len(units) != 1 {
+		t.Fatalf("%v %v", names(units), err)
+	}
+	if want := unitOverhead + 5*2 + 1*10 + 6*1; units[0].cost != want {
+		t.Errorf("the unit costs %v, want %v", units[0].cost, want)
+	}
+}
+
 func TestUnitsRefuseWhatCannotBePlanned(t *testing.T) {
 	dir := files(t, map[string]string{
 		"a/b/x.go":  big("b", 1),
@@ -323,17 +376,22 @@ func TestUnitsRefuseWhatCannotBePlanned(t *testing.T) {
 		"a root in another":    {[]root{{dir: "a"}, {dir: "a/b"}}, nil, "scope root a/b has no in-scope mutant"},
 		"two unit names":       {[]root{{dir: "a"}, {dir: "a_b"}}, nil, "two units are named a_b"},
 		"a stale cost":         {[]root{{dir: "a"}}, map[string]float64{"gone": 1}, "the cost of gone names no package"},
+		"a stale file cost":    {[]root{{dir: "a"}}, map[string]float64{"a/b/gone.go": 1}, "the cost of a/b/gone.go names no package"},
+		"a mutant never made":  {[]root{{dir: "a"}}, map[string]float64{"a/b/x.go:INVERT_LOOPCTRL": 1}, "the cost of a/b/x.go:INVERT_LOOPCTRL names no package"},
 	} {
 		if us, err := planUnits(dir, c.roots, c.cost); err == nil || !strings.Contains(err.Error(), c.want) || us != nil {
 			t.Errorf("%s: %v %v", name, names(us), err)
 		}
 	}
 	for body, want := range map[string]string{
-		"a/b\t-1\tmeasured\n": "seconds above 0",
-		"a/b\tx\tmeasured\n":  "seconds above 0",
-		"a/b\t1\t \n":         "how they were measured",
-		"a/../b\t1\tm\n":      "a clean directory",
-		"a/b\t1\n":            "want 3 tab-separated fields",
+		"a/b\t-1\tmeasured\n":        "seconds above 0",
+		"a/b\tx\tmeasured\n":         "seconds above 0",
+		"a/b\t1\t \n":                "how they were measured",
+		"a/../b\t1\tm\n":             "a clean directory",
+		"a/b\t1\n":                   "want 3 tab-separated fields",
+		"a/b.go:NOPE\t1\tm\n":        "an enabled mutator",
+		"a/b:INVERT_LOGICAL\t1\tm\n": "file:MUTATOR",
+		"a/../b.go\t1\tm\n":          "a clean directory",
 	} {
 		p := filepath.Join(dir, "cost.tsv")
 		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
@@ -370,14 +428,23 @@ func TestTheReleaseShardsOfTheRealScope(t *testing.T) {
 	if f := spreadFindings(units, shards); len(f) > 0 {
 		t.Errorf("the release shards: %v", f)
 	}
-	for k, s := range shards {
-		load := 0.0
-		for _, u := range s {
-			load += u.cost
+	for _, f := range budgetFindings(shards) {
+		t.Error(f)
+	}
+	// The check catches a shard over its budget.
+	pair := unit{name: "p.1", files: []string{"a.go"}, mutators: []string{"ARITHMETIC_BASE", "CONDITIONALS_NEGATION"}, want: map[string]int{"a.go CONDITIONALS_NEGATION": 2}}
+	for planted, bad := range map[string][][]unit{
+		"a shard of two units over the budget":    {{{name: "a", cost: 300}, {name: "b", cost: shardBudget - 299}}},
+		"a whole package alone over the budget":   {{{name: "a", files: []string{"a.go"}, want: map[string]int{"a.go INVERT_LOGICAL": 1, "a.go CONDITIONALS_NEGATION": 1}, cost: shardBudget + 1}}},
+		"two mutators of a file over the budget":  {{{name: "a", files: []string{"a.go"}, mutators: []string{"A", "B"}, want: map[string]int{"a.go A": 1, "a.go B": 1}, cost: shardBudget + 1}}},
+		"one mutator of one file over its budget": {{func() unit { u := pair; u.cost = pairBudget + 1; return u }()}},
+	} {
+		if len(budgetFindings(bad)) != 1 {
+			t.Errorf("%s: planted and not reported", planted)
 		}
-		if load > shardBudget {
-			t.Errorf("shard %d/%d is estimated at %.0f s, above the budget of %.0f s: raise the shard count of mutation.yml and releaseShards", k+1, releaseShards, load, shardBudget)
-		}
+	}
+	if f := budgetFindings([][]unit{{func() unit { u := pair; u.cost = pairBudget; return u }()}}); len(f) > 0 {
+		t.Errorf("one mutator of one file within its budget: %v", f)
 	}
 	for _, r := range roots {
 		if !slices.ContainsFunc(units, func(u unit) bool { return inScope([]root{r}, path.Join(u.dir, u.files[0])) }) {

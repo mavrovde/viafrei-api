@@ -1,9 +1,166 @@
-# Seconds per mutant of a package directory on a ubuntu-24.04 runner (4
-# workers), for the shard balance of the full run only: a directory without
-# a row costs 0.6 (defaultCost of internal/testkit/mutgate/units.go). The
-# estimate is a local Gremlins run (8 workers, macOS arm64) times 3.0, the
-# ratio of the v1.2.0 release run of internal/adapters/httpapi (163 s in
-# Mutation shard 3) to the same run locally (54 s). A row may only name a
-# package directory of the scope (mutgate refuses a stale one).
-internal/domain/places	3.0	160 runnable mutants of resolve_inside.go in 162 s locally (1.01 s each), times 3.0
-internal/adapters/httpapi	2.3	70 runnable mutants of auth.go, key.go and limits.go in 54 s locally (0.77 s each), times 3.0
+# Seconds per mutant on a ubuntu-24.04 runner (4 workers), for the shard
+# balance of the full run only. A key is a package directory, one file of it
+# (dir/file.go) or one mutator of one file (dir/file.go:MUTATOR); a mutant
+# costs the row of its mutator in its file, else of its file, else of its
+# directory, else 0.6 (defaultCost of internal/testkit/mutgate/units.go).
+# mutgate refuses a key that names no package, in-scope file or mutant of
+# the scope (stale).
+#
+# The rows are the units of the full run 45751491495 (2026-11-26, the
+# 64-unit plan of 20 shards): each unit's Gremlins elapsed time over its
+# mutants, every (file, mutator) of the unit at that rate. A unit that run
+# did not finish (shards 5, 11 and 17) was run locally (8 workers, macOS
+# arm64). Its places mutants are priced per file and mutator from their
+# local status by the fit of the 36 places units of that run: 1.41 s a
+# killed and 8.91 s a lived mutant, and at least 600 s for a file's
+# mutator with a mutant that timed out (unit places.23 took 618 s on the
+# runner for one). Another package's unit is its local time times 3.7
+# (units places.37, places.10, limits and number: 453 s on the runner, 123
+# to 126 s locally). The cost varies by file and mutator: a mutant that
+# lives runs all of its package's tests (about 9 s on the
+# runner in places), one killed stops at the first failing test (about
+# 1.4 s), and one that never ends costs Gremlins' timeout, the coverage run
+# times --timeout-coefficient (about 600 s in places). Re-measure after a
+# release run whose shards drift from the estimate.
+internal/adapters/httpapi	2.15	unit internal_adapters_httpapi of run 45751491495: 157 s of mutation for 73 mutants
+internal/app/admission	0.18	unit internal_app_admission of run 45751491495: 13 s of mutation for 73 mutants
+internal/app/auth	0.16	unit internal_app_auth of run 45751491495: 14 s of mutation for 91 mutants
+internal/app/metering	0.17	unit internal_app_metering of run 45751491495: 2 s of mutation for 12 mutants
+internal/app/ratelimit	0.17	unit internal_app_ratelimit of run 45751491495: 5 s of mutation for 27 mutants
+internal/domain/access	0.26	unit internal_domain_access of run 45751491495: 19 s of mutation for 74 mutants
+internal/domain/ampel	0.16	unit internal_domain_ampel of run 45751491495: 16 s of mutation for 99 mutants
+internal/domain/energy/charging.go	0.27	unit internal_domain_energy.1 of run 45751491495: 90 s of mutation for 335 mutants
+internal/domain/energy/filter.go	0.29	unit internal_domain_energy.2 of run 45751491495: 76 s of mutation for 266 mutants
+internal/domain/energy/fuel.go	0.29	unit internal_domain_energy.2 of run 45751491495: 76 s of mutation for 266 mutants
+internal/domain/energy/hours.go	0.27	unit internal_domain_energy.1 of run 45751491495: 90 s of mutation for 335 mutants
+internal/domain/energy/hydrogen.go	0.27	unit internal_domain_energy.1 of run 45751491495: 90 s of mutation for 335 mutants
+internal/domain/energy/page.go	0.27	unit internal_domain_energy.1 of run 45751491495: 90 s of mutation for 335 mutants
+internal/domain/energy/place.go	0.27	unit internal_domain_energy.1 of run 45751491495: 90 s of mutation for 335 mutants
+internal/domain/energy/place_status.go	0.29	unit internal_domain_energy.2 of run 45751491495: 76 s of mutation for 266 mutants
+internal/domain/energy/place_text.go	0.29	unit internal_domain_energy.2 of run 45751491495: 76 s of mutation for 266 mutants
+internal/domain/geo	0.34	internal_domain_geo run locally (run 45751491495 did not finish it): 3 s of mutation for 34 mutants, times 3.7
+internal/domain/limits	0.16	unit internal_domain_limits of run 45751491495: 3 s of mutation for 21 mutants
+internal/domain/number	0.21	unit internal_domain_number of run 45751491495: 0 s of mutation for 2 mutants
+internal/domain/parking	0.29	internal_domain_parking run locally (run 45751491495 did not finish it): 7 s of mutation for 94 mutants, times 3.7
+internal/domain/places	3.07	the mean of the 36 measured places units of run 45751491495: 5848 s for 1907 mutants
+internal/domain/places/address.go	3.97	unit internal_domain_places.2 of run 45751491495: 270 s of mutation for 68 mutants
+internal/domain/places/address_text.go	3.97	unit internal_domain_places.2 of run 45751491495: 270 s of mutation for 68 mutants
+internal/domain/places/coverage.go	2.95	unit internal_domain_places.1 of run 45751491495: 192 s of mutation for 65 mutants
+internal/domain/places/gemeinde.go	4.55	unit internal_domain_places.3 of run 45751491495: 268 s of mutation for 59 mutants
+internal/domain/places/junction.go	4.55	unit internal_domain_places.3 of run 45751491495: 268 s of mutation for 59 mutants
+internal/domain/places/junction_road.go	2.95	unit internal_domain_places.1 of run 45751491495: 192 s of mutation for 65 mutants
+internal/domain/places/kreis.go	4.55	unit internal_domain_places.3 of run 45751491495: 268 s of mutation for 59 mutants
+internal/domain/places/nearby.go	4.55	unit internal_domain_places.3 of run 45751491495: 268 s of mutation for 59 mutants
+internal/domain/places/places.go	4.55	unit internal_domain_places.3 of run 45751491495: 268 s of mutation for 59 mutants
+internal/domain/places/poi.go	2.95	unit internal_domain_places.1 of run 45751491495: 192 s of mutation for 65 mutants
+internal/domain/places/resolve.go:ARITHMETIC_BASE	4.35	unit internal_domain_places.4 of run 45751491495: 91 s of mutation for 21 mutants
+internal/domain/places/resolve.go:CONDITIONALS_BOUNDARY	4.35	unit internal_domain_places.4 of run 45751491495: 91 s of mutation for 21 mutants
+internal/domain/places/resolve.go:CONDITIONALS_NEGATION	1.86	unit internal_domain_places.5 of run 45751491495: 198 s of mutation for 106 mutants
+internal/domain/places/resolve.go:INVERT_LOGICAL	2.66	internal_domain_places.6 run locally (run 45751491495 did not finish it): 30 killed, 6 lived; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run)
+internal/domain/places/resolve.go:INVERT_LOOPCTRL	300.00	internal_domain_places.6 run locally (run 45751491495 did not finish it): 1 killed, 1 timed out; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run), at least 600 s with a timed-out one beside it (unit places.23: 618 s on the runner)
+internal/domain/places/resolve.go:INVERT_NEGATIVES	8.91	internal_domain_places.6 run locally (run 45751491495 did not finish it): 1 lived; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run)
+internal/domain/places/resolve_address.go:ARITHMETIC_BASE	2.46	unit internal_domain_places.7 of run 45751491495: 86 s of mutation for 35 mutants
+internal/domain/places/resolve_address.go:CONDITIONALS_BOUNDARY	2.46	unit internal_domain_places.7 of run 45751491495: 86 s of mutation for 35 mutants
+internal/domain/places/resolve_address.go:CONDITIONALS_NEGATION	0.85	unit internal_domain_places.8 of run 45751491495: 83 s of mutation for 98 mutants
+internal/domain/places/resolve_address.go:INCREMENT_DECREMENT	3.83	unit internal_domain_places.9 of run 45751491495: 165 s of mutation for 43 mutants
+internal/domain/places/resolve_address.go:INVERT_LOGICAL	3.83	unit internal_domain_places.9 of run 45751491495: 165 s of mutation for 43 mutants
+internal/domain/places/resolve_address.go:INVERT_LOOPCTRL	3.83	unit internal_domain_places.9 of run 45751491495: 165 s of mutation for 43 mutants
+internal/domain/places/resolve_address.go:INVERT_NEGATIVES	3.83	unit internal_domain_places.9 of run 45751491495: 165 s of mutation for 43 mutants
+internal/domain/places/resolve_candidates.go	2.95	unit internal_domain_places.1 of run 45751491495: 192 s of mutation for 65 mutants
+internal/domain/places/resolve_decide.go:ARITHMETIC_BASE	2.16	unit internal_domain_places.10 of run 45751491495: 82 s of mutation for 38 mutants
+internal/domain/places/resolve_decide.go:CONDITIONALS_BOUNDARY	4.34	unit internal_domain_places.11 of run 45751491495: 143 s of mutation for 33 mutants
+internal/domain/places/resolve_decide.go:CONDITIONALS_NEGATION	1.08	unit internal_domain_places.12 of run 45751491495: 76 s of mutation for 70 mutants
+internal/domain/places/resolve_decide.go:INVERT_LOGICAL	2.88	unit internal_domain_places.13 of run 45751491495: 130 s of mutation for 45 mutants
+internal/domain/places/resolve_decide.go:INVERT_LOOPCTRL	2.88	unit internal_domain_places.13 of run 45751491495: 130 s of mutation for 45 mutants
+internal/domain/places/resolve_decide.go:INVERT_NEGATIVES	2.88	unit internal_domain_places.13 of run 45751491495: 130 s of mutation for 45 mutants
+internal/domain/places/resolve_exonyms_table.go	2.95	unit internal_domain_places.1 of run 45751491495: 192 s of mutation for 65 mutants
+internal/domain/places/resolve_inside.go:ARITHMETIC_BASE	4.97	unit internal_domain_places.14 of run 45751491495: 169 s of mutation for 34 mutants
+internal/domain/places/resolve_inside.go:CONDITIONALS_BOUNDARY	4.97	unit internal_domain_places.14 of run 45751491495: 169 s of mutation for 34 mutants
+internal/domain/places/resolve_inside.go:CONDITIONALS_NEGATION	2.54	unit internal_domain_places.15 of run 45751491495: 201 s of mutation for 79 mutants
+internal/domain/places/resolve_inside.go:INCREMENT_DECREMENT	1.41	internal_domain_places.16 run locally (run 45751491495 did not finish it): 2 killed; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run)
+internal/domain/places/resolve_inside.go:INVERT_LOGICAL	3.23	internal_domain_places.16 run locally (run 45751491495 did not finish it): 28 killed, 9 lived; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run)
+internal/domain/places/resolve_inside.go:INVERT_LOOPCTRL	7.97	internal_domain_places.16 run locally (run 45751491495 did not finish it): 1 killed, 7 lived; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run)
+internal/domain/places/resolve_inside.go:INVERT_NEGATIVES	3.29	internal_domain_places.16 run locally (run 45751491495 did not finish it): 3 killed, 1 lived; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run)
+internal/domain/places/resolve_judge.go:ARITHMETIC_BASE	3.86	unit internal_domain_places.17 of run 45751491495: 212 s of mutation for 55 mutants
+internal/domain/places/resolve_judge.go:CONDITIONALS_BOUNDARY	3.86	unit internal_domain_places.17 of run 45751491495: 212 s of mutation for 55 mutants
+internal/domain/places/resolve_judge.go:CONDITIONALS_NEGATION	2.82	unit internal_domain_places.18 of run 45751491495: 192 s of mutation for 68 mutants
+internal/domain/places/resolve_judge.go:INCREMENT_DECREMENT	4.45	unit internal_domain_places.19 of run 45751491495: 280 s of mutation for 63 mutants
+internal/domain/places/resolve_judge.go:INVERT_LOGICAL	4.45	unit internal_domain_places.19 of run 45751491495: 280 s of mutation for 63 mutants
+internal/domain/places/resolve_judge.go:INVERT_LOOPCTRL	4.45	unit internal_domain_places.19 of run 45751491495: 280 s of mutation for 63 mutants
+internal/domain/places/resolve_judge.go:INVERT_NEGATIVES	4.45	unit internal_domain_places.19 of run 45751491495: 280 s of mutation for 63 mutants
+internal/domain/places/resolve_junction.go:ARITHMETIC_BASE	3.37	unit internal_domain_places.20 of run 45751491495: 98 s of mutation for 29 mutants
+internal/domain/places/resolve_junction.go:CONDITIONALS_BOUNDARY	3.37	unit internal_domain_places.20 of run 45751491495: 98 s of mutation for 29 mutants
+internal/domain/places/resolve_junction.go:CONDITIONALS_NEGATION	1.64	unit internal_domain_places.21 of run 45751491495: 115 s of mutation for 70 mutants
+internal/domain/places/resolve_junction.go:INCREMENT_DECREMENT	1.64	unit internal_domain_places.21 of run 45751491495: 115 s of mutation for 70 mutants
+internal/domain/places/resolve_junction.go:INVERT_LOGICAL	1.64	unit internal_domain_places.21 of run 45751491495: 115 s of mutation for 70 mutants
+internal/domain/places/resolve_junction.go:INVERT_LOOPCTRL	1.64	unit internal_domain_places.21 of run 45751491495: 115 s of mutation for 70 mutants
+internal/domain/places/resolve_junction.go:INVERT_NEGATIVES	1.64	unit internal_domain_places.21 of run 45751491495: 115 s of mutation for 70 mutants
+internal/domain/places/resolve_labels.go:ARITHMETIC_BASE	1.94	unit internal_domain_places.22 of run 45751491495: 78 s of mutation for 40 mutants
+internal/domain/places/resolve_labels.go:CONDITIONALS_BOUNDARY	1.94	unit internal_domain_places.22 of run 45751491495: 78 s of mutation for 40 mutants
+internal/domain/places/resolve_labels.go:CONDITIONALS_NEGATION	7.25	unit internal_domain_places.23 of run 45751491495: 618 s, less 16 s of start (its shard timed out before the upload); locally 79 killed, 2 lived, 1 not covered, 1 timed out, the timed-out one resolve_labels.go:212
+internal/domain/places/resolve_labels.go:INCREMENT_DECREMENT	100.00	internal_domain_places.24 run locally (run 45751491495 did not finish it): 3 killed, 1 lived, 2 timed out; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run), at least 600 s with a timed-out one beside it (unit places.23: 618 s on the runner)
+internal/domain/places/resolve_labels.go:INVERT_LOGICAL	1.58	internal_domain_places.24 run locally (run 45751491495 did not finish it): 43 killed, 1 lived; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run)
+internal/domain/places/resolve_labels.go:INVERT_LOOPCTRL	3.29	internal_domain_places.24 run locally (run 45751491495 did not finish it): 9 killed, 3 lived; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run)
+internal/domain/places/resolve_labels.go:INVERT_NEGATIVES	3.29	internal_domain_places.24 run locally (run 45751491495 did not finish it): 3 killed, 1 lived; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run)
+internal/domain/places/resolve_own.go:ARITHMETIC_BASE	2.09	unit internal_domain_places.25 of run 45751491495: 46 s of mutation for 22 mutants
+internal/domain/places/resolve_own.go:CONDITIONALS_BOUNDARY	2.09	unit internal_domain_places.25 of run 45751491495: 46 s of mutation for 22 mutants
+internal/domain/places/resolve_own.go:CONDITIONALS_NEGATION	2.28	internal_domain_places.26 run locally (run 45751491495 did not finish it): 53 killed, 7 lived; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run)
+internal/domain/places/resolve_own.go:INVERT_LOGICAL	3.28	internal_domain_places.27 run locally (run 45751491495 did not finish it): 15 killed, 5 lived; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run)
+internal/domain/places/resolve_own.go:INVERT_NEGATIVES	5.16	internal_domain_places.27 run locally (run 45751491495 did not finish it): 1 killed, 1 lived; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run)
+internal/domain/places/resolve_poi.go:ARITHMETIC_BASE	6.73	unit internal_domain_places.28 of run 45751491495: 444 s of mutation for 66 mutants
+internal/domain/places/resolve_poi.go:CONDITIONALS_BOUNDARY	6.73	unit internal_domain_places.28 of run 45751491495: 444 s of mutation for 66 mutants
+internal/domain/places/resolve_poi.go:CONDITIONALS_NEGATION	2.54	unit internal_domain_places.29 of run 45751491495: 271 s of mutation for 107 mutants
+internal/domain/places/resolve_poi.go:INCREMENT_DECREMENT	5.91	unit internal_domain_places.30 of run 45751491495: 18 s of mutation for 3 mutants
+internal/domain/places/resolve_poi.go:INVERT_LOGICAL	3.36	unit internal_domain_places.31 of run 45751491495: 229 s of mutation for 68 mutants
+internal/domain/places/resolve_poi.go:INVERT_NEGATIVES	3.27	unit internal_domain_places.32 of run 45751491495: 46 s of mutation for 14 mutants
+internal/domain/places/resolve_poi_judge.go:ARITHMETIC_BASE	2.87	unit internal_domain_places.33 of run 45751491495: 72 s of mutation for 25 mutants
+internal/domain/places/resolve_poi_judge.go:CONDITIONALS_BOUNDARY	2.87	unit internal_domain_places.33 of run 45751491495: 72 s of mutation for 25 mutants
+internal/domain/places/resolve_poi_judge.go:CONDITIONALS_NEGATION	1.77	unit internal_domain_places.34 of run 45751491495: 121 s of mutation for 68 mutants
+internal/domain/places/resolve_poi_judge.go:INVERT_LOGICAL	1.77	unit internal_domain_places.34 of run 45751491495: 121 s of mutation for 68 mutants
+internal/domain/places/resolve_poi_judge.go:INVERT_LOOPCTRL	1.77	unit internal_domain_places.34 of run 45751491495: 121 s of mutation for 68 mutants
+internal/domain/places/resolve_poi_judge.go:INVERT_NEGATIVES	1.11	unit internal_domain_places.35 of run 45751491495: 4 s of mutation for 4 mutants
+internal/domain/places/resolve_poi_words.go	2.95	unit internal_domain_places.1 of run 45751491495: 192 s of mutation for 65 mutants
+internal/domain/places/resolve_rows.go:ARITHMETIC_BASE	6.74	unit internal_domain_places.36 of run 45751491495: 283 s of mutation for 42 mutants
+internal/domain/places/resolve_rows.go:CONDITIONALS_BOUNDARY	6.74	unit internal_domain_places.36 of run 45751491495: 283 s of mutation for 42 mutants
+internal/domain/places/resolve_rows.go:CONDITIONALS_NEGATION	3.49	unit internal_domain_places.37 of run 45751491495: 325 s of mutation for 93 mutants
+internal/domain/places/resolve_rows.go:INVERT_LOGICAL	4.27	unit internal_domain_places.38 of run 45751491495: 256 s of mutation for 60 mutants
+internal/domain/places/resolve_rows.go:INVERT_LOOPCTRL	4.48	unit internal_domain_places.39 of run 45751491495: 63 s of mutation for 14 mutants
+internal/domain/places/resolve_rows.go:INVERT_NEGATIVES	4.48	unit internal_domain_places.39 of run 45751491495: 63 s of mutation for 14 mutants
+internal/domain/places/resolve_town.go:ARITHMETIC_BASE	3.55	unit internal_domain_places.40 of run 45751491495: 224 s of mutation for 63 mutants
+internal/domain/places/resolve_town.go:CONDITIONALS_BOUNDARY	3.55	unit internal_domain_places.40 of run 45751491495: 224 s of mutation for 63 mutants
+internal/domain/places/resolve_town.go:CONDITIONALS_NEGATION	1.41	unit internal_domain_places.41 of run 45751491495: 115 s of mutation for 82 mutants
+internal/domain/places/resolve_town.go:INCREMENT_DECREMENT	3.60	unit internal_domain_places.42 of run 45751491495: 205 s of mutation for 57 mutants
+internal/domain/places/resolve_town.go:INVERT_LOGICAL	3.60	unit internal_domain_places.42 of run 45751491495: 205 s of mutation for 57 mutants
+internal/domain/places/resolve_town.go:INVERT_LOOPCTRL	3.60	unit internal_domain_places.42 of run 45751491495: 205 s of mutation for 57 mutants
+internal/domain/places/resolve_town.go:INVERT_NEGATIVES	3.60	unit internal_domain_places.42 of run 45751491495: 205 s of mutation for 57 mutants
+internal/domain/provenance	0.19	unit internal_domain_provenance of run 45751491495: 6 s of mutation for 33 mutants
+internal/domain/refresh	0.14	internal_domain_refresh run locally (run 45751491495 did not finish it): 0 s of mutation for 4 mutants, times 3.7
+internal/domain/roads/catalogue.go	0.64	internal_domain_roads.1 run locally (run 45751491495 did not finish it): 60 s of mutation for 348 mutants, times 3.7
+internal/domain/roads/lorry.go	0.64	internal_domain_roads.1 run locally (run 45751491495 did not finish it): 60 s of mutation for 348 mutants, times 3.7
+internal/domain/roads/motorway.go	0.64	internal_domain_roads.1 run locally (run 45751491495 did not finish it): 60 s of mutation for 348 mutants, times 3.7
+internal/domain/roads/roads.go	0.26	unit internal_domain_roads.2 of run 45751491495: 59 s of mutation for 224 mutants
+internal/domain/roads/roadstatus.go	0.26	unit internal_domain_roads.2 of run 45751491495: 59 s of mutation for 224 mutants
+internal/domain/roads/speed.go	0.26	unit internal_domain_roads.2 of run 45751491495: 59 s of mutation for 224 mutants
+internal/domain/roads/stamps.go	0.64	internal_domain_roads.1 run locally (run 45751491495 did not finish it): 60 s of mutation for 348 mutants, times 3.7
+internal/domain/roads/watchask.go	0.64	internal_domain_roads.1 run locally (run 45751491495 did not finish it): 60 s of mutation for 348 mutants, times 3.7
+internal/domain/roads/window.go	0.26	unit internal_domain_roads.2 of run 45751491495: 59 s of mutation for 224 mutants
+internal/domain/rules	0.10	unit internal_domain_rules of run 45751491495: 9 s of mutation for 87 mutants
+internal/domain/service	0.17	unit internal_domain_service of run 45751491495: 2 s of mutation for 13 mutants
+internal/domain/transit/affected.go	0.43	unit internal_domain_transit.1 of run 45751491495: 149 s of mutation for 350 mutants
+internal/domain/transit/departure.go	0.43	unit internal_domain_transit.1 of run 45751491495: 149 s of mutation for 350 mutants
+internal/domain/transit/disruption.go	0.43	unit internal_domain_transit.1 of run 45751491495: 149 s of mutation for 350 mutants
+internal/domain/transit/facility.go	0.55	unit internal_domain_transit.2 of run 45751491495: 166 s of mutation for 303 mutants
+internal/domain/transit/interchange.go	0.55	unit internal_domain_transit.2 of run 45751491495: 166 s of mutation for 303 mutants
+internal/domain/transit/interchange_live.go	0.43	unit internal_domain_transit.1 of run 45751491495: 149 s of mutation for 350 mutants
+internal/domain/transit/platforms.go	0.55	unit internal_domain_transit.2 of run 45751491495: 166 s of mutation for 303 mutants
+internal/domain/transit/railampel.go	0.43	unit internal_domain_transit.1 of run 45751491495: 149 s of mutation for 350 mutants
+internal/domain/transit/reach.go	0.43	unit internal_domain_transit.1 of run 45751491495: 149 s of mutation for 350 mutants
+internal/domain/transit/sharing.go	0.55	unit internal_domain_transit.2 of run 45751491495: 166 s of mutation for 303 mutants
+internal/domain/transit/state_alerts.go	0.55	unit internal_domain_transit.2 of run 45751491495: 166 s of mutation for 303 mutants
+internal/domain/transit/stationboard_db.go	0.55	unit internal_domain_transit.2 of run 45751491495: 166 s of mutation for 303 mutants
+internal/domain/transit/stationpage.go	0.55	unit internal_domain_transit.2 of run 45751491495: 166 s of mutation for 303 mutants
+internal/domain/transit/stopsnear.go	0.43	unit internal_domain_transit.1 of run 45751491495: 149 s of mutation for 350 mutants
+internal/domain/transit/town.go	0.55	unit internal_domain_transit.2 of run 45751491495: 166 s of mutation for 303 mutants
+internal/domain/transit/trainboard.go	0.55	unit internal_domain_transit.2 of run 45751491495: 166 s of mutation for 303 mutants
+internal/domain/transit/transit.go	0.55	unit internal_domain_transit.2 of run 45751491495: 166 s of mutation for 303 mutants
+internal/domain/weather	0.10	unit internal_domain_weather of run 45751491495: 2 s of mutation for 20 mutants

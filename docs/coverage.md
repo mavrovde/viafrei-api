@@ -85,8 +85,12 @@ excludes the other files of its package and every subdirectory (`-E`) and
 switches the other mutators off, so the units are disjoint and together
 every in-scope mutant: each is mutated once. The cost of a unit is an
 estimate in runner seconds, its mutants (counted from the source the way
-Gremlins finds them) times the seconds per mutant of its package
-(`test/mutation/cost.tsv`, measured), plus the start of the run. Mutation
+Gremlins finds them) times the seconds per mutant of their mutator in their
+file, their file or their package (`test/mutation/cost.tsv`, the most
+specific row), plus the start of the run. The rows are the unit times of a
+real release run: a mutant that lives runs all its package's tests, one that
+never ends costs Gremlins' timeout, so the cost differs by file and mutator
+far more than by package. Mutation
 shard k (k = 1 to 20) mutates the units `mutgate -plan -shard k/20` deals
 it: the costliest first, each to the shard with the least so far. The
 Mutation testing job then gathers the shards' reports into one full-mode
@@ -96,7 +100,8 @@ has no report or has two, and the gate is exit 2 on a report that holds a
 mutant of another unit; it is red unless every shard ended green.
 `internal/testkit/mutgate/shard_test.go` proves the units of the real scope
 disjoint and complete, the twenty shards none empty and each within the
-budget of 9 minutes of work. A conformance test holds `mutation.yml` to the
+budget of 9 minutes of work, except a shard holding only one mutator of one
+file, the unit nothing cuts further, which may take up to about 12 minutes. A conformance test holds `mutation.yml` to the
 matrix and the fan-in.
 
 Run it locally with `scripts/mutation.sh pr origin/main` or

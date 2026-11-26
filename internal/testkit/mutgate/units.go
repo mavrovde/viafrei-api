@@ -28,20 +28,27 @@ import (
 //
 // The cost of a unit is an estimate in seconds of a ubuntu-24.04 runner (4
 // workers): its mutation sites, counted the way Gremlins v0.6.0 finds them,
-// times the seconds per mutant of its directory (test/mutation/cost.tsv, or
+// each times the seconds per mutant of its mutator in its file, its file or
+// its directory (test/mutation/cost.tsv, the most specific row, else
 // defaultCost), plus unitOverhead for the run's start and its coverage run.
+// The seconds per mutant differ by file and mutator, not only by package: a
+// mutant that lives runs every test of its package, one killed stops at
+// the first failing test (-failfast), and one that never ends costs
+// Gremlins' timeout (the coverage run times --timeout-coefficient). So the
+// rows come from the unit times of a real release run.
 // The shards take the units by longest cost first, each to the lightest
 // shard, so the heaviest shard stays near the mean.
 
 const (
 	// unitCap is the most a unit may cost before it is cut, under half the
-	// shard budget of shard_test.go, so the shards pack evenly.
+	// shard budget of shard_test.go, so the shards pack evenly. One mutator
+	// of one file is never cut, whatever it costs.
 	unitCap = 240.0
 	// unitOverhead is the start of a Gremlins run: module download and the
-	// coverage run of the package, once per unit. 30 s makes the estimate of
-	// the heaviest release shard (3 units of internal/domain/places) match
-	// its local run times the cost file's factor.
-	unitOverhead = 30.0
+	// coverage run of the package, once per unit. Run 45751491495 measured 9
+	// to 28 s of a places unit outside Gremlins' elapsed time, and about 1 s
+	// of a small package's.
+	unitOverhead = 20.0
 	// defaultCost is the seconds per mutant of a directory without a row in
 	// the cost file.
 	defaultCost = 0.6
@@ -140,7 +147,9 @@ func (u unit) holds(m mutant) bool {
 	return slices.Contains(u.files, strings.TrimPrefix(m.file, u.dir+"/")) && (u.mutators == nil || slices.Contains(u.mutators, m.mutator))
 }
 
-// readCost reads DIR, SECONDS PER MUTANT and HOW MEASURED per line.
+// readCost reads KEY, SECONDS PER MUTANT and HOW MEASURED per line. A key
+// is a package directory, a file of one (dir/file.go) or one mutator of a
+// file (dir/file.go:MUTATOR); rate takes the most specific.
 func readCost(name string) (map[string]float64, error) {
 	out := map[string]float64{}
 	if name == "" {
@@ -152,12 +161,24 @@ func readCost(name string) (map[string]float64, error) {
 	}
 	for _, r := range rows {
 		s, err := strconv.ParseFloat(r[1], 64)
-		if err != nil || s <= 0 || strings.TrimSpace(r[2]) == "" || path.Clean(r[0]) != r[0] {
-			return nil, fmt.Errorf("%s: cost line %q needs a clean directory, seconds above 0 and how they were measured", name, strings.Join(r, "\t"))
+		p, m, pair := strings.Cut(r[0], ":")
+		if err != nil || s <= 0 || strings.TrimSpace(r[2]) == "" || path.Clean(p) != p || pair && (!strings.HasSuffix(p, ".go") || !slices.Contains(enabled, m)) {
+			return nil, fmt.Errorf("%s: cost line %q needs a clean directory, file or file:MUTATOR of an enabled mutator, seconds above 0 and how they were measured", name, strings.Join(r, "\t"))
 		}
 		out[r[0]] = s
 	}
 	return out, nil
+}
+
+// rate is the seconds per mutant of mutator m of file f of dir: the row of
+// the pair, else of the file, else of the directory, else defaultCost.
+func rate(cost map[string]float64, dir, f, m string) float64 {
+	for _, k := range []string{dir + "/" + f + ":" + m, dir + "/" + f, dir} {
+		if s, ok := cost[k]; ok {
+			return s
+		}
+	}
+	return defaultCost
 }
 
 // piece is a part of a package: files with every mutator, or one file with
@@ -165,13 +186,14 @@ func readCost(name string) (map[string]float64, error) {
 type piece struct {
 	files, mutators []string
 	sites           int
+	work            float64 // the seconds of its mutants, without unitOverhead
 }
 
 // planUnits cuts the scope roots into the units of the full run, reading the
 // sources under tree.
 func planUnits(tree string, roots []root, cost map[string]float64) ([]unit, error) {
 	var out []unit
-	done := map[string]bool{}
+	done := map[string]bool{} // the package directories, and the cost keys they make valid
 	for _, r := range roots {
 		dirs := map[string][]string{}
 		err := filepath.WalkDir(filepath.Join(tree, r.dir), func(p string, d fs.DirEntry, err error) error {
@@ -194,7 +216,7 @@ func planUnits(tree string, roots []root, cost map[string]float64) ([]unit, erro
 				continue
 			}
 			done[dir] = true
-			us, err := packageUnits(tree, dir, dirs[dir], roots, cost)
+			us, err := packageUnits(tree, dir, dirs[dir], roots, cost, done)
 			if err != nil {
 				return nil, err
 			}
@@ -211,23 +233,21 @@ func planUnits(tree string, roots []root, cost map[string]float64) ([]unit, erro
 		}
 		names[u.name] = true
 	}
-	for dir := range cost {
-		if !done[dir] {
-			return nil, fmt.Errorf("the cost of %s names no package of the scope (stale); remove it", dir)
+	for k := range cost {
+		if !done[k] {
+			return nil, fmt.Errorf("the cost of %s names no package, in-scope file or mutant of one in the scope (stale); remove it", k)
 		}
 	}
 	return out, nil
 }
 
 // packageUnits cuts one package directory.
-func packageUnits(tree, dir string, names []string, roots []root, cost map[string]float64) ([]unit, error) {
-	per := cost[dir]
-	if per == 0 {
-		per = defaultCost
-	}
+// The cost keys of its in-scope files and of their mutants go into known.
+func packageUnits(tree, dir string, names []string, roots []root, cost map[string]float64, known map[string]bool) ([]unit, error) {
 	var files, others []string
 	count := map[string]map[string]int{}
-	total := 0
+	work := map[string]float64{} // file -> seconds, and "file mutator" -> seconds
+	total, all := 0, 0.0
 	for _, f := range slices.Sorted(slices.Values(names)) {
 		if !inScope(roots, dir+"/"+f) {
 			others = append(others, f)
@@ -238,8 +258,13 @@ func packageUnits(tree, dir string, names []string, roots []root, cost map[strin
 			return nil, err
 		}
 		files, count[f] = append(files, f), c
-		for _, n := range c {
-			total += n
+		known[dir+"/"+f] = true
+		for _, m := range enabled {
+			if c[m] > 0 {
+				known[dir+"/"+f+":"+m] = true
+				w := rate(cost, dir, f, m) * float64(c[m])
+				work[f+" "+m], work[f], total, all = w, work[f]+w, total+c[m], all+w
+			}
 		}
 	}
 	if total == 0 {
@@ -248,9 +273,9 @@ func packageUnits(tree, dir string, names []string, roots []root, cost map[strin
 		return nil, nil
 	}
 	name := strings.ReplaceAll(dir, "/", "_")
-	weigh := func(sites int) float64 { return unitOverhead + per*float64(sites) }
-	if weigh(total) <= unitCap {
-		return []unit{{name: name, dir: dir, files: files, others: others, sites: total, cost: weigh(total), want: wants(count, files, nil)}}, nil
+	weigh := func(w float64) float64 { return unitOverhead + w }
+	if weigh(all) <= unitCap {
+		return []unit{{name: name, dir: dir, files: files, others: others, sites: total, cost: weigh(all), want: wants(count, files, nil)}}, nil
 	}
 	// Each file whole when it fits, else its mutators in groups that fit.
 	var whole, split []piece
@@ -259,33 +284,35 @@ func packageUnits(tree, dir string, names []string, roots []root, cost map[strin
 		for _, m := range enabled {
 			n += count[f][m]
 		}
-		if weigh(n) <= unitCap {
-			whole = append(whole, piece{files: []string{f}, sites: n})
+		if weigh(work[f]) <= unitCap {
+			whole = append(whole, piece{files: []string{f}, sites: n, work: work[f]})
 			continue
 		}
 		cur := piece{files: []string{f}}
 		for _, m := range enabled {
-			if cur.sites > 0 && weigh(cur.sites+count[f][m]) > unitCap {
+			if cur.sites > 0 && weigh(cur.work+work[f+" "+m]) > unitCap {
 				split = append(split, cur)
 				cur = piece{files: []string{f}}
 			}
 			cur.mutators = append(cur.mutators, m)
 			cur.sites += count[f][m]
+			cur.work += work[f+" "+m]
 		}
 		split = append(split, cur)
 	}
 	// The whole files packed into groups, the heaviest first, each into the
 	// first group it fits.
-	slices.SortStableFunc(whole, func(a, b piece) int { return cmp.Compare(b.sites, a.sites) })
+	slices.SortStableFunc(whole, func(a, b piece) int { return cmp.Compare(b.work, a.work) })
 	var groups []piece
 	for _, p := range whole {
-		i := slices.IndexFunc(groups, func(g piece) bool { return weigh(g.sites+p.sites) <= unitCap })
+		i := slices.IndexFunc(groups, func(g piece) bool { return weigh(g.work+p.work) <= unitCap })
 		if i < 0 {
 			groups = append(groups, piece{})
 			i = len(groups) - 1
 		}
 		groups[i].files = append(groups[i].files, p.files...)
 		groups[i].sites += p.sites
+		groups[i].work += p.work
 	}
 	var out []unit
 	for _, g := range append(groups, split...) {
@@ -293,7 +320,7 @@ func packageUnits(tree, dir string, names []string, roots []root, cost map[strin
 			continue // files without a mutant, packed together
 		}
 		slices.Sort(g.files)
-		u := unit{name: fmt.Sprintf("%s.%d", name, len(out)+1), dir: dir, files: g.files, mutators: g.mutators, sites: g.sites, cost: weigh(g.sites), want: wants(count, g.files, g.mutators)}
+		u := unit{name: fmt.Sprintf("%s.%d", name, len(out)+1), dir: dir, files: g.files, mutators: g.mutators, sites: g.sites, cost: weigh(g.work), want: wants(count, g.files, g.mutators)}
 		for _, f := range files {
 			if !slices.Contains(g.files, f) {
 				u.others = append(u.others, f)

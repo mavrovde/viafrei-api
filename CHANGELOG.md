@@ -9,6 +9,18 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [1.2.1](https://github.com/mavrovde/viafrei-api/compare/v1.2.0...v1.2.1) (2026-11-26)
+
+
+### Fixed
+
+* **mutation:** the full run is cut into cost-balanced units over 20 shards, so the place resolver fits the 15-minute job cap ([#254](https://github.com/mavrovde/viafrei-api/issues/254)) ([940726d](https://github.com/mavrovde/viafrei-api/commit/940726da977b1e8e421f4d547f3e5a83bafbb7d2))
+
+
+### Build and CI
+
+* every job's ceiling is 30 minutes, and the mutation shards may use it ([#256](https://github.com/mavrovde/viafrei-api/issues/256)) ([6c44bf0](https://github.com/mavrovde/viafrei-api/commit/6c44bf01ad1e1c810a8a1d9d4f064f05650d898e))
+
 ## [1.2.0](https://github.com/mavrovde/viafrei-api/compare/v1.1.4...v1.2.0) (2026-11-26)
 
 

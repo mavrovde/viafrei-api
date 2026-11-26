@@ -9,6 +9,18 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [2.0.0](https://github.com/mavrovde/viafrei-api/compare/v1.2.2...v2.0.0) (2026-11-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* GET /v1/stations/{stationId}/page answers 404 not-found for an id that names no station, where it answered 200 with data null.
+* GET /v1/stations/{stationId}/page answers a page for a listStations stop that DB's station register does not hold; `data.pageUrl` and the header's `slug` and `stationNo` may now be null (pageUrl is the nested stop URL of the nearest station page that lists the stop, null when none does).
+
+### Fixed
+
+* boards, motorway parking and affected stations inside the deadline; station page 404 and pages for stops outside the register ([#271](https://github.com/mavrovde/viafrei-api/issues/271)) ([030b546](https://github.com/mavrovde/viafrei-api/commit/030b5468b674744c6b9a9781ca5f1503b6990716))
+
 ## [1.2.2](https://github.com/mavrovde/viafrei-api/compare/v1.2.1...v1.2.2) (2026-11-26)
 
 

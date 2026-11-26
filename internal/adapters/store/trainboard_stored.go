@@ -101,6 +101,25 @@ order by 1 nulls last, 2`, "text[]", "float8", "text[]")
 const callAt = `(case when ((((((sd.service_date)::date::timestamp + date_part('epoch', st.departure) * interval '1 second')) at time zone 'Europe/Berlin') - interval '1 hour') at time zone 'Europe/Berlin') = (((sd.service_date)::date::timestamp + date_part('epoch', st.departure) * interval '1 second'))
          then ((((sd.service_date)::date::timestamp + date_part('epoch', st.departure) * interval '1 second')) at time zone 'Europe/Berlin') - interval '1 hour' else ((((sd.service_date)::date::timestamp + date_part('epoch', st.departure) * interval '1 second')) at time zone 'Europe/Berlin') end)`
 
+// timesOfDay is the ranges [lo, hi) of a stop time's time of day (its
+// departure's seconds mod 86400, the key of stop_times_stop_tod) in which
+// a call planned in the window [from, to) lies: a call's planned instant is
+// its service day's noon in Berlin less 12 hours (22:00 or 23:00 UTC the
+// day before) plus the stop time, so its time of day is the instant's UTC
+// time of day plus one or two hours. One range, or two where the window
+// passes midnight; the whole day for a window of a day or more.
+func timesOfDay(from, to string) string {
+	return `select r.lo, r.hi
+    from (select mod(ceil(extract(epoch from ((` + from + ` at time zone 'UTC') + interval '1 hour')::time))::bigint, 86400::bigint) c,
+                 ceil(extract(epoch from (` + to + ` - ` + from + `)) + 3600)::bigint w) p
+    cross join lateral (values
+      (case when p.w >= 86400 then 0::bigint else p.c end,
+       case when p.w >= 86400 then 86400::bigint else least(p.c + p.w, 86400::bigint) end),
+      (0::bigint,
+       case when p.w >= 86400 then 0::bigint else greatest(p.c + p.w - 86400, 0::bigint) end)) r(lo, hi)
+    where r.hi > r.lo`
+}
+
 // interchangePlan is today's URBAN_RAIL_AT_STOPS_SQL on its tables: the
 // U-Bahn and tram calls (route types 0, 1, 400 to 405, 900 to 906) of the
 // timetable stops $2 of the feed $1 in [$3, $4), each stop's stop times
@@ -117,15 +136,7 @@ fam_tod as materialized (
   select f.stop_id, f.grp, nullif(btrim(s.platform_code), '') platform, tod.lo, tod.hi
   from fam f
   join stops s on s.gtfs_feed_key = $1::smallint and s.id = f.stop_id and s.deleted_at is null
-  cross join (select r.lo, r.hi
-    from (select mod(ceil(extract(epoch from (($3::timestamptz at time zone 'UTC') + interval '1 hour')::time))::bigint, 86400::bigint) c,
-                 ceil(extract(epoch from ($4::timestamptz - $3::timestamptz)) + 3600)::bigint w) p
-    cross join lateral (values
-      (case when p.w >= 86400 then 0::bigint else p.c end,
-       case when p.w >= 86400 then 86400::bigint else least(p.c + p.w, 86400::bigint) end),
-      (0::bigint,
-       case when p.w >= 86400 then 0::bigint else greatest(p.c + p.w - 86400, 0::bigint) end)) r(lo, hi)
-    where r.hi > r.lo) tod),
+  cross join (`+timesOfDay("$3::timestamptz", "$4::timestamptz")+`) tod),
 win as materialized (
   select f.grp, st.trip_id, st.stop_id, st.stop_sequence, `+callAt+` at, sd.service_date, r.route_type,
          coalesce(nullif(btrim(r.short_name), ''), nullif(btrim(r.long_name), '')) line,

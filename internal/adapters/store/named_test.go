@@ -219,6 +219,21 @@ func TestDeparturesOfTripsKeepTheRelation(t *testing.T) {
 	}
 }
 
+// TestDeparturesOfWindowReplaceOnce: the stop times' join and the real-time
+// call's freshness check are each found once in the departure relation and
+// replaced, by the join in the window's times of day and the fresh sources
+// read once.
+func TestDeparturesOfWindowReplaceOnce(t *testing.T) {
+	w := departuresOfWindow("$2::timestamptz", "$3::timestamptz")
+	if strings.Count(departuresOfTrips, stopTimesOfStop) != 1 || strings.Count(departuresOfTrips, siriFresh) != 1 ||
+		strings.Contains(w, siriFresh) ||
+		!strings.Contains(w, "CROSS JOIN ("+timesOfDay("$2::timestamptz", "$3::timestamptz")+") tod\n     "+stopTimesOfStop+
+			" AND "+stopTimeOfDay+" >= tod.lo AND "+stopTimeOfDay+" < tod.hi\n") ||
+		!strings.Contains(w, "(c.source_feed = ANY (ARRAY( SELECT k_1.feed_key") {
+		t.Fatal("the departure relation's stop times join or real-time freshness check is not replaced once")
+	}
+}
+
 // TestTrafficEventsOfFamiliesMatchRulesOnce: the per-event rule match is
 // found in the traffic event relation and replaced.
 func TestTrafficEventsOfFamiliesMatchRulesOnce(t *testing.T) {

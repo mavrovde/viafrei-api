@@ -553,7 +553,7 @@ select d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transport_mod
                   order by lc.stop_sequence desc limit 1)),
        d.planned_departure_at, d.platform, d.planned_platform, d.platform_changed, d.realtime, d.realtime_source,
        d.cancelled, d.delay_s, d.expected_departure_at, d.no_forecast, d.source_ref, d.source_refs
-from (`+departuresOfTrips+`) d
+from (`+departuresOfWindow("$2::timestamp with time zone", "$3::timestamp with time zone")+`) d
 where d.board_stop_feed = any(array(select split_part(x, ':', 1)::smallint from unnest((select f.ids from fam f)) x))
   and d.board_stop = any(array(select substr(x, strpos(x, ':') + 1) from unnest((select f.ids from fam f)) x))
   and d.stop_point_id = any((select f.ids from fam f)::text[])
@@ -577,6 +577,34 @@ order by d.planned_departure_at, d.journey_id, d.call_order`, "text", "timestamp
 // ran past 60 s.
 var departuresOfTrips = "\n SELECT t.gtfs_feed_key AS board_feed, t.id AS board_trip, t.headsign AS board_headsign, s.gtfs_feed_key AS board_stop_feed, s.id AS board_stop," +
 	strings.TrimPrefix(relDeparture, "\n SELECT")
+
+// stopTimesOfStop is the departure relation's join of a stop's stop
+// times, siriFresh its check, for each real-time call it weighs, that the
+// call's feed is fresh, and stopTimeOfDay a stop time's time of day (the
+// key of stop_times_stop_tod).
+const (
+	stopTimesOfStop = `JOIN stop_times st ON st.gtfs_feed_key = s.gtfs_feed_key AND st.stop_id = s.id AND st.deleted_at IS NULL`
+	siriFresh       = `(EXISTS ( SELECT 1
+                   FROM feed_checks k_1
+                  WHERE k_1.feed_key = c.source_feed AND k_1.checked_at IS NOT NULL AND (k_1.paused OR k_1.checked_at >= (now() - 3::double precision * make_interval(secs => COALESCE(NULLIF(k_1.cadence_s, 0), 600)::double precision)))))`
+	stopTimeOfDay = `mod(date_part('epoch', st.departure)::bigint, 86400::bigint)`
+)
+
+// departuresOfWindow is departuresOfTrips for the calls planned in [from,
+// to), the same rows: a stop's stop times are read in the window's times
+// of day (timesOfDay, on stop_times_stop_tod), which hold every call
+// planned in the window, not each stop time of the stop for its planned
+// instant to be weighed after; and the fresh feeds are read once for the
+// statement, not once for each real-time call weighed.
+func departuresOfWindow(from, to string) string {
+	return strings.NewReplacer(
+		stopTimesOfStop, `CROSS JOIN (`+timesOfDay(from, to)+`) tod
+     `+stopTimesOfStop+` AND `+stopTimeOfDay+` >= tod.lo AND `+stopTimeOfDay+` < tod.hi`,
+		siriFresh, `(c.source_feed = ANY (ARRAY( SELECT k_1.feed_key
+                   FROM feed_checks k_1
+                  WHERE k_1.checked_at IS NOT NULL AND (k_1.paused OR k_1.checked_at >= (now() - 3::double precision * make_interval(secs => COALESCE(NULLIF(k_1.cadence_s, 0), 600)::double precision))))))`,
+	).Replace(departuresOfTrips)
+}
 
 // Departures reads the departing calls of q's station in q's window
 // (features.Transit); the board's rules are transit.Board's.
@@ -949,7 +977,10 @@ order by m.ord, n.metres`, "float8", "float8", "float8", "text[]", "int", "text[
 // the listed stop each root belongs to (its index), $3 and $4 the window,
 // $5 the families. Each call is its stop's (the first listed whose
 // station family holds its stop point); a trip must call somewhere outside
-// that stop after it.
+// that stop after it. The family's stop points (fam.ids) and each one's
+// first listed stop (fam.ords) are read once, and a later call's stop is
+// looked up among the listed stops' stop points in one hashed set of
+// (stop, stop point), not by a scan of the family for each call.
 //
 //nolint:misspell // materialized is the SQL keyword
 var stopBoardsCalls = named("api_stop_boards_calls", `
@@ -957,7 +988,9 @@ with grp as materialized (
   select g.ord, m.id member
   from unnest((select $1::text[]), (select $2::int[])) g(root, ord)
   cross join lateral (`+stationFamily("g.root")+`) m(id)),
-fam as materialized (select array(select distinct g.member from grp g) ids)
+fam as materialized (
+  select array_agg(x.member order by x.member) ids, array_agg(x.ord order by x.member) ords
+  from (select g.member, min(g.ord) ord from grp g group by g.member) x)
 select k.ord, d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transport_mode, d.route_type,
        d.train_number, d.train_category, nullif(btrim(d.board_headsign), ''),
        coalesce(nullif(btrim(d.board_headsign), ''),
@@ -968,8 +1001,8 @@ select k.ord, d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transp
                   order by lc.stop_sequence desc limit 1)),
        d.planned_departure_at, d.platform, d.planned_platform, d.platform_changed, d.realtime, d.realtime_source,
        d.cancelled, d.delay_s, d.expected_departure_at, d.no_forecast, d.source_ref, d.source_refs
-from (`+departuresOfTrips+`) d
-cross join lateral (select min(g.ord) ord from grp g where g.member = d.stop_point_id) k
+from (`+departuresOfWindow("(select $3::timestamptz)", "(select $4::timestamptz)")+`) d
+cross join lateral (select f.ords[array_position(f.ids, d.stop_point_id)] ord from fam f) k
 where d.board_stop_feed = any(array(select split_part(x, ':', 1)::smallint from unnest((select f.ids from fam f)) x))
   and d.board_stop = any(array(select substr(x, strpos(x, ':') + 1) from unnest((select f.ids from fam f)) x))
   and d.stop_point_id = any((select f.ids from fam f)::text[])
@@ -982,7 +1015,7 @@ where d.board_stop_feed = any(array(select split_part(x, ':', 1)::smallint from 
                 join stops np on np.gtfs_feed_key = nx.gtfs_feed_key and np.id = nx.stop_id
                where nx.gtfs_feed_key = d.board_feed and nx.trip_id = d.board_trip and nx.stop_sequence > d.call_order
                  and nx.deleted_at is null and np.deleted_at is null and coalesce(np.location_type::integer, 0) = 0
-                 and (np.gtfs_feed_key || ':') || np.id not in (select g.member from grp g where g.ord = k.ord))
+                 and (k.ord, (np.gtfs_feed_key || ':') || np.id) not in (select g.ord, g.member from grp g))
 order by d.planned_departure_at, d.journey_id, d.call_order`, "text[]", "int[]", "timestamptz", "timestamptz", "text[]")
 
 // StopBoards reads the stops around q.At with their departures

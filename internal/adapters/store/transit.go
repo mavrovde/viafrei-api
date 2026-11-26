@@ -764,19 +764,37 @@ select station_ifopt, sum(c)::int, sum(l)::int, array_agg(distinct src order by 
 from u group by 1 having sum(c) + sum(l) > 0`, "text[]")
 
 // stationDisruptionOfHour is the platform's station disruption relation
-// with the calls of the hour read in one range of the aimed departures,
-// joined to the stations' refs, not probed ref by ref (12 580 probes on
-// prod, most of a second; the hour's calls are one range of about 300 000
-// rows); the recently checked feeds and the source rules (per family of
-// $1) are read once, not per call or per group. The relation's limit of 500 calls per ref changes nothing: the
-// most a ref holds in an hour on prod is under a hundred. The calls are
-// those of the families ($1): a statement reading it keeps only those.
+// with the calls of the hour joined to the stations' refs, so the planner
+// picks how to read them: on prod it probes the refs' index per ref, about
+// seven times faster than one range read of the hour's 700 000 calls hashed
+// to the refs. The recently checked feeds and the source rules (per family
+// of $1) are read once, not per call or per group, and the stations are the
+// open register rows with an ifopt and a slug, tested for the slug, not
+// sorted for the current one (the view's lateral, 90 to 380 ms on prod; the
+// semi join 12 ms). The relation's limit of 500 calls per ref changes
+// nothing: the most a ref holds in an hour on prod is under a hundred. The
+// calls are those of the families ($1): a statement reading it keeps only
+// those.
 var stationDisruptionOfHour = strings.NewReplacer(
+	stationsOfIndex, stationsWithSlug,
 	callsPerRef, callsOfHour,
 	"\n                 LIMIT 500) c_1\n", ") c_1 ON c_1.stop_ref = r.ref\n",
 	freshPerCall, freshOnce,
 	rulesPerRow("c.source_feed"), rulesOfFamilies("c.source_feed"),
 ).Replace(relStationDisruption)
+
+// stationsOfIndex is the relation's read of the stations' ifopts through
+// the station index view, whose lateral picks each station's current slug;
+// stationsWithSlug keeps the same stations (the view's open register rows
+// with a slug) without picking it.
+const (
+	stationsOfIndex = `SELECT DISTINCT s.ifopt
+           FROM station_index_live s
+          WHERE s.ifopt IS NOT NULL`
+	stationsWithSlug = `SELECT DISTINCT s.ifopt
+           FROM db_stations s
+          WHERE s.ifopt IS NOT NULL AND s.closed_at IS NULL AND (EXISTS ( SELECT 1 FROM station_slugs g WHERE g.station_no = s.station_no))`
+)
 
 // freshPerCall is the relation's test of a call's feed against the recently
 // checked ones, a scan of them per call; freshOnce reads them once.

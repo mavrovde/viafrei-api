@@ -260,12 +260,14 @@ func TestTrafficEventsOfFamiliesReadTheStoredLand(t *testing.T) {
 	}
 }
 
-// TestStationDisruptionOfHourReadsOneRange: the per-ref probe and its limit
-// are found in the station disruption relation and replaced.
+// TestStationDisruptionOfHourReadsOneRange: the per-ref probe and its limit,
+// the stations' read through the index view and the per-call source test are
+// found in the station disruption relation and replaced.
 func TestStationDisruptionOfHourReadsOneRange(t *testing.T) {
 	if strings.Count(relStationDisruption, callsPerRef) != 1 || strings.Contains(stationDisruptionOfHour, callsPerRef) ||
 		strings.Contains(stationDisruptionOfHour, "LIMIT 500") || !strings.Contains(stationDisruptionOfHour, "ON c_1.stop_ref = r.ref") ||
-		strings.Count(relStationDisruption, freshPerCall) != 1 || strings.Contains(stationDisruptionOfHour, freshPerCall) ||
+		strings.Count(relStationDisruption, stationsOfIndex) != 1 || strings.Contains(stationDisruptionOfHour, stationsOfIndex) ||
+		!strings.Contains(stationDisruptionOfHour, stationsWithSlug) || strings.Count(relStationDisruption, freshPerCall) != 1 || strings.Contains(stationDisruptionOfHour, freshPerCall) ||
 		strings.Count(relStationDisruption, rulesPerRow("c.source_feed")) != 1 || strings.Contains(stationDisruptionOfHour, rulesPerRow("c.source_feed")) {
 		t.Fatal("the station disruption relation's read of the calls changed")
 	}

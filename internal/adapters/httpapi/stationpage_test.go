@@ -79,6 +79,20 @@ func TestStationPageAnswer(t *testing.T) {
 	if land := data["sections"].([]any)[0].(map[string]any)["header"].(map[string]any)["land"]; land != nil {
 		t.Errorf("no land %v", land)
 	}
+	// A stop the register does not hold: no register number or slug, its
+	// page under the station that lists it, or none.
+	f.page.Stop, f.page.Record.StationNo, f.page.Record.Slug = true, "", nil
+	f.page.Link = &transit.StopLink{Slug: "jungfernstieg", Key: "de-02000-11950-1-119004"}
+	data, _ = decode(t, do(t, h, http.MethodGet, "/v1/stations/1:de:02000:11950:1:119004/page?lang=en", bearer))["data"].(map[string]any)
+	h0 = data["sections"].([]any)[0].(map[string]any)["header"].(map[string]any)
+	if data["pageUrl"] != "https://viafrei.de/en/station/jungfernstieg/stop/de-02000-11950-1-119004" || h0["stationNo"] != nil || h0["slug"] != nil {
+		t.Errorf("stop %v", data)
+	}
+	f.page.Link = nil
+	data, _ = decode(t, do(t, h, http.MethodGet, "/v1/stations/1:de:02000:11003:2:110032/page", bearer))["data"].(map[string]any)
+	if v, ok := data["pageUrl"]; !ok || v != nil {
+		t.Errorf("no station lists it %v", data)
+	}
 	f.pageErr = transit.ErrNotFound
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/stations/x/page", bearer), 404, "not-found")
 	f.pageErr = errFake

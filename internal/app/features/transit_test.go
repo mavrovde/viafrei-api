@@ -48,6 +48,8 @@ type trFake struct {
 	reachErr    error
 	record      transit.StationRecord
 	recErr      error
+	link        *transit.StopLink
+	linkErr     error
 	alertRows   []transit.StationAlertRow
 	alertErr    error
 	gotAlerts   transit.StationAlertsQuery
@@ -55,6 +57,10 @@ type trFake struct {
 
 func (f *trFake) StationRecord(context.Context, string, []string) (transit.StationRecord, error) {
 	return f.record, f.recErr
+}
+
+func (f *trFake) StopStation(context.Context, string) (*transit.StopLink, error) {
+	return f.link, f.linkErr
 }
 
 func (f *trFake) StationAlerts(_ context.Context, q transit.StationAlertsQuery, _ []string) ([]transit.StationAlertRow, error) {

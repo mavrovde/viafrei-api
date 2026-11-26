@@ -1,2 +1,5 @@
 GET /v1/watch the `data/warnings/items/level` response property's min was decreased from `1.00` to `0.00` for the response status `200`
 GET /v1/weather-risk the `data/warnings/items/level` response property's min was decreased from `1.00` to `0.00` for the response status `200`
+GET /v1/stations/{stationId}/page the response property `data/pageUrl` became nullable for the status `200`
+GET /v1/stations/{stationId}/page the response property `data/sections/items/header/slug` became nullable for the status `200`
+GET /v1/stations/{stationId}/page the response property `data/sections/items/header/stationNo` became nullable for the status `200`

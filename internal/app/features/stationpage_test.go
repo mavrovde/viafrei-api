@@ -9,6 +9,7 @@ import (
 
 	"github.com/mavrovde/viafrei-api/internal/app/features"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 )
 
@@ -98,7 +99,10 @@ func TestStationPageFailsAsItsReads(t *testing.T) {
 	}{
 		"register":   {errFake(func(f *trFake) { f.fake = &fake{regErr: errStore} }), pageKey, errStore},
 		"no transit": {pageFake(), key("commercial", []access.Scope{"transit"}, "a1"), access.ErrNonePermitted},
-		"unknown":    {errFake(func(f *trFake) { f.recErr = transit.ErrNotFound }), pageKey, transit.ErrNotFound},
+		"unknown":    {errFake(func(f *trFake) { f.recErr, f.stErr = transit.ErrNotFound, transit.ErrNotFound }), pageKey, transit.ErrNotFound},
+		"stop board": {errFake(func(f *trFake) { f.recErr, f.depErr = transit.ErrNotFound, errStore }), pageKey, errStore},
+		"stop link":  {errFake(func(f *trFake) { f.recErr, f.linkErr = transit.ErrNotFound, errStore }), pageKey, errStore},
+		"record":     {errFake(func(f *trFake) { f.recErr = errStore }), pageKey, errStore},
 		"board":      {errFake(func(f *trFake) { f.depErr = errStore }), pageKey, errStore},
 		"facilities": {errFake(func(f *trFake) { f.facErr = errStore }), pageKey, errStore},
 		"alerts":     {errFake(func(f *trFake) { f.alertErr = errStore }), pageKey, errStore},
@@ -114,6 +118,31 @@ func TestStationPageFailsAsItsReads(t *testing.T) {
 	f.stErr = transit.ErrNotFound
 	if p, err := trService(f).StationPage(context.Background(), pageKey, features.StationPageQuery{StationID: "1", Departures: 10}); err != nil || p.Sections["departures"].At != nil {
 		t.Errorf("no board %+v: %v", p, err)
+	}
+}
+
+// A stop DB's register does not hold is paged from its own board: its
+// name, point, district and family, its departures, lifts and alerts, and
+// its page under the station page that lists it, read once each.
+func TestStationPageOfAStopTheRegisterDoesNotHold(t *testing.T) {
+	f := pageFake()
+	code := "01001"
+	f.recErr = transit.ErrNotFound
+	f.station.Name, f.station.Location, f.station.RegionCode = "Markt", geo.Point{Lat: 53.5, Lon: 10}, &code
+	f.link = &transit.StopLink{Slug: "nord", Key: "de-1-1"}
+	p, err := trService(f).StationPage(context.Background(), pageKey, features.StationPageQuery{StationID: "1:de:1:1", Departures: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := p.Record
+	if !p.Stop || p.Link != f.link || r.Name != "Markt" || *r.At != f.station.Location || *r.StopPlaceID != "1:de:1:1" || r.Family != "t1" ||
+		!r.SeenAt.Equal(now) || r.StationNo != "" || len(p.Departures) != 2 || len(p.Lifts) != 1 || len(p.Alerts) != 1 ||
+		!slices.Equal(f.gotAlerts.Kreis, []string{"01001"}) || f.gotBoard.StationID != "1:de:1:1" {
+		t.Fatalf("%+v", p)
+	}
+	f.link = nil
+	if p, err := trService(f).StationPage(context.Background(), pageKey, features.StationPageQuery{StationID: "1:de:1:1", Departures: 10}); err != nil || !p.Stop || p.Link != nil {
+		t.Errorf("no station lists it %+v: %v", p, err)
 	}
 }
 

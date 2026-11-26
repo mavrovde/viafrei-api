@@ -26,10 +26,15 @@ type PageSection struct {
 }
 
 // StationPage is a station's page as today's describe_station builds it,
-// section by section in the page's order.
+// section by section in the page's order. A stop DB's register does not
+// hold is paged from its own data (Stop): its name, point, departures and
+// facilities, with its page under the nearest station page that lists it
+// (Link, nil when none does).
 type StationPage struct {
 	Meta   Answer[struct{}]
 	Record transit.StationRecord
+	Stop   bool
+	Link   *transit.StopLink
 	// Sections holds each section's instant and sources by section id.
 	Sections   map[string]PageSection
 	Ampel      transit.RailAmpel
@@ -65,12 +70,34 @@ func (s *Service) StationPage(ctx context.Context, key access.Record, q StationP
 	if err != nil {
 		return StationPage{}, err
 	}
+	now := s.now()
+	window := transit.DepartureQuery{From: now, Window: time.Duration(transit.RailWindowMin) * time.Minute, Limit: pageBoardLimit}
+	var (
+		board  Board
+		read   bool
+		stop   bool
+		link   *transit.StopLink
+		facil  StationFacilities
+		hasFac bool
+	)
 	rec, err := s.repos.Transit.StationRecord(ctx, q.StationID, stations)
-	if err != nil {
+	if errors.Is(err, transit.ErrNotFound) {
+		// A stop the register does not hold: its board names and places it.
+		window.StationID = q.StationID
+		if board, err = s.Departures(ctx, key, window); err != nil {
+			return StationPage{}, err
+		}
+		if link, err = s.repos.Transit.StopStation(ctx, q.StationID); err != nil {
+			return StationPage{}, err
+		}
+		at := board.Station.Location
+		rec = transit.StationRecord{Name: board.Station.Name, StopPlaceID: &q.StationID, At: &at, SeenAt: board.At,
+			Family: board.Station.Family, Municipality: board.Station.RegionCode}
+		read, stop = true, true
+	} else if err != nil {
 		return StationPage{}, err
 	}
-	now := s.now()
-	out := StationPage{Record: rec, Sections: map[string]PageSection{}}
+	out := StationPage{Record: rec, Stop: stop, Link: link, Sections: map[string]PageSection{}}
 	// The register's row stands at its last sighting, never after the answer.
 	seen := rec.SeenAt
 	if seen.After(now) {
@@ -83,17 +110,14 @@ func (s *Service) StationPage(ctx context.Context, key access.Record, q StationP
 	}
 	out.Sections["parking_charging"] = PageSection{At: &seen, Sources: flags}
 	contributed := []string{rec.Family}
-	var (
-		board  Board
-		read   = rec.StopPlaceID != nil
-		facil  StationFacilities
-		hasFac bool
-	)
-	if read {
-		board, err = s.Departures(ctx, key, transit.DepartureQuery{StationID: *rec.StopPlaceID, From: now, Window: time.Duration(transit.RailWindowMin) * time.Minute, Limit: pageBoardLimit})
-		read = err == nil
-		if err != nil && !errors.Is(err, access.ErrNonePermitted) && !errors.Is(err, transit.ErrNotFound) {
-			return StationPage{}, err
+	if rec.StopPlaceID != nil {
+		if !stop {
+			window.StationID = *rec.StopPlaceID
+			board, err = s.Departures(ctx, key, window)
+			read = err == nil
+			if err != nil && !errors.Is(err, access.ErrNonePermitted) && !errors.Is(err, transit.ErrNotFound) {
+				return StationPage{}, err
+			}
 		}
 		facil, err = s.Facilities(ctx, key, transit.FacilityQuery{StationID: *rec.StopPlaceID, Limit: pageLiftLimit})
 		hasFac = err == nil

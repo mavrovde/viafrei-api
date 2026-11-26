@@ -1161,6 +1161,88 @@ func (s *Store) StationRecord(ctx context.Context, id string, families []string)
 	})
 }
 
+// stopStations are the register's stations with a page whose stops around
+// them may list the stop $1 (a stop place id, "<feed>:<stop id>"): every
+// open station with a slug within $2 metres of the stop's family, nearest
+// first, each with its own DHIDs (the zHV stops within $5 metres of a StaDa
+// point of its EVA numbers, and a timetable station's own DHID: the page's
+// own stops, never listed around it) and, for each mode of $3 in order, the
+// $4 nearest families serving it within $2 metres of its point. It is the
+// platform's read of the stops around a station page (STOPS_NEAR_SQL at the
+// station's point, with the board's DHID pairing), asked of each station
+// near the stop.
+//
+//nolint:misspell // materialized is the SQL keyword
+var stopStations = named("api_stop_stations", `
+with fam as materialized (
+  select t.geom
+  from stops x
+  join transit_stop_modes t on t.gtfs_feed_key = x.gtfs_feed_key and t.root_id = coalesce(x.parent_id, x.id)
+  where x.gtfs_feed_key = (select split_part($1::text, ':', 1)::smallint) and x.id = (select substr($1::text, strpos($1::text, ':') + 1))
+    and x.deleted_at is null),
+near as materialized (
+  select s.station_no, g.slug, s.geom, s.source_id, s.ifopt, coalesce(s.eva_nos, '{}') || coalesce(array[s.eva_no], '{}') evas,
+         row_number() over (order by st_distance(s.geom, f.geom), s.station_no) ord
+  from fam f
+  join db_stations s on s.closed_at is null and s.geom is not null and st_dwithin(s.geom, f.geom, (select $2::float8))
+  join lateral (select g.slug from station_slugs g where g.station_no = s.station_no order by g.assigned_at desc, g.slug limit 1) g on true)
+select n.ord, n.slug,
+       coalesce((select array_agg(distinct z.external_id order by z.external_id)
+                 from gazetteer_places a
+                 join gazetteer_places z on z.source_id = 'delfi_zhv' and z.kind = 'stop' and z.closed_at is null and z.geom is not null
+                  and st_dwithin(z.geom, a.geom, (select $5::float8))
+                 where a.source_id = 'db_stada' and a.kind = 'station' and a.closed_at is null and a.geom is not null
+                   and a.external_id = any(n.evas)), '{}')
+         || case when n.source_id = 'delfi_static' and n.ifopt is not null then array[n.ifopt] else '{}' end,
+       t.root_id, t.name, coalesce(t.modes, '{}'), coalesce(t.stop_ids, '{}'), t.metres, st_y(t.geom::geometry), st_x(t.geom::geometry)
+from near n
+cross join unnest((select $3::text[])) with ordinality m(mode, mord)
+cross join lateral (
+  select t.root_id, t.name, t.modes, t.stop_ids, t.geom, st_distance(t.geom, n.geom) metres
+  from transit_stop_modes t
+  where t.modes @> array[m.mode] and st_dwithin(t.geom, n.geom, (select $2::float8))
+  order by t.geom <-> n.geom
+  limit (select $4::int)) t
+order by n.ord, m.mord, t.metres`, "text", "float8", "text[]", "int", "float8")
+
+// StopStation reads the page of the stop id names under the nearest
+// station page that lists it among the stops around it
+// (features.Transit); nil when none does.
+func (s *Store) StopStation(ctx context.Context, id string) (*transit.StopLink, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (*transit.StopLink, error) {
+		type row struct {
+			ord      int64
+			slug     string
+			own      []string
+			near     transit.StopNear
+			stopIDs  []string
+			lat, lon float64
+		}
+		rows, _ := run(ctx, tx, stopStations, id, float64(transit.StationAroundM), transit.StationAroundModes, transit.StationAroundPerMode,
+			float64(transit.StationDHIDRadiusM))
+		got, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (row, error) {
+			var v row
+			err := r.Scan(&v.ord, &v.slug, &v.own, &v.near.Root, &v.near.Name, &v.near.Modes, &v.stopIDs, &v.near.Metres, &v.lat, &v.lon)
+			v.near.At = geo.Point{Lat: v.lat, Lon: v.lon}
+			return v, err
+		})
+		if err != nil {
+			return nil, err
+		}
+		var stations []transit.StationAround
+		for i, r := range got {
+			if i == 0 || got[i-1].ord != r.ord {
+				stations = append(stations, transit.StationAround{Slug: r.slug, Own: r.own, Stops: map[string][]string{}})
+			}
+			st := &stations[len(stations)-1]
+			st.Near = append(st.Near, r.near)
+			st.Stops[r.near.Root] = r.stopIDs
+		}
+		_, stop, _ := strings.Cut(id, ":")
+		return transit.ListedStop(stations, stop), nil
+	})
+}
+
 // stationAlerts are the alerts in force at $1 of the families $2 naming a
 // stop of $3, or a line of $4 within a Kreis of $5, at most $6: today's
 // STATION_ALERTS_NEAR_SQL on its table (the live view's rule: open,

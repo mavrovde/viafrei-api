@@ -6168,12 +6168,18 @@
             "type": "string"
           },
           "slug": {
-            "description": "The page's slug on viafrei.de.",
-            "type": "string"
+            "description": "The station page's slug on viafrei.de; null for a stop the register does not hold.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "stationNo": {
-            "description": "DB's register number.",
-            "type": "string"
+            "description": "DB's register number; null for a stop the register does not hold, which is paged from its own name, point, departures and facilities.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "street": {
             "type": [
@@ -10841,8 +10847,11 @@
             "additionalProperties": false,
             "properties": {
               "pageUrl": {
-                "description": "The station's page on viafrei.de, in the language asked.",
-                "type": "string"
+                "description": "The station's page on viafrei.de, in the language asked. For a stop the register does not hold, its page under the nearest station page that lists it among the stops around it (the bus, tram and U-Bahn stops within 400 m of the station, eight at most, the station's own left out), /\u003clang\u003e/station/\u003cslug\u003e/stop/\u003ckey\u003e with key the stop family's id, colons as hyphens; null when no station page lists it.",
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "sections": {
                 "description": "header, rail_ampel, step_free_now, lifts, platforms, departures, service_alerts, parking_charging, in this order, each present.",
@@ -26476,7 +26485,7 @@
     },
     "/v1/stations/{stationId}/page": {
       "get": {
-        "description": "A station's page as the platform's station page shows it, section by section: the register's record, the rail lamp, the step-free platforms now, the lifts, the platforms, the next departures, the service alerts and DB's facility flags. Needs the scope transit.",
+        "description": "A station's page as the platform's station page shows it, section by section: the register's record, the rail lamp, the step-free platforms now, the lifts, the platforms, the next departures, the service alerts and DB's facility flags. A stop listStations answers that DB's register does not hold is paged from its own name, point, departures, lifts and alerts, with no register number, slug or facility flags. An id that names neither answers 404 not-found. Needs the scope transit.",
         "operationId": "getStationPage",
         "parameters": [
           {

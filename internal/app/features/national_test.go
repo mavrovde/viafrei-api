@@ -97,6 +97,48 @@ func TestNationalReadsTheDomainsAtOnce(t *testing.T) {
 	}
 }
 
+// peakNat records the most reads running at once; the first two wait for
+// each other, so two that may run together do.
+type peakNat struct {
+	*fake
+	mu                  sync.Mutex
+	running, peak, seen int
+	two                 chan struct{}
+}
+
+func (f *peakNat) National(ctx context.Context, d string, _ []string, _ time.Time, _ time.Duration) ([]national.Row, error) {
+	f.mu.Lock()
+	f.running++
+	f.peak = max(f.peak, f.running)
+	if f.seen++; f.seen == 2 {
+		close(f.two)
+	}
+	first := f.seen <= 2
+	f.mu.Unlock()
+	defer func() { f.mu.Lock(); f.running--; f.mu.Unlock() }()
+	if first {
+		select {
+		case <-f.two:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	return nil, nil
+}
+
+// No more than Settings.ReadsAtOnce domains are read together: the reads
+// past a key's admission share would queue behind its own.
+func TestNationalReadsNoMoreThanTheKeysShareAtOnce(t *testing.T) {
+	f := &peakNat{fake: &fake{reg: natRegister}, two: make(chan struct{})}
+	svc := features.New(features.Repositories{Register: f, National: f}, features.Settings{Language: "en", ReadsAtOnce: 2}, func() time.Time { return now })
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	k := key("consumer", []access.Scope{"roads", "energy", "weather"}, "r1", "e1", "w1")
+	if _, err := svc.National(ctx, k, time.Hour); err != nil || f.seen != 3 || f.peak != 2 {
+		t.Fatalf("read %d domains, %d at most at once (want 3, 2): %v", f.seen, f.peak, err)
+	}
+}
+
 func TestNationalReadsEveryScopedDomain(t *testing.T) {
 	f := &natFake{rows: map[string][]national.Row{
 		"energy": {{Section: national.SectionFuel, Key: "e10", Family: "e1", N: 2}},

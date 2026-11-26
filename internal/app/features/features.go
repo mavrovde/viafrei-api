@@ -124,6 +124,10 @@ type Settings struct {
 	Disabled []string
 	// IsTimeout reports whether a repository error means the time ran out.
 	IsTimeout func(error) bool
+	// ReadsAtOnce is the most reads one answer runs at the same time: no
+	// more than the admission permits one key may hold (RATE-016). 0 runs
+	// them all at once.
+	ReadsAtOnce int
 }
 
 // Service answers the feature questions.

@@ -60,14 +60,27 @@ func (s *Service) National(ctx context.Context, key access.Record, fuelWindow ti
 	if !asked || len(consulted) == 0 {
 		return NationalAnswer{}, access.ErrNonePermitted
 	}
-	// The domains' reads are independent: each runs at once, in a read of
-	// its own (its own connection) under the request's deadline, so the
-	// answer waits for the slowest one, not for their sum. Their rows are
-	// taken in the domains' order, and the first failure in that order is
-	// the answer's.
+	// The domains' reads are independent: they run at the same time, each
+	// in a read of its own (its own connection) under the request's
+	// deadline, so the answer waits for the slowest ones, not for their sum.
+	// At most Settings.ReadsAtOnce run together: a read takes one of the
+	// key's admission permits, and a read past the key's share would wait
+	// in the tier's queue, counted ahead of every other caller and shed
+	// when its wait outlasts the budget, failing the whole answer. Their
+	// rows are taken in the domains' order, and the first failure in that
+	// order is the answer's.
+	n := s.set.ReadsAtOnce
+	if n <= 0 || n > len(parts) {
+		n = len(parts)
+	}
+	slots := make(chan struct{}, n)
 	var wg sync.WaitGroup
 	for _, p := range parts {
-		wg.Go(func() { p.rows, p.err = s.repos.National.National(ctx, p.domain, p.permitted, now, fuelWindow) })
+		wg.Go(func() {
+			slots <- struct{}{}
+			defer func() { <-slots }()
+			p.rows, p.err = s.repos.National.National(ctx, p.domain, p.permitted, now, fuelWindow)
+		})
 	}
 	wg.Wait()
 	var rows []national.Row

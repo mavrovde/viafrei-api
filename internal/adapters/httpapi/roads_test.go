@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"reflect"
 	"slices"
 	"strings"
@@ -246,6 +247,24 @@ func TestRoadSituationAnswer(t *testing.T) {
 	}
 }
 
+// Every id a list operation hands out can be asked for again: a city's
+// id with a space and slashes, and a long id, arrive intact;
+// an id over 256 characters or with a control character is refused.
+func TestRoadSituationTakesTheIdsTheListsGive(t *testing.T) {
+	req.Covers(t, "FR-ROAD-002", "NFR-SEC-002")
+	long := "src:2026-059078--vi-fbm.2026-12-02_20-00-00-000.devi-bs.2026-12-02_20-00-00-000.de0"
+	for _, id := range []string{"src:Ops Centre/area:280/2026", long, strings.Repeat("x", 256)} {
+		f := everyAnswer()
+		w := do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/road-situations/"+url.PathEscape(id), bearer)
+		if w.Code != http.StatusOK || f.gotSitID != id {
+			t.Errorf("%q: status %d, asked %q: %s", id, w.Code, f.gotSitID, w.Body)
+		}
+	}
+	for _, id := range []string{strings.Repeat("x", 257), "ev\x01one"} {
+		assertProblem(t, do(t, featureHandler(t, config.Defaults(), everyAnswer(), nil), http.MethodGet, "/v1/road-situations/"+url.PathEscape(id), bearer), 400, "invalid-parameter")
+	}
+}
+
 func TestRoadOperationsNotFound(t *testing.T) {
 	req.Covers(t, "FR-ROAD-001")
 	assertProblem(t, do(t, featureHandler(t, config.Defaults(), &fakeFeatures{err: roads.ErrUnknownRoad}, nil), http.MethodGet, "/v1/motorways/A999/parking-options", bearer), 404, "not-found")
@@ -258,7 +277,7 @@ func TestRoadInputsAreChecked(t *testing.T) {
 	for _, target := range []string{
 		"/v1/motorways/C8/conditions", "/v1/motorways/K7864/conditions", "/v1/motorways/L12345/conditions", "/v1/motorways/A%20%208/conditions", "/v1/motorways/A8/conditions?direction=up",
 		"/v1/motorways/A8/conditions?kinds=flood", "/v1/motorways/A8/conditions?min_severity=other", "/v1/motorways/A8/conditions?limit=0",
-		"/v1/road-conditions", "/v1/road-conditions?at=48,11&road_class=lane", "/v1/road-situations/ev%201",
+		"/v1/road-conditions", "/v1/road-conditions?at=48,11&road_class=lane", "/v1/road-situations/ev%01one",
 	} {
 		assertProblem(t, do(t, h, http.MethodGet, target, bearer), 400, "invalid-parameter")
 	}

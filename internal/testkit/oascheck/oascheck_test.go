@@ -120,6 +120,11 @@ func TestCheckValidatesEveryPart(t *testing.T) {
 	if err := d.Check("GET", "/things/t1?radius_m=5", 200, ok, []byte(thing)); err != nil {
 		t.Fatalf("a valid response failed: %v", err)
 	}
+	// An id holding a percent-encoded slash is one path segment, as the
+	// router reads it; decoded, it would be two and match nothing.
+	if err := d.Check("GET", "/things/a%2Fb%20c", 200, ok, []byte(thing)); err != nil {
+		t.Fatalf("an id with an encoded slash failed: %v", err)
+	}
 	problem := hdr("Content-Type", ProblemMediaType, "Retry-After", "3", "Cache-Control", "no-store")
 	for name, c := range map[string]struct {
 		method, target string

@@ -20,9 +20,17 @@ import (
 // so a late call of that kind is the database's own test's.
 func plantLiveCalls(t *testing.T) {
 	t.Helper()
-	plant(t, `insert into vf_seed.stop_place (stop_place_id, name, location, national_stop_code, source_ref, eva_no)
-values ('1:de:09999:1', 'Testbahnhof Live', st_setsrid(st_makepoint(11.0, 49.0), 4326), 'de:09999:1', 'delfi_static', '8099999')`)
-	n := plant(t, `insert into vf_seed.departure (stop_place_id, stop_point_id, journey_id, call_order, line_name, transport_mode, planned_departure_at,
+	plant(t, liveCalls[0])
+	if n := plant(t, liveCalls[1]); n != 5 {
+		t.Fatalf("planted %d of 5", n)
+	}
+}
+
+// liveCalls are plantLiveCalls' statements: the station, then its five
+// departures.
+var liveCalls = []string{`insert into vf_seed.stop_place (stop_place_id, name, location, national_stop_code, source_ref, eva_no)
+values ('1:de:09999:1', 'Testbahnhof Live', st_setsrid(st_makepoint(11.0, 49.0), 4326), 'de:09999:1', 'delfi_static', '8099999')`,
+	`insert into vf_seed.departure (stop_place_id, stop_point_id, journey_id, call_order, line_name, transport_mode, planned_departure_at,
   boarding, realtime_source, cancelled, delay_s, source_ref)
 select '1:de:09999:1', v.point, '1:' || v.trip || ':' || to_char(now() at time zone 'Europe/Berlin', 'YYYYMMDD'), 1, v.line, 'rail',
        date_trunc('minute', now()) + v.at, true, v.src, v.cancelled, v.delay, 'delfi_static'
@@ -30,11 +38,7 @@ from (values ('1:de:09999:1', 'live-1', 'RE 9', interval '10 minutes', 'delfi_si
              ('1:de:09999:1', 'live-2', 'RE 9', interval '12 minutes', 'delfi_siri_et_zz', false, null),
              ('1:de:09999:1', 'live-3', 'S 1', interval '20 minutes', 'delfi_siri_et_zz', false, null),
              ('1:de:09999:1:1', 'live-4', 'RB 2', interval '15 minutes', 'delfi_rt_tu', false, 900),
-             ('1:de:09999:1:1', 'live-5', 'RB 2', interval '25 minutes', 'delfi_rt_tu', false, 120)) v(point, trip, line, at, src, cancelled, delay)`)
-	if n != 5 {
-		t.Fatalf("planted %d of 5", n)
-	}
-}
+             ('1:de:09999:1:1', 'live-5', 'RB 2', interval '25 minutes', 'delfi_rt_tu', false, 120)) v(point, trip, line, at, src, cancelled, delay)`}
 
 // plant runs one seed statement as the owner, with a setup bound of its own:
 // the seed reads each departure back through its view, slower than a read

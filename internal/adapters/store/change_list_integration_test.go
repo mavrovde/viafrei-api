@@ -368,6 +368,15 @@ func TestTheRegisterIsReadAgainOnlyWhenItsRowsMove(t *testing.T) {
 	}
 }
 
+// freshDelays plants three trips' delays two minutes ago, inside the live
+// punctuality's half hour, which the seed's own delays are older than.
+const freshDelays = `insert into public.transit_delays (observed_at, feed_ts, trip_id, stop_id, stop_sequence, delay_s, schedule_relationship, source)
+ select now() - interval '2 minutes', now() - interval '2 minutes', v.trip, v.stop, 1, v.delay, 'SCHEDULED', 'delfi_rt_tu'
+ from (values ('n-1', 'de:09162:1', 900), ('n-2', 'de:09162:2', 60), ('n-3', 'de:05315:1', 30)) v(trip, stop, delay)`
+
+// freshDelaysGone removes freshDelays' rows again.
+const freshDelaysGone = `delete from public.transit_delays where trip_id in ('n-1', 'n-2', 'n-3') and source = 'delfi_rt_tu'`
+
 // An area's punctuality is read from its Land alone, and its rows are the
 // platform view's rows of that area: for a Land, a Kreis and the nation,
 // with delays planted in two Länder, the bound read and the view agree row

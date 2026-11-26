@@ -449,3 +449,18 @@ func CutRegisterProbe(ctx context.Context, s *Store) error {
 	})
 	return err
 }
+
+// SleepPastTheBudget runs the register's probe (api_register_probe) in a
+// read and then a sleep of sleep, which the read's statement timeout cuts
+// when sleep is past the read's budget.
+func SleepPastTheBudget(ctx context.Context, s *Store, sleep time.Duration) error {
+	_, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (struct{}, error) {
+		var probe string
+		if err := scanOne(run(ctx, tx, registerProbeRead))(&probe); err != nil {
+			return struct{}{}, err
+		}
+		_, err := tx.Exec(ctx, "select pg_sleep($1)", sleep.Seconds())
+		return struct{}{}, err
+	})
+	return err
+}

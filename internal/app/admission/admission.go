@@ -135,8 +135,8 @@ func SlotTierOf(ctx context.Context) Tier {
 
 type tallyKey struct{}
 
-// Tally is what the reads of one request spent: the time they held a
-// permit (storage), the time they waited for one, and the named statement
+// Tally is what the reads of one request spent: their permit-held time
+// (storage), the time they waited for one, and the named statement
 // a read had started last when the request's deadline cut it.
 type Tally struct {
 	storage atomic.Int64
@@ -160,7 +160,10 @@ func (t *Tally) Wait() time.Duration {
 	return time.Duration(t.wait.Load())
 }
 
-// Storage is the time the reads held a permit.
+// Storage is the permit-held time, summed over the request's reads: it
+// includes opening each transaction, taking its slot and the Go work inside
+// the read, and exceeds the request's duration when reads run at the same
+// time.
 func (t *Tally) Storage() time.Duration {
 	if t == nil {
 		return 0

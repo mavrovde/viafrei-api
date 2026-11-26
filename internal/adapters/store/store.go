@@ -271,6 +271,12 @@ func ReadValue[T any](ctx context.Context, s *Store, fn func(context.Context, pg
 		if o.panic != nil {
 			panic(o.panic)
 		}
+		// The statement timeout, set from the deadline less the reserve,
+		// usually cuts the statement before the context ends: that cut is
+		// the deadline's too.
+		if name := cur.Load(); name != nil && deadlineCut(o.err) {
+			admission.NoteCut(ctx, *name)
+		}
 		return o.value, o.err
 	case <-ctx.Done():
 		close(gone)
@@ -279,6 +285,15 @@ func ReadValue[T any](ctx context.Context, s *Store, fn func(context.Context, pg
 		}
 		return zero, fmt.Errorf("%w: %w", ErrDeadlineExhausted, ctx.Err())
 	}
+}
+
+// deadlineCut reports whether err is a read cut by its deadline: the
+// statement timeout (SQLSTATE 57014) or the context's deadline.
+func deadlineCut(err error) bool {
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok && pgErr.Code == "57014" {
+		return true
+	}
+	return errors.Is(err, context.DeadlineExceeded)
 }
 
 // runningKey is the context key of a read's running statement (ReadValue).

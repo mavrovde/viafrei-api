@@ -386,3 +386,20 @@ func TestADeadlineNotesTheStatementItCut(t *testing.T) {
 		t.Fatalf("cut %q, want api_register_probe", got)
 	}
 }
+
+// TestAStatementTimeoutNotesTheStatementItCut: the statement timeout the read
+// sets from the deadline fires before the context ends, and the cut names
+// the statement all the same.
+func TestAStatementTimeoutNotesTheStatementItCut(t *testing.T) {
+	// A reserve of 400 ms leaves the context 400 ms past the statement timeout.
+	st := openStore(t, bounded(t), "VFAPI_DEADLINE_RESERVE=400ms")
+	ctx, cancel := context.WithTimeout(admission.WithTally(bounded(t)), 900*time.Millisecond)
+	defer cancel()
+	err := store.SleepPastTheBudget(ctx, st, 1500*time.Millisecond)
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); !ok || pgErr.Code != "57014" || ctx.Err() != nil {
+		t.Fatalf("err %v (context %v), want the statement timeout before the deadline", err, ctx.Err())
+	}
+	if got := admission.CutStatement(ctx); got != "api_register_probe" {
+		t.Fatalf("cut %q, want api_register_probe", got)
+	}
+}

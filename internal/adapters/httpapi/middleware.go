@@ -167,11 +167,14 @@ func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter 
 // accessLog writes one structured line per request. The query string is not
 // logged: it may carry a key presented by mistake. The line says where the
 // request's time went: how long its reads waited for an admission permit
-// (admissionWaitMs), how long they held one, the transactions of their
-// statements (storageMs), and the named statement a read had started last
-// when the request's deadline cut it (cutStatement, empty when no read was
-// cut inside a statement), so a request answered at the deadline shows
-// whether it waited, read, or both.
+// (admissionWaitMs), their permit-held time, summed over the request's
+// reads (storageMs: it includes opening each transaction, taking its slot
+// and the Go work inside the read, and exceeds durationMs when reads run
+// at the same time), and the named statement a read had started last when
+// the request's deadline cut it, by the request's context or by the
+// statement timeout the read set from it (cutStatement, empty when no cut
+// read had started a statement), so a request answered at the deadline
+// shows whether it waited, read, or both.
 func accessLog(log *slog.Logger, now func() time.Time) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

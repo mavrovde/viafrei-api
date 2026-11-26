@@ -52,3 +52,11 @@ func TestFuelStationsStateTheOpeningAtTheAnswersInstant(t *testing.T) {
 		t.Fatalf("%d %s", w.Code, w.Body)
 	}
 }
+
+// A station's page and the stop boards are refused with the features off.
+func TestStationPageAndStopBoardsRefusedWithTheFeaturesOff(t *testing.T) {
+	off := featureHandler(t, config.Defaults(), nil, nil)
+	for _, target := range []string{"/v1/stations/de:11000:900100003/page", "/v1/stop-boards?at=52.52,13.41"} {
+		assertProblem(t, do(t, off, http.MethodGet, target, bearer), 404, "feature-disabled")
+	}
+}

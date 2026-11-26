@@ -1,0 +1,73 @@
+{
+  "title": "The stops around a position with their next departures",
+  "request": "/v1/stop-boards?at=47.4035,14.5617\u0026limit=3\u0026per_stop=2",
+  "attribution": "The stops and their departures come from the source families of the transit domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "transit"
+    ],
+    "sources": [
+      "delfi_static"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": {
+      "location": {
+        "lat": 47.4035,
+        "lon": 14.5617
+      },
+      "window": {
+        "from": "2026-03-30T00:00:00Z",
+        "fromLocal": "2026-03-30T02:00:00+02:00",
+        "until": "2026-03-30T01:00:00Z",
+        "untilLocal": "2026-03-30T03:00:00+02:00"
+      },
+      "stops": []
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": "2026-03-29T12:00:00Z",
+      "freshness": [
+        {
+          "family": "delfi_static",
+          "dataAsOf": "2026-03-29T12:00:00Z",
+          "ageS": 43200,
+          "staleAfterS": 259200,
+          "stale": false,
+          "lastCheckedAt": "2026-03-29T12:00:00Z"
+        }
+      ],
+      "attribution": [
+        {
+          "family": "delfi_static",
+          "domain": "transit",
+          "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+          "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://www.opendata-oepnv.de",
+          "sourceUrl": "https://www.opendata-oepnv.de"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ]
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/stop-boards"
+    }
+  }
+}

@@ -92,6 +92,9 @@ type BoardWindow struct {
 	Matched    int       `json:"matched" doc:"Departures of the asked modes and categories in the window; more than listed when meta.page.hasMore."`
 	MatchedAll int       `json:"matchedAll" doc:"Departures of every mode and category in the window."`
 	Dropped    []Dropped `json:"dropped" doc:"Departures the mode and category filter left out, per route type; empty when it left none out."`
+	// TimetableUntil and TimetableLoadedAt are the loaded timetable's reach.
+	TimetableUntil    *time.Time `json:"timetableUntil" nullable:"true" doc:"End of the loaded timetable's last service day (the Berlin midnight after it, excluded): no planned departure is known from then on. Null when no timetable is loaded."`
+	TimetableLoadedAt *time.Time `json:"timetableLoadedAt" nullable:"true" doc:"When the timetable was loaded; null when no load is recorded."`
 }
 
 // Dropped counts the departures of one route type a filter left out.
@@ -163,7 +166,8 @@ func registerDepartures(api huma.API, s *server, op huma.Operation) {
 		data := Board{
 			Station: BoardStation{ID: b.Station.ID, Name: b.Station.Name, Location: position(b.Station.Location), StopCode: b.Station.NationalCode, StopIDs: stopIDs(b.Station)},
 			Window: BoardWindow{From: from.UTC(), FromLocal: local(from), Until: until.UTC(), UntilLocal: local(until),
-				Matched: b.Matched, MatchedAll: b.MatchedAll, Dropped: dropped(b.Dropped)},
+				Matched: b.Matched, MatchedAll: b.MatchedAll, Dropped: dropped(b.Dropped),
+				TimetableUntil: utc(b.Reach.Until), TimetableLoadedAt: utc(b.Reach.LoadedAt)},
 			Departures: make([]Departure, len(b.Items)),
 		}
 		for i, d := range b.Items {

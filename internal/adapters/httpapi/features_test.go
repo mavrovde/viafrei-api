@@ -38,77 +38,92 @@ import (
 // fakeFeatures answers every feature operation from fixed values and
 // records what it was asked.
 type fakeFeatures struct {
-	motorways  features.MotorwaysAnswer
-	gotCat     roads.CatalogueQuery
-	trainBoard features.TrainBoardAnswer
-	lorry      features.LorryAnswer
-	zonesErr   error
-	refresh    refresh.Request
-	refreshErr error
-	gotRefresh refresh.Ask
-	gotRefID   string
-	gotEVA     string
-	gotLang    string
-	bays       features.BaysAnswer
-	gotBays    parking.BayQuery
-	objects    objectsFake
-	states     statesFake
-	charging   features.Answer[energy.Site]
-	parking    features.Answer[parking.Site]
-	overview   features.Overview
-	conditions features.Conditions
-	situation  features.Answer[roads.Situation]
-	risk       features.WeatherRisk
-	topic      rules.Topic
-	zones      features.ZonesAnswer
-	gotZones   *rules.ZoneQuery
-	gotRisk    weather.Query
-	cell       features.CellAnswer
-	cellErr    error
-	gotCell    weather.CellQuery
-	gotTopic   string
-	err        error
-	gotRoad    roads.CorridorQuery
-	gotArea    roads.AreaQuery
-	gotSitID   string
-	gotCharge  energy.Query
-	gotPark    parking.Query
-	gotOver    features.OverviewQuery
-	gotKey     access.Record
-	chargeCall int
-	stations   features.Answer[transit.Station]
-	gotStation transit.Query
-	board      features.Board
-	gotBoard   transit.DepartureQuery
-	fuel       features.FuelStations
-	gotFuel    energy.FuelQuery
-	places     features.Answer[places.Place]
-	gotPlaces  places.Query
-	facilities features.StationFacilities
-	gotFacil   transit.FacilityQuery
-	hydrogen   features.HydrogenStations
-	gotHydro   energy.HydrogenQuery
-	speed      features.SpeedAnswer
-	gotSpeed   roads.SpeedQuery
-	disruption features.DisruptionAnswer
-	gotDisrupt transit.DisruptionQuery
-	nearby     features.NearbyAnswer
-	gotNearby  features.NearbyQuery
-	sharing    features.SharingAnswer
-	gotSharing transit.SharingQuery
-	addresses  features.AddressAnswer
-	gotAddress places.AddressQuery
-	pois       features.PoiAnswer
-	gotPoi     places.PoiQuery
-	location   features.LocationAnswer
-	gotLoc     places.LocationQuery
-	gotAccept  []string
+	motorways     features.MotorwaysAnswer
+	gotCat        roads.CatalogueQuery
+	trainBoard    features.TrainBoardAnswer
+	lorry         features.LorryAnswer
+	zonesErr      error
+	refresh       refresh.Request
+	refreshErr    error
+	gotRefresh    refresh.Ask
+	gotRefID      string
+	gotEVA        string
+	gotTrainBoard features.TrainBoardQuery
+	gotLang       string
+	bays          features.BaysAnswer
+	gotBays       parking.BayQuery
+	objects       objectsFake
+	states        statesFake
+	charging      features.Answer[energy.Site]
+	chargePlaces  features.PlacesAnswer
+	gotPlaceQ     features.PlaceQuery
+	parking       features.Answer[parking.Site]
+	overview      features.Overview
+	conditions    features.Conditions
+	situation     features.Answer[roads.Situation]
+	risk          features.WeatherRisk
+	topic         rules.Topic
+	zones         features.ZonesAnswer
+	gotZones      *rules.ZoneQuery
+	gotRisk       weather.Query
+	cell          features.CellAnswer
+	cellErr       error
+	gotCell       weather.CellQuery
+	gotTopic      string
+	err           error
+	gotRoad       roads.CorridorQuery
+	gotArea       roads.AreaQuery
+	gotSitID      string
+	gotCharge     energy.Query
+	gotPark       parking.Query
+	gotOver       features.OverviewQuery
+	gotKey        access.Record
+	chargeCall    int
+	stations      features.Answer[transit.Station]
+	gotStation    transit.Query
+	board         features.Board
+	gotBoard      transit.DepartureQuery
+	stops         features.StopBoards
+	gotStops      transit.StopBoardsQuery
+	page          features.StationPage
+	pageErr       error
+	gotPage       features.StationPageQuery
+	fuel          features.FuelStations
+	gotFuel       energy.FuelQuery
+	places        features.Answer[places.Place]
+	gotPlaces     places.Query
+	resolved      features.ResolveAnswer
+	gotResolve    string
+	facilities    features.StationFacilities
+	gotFacil      transit.FacilityQuery
+	hydrogen      features.HydrogenStations
+	gotHydro      energy.HydrogenQuery
+	speed         features.SpeedAnswer
+	gotSpeed      roads.SpeedQuery
+	disruption    features.DisruptionAnswer
+	gotDisrupt    transit.DisruptionQuery
+	nearby        features.NearbyAnswer
+	gotNearby     features.NearbyQuery
+	sharing       features.SharingAnswer
+	gotSharing    transit.SharingQuery
+	addresses     features.AddressAnswer
+	gotAddress    places.AddressQuery
+	pois          features.PoiAnswer
+	gotPoi        places.PoiQuery
+	location      features.LocationAnswer
+	gotLoc        places.LocationQuery
+	gotAccept     []string
 }
 
 func (f *fakeFeatures) Charging(_ context.Context, key access.Record, q energy.Query) (features.Answer[energy.Site], error) {
 	f.gotKey, f.gotCharge = key, q
 	f.chargeCall++
 	return f.charging, f.err
+}
+
+func (f *fakeFeatures) ChargingPlaces(_ context.Context, key access.Record, q features.PlaceQuery) (features.PlacesAnswer, error) {
+	f.gotKey, f.gotPlaceQ = key, q
+	return f.chargePlaces, f.err
 }
 
 func (f *fakeFeatures) Parking(ctx context.Context, key access.Record, q parking.Query) (features.Answer[parking.Site], error) {
@@ -189,7 +204,7 @@ func overviewAnswer() features.Overview {
 }
 
 func everyAnswer() *fakeFeatures {
-	return &fakeFeatures{charging: chargingAnswer(), parking: parkingAnswer(), overview: overviewAnswer(), conditions: conditionsAnswer(), situation: situationAnswer(), risk: riskAnswer(), topic: topicAnswer(), stations: stationsAnswer(),
+	return &fakeFeatures{charging: chargingAnswer(), parking: parkingAnswer(), overview: overviewAnswer(), conditions: conditionsAnswer(), situation: situationAnswer(), risk: riskAnswer(), topic: topicAnswer(), stations: stationsAnswer(), page: pageAnswer(),
 		refresh: refresh.Request{ID: "42", Source: "fuel-prices-de", State: refresh.NoneDue}}
 }
 
@@ -323,7 +338,7 @@ func TestChargingOptionsWarnsOfStaleAndWithheldData(t *testing.T) {
 	m = meta(t, decode(t, do(t, featureHandler(t, config.Defaults(), f, nil), http.MethodGet, "/v1/charging-options?at=52.52,13.405", bearer)))
 	fr, _ := m["freshness"].([]any)
 	f0, _ := fr[0].(map[string]any)
-	if m["asOf"] != nil || f0["dataAsOf"] != nil || f0["ageS"] != nil || f0["stale"] != true {
+	if m["asOf"] != nil || f0["dataAsOf"] != nil || f0["ageS"] != nil || f0["stale"] != true || f0["lastCheckedAt"] != nil {
 		t.Errorf("a family that published nothing: %v", m)
 	}
 }
@@ -335,7 +350,7 @@ func TestParkingOptionsAnswer(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", w.Code, w.Body)
 	}
-	if !reflect.DeepEqual(f.gotPark, parking.Query{At: geo.Point{Lat: 52.52, Lon: 13.405}, RadiusM: 2000, FreeMin: 2, Kind: "truck", Amenities: []string{"shower", "toilet"}, Limit: 5}) {
+	if !reflect.DeepEqual(f.gotPark, parking.Query{At: geo.Point{Lat: 52.52, Lon: 13.405}, RadiusM: 2000, FreeMin: 2, Kind: "truck", Amenities: []string{"shower", "toilet"}, Limit: 5, CarParks: true, Around: true}) {
 		t.Errorf("asked %+v", f.gotPark)
 	}
 	body := decode(t, w)
@@ -764,7 +779,7 @@ func TestMotorwayParkingAnswer(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", w.Code, w.Body)
 	}
-	if !reflect.DeepEqual(f.gotPark, parking.Query{Road: "A7", Kind: "rest_area", Amenities: []string{"shower"}, Limit: 3}) {
+	if !reflect.DeepEqual(f.gotPark, parking.Query{Road: "A7", Kind: "rest_area", Amenities: []string{"shower"}, Limit: 3, Around: true}) {
 		t.Errorf("asked %+v", f.gotPark)
 	}
 	body := decode(t, w)

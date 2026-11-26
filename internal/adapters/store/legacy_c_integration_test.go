@@ -103,13 +103,38 @@ where p.source_ref = 'bkg_gvisys' and p.place_kind = 'municipality' and p.withdr
   and st_dwithin(p.location::geography, st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography, $3::float8)
 order by p.location::geography <-> st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography, p.official_key
 limit 1`,
-		"api_nearby_junctions": `select j.junction_id, j.road_ref, j.number, j.name, st_y(j.location), st_x(j.location),
-       round(st_distance(j.location::geography, st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography))::int, j.source_ref
-from contract.junction j
-where j.name is not null and st_dwithin(j.location::geography, st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography, $3::float8)
-  and j.source_ref = any($4::text[]) and ` + permitted("j") + `
-order by 7, j.junction_id
+		// The junctions are today's since #241, reads that had no view: their
+		// frozen statements are the platform's own (JUNCTIONS_OSM_NEAR,
+		// findPlacesAround of kind junction, JUNCTION_ROAD_LCL over the
+		// motorway_points_live view, inlined: api_reader reads no view), each
+		// under the key's families.
+		"api_nearby_junctions_osm": `select 'osm:' || o.osm_type || o.osm_id, coalesce(o.name, ''), st_y(o.geom::geometry), st_x(o.geom::geometry),
+       round(st_distance(o.geom, st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography))::int, o.source_id
+from osm_pois o
+where o.closed_at is null and o.category = 'highway' and o.category_value = 'motorway_junction'
+  and st_dwithin(o.geom, st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography, $3::float8)
+  and o.source_id = any($4::text[])
+order by st_distance(o.geom, st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography), o.id
 limit $5::int8`,
+		"api_nearby_junctions_gazetteer": `select id::text, name, road, st_y(geom::geometry), st_x(geom::geometry),
+       round(st_distance(geom, st_point($1::float8, $2::float8)::geography))::int, source_id
+from gazetteer_places
+where closed_at is null and geom is not null and kind = 'junction'
+  and st_dwithin(geom, st_point($1::float8, $2::float8)::geography, $3::float8)
+  and source_id = any($4::text[])
+order by geom <-> st_point($1::float8, $2::float8)::geography
+limit $5::int8`,
+		"api_junction_roads_lcl": `select u.ord::int, p.road, p.name, p.d
+from unnest($1::float8[], $2::float8[]) with ordinality as u(lon, lat, ord)
+cross join lateral (
+  select m.road, m.name, st_distance(m.geom::geometry(Point,4326)::geography, st_setsrid(st_makepoint(u.lon, u.lat), 4326)::geography) d
+  from (select t.road_number road, t.name, t.geom from tmc_locations t
+        where t.cid = 58 and t.tabcd = 1 and t.road_number ~ '^A[1-9][0-9]{0,2}$') m
+  where 'bast_lcl' = any($3::text[]) and m.geom is not null
+    and st_dwithin(m.geom::geometry(Point,4326)::geography, st_setsrid(st_makepoint(u.lon, u.lat), 4326)::geography, 1500)
+  order by m.geom::geometry(Point,4326)::geography <-> st_setsrid(st_makepoint(u.lon, u.lat), 4326)::geography
+  limit 5) p
+order by u.ord, p.d`,
 		"api_state_warnings": `
 select w.event, max(w.warning_level)::int, count(distinct w.identifier)::int, count(distinct w.warn_cell_id)::int,
        max(w.valid_to), array_agg(distinct w.source_ref order by w.source_ref)
@@ -208,12 +233,23 @@ where not exists (select 1 from near)) j`,
 // legacyOpaque is a parameter as opaqueNamed reads it.
 var legacyOpaque = regexp.MustCompile(`\(\(select (\$[0-9]+)::[a-z0-9_ \[\]]+\)::[a-z0-9_ \[\]]+\)`)
 
+// legacyTrafficEvents are the read contract's situations as they are
+// published since a road's Autobahn messages are those of its newest sweep
+// while that sweep is under 30 minutes old (today's motorway read): the
+// view keeps each road and kind's newest sweep of the last day, so its
+// Autobahn rows are kept only at their road's newest sweep, from the sweeps.
+const legacyTrafficEvents = `(select e.* from contract.traffic_event e
+  where e.event_id not like 'autobahn:%'
+     or (e.recorded_at > now() - interval '30 minutes'
+         and e.recorded_at = (select max(s.observed_at) from autobahn_sweeps s
+                              where s.road = e.road_ref and s.kind = any(array['warning', 'roadworks', 'closure', 'closure_entry_exit']))))`
+
 // legacyEvents is the named statement name as the view statement read it:
 // its parameters plain, its situations the read contract's.
 func legacyEvents(name string) string {
 	sql := legacyOpaque.ReplaceAllString(namedStmts[name].SQL, "$1")
 	for _, in := range []string{"$3", "$8", ""} {
-		sql = strings.ReplaceAll(sql, trafficEvents(in), "contract.traffic_event")
+		sql = strings.ReplaceAll(sql, trafficEvents(in), legacyTrafficEvents)
 	}
 	return sql
 }

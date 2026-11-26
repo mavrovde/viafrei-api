@@ -23,7 +23,7 @@ const (
 type BaysInput struct {
 	AtPosition
 	Kind     string `query:"kind" enum:"disabled,ev_charging" doc:"Which bays: disabled = reserved for a disabled parking permit, ev_charging = reserved for charging. Default: disabled."`
-	RadiusM  int    `query:"radius_m" minimum:"1000" maximum:"25000" doc:"Search radius in metres (1000 to 25000); default 10000."`
+	RadiusM  int    `query:"radius_m" minimum:"100" maximum:"25000" doc:"Search radius in metres (100 to 25000); default 10000."`
 	Limit    int    `query:"limit" minimum:"1" maximum:"20" doc:"Most bays to list, nearest first; default 5. The counts cover every bay in the radius."`
 	OnlyFree string `query:"only_free" enum:"true,false" doc:"List only the bays a sensor reports free now; default false. A sensor-less site is never free."`
 }

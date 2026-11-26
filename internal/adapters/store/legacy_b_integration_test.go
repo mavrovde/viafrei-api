@@ -14,12 +14,40 @@ const legacyWarningPlaced = `from contract.weather_warning w
   and w.area is not null and w.area && st_setsrid(st_makepoint($4::float8, $3::float8), 4326)
   and st_intersects(w.area::geography, st_setsrid(st_makepoint($4::float8, $3::float8), 4326)::geography)`
 
+// legacyFuelHours are the station's hours as the fuel reads take them since
+// they carry their date (#237): none until the details were read, then with
+// the time they were read, from the station's own row.
+const legacyFuelHours = `(select case when x.detail_refreshed_at is not null then x.whole_day end from public.fuel_stations x where x.id = s.station_id),
+       (select case when x.detail_refreshed_at is not null then x.opening_times end from public.fuel_stations x where x.id = s.station_id),
+       (select x.detail_refreshed_at from public.fuel_stations x where x.id = s.station_id)`
+
+// legacyFuelLatest is a station's newest price per grade with the open state
+// reported with it (#226, #237): fuel_price_latest's rows, a retracted one
+// not read, each under its source's rule as the price view applies it to
+// the ticks (the first matching contract_source_rules row: not excluded, not
+// withheld, public or the key's own); fams names the families, window limits
+// the observed time.
+func legacyFuelLatest(fams, window string) string {
+	return `left join lateral (
+  select array_agg(l.product order by l.product) products,
+         array_agg(l.price::float8 order by l.product) prices,
+         array_agg(l.observed_at order by l.product) observed,
+         array_agg(l.is_open order by l.product) open
+  from public.fuel_price_latest l
+  left join lateral (select k.excluded, k.audience, k.display_class from contract_source_rules k
+                      where coalesce(l.source_feed, '') ~ k.pattern order by k.priority limit 1) k on true
+  where l.station_id = s.station_id and l.deleted_at is null and l.price is not null
+    and not coalesce(k.excluded, false) and coalesce(k.display_class, 'open') <> 'withhold'
+    and (coalesce(k.audience, 'public') = 'public' or ` + ownKeyOn + `)
+    and l.source_feed = any(` + fams + `::text[]) ` + window + `) p on true`
+}
+
 var legacyWarningColumns = `
 select w.warning_id, w.source_ref, w.hazard, w.warning_level, w.level_label, w.issuer_name, w.headline,
        w.text_lang, w.valid_from, w.valid_to, coalesce(w.area_name, ''),
        w.warn_cell_id, w.event, w.identifier, w.published_at,
        x.description, x.instruction, x.urgency, x.certainty, en.en_headline, en.en_description, en.en_instruction,
-       ` + descriptionUnaltered("x") + `, ` + englishUnaltered + `
+       ` + descriptionUnaltered("x") + `, ` + englishUnaltered + `, x.level_source
 `
 
 const legacyZoneAlive = `(z.checked_at > $3::timestamptz - make_interval(secs => 3 * coalesce(z.cadence_s, 2592000))
@@ -98,19 +126,11 @@ order by e.entry_key limit 1`,
 		"api_fuel_near": `
 with here as (select st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography g)
 select s.station_id, s.name, s.brand, st_y(s.location), st_x(s.location),
-       round(st_distance(s.location::geography, here.g))::int, s.open_state, s.source_ref, s.whole_day, s.opening_times,
-       coalesce(p.products, '{}'), coalesce(p.prices, '{}'), coalesce(p.observed, '{}')
+       round(st_distance(s.location::geography, here.g))::int, s.source_ref, ` + legacyFuelHours + `,
+       coalesce(p.products, '{}'), coalesce(p.prices, '{}'), coalesce(p.observed, '{}'), coalesce(p.open, '{}')
 from contract.fuel_station s
 cross join here
-left join lateral (
-  select array_agg(l.product_code order by l.product_code) products,
-         array_agg(l.price::float8 order by l.product_code) prices,
-         array_agg(l.observed_at order by l.product_code) observed
-  from (select distinct on (o.product_code) o.product_code, o.price, o.observed_at
-          from contract.fuel_price_observation o
-         where o.station_id = s.station_id and o.price is not null
-           and o.source_ref = any($4::text[]) and ` + permitted("o") + `
-         order by o.product_code, o.observed_at desc) l) p on true
+` + legacyFuelLatest("$4", "") + `
 where s.withdrawn_at is null
   and s.source_ref = any($4::text[])
   and ` + permitted("s") + `
@@ -137,20 +157,11 @@ select
                         and o.observed_at > $8::timestamptz - make_interval(secs => $7::int)
                         and o.source_ref = any($4::text[]) and ` + permitted("o") + `)) end`,
 		"api_fuel_by_id": `
-select s.station_id, s.name, s.brand, st_y(s.location), st_x(s.location), s.open_state, s.source_ref, s.whole_day, s.opening_times,
+select s.station_id, s.name, s.brand, st_y(s.location), st_x(s.location), s.source_ref, ` + legacyFuelHours + `,
        s.street, s.house_number, s.postcode, s.city,
-       coalesce(p.products, '{}'), coalesce(p.prices, '{}'), coalesce(p.observed, '{}')
+       coalesce(p.products, '{}'), coalesce(p.prices, '{}'), coalesce(p.observed, '{}'), coalesce(p.open, '{}')
 from contract.fuel_station s
-left join lateral (
-  select array_agg(l.product_code order by l.product_code) products,
-         array_agg(l.price::float8 order by l.product_code) prices,
-         array_agg(l.observed_at order by l.product_code) observed
-  from (select distinct on (o.product_code) o.product_code, o.price, o.observed_at
-          from contract.fuel_price_observation o
-         where o.station_id = s.station_id and o.price is not null
-           and o.observed_at > $4::timestamptz - make_interval(secs => $3::int) and o.observed_at <= $4::timestamptz
-           and o.source_ref = any($2::text[]) and ` + permitted("o") + `
-         order by o.product_code, o.observed_at desc) l) p on true
+` + legacyFuelLatest("$2", "and l.observed_at > $4::timestamptz - make_interval(secs => $3::int) and l.observed_at <= $4::timestamptz") + `
 where s.station_id = $1::text
   and s.withdrawn_at is null
   and s.source_ref = any($2::text[])

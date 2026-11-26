@@ -161,21 +161,24 @@
           "dataAsOf": null,
           "ageS": null,
           "staleAfterS": 9007199254740991,
-          "stale": false
+          "stale": false,
+          "lastCheckedAt": null
         },
         {
           "family": "geonames",
           "dataAsOf": null,
           "ageS": null,
           "staleAfterS": 9007199254740991,
-          "stale": false
+          "stale": false,
+          "lastCheckedAt": null
         },
         {
           "family": "osm",
           "dataAsOf": null,
           "ageS": null,
           "staleAfterS": 9007199254740991,
-          "stale": false
+          "stale": false,
+          "lastCheckedAt": null
         }
       ],
       "attribution": [

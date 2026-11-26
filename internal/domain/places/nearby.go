@@ -106,6 +106,9 @@ type Junction struct {
 	Location  geo.Point
 	DistanceM int
 	Family    string
+	// RoadBy is the family the road was read from when it is not the
+	// row's own (the LCL's, for an OpenStreetMap node); "" else.
+	RoadBy string
 }
 
 // NearbyQuery asks what is within RadiusM of At: the junctions, at most

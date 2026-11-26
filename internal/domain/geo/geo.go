@@ -80,3 +80,13 @@ func Round(v float64, decimals int) float64 {
 	f := math.Pow10(decimals)
 	return math.Round(v*f) / f
 }
+
+// MetresBetween is the great-circle distance between two points in metres,
+// as the platform's haversine (metresBetween, haversineM).
+func MetresBetween(a, b Point) float64 {
+	const r = 6_371_008.8
+	rad := math.Pi / 180
+	dLat, dLon := (b.Lat-a.Lat)*rad, (b.Lon-a.Lon)*rad
+	h := math.Sin(dLat/2)*math.Sin(dLat/2) + math.Cos(a.Lat*rad)*math.Cos(b.Lat*rad)*math.Sin(dLon/2)*math.Sin(dLon/2)
+	return 2 * r * math.Asin(math.Min(1, math.Sqrt(h)))
+}

@@ -11,8 +11,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
@@ -358,23 +360,56 @@ func TestScopeLint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cache := &denyCache{deny: deny, seen: map[string]bool{}}
+	// The files are scanned side by side, a deny cache a worker (it only
+	// memoises the hashes), and their findings kept in the files' order: one
+	// scan after the other passed the 2 s bound on a loaded runner (TST-012).
+	var paths []string
+	for _, p := range trackedFiles(t) {
+		if p != scopeSelf && p != "go.sum" && !strings.HasPrefix(p, scopeDir+"/") {
+			paths = append(paths, p)
+		}
+	}
+	type scanned1 struct {
+		found []scopeFinding
+		lines int
+		text  bool
+		err   error
+	}
+	per := make([]scanned1, len(paths))
+	next := make(chan int)
+	var wg sync.WaitGroup
+	for range runtime.GOMAXPROCS(0) {
+		wg.Go(func() {
+			cache := &denyCache{deny: deny, seen: map[string]bool{}}
+			for i := range next {
+				src, err := os.ReadFile(filepath.Join(root, paths[i]))
+				if err != nil {
+					per[i].err = err
+					continue
+				}
+				if bytes.IndexByte(src, 0) >= 0 {
+					continue // binary
+				}
+				per[i] = scanned1{found: scanText(paths[i], src, vocab, cache), lines: bytes.Count(src, []byte("\n")), text: true}
+			}
+		})
+	}
+	for i := range paths {
+		next <- i
+	}
+	close(next)
+	wg.Wait()
 	var findings []scopeFinding
 	scanned, lines := 0, 0
-	for _, p := range trackedFiles(t) {
-		if p == scopeSelf || p == "go.sum" || strings.HasPrefix(p, scopeDir+"/") {
-			continue
+	for _, r := range per {
+		if r.err != nil {
+			t.Fatal(r.err)
 		}
-		src, err := os.ReadFile(filepath.Join(root, p))
-		if err != nil {
-			t.Fatal(err)
+		if r.text {
+			scanned++
+			lines += r.lines
+			findings = append(findings, r.found...)
 		}
-		if bytes.IndexByte(src, 0) >= 0 {
-			continue // binary
-		}
-		scanned++
-		lines += bytes.Count(src, []byte("\n"))
-		findings = append(findings, scanText(p, src, vocab, cache)...)
 	}
 
 	list, err := os.ReadFile(filepath.Join(root, "test", "contract", "columns.tsv"))

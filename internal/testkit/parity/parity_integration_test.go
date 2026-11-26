@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -133,8 +134,33 @@ func load(fx parity.Fixture) (string, error) {
 	} else if err := db.Seed(ctx, buf.String()); err != nil {
 		return "", err
 	}
+	if err := derive(ctx); err != nil {
+		return "", err
+	}
 	seeded[fx] = parity.Checksum(buf.Bytes())
 	return seeded[fx], nil
+}
+
+// derived are the platform's views its workers refresh after every load
+// (the stops' modes the stop boards pick by, the routes' districts, the
+// untimed trips, the street tiles): the fixture is the platform's state
+// only once they are refreshed, as the platform's side of the kit
+// refreshes them after its load.
+var derived = []string{"gtfs_route_kreise", "gtfs_untimed_trips", "transit_stop_modes", "osm_street_tiles", "osm_street_tiles_lo"}
+
+// derive refreshes the derived views over the questions' database.
+func derive(ctx context.Context) error {
+	conn, err := pgx.Connect(ctx, db.OwnerURL)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = conn.Close(ctx) }()
+	for _, v := range derived {
+		if _, err := conn.Exec(ctx, "refresh materialized view public."+v); err != nil { //nolint:misspell // the SQL keyword
+			return fmt.Errorf("refresh %s: %w", v, err)
+		}
+	}
+	return nil
 }
 
 // The repository's refresh registry and the fake live refresher's script
@@ -212,7 +238,7 @@ func principal(c parity.Case) auth.Principal {
 func (a asker) ask(t *testing.T, c parity.Case) []byte {
 	t.Helper()
 	now := func() time.Time { return c.Now }
-	svc := features.New(features.Repositories{Register: a.st, Charging: a.st, Parking: a.st, Places: a.st, Roads: a.st, Weather: a.st, Rules: a.st, Transit: a.st, Fuel: a.st, Hydrogen: a.st, Speed: a.st, Sharing: a.st, Addresses: a.st, Pois: a.st, Locations: a.st, Disruptions: a.st, Nearby: a.st, Lorry: a.st, Catalogue: a.st, National: a.st, Affected: a.st, Coverage: a.st, States: a.st, TrainBoards: a.st, Bays: a.st}, wire.FeatureSettings(a.cfg), now)
+	svc := features.New(features.Repositories{Register: a.st, Charging: a.st, Parking: a.st, Places: a.st, Resolver: a.st, Roads: a.st, Weather: a.st, Rules: a.st, Transit: a.st, Fuel: a.st, Hydrogen: a.st, Speed: a.st, Sharing: a.st, Addresses: a.st, Pois: a.st, Locations: a.st, Disruptions: a.st, Nearby: a.st, Lorry: a.st, Catalogue: a.st, National: a.st, Affected: a.st, Coverage: a.st, States: a.st, TrainBoards: a.st, Bays: a.st}, wire.FeatureSettings(a.cfg), now)
 	svc.WithRefreshes(a.refreshes)
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Config: a.cfg, Build: buildinfo.Info{Version: "parity", Commit: "parity"}, ContractVersion: dbcontract.ContractVersion, Now: now,
@@ -292,6 +318,12 @@ func refresh(t *testing.T, h http.Handler, c parity.Case) func() {
 		for _, tb := range tables {
 			stmts = append(stmts, stmt{`delete from ` + pgx.Identifier(strings.Split(tb, ".")).Sanitize() + ` where observed_at = $1`, []any{c.Now}}) //nolint:misspell // the pgx method's name
 		}
+		if latest, ok := restatedLatest[c.Refresh.Source]; ok {
+			ticks := pgx.Identifier(strings.Split(tables[len(tables)-1], ".")).Sanitize() //nolint:misspell // the pgx method's name
+			stmts = append(stmts, stmt{`update ` + latest + ` l set observed_at = t.at
+  from (select station_id, product, max(observed_at) at from ` + ticks + ` group by 1, 2) t
+  where l.observed_at = $1 and t.station_id = l.station_id and t.product = l.product`, []any{c.Now}})
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), testBound)
 		defer cancel()
 		conn, err := db.Owner(ctx)
@@ -312,6 +344,12 @@ func refresh(t *testing.T, h http.Handler, c parity.Case) func() {
 // partitions (no platform table is named in the tree): the undo removes the
 // rows of the partitioned table under the view.
 var tickViews = map[string]string{"fuel-prices-de": "contract.fuel_price_observation"}
+
+// restatedLatest are the newest-price tables a source's refresh restates
+// (a confirmed price's observed time set to the refresh's, as the
+// platform's price poll does, with no new tick): the undo sets each row it
+// restated back to its newest remaining tick, the time the seed gave it.
+var restatedLatest = map[string]string{"fuel-prices-de": "public.fuel_price_latest"}
 
 // baseTable is the partitioned table under the view $1, as schema.table,
 // found from the view's own dependencies.
@@ -438,7 +476,7 @@ func noteOwners(t *testing.T) parity.Owners {
 // compare asks every case of the bundle pinned under name and compares the
 // facts; it returns the bundle and the asker it used, whose store and
 // connections a caller reuses rather than opening a second one.
-func compare(t *testing.T, name string) (parity.Bundle, asker) {
+func compare(t *testing.T, name string, deferred []parity.Deferral) (parity.Bundle, asker) {
 	t.Helper()
 	b, err := parity.Load(os.DirFS(dir), name)
 	if err != nil {
@@ -457,6 +495,10 @@ func compare(t *testing.T, name string) (parity.Bundle, asker) {
 	a := open(t)
 	compared := map[string][]string{}
 	facts, differ := 0, 0
+	// The report of #245: the deferred differences per class and per tool,
+	// and the deferrals nothing in the bundle needs any more.
+	perClass := map[string]map[string]int{}
+	used := make([]bool, len(deferred))
 	// Each case is a subtest of its own: a case is a read (and a refresh it
 	// waits on), and the bundle's cases together outgrow one leaf's bound
 	// (TST-012).
@@ -466,7 +508,23 @@ func compare(t *testing.T, name string) (parity.Bundle, asker) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			d := parity.Diff(c.Facts, got)
+			var d []string
+			for _, line := range parity.Diff(c.Facts, got) {
+				i := parity.Defers(deferred, c.Operation, line)
+				if i < 0 {
+					d = append(d, line)
+					continue
+				}
+				used[i] = true
+				cl := deferred[i].Class
+				if deferred[i].BlindSpot() {
+					cl += " (blind spot)"
+				}
+				if perClass[cl] == nil {
+					perClass[cl] = map[string]int{}
+				}
+				perClass[cl][c.Operation]++
+			}
 			if len(d) > 0 {
 				t.Errorf("case %s (%s, MCP %q): %d of %d facts differ:\n  %s", c.ID, c.Operation, c.Counterpart, len(d), len(c.Facts), strings.Join(d, "\n  "))
 			}
@@ -478,7 +536,21 @@ func compare(t *testing.T, name string) (parity.Bundle, asker) {
 	for op, ids := range compared {
 		t.Logf("compared %s: %d case(s): %s", op, len(ids), strings.Join(ids, ", "))
 	}
-	t.Logf("bundle %s: %d case(s), %d fact(s) compared, %d difference(s)", name, len(b.Cases), facts, differ)
+	t.Logf("bundle %s: %d case(s), %d fact(s) compared, %d difference(s) open", name, len(b.Cases), facts, differ)
+	for _, cl := range slices.Concat(parity.DeferClasses, []string{"C (blind spot)"}) {
+		ops := slices.Sorted(maps.Keys(perClass[cl]))
+		n, by := 0, make([]string, 0, len(ops))
+		for _, op := range ops {
+			n += perClass[cl][op]
+			by = append(by, fmt.Sprintf("%s %d", op, perClass[cl][op]))
+		}
+		t.Logf("deferred class %s: %d difference(s): %s", cl, n, strings.Join(by, ", "))
+	}
+	for i, u := range used {
+		if !u {
+			t.Errorf("%s line %+v defers a difference the bundle %s no longer has: remove it", parity.DeferredFile, deferred[i], name)
+		}
+	}
 	return b, a
 }
 
@@ -487,7 +559,11 @@ func compare(t *testing.T, name string) (parity.Bundle, asker) {
 // evidence.
 func TestParity(t *testing.T) {
 	req.Covers(t, "TEST-009", "FR-GEN-002", "CON-007")
-	b, a := compare(t, platform())
+	deferred, err := parity.LoadDeferred(os.DirFS(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, a := compare(t, platform(), deferred)
 	switch b.Producer {
 	case parity.ProducerAPI:
 		t.Logf("bundle %s was recorded by the API itself: it is a regression lock, not parity evidence; parity needs a bundle the MCP side produced", platform())
@@ -533,7 +609,7 @@ func TestRegressionLock(t *testing.T) {
 	if *record {
 		recordBundle(t)
 	}
-	if b, _ := compare(t, buildinfo.Unsynced); b.Producer != parity.ProducerAPI {
+	if b, _ := compare(t, buildinfo.Unsynced, nil); b.Producer != parity.ProducerAPI {
 		t.Errorf("the regression lock %s is produced by %q; it is the API's own recording", buildinfo.Unsynced, b.Producer)
 	}
 }

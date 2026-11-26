@@ -34,6 +34,8 @@ vocabulary	api/openapi.json	datex	a situation id exactly as the read contract gi
 vocabulary	internal/adapters/httpapi/roads.go	datex	a situation id exactly as the read contract gives a Land or city traffic message (the generated fixture id it was answered with); the id is the read contract's, opaque to a client; an opaque id is asked of the database lane
 vocabulary	test/parity/bundles/unsynced.json	datex	a situation id exactly as the read contract gives a Land or city traffic message (the generated fixture ids the API answered the parity questions with); the id is the read contract's, opaque to a client; an opaque id is asked of the database lane
 vocabulary	test/parity/bundles/2.6.22.json	datex	a situation id exactly as the read contract gives a Land or city traffic message (the generated fixture ids both sides of the pinned parity bundle state); the id is the read contract's, opaque to a client; an opaque id is asked of the database lane
+vocabulary	test/parity/bundles/2.6.52.json	datex	a situation id exactly as the read contract gives a Land or city traffic message (the generated fixture ids both sides of the pinned parity bundle state); the id is the read contract's, opaque to a client; an opaque id is asked of the database lane
+vocabulary	test/parity/bundles/2.6.54.json	datex	a situation id exactly as the read contract gives a Land or city traffic message (the generated fixture ids both sides of the pinned parity bundle state); the id is the read contract's, opaque to a client; an opaque id is asked of the database lane
 column	api/openapi.json	providerUpdatedAt	the public member of a hydrogen station published before the read contract named its column; the contract took the public name, it exposes no storage
 column	api/openapi.json	reportedAt	the public member of a report published before the read contract named a sharing column the same; the contract took the public name, it exposes no storage
 column	api/openapi.json	whole_day	the platform tool argument find_fuel_station.whole_day, named as the tool names it for parity (FR-ENERGY-002); a request parameter, not a storage name
@@ -81,6 +83,9 @@ denylist	internal/adapters/store/parity_b2_integration_test.go	-	owner decision 
 denylist	internal/adapters/store/parity_b_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
 denylist	internal/adapters/store/legacy_text_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
 denylist	internal/adapters/store/weather_text_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/change_list_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	test/live/fakelive.json	-	owner decision 2026-11-23: the store reads the platform's tables directly; the fake refresher restates the newest fuel prices in the table the store reads, as the platform's price poll does
+denylist	internal/testkit/parity/parity_integration_test.go	-	owner decision 2026-11-23: the store reads the platform's tables directly; a refresh question's undo sets back the newest fuel prices the fake refresher restated, in the table the store reads
 denylist	internal/adapters/store/parity_c_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
 denylist	internal/adapters/store/parity_events_c_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
 denylist	internal/adapters/store/parity_named_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
@@ -131,3 +136,53 @@ vocabulary	internal/testkit/baseseed/base_seed.sql	feeds	the platform's table an
 vocabulary	internal/testkit/baseseed/base_seed.sql	gtfs	the platform's table and column names the test seed writes carry this word
 vocabulary	internal/testkit/baseseed/base_seed.sql	ingest	the platform's table and column names the test seed writes carry this word
 vocabulary	internal/testkit/baseseed/base_seed.sql	siri	the platform's table and column names the test seed writes carry this word
+vocabulary	internal/adapters/store/freshness.go	ingest	the schema name of the registered sources table whose row versions the register probe reads (ctid and xmin only); the platform's storage name, not the API's vocabulary
+denylist	internal/adapters/store/speed_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables (the official cameras and the status rows whose versions key the kept cells)
+vocabulary	internal/adapters/store/speed_integration_test.go	feed	the platform's status table and its ledger names, which this test writes to move a family's version
+vocabulary	internal/adapters/store/speed_integration_test.go	ingest	the platform's status ledger name, which this test writes to state the gazetteer's version
+denylist	internal/adapters/store/reach_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them writes the run ledger they read
+vocabulary	internal/adapters/store/reach_integration_test.go	ingest	the platform's run ledger, which this test writes to state the timetable's load
+vocabulary	internal/adapters/store/relations.go	ingest	the platform's run ledger (ingest_runs), which the timetable reach reads
+denylist	internal/adapters/store/gemeinde_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them plants their rows
+denylist	internal/adapters/store/junctions_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them plants their rows
+denylist	internal/adapters/store/datapaths_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them refreshes the stop families they read
+denylist	internal/adapters/store/motorway_sql.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/roadstatus_sql.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/motorway_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/roadstatus_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+vocabulary	internal/adapters/store/roadstatus_integration_test.go	feed	the platform's status ledger name, which this test writes to state when a strategy source was last checked
+denylist	internal/adapters/store/parking_around.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+vocabulary	internal/adapters/store/parking_around.go	feed	the platform's column and check names of a road-context row's source
+denylist	internal/adapters/store/parking_around_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+vocabulary	internal/adapters/store/parking_around_integration_test.go	feed	the platform's register and status ledger names, which this test writes to state a source's last check
+denylist	internal/adapters/store/trainboard_stored.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+vocabulary	internal/adapters/store/trainboard_stored.go	feed	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/trainboard_stored.go	feeds	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/trainboard_stored.go	gtfs	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+denylist	internal/adapters/store/trainboard_stored_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+vocabulary	internal/adapters/store/trainboard_stored_integration_test.go	feed	owner decision 2026-11-23: the platform's table and column names this test's seed rows write carry this word
+column	api/openapi.json	siteId	member name of a charging place fixed by the MCP charging answer (its sites[].siteId, the id a charger watch takes back); the resource vocabulary, not a storage name
+denylist	internal/adapters/store/charging_places_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/charging_places_sql.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+vocabulary	internal/adapters/store/charging_places.go	feed	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/charging_places.go	feeds	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/charging_places_integration_test.go	feed	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/charging_places_sql.go	feed	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/charging_places_sql.go	feeds	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+denylist	internal/adapters/store/place_resolve.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/place_resolve_address_sql.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/place_resolve_poi_sql.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, so this file names them
+denylist	internal/adapters/store/entry_static_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/legacy_b_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/legacy_b9_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/legacy_c_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/legacy_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/legacy_platform_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+denylist	internal/adapters/store/place_rows_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+vocabulary	internal/adapters/store/legacy_platform_integration_test.go	feed	owner decision 2026-11-23: the platform's own reads, frozen beside the named statements for the parity, name its tables and columns, which carry this word
+vocabulary	internal/adapters/store/legacy_platform_integration_test.go	feeds	owner decision 2026-11-23: the platform's own reads, frozen beside the named statements for the parity, name its tables and columns, which carry this word
+vocabulary	internal/adapters/store/legacy_platform_integration_test.go	gtfs	owner decision 2026-11-23: the platform's own reads, frozen beside the named statements for the parity, name its tables and columns, which carry this word
+vocabulary	internal/adapters/store/legacy_platform_integration_test.go	ingest	owner decision 2026-11-23: the platform's own reads, frozen beside the named statements for the parity, name its tables and columns, which carry this word
+vocabulary	internal/adapters/store/trainboard_stored_integration_test.go	gtfs	owner decision 2026-11-23: the platform's table and column names this file's statements read carry this word
+vocabulary	internal/adapters/store/export_integration_test.go	feed	the name of a named statement of the store (charging_places.go), written as the store names it to say why it has no platform read to compare with
+vocabulary	internal/testkit/parity/parity_integration_test.go	gtfs	owner decision 2026-11-23: the platform's derived views the harness refreshes after its load, as the platform's workers do, carry this word in their names

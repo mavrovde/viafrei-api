@@ -351,6 +351,8 @@ func open(t *testing.T) *rig {
 	list("departures", "select stop_place_id from contract.stop_place where withdrawn_at is null order by 1 limit 40",
 		"/v1/stations/", "/departures?from="+r.now.Add(-2*time.Hour).UTC().Format(time.RFC3339)+"&duration_min=240")
 	list("facilities", "select distinct stop_place_id from contract.station_facility order by 1 limit 40", "/v1/stations/", "/facilities")
+	list("station-page", "select stop_place_id from contract.stop_place where withdrawn_at is null order by 1 limit 40", "/v1/stations/", "/page")
+	list("stop-boards", fmt.Sprintf(at, "stop_place"), "/v1/stop-boards?at=", "&radius_m=1000&limit=5")
 	list("disruptions", "select region_code from contract.admin_region order by 1 limit 40", "/v1/transit-disruptions?area=", "")
 	list("states", "select distinct region_code from contract.admin_region where region_level = 'state' order by 1 limit 40",
 		"/v1/states/", "/road-conditions?road_class=motorway")
@@ -470,7 +472,7 @@ func (r *rig) handler(t *testing.T, cached bool) http.Handler {
 		Config: &cfg, Build: buildinfo.Info{Version: "bench", Commit: "bench"}, ContractVersion: dbcontract.ContractVersion, Now: now,
 		Readiness: health.NewChecker(r.st, expected, cfg.Health.ReadyTimeout),
 		Auth:      keyAuth{r.key, r.own}, Sources: r.st, Versions: r.st,
-		Features: features.New(features.Repositories{Register: r.st, Charging: r.st, Parking: r.st, Places: r.st, Roads: r.st, Weather: r.st, Rules: r.st, Transit: r.st, Fuel: r.st, Hydrogen: r.st, Speed: r.st, Sharing: r.st, Addresses: r.st, Pois: r.st, Locations: r.st, Disruptions: r.st, Nearby: r.st, Lorry: r.st, Catalogue: r.st, National: r.st, Affected: r.st, Coverage: r.st, States: r.st, TrainBoards: r.st, Bays: r.st}, wire.FeatureSettings(&cfg), now).WithRefreshes(r.refresh),
+		Features: features.New(features.Repositories{Register: r.st, Charging: r.st, Parking: r.st, Places: r.st, Resolver: r.st, Roads: r.st, Weather: r.st, Rules: r.st, Transit: r.st, Fuel: r.st, Hydrogen: r.st, Speed: r.st, Sharing: r.st, Addresses: r.st, Pois: r.st, Locations: r.st, Disruptions: r.st, Nearby: r.st, Lorry: r.st, Catalogue: r.st, National: r.st, Affected: r.st, Coverage: r.st, States: r.st, TrainBoards: r.st, Bays: r.st}, wire.FeatureSettings(&cfg), now).WithRefreshes(r.refresh),
 	}
 	h, err := httpapi.NewHandler(deps)
 	if err != nil {
@@ -534,6 +536,12 @@ func (r *rig) targetsOf(op string) []string {
 		return r.targets["lorry"]
 	case "listPlaces":
 		return r.targets["places"]
+	case "resolvePlace":
+		var out []string
+		for _, t := range r.targets["places"] {
+			out = append(out, strings.Replace(t, "/v1/places?q=", "/v1/places/resolve?q=", 1))
+		}
+		return out
 	case "listAddresses":
 		return r.targets["addresses"]
 	case "listPois":
@@ -542,6 +550,10 @@ func (r *rig) targetsOf(op string) []string {
 		return r.targets["departures"]
 	case "listStationFacilities":
 		return r.targets["facilities"]
+	case "getStationPage":
+		return r.targets["station-page"]
+	case "listStopBoards":
+		return r.targets["stop-boards"]
 	case "listTransitDisruptions":
 		return r.targets["disruptions"]
 	case "listStateRoadConditions":

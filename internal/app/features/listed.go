@@ -28,12 +28,25 @@ func listedOwn[T any](ctx context.Context, s *Service, key access.Record, domain
 
 func listedCredits[T any](ctx context.Context, s *Service, key access.Record, domain string, dataset provenance.Dataset, own bool,
 	read func(permitted []string) (T, []string, error)) (T, Answer[struct{}], error) {
+	return listedFrom(ctx, s, key, func(reg []access.Terms) []string { return access.Answering(reg, domain) }, dataset, own, read)
+}
+
+// listedBoard is listedOwn over a departure board's families
+// (boardFamilies): the transit families and the Trip Updates'.
+func listedBoard[T any](ctx context.Context, s *Service, key access.Record,
+	read func(permitted []string) (T, []string, error)) (T, Answer[struct{}], error) {
+	return listedFrom(ctx, s, key, boardFamilies, "", true, read)
+}
+
+// listedFrom is listed over the families answering picks from the register.
+func listedFrom[T any](ctx context.Context, s *Service, key access.Record, answering func([]access.Terms) []string, dataset provenance.Dataset, own bool,
+	read func(permitted []string) (T, []string, error)) (T, Answer[struct{}], error) {
 	var zero T
 	reg, gate, err := s.gate(ctx, key)
 	if err != nil {
 		return zero, Answer[struct{}]{}, err
 	}
-	permitted, partial, err := gate.Answer(access.Answering(reg, domain))
+	permitted, partial, err := gate.Answer(answering(reg))
 	if err != nil {
 		return zero, Answer[struct{}]{}, err
 	}

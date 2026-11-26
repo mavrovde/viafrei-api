@@ -1,0 +1,173 @@
+{
+  "title": "A station's page",
+  "request": "/v1/stations/8001001/page?departures=3\u0026lang=en",
+  "attribution": "Each section names the source families it was read from in its sources, and the answer credits each of them once in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+  "key": {
+    "useClass": "commercial",
+    "scopes": [
+      "transit",
+      "accessibility"
+    ],
+    "sources": [
+      "db_stada",
+      "delfi_static",
+      "mobilithek_connect_gtfs",
+      "delfi_rt_tu",
+      "openstation_siri_fm",
+      "delfi_rt_sa"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "data": {
+      "pageUrl": "https://viafrei.de/en/station/seed-ijaijceeccig",
+      "sections": [
+        {
+          "id": "header",
+          "asOf": "2026-03-30T00:00:00Z",
+          "sources": [
+            "db_stada"
+          ],
+          "header": {
+            "name": "Schömpingbach Hbf",
+            "stationNo": "822292607",
+            "eva": "8001001",
+            "evaNumbers": [
+              "8001001",
+              "8001002",
+              "8001003"
+            ],
+            "slug": "seed-ijaijceeccig",
+            "street": null,
+            "zipcode": null,
+            "city": null,
+            "land": null,
+            "category": null
+          }
+        },
+        {
+          "id": "rail_ampel",
+          "asOf": "2026-03-30T00:00:00Z",
+          "sources": [
+            "delfi_static"
+          ],
+          "railAmpel": {
+            "lamp": "unknown",
+            "trips": 0,
+            "reasons": [],
+            "lines": []
+          }
+        },
+        {
+          "id": "step_free_now",
+          "asOf": "2026-03-30T00:00:00Z",
+          "sources": [
+            "db_stada"
+          ],
+          "stepFreeNow": {
+            "platforms": [],
+            "blocked": [],
+            "steplessAccess": null
+          }
+        },
+        {
+          "id": "lifts",
+          "asOf": null,
+          "sources": [],
+          "lifts": []
+        },
+        {
+          "id": "platforms",
+          "asOf": null,
+          "sources": []
+        },
+        {
+          "id": "departures",
+          "asOf": "2026-03-30T00:00:00Z",
+          "sources": [
+            "delfi_static"
+          ],
+          "departures": []
+        },
+        {
+          "id": "service_alerts",
+          "asOf": "2026-03-30T00:00:00Z",
+          "sources": [],
+          "alerts": []
+        },
+        {
+          "id": "parking_charging",
+          "asOf": "2026-03-30T00:00:00Z",
+          "sources": [],
+          "facilities": {
+            "flags": [],
+            "location": null
+          }
+        }
+      ]
+    },
+    "meta": {
+      "requestId": "example-request-0001",
+      "generatedAt": "2026-03-30T00:00:00Z",
+      "language": "en",
+      "asOf": null,
+      "freshness": [
+        {
+          "family": "db_stada",
+          "dataAsOf": null,
+          "ageS": null,
+          "staleAfterS": 9007199254740991,
+          "stale": false,
+          "lastCheckedAt": null
+        },
+        {
+          "family": "delfi_static",
+          "dataAsOf": "2026-03-29T12:00:00Z",
+          "ageS": 43200,
+          "staleAfterS": 259200,
+          "stale": false,
+          "lastCheckedAt": "2026-03-29T12:00:00Z"
+        }
+      ],
+      "attribution": [
+        {
+          "family": "db_stada",
+          "domain": "transit",
+          "publisher": "Bahnhofsdaten: Deutsche Bahn AG, DB API Marketplace, CC BY 4.0, bearbeitet",
+          "text": "Bahnhofsdaten: Deutsche Bahn AG, DB API Marketplace, CC BY 4.0, bearbeitet",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://developers.deutschebahn.com",
+          "sourceUrl": "https://developers.deutschebahn.com"
+        },
+        {
+          "family": "delfi_static",
+          "domain": "transit",
+          "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+          "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://licences.example/cc-by-4-0",
+          "shareAlike": false,
+          "shareAlikeOffer": null,
+          "termsUrl": "https://www.opendata-oepnv.de",
+          "sourceUrl": "https://www.opendata-oepnv.de"
+        }
+      ],
+      "notes": {
+        "condition": [],
+        "purpose": []
+      },
+      "warnings": [
+        {
+          "code": "partial",
+          "detail": "A source family that could answer was withheld under the key's licence terms."
+        }
+      ]
+    },
+    "links": {
+      "self": "https://api.viafrei.de/v1/stations/8001001/page"
+    }
+  }
+}

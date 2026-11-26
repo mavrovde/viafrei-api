@@ -11,7 +11,7 @@ select source_ref, domain, use_classes, acceptance_required,
 from contract.source order by source_ref`
 	legacyReads["api_sources"] = `
 select s.source_ref, s.domain, p.display_name, s.attribution_text, l.licence_name, l.licence_url,
-       l.share_alike, s.share_alike_offer_url, s.terms_url
+       l.share_alike, s.share_alike_offer_url, ` + legacyTermsPage + `
 from contract.source s
 join contract.publisher p using (publisher_id)
 join contract.licence l using (licence_code)

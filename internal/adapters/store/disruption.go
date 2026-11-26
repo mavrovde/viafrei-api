@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -77,10 +78,15 @@ from o where $5::int >= 0 -- $5, the limit, is the list's alone`, "timestamp wit
 
 var alertsCTE = strings.NewReplacer("{live}", alertLive("a", "$1"), "{inforce}", alertInForce("a", "$1")).Replace(regionAlerts)
 
-// areaPunctuality reads the punctuality of the area $1, of the families $2.
+// alertsCoverage reads the alerts coverage of the area's Land
+// (relAlertsCoverage).
+var alertsCoverage = named("api_alerts_coverage", relAlertsCoverage, "text", "timestamptz", "text[]")
+
+// areaPunctuality reads the punctuality of the area $1, of the families $2,
+// from the Land of the area alone (areaBound).
 var areaPunctuality = namedOpaque("api_area_punctuality", `select p.area_level, p.area_code, p.area_name, p.trips_observed, p.trips_late, p.trips_skipped_stop, p.trips_untimed,
        p.median_worst_delay_s, p.stops_seen, p.observed_at, p.source_ref
-from (`+relTransitPunctuality+`) p
+from (`+areaBound(relTransitPunctuality)+`) p
 where p.area_code = $1 and p.source_ref = any($2) and `+permitted("p")+`
 order by p.area_level
 limit 1`, "text", "text[]")
@@ -160,6 +166,14 @@ func (s *Store) Disruptions(ctx context.Context, q transit.DisruptionQuery, fami
 		if q.Area == "" {
 			return out, nil
 		}
+		cov := transit.AlertsCoverage{LookbackDays: transit.AlertsLookbackDays, Covered: len(alerts) > 0,
+			Lands: []transit.LandCoverage{{Land: transit.LandOf(q.Area)}}}
+		since := q.Now.Add(-time.Duration(transit.AlertsLookbackDays) * 24 * time.Hour)
+		if err := runRow(ctx, tx, alertsCoverage, q.Area, since, families).Scan(&cov.Lands[0].Land, &cov.Lands[0].AlertsSeen, &cov.Lands[0].LastSeenAt); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return out, err
+		}
+		cov.Covered = cov.Covered || cov.Lands[0].AlertsSeen > 0
+		out.Coverage = &cov
 		for _, f := range families {
 			if f == punctualityFamily {
 				out.PunctualityRead = append(out.PunctualityRead, f)
@@ -191,4 +205,39 @@ func (s *Store) Disruptions(ctx context.Context, q transit.DisruptionQuery, fami
 		}
 		return out, nil
 	})
+}
+
+// areaBound is the punctuality relation rel read from the Land of the area
+// $1 alone (punctualityOfArea) in place of the view of every Land; it
+// panics at init when rel no longer reads the view once.
+func areaBound(rel string) string {
+	const view = "FROM transit_punctuality_area_live p"
+	if n := strings.Count(rel, view); n != 1 {
+		panic(fmt.Sprintf("store: the punctuality relation reads %q %d times, not once: the area bound has no place", view, n))
+	}
+	return strings.Replace(rel, view, "FROM ("+punctualityOfArea+") p", 1)
+}
+
+// punctualityOfArea is the platform's punctuality of every area
+// (transit_punctuality_area_live, its definition at schema head 348) with
+// its Länder bound to the one the area $1 lies in (the first two digits of
+// its key; every Land for the nation, 'de'): the view counts each Land in
+// its own lateral read and derives its Kreise and cities from that Land's
+// alone, so one Land's rows are the view's rows of that Land. The view
+// counted all sixteen in a materialised CTE no area filter reached, 2.9 to
+// 9.6 s on prod for Berlin; bound, 26 to 55 ms (2026-11-25).
+var punctualityOfArea = landsOfArea(punctualityView)
+
+// landsOfArea binds the Länder of the punctuality definition def to the area
+// $1; it panics at init when def no longer lists the sixteen Länder once,
+// so the bound is never dropped quietly.
+func landsOfArea(def string) string {
+	const all = "( VALUES ('01'::text), ('02'::text), ('03'::text), ('04'::text), ('05'::text), ('06'::text), ('07'::text), ('08'::text), ('09'::text), ('10'::text), ('11'::text), ('12'::text), ('13'::text), ('14'::text), ('15'::text), ('16'::text)) l(land)"
+	if n := strings.Count(def, all); n != 1 {
+		panic(fmt.Sprintf("store: the punctuality definition lists the Länder %d times, not once: the area bound has no place", n))
+	}
+	return strings.Replace(def, all, `unnest(CASE WHEN $1::text = 'de'::text
+               THEN ARRAY['01'::text, '02'::text, '03'::text, '04'::text, '05'::text, '06'::text, '07'::text, '08'::text,
+                          '09'::text, '10'::text, '11'::text, '12'::text, '13'::text, '14'::text, '15'::text, '16'::text]
+               ELSE ARRAY["left"($1::text, 2)] END) l(land)`, 1)
 }

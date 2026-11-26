@@ -532,6 +532,22 @@
             "format": "int64",
             "type": "integer"
           },
+          "timetableLoadedAt": {
+            "description": "When the timetable was loaded; null when no load is recorded.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timetableUntil": {
+            "description": "End of the loaded timetable's last service day (the Berlin midnight after it, excluded): no planned departure is known from then on. Null when no timetable is loaded.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "until": {
             "description": "End of the window (excluded).",
             "format": "date-time",
@@ -550,7 +566,9 @@
           "untilLocal",
           "matched",
           "matchedAll",
-          "dropped"
+          "dropped",
+          "timetableUntil",
+          "timetableLoadedAt"
         ],
         "type": "object"
       },
@@ -619,6 +637,70 @@
           "current",
           "maxPowerKw",
           "availability"
+        ],
+        "type": "object"
+      },
+      "ChargingAddress": {
+        "additionalProperties": false,
+        "properties": {
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "postcode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "street": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "street",
+          "number",
+          "postcode",
+          "city"
+        ],
+        "type": "object"
+      },
+      "ChargingConnector": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "description": "Points with this plug.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "powerKw": {
+            "description": "The highest power of the points with this plug, in kW; null when none is published.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "type": {
+            "description": "The plug's name in the answer's language (CCS2, Typ 2 / Type 2, CHAdeMO, ...).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "powerKw",
+          "count"
         ],
         "type": "object"
       },
@@ -742,6 +824,10 @@
           "page": {
             "$ref": "#/components/schemas/Page"
           },
+          "pricesPublished": {
+            "$ref": "#/components/schemas/ChargingPricesPublished",
+            "description": "Only with group=place: how many of the places listed publish a price per kWh (\"published for 3 of 5 only\")."
+          },
           "query": {
             "$ref": "#/components/schemas/ChargingQuery"
           },
@@ -786,6 +872,209 @@
         ],
         "type": "object"
       },
+      "ChargingPlace": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "additionalProperties": false,
+            "description": "The first record's published address; null when it was filed under an address that is not where the place lies (see reportedAddress).",
+            "properties": {
+              "city": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "number": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "postcode": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "street": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "street",
+              "number",
+              "postcode",
+              "city"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "connectors": {
+            "items": {
+              "$ref": "#/components/schemas/ChargingConnector"
+            },
+            "type": "array"
+          },
+          "fromRegister": {
+            "description": "A Bundesnetzagentur register row is among the records.",
+            "type": "boolean"
+          },
+          "locatedNear": {
+            "description": "With reportedAddress: the town the place lies in, when one is known.",
+            "type": "string"
+          },
+          "price": {
+            "additionalProperties": false,
+            "description": "null: no record publishes a price per kWh (never 0).",
+            "properties": {
+              "amount": {
+                "description": "EUR per kWh, three decimals.",
+                "format": "double",
+                "type": "number"
+              },
+              "basis": {
+                "description": "gross: VAT included, as published or grossed up by the published rate; net: published without VAT and without a rate.",
+                "enum": [
+                  "net",
+                  "gross"
+                ],
+                "type": "string"
+              },
+              "currency": {
+                "enum": [
+                  "EUR"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "amount",
+              "basis",
+              "currency"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "registerReleasedOn": {
+            "description": "The release (Berlin date) of the register file the place's register rows come from; null when none is among them.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reportedAddress": {
+            "$ref": "#/components/schemas/ChargingAddress",
+            "description": "Only when the register row was filed under an address elsewhere (probably the operator's own): that address."
+          },
+          "reportedLocation": {
+            "$ref": "#/components/schemas/Position",
+            "description": "Only when the place was located by its address: the point the operator published."
+          },
+          "siteId": {
+            "description": "The platform's key of the place's first record: the site a charger watch (watch_situation, kind charger) takes.",
+            "type": "string"
+          },
+          "siteIds": {
+            "description": "Every record id of the place, siteId first.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "sourceEnded": {
+            "description": "The first record's source was ended by its publisher and answers until its window ends; its points carry no status.",
+            "type": "boolean"
+          },
+          "status": {
+            "additionalProperties": false,
+            "description": "null: no point has a status (unknown, never 0).",
+            "properties": {
+              "free": {
+                "description": "Points reported available.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "observedAt": {
+                "description": "When the newest status counted was last confirmed (UTC).",
+                "format": "date-time",
+                "type": "string"
+              },
+              "occupied": {
+                "description": "Points reported occupied.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "outOfOrder": {
+                "description": "Points reported out of order.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "stale": {
+                "description": "true: no point has a current status, and the counts are the last ones known, as of observedAt; possibly out of date.",
+                "type": "boolean"
+              },
+              "total": {
+                "description": "Every point of the place, those with no status included.",
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "free",
+              "occupied",
+              "outOfOrder",
+              "total",
+              "observedAt",
+              "stale"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "siteId",
+          "siteIds",
+          "address",
+          "fromRegister",
+          "registerReleasedOn",
+          "sourceEnded",
+          "status",
+          "price",
+          "connectors"
+        ],
+        "type": "object"
+      },
+      "ChargingPricesPublished": {
+        "additionalProperties": false,
+        "properties": {
+          "places": {
+            "description": "Places listed.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "priced": {
+            "description": "Places with a published price per kWh.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "priced",
+          "places"
+        ],
+        "type": "object"
+      },
       "ChargingQuery": {
         "additionalProperties": false,
         "properties": {
@@ -807,6 +1096,12 @@
             "type": "array"
           },
           "connector": {
+            "type": "string"
+          },
+          "group": {
+            "enum": [
+              "place"
+            ],
             "type": "string"
           },
           "maxKw": {
@@ -880,6 +1175,10 @@
               "string",
               "null"
             ]
+          },
+          "place": {
+            "$ref": "#/components/schemas/ChargingPlace",
+            "description": "Only with group=place: the place this item stands for. The item is then its first record, name is the place's label (its name and address, never a record id), and chargePoints are every record's points."
           },
           "sourceFamily": {
             "description": "The source family of the item; its attribution is in meta.attribution.",
@@ -1460,6 +1759,35 @@
             "description": "Whether an alert publication was alive to ask: alertsTotal 0 means none in force only when this is true, and that it could not be told when false.",
             "type": "boolean"
           },
+          "alertsCoverage": {
+            "additionalProperties": false,
+            "description": "Whether any alert source read covers the area's Land at all: no alert in force is an answer only where somebody publishes. Null without an area.",
+            "properties": {
+              "covered": {
+                "description": "An alert is listed now, or one was placed in a Land of the area by a stop or a route within lookbackDays.",
+                "type": "boolean"
+              },
+              "lands": {
+                "items": {
+                  "$ref": "#/components/schemas/LandCoverage"
+                },
+                "type": "array"
+              },
+              "lookbackDays": {
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "covered",
+              "lookbackDays",
+              "lands"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "alertsTotal": {
             "description": "Alerts in force before the limit, duplicates left out.",
             "format": "int64",
@@ -1597,7 +1925,8 @@
           "duplicatesOmitted",
           "punctuality",
           "windowMin",
-          "line"
+          "line",
+          "alertsCoverage"
         ],
         "type": "object"
       },
@@ -1978,6 +2307,14 @@
             "description": "The source family.",
             "type": "string"
           },
+          "lastCheckedAt": {
+            "description": "When the family's source was last asked and its data found current, whether it brought a new copy or confirmed the data unchanged (UTC); null when it never was. Beside dataAsOf it says how recently an unchanged answer was confirmed.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "stale": {
             "description": "True when ageS is above staleAfterS, or dataAsOf is unknown; never for a family with no fixed interval.",
             "type": "boolean"
@@ -1993,7 +2330,8 @@
           "dataAsOf",
           "ageS",
           "staleAfterS",
-          "stale"
+          "stale",
+          "lastCheckedAt"
         ],
         "type": "object"
       },
@@ -2011,10 +2349,18 @@
           },
           "meta": {
             "$ref": "#/components/schemas/FuelMeta"
+          },
+          "osmWithoutPrice": {
+            "description": "More filling stations mapped by OpenStreetMap with no station we hold within 300 m: no price for these stations yet. Nearest first, at most the limit and 5; empty when there are none or the key may not read OpenStreetMap's places. Credited in meta.attribution (ODbL).",
+            "items": {
+              "$ref": "#/components/schemas/OSMFuelStation"
+            },
+            "type": "array"
           }
         },
         "required": [
           "data",
+          "osmWithoutPrice",
           "meta",
           "links"
         ],
@@ -2262,6 +2608,22 @@
               "null"
             ]
           },
+          "openingHoursAsOf": {
+            "description": "When the station's published opening hours were last read from the provider. Null when never: then the station has no published hours and no claim of being open around the clock is made.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "openingObservedAt": {
+            "description": "When the station reported the open state it reported, with a price (under sort=price, with the asked grade's price): the state openingState states under sort=price. Null when no observation stated one.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "openingState": {
             "description": "open, closed or unknown at the answer's instant (open_at's, when asked), read from the published opening hours: unknown when there are none or they cannot be read. Under sort=price, the state the station reported, as the platform's cheapest-fuel search states it. Open enumeration.",
             "type": "string"
@@ -2285,6 +2647,8 @@
           "location",
           "distanceM",
           "openingState",
+          "openingObservedAt",
+          "openingHoursAsOf",
           "prices",
           "sourceFamily"
         ],
@@ -2558,6 +2922,108 @@
         ],
         "type": "object"
       },
+      "InterchangeDeparture": {
+        "additionalProperties": false,
+        "properties": {
+          "cancelled": {
+            "type": "boolean"
+          },
+          "delayMin": {
+            "description": "Minutes late (negative early); null when cancelled or no live figure stands.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "destination": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expectedAt": {
+            "description": "The time a live figure expects; null without one.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "line": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "live": {
+            "description": "Whether a live figure stands for it; false: the timetable's time.",
+            "type": "boolean"
+          },
+          "mode": {
+            "enum": [
+              "subway",
+              "tram"
+            ],
+            "type": "string"
+          },
+          "plannedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "platform": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "routeType": {
+            "description": "The timetable's route type code.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "sourceFamily": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "line",
+          "routeType",
+          "destination",
+          "platform",
+          "plannedAt",
+          "expectedAt",
+          "delayMin",
+          "cancelled",
+          "live",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
+      "InterchangeLines": {
+        "additionalProperties": false,
+        "properties": {
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "modes": {
+            "description": "subway, tram or bus; several when the name could be either.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "modes",
+          "lines"
+        ],
+        "type": "object"
+      },
       "KeyData": {
         "additionalProperties": false,
         "properties": {
@@ -2787,6 +3253,34 @@
         ],
         "type": "object"
       },
+      "LandCoverage": {
+        "additionalProperties": false,
+        "properties": {
+          "alertsSeen": {
+            "description": "Alerts placed in the Land by a stop or a route within lookbackDays.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "land": {
+            "description": "The Land's two-digit official key.",
+            "type": "string"
+          },
+          "newestAlertSeenAt": {
+            "description": "When the newest alert placed in the Land was last seen, at any age; null when none ever was.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "land",
+          "alertsSeen",
+          "newestAlertSeenAt"
+        ],
+        "type": "object"
+      },
       "Links": {
         "additionalProperties": false,
         "properties": {
@@ -2916,6 +3410,105 @@
               "code",
               "location",
               "distanceM",
+              "sourceFamily"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "gemeinde": {
+            "additionalProperties": false,
+            "description": "The Gemeinde the position lies in: the one the nearest German address names as its town (inside true), else the nearest Gemeinde within 15 km (inside false); null when none, or when the position may lie outside Germany. It decides the Kreis and the Regierungsbezirk, by its key.",
+            "properties": {
+              "bezirk": {
+                "description": "The Regierungsbezirk its key names; null where there is none.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "code": {
+                "description": "Its eight-digit official key (AGS).",
+                "type": "string"
+              },
+              "inside": {
+                "description": "True when the nearest German address names it as its town; false when it is only the nearest Gemeinde.",
+                "type": "boolean"
+              },
+              "kreis": {
+                "description": "The Kreis its key names; null when the gazetteer holds none.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "sourceFamily": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "code",
+              "inside",
+              "kreis",
+              "bezirk",
+              "sourceFamily"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "governmentRegion": {
+            "description": "The Regierungsbezirk the Gemeinde lies in; null where its Land has none, or with no Gemeinde.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "junction": {
+            "additionalProperties": false,
+            "description": "The nearest motorway junction within 100 km, as listNearby reads junctions (OpenStreetMap's node on the road the LCL places it on, else the gazetteer's point); null when none.",
+            "properties": {
+              "distanceM": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "from": {
+                "description": "osm, or gazetteer when no OpenStreetMap junction node is within reach: the gazetteer's points are sparse, so one beyond 15 km may not be the nearest there is.",
+                "enum": [
+                  "osm",
+                  "gazetteer"
+                ],
+                "type": "string"
+              },
+              "location": {
+                "$ref": "#/components/schemas/Position"
+              },
+              "name": {
+                "type": "string"
+              },
+              "road": {
+                "description": "The motorway it lies on; null for a junction off any motorway that can be named.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sourceFamily": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "road",
+              "location",
+              "distanceM",
+              "from",
               "sourceFamily"
             ],
             "type": [
@@ -3153,6 +3746,9 @@
           "district",
           "state",
           "mayLieOutsideGermany",
+          "gemeinde",
+          "junction",
+          "governmentRegion",
           "lowEmissionZone"
         ],
         "type": "object"
@@ -3466,6 +4062,38 @@
         ],
         "type": "object"
       },
+      "MotorwayAnnounced": {
+        "additionalProperties": false,
+        "properties": {
+          "closures": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "from": {
+            "description": "The earliest start of an announced entry; null when none.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reports": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "roadworks": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "closures",
+          "roadworks",
+          "reports",
+          "from"
+        ],
+        "type": "object"
+      },
       "MotorwayData": {
         "additionalProperties": false,
         "properties": {
@@ -3553,6 +4181,187 @@
             },
             "type": "array"
           },
+          "motorway": {
+            "additionalProperties": false,
+            "description": "The platform's motorway traffic answer for a motorway the road register holds, asked now, with a sweep of the road operator in the last 30 minutes: the road-wide counts, the measured state, the plan's works in force and the operator's entries with each jam's detail. Null for any other road, a window ahead, or a key that may not read the operator's events.",
+            "properties": {
+              "asOf": {
+                "description": "The road operator's newest sweep of the road, which every entry and count is of.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "events": {
+                "description": "The road operator's warnings, roadworks and closures at the sweep, one entry per site, in the platform's order (jams first), up to limit.",
+                "items": {
+                  "$ref": "#/components/schemas/MotorwayEntryView"
+                },
+                "type": "array"
+              },
+              "lampReasonsTotal": {
+                "description": "The lamp's reasons when a measure published as several sections is one reason, as the platform counts them.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "measured": {
+                "additionalProperties": false,
+                "description": "The measured state at the road's counting sites in the last 30 minutes; null when the key may not read it or no site measured.",
+                "properties": {
+                  "free": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "heavy": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "laneSites": {
+                    "description": "The sites whose state is measured per lane; 0 when the key may not read it.",
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "measuredAt": {
+                    "format": "date-time",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "sites": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "slow": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "slowNear": {
+                    "description": "The places near the slow or standing sites, as the location register names them.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "standstill": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "sites",
+                  "standstill",
+                  "slow",
+                  "heavy",
+                  "free",
+                  "laneSites",
+                  "measuredAt",
+                  "slowNear"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "plannedNow": {
+                "description": "The plan's short-duration works in force on the road now (at most 20); empty when none or the key may not read the plan.",
+                "items": {
+                  "$ref": "#/components/schemas/MotorwayPlan"
+                },
+                "type": "array"
+              },
+              "roadWide": {
+                "$ref": "#/components/schemas/MotorwayRoadWide",
+                "description": "The counts of the whole road at the sweep, whatever direction, kinds, limit or cursor ask."
+              }
+            },
+            "required": [
+              "asOf",
+              "roadWide",
+              "measured",
+              "lampReasonsTotal",
+              "plannedNow",
+              "events"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "roadStatus": {
+            "additionalProperties": false,
+            "description": "The platform's road status by road number: the totals by bucket, the entries listed and hidden, the sources that answered with when each was last seen current, and on a motorway the road operator's switched strategies. Null when the key may read none of its sources.",
+            "properties": {
+              "canRaise": {
+                "description": "Whether a higher limit would list every entry.",
+                "type": "boolean"
+              },
+              "counts": {
+                "$ref": "#/components/schemas/RoadStatusCounts"
+              },
+              "guidance": {
+                "description": "The road operator's switched strategies in force on the motorway, said as its recommendation; empty when none or not a motorway.",
+                "items": {
+                  "$ref": "#/components/schemas/RoadStatusGuidance"
+                },
+                "type": "array"
+              },
+              "guidanceNotCurrent": {
+                "description": "The strategy sources not checked within three of their cycles, whose strategies are not said.",
+                "items": {
+                  "$ref": "#/components/schemas/RoadStatusStaleCheck"
+                },
+                "type": "array"
+              },
+              "hidden": {
+                "description": "The entries counted and not listed: items plus hidden is counts.total.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "hiddenClosures": {
+                "description": "The closures among hidden.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "items": {
+                "description": "The entries listed, closures first, at most the limit (and eleven), in the platform's order.",
+                "items": {
+                  "$ref": "#/components/schemas/RoadStatusItem"
+                },
+                "type": "array"
+              },
+              "plannedWorksHaveNoCoordinates": {
+                "description": "The planning data carries no coordinates: planned works are filed by road and section.",
+                "type": "boolean"
+              },
+              "sourcesAnswered": {
+                "description": "The sources that answered, in the register's order; a source that did not answer is not listed.",
+                "items": {
+                  "$ref": "#/components/schemas/RoadStatusSource"
+                },
+                "type": "array"
+              },
+              "windowEnd": {
+                "description": "The end of the window the status covers: the window asked, else three days from now.",
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "windowEnd",
+              "counts",
+              "items",
+              "hidden",
+              "hiddenClosures",
+              "canRaise",
+              "sourcesAnswered",
+              "guidance",
+              "guidanceNotCurrent",
+              "plannedWorksHaveNoCoordinates"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "sight": {
             "description": "The sight of every group the lamp read; any group not fresh keeps the lamp from green (limited_sight).",
             "items": {
@@ -3584,7 +4393,340 @@
           "counts",
           "sourceStamps",
           "coverage",
-          "situations"
+          "situations",
+          "motorway",
+          "roadStatus"
+        ],
+        "type": "object"
+      },
+      "MotorwayEntryView": {
+        "additionalProperties": false,
+        "properties": {
+          "averageSpeedKmh": {
+            "description": "The publisher's average speed; null when it states none.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "blocked": {
+            "type": "boolean"
+          },
+          "congestion": {
+            "description": "The publisher's state of the traffic (queuing, stationary, heavy, slow); set marks a jam.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "delayMinutes": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "description": {
+            "description": "The description's lines the platform shows: without its start line and its since clauses (marked with an ellipsis in brackets), at most two, each clipped at a word to 200 characters.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "extent": {
+            "description": "The publisher's extent of the site: lat,lon of its start then of its end.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "jam": {
+            "additionalProperties": false,
+            "description": "A jam's detail; null for any other entry.",
+            "properties": {
+              "causes": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "detours": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "endKm": {
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "endPlace": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "endSide": {
+                "enum": [
+                  "past",
+                  "before",
+                  "at",
+                  null
+                ],
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "endText": {
+                "description": "Where the jam ends, as its description words it.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "howLong": {
+                "additionalProperties": false,
+                "description": "How long a jam here lasts, the middle half of its runs; null under eight runs.",
+                "properties": {
+                  "cases": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "dayKind": {
+                    "enum": [
+                      "weekday",
+                      "weekend"
+                    ],
+                    "type": "string"
+                  },
+                  "fromHours": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "toHours": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "weeks": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "cases",
+                  "fromHours",
+                  "toHours",
+                  "dayKind",
+                  "weeks"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "lengthM": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "trend": {
+                "additionalProperties": false,
+                "description": "Its length, else its delay, over the last 30 minutes; null under three sweeps.",
+                "properties": {
+                  "direction": {
+                    "enum": [
+                      "growing",
+                      "shrinking",
+                      "stable"
+                    ],
+                    "type": "string"
+                  },
+                  "earlier": {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  "earlierAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "latest": {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  "latestAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "metric": {
+                    "enum": [
+                      "length",
+                      "delay"
+                    ],
+                    "type": "string"
+                  },
+                  "ticks": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "direction",
+                  "metric",
+                  "earlierAt",
+                  "earlier",
+                  "latestAt",
+                  "latest",
+                  "ticks"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "usual": {
+                "additionalProperties": false,
+                "description": "Whether it stands here at this Berlin weekday and hour in most of the last eight weeks; null under four weeks observed.",
+                "properties": {
+                  "hour": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "jamWeeks": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "verdict": {
+                    "enum": [
+                      "usual",
+                      "unusual"
+                    ],
+                    "type": "string"
+                  },
+                  "weekday": {
+                    "description": "ISO weekday in Berlin, Monday 1.",
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "weeks": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "verdict",
+                  "weeks",
+                  "jamWeeks",
+                  "weekday",
+                  "hour"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "lengthM",
+              "endText",
+              "endKm",
+              "endSide",
+              "endPlace",
+              "causes",
+              "detours",
+              "trend",
+              "usual",
+              "howLong"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "warning",
+              "roadworks",
+              "closure"
+            ],
+            "type": "string"
+          },
+          "lat": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "lon": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "phase": {
+            "$ref": "#/components/schemas/MotorwayPhase"
+          },
+          "segments": {
+            "description": "The sections the publisher gives the site as.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "since": {
+            "description": "The start the in-force rule used: the publisher's start, or the first phase its description states.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "siteIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "subtitle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "subtitle",
+          "congestion",
+          "delayMinutes",
+          "averageSpeedKmh",
+          "blocked",
+          "lat",
+          "lon",
+          "extent",
+          "since",
+          "segments",
+          "siteIds",
+          "description",
+          "phase",
+          "jam"
         ],
         "type": "object"
       },
@@ -3856,6 +4998,96 @@
         ],
         "type": "object"
       },
+      "MotorwayPhase": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "measureEnd": {
+            "description": "The end of the whole measure.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "measureEnd"
+        ],
+        "type": "object"
+      },
+      "MotorwayPlan": {
+        "additionalProperties": false,
+        "properties": {
+          "cause": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "family": {
+            "type": "string"
+          },
+          "from": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "section": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "family",
+          "id",
+          "kind",
+          "name",
+          "section",
+          "cause",
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
       "MotorwayQuery": {
         "additionalProperties": false,
         "properties": {
@@ -3891,6 +5123,39 @@
           "direction",
           "kinds",
           "minSeverity"
+        ],
+        "type": "object"
+      },
+      "MotorwayRoadWide": {
+        "additionalProperties": false,
+        "properties": {
+          "announced": {
+            "$ref": "#/components/schemas/MotorwayAnnounced",
+            "description": "Entries not yet in force: their counts and the earliest start."
+          },
+          "closures": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "jams": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "roadworks": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "warnings": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "jams",
+          "warnings",
+          "closures",
+          "roadworks",
+          "announced"
         ],
         "type": "object"
       },
@@ -4074,6 +5339,65 @@
         ],
         "type": "object"
       },
+      "NearbyAmenity": {
+        "additionalProperties": false,
+        "properties": {
+          "distanceM": {
+            "description": "Distance from the site, in metres.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "kind": {
+            "description": "Open enumeration; treat an unknown value as other.",
+            "enum": [
+              "toilet",
+              "shower",
+              "restaurant",
+              "snack",
+              "cafe",
+              "shop",
+              "drinking_water"
+            ],
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "name": {
+            "type": "string"
+          },
+          "osmDataAsOf": {
+            "description": "The day of the OpenStreetMap extract the entry comes from.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "distanceM",
+          "location",
+          "osmDataAsOf"
+        ],
+        "type": "object"
+      },
+      "NearbyChargingRegister": {
+        "additionalProperties": false,
+        "properties": {
+          "releasedOn": {
+            "description": "The release (Berlin date) of the Bundesnetzagentur register file.",
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "releasedOn"
+        ],
+        "type": "object"
+      },
       "NearbyData": {
         "additionalProperties": false,
         "properties": {
@@ -4084,6 +5408,10 @@
             },
             "type": "array"
           },
+          "chargingRegister": {
+            "$ref": "#/components/schemas/NearbyChargingRegister",
+            "description": "Only with charging_group=place, when a Bundesnetzagentur register row is among the charging places: the register's release."
+          },
           "fuel": {
             "description": "The cheapest current E5 prices first, three at most, each with its E5 price only.",
             "items": {
@@ -4092,16 +5420,31 @@
             "type": "array"
           },
           "junctions": {
-            "description": "Motorway junctions, nearest first, three at most; services areas and car parks are none.",
+            "description": "Motorway junctions, nearest first, three at most; services areas and car parks are none. OpenStreetMap's junction nodes, same-named ones within 1.5 km as one; with none, the gazetteer's junction points.",
             "items": {
               "$ref": "#/components/schemas/NearbyJunction"
             },
             "type": "array"
           },
+          "junctionsFrom": {
+            "description": "Where the junctions came from: osm, or gazetteer, when no OpenStreetMap junction node is within the radius. With junctions only.",
+            "enum": [
+              "osm",
+              "gazetteer"
+            ],
+            "type": "string"
+          },
           "needs": {
             "description": "The asked everyday needs, in the order asked.",
             "items": {
               "$ref": "#/components/schemas/NeedBlock"
+            },
+            "type": "array"
+          },
+          "osmParking": {
+            "description": "OpenStreetMap's car parks (ODbL; no capacity, no occupancy) in the radius that are none of the parking sites, nearest first, same-named ones as one, three at most; with parking, when the key may read OpenStreetMap.",
+            "items": {
+              "$ref": "#/components/schemas/OSMCarPark"
             },
             "type": "array"
           },
@@ -4216,7 +5559,7 @@
             ]
           },
           "road": {
-            "description": "The motorway; null when not published.",
+            "description": "The motorway: the gazetteer point's own, or for an OpenStreetMap node the one the BASt Location Code List places it on (two for an interchange named on both, A3/A46); null for a junction off any motorway that can be named.",
             "type": [
               "string",
               "null"
@@ -4440,6 +5783,110 @@
         ],
         "type": "object"
       },
+      "OSMCarPark": {
+        "additionalProperties": false,
+        "properties": {
+          "distanceM": {
+            "description": "Distance from the asked position, in metres.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "houseNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "The OpenStreetMap element (node/1, way/2, relation/3).",
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "operator": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "street": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "town": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zip": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "operator",
+          "street",
+          "houseNo",
+          "zip",
+          "town",
+          "location",
+          "distanceM"
+        ],
+        "type": "object"
+      },
+      "OSMFuelStation": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/PostalAddress"
+          },
+          "brand": {
+            "description": "The brand; null when not mapped.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "distanceM": {
+            "description": "Distance from the asked position in metres, to the nearest 100 m, as the stations' distanceM.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sourceFamily": {
+            "description": "The source family of the item; its attribution is in meta.attribution.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "brand",
+          "address",
+          "location",
+          "distanceM",
+          "sourceFamily"
+        ],
+        "type": "object"
+      },
       "OverviewData": {
         "additionalProperties": false,
         "properties": {
@@ -4598,6 +6045,473 @@
         "required": [
           "limit",
           "hasMore"
+        ],
+        "type": "object"
+      },
+      "PageAlert": {
+        "additionalProperties": false,
+        "properties": {
+          "atStation": {
+            "description": "It names one of the station's stops, not only one of its lines.",
+            "type": "boolean"
+          },
+          "header": {
+            "description": "The publisher's headline, verbatim.",
+            "type": "string"
+          },
+          "lines": {
+            "description": "The station's lines the alert names.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "until": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "header",
+          "lines",
+          "atStation",
+          "until"
+        ],
+        "type": "object"
+      },
+      "PageFacilities": {
+        "additionalProperties": false,
+        "properties": {
+          "flags": {
+            "description": "The facilities DB's register states the station has.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "location": {
+            "additionalProperties": false,
+            "description": "The station's point; null when the register gives none.",
+            "properties": {
+              "lat": {
+                "description": "Latitude in decimal degrees.",
+                "format": "double",
+                "maximum": 90,
+                "minimum": -90,
+                "type": "number"
+              },
+              "lon": {
+                "description": "Longitude in decimal degrees.",
+                "format": "double",
+                "maximum": 180,
+                "minimum": -180,
+                "type": "number"
+              }
+            },
+            "required": [
+              "lat",
+              "lon"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "flags",
+          "location"
+        ],
+        "type": "object"
+      },
+      "PageHeader": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "description": "DB's station category, 1 to 7.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "eva": {
+            "description": "The main EVA number; null when the register gives none.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evaNumbers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "land": {
+            "description": "The Land, named in the language asked.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "description": "The page's slug on viafrei.de.",
+            "type": "string"
+          },
+          "stationNo": {
+            "description": "DB's register number.",
+            "type": "string"
+          },
+          "street": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zipcode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "stationNo",
+          "eva",
+          "evaNumbers",
+          "slug",
+          "street",
+          "zipcode",
+          "city",
+          "land",
+          "category"
+        ],
+        "type": "object"
+      },
+      "PageLift": {
+        "additionalProperties": false,
+        "properties": {
+          "equipmentNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "position": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "enum": [
+              "active",
+              "inactive",
+              "unknown"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "position",
+          "state",
+          "equipmentNo"
+        ],
+        "type": "object"
+      },
+      "PageRailAmpel": {
+        "additionalProperties": false,
+        "properties": {
+          "lamp": {
+            "description": "Over the next hour's trains (no bus): red when a fifth is cancelled, two fifths are more than 5 minutes late or the median delay is 15 minutes; yellow on a cancellation, a tenth late, three platform changes, an alert or a source not read; green with three trains and none of that; else unknown.",
+            "enum": [
+              "green",
+              "yellow",
+              "red",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "lines": {
+            "description": "The lamp per line, long-distance trains as one, long-distance first, then by name.",
+            "items": {
+              "$ref": "#/components/schemas/PageRailLine"
+            },
+            "type": "array"
+          },
+          "reasons": {
+            "description": "Red reasons first.",
+            "items": {
+              "$ref": "#/components/schemas/PageRailReason"
+            },
+            "type": "array"
+          },
+          "trips": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lamp",
+          "trips",
+          "reasons",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "PageRailLine": {
+        "additionalProperties": false,
+        "properties": {
+          "lamp": {
+            "enum": [
+              "green",
+              "yellow",
+              "red",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "line": {
+            "type": "string"
+          },
+          "long": {
+            "type": "boolean"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/PageRailReason"
+            },
+            "type": "array"
+          },
+          "trips": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "line",
+          "long",
+          "lamp",
+          "trips",
+          "reasons"
+        ],
+        "type": "object"
+      },
+      "PageRailReason": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "cancelled",
+              "late",
+              "median",
+              "platform",
+              "alert",
+              "sight",
+              "line"
+            ],
+            "type": "string"
+          },
+          "lamp": {
+            "enum": [
+              "red",
+              "yellow"
+            ],
+            "type": "string"
+          },
+          "line": {
+            "description": "The line whose lamp raised the station's (line).",
+            "type": "string"
+          },
+          "long": {
+            "type": "boolean"
+          },
+          "min": {
+            "description": "The median delay in minutes.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "n": {
+            "description": "How many trains (cancelled, late, platform) or alerts.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "of": {
+            "description": "Of how many trains.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "sources": {
+            "description": "What could not be read (sight).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "lamp"
+        ],
+        "type": "object"
+      },
+      "PageSection": {
+        "additionalProperties": false,
+        "properties": {
+          "alerts": {
+            "items": {
+              "$ref": "#/components/schemas/PageAlert"
+            },
+            "type": "array"
+          },
+          "asOf": {
+            "description": "The instant the section's data stands at (UTC); null when its read had no data, its content then empty.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "departures": {
+            "items": {
+              "$ref": "#/components/schemas/Departure"
+            },
+            "type": "array"
+          },
+          "facilities": {
+            "$ref": "#/components/schemas/PageFacilities"
+          },
+          "header": {
+            "$ref": "#/components/schemas/PageHeader"
+          },
+          "id": {
+            "enum": [
+              "header",
+              "rail_ampel",
+              "step_free_now",
+              "lifts",
+              "platforms",
+              "departures",
+              "service_alerts",
+              "parking_charging"
+            ],
+            "type": "string"
+          },
+          "lifts": {
+            "description": "The station's lifts and escalators, out of service first.",
+            "items": {
+              "$ref": "#/components/schemas/PageLift"
+            },
+            "type": "array"
+          },
+          "platforms": {
+            "$ref": "#/components/schemas/Platforms"
+          },
+          "railAmpel": {
+            "$ref": "#/components/schemas/PageRailAmpel"
+          },
+          "sources": {
+            "description": "The source families the section was read from; each is credited once in meta.attribution.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "stepFreeNow": {
+            "$ref": "#/components/schemas/PageStepFree"
+          }
+        },
+        "required": [
+          "id",
+          "asOf",
+          "sources"
+        ],
+        "type": "object"
+      },
+      "PageStepFree": {
+        "additionalProperties": false,
+        "properties": {
+          "blocked": {
+            "description": "Those whose lift is out of service now.",
+            "items": {
+              "$ref": "#/components/schemas/PageStepFreePlatform"
+            },
+            "type": "array"
+          },
+          "platforms": {
+            "description": "The platforms the inventory calls step-free whose lift is not out of service.",
+            "items": {
+              "$ref": "#/components/schemas/PageStepFreePlatform"
+            },
+            "type": "array"
+          },
+          "steplessAccess": {
+            "description": "The register's stepless access word (yes, no, partial); null when it states none.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "platforms",
+          "blocked",
+          "steplessAccess"
+        ],
+        "type": "object"
+      },
+      "PageStepFreePlatform": {
+        "additionalProperties": false,
+        "properties": {
+          "lift": {
+            "description": "The state of the lifts serving its tracks; none when no lift names them.",
+            "enum": [
+              "ok",
+              "out",
+              "unknown",
+              "none"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tracks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "tracks",
+          "name",
+          "lift"
         ],
         "type": "object"
       },
@@ -4913,6 +6827,109 @@
         ],
         "type": "object"
       },
+      "ParkingContextItem": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "distanceM": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "facts": {
+            "additionalProperties": {},
+            "description": "The publisher's facts as published (its period, a coach count, the bays' rules).",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "description": "Open enumeration; treat an unknown value as other.",
+            "enum": [
+              "coach_parking",
+              "street_parking"
+            ],
+            "type": "string"
+          },
+          "kindTotal": {
+            "description": "The entries of this kind in its radius (2 km for coach places, 300 m for bays), the bays counted one per bay inside it.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "kindVariants": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "description": "kindTotal by variant.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position",
+            "description": "The point of the entry nearest the asked position."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "partsInside": {
+            "description": "The entry's own bays inside the radius; 1 for an entry not counted by bay.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "publishedSeenAt": {
+            "description": "When the source last published the entry.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceFamily": {
+            "type": "string"
+          },
+          "variant": {
+            "description": "The publisher's variant of the kind.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "sourceFamily",
+          "id",
+          "variant",
+          "name",
+          "ref",
+          "detail",
+          "facts",
+          "location",
+          "distanceM",
+          "publishedSeenAt",
+          "kindTotal",
+          "kindVariants",
+          "partsInside"
+        ],
+        "type": "object"
+      },
       "ParkingEnvelope": {
         "additionalProperties": false,
         "properties": {
@@ -4973,6 +6990,16 @@
           "name": {
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "nearbyAmenities": {
+            "description": "What OpenStreetMap maps near the site (500 m around a city car park, park and ride or other site, else 300 m; along a motorway 300 m): the nearest named entry of each amenity, none the site's publisher states, nearest first, five at most; null when not read (a nearby search, a place overview).",
+            "items": {
+              "$ref": "#/components/schemas/NearbyAmenity"
+            },
+            "type": [
+              "array",
               "null"
             ]
           },
@@ -5050,13 +7077,56 @@
           "occupancy",
           "termsRequired",
           "sourceFamily",
-          "amenities"
+          "amenities",
+          "nearbyAmenities"
         ],
         "type": "object"
       },
       "ParkingMeta": {
         "additionalProperties": false,
         "properties": {
+          "around": {
+            "additionalProperties": false,
+            "properties": {
+              "osmCarParks": {
+                "description": "OpenStreetMap's car parks (ODbL; no capacity, no occupancy) within the radius that are none of the listed sites, nearest first, same-named ones as one, at most the limit; null when not read: a lorry or rest-area question, or a key that may not read OpenStreetMap. Credited in meta.attribution, with its share-alike offer, only when one is listed.",
+                "items": {
+                  "$ref": "#/components/schemas/OSMCarPark"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "osmDataAsOf": {
+                "description": "The newest OpenStreetMap extract day of the car parks listed; null when none is listed.",
+                "format": "date",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "roadContext": {
+                "description": "The city's coach places within 2 km and on-street bay rules within 300 m, three of each at most, the coach places for parking first; empty where no city publishes them; null when not read: a question with a kind, free_min or facilities.",
+                "items": {
+                  "$ref": "#/components/schemas/ParkingContextItem"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "osmCarParks",
+              "osmDataAsOf",
+              "roadContext"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "asOf": {
             "description": "The oldest dataAsOf of meta.freshness; null when one is unknown.",
             "format": "date-time",
@@ -5119,6 +7189,7 @@
         "required": [
           "page",
           "query",
+          "around",
           "asOf",
           "freshness",
           "attribution",
@@ -5216,6 +7287,16 @@
               "null"
             ]
           },
+          "nearbyAmenities": {
+            "description": "What OpenStreetMap maps near the site (500 m around a city car park, park and ride or other site, else 300 m; along a motorway 300 m): the nearest named entry of each amenity, none the site's publisher states, nearest first, five at most; null when not read (a nearby search, a place overview).",
+            "items": {
+              "$ref": "#/components/schemas/NearbyAmenity"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
           "occupancy": {
             "additionalProperties": false,
             "description": "The last report; null when none is published, or while the terms are not accepted.",
@@ -5290,7 +7371,8 @@
           "occupancy",
           "termsRequired",
           "sourceFamily",
-          "amenities"
+          "amenities",
+          "nearbyAmenities"
         ],
         "type": "object"
       },
@@ -5637,6 +7719,220 @@
           "q",
           "kind",
           "radiusM"
+        ],
+        "type": "object"
+      },
+      "PlatformAccess": {
+        "additionalProperties": false,
+        "properties": {
+          "facts": {
+            "$ref": "#/components/schemas/PlatformFacts"
+          },
+          "heightCm": {
+            "additionalProperties": false,
+            "description": "The lowest and highest height published over the platform, its edges and their sectors; null when none is.",
+            "properties": {
+              "max": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "min": {
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "min",
+              "max"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "The platform's own name (Bahnsteig Gleis 6/7); null when the publisher gives none.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stated": {
+            "description": "False when the platform carries no assessment: its facts are then unknown, not no.",
+            "type": "boolean"
+          },
+          "tracks": {
+            "description": "The numbers of its track edges, in number order.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "tracks",
+          "stated",
+          "facts",
+          "heightCm"
+        ],
+        "type": "object"
+      },
+      "PlatformFacts": {
+        "additionalProperties": false,
+        "properties": {
+          "levelBoarding": {
+            "enum": [
+              "yes",
+              "partial",
+              "no",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "stepFree": {
+            "enum": [
+              "yes",
+              "partial",
+              "no",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "tactileGuidance": {
+            "enum": [
+              "yes",
+              "partial",
+              "no",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "wheelchair": {
+            "enum": [
+              "yes",
+              "partial",
+              "no",
+              "unknown"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "stepFree",
+          "wheelchair",
+          "tactileGuidance",
+          "levelBoarding"
+        ],
+        "type": "object"
+      },
+      "Platforms": {
+        "additionalProperties": false,
+        "properties": {
+          "releasedOn": {
+            "description": "The Berlin date of DB's newest publication of them; null when none is stated.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stations": {
+            "description": "One per stop place of the inventory.",
+            "items": {
+              "$ref": "#/components/schemas/PlatformsStation"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "releasedOn",
+          "stations"
+        ],
+        "type": "object"
+      },
+      "PlatformsStation": {
+        "additionalProperties": false,
+        "properties": {
+          "list": {
+            "description": "By the number of the first track, then by name.",
+            "items": {
+              "$ref": "#/components/schemas/PlatformAccess"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "station": {
+            "additionalProperties": false,
+            "description": "The stop place's own assessment; null when it carries none.",
+            "properties": {
+              "levelBoarding": {
+                "enum": [
+                  "yes",
+                  "partial",
+                  "no",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              "stepFree": {
+                "enum": [
+                  "yes",
+                  "partial",
+                  "no",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              "tactileGuidance": {
+                "enum": [
+                  "yes",
+                  "partial",
+                  "no",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              "wheelchair": {
+                "enum": [
+                  "yes",
+                  "partial",
+                  "no",
+                  "unknown"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "stepFree",
+              "wheelchair",
+              "tactileGuidance",
+              "levelBoarding"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "stepFreeCounts": {
+            "$ref": "#/components/schemas/StepFreeCounts"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "station",
+          "stepFreeCounts",
+          "total",
+          "list"
         ],
         "type": "object"
       },
@@ -6169,6 +8465,88 @@
         "required": [
           "source",
           "subject"
+        ],
+        "type": "object"
+      },
+      "ResolvePlaceEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "description": "The place; null when the text names no one place (none, or several alike).",
+            "properties": {
+              "alternatives": {
+                "description": "The other places of the same name the label names; empty when none.",
+                "items": {
+                  "$ref": "#/components/schemas/ResolvedAlternative"
+                },
+                "type": "array"
+              },
+              "districtCode": {
+                "description": "The municipality key (AGS) of a town; null for any other place.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kind": {
+                "description": "The kind of the place.",
+                "type": "string"
+              },
+              "label": {
+                "description": "What the answer says of the place, with its kind and the alternatives where the name is shared.",
+                "type": "string"
+              },
+              "location": {
+                "$ref": "#/components/schemas/Position"
+              },
+              "name": {
+                "description": "The place's name: the label without the other places of the same name.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "label",
+              "kind",
+              "location",
+              "districtCode",
+              "alternatives"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DataMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "ResolvedAlternative": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "description": "Its kind.",
+            "type": "string"
+          },
+          "name": {
+            "description": "How the label names it.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "kind"
         ],
         "type": "object"
       },
@@ -6786,6 +9164,451 @@
           "updatedAtLocal",
           "position",
           "sourceFamily"
+        ],
+        "type": "object"
+      },
+      "RoadStatusCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "closed": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "current": {
+            "description": "Plan works in force on a road the live sweep answers.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "currentFamilies": {
+            "description": "The plan sources behind current, over every counted entry.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "planned": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "programme": {
+            "description": "Started records of a works programme, no restriction in force.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "restricted": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "closed",
+          "restricted",
+          "planned",
+          "programme",
+          "current",
+          "total",
+          "currentFamilies"
+        ],
+        "type": "object"
+      },
+      "RoadStatusGuidance": {
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "detour",
+              "guidance"
+            ],
+            "type": "string"
+          },
+          "road": {
+            "type": "string"
+          },
+          "since": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceFamily": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "titleEnglish": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "until": {
+            "description": "Null when the publisher states none, or its stated end is its next pull.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "via": {
+            "description": "The roads of the alternative route.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "words": {
+            "description": "The publisher's words of the route, as published.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "wordsEnglish": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "road",
+          "sourceFamily",
+          "id",
+          "kind",
+          "via",
+          "words",
+          "title",
+          "titleEnglish",
+          "wordsEnglish",
+          "from",
+          "to",
+          "since",
+          "until"
+        ],
+        "type": "object"
+      },
+      "RoadStatusItem": {
+        "additionalProperties": false,
+        "properties": {
+          "cause": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "closureFrom": {
+            "description": "A closure ahead within a restriction's validity: its start.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "closureTo": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "description": "The road operator's description lines, without its start line and since clauses; empty for another source's entry.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "detour": {
+            "description": "A rerouting record.",
+            "type": "boolean"
+          },
+          "detourForSomeVehicles": {
+            "description": "The rerouting applies to some vehicles only.",
+            "type": "boolean"
+          },
+          "detourVia": {
+            "description": "The roads a rerouting record's alternative route takes.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "eventType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "extent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "from": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "description": "The road operator's kind (closure, roadworks); null for another source's entry.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lat": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "lon": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "measureTo": {
+            "description": "The end of the whole measure the description states.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "place": {
+            "description": "The place a message's words name.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publicationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publisher": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "referentFrom": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "referentTo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "road": {
+            "description": "The road the entry is on: for the road operator's entry, the motorway its title names first.",
+            "type": "string"
+          },
+          "sectionName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "segments": {
+            "description": "The sections the road operator publishes the site as; 0 for another source's entry.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "siteName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceFamily": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "closed",
+              "restricted",
+              "current",
+              "programme",
+              "planned"
+            ],
+            "type": "string"
+          },
+          "subtitle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "term": {
+            "description": "What the entry is called.",
+            "enum": [
+              "closure",
+              "roadworks",
+              "restriction"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "windowCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "windowEnds": {
+            "items": {
+              "format": "date-time",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": "array"
+          },
+          "windowStarts": {
+            "description": "The starts of the validity windows touching the window.",
+            "items": {
+              "format": "date-time",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "status",
+          "term",
+          "sourceFamily",
+          "road",
+          "id",
+          "kind",
+          "title",
+          "subtitle",
+          "extent",
+          "description",
+          "segments",
+          "eventType",
+          "publisher",
+          "publicationId",
+          "place",
+          "detail",
+          "siteName",
+          "sectionName",
+          "cause",
+          "referentFrom",
+          "referentTo",
+          "detour",
+          "detourVia",
+          "detourForSomeVehicles",
+          "windowStarts",
+          "windowEnds",
+          "windowCount",
+          "closureFrom",
+          "closureTo",
+          "from",
+          "to",
+          "measureTo",
+          "lat",
+          "lon"
+        ],
+        "type": "object"
+      },
+      "RoadStatusSource": {
+        "additionalProperties": false,
+        "properties": {
+          "asOf": {
+            "description": "When the source was last seen current: the live sweep, else the newest of its listed entries (its last good run when as new); null when none of its entries is listed.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceFamily": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceFamily",
+          "asOf"
+        ],
+        "type": "object"
+      },
+      "RoadStatusStaleCheck": {
+        "additionalProperties": false,
+        "properties": {
+          "lastChecked": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceFamily": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceFamily",
+          "lastChecked"
         ],
         "type": "object"
       },
@@ -7915,6 +10738,35 @@
             },
             "type": "array"
           },
+          "platforms": {
+            "additionalProperties": false,
+            "description": "The station's platforms as DB's station inventory (OpenStation) states them, as the platform's facilities check lists them; null for a stop with no EVA number or none the inventory lists.",
+            "properties": {
+              "releasedOn": {
+                "description": "The Berlin date of DB's newest publication of them; null when none is stated.",
+                "format": "date",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "stations": {
+                "description": "One per stop place of the inventory.",
+                "items": {
+                  "$ref": "#/components/schemas/PlatformsStation"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "releasedOn",
+              "stations"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "station": {
             "$ref": "#/components/schemas/FacilityStation"
           }
@@ -7922,7 +10774,8 @@
         "required": [
           "station",
           "counts",
-          "facilities"
+          "facilities",
+          "platforms"
         ],
         "type": "object"
       },
@@ -7943,6 +10796,10 @@
             "description": "elevator, escalator or other. Open enumeration.",
             "type": "string"
           },
+          "nameShared": {
+            "description": "Another unit of the station has the same kind and position, listed or beyond the limit: name this unit by its number.",
+            "type": "boolean"
+          },
           "position": {
             "description": "Where it is, as published (zu Gleis 2); null when not published.",
             "type": [
@@ -7956,6 +10813,13 @@
           "state": {
             "description": "active, inactive or unknown: a state older than its family's freshness threshold is unknown. Open enumeration.",
             "type": "string"
+          },
+          "stateExplanation": {
+            "description": "The operator's explanation of the state, verbatim (not monitored, under maintenance, or the operator's own words); null when it gives none or one that repeats the state (available, not available).",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -7964,7 +10828,51 @@
           "position",
           "state",
           "sourceFamily",
-          "equipmentNo"
+          "equipmentNo",
+          "stateExplanation",
+          "nameShared"
+        ],
+        "type": "object"
+      },
+      "StationPageEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "description": "Null when no station of DB's register has that id.",
+            "properties": {
+              "pageUrl": {
+                "description": "The station's page on viafrei.de, in the language asked.",
+                "type": "string"
+              },
+              "sections": {
+                "description": "header, rail_ampel, step_free_now, lifts, platforms, departures, service_alerts, parking_charging, in this order, each present.",
+                "items": {
+                  "$ref": "#/components/schemas/PageSection"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "pageUrl",
+              "sections"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DataMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
         ],
         "type": "object"
       },
@@ -8138,6 +11046,147 @@
         ],
         "type": "object"
       },
+      "StepFreeCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "no": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "partial": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "unknown": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "yes": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "yes",
+          "partial",
+          "no",
+          "unknown"
+        ],
+        "type": "object"
+      },
+      "StopBoard": {
+        "additionalProperties": false,
+        "properties": {
+          "departures": {
+            "description": "Its departures as its board (listStationDepartures) shows them, at most per_stop; empty when none leaves in the window.",
+            "items": {
+              "$ref": "#/components/schemas/Departure"
+            },
+            "type": "array"
+          },
+          "distanceM": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "description": "The stop family's id, as listStations answers a station's.",
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "name": {
+            "type": "string"
+          },
+          "stopId": {
+            "description": "The stop id as the timetable spells it, without the prefix of the timetable it is read from: listStationDepartures takes id, and the timetable stop id is what a passenger information system prints.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "stopId",
+          "distanceM",
+          "location",
+          "departures"
+        ],
+        "type": "object"
+      },
+      "StopBoardsData": {
+        "additionalProperties": false,
+        "properties": {
+          "location": {
+            "$ref": "#/components/schemas/Position",
+            "description": "The position asked."
+          },
+          "stops": {
+            "description": "The stops, as today's departures around a place pick them: the nearest railway or S-Bahn station first wherever it lies in the radius, then the nearest stops by distance; a stop filed twice under one name within 300 m listed once. Empty when no stop lies in the radius.",
+            "items": {
+              "$ref": "#/components/schemas/StopBoard"
+            },
+            "type": "array"
+          },
+          "window": {
+            "$ref": "#/components/schemas/StopBoardsWindow"
+          }
+        },
+        "required": [
+          "location",
+          "window",
+          "stops"
+        ],
+        "type": "object"
+      },
+      "StopBoardsEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StopBoardsData"
+          },
+          "links": {
+            "$ref": "#/components/schemas/Links"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DataMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "links"
+        ],
+        "type": "object"
+      },
+      "StopBoardsWindow": {
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "fromLocal": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "until": {
+            "description": "End of the window (excluded).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "untilLocal": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "fromLocal",
+          "until",
+          "untilLocal"
+        ],
+        "type": "object"
+      },
       "SummaryCount": {
         "additionalProperties": false,
         "properties": {
@@ -8293,8 +11342,36 @@
               "null"
             ]
           },
+          "capped": {
+            "additionalProperties": false,
+            "description": "What the limit cut; null when nothing was.",
+            "properties": {
+              "more": {
+                "description": "How many more departures the window holds.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "until": {
+                "description": "The planned time of the last of them.",
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "more",
+              "until"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "degraded": {
+            "description": "Whether the board served was read in part (a plan hour or the changes missing): its rows are what it read.",
+            "type": "boolean"
+          },
           "departures": {
-            "description": "The fresh board's departures by planned time; empty without a fresh board.",
+            "description": "The departures of the window, the next to leave first up to the limit, in planned order; empty without a fresh board.",
             "items": {
               "$ref": "#/components/schemas/TrainBoardDeparture"
             },
@@ -8303,8 +11380,15 @@
           "eva": {
             "type": "string"
           },
+          "evaNumbers": {
+            "description": "The station's EVA numbers the board merges, the asked one first.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "fetchedAt": {
-            "description": "When the newest board held was fetched, fresh or not; null when none is held.",
+            "description": "When the board served was read; without one, when the newest board held was, fresh or not; null when none is held.",
             "format": "date-time",
             "type": [
               "string",
@@ -8312,16 +11396,48 @@
             ]
           },
           "fresh": {
-            "description": "Whether a board fetched no longer ago than the MCP server's cache lifetime (30 s) is held: false is no fresh board.",
+            "description": "Whether a fresh board is held: one the live refresher fetched no longer ago than the MCP server's cache lifetime (30 s), or one the stored-boards worker wrote no longer ago than 20 minutes. False is no fresh board.",
             "type": "boolean"
+          },
+          "interchange": {
+            "additionalProperties": false,
+            "description": "The U-Bahn and tram at the station, from the DELFI timetable and its realtime; null when the station has neither a departure nor a line to name.",
+            "properties": {
+              "departures": {
+                "description": "The next U-Bahn and tram departures, in planned order, at most 10.",
+                "items": {
+                  "$ref": "#/components/schemas/InterchangeDeparture"
+                },
+                "type": "array"
+              },
+              "lines": {
+                "description": "The U-Bahn, tram and bus lines here.",
+                "items": {
+                  "$ref": "#/components/schemas/InterchangeLines"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "departures",
+              "lines"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
           }
         },
         "required": [
           "eva",
+          "evaNumbers",
           "fresh",
           "fetchedAt",
           "ageSeconds",
-          "departures"
+          "degraded",
+          "departures",
+          "capped",
+          "interchange"
         ],
         "type": "object"
       },
@@ -8363,7 +11479,7 @@
             ]
           },
           "number": {
-            "description": "The train number.",
+            "description": "The train number; null when the board stated none (a stored board states the number in the line).",
             "type": [
               "string",
               "null"
@@ -8392,6 +11508,13 @@
           },
           "sourceFamily": {
             "type": "string"
+          },
+          "stationPart": {
+            "description": "The part of the station it leaves from, when the station's EVA numbers name several (Frankfurt (Main) Hbf (tief)); null for the main part, and on a board that does not state the part.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -8406,6 +11529,7 @@
           "plannedPlatform",
           "platformChanged",
           "cancelled",
+          "stationPart",
           "sourceFamily"
         ],
         "type": "object"
@@ -8962,6 +12086,18 @@
             "description": "The issuer's name of the level, as issued.",
             "type": "string"
           },
+          "levelSource": {
+            "description": "Where level came from: published (the issuer's number) or derived_from_severity (the issuer published no number; level is mapped from its CAP severity word, the platform's mapping, and is not the issuer's own figure); null when unknown.",
+            "enum": [
+              "published",
+              "derived_from_severity",
+              null
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "published": {
             "description": "When the issuer published the warning (its sent time); null when not given.",
             "format": "date-time",
@@ -9022,6 +12158,7 @@
           "unaltered",
           "urgency",
           "certainty",
+          "levelSource",
           "english"
         ],
         "type": "object"
@@ -9479,7 +12616,8 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -9799,7 +12937,8 @@
                             "dataAsOf": "2026-03-29T23:52:30Z",
                             "ageS": 450,
                             "staleAfterS": 2700,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:52:30Z"
                           }
                         ],
                         "attribution": [
@@ -10169,6 +13308,19 @@
             }
           },
           {
+            "description": "place: one item a place, as the MCP charging search answers: the records of one place (an operator's site, the Bundesnetzagentur register's rows of it, one building listed per charging unit) folded into one item named by its name and address, with item.place. Takes min_kw, connector and only_available; not max_kw, operator, conditions or access other than public. Default: one item a site record.",
+            "explode": false,
+            "in": "query",
+            "name": "group",
+            "schema": {
+              "description": "place: one item a place, as the MCP charging search answers: the records of one place (an operator's site, the Bundesnetzagentur register's rows of it, one building listed per charging unit) folded into one item named by its name and address, with item.place. Takes min_kw, connector and only_available; not max_kw, operator, conditions or access other than public. Default: one item a site record.",
+              "enum": [
+                "place"
+              ],
+              "type": "string"
+            }
+          },
+          {
             "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
             "example": "en",
             "in": "query",
@@ -10301,7 +13453,8 @@
                             "dataAsOf": "2026-03-29T23:55:00Z",
                             "ageS": 300,
                             "staleAfterS": 1800,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:55:00Z"
                           }
                         ],
                         "attribution": [
@@ -10645,7 +13798,8 @@
                             "dataAsOf": "2026-03-29T23:55:00Z",
                             "ageS": 300,
                             "staleAfterS": 1800,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:55:00Z"
                           }
                         ],
                         "attribution": [
@@ -10983,7 +14137,8 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -11323,12 +14478,12 @@
             }
           },
           {
-            "description": "Most stations to return; default 5.",
+            "description": "Most stations to return (1 to 10, the provider's terms cap a consumer list at 10; a client clamps a larger wish to 10); default 5.",
             "explode": false,
             "in": "query",
             "name": "limit",
             "schema": {
-              "description": "Most stations to return; default 5.",
+              "description": "Most stations to return (1 to 10, the provider's terms cap a consumer list at 10; a client clamps a larger wish to 10); default 5.",
               "format": "int64",
               "maximum": 10,
               "minimum": 1,
@@ -11368,6 +14523,8 @@
                           },
                           "distanceM": 100,
                           "openingState": "open",
+                          "openingObservedAt": "2026-03-30T00:00:00Z",
+                          "openingHoursAsOf": null,
                           "prices": [
                             {
                               "fuel": "e10",
@@ -11380,6 +14537,7 @@
                           "sourceFamily": "tankerkoenig_gamma"
                         }
                       ],
+                      "osmWithoutPrice": [],
                       "meta": {
                         "requestId": "example-request-0001",
                         "generatedAt": "2026-03-30T00:00:00Z",
@@ -11391,7 +14549,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -11731,7 +14890,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -12151,42 +15311,48 @@
                             "dataAsOf": "2026-03-29T23:55:00Z",
                             "ageS": 300,
                             "staleAfterS": 1800,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:55:00Z"
                           },
                           {
                             "family": "dwd_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           },
                           {
                             "family": "openstation_siri_fm",
                             "dataAsOf": "2026-03-29T23:52:30Z",
                             "ageS": 450,
                             "staleAfterS": 2700,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:52:30Z"
                           },
                           {
                             "family": "park_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           },
                           {
                             "family": "roads_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           },
                           {
                             "family": "tankerkoenig_gamma",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -12580,7 +15746,8 @@
                             "dataAsOf": "2026-03-29T23:55:00Z",
                             "ageS": 300,
                             "staleAfterS": 1800,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:55:00Z"
                           }
                         ],
                         "attribution": [
@@ -13062,6 +16229,9 @@
                           "sourceFamily": "geonames"
                         },
                         "mayLieOutsideGermany": true,
+                        "gemeinde": null,
+                        "junction": null,
+                        "governmentRegion": null,
                         "lowEmissionZone": null
                       },
                       "meta": {
@@ -13075,14 +16245,16 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           },
                           {
                             "family": "osm",
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -13452,7 +16624,8 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -13885,7 +17058,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -14433,7 +17607,9 @@
                             "position": null,
                             "sourceFamily": "roads_alpha"
                           }
-                        ]
+                        ],
+                        "motorway": null,
+                        "roadStatus": null
                       },
                       "meta": {
                         "requestId": "example-request-0001",
@@ -14446,14 +17622,16 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           },
                           {
                             "family": "roads_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -14854,7 +18032,8 @@
                               "shower"
                             ],
                             "absent": []
-                          }
+                          },
+                          "nearbyAmenities": []
                         }
                       ],
                       "meta": {
@@ -14868,7 +18047,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -15168,6 +18348,19 @@
             }
           },
           {
+            "description": "place: the charging sites one item a place, as listChargingOptions with group=place answers them (item.place), and data.chargingRegister when a register row is among them. Default: one item a site record.",
+            "explode": false,
+            "in": "query",
+            "name": "charging_group",
+            "schema": {
+              "description": "place: the charging sites one item a place, as listChargingOptions with group=place answers them (item.place), and data.chargingRegister when a register row is among them. Default: one item a site record.",
+              "enum": [
+                "place"
+              ],
+              "type": "string"
+            }
+          },
+          {
             "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
             "example": "en",
             "in": "query",
@@ -15235,7 +18428,8 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -15501,15 +18695,15 @@
             }
           },
           {
-            "description": "Search radius in metres (1000 to 25000); default 10000.",
+            "description": "Search radius in metres (100 to 25000); default 10000.",
             "explode": false,
             "in": "query",
             "name": "radius_m",
             "schema": {
-              "description": "Search radius in metres (1000 to 25000); default 10000.",
+              "description": "Search radius in metres (100 to 25000); default 10000.",
               "format": "int64",
               "maximum": 25000,
-              "minimum": 1000,
+              "minimum": 100,
               "type": "integer"
             }
           },
@@ -15641,14 +18835,16 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           },
                           {
                             "family": "frankfurt_behindertenparkplaetze",
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -16056,7 +19252,8 @@
                               "shower"
                             ],
                             "absent": []
-                          }
+                          },
+                          "nearbyAmenities": []
                         }
                       ],
                       "meta": {
@@ -16070,7 +19267,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -16108,6 +19306,11 @@
                           },
                           "radiusM": 50000,
                           "freeMin": 0
+                        },
+                        "around": {
+                          "osmCarParks": null,
+                          "osmDataAsOf": null,
+                          "roadContext": []
                         }
                       },
                       "links": {
@@ -16435,7 +19638,8 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -16842,21 +20046,24 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           },
                           {
                             "family": "geonames",
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           },
                           {
                             "family": "osm",
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -17104,6 +20311,297 @@
         "x-required-scope": "places"
       }
     },
+    "/v1/places/resolve": {
+      "get": {
+        "description": "The one place a free text names, as the platform's resolver reads it: a town by its gazetteer point, a stop, station, landmark or other place of interest, an address or a motorway junction where the text names one ('Berlin Alexanderplatz'), the other places of the same name said as alternatives ('Sylt (town), also: Sylt (island)'). The label is what the answer says; meta.attribution credits the sources the place came from. data is null when the text names no one place. Needs the scope places.",
+        "operationId": "resolvePlace",
+        "parameters": [
+          {
+            "description": "The place as typed: a town, a district, a station or stop, a landmark or other place of interest, an address, a motorway junction; case, umlauts written out (koeln for Köln), accents and punctuation do not matter; any of its names (an English one too) answers.",
+            "explode": false,
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "The place as typed: a town, a district, a station or stop, a landmark or other place of interest, an address, a motorway junction; case, umlauts written out (koeln for Köln), accents and punctuation do not matter; any of its names (an English one too) answers.",
+              "examples": [
+                "Neustadt"
+              ],
+              "maxLength": 80,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The one place a text names",
+                    "value": {
+                      "data": {
+                        "name": "Matfienland",
+                        "label": "Matfienland",
+                        "kind": "region",
+                        "location": {
+                          "lat": 48.24375,
+                          "lon": 7.01625
+                        },
+                        "districtCode": "01",
+                        "alternatives": []
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": null,
+                        "freshness": [
+                          {
+                            "family": "geonames",
+                            "dataAsOf": null,
+                            "ageS": null,
+                            "staleAfterS": 9007199254740991,
+                            "stale": false,
+                            "lastCheckedAt": null
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "geonames",
+                            "domain": "places",
+                            "publisher": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+                            "text": "Ortsdaten: © GeoNames (CC BY 4.0), bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://download.geonames.org/export/dump/",
+                            "sourceUrl": "https://download.geonames.org/export/dump/"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ]
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/places/resolve"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ResolvePlaceEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "$ref": "#/components/headers/Age"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/Cache-Control"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/Last-Modified"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              },
+              "Vary": {
+                "$ref": "#/components/headers/Vary"
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/Cache-Control"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/Last-Modified"
+              },
+              "Vary": {
+                "$ref": "#/components/headers/Vary"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not used by this operation.",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "The one place a text names",
+        "tags": [
+          "places"
+        ],
+        "x-attribution": "The place comes from the source families of the places domain the key is entitled to, and from the stop families of transit and the junctions of the roads domain where the key may read them. The answer lists each source family the place came from in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. When the text names no one place, data is null and nothing is credited.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/places/resolve?q=Matfienland\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/places/resolve?q=Matfienland",
+        "x-mcp-counterpart": "place resolver",
+        "x-required-scope": "places"
+      }
+    },
     "/v1/places/{placeId}/overview": {
       "get": {
         "description": "A composed answer: the place, then each asked part (charging, parking) around it, each under the licence gate on its own and within its own sub-deadline (compose.part_deadline). A part that is not ok is absent from data and named in meta.parts. 200 when at least one part is ok. Needs the scope places; each part also needs its own scope.",
@@ -17232,7 +20730,8 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -17629,7 +21128,8 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -18920,14 +22420,16 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           },
                           {
                             "family": "roads_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -19262,7 +22764,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -19584,7 +23087,8 @@
                             "dataAsOf": "2026-03-29T23:59:30Z",
                             "ageS": 30,
                             "staleAfterS": 180,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:59:30Z"
                           }
                         ],
                         "attribution": [
@@ -19907,21 +23411,24 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           },
                           {
                             "family": "geonames",
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           },
                           {
                             "family": "osm",
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -20214,11 +23721,11 @@
                         "officialTotal": 0,
                         "osm": [
                           {
-                            "id": "osm:node800005",
+                            "id": "osm:node800029",
                             "kind": "fixed",
                             "enforces": "speed",
                             "street": null,
-                            "locationLabel": "Blitzer Kansilkamp",
+                            "locationLabel": "Blitzer Halschüßau",
                             "municipality": null,
                             "direction": null,
                             "limitKmh": 50,
@@ -20228,17 +23735,17 @@
                             "dataAsOf": "2026-02-28",
                             "staleYear": null,
                             "location": {
-                              "lat": 47.655653,
-                              "lon": 7.799556
+                              "lat": 50.260982,
+                              "lon": 6.401139
                             },
                             "sourceFamily": "osm_speed_cameras"
                           },
                           {
-                            "id": "osm:node800006",
+                            "id": "osm:node800030",
                             "kind": "fixed",
                             "enforces": "speed",
                             "street": null,
-                            "locationLabel": "Blitzer Kansilkamp",
+                            "locationLabel": "Blitzer Halschüßau",
                             "municipality": null,
                             "direction": null,
                             "limitKmh": 50,
@@ -20248,8 +23755,8 @@
                             "dataAsOf": "2026-02-28",
                             "staleYear": null,
                             "location": {
-                              "lat": 47.653764,
-                              "lon": 7.829412
+                              "lat": 50.29929,
+                              "lon": 6.308556
                             },
                             "sourceFamily": "osm_speed_cameras"
                           }
@@ -20267,7 +23774,8 @@
                             "dataAsOf": "2026-03-29T12:00:00Z",
                             "ageS": 43200,
                             "staleAfterS": 259200,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T12:00:00Z"
                           }
                         ],
                         "attribution": [
@@ -20490,10 +23998,10 @@
           {
             "lang": "Shell",
             "label": "curl",
-            "source": "curl -sS \"https://api.viafrei.de/v1/speed-cameras?at=47.655,7.81\u0026radius_m=5000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+            "source": "curl -sS \"https://api.viafrei.de/v1/speed-cameras?at=50.28,6.355\u0026radius_m=10000\u0026limit=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
           }
         ],
-        "x-example-request": "/v1/speed-cameras?at=47.655,7.81\u0026radius_m=5000\u0026limit=2",
+        "x-example-request": "/v1/speed-cameras?at=50.28,6.355\u0026radius_m=10000\u0026limit=2",
         "x-mcp-counterpart": "speed camera search",
         "x-required-scope": "roads"
       }
@@ -20827,14 +24335,16 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           },
                           {
                             "family": "roads_alpha",
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -21164,7 +24674,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -21459,7 +24970,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -21847,14 +25359,16 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           },
                           {
                             "family": "delfi_static",
                             "dataAsOf": "2026-03-29T12:00:00Z",
                             "ageS": 43200,
                             "staleAfterS": 259200,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T12:00:00Z"
                           }
                         ],
                         "attribution": [
@@ -21961,14 +25475,16 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           },
                           {
                             "family": "delfi_static",
                             "dataAsOf": "2026-03-29T12:00:00Z",
                             "ageS": 43200,
                             "staleAfterS": 259200,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T12:00:00Z"
                           }
                         ],
                         "attribution": [
@@ -22345,7 +25861,9 @@
                           "untilLocal": "2026-03-30T03:00:00+02:00",
                           "matched": 0,
                           "matchedAll": 0,
-                          "dropped": []
+                          "dropped": [],
+                          "timetableUntil": "2026-03-29T22:00:00Z",
+                          "timetableLoadedAt": null
                         },
                         "departures": []
                       },
@@ -22360,7 +25878,8 @@
                             "dataAsOf": "2026-03-29T12:00:00Z",
                             "ageS": 43200,
                             "staleAfterS": 259200,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T12:00:00Z"
                           }
                         ],
                         "attribution": [
@@ -22667,28 +26186,33 @@
                           "name": "Pienköckheim Nord"
                         },
                         "counts": {
-                          "active": 2,
+                          "active": 0,
                           "inactive": 0,
-                          "unknown": 0
+                          "unknown": 2
                         },
                         "facilities": [
                           {
                             "id": "equipment:100003",
                             "kind": "escalator",
                             "position": "zu Gleis 1",
-                            "state": "active",
+                            "state": "unknown",
                             "sourceFamily": "openstation_siri_fm",
-                            "equipmentNo": null
+                            "equipmentNo": null,
+                            "stateExplanation": null,
+                            "nameShared": false
                           },
                           {
                             "id": "equipment:100004",
                             "kind": "escalator",
                             "position": "zu Gleis 2",
-                            "state": "active",
+                            "state": "unknown",
                             "sourceFamily": "openstation_siri_fm",
-                            "equipmentNo": null
+                            "equipmentNo": null,
+                            "stateExplanation": null,
+                            "nameShared": false
                           }
-                        ]
+                        ],
+                        "platforms": null
                       },
                       "meta": {
                         "requestId": "example-request-0001",
@@ -22701,14 +26225,16 @@
                             "dataAsOf": "2026-03-29T12:00:00Z",
                             "ageS": 43200,
                             "staleAfterS": 259200,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T12:00:00Z"
                           },
                           {
                             "family": "openstation_siri_fm",
                             "dataAsOf": "2026-03-29T23:52:30Z",
                             "ageS": 450,
                             "staleAfterS": 2700,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:52:30Z"
                           }
                         ],
                         "attribution": [
@@ -22949,9 +26475,777 @@
         "x-required-scope": "transit"
       }
     },
+    "/v1/stations/{stationId}/page": {
+      "get": {
+        "description": "A station's page as the platform's station page shows it, section by section: the register's record, the rail lamp, the step-free platforms now, the lifts, the platforms, the next departures, the service alerts and DB's facility flags. Needs the scope transit.",
+        "operationId": "getStationPage",
+        "parameters": [
+          {
+            "description": "The station: its id as listStations answers it, DB's register number or an EVA number.",
+            "in": "path",
+            "name": "stationId",
+            "required": true,
+            "schema": {
+              "description": "The station: its id as listStations answers it, DB's register number or an EVA number.",
+              "examples": [
+                "1:de:02000:10950"
+              ],
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Most departures the departures section lists, earliest first; default 10.",
+            "explode": false,
+            "in": "query",
+            "name": "departures",
+            "schema": {
+              "description": "Most departures the departures section lists, earliest first; default 10.",
+              "format": "int64",
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "A station's page",
+                    "value": {
+                      "data": {
+                        "pageUrl": "https://viafrei.de/en/station/seed-ijaijceeccig",
+                        "sections": [
+                          {
+                            "id": "header",
+                            "asOf": "2026-03-30T00:00:00Z",
+                            "sources": [
+                              "db_stada"
+                            ],
+                            "header": {
+                              "name": "Schömpingbach Hbf",
+                              "stationNo": "822292607",
+                              "eva": "8001001",
+                              "evaNumbers": [
+                                "8001001",
+                                "8001002",
+                                "8001003"
+                              ],
+                              "slug": "seed-ijaijceeccig",
+                              "street": null,
+                              "zipcode": null,
+                              "city": null,
+                              "land": null,
+                              "category": null
+                            }
+                          },
+                          {
+                            "id": "rail_ampel",
+                            "asOf": "2026-03-30T00:00:00Z",
+                            "sources": [
+                              "delfi_static"
+                            ],
+                            "railAmpel": {
+                              "lamp": "unknown",
+                              "trips": 0,
+                              "reasons": [],
+                              "lines": []
+                            }
+                          },
+                          {
+                            "id": "step_free_now",
+                            "asOf": "2026-03-30T00:00:00Z",
+                            "sources": [
+                              "db_stada"
+                            ],
+                            "stepFreeNow": {
+                              "platforms": [],
+                              "blocked": [],
+                              "steplessAccess": null
+                            }
+                          },
+                          {
+                            "id": "lifts",
+                            "asOf": null,
+                            "sources": [],
+                            "lifts": []
+                          },
+                          {
+                            "id": "platforms",
+                            "asOf": null,
+                            "sources": []
+                          },
+                          {
+                            "id": "departures",
+                            "asOf": "2026-03-30T00:00:00Z",
+                            "sources": [
+                              "delfi_static"
+                            ],
+                            "departures": []
+                          },
+                          {
+                            "id": "service_alerts",
+                            "asOf": "2026-03-30T00:00:00Z",
+                            "sources": [],
+                            "alerts": []
+                          },
+                          {
+                            "id": "parking_charging",
+                            "asOf": "2026-03-30T00:00:00Z",
+                            "sources": [],
+                            "facilities": {
+                              "flags": [],
+                              "location": null
+                            }
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": null,
+                        "freshness": [
+                          {
+                            "family": "db_stada",
+                            "dataAsOf": null,
+                            "ageS": null,
+                            "staleAfterS": 9007199254740991,
+                            "stale": false,
+                            "lastCheckedAt": null
+                          },
+                          {
+                            "family": "delfi_static",
+                            "dataAsOf": "2026-03-29T12:00:00Z",
+                            "ageS": 43200,
+                            "staleAfterS": 259200,
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T12:00:00Z"
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "db_stada",
+                            "domain": "transit",
+                            "publisher": "Bahnhofsdaten: Deutsche Bahn AG, DB API Marketplace, CC BY 4.0, bearbeitet",
+                            "text": "Bahnhofsdaten: Deutsche Bahn AG, DB API Marketplace, CC BY 4.0, bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://developers.deutschebahn.com",
+                            "sourceUrl": "https://developers.deutschebahn.com"
+                          },
+                          {
+                            "family": "delfi_static",
+                            "domain": "transit",
+                            "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://www.opendata-oepnv.de",
+                            "sourceUrl": "https://www.opendata-oepnv.de"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ]
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/stations/8001001/page"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/StationPageEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "$ref": "#/components/headers/Age"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/Cache-Control"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/Last-Modified"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              },
+              "Vary": {
+                "$ref": "#/components/headers/Vary"
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/Cache-Control"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/Last-Modified"
+              },
+              "Vary": {
+                "$ref": "#/components/headers/Vary"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not used by this operation.",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "A station's page",
+        "tags": [
+          "transit"
+        ],
+        "x-attribution": "Each section names the source families it was read from in its sources, and the answer credits each of them once in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/stations/8001001/page?departures=3\u0026lang=en\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/stations/8001001/page?departures=3\u0026lang=en",
+        "x-mcp-counterpart": "station page",
+        "x-required-scope": "transit"
+      }
+    },
+    "/v1/stop-boards": {
+      "get": {
+        "description": "The stops around the position, as the platform's departures around a place list them, each with its next departures as its departure board shows them, all in one read. Needs the scope transit.",
+        "operationId": "listStopBoards",
+        "parameters": [
+          {
+            "description": "The position: lat,lon in decimal degrees (WGS 84).",
+            "explode": false,
+            "in": "query",
+            "name": "at",
+            "required": true,
+            "schema": {
+              "description": "The position: lat,lon in decimal degrees (WGS 84).",
+              "examples": [
+                "52.52,13.405"
+              ],
+              "pattern": "^-?[0-9]{1,3}(\\.[0-9]+)?,-?[0-9]{1,3}(\\.[0-9]+)?$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The radius in metres the stops lie within (100 to 5000); default 5000.",
+            "explode": false,
+            "in": "query",
+            "name": "radius_m",
+            "schema": {
+              "description": "The radius in metres the stops lie within (100 to 5000); default 5000.",
+              "format": "int64",
+              "maximum": 5000,
+              "minimum": 100,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Most stops to list; default 8.",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "description": "Most stops to list; default 8.",
+              "format": "int64",
+              "maximum": 20,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Most departures per stop, earliest first; default 4.",
+            "explode": false,
+            "in": "query",
+            "name": "per_stop",
+            "schema": {
+              "description": "Most departures per stop, earliest first; default 4.",
+              "format": "int64",
+              "maximum": 15,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Start of the window (RFC 3339 with an offset); default: now.",
+            "explode": false,
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "description": "Start of the window (RFC 3339 with an offset); default: now.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Length of the window in minutes; default 60.",
+            "explode": false,
+            "in": "query",
+            "name": "duration_min",
+            "schema": {
+              "description": "Length of the window in minutes; default 60.",
+              "format": "int64",
+              "maximum": 1440,
+              "minimum": 5,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Keep only departures of these modes (comma-separated): rail, sbahn, subway, tram, bus, ferry, other. Default: every mode. The stops listed are the same.",
+            "explode": false,
+            "in": "query",
+            "name": "modes",
+            "schema": {
+              "description": "Keep only departures of these modes (comma-separated): rail, sbahn, subway, tram, bus, ferry, other. Default: every mode. The stops listed are the same.",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 7,
+              "type": "array"
+            }
+          },
+          {
+            "description": "The language of the answer's texts (de, en): the source notes, rules texts and notices. Default: the instance's language, German.",
+            "example": "en",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "enum": [
+                "de",
+                "en"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "example": {
+                    "summary": "The stops around a position with their next departures",
+                    "value": {
+                      "data": {
+                        "location": {
+                          "lat": 47.4035,
+                          "lon": 14.5617
+                        },
+                        "window": {
+                          "from": "2026-03-30T00:00:00Z",
+                          "fromLocal": "2026-03-30T02:00:00+02:00",
+                          "until": "2026-03-30T01:00:00Z",
+                          "untilLocal": "2026-03-30T03:00:00+02:00"
+                        },
+                        "stops": []
+                      },
+                      "meta": {
+                        "requestId": "example-request-0001",
+                        "generatedAt": "2026-03-30T00:00:00Z",
+                        "language": "en",
+                        "asOf": "2026-03-29T12:00:00Z",
+                        "freshness": [
+                          {
+                            "family": "delfi_static",
+                            "dataAsOf": "2026-03-29T12:00:00Z",
+                            "ageS": 43200,
+                            "staleAfterS": 259200,
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T12:00:00Z"
+                          }
+                        ],
+                        "attribution": [
+                          {
+                            "family": "delfi_static",
+                            "domain": "transit",
+                            "publisher": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "text": "Fahrplandaten: DELFI e.V., CC BY 4.0, bearbeitet",
+                            "licence": "CC BY 4.0",
+                            "licenceUrl": "https://licences.example/cc-by-4-0",
+                            "shareAlike": false,
+                            "shareAlikeOffer": null,
+                            "termsUrl": "https://www.opendata-oepnv.de",
+                            "sourceUrl": "https://www.opendata-oepnv.de"
+                          }
+                        ],
+                        "notes": {
+                          "condition": [],
+                          "purpose": []
+                        },
+                        "warnings": [
+                          {
+                            "code": "partial",
+                            "detail": "A source family that could answer was withheld under the key's licence terms."
+                          }
+                        ]
+                      },
+                      "links": {
+                        "self": "https://api.viafrei.de/v1/stop-boards"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/StopBoardsEnvelope"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Age": {
+                "$ref": "#/components/headers/Age"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/Cache-Control"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/Last-Modified"
+              },
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              },
+              "Vary": {
+                "$ref": "#/components/headers/Vary"
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: If-None-Match names the answer's current ETag. Counts against the quota like any answer.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/Cache-Control"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/Last-Modified"
+              },
+              "Vary": {
+                "$ref": "#/components/headers/Vary"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key, or a key that is invalid, expired or revoked.",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key's plan lacks the operation's scope (scope-denied), or no source family that could answer is permitted to it (source-not-permitted, or terms-not-accepted when only the acceptance of terms is missing).",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not used by this operation.",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Refused by the key's rate (rate-limited), its quota (quota-exceeded) or the admission under load (overloaded; 503 when admission.shed_status says so).",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              },
+              "Retry-After": {
+                "description": "Whole seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Storage did not answer in time (deadline-exhausted) or is unavailable (upstream-unavailable), or the admission refused the request under load (overloaded, when admission.shed_status is 503); retryable, with Retry-After. While storage cannot answer, a stored answer of the same request read no longer than the stale allowance of its domain (cache.stale_if_error) ago is sent instead, as a 200 with the served_stale warning and its Age.",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Error",
+            "headers": {
+              "RateLimit": {
+                "$ref": "#/components/headers/RateLimit"
+              },
+              "RateLimit-Policy": {
+                "$ref": "#/components/headers/RateLimit-Policy"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerKey": []
+          },
+          {
+            "headerKey": []
+          }
+        ],
+        "summary": "The stops around a position with their next departures",
+        "tags": [
+          "transit"
+        ],
+        "x-attribution": "The stops and their departures come from the source families of the transit domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
+        "x-codeSamples": [
+          {
+            "lang": "Shell",
+            "label": "curl",
+            "source": "curl -sS \"https://api.viafrei.de/v1/stop-boards?at=47.4035,14.5617\u0026limit=3\u0026per_stop=2\" \\\n  -H \"Authorization: Bearer $VIAFREI_API_KEY\""
+          }
+        ],
+        "x-example-request": "/v1/stop-boards?at=47.4035,14.5617\u0026limit=3\u0026per_stop=2",
+        "x-mcp-counterpart": "departures around a place",
+        "x-required-scope": "transit"
+      }
+    },
     "/v1/train-boards/{eva}": {
       "get": {
-        "description": "The newest DB Timetables departure board the live refresher fetched for the station, while it was fetched no longer ago than the MCP server's own cache lifetime (30 s): DB Timetables alone, CC BY 4.0, never blended with a share-alike source. Without one, fresh is false and the answer states when the newest board held was fetched. Needs the scope transit.",
+        "description": "A station's DB Timetables departure board while a fresh one is held, without a refresh: the newest board the live refresher fetched (no older than the MCP server's cache lifetime, 30 s), else the board the stored-boards worker wrote for the station (no older than 20 minutes), its EVA numbers merged into one list. DB Timetables alone, CC BY 4.0, never blended with a share-alike source; the interchange under it is the DELFI timetable's, with its own sources in meta. Without a fresh board, fresh is false and the answer states when the newest board held was read. Needs the scope transit.",
         "operationId": "getTrainBoard",
         "parameters": [
           {
@@ -22966,6 +27260,34 @@
               ],
               "pattern": "^[0-9]{7}$",
               "type": "string"
+            }
+          },
+          {
+            "description": "How many departures to show, the next to leave first (1 to 50).",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 5,
+              "description": "How many departures to show, the next to leave first (1 to 50).",
+              "format": "int64",
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "How far ahead to look, in minutes (5 to 120).",
+            "explode": false,
+            "in": "query",
+            "name": "duration_min",
+            "schema": {
+              "default": 60,
+              "description": "How far ahead to look, in minutes (5 to 120).",
+              "format": "int64",
+              "maximum": 120,
+              "minimum": 5,
+              "type": "integer"
             }
           },
           {
@@ -22992,9 +27314,13 @@
                     "value": {
                       "data": {
                         "eva": "8001001",
+                        "evaNumbers": [
+                          "8001001"
+                        ],
                         "fresh": true,
                         "fetchedAt": "2026-03-30T00:00:00Z",
                         "ageSeconds": 0,
+                        "degraded": false,
                         "departures": [
                           {
                             "line": null,
@@ -23008,9 +27334,12 @@
                             "plannedPlatform": "4",
                             "platformChanged": false,
                             "cancelled": false,
+                            "stationPart": null,
                             "sourceFamily": "db_timetables"
                           }
-                        ]
+                        ],
+                        "capped": null,
+                        "interchange": null
                       },
                       "meta": {
                         "requestId": "example-request-0001",
@@ -23023,7 +27352,8 @@
                             "dataAsOf": null,
                             "ageS": null,
                             "staleAfterS": 9007199254740991,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": null
                           }
                         ],
                         "attribution": [
@@ -23347,7 +27677,18 @@
                         "duplicatesOmitted": 0,
                         "punctuality": null,
                         "windowMin": 60,
-                        "line": null
+                        "line": null,
+                        "alertsCoverage": {
+                          "covered": true,
+                          "lookbackDays": 14,
+                          "lands": [
+                            {
+                              "land": "08",
+                              "alertsSeen": 2,
+                              "newestAlertSeenAt": "2026-03-29T23:57:30Z"
+                            }
+                          ]
+                        }
                       },
                       "meta": {
                         "requestId": "example-request-0001",
@@ -23360,7 +27701,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -23411,7 +27753,8 @@
                           "key": "RE45",
                           "checked": true,
                           "inTimetable": true
-                        }
+                        },
+                        "alertsCoverage": null
                       },
                       "meta": {
                         "requestId": "example-request-0001",
@@ -23424,7 +27767,8 @@
                             "dataAsOf": "2026-03-29T12:00:00Z",
                             "ageS": 43200,
                             "staleAfterS": 259200,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T12:00:00Z"
                           }
                         ],
                         "attribution": [
@@ -23841,7 +28185,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [
@@ -24180,6 +28525,7 @@
                             "unaltered": false,
                             "urgency": null,
                             "certainty": null,
+                            "levelSource": null,
                             "english": null
                           }
                         ],
@@ -24199,7 +28545,8 @@
                             "dataAsOf": "2026-03-29T23:57:30Z",
                             "ageS": 150,
                             "staleAfterS": 900,
-                            "stale": false
+                            "stale": false,
+                            "lastCheckedAt": "2026-03-29T23:57:30Z"
                           }
                         ],
                         "attribution": [

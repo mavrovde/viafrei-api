@@ -20,6 +20,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/domain/rules"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 	"github.com/mavrovde/viafrei-api/internal/domain/weather"
+	"github.com/mavrovde/viafrei-api/internal/runtime/config"
 )
 
 // errInjected is the fault a faultConn answers its armed statement with.
@@ -101,9 +102,18 @@ func (c *faultConn) Write(b []byte) (int, error) {
 // statements f can fail.
 func faulty(t *testing.T) (*store.Store, *fault) {
 	t.Helper()
+	return faultyOn(t, db.ReaderURL)
+}
+
+// faultyOn is faulty on the database the reader url names.
+func faultyOn(t *testing.T, url string) (*store.Store, *fault) {
+	t.Helper()
 	// The road snapshot off: its reads are statements of every call, so
 	// each statement of a read takes its fault in turn.
-	cfg := readerConfig(t, "VFAPI_DB_ROAD_SNAPSHOT_TTL=0s")
+	cfg, err := config.Load(config.Options{Environ: []string{"VFAPI_DB_URL=" + url, "VFAPI_DB_ROAD_SNAPSHOT_TTL=0s"}, RequireSecrets: true})
+	if err != nil {
+		t.Fatal(err)
+	}
 	pc, err := store.PoolConfig(cfg)
 	if err != nil {
 		t.Fatal(err)

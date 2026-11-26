@@ -80,6 +80,14 @@ func (f *cachedFeatures) Stations(context.Context, access.Record, transit.Query)
 	return features.Answer[transit.Station]{}, nil
 }
 
+func (f *cachedFeatures) StationPage(context.Context, access.Record, features.StationPageQuery) (features.StationPage, error) {
+	return features.StationPage{}, nil
+}
+
+func (f *cachedFeatures) StopBoards(context.Context, access.Record, transit.StopBoardsQuery) (features.StopBoards, error) {
+	return features.StopBoards{}, nil
+}
+
 func (f *cachedFeatures) Departures(context.Context, access.Record, transit.DepartureQuery) (features.Board, error) {
 	return features.Board{}, nil
 }

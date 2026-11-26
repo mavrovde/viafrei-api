@@ -60,6 +60,14 @@ type Station struct {
 	// InTown marks a station found as a stop in the town the text names
 	// (TownSplits): its district placed it there.
 	InTown bool
+	// TownBy is the family whose places named the town the station was
+	// found in (the gazetteer's Gemeinden), credited with it; nil when the
+	// town was a district's own name.
+	TownBy *string
+	// RegisterName is the station's name in DB's station register, of the
+	// family RegisterBy; nil for a stop the register does not list.
+	RegisterName *string
+	RegisterBy   *string
 	// EVA is the railway's main station number (DB StaDa); nil for a stop
 	// that is no DB station. EVANumbers are every number of the station, the
 	// main one first: a station of several parts files each part's trains

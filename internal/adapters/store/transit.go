@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/mavrovde/viafrei-api/internal/domain/geo"
 	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 )
 
@@ -130,7 +131,7 @@ var stationsPage = func() map[stationShape]stmt {
 select s.stop_place_id, s.name, st_y(s.location) lat, st_x(s.location) lon, s.national_stop_code, s.region_code,
        coalesce(s.modes, '{}') modes, s.source_ref,
        case when here.g is null then null else round(st_distance(s.location::geography, here.g))::int end dist,
-       s.placement_source_ref, s.eva_no, s.eva_numbers
+       s.placement_source_ref, s.eva_no, s.eva_numbers, s.register_name, s.register_ref
 from (` + relStopPlace + `) s, here
 where s.withdrawn_at is null
   and s.location is not null
@@ -240,10 +241,11 @@ limit ` + limit + `::bigint)`
 // limit at most, each read by its key.
 func keyedPage(name, order, limit string) string {
 	return `select p.stop_place_id, p.name, st_y(p.location) lat, st_x(p.location) lon, p.national_stop_code, p.region_code,
-       coalesce(p.modes, '{}') modes, p.source_ref, k.dist, p.placement_source_ref, p.eva_no, p.eva_numbers
+       coalesce(p.modes, '{}') modes, p.source_ref, k.dist, p.placement_source_ref, p.eva_no, p.eva_numbers,
+       p.register_name, p.register_ref
 from ` + name + ` k
 cross join lateral (select s.stop_place_id, s.name, s.location, s.national_stop_code, s.region_code, s.modes, s.source_ref,
-                           s.placement_source_ref, s.eva_no, s.eva_numbers
+                           s.placement_source_ref, s.eva_no, s.eva_numbers, s.register_name, s.register_ref
                       from (` + relStopPlace + `) s
                      where s.stop_place_id = k.stop_place_id
                      limit 1) p
@@ -387,22 +389,24 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 // the district its key starts with, for every run $1 of the text
 // (transit.TownRuns); and, flagged not exact, a Gemeinde whose name starts
 // with a prefix $2 and a space (transit.TownPrefixes): "Frankfurt" for
-// "Frankfurt am Main". Exact rows first; sixty at most.
+// "Frankfurt am Main". Exact rows first; sixty at most. Each row names the
+// family whose places named it: the gazetteer's for a Gemeinde, none for a
+// district's own name.
 var stationTownKreise = namedOpaque("api_station_town_kreise", `
-select distinct k.ags, k.run, k.exact from (
-  select a.ags, r.run, true exact
+select distinct k.ags, k.run, k.exact, k.via from (
+  select a.ags, r.run, true exact, null::text via
     from unnest($1::text[]) r(run)
     join ags_regions a on a.level = 'kreis' and (a.name_norm = r.run or a.name_en_norm = r.run)
   union all
-  select left(g.admin_code, 5), g.name_norm, true from gazetteer_places g
+  select left(g.admin_code, 5), g.name_norm, true, g.source_id from gazetteer_places g
    where g.closed_at is null and g.source_id = 'bkg_gvisys' and g.kind = 'city' and g.admin_code ~ '^[0-9]{8}$'
      and g.name_norm = any($1::text[])
   union all
-  select left(g.admin_code, 5), p.w, false
+  select left(g.admin_code, 5), p.w, false, g.source_id
     from unnest($2::text[]) p(w)
     join gazetteer_places g on left(g.name_norm, length(p.w) + 1) = p.w || ' '
    where g.closed_at is null and g.source_id = 'bkg_gvisys' and g.kind = 'city' and g.admin_code ~ '^[0-9]{8}$') k
-order by k.exact desc, k.ags, k.run
+order by k.exact desc, k.ags, k.run, k.via nulls first
 limit 60`, "text[]", "text[]")
 
 // stationsInTowns are the stations of the districts $4 whose name holds the
@@ -439,24 +443,30 @@ order by s.name, s.stop_place_id`, "$5")+`
 // its town names (stationTownKreise: the exact names where there are any,
 // else the Gemeinden its prefix starts), and the stations of those districts
 // whose name holds the rest of the text (transit.TownRest). Two statements,
-// whatever the text.
+// whatever the text. A station found where a Gemeinde of the gazetteer
+// named the town is credited to the gazetteer (TownBy), as today's resolver
+// credits BKG's map when it took part.
 func (s *Store) stationsInTown(ctx context.Context, q transit.Query, families []string) ([]transit.Station, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.Station, error) {
 		rows, _ := run(ctx, tx, stationTownKreise, transit.TownRuns(q.Text), transit.TownPrefixes(q.Text))
 		towns, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (townRow, error) {
 			var v townRow
-			return v, r.Scan(&v.ags, &v.run, &v.exact)
+			return v, r.Scan(&v.ags, &v.run, &v.exact, &v.via)
 		})
 		if err != nil || len(towns) == 0 {
 			return nil, err
 		}
 		var kreise, runs []string
+		var via *string
 		for _, tw := range towns {
 			if tw.exact == towns[0].exact {
 				if !slices.Contains(kreise, tw.ags) {
 					kreise = append(kreise, tw.ags)
 				}
 				runs = append(runs, tw.run)
+				if tw.via != nil {
+					via = tw.via
+				}
 			}
 		}
 		rest := transit.TownRest(q.Text, runs)
@@ -468,14 +478,20 @@ func (s *Store) stationsInTown(ctx context.Context, q transit.Query, families []
 			read = railwayInTowns
 		}
 		rows, _ = run(ctx, tx, read, families, transit.Fold(rest), townSpellings(rest), kreise, q.Limit+1)
-		return pgx.CollectRows(rows, inTown)
+		out, err := pgx.CollectRows(rows, inTown)
+		for i := range out {
+			out[i].TownBy = via
+		}
+		return out, err
 	})
 }
 
-// townRow is one district a town names.
+// townRow is one district a town names, and the family whose places named
+// it (nil for a district's own name).
 type townRow struct {
 	ags, run string
 	exact    bool
+	via      *string
 }
 
 // townSpellings are the spellings a town reading's stop name is searched
@@ -502,7 +518,7 @@ func stationRow(r pgx.CollectableRow) (transit.Station, error) {
 		modes []string
 	)
 	err := r.Scan(&v.ID, &v.Name, &v.Location.Lat, &v.Location.Lon, &v.NationalCode, &v.RegionCode,
-		&modes, &v.Family, &v.DistanceM, &v.PlacedBy, &v.EVA, &v.EVANumbers)
+		&modes, &v.Family, &v.DistanceM, &v.PlacedBy, &v.EVA, &v.EVANumbers, &v.RegisterName, &v.RegisterBy)
 	v.Modes = transit.MapModes(modes)
 	return v, err
 }
@@ -588,7 +604,10 @@ func (s *Store) Departures(ctx context.Context, q transit.DepartureQuery, famili
 // the families, $3 now. A state last observed (last restated by its feed)
 // longer ago than its family's stale_after_s, or never observed, is
 // unknown: a state is current while its feed restates it, whenever it
-// began. Judged on when the state began, every lift in service for more
+// began. A unit whose state comes from one family (OpenStation's status)
+// and its listing, kind and position from another (OpenStation's inventory)
+// names both, the listing's when the key may read it, as today's credit
+// line credits both. Judged on when the state began, every lift in service for more
 // than three of its feed's cadences read as unknown (Hamburg Hbf: 49 of 49,
 // prod 2026-11-24, where the platform states 26 with 1 out of service).
 var stationFacilities = namedOpaque("api_station_facilities", `
@@ -596,7 +615,9 @@ select f.facility_id, f.facility_kind, f.position_text,
        case when f.status_observed_at is null then 'unknown'
             when s.stale_after_s is not null and f.status_observed_at < $3::timestamptz - make_interval(secs => s.stale_after_s) then 'unknown'
             else f.facility_status end,
-       f.status_observed_at, f.source_ref, f.equipment_no
+       f.status_observed_at, f.source_ref, f.equipment_no,
+       case when f.listed_ref <> f.source_ref and f.listed_ref = any($2) then f.listed_ref else '' end,
+       case when lower(btrim(f.state_explanation)) in ('', 'available', 'not available') then null else btrim(f.state_explanation) end
 from (`+stationFacilityOf+`) f
 join (`+relSource+`) s on s.source_ref = f.source_ref
 where f.source_ref = any($2) and `+permitted("f")+`
@@ -626,7 +647,7 @@ n as (select d.station_no from db_stations d where substring(d.ifopt, '` + dhidO
 select 'equipment:' || e.equipment_id facility_id, contract_stop_place_of(e.stop_place_id) stop_place_id, e.kind facility_kind,
        e.description position_text, coalesce(st.state, 'unknown') facility_status,
        coalesce(st.last_seen_at, e.last_seen_at) status_observed_at, coalesce(st.source_feed, e.source_feed) source_ref,
-       'open' display_class, 'public' audience, e.equipment_no
+       'open' display_class, 'public' audience, e.equipment_no, e.source_feed listed_ref, st.status_description state_explanation
 from station_equipment e
 left join station_equipment_state st on st.equipment_id = e.equipment_id
 where e.closed_at is null and substring(e.stop_place_id, '` + dhidOf + `') in (select k.d from k)
@@ -634,22 +655,26 @@ where e.closed_at is null and substring(e.stop_place_id, '` + dhidOf + `') in (s
                    and x.source_feed = any($2))
 union all
 select 'fasta:' || f.equipment_no, (select contract_stop_place_of(d.ifopt) from db_stations d where d.station_no = f.station_no),
-       f.kind, f.description, f.state, f.last_seen_at, f.source_feed, 'open', 'public', f.equipment_no
+       f.kind, f.description, f.state, f.last_seen_at, f.source_feed, 'open', 'public', f.equipment_no, f.source_feed, f.state_explanation
 from db_facilities f
 where f.station_no in (select n.station_no from n)`
 
 // dhidOf is the DHID a ref names, as contract_stop_place_of reads it.
 const dhidOf = `^(?:dhid:)?([a-z]{2}:[0-9]{5}:[0-9]+)`
 
-// Facilities reads the facilities of a station (features.Transit).
+// Facilities reads the facilities of a station (features.Transit), one row
+// per unit (transit.OnePerUnit), each with the operator's explanation of its
+// state where it adds one (not "available" or "not available", which repeat
+// the state).
 func (s *Store) Facilities(ctx context.Context, station string, families []string, now time.Time) ([]transit.Facility, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.Facility, error) {
 		rows, _ := run(ctx, tx, stationFacilities, station, families, now)
-		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.Facility, error) {
+		fs, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.Facility, error) {
 			var v transit.Facility
-			err := r.Scan(&v.ID, &v.Kind, &v.Position, &v.State, &v.ObservedAt, &v.Family, &v.EquipmentNo)
+			err := r.Scan(&v.ID, &v.Kind, &v.Position, &v.State, &v.ObservedAt, &v.Family, &v.EquipmentNo, &v.Listing, &v.StateExplanation)
 			return v, err
 		})
+		return transit.OnePerUnit(fs), err
 	})
 }
 
@@ -898,4 +923,230 @@ func affectedPlacesOf(ctx context.Context, tx pgx.Tx, families []string, by map[
 		return nil
 	})
 	return stations, err
+}
+
+// stopsNear is today's stops-near probe (STOPS_NEAR_SQL): for each mode of
+// $4 in order, the $5 nearest stop families serving it within $3 metres of
+// the point ($1 lon, $2 lat), of the feeds of the families $6.
+var stopsNear = named("api_stops_near", `
+select (n.gtfs_feed_key || ':') || n.root_id, n.name, coalesce(n.modes, '{}'), n.metres,
+       st_y(n.geom::geometry), st_x(n.geom::geometry), n.source_feed
+from unnest((select $4::text[])) with ordinality m(mode, ord)
+cross join lateral (
+  select t.gtfs_feed_key, t.root_id, t.name, t.modes, t.geom, f.source_feed,
+         st_distance(t.geom, st_point((select $1::float8), (select $2::float8))::geography) metres
+  from transit_stop_modes t
+  join feeds f on f.gtfs_feed_key = t.gtfs_feed_key
+  where t.modes @> array[m.mode]
+    and st_dwithin(t.geom, st_point((select $1::float8), (select $2::float8))::geography, (select $3::float8))
+    and f.source_feed = any((select $6::text[])::text[])
+  order by t.geom <-> st_point((select $1::float8), (select $2::float8))::geography
+  limit (select $5::int)) n
+order by m.ord, n.metres`, "float8", "float8", "float8", "text[]", "int", "text[]")
+
+// stopBoardsCalls reads the departing calls of several stops in one
+// statement, as boardCalls reads one station's: $1 the stops' roots, $2
+// the listed stop each root belongs to (its index), $3 and $4 the window,
+// $5 the families. Each call is its stop's (the first listed whose
+// station family holds its stop point); a trip must call somewhere outside
+// that stop after it.
+//
+//nolint:misspell // materialized is the SQL keyword
+var stopBoardsCalls = named("api_stop_boards_calls", `
+with grp as materialized (
+  select g.ord, m.id member
+  from unnest((select $1::text[]), (select $2::int[])) g(root, ord)
+  cross join lateral (`+stationFamily("g.root")+`) m(id)),
+fam as materialized (select array(select distinct g.member from grp g) ids)
+select k.ord, d.journey_id, d.stop_point_id, d.call_order, d.line_name, d.transport_mode, d.route_type,
+       d.train_number, d.train_category, nullif(btrim(d.board_headsign), ''),
+       coalesce(nullif(btrim(d.board_headsign), ''),
+                (select nullif(btrim(ls.name), '') from stop_times lc
+                   join stops ls on ls.gtfs_feed_key = lc.gtfs_feed_key and ls.id = lc.stop_id
+                  where lc.gtfs_feed_key = d.board_feed and lc.trip_id = d.board_trip and lc.deleted_at is null
+                    and ls.deleted_at is null and coalesce(ls.location_type::integer, 0) = 0
+                  order by lc.stop_sequence desc limit 1)),
+       d.planned_departure_at, d.platform, d.planned_platform, d.platform_changed, d.realtime, d.realtime_source,
+       d.cancelled, d.delay_s, d.expected_departure_at, d.no_forecast, d.source_ref, d.source_refs
+from (`+departuresOfTrips+`) d
+cross join lateral (select min(g.ord) ord from grp g where g.member = d.stop_point_id) k
+where d.board_stop_feed = any(array(select split_part(x, ':', 1)::smallint from unnest((select f.ids from fam f)) x))
+  and d.board_stop = any(array(select substr(x, strpos(x, ':') + 1) from unnest((select f.ids from fam f)) x))
+  and d.stop_point_id = any((select f.ids from fam f)::text[])
+  and d.planned_departure_at >= (select $3::timestamptz) and d.planned_departure_at < (select $4::timestamptz)
+  and d.boarding
+  and d.source_ref = any((select $5::text[])::text[])
+  and d.source_refs <@ (select $5::text[])
+  and `+permitted("d")+`
+  and exists (select 1 from stop_times nx
+                join stops np on np.gtfs_feed_key = nx.gtfs_feed_key and np.id = nx.stop_id
+               where nx.gtfs_feed_key = d.board_feed and nx.trip_id = d.board_trip and nx.stop_sequence > d.call_order
+                 and nx.deleted_at is null and np.deleted_at is null and coalesce(np.location_type::integer, 0) = 0
+                 and (np.gtfs_feed_key || ':') || np.id not in (select g.member from grp g where g.ord = k.ord))
+order by d.planned_departure_at, d.journey_id, d.call_order`, "text[]", "int[]", "timestamptz", "timestamptz", "text[]")
+
+// StopBoards reads the stops around q.At with their departures
+// (features.Transit): today's stop pick (transit.PickStops over stopsNear),
+// then every listed stop's departing calls in one statement, each stop's
+// board by transit.Board.
+func (s *Store) StopBoards(ctx context.Context, q transit.StopBoardsQuery, families []string) ([]transit.StopBoard, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.StopBoard, error) {
+		rows, _ := run(ctx, tx, stopsNear, q.At.Lon, q.At.Lat, float64(q.RadiusM), transit.StopModes, transit.StopsPerMode, families)
+		near, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.StopNear, error) {
+			var v transit.StopNear
+			err := r.Scan(&v.Root, &v.Name, &v.Modes, &v.Metres, &v.At.Lat, &v.At.Lon, &v.Family)
+			return v, err
+		})
+		stops := transit.PickStops(near, q.Limit)
+		if err != nil || len(stops) == 0 {
+			return []transit.StopBoard{}, err
+		}
+		var roots []string
+		var ords []int32
+		for i, st := range stops {
+			for _, r := range st.Roots {
+				roots, ords = append(roots, r), append(ords, int32(i))
+			}
+		}
+		calls := make([][]transit.Departure, len(stops))
+		rows, _ = run(ctx, tx, stopBoardsCalls, roots, ords, q.From, q.From.Add(q.Window), families)
+		var (
+			ord    int32
+			v      transit.Departure
+			mode   string
+			delayS *int
+		)
+		_, err = pgx.ForEachRow(rows, []any{&ord, &v.JourneyID, &v.StopPointID, &v.CallOrder, &v.Line, &mode, &v.RouteType, &v.TrainNumber,
+			&v.Category, &v.Headsign, &v.Destination, &v.PlannedAt, &v.Platform, &v.PlannedPlatform,
+			&v.PlatformChanged, &v.Live, &v.Source, &v.Cancelled, &delayS, &v.ExpectedAt, &v.NoForecast,
+			&v.Family, &v.Families}, func() error {
+			d := v
+			d.DelayMin, d.Mode = transit.DelayMinOf(delayS), transit.MapMode(mode)
+			calls[ord] = append(calls[ord], d)
+			// Each row scans into fresh pointers and slices.
+			v, delayS = transit.Departure{}, nil
+			return nil
+		})
+		out := make([]transit.StopBoard, len(stops))
+		for i, st := range stops {
+			out[i] = transit.StopBoard{Stop: st, Board: transit.Board(calls[i], transit.DepartureQuery{From: q.From, Window: q.Window, Modes: q.Modes, Limit: q.PerStop})}
+		}
+		return out, err
+	})
+}
+
+// platformAccess reads DB's station inventory (OpenStation) of the
+// EVA numbers $1, of the families $2, as today's PLATFORM_ACCESS_AT_EVAS
+// (its open rows, the live view's rule, on the table).
+var platformAccess = named("api_platform_access", `
+select a.element_id, a.element_kind = 'stop_place', a.stop_place_id, a.station_name, a.quay_name, a.plate_code,
+       a.parent_quay_id, a.platform_height_cm::int, a.has_assessment, a.step_free_access, a.wheelchair_access,
+       a.tactile_guidance, a.level_access_into_vehicle, a.provider_updated_at, a.source_feed
+from station_accessibility a
+where a.closed_at is null and a.source_feed = 'openstation_netex' and a.source_feed = any((select $2::text[])::text[])
+  and a.eva_nos && (select $1::text[])::text[]
+order by a.stop_place_id, a.element_kind desc, a.element_id
+limit 2000`, "text[]", "text[]")
+
+// Platforms reads the platforms of the station numbered evas
+// (features.Transit), as DB's station inventory states them.
+func (s *Store) Platforms(ctx context.Context, evas, families []string) ([]transit.PlatformRow, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.PlatformRow, error) {
+		rows, _ := run(ctx, tx, platformAccess, evas, families)
+		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.PlatformRow, error) {
+			var v transit.PlatformRow
+			err := r.Scan(&v.ElementID, &v.StopPlace, &v.StopPlaceID, &v.StationName, &v.QuayName, &v.PlateCode, &v.ParentQuayID,
+				&v.HeightCm, &v.HasAssessment, &v.StepFree, &v.Wheelchair, &v.Tactile, &v.LevelBoarding, &v.UpdatedAt, &v.Family)
+			return v, err
+		})
+	})
+}
+
+// stationRecord is DB's register row (today's STATION_RECORD_SQL over
+// station_index_live, on its tables) of the station $1 names: by register
+// number, by EVA number or by the DHID of a stop place id; $2 the families.
+// Each test is an index's (the main EVA number is one of eva_nos, an IFOPT
+// is a bare DHID: both hold for every open row on prod, 2026-11-25); a
+// regular expression over every row took 150 ms.
+// A row with no page slug is not on the index, as the live view joins it.
+//
+//nolint:misspell // has_travel_center is the column
+var stationRecord = named("api_station_record", `
+with k as (select substring(regexp_replace((select $1::text), '^[0-9]+:', ''), '`+dhidOf+`') d)
+select s.station_no, s.name, s.eva_no, s.eva_nos, g.slug, s.street, s.zipcode, s.city, s.federal_state, s.municipality_code,
+       s.category::int, s.stepless_access, contract_stop_place_of(s.ifopt), st_y(s.geom::geometry), st_x(s.geom::geometry),
+       s.last_seen_at, s.source_id,
+       array_remove(array[case when s.has_parking then 'parking' end, case when s.has_bicycle_parking then 'bicycleParking' end,
+         case when s.has_local_public_transport then 'localPublicTransport' end, case when s.has_public_facilities then 'publicFacilities' end,
+         case when s.has_locker_system then 'lockerSystem' end, case when s.has_taxi_rank then 'taxiRank' end,
+         case when s.has_travel_necessities then 'travelNecessities' end, case when s.has_wifi then 'wifi' end,
+         case when s.has_travel_center then 'travelCentre' end, case when s.has_railway_mission then 'railwayMission' end,
+         case when s.has_db_lounge then 'dbLounge' end, case when s.has_lost_and_found then 'lostAndFound' end,
+         case when s.has_car_rental then 'carRental' end], null)
+from db_stations s
+join lateral (select g.slug from station_slugs g where g.station_no = s.station_no order by g.assigned_at desc, g.slug limit 1) g on true
+where s.closed_at is null and s.source_id = any((select $2::text[])::text[])
+  and (s.station_no = (select $1::text) or s.eva_nos @> array[(select $1::text)] or s.ifopt = (select k.d from k))
+order by (s.station_no = (select $1::text)) desc, (s.eva_no = (select $1::text)) desc, (s.source_id = 'db_stada') desc, s.station_no
+limit 1`, "text", "text[]")
+
+// StationRecord reads DB's register row of the station id names
+// (features.Transit); transit.ErrNotFound when none.
+func (s *Store) StationRecord(ctx context.Context, id string, families []string) (transit.StationRecord, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (transit.StationRecord, error) {
+		var (
+			v        transit.StationRecord
+			lat, lon *float64
+		)
+		err := runRow(ctx, tx, stationRecord, id, families).Scan(&v.StationNo, &v.Name, &v.EVANo, &v.EVANumbers, &v.Slug, &v.Street, &v.Zipcode,
+			&v.City, &v.Land, &v.Municipality, &v.Category, &v.SteplessAccess, &v.StopPlaceID, &lat, &lon, &v.SeenAt, &v.Family, &v.Flags)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return v, transit.ErrNotFound
+		}
+		if lat != nil && lon != nil {
+			v.At = &geo.Point{Lat: *lat, Lon: *lon}
+		}
+		return v, err
+	})
+}
+
+// stationAlerts are the alerts in force at $1 of the families $2 naming a
+// stop of $3, or a line of $4 within a Kreis of $5, at most $6: today's
+// STATION_ALERTS_NEAR_SQL on its table (the live view's rule: open,
+// unrestricted), the secondary feed's alert only when seen within a day.
+//
+//nolint:misspell // materialized is the SQL keyword
+var stationAlerts = named("api_station_alerts", `
+with in_force as materialized (
+  select a.source_id, a.source_feed, a.alert_id, a.header, a.active_from, a.active_to, a.line_names, a.stop_ids, a.kreise, a.dedupe_key, a.message_ref
+  from delfi_service_alerts a
+  where a.closed_at is null and coalesce(a.confidentiality, 'noRestriction') = 'noRestriction'
+    and a.source_feed = any((select $2::text[])::text[])
+    and (a.source_id <> 'delfi_siri_sx' or a.last_seen_at > (select $1::timestamptz) - interval '1 day')
+    and (jsonb_array_length(a.active_periods) = 0
+         or exists (select 1 from jsonb_array_elements(a.active_periods) p
+                    where (p->>'start' is null or (p->>'start')::timestamptz <= (select $1::timestamptz))
+                      and (p->>'end' is null or (p->>'end')::timestamptz > (select $1::timestamptz)))))
+select o.source_id || ':' || o.alert_id, o.header, o.active_to, o.line_names, o.stop_ids,
+       (select g.source_id || ':' || g.alert_id from in_force g
+         where g.dedupe_key = o.dedupe_key or (o.message_ref is not null and g.message_ref = o.message_ref)
+         order by (g.source_id <> 'delfi_rt_sa'), g.source_id, g.alert_id limit 1),
+       (select array_agg(distinct g.source_feed order by g.source_feed) from in_force g
+         where g.dedupe_key = o.dedupe_key or (o.message_ref is not null and g.message_ref = o.message_ref)),
+       o.source_feed
+from in_force o
+where o.stop_ids && (select $3::text[])::text[] or (o.line_names && (select $4::text[])::text[] and o.kreise && (select $5::text[])::text[])
+order by (case when o.stop_ids && (select $3::text[])::text[] then 0 else 1 end), o.active_from desc nulls last, o.source_id, o.alert_id
+limit (select $6::int)`, "timestamptz", "text[]", "text[]", "text[]", "text[]", "int")
+
+// StationAlerts reads the alerts in force near a station (features.Transit).
+func (s *Store) StationAlerts(ctx context.Context, q transit.StationAlertsQuery, families []string) ([]transit.StationAlertRow, error) {
+	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.StationAlertRow, error) {
+		rows, _ := run(ctx, tx, stationAlerts, q.Now, families, q.IDs, q.Lines, q.Kreis, transit.StationAlertsLimit)
+		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (transit.StationAlertRow, error) {
+			var v transit.StationAlertRow
+			err := r.Scan(&v.ID, &v.Header, &v.Until, &v.Lines, &v.StopIDs, &v.MessageKey, &v.CarriedBy, &v.Family)
+			return v, err
+		})
+	})
 }

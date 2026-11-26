@@ -79,3 +79,9 @@ func TestRounded(t *testing.T) {
 		t.Errorf("Decimals = %d", geo.Decimals)
 	}
 }
+
+func TestMetresBetween(t *testing.T) {
+	if d := geo.MetresBetween(geo.Point{Lat: 50, Lon: 7}, geo.Point{Lat: 51, Lon: 7}); d < 111_194 || d > 111_196 {
+		t.Errorf("one degree of latitude: %v", d)
+	}
+}

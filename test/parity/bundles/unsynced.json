@@ -6,7 +6,7 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "6b146cee258538b77b3eb7f018e5335c7a8c606041afee7c08a08210a2e04dea"
+    "sha256": "fa6540d71811eeb6227e68be2de011bf13ab601ad62c01c512812f61f8119c0b"
   },
   "cases": [
     {
@@ -1044,6 +1044,10 @@
           "value": "Möniltal Parken"
         },
         {
+          "name": "data[p:27].nearbyAmenities",
+          "value": "[]"
+        },
+        {
           "name": "data[p:27].occupancy.free",
           "value": "106"
         },
@@ -1134,6 +1138,10 @@
           "value": "Möniltal Parken"
         },
         {
+          "name": "data[p:27].nearbyAmenities",
+          "value": "[]"
+        },
+        {
           "name": "data[p:27].occupancy.free",
           "value": "106"
         },
@@ -1180,6 +1188,10 @@
         {
           "name": "data[sid:7].name",
           "value": "Lurzonheim Parken"
+        },
+        {
+          "name": "data[sid:7].nearbyAmenities",
+          "value": "[]"
         },
         {
           "name": "data[sid:7].occupancy.free",
@@ -1442,6 +1454,14 @@
           "value": "0"
         },
         {
+          "name": "data.window.timetableLoadedAt",
+          "value": "null"
+        },
+        {
+          "name": "data.window.timetableUntil",
+          "value": "2026-03-29T22:00:00Z"
+        },
+        {
           "name": "data.window.until",
           "value": "2026-03-31T04:00:00Z"
         },
@@ -1526,6 +1546,14 @@
           "value": "0"
         },
         {
+          "name": "data.window.timetableLoadedAt",
+          "value": "null"
+        },
+        {
+          "name": "data.window.timetableUntil",
+          "value": "2026-03-29T22:00:00Z"
+        },
+        {
           "name": "data.window.until",
           "value": "2026-03-31T04:00:00Z"
         },
@@ -1573,6 +1601,14 @@
       "now": "2026-03-30T00:00:00Z",
       "facts": [
         {
+          "name": "data.capped",
+          "value": "null"
+        },
+        {
+          "name": "data.degraded",
+          "value": "false"
+        },
+        {
           "name": "data.departures[0].cancelled",
           "value": "false"
         },
@@ -1611,6 +1647,10 @@
         {
           "name": "data.departures[0].sourceFamily",
           "value": "db_timetables"
+        },
+        {
+          "name": "data.departures[0].stationPart",
+          "value": "null"
         },
         {
           "name": "data.departures[1].cancelled",
@@ -1653,6 +1693,10 @@
           "value": "db_timetables"
         },
         {
+          "name": "data.departures[1].stationPart",
+          "value": "null"
+        },
+        {
           "name": "data.departures[2].cancelled",
           "value": "false"
         },
@@ -1693,8 +1737,20 @@
           "value": "db_timetables"
         },
         {
+          "name": "data.departures[2].stationPart",
+          "value": "null"
+        },
+        {
           "name": "data.eva",
           "value": "8001001"
+        },
+        {
+          "name": "data.evaNumbers",
+          "value": "[\"8001001\"]"
+        },
+        {
+          "name": "data.interchange",
+          "value": "null"
         },
         {
           "name": "meta.attribution[db_timetables].family",
@@ -1811,6 +1867,14 @@
         {
           "name": "data[00000000-0000-4000-8000-000000000002].name",
           "value": "Belnan Namüningen"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].openingHoursAsOf",
+          "value": "null"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].openingObservedAt",
+          "value": "2026-03-29T22:45:59Z"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].openingState",
@@ -2085,6 +2149,14 @@
           "value": "Belnan Namüningen"
         },
         {
+          "name": "data[00000000-0000-4000-8000-000000000002].openingHoursAsOf",
+          "value": "null"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].openingObservedAt",
+          "value": "2026-03-29T15:24:44Z"
+        },
+        {
           "name": "data[00000000-0000-4000-8000-000000000002].openingState",
           "value": "open"
         },
@@ -2219,6 +2291,14 @@
         {
           "name": "data[00000000-0000-4000-8000-000000000002].name",
           "value": "Belnan Namüningen"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].openingHoursAsOf",
+          "value": "null"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].openingObservedAt",
+          "value": "2026-03-29T22:45:59Z"
         },
         {
           "name": "data[00000000-0000-4000-8000-000000000002].openingState",
@@ -3109,6 +3189,14 @@
         {
           "name": "data.lampReason",
           "value": "weather_warning"
+        },
+        {
+          "name": "data.motorway",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus",
+          "value": "null"
         },
         {
           "name": "data.situations[datex:syn:ev-00001].delayMin",
@@ -4159,6 +4247,10 @@
           "value": "elevator"
         },
         {
+          "name": "data.facilities[equipment:100001].nameShared",
+          "value": "false"
+        },
+        {
           "name": "data.facilities[equipment:100001].position",
           "value": "zu Gleis 1"
         },
@@ -4171,12 +4263,20 @@
           "value": "unknown"
         },
         {
+          "name": "data.facilities[equipment:100001].stateExplanation",
+          "value": "null"
+        },
+        {
           "name": "data.facilities[equipment:100002].id",
           "value": "equipment:100002"
         },
         {
           "name": "data.facilities[equipment:100002].kind",
           "value": "elevator"
+        },
+        {
+          "name": "data.facilities[equipment:100002].nameShared",
+          "value": "false"
         },
         {
           "name": "data.facilities[equipment:100002].position",
@@ -4189,6 +4289,14 @@
         {
           "name": "data.facilities[equipment:100002].state",
           "value": "unknown"
+        },
+        {
+          "name": "data.facilities[equipment:100002].stateExplanation",
+          "value": "null"
+        },
+        {
+          "name": "data.platforms",
+          "value": "null"
         },
         {
           "name": "data.station.name",
@@ -4260,6 +4368,10 @@
           "value": "elevator"
         },
         {
+          "name": "data.facilities[equipment:100001].nameShared",
+          "value": "false"
+        },
+        {
           "name": "data.facilities[equipment:100001].position",
           "value": "zu Gleis 1"
         },
@@ -4270,6 +4382,14 @@
         {
           "name": "data.facilities[equipment:100001].state",
           "value": "unknown"
+        },
+        {
+          "name": "data.facilities[equipment:100001].stateExplanation",
+          "value": "null"
+        },
+        {
+          "name": "data.platforms",
+          "value": "null"
         },
         {
           "name": "data.station.name",
@@ -4348,6 +4468,14 @@
         {
           "name": "data.lampReason",
           "value": "weather_warning"
+        },
+        {
+          "name": "data.motorway",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus",
+          "value": "null"
         },
         {
           "name": "data.situations[datex:syn:ev-00028].delayMin",
@@ -6046,6 +6174,18 @@
           "value": "null"
         },
         {
+          "name": "data.gemeinde",
+          "value": "null"
+        },
+        {
+          "name": "data.governmentRegion",
+          "value": "null"
+        },
+        {
+          "name": "data.junction",
+          "value": "null"
+        },
+        {
           "name": "data.lowEmissionZone",
           "value": "null"
         },
@@ -6128,6 +6268,18 @@
         },
         {
           "name": "data.district",
+          "value": "null"
+        },
+        {
+          "name": "data.gemeinde",
+          "value": "null"
+        },
+        {
+          "name": "data.governmentRegion",
+          "value": "null"
+        },
+        {
+          "name": "data.junction",
           "value": "null"
         },
         {
@@ -6231,6 +6383,26 @@
           "value": "true"
         },
         {
+          "name": "data.alertsCoverage.covered",
+          "value": "true"
+        },
+        {
+          "name": "data.alertsCoverage.lands[0].alertsSeen",
+          "value": "2"
+        },
+        {
+          "name": "data.alertsCoverage.lands[0].land",
+          "value": "08"
+        },
+        {
+          "name": "data.alertsCoverage.lands[0].newestAlertSeenAt",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.alertsCoverage.lookbackDays",
+          "value": "14"
+        },
+        {
           "name": "data.alertsTotal",
           "value": "1"
         },
@@ -6325,6 +6497,26 @@
         {
           "name": "data.alertsChecked",
           "value": "true"
+        },
+        {
+          "name": "data.alertsCoverage.covered",
+          "value": "true"
+        },
+        {
+          "name": "data.alertsCoverage.lands[0].alertsSeen",
+          "value": "2"
+        },
+        {
+          "name": "data.alertsCoverage.lands[0].land",
+          "value": "08"
+        },
+        {
+          "name": "data.alertsCoverage.lands[0].newestAlertSeenAt",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.alertsCoverage.lookbackDays",
+          "value": "14"
         },
         {
           "name": "data.alertsTotal",
@@ -6426,6 +6618,10 @@
           "value": "true"
         },
         {
+          "name": "data.alertsCoverage",
+          "value": "null"
+        },
+        {
           "name": "data.alertsTotal",
           "value": "0"
         },
@@ -6487,6 +6683,26 @@
         {
           "name": "data.alertsChecked",
           "value": "true"
+        },
+        {
+          "name": "data.alertsCoverage.covered",
+          "value": "true"
+        },
+        {
+          "name": "data.alertsCoverage.lands[0].alertsSeen",
+          "value": "2"
+        },
+        {
+          "name": "data.alertsCoverage.lands[0].land",
+          "value": "08"
+        },
+        {
+          "name": "data.alertsCoverage.lands[0].newestAlertSeenAt",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.alertsCoverage.lookbackDays",
+          "value": "14"
         },
         {
           "name": "data.alertsTotal",
@@ -6607,6 +6823,14 @@
         },
         {
           "name": "data.junctions",
+          "value": "[]"
+        },
+        {
+          "name": "data.junctionsFrom",
+          "value": "osm"
+        },
+        {
+          "name": "data.osmParking",
           "value": "[]"
         },
         {
@@ -6806,6 +7030,10 @@
         {
           "name": "data.needs[0].widened",
           "value": "true"
+        },
+        {
+          "name": "data.osmParking",
+          "value": "[]"
         },
         {
           "name": "data.parking",
@@ -7412,6 +7640,10 @@
           "value": "Möniltal Parken"
         },
         {
+          "name": "data[p:27].nearbyAmenities",
+          "value": "[]"
+        },
+        {
           "name": "data[p:27].occupancy.free",
           "value": "106"
         },
@@ -7507,6 +7739,10 @@
           "value": "Stunsaltal Parken"
         },
         {
+          "name": "data[p:9].nearbyAmenities",
+          "value": "[]"
+        },
+        {
           "name": "data[p:9].occupancy.free",
           "value": "32"
         },
@@ -7596,6 +7832,482 @@
         {
           "name": "data.coverage",
           "value": "null"
+        },
+        {
+          "name": "data.motorway",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.canRaise",
+          "value": "false"
+        },
+        {
+          "name": "data.roadStatus.counts.closed",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.counts.current",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.counts.currentFamilies",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.counts.planned",
+          "value": "2"
+        },
+        {
+          "name": "data.roadStatus.counts.programme",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.counts.restricted",
+          "value": "1"
+        },
+        {
+          "name": "data.roadStatus.counts.total",
+          "value": "3"
+        },
+        {
+          "name": "data.roadStatus.guidance",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.guidanceNotCurrent",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.hidden",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.hiddenClosures",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].cause",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].closureFrom",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].closureTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].description",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].detail",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].detour",
+          "value": "false"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].detourForSomeVehicles",
+          "value": "false"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].detourVia",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].eventType",
+          "value": "MaintenanceWorks"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].extent",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].from",
+          "value": "2026-03-28T00:00:00Z"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].id",
+          "value": "roadworks_bast:bast-0001"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].kind",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].lat",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].lon",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].measureTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].place",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].publicationId",
+          "value": "bast-0001"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].publisher",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].referentFrom",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].referentTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].road",
+          "value": "A101"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].sectionName",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].segments",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].siteName",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].sourceFamily",
+          "value": "roadworks_bast"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].status",
+          "value": "restricted"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].subtitle",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].term",
+          "value": "roadworks"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].title",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].to",
+          "value": "2026-04-04T00:00:00Z"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].windowCount",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].windowEnds",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].windowStarts",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].cause",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].closureFrom",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].closureTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].description",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].detail",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].detour",
+          "value": "false"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].detourForSomeVehicles",
+          "value": "false"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].detourVia",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].eventType",
+          "value": "MaintenanceWorks"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].extent",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].from",
+          "value": "2026-04-02T00:00:00Z"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].id",
+          "value": "roadworks_bast:bast-0002"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].kind",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].lat",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].lon",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].measureTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].place",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].publicationId",
+          "value": "bast-0002"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].publisher",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].referentFrom",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].referentTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].road",
+          "value": "A101"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].sectionName",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].segments",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].siteName",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].sourceFamily",
+          "value": "roadworks_bast"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].status",
+          "value": "planned"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].subtitle",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].term",
+          "value": "roadworks"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].title",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].to",
+          "value": "2026-04-03T00:00:00Z"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].windowCount",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].windowEnds",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].windowStarts",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].cause",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].closureFrom",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].closureTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].description",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].detail",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].detour",
+          "value": "false"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].detourForSomeVehicles",
+          "value": "false"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].detourVia",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].eventType",
+          "value": "MaintenanceWorks"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].extent",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].from",
+          "value": "2026-04-09T06:00:00Z"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].id",
+          "value": "roadworks_bast:bast-0003"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].kind",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].lat",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].lon",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].measureTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].place",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].publicationId",
+          "value": "bast-0003"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].publisher",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].referentFrom",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].referentTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].road",
+          "value": "A101"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].sectionName",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].segments",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].siteName",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].sourceFamily",
+          "value": "roadworks_bast"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].status",
+          "value": "planned"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].subtitle",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].term",
+          "value": "roadworks"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].title",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].to",
+          "value": "2026-04-11T00:00:00Z"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].windowCount",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].windowEnds",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].windowStarts",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.plannedWorksHaveNoCoordinates",
+          "value": "true"
+        },
+        {
+          "name": "data.roadStatus.sourcesAnswered[0].asOf",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.roadStatus.sourcesAnswered[0].sourceFamily",
+          "value": "roadworks_bast"
+        },
+        {
+          "name": "data.roadStatus.windowEnd",
+          "value": "2026-04-13T00:00:00Z"
         },
         {
           "name": "data.situations[datex:syn:bast-0001].delayMin",
@@ -7935,6 +8647,618 @@
         {
           "name": "data.coverage",
           "value": "null"
+        },
+        {
+          "name": "data.motorway",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.canRaise",
+          "value": "false"
+        },
+        {
+          "name": "data.roadStatus.counts.closed",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.counts.current",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.counts.currentFamilies",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.counts.planned",
+          "value": "3"
+        },
+        {
+          "name": "data.roadStatus.counts.programme",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.counts.restricted",
+          "value": "1"
+        },
+        {
+          "name": "data.roadStatus.counts.total",
+          "value": "4"
+        },
+        {
+          "name": "data.roadStatus.guidance",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.guidanceNotCurrent",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.hidden",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.hiddenClosures",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].cause",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].closureFrom",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].closureTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].description",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].detail",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].detour",
+          "value": "false"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].detourForSomeVehicles",
+          "value": "false"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].detourVia",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].eventType",
+          "value": "MaintenanceWorks"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].extent",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].from",
+          "value": "2026-03-28T00:00:00Z"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].id",
+          "value": "roadworks_bast:bast-0001"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].kind",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].lat",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].lon",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].measureTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].place",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].publicationId",
+          "value": "bast-0001"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].publisher",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].referentFrom",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].referentTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].road",
+          "value": "A101"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].sectionName",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].segments",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].siteName",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].sourceFamily",
+          "value": "roadworks_bast"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].status",
+          "value": "restricted"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].subtitle",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].term",
+          "value": "roadworks"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].title",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].to",
+          "value": "2026-04-04T00:00:00Z"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].windowCount",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].windowEnds",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0001].windowStarts",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].cause",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].closureFrom",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].closureTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].description",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].detail",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].detour",
+          "value": "false"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].detourForSomeVehicles",
+          "value": "false"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].detourVia",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].eventType",
+          "value": "MaintenanceWorks"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].extent",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].from",
+          "value": "2026-04-02T00:00:00Z"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].id",
+          "value": "roadworks_bast:bast-0002"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].kind",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].lat",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].lon",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].measureTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].place",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].publicationId",
+          "value": "bast-0002"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].publisher",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].referentFrom",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].referentTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].road",
+          "value": "A101"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].sectionName",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].segments",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].siteName",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].sourceFamily",
+          "value": "roadworks_bast"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].status",
+          "value": "planned"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].subtitle",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].term",
+          "value": "roadworks"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].title",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].to",
+          "value": "2026-04-03T00:00:00Z"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].windowCount",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].windowEnds",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0002].windowStarts",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].cause",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].closureFrom",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].closureTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].description",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].detail",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].detour",
+          "value": "false"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].detourForSomeVehicles",
+          "value": "false"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].detourVia",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].eventType",
+          "value": "MaintenanceWorks"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].extent",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].from",
+          "value": "2026-04-09T06:00:00Z"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].id",
+          "value": "roadworks_bast:bast-0003"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].kind",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].lat",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].lon",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].measureTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].place",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].publicationId",
+          "value": "bast-0003"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].publisher",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].referentFrom",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].referentTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].road",
+          "value": "A101"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].sectionName",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].segments",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].siteName",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].sourceFamily",
+          "value": "roadworks_bast"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].status",
+          "value": "planned"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].subtitle",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].term",
+          "value": "roadworks"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].title",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].to",
+          "value": "2026-04-11T00:00:00Z"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].windowCount",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].windowEnds",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0003].windowStarts",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].cause",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].closureFrom",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].closureTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].description",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].detail",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].detour",
+          "value": "false"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].detourForSomeVehicles",
+          "value": "false"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].detourVia",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].eventType",
+          "value": "MaintenanceWorks"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].extent",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].from",
+          "value": "2026-04-19T00:00:00Z"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].id",
+          "value": "roadworks_bast:bast-0004"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].kind",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].lat",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].lon",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].measureTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].place",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].publicationId",
+          "value": "bast-0004"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].publisher",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].referentFrom",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].referentTo",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].road",
+          "value": "A101"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].sectionName",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].segments",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].siteName",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].sourceFamily",
+          "value": "roadworks_bast"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].status",
+          "value": "planned"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].subtitle",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].term",
+          "value": "roadworks"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].title",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].to",
+          "value": "2026-04-21T00:00:00Z"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].windowCount",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].windowEnds",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.items[roadworks_bast:bast-0004].windowStarts",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.plannedWorksHaveNoCoordinates",
+          "value": "true"
+        },
+        {
+          "name": "data.roadStatus.sourcesAnswered[0].asOf",
+          "value": "2026-03-29T23:57:30Z"
+        },
+        {
+          "name": "data.roadStatus.sourcesAnswered[0].sourceFamily",
+          "value": "roadworks_bast"
+        },
+        {
+          "name": "data.roadStatus.windowEnd",
+          "value": "2026-04-30T22:00:00Z"
         },
         {
           "name": "data.situations[datex:syn:bast-0001].delayMin",
@@ -8379,6 +9703,14 @@
           "value": "weather_warning"
         },
         {
+          "name": "data.motorway",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus",
+          "value": "null"
+        },
+        {
           "name": "data.situations[datex:syn:ev-00020].delayMin",
           "value": "null"
         },
@@ -8729,6 +10061,10 @@
         {
           "name": "data.parking.sites[p:31].name",
           "value": "Hölkönrode Parken"
+        },
+        {
+          "name": "data.parking.sites[p:31].nearbyAmenities",
+          "value": "null"
         },
         {
           "name": "data.parking.sites[p:31].occupancy.free",
@@ -11853,6 +13189,78 @@
           "value": "federal"
         },
         {
+          "name": "data.motorway",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.canRaise",
+          "value": "false"
+        },
+        {
+          "name": "data.roadStatus.counts.closed",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.counts.current",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.counts.currentFamilies",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.counts.planned",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.counts.programme",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.counts.restricted",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.counts.total",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.guidance",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.guidanceNotCurrent",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.hidden",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.hiddenClosures",
+          "value": "0"
+        },
+        {
+          "name": "data.roadStatus.items",
+          "value": "[]"
+        },
+        {
+          "name": "data.roadStatus.plannedWorksHaveNoCoordinates",
+          "value": "true"
+        },
+        {
+          "name": "data.roadStatus.sourcesAnswered[0].asOf",
+          "value": "null"
+        },
+        {
+          "name": "data.roadStatus.sourcesAnswered[0].sourceFamily",
+          "value": "roadworks_bast"
+        },
+        {
+          "name": "data.roadStatus.windowEnd",
+          "value": "2026-04-06T22:00:00Z"
+        },
+        {
           "name": "data.situations",
           "value": "[]"
         },
@@ -12861,6 +14269,14 @@
           "value": "Belnan Namüningen"
         },
         {
+          "name": "data[00000000-0000-4000-8000-000000000002].openingHoursAsOf",
+          "value": "null"
+        },
+        {
+          "name": "data[00000000-0000-4000-8000-000000000002].openingObservedAt",
+          "value": "2026-03-30T01:00:00Z"
+        },
+        {
           "name": "data[00000000-0000-4000-8000-000000000002].openingState",
           "value": "unknown"
         },
@@ -12975,6 +14391,14 @@
       },
       "facts": [
         {
+          "name": "data.capped",
+          "value": "null"
+        },
+        {
+          "name": "data.degraded",
+          "value": "false"
+        },
+        {
           "name": "data.departures[0].cancelled",
           "value": "false"
         },
@@ -13015,12 +14439,946 @@
           "value": "db_timetables"
         },
         {
+          "name": "data.departures[0].stationPart",
+          "value": "null"
+        },
+        {
           "name": "data.eva",
           "value": "8001001"
         },
         {
+          "name": "data.evaNumbers",
+          "value": "[\"8001001\"]"
+        },
+        {
+          "name": "data.interchange",
+          "value": "null"
+        },
+        {
           "name": "meta.attribution[db_timetables].family",
           "value": "db_timetables"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "station-page",
+      "operation": "getStationPage",
+      "counterpart": "station page",
+      "request": "/v1/stations/8001001/page?departures=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit",
+          "accessibility"
+        ],
+        "sources": [
+          "db_stada",
+          "delfi_static",
+          "delfi_rt_tu",
+          "openstation_siri_fm",
+          "delfi_sa_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.pageUrl",
+          "value": "https://viafrei.de/de/station/seed-ijaijceeccig"
+        },
+        {
+          "name": "data.sections[departures].asOf",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.sections[departures].departures",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[departures].id",
+          "value": "departures"
+        },
+        {
+          "name": "data.sections[departures].sources",
+          "value": "[\"delfi_static\"]"
+        },
+        {
+          "name": "data.sections[header].asOf",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.sections[header].header.category",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[header].header.city",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[header].header.eva",
+          "value": "8001001"
+        },
+        {
+          "name": "data.sections[header].header.evaNumbers",
+          "value": "[\"8001001\",\"8001002\",\"8001003\"]"
+        },
+        {
+          "name": "data.sections[header].header.land",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[header].header.name",
+          "value": "Schömpingbach Hbf"
+        },
+        {
+          "name": "data.sections[header].header.slug",
+          "value": "seed-ijaijceeccig"
+        },
+        {
+          "name": "data.sections[header].header.stationNo",
+          "value": "822292607"
+        },
+        {
+          "name": "data.sections[header].header.street",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[header].header.zipcode",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[header].id",
+          "value": "header"
+        },
+        {
+          "name": "data.sections[header].sources",
+          "value": "[\"db_stada\"]"
+        },
+        {
+          "name": "data.sections[lifts].asOf",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[lifts].id",
+          "value": "lifts"
+        },
+        {
+          "name": "data.sections[lifts].lifts",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[lifts].sources",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[parking_charging].asOf",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.sections[parking_charging].facilities.flags",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[parking_charging].facilities.location",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[parking_charging].id",
+          "value": "parking_charging"
+        },
+        {
+          "name": "data.sections[parking_charging].sources",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[platforms].asOf",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[platforms].id",
+          "value": "platforms"
+        },
+        {
+          "name": "data.sections[platforms].sources",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[rail_ampel].asOf",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.sections[rail_ampel].id",
+          "value": "rail_ampel"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lamp",
+          "value": "unknown"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.reasons",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.trips",
+          "value": "0"
+        },
+        {
+          "name": "data.sections[rail_ampel].sources",
+          "value": "[\"delfi_static\"]"
+        },
+        {
+          "name": "data.sections[service_alerts].alerts",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[service_alerts].asOf",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.sections[service_alerts].id",
+          "value": "service_alerts"
+        },
+        {
+          "name": "data.sections[service_alerts].sources",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[step_free_now].asOf",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.sections[step_free_now].id",
+          "value": "step_free_now"
+        },
+        {
+          "name": "data.sections[step_free_now].sources",
+          "value": "[\"db_stada\"]"
+        },
+        {
+          "name": "data.sections[step_free_now].stepFreeNow.blocked",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[step_free_now].stepFreeNow.platforms",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[step_free_now].stepFreeNow.steplessAccess",
+          "value": "null"
+        },
+        {
+          "name": "meta.attribution[db_stada].family",
+          "value": "db_stada"
+        },
+        {
+          "name": "meta.attribution[delfi_static].family",
+          "value": "delfi_static"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "station-page-db",
+      "operation": "getStationPage",
+      "counterpart": "station page",
+      "request": "/v1/stations/8001001/page?departures=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit",
+          "accessibility"
+        ],
+        "sources": [
+          "db_stada",
+          "delfi_static",
+          "delfi_rt_tu",
+          "openstation_siri_fm",
+          "delfi_sa_alpha",
+          "db_timetables"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.pageUrl",
+          "value": "https://viafrei.de/de/station/seed-ijaijceeccig"
+        },
+        {
+          "name": "data.sections[departures].asOf",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].cancelled",
+          "value": "false"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].category",
+          "value": "ICE"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].delayMin",
+          "value": "5"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].destination",
+          "value": "Schömpingbach"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].expectedAt",
+          "value": "2026-03-30T00:08:50Z"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].id",
+          "value": "db_timetables:2026-03-30t00:03:50z:ice 571/0"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].journeyId",
+          "value": "db_timetables:2026-03-30T00:03:50Z:ICE 571"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].line",
+          "value": "ICE 571"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].mode",
+          "value": "rail"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].noForecast",
+          "value": "false"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].plannedAt",
+          "value": "2026-03-30T00:03:50Z"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].plannedAtLocal",
+          "value": "2026-03-30T00:03:50Z"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].plannedPlatform",
+          "value": "5"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].platform",
+          "value": "7"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].platformChanged",
+          "value": "true"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].realtime",
+          "value": "true"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].realtimeSource",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].routeType",
+          "value": "2"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].sourceFamily",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:03:50z:ice 571/0].trainNumber",
+          "value": "571"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].cancelled",
+          "value": "true"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].category",
+          "value": "RE"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].delayMin",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].destination",
+          "value": "Schömpingbach"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].expectedAt",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].id",
+          "value": "db_timetables:2026-03-30t00:11:50z:re 1/0"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].journeyId",
+          "value": "db_timetables:2026-03-30T00:11:50Z:RE 1"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].line",
+          "value": "RE 1"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].mode",
+          "value": "rail"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].noForecast",
+          "value": "false"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].plannedAt",
+          "value": "2026-03-30T00:11:50Z"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].plannedAtLocal",
+          "value": "2026-03-30T00:11:50Z"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].plannedPlatform",
+          "value": "2"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].platform",
+          "value": "2"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].platformChanged",
+          "value": "false"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].realtime",
+          "value": "true"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].realtimeSource",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].routeType",
+          "value": "2"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].sourceFamily",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:11:50z:re 1/0].trainNumber",
+          "value": "4713"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].cancelled",
+          "value": "false"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].category",
+          "value": "S"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].delayMin",
+          "value": "0"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].destination",
+          "value": "Schömpingbach"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].expectedAt",
+          "value": "2026-03-30T00:19:50Z"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].id",
+          "value": "db_timetables:2026-03-30t00:19:50z:s 3/0"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].journeyId",
+          "value": "db_timetables:2026-03-30T00:19:50Z:S 3"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].line",
+          "value": "S 3"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].mode",
+          "value": "sbahn"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].noForecast",
+          "value": "false"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].plannedAt",
+          "value": "2026-03-30T00:19:50Z"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].plannedAtLocal",
+          "value": "2026-03-30T00:19:50Z"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].plannedPlatform",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].platform",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].platformChanged",
+          "value": "false"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].realtime",
+          "value": "true"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].realtimeSource",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].routeType",
+          "value": "2"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].sourceFamily",
+          "value": "db_timetables"
+        },
+        {
+          "name": "data.sections[departures].departures[db_timetables:2026-03-30t00:19:50z:s 3/0].trainNumber",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[departures].id",
+          "value": "departures"
+        },
+        {
+          "name": "data.sections[departures].sources",
+          "value": "[\"db_timetables\",\"delfi_static\"]"
+        },
+        {
+          "name": "data.sections[header].asOf",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.sections[header].header.category",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[header].header.city",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[header].header.eva",
+          "value": "8001001"
+        },
+        {
+          "name": "data.sections[header].header.evaNumbers",
+          "value": "[\"8001001\",\"8001002\",\"8001003\"]"
+        },
+        {
+          "name": "data.sections[header].header.land",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[header].header.name",
+          "value": "Schömpingbach Hbf"
+        },
+        {
+          "name": "data.sections[header].header.slug",
+          "value": "seed-ijaijceeccig"
+        },
+        {
+          "name": "data.sections[header].header.stationNo",
+          "value": "822292607"
+        },
+        {
+          "name": "data.sections[header].header.street",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[header].header.zipcode",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[header].id",
+          "value": "header"
+        },
+        {
+          "name": "data.sections[header].sources",
+          "value": "[\"db_stada\"]"
+        },
+        {
+          "name": "data.sections[lifts].asOf",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[lifts].id",
+          "value": "lifts"
+        },
+        {
+          "name": "data.sections[lifts].lifts",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[lifts].sources",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[parking_charging].asOf",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.sections[parking_charging].facilities.flags",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[parking_charging].facilities.location",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[parking_charging].id",
+          "value": "parking_charging"
+        },
+        {
+          "name": "data.sections[parking_charging].sources",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[platforms].asOf",
+          "value": "null"
+        },
+        {
+          "name": "data.sections[platforms].id",
+          "value": "platforms"
+        },
+        {
+          "name": "data.sections[platforms].sources",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[rail_ampel].asOf",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.sections[rail_ampel].id",
+          "value": "rail_ampel"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lamp",
+          "value": "red"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[0].lamp",
+          "value": "unknown"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[0].line",
+          "value": "ICE 571"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[0].long",
+          "value": "true"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[0].reasons",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[0].trips",
+          "value": "1"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[1].lamp",
+          "value": "yellow"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[1].line",
+          "value": "RE 1"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[1].long",
+          "value": "false"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[1].reasons[0].kind",
+          "value": "cancelled"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[1].reasons[0].lamp",
+          "value": "yellow"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[1].reasons[0].n",
+          "value": "1"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[1].reasons[0].of",
+          "value": "1"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[1].trips",
+          "value": "1"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[2].lamp",
+          "value": "unknown"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[2].line",
+          "value": "S 3"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[2].long",
+          "value": "false"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[2].reasons",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.lines[2].trips",
+          "value": "1"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.reasons[0].kind",
+          "value": "cancelled"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.reasons[0].lamp",
+          "value": "red"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.reasons[0].n",
+          "value": "1"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.reasons[0].of",
+          "value": "3"
+        },
+        {
+          "name": "data.sections[rail_ampel].railAmpel.trips",
+          "value": "3"
+        },
+        {
+          "name": "data.sections[rail_ampel].sources",
+          "value": "[\"db_timetables\",\"delfi_static\"]"
+        },
+        {
+          "name": "data.sections[service_alerts].alerts",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[service_alerts].asOf",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.sections[service_alerts].id",
+          "value": "service_alerts"
+        },
+        {
+          "name": "data.sections[service_alerts].sources",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[step_free_now].asOf",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.sections[step_free_now].id",
+          "value": "step_free_now"
+        },
+        {
+          "name": "data.sections[step_free_now].sources",
+          "value": "[\"db_stada\"]"
+        },
+        {
+          "name": "data.sections[step_free_now].stepFreeNow.blocked",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[step_free_now].stepFreeNow.platforms",
+          "value": "[]"
+        },
+        {
+          "name": "data.sections[step_free_now].stepFreeNow.steplessAccess",
+          "value": "null"
+        },
+        {
+          "name": "meta.attribution[db_stada].family",
+          "value": "db_stada"
+        },
+        {
+          "name": "meta.attribution[db_timetables].family",
+          "value": "db_timetables"
+        },
+        {
+          "name": "meta.attribution[delfi_static].family",
+          "value": "delfi_static"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "stop-boards",
+      "operation": "listStopBoards",
+      "counterpart": "departures around a place",
+      "request": "/v1/stop-boards?at=49.15,7.79",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_static",
+          "delfi_rt_tu"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.location.lat",
+          "value": "49.15000"
+        },
+        {
+          "name": "data.location.lon",
+          "value": "7.79000"
+        },
+        {
+          "name": "data.stops[1:de:01002:0].departures",
+          "value": "[]"
+        },
+        {
+          "name": "data.stops[1:de:01002:0].distanceM",
+          "value": "371"
+        },
+        {
+          "name": "data.stops[1:de:01002:0].id",
+          "value": "1:de:01002:0"
+        },
+        {
+          "name": "data.stops[1:de:01002:0].location.lat",
+          "value": "49.14816"
+        },
+        {
+          "name": "data.stops[1:de:01002:0].location.lon",
+          "value": "7.78575"
+        },
+        {
+          "name": "data.stops[1:de:01002:0].name",
+          "value": "Namüningen Süd"
+        },
+        {
+          "name": "data.stops[1:de:01002:0].stopId",
+          "value": "de:01002:0"
+        },
+        {
+          "name": "data.window.from",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.window.fromLocal",
+          "value": "2026-03-30T00:00:00Z"
+        },
+        {
+          "name": "data.window.until",
+          "value": "2026-03-30T01:00:00Z"
+        },
+        {
+          "name": "data.window.untilLocal",
+          "value": "2026-03-30T01:00:00Z"
+        },
+        {
+          "name": "meta.attribution[delfi_static].family",
+          "value": "delfi_static"
+        },
+        {
+          "name": "meta.notes.condition",
+          "value": "[]"
+        },
+        {
+          "name": "meta.notes.purpose",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "id": "resolve-place",
+      "operation": "resolvePlace",
+      "counterpart": "place resolver",
+      "request": "/v1/places/resolve?q=Matfienland",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z",
+      "facts": [
+        {
+          "name": "data.alternatives",
+          "value": "[]"
+        },
+        {
+          "name": "data.districtCode",
+          "value": "01"
+        },
+        {
+          "name": "data.kind",
+          "value": "state"
+        },
+        {
+          "name": "data.label",
+          "value": "Matfienland"
+        },
+        {
+          "name": "data.location.lat",
+          "value": "48.24375"
+        },
+        {
+          "name": "data.location.lon",
+          "value": "7.01625"
+        },
+        {
+          "name": "data.name",
+          "value": "Matfienland"
+        },
+        {
+          "name": "meta.attribution[geonames].family",
+          "value": "geonames"
         },
         {
           "name": "meta.notes.condition",

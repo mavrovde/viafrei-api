@@ -1,6 +1,6 @@
 {
   "title": "Speed check locations within 10 km",
-  "request": "/v1/speed-cameras?at=47.655,7.81\u0026radius_m=5000\u0026limit=2",
+  "request": "/v1/speed-cameras?at=50.28,6.355\u0026radius_m=10000\u0026limit=2",
   "attribution": "Speed check locations come from the source families of the roads domain the key is entitled to. Every answer lists each source family that contributed in meta.attribution: its publisher, licence, licence URL and the attribution text a client must show wherever it displays the data, with meta.notes carrying any condition or purpose the licence attaches, verbatim. Families withheld by the key's licence terms are named in meta.warnings, never silently dropped.",
   "key": {
     "useClass": "commercial",
@@ -19,11 +19,11 @@
       "officialTotal": 0,
       "osm": [
         {
-          "id": "osm:node800005",
+          "id": "osm:node800029",
           "kind": "fixed",
           "enforces": "speed",
           "street": null,
-          "locationLabel": "Blitzer Kansilkamp",
+          "locationLabel": "Blitzer Halschüßau",
           "municipality": null,
           "direction": null,
           "limitKmh": 50,
@@ -33,17 +33,17 @@
           "dataAsOf": "2026-02-28",
           "staleYear": null,
           "location": {
-            "lat": 47.655653,
-            "lon": 7.799556
+            "lat": 50.260982,
+            "lon": 6.401139
           },
           "sourceFamily": "osm_speed_cameras"
         },
         {
-          "id": "osm:node800006",
+          "id": "osm:node800030",
           "kind": "fixed",
           "enforces": "speed",
           "street": null,
-          "locationLabel": "Blitzer Kansilkamp",
+          "locationLabel": "Blitzer Halschüßau",
           "municipality": null,
           "direction": null,
           "limitKmh": 50,
@@ -53,8 +53,8 @@
           "dataAsOf": "2026-02-28",
           "staleYear": null,
           "location": {
-            "lat": 47.653764,
-            "lon": 7.829412
+            "lat": 50.29929,
+            "lon": 6.308556
           },
           "sourceFamily": "osm_speed_cameras"
         }
@@ -72,7 +72,8 @@
           "dataAsOf": "2026-03-29T12:00:00Z",
           "ageS": 43200,
           "staleAfterS": 259200,
-          "stale": false
+          "stale": false,
+          "lastCheckedAt": "2026-03-29T12:00:00Z"
         }
       ],
       "attribution": [

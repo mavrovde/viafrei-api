@@ -6,8 +6,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"reflect"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -139,8 +142,15 @@ func TestNamedStatementsAnswerAsTheViews(t *testing.T) {
 	// timeout), each on a connection of its own; the group returns when
 	// every one has.
 	slots := make(chan struct{}, 4)
+	// A shard of the parity set compares its part of the statements, by
+	// name (shard).
+	names := slices.Sorted(maps.Keys(namedCases))
 	t.Run("statements", func(t *testing.T) {
-		for name, cases := range namedCases {
+		for i, name := range names {
+			if !inShard(i) {
+				continue
+			}
+			cases := namedCases[name]
 			t.Run(name, func(t *testing.T) {
 				if !alone(name) {
 					t.Parallel()
@@ -187,6 +197,12 @@ func namedParity(t *testing.T, ctx context.Context, byName map[string]store.Name
 		}
 		defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 		if _, err := tx.Exec(ctx, "select set_config('viafrei_api.own_key', $1, true)", own); err != nil {
+			t.Fatal(err)
+		}
+		// The comparison runs outside any request's budget: the role's
+		// per-read statement timeout would cancel a read whenever the
+		// machine is loaded (four parity shards side by side).
+		if _, err := tx.Exec(ctx, "select set_config('statement_timeout', $1, true)", strconv.FormatInt(time.Minute.Milliseconds(), 10)); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := tx.Conn().Prepare(ctx, r.Name, r.SQL); err != nil {
@@ -301,6 +317,19 @@ func TestSettlingCheckFailsWithoutAGenericPlan(t *testing.T) {
 // rows in every run, each with its reason.
 var noRowsAccepted = map[string]string{}
 
+// accepted is what a full set accepts of the named statement name: "unrun:
+// <reason>" for one with no platform statement to compare with, "norows:
+// <reason>" for one that may compare no row; empty when neither.
+func accepted(name string) string {
+	if r := store.NoPlatformRead(name); r != "" {
+		return "unrun: " + r
+	}
+	if r := noRowsAccepted[name]; r != "" {
+		return "norows: " + r
+	}
+	return ""
+}
+
 // parityHeld reports whether every named statement the tests ran answered
 // the rows of its view statement, under both plans, and whether a full run
 // ran each named statement at least once.
@@ -322,15 +351,26 @@ func parityHeld() bool {
 	for name, n := range store.ReplayedAfter() {
 		fmt.Fprintf(os.Stderr, "parity: %s: %d checks read outside a test's context, compared after the tests\n", name, n)
 	}
+	names := []string{}
+	for _, r := range store.NamedReads() {
+		names = append(names, r.Name)
+	}
+	if err := writeRan(runs, rows, names, accepted); err != nil {
+		fmt.Fprintln(os.Stderr, "parity: writing -parity.ran:", err)
+		return false
+	}
+	// Whether every statement ran and compared rows is a full set's
+	// judgement: a filtered run's is no one's, a shard's is paritygather's.
 	unrun := 0
 	if flag.Lookup("test.run").Value.String() == "" {
-		for _, r := range store.NamedReads() {
-			switch {
-			case runs[r.Name] == 0:
-				fmt.Fprintf(os.Stderr, "parity: %s never ran beside its view statement\n", r.Name)
+		for _, name := range names {
+			switch a := accepted(name); {
+			case strings.HasPrefix(a, "unrun"):
+			case runs[name] == 0:
+				fmt.Fprintf(os.Stderr, "parity: %s never ran beside its view statement\n", name)
 				unrun++
-			case rows[r.Name] == 0 && noRowsAccepted[r.Name] == "":
-				fmt.Fprintf(os.Stderr, "parity: %s compared 0 rows in every run: the parity proves nothing\n", r.Name)
+			case rows[name] == 0 && a == "":
+				fmt.Fprintf(os.Stderr, "parity: %s compared 0 rows in every run: the parity proves nothing\n", name)
 				unrun++
 			}
 		}

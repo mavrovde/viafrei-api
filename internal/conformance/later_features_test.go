@@ -23,6 +23,10 @@ import (
 // operations they name.
 type laterFeatures struct{}
 
+func (laterFeatures) ChargingPlaces(context.Context, access.Record, features.PlaceQuery) (features.PlacesAnswer, error) {
+	return features.PlacesAnswer{}, nil
+}
+
 func (laterFeatures) SpeedCameras(context.Context, access.Record, roads.SpeedQuery) (features.SpeedAnswer, error) {
 	return features.SpeedAnswer{}, nil
 }
@@ -39,7 +43,7 @@ func (laterFeatures) Refresh(context.Context, access.Record, string) (refresh.Re
 	return refresh.Request{State: refresh.NoneDue}, nil
 }
 
-func (laterFeatures) TrainBoard(context.Context, access.Record, string) (features.TrainBoardAnswer, error) {
+func (laterFeatures) TrainBoard(context.Context, access.Record, features.TrainBoardQuery) (features.TrainBoardAnswer, error) {
 	return features.TrainBoardAnswer{}, nil
 }
 
@@ -113,4 +117,8 @@ func (laterFeatures) StateWarnings(context.Context, access.Record, string) ([]we
 
 func (laterFeatures) StateAlerts(context.Context, access.Record, string, int) (features.StateAlertsAnswer, error) {
 	return features.StateAlertsAnswer{}, nil
+}
+
+func (laterFeatures) ResolvePlace(context.Context, access.Record, string) (features.ResolveAnswer, error) {
+	return features.ResolveAnswer{}, nil
 }

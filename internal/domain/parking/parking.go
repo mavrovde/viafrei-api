@@ -143,6 +143,12 @@ type Query struct {
 	// spaces; zero keeps every site.
 	FreeMin int
 	Limit   int
+	// CarParks asks for OpenStreetMap's car parks beside the list (OSMQuery
+	// says which questions list them).
+	CarParks bool
+	// Around asks for the amenities near each listed site and the road
+	// context near the place (ContextAsked says which questions read it).
+	Around bool
 }
 
 // CorridorM is how far from one of a motorway's location-code points a

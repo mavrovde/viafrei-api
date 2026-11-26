@@ -3,6 +3,7 @@ package features_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -27,10 +28,15 @@ var nbRegister = []access.Terms{
 type nbFake struct {
 	*fake
 	junctions  []places.Junction
+	gotJFams   []string
 	needs      map[string][]places.NeedPlace
 	jErr, nErr error
 	gotNeeds   places.NearbyQuery
 	gotFuel    energy.FuelQuery
+}
+
+func (f *nbFake) OSMFuelNear(context.Context, energy.FuelQuery, []string, int) ([]energy.OSMFuelStation, error) {
+	return nil, nil
 }
 
 func (f *nbFake) FuelNear(_ context.Context, q energy.FuelQuery, _ []string) ([]energy.FuelStation, error) {
@@ -50,7 +56,27 @@ func (f *nbFake) Station(context.Context, string, []string) (transit.Station, er
 	return transit.Station{}, nil
 }
 
+func (f *nbFake) TimetableReach(context.Context) (transit.Reach, error) {
+	return transit.Reach{}, nil
+}
+
 func (f *nbFake) Departures(context.Context, transit.DepartureQuery, []string) ([]transit.Departure, error) {
+	return nil, nil
+}
+
+func (f *nbFake) Platforms(context.Context, []string, []string) ([]transit.PlatformRow, error) {
+	return nil, nil
+}
+
+func (f *nbFake) StationRecord(context.Context, string, []string) (transit.StationRecord, error) {
+	return transit.StationRecord{}, nil
+}
+
+func (f *nbFake) StationAlerts(context.Context, transit.StationAlertsQuery, []string) ([]transit.StationAlertRow, error) {
+	return nil, nil
+}
+
+func (f *nbFake) StopBoards(context.Context, transit.StopBoardsQuery, []string) ([]transit.StopBoard, error) {
 	return nil, nil
 }
 
@@ -58,8 +84,9 @@ func (f *nbFake) Facilities(context.Context, string, []string, time.Time) ([]tra
 	return nil, nil
 }
 
-func (f *nbFake) Junctions(_ context.Context, q places.NearbyQuery, _ []string) ([]places.Junction, error) {
-	return f.junctions, f.jErr
+func (f *nbFake) Junctions(_ context.Context, q places.NearbyQuery, fams []string) (places.Junctions, error) {
+	f.gotJFams = fams
+	return places.Junctions{From: places.JunctionsFromOSM, Rows: f.junctions}, f.jErr
 }
 
 func (f *nbFake) NeedPlaces(_ context.Context, q places.NearbyQuery, _ []string) (map[string][]places.NeedPlace, error) {
@@ -84,7 +111,7 @@ func nbQuery(cats ...string) features.NearbyQuery {
 
 func TestNearbyEveryCategory(t *testing.T) {
 	req.Covers(t, "FR-PLACE-001", "SEC-030")
-	f := &nbFake{junctions: []places.Junction{{ID: "j1", Name: "Köln-Ost", Family: "r1"}},
+	f := &nbFake{junctions: []places.Junction{{ID: "j1", Name: "Köln-Ost", Family: "pl", RoadBy: "r1"}},
 		needs: map[string][]places.NeedPlace{"food": {{ID: "o1", Name: "Café", DistanceM: 300, Family: "pl"}}}}
 	k := key("commercial", nbAll, "e1", "p1", "t1", "pl", "r1")
 	a, err := nbService(f).Nearby(context.Background(), k, nbQuery("fuel", "charging", "parking", "station", "junction", "food", "police"))
@@ -93,6 +120,12 @@ func TestNearbyEveryCategory(t *testing.T) {
 	}
 	if a.Fuel == nil || a.Charging == nil || a.Parking == nil || a.Stations == nil || len(a.Junctions.Items) != 1 || len(a.Parts) != 6 {
 		t.Fatalf("answer %+v", a)
+	}
+	// The junctions are read of the roads and the places families; the
+	// node's and its road's are credited.
+	if !slices.Contains(f.gotJFams, "pl") || !slices.Contains(f.gotJFams, "r1") || a.JunctionsFrom != places.JunctionsFromOSM ||
+		!slices.Equal(names(a.Junctions.Families), []string{"pl", "r1"}) {
+		t.Errorf("junctions read of %v from %q, credited %v", f.gotJFams, a.JunctionsFrom, names(a.Junctions.Families))
 	}
 	if f.gotFuel.Fuel != "e5" || f.gotFuel.Sort != "price" || f.gotFuel.Limit != 3 || f.gotFuel.Window != time.Hour {
 		t.Errorf("fuel asked %+v", f.gotFuel)

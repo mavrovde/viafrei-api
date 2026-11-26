@@ -32,7 +32,7 @@ type FuelInput struct {
 	OpenAt   string `query:"open_at" maxLength:"16" pattern:"^([0-9]{4}-[0-9]{2}-[0-9]{2}[T ])?[0-9]{1,2}:[0-9]{2}$" example:"23:30" doc:"Only stations whose published opening hours have them open at that time in Germany (Europe/Berlin): 23:30 is the next time the clock shows 23:30, 2026-09-30 06:15 that date and time. Not with open_now. A station whose hours are unknown or unreadable is counted in meta.query.droppedUnknown, never guessed open."`
 	WholeDay bool   `query:"whole_day" doc:"Only stations the provider flags as open around the clock; meta.query.droppedNotWholeDay counts the others."`
 	Sort     string `query:"sort" enum:"distance,price,name" doc:"distance (default, nearest first), price (every current price cheapest first, then the last known prices nearest first; needs fuel) or name (alphabetical, as German sorts it)."`
-	Limit    int    `query:"limit" minimum:"1" maximum:"10" doc:"Most stations to return; default 5."`
+	Limit    int    `query:"limit" minimum:"1" maximum:"10" doc:"Most stations to return (1 to 10, the provider's terms cap a consumer list at 10; a client clamps a larger wish to 10); default 5."`
 }
 
 // Resolve reads the position and requires fuel with sort=price.
@@ -65,12 +65,17 @@ type FuelPrice struct {
 
 // FuelStation is a filling station of an answer.
 type FuelStation struct {
-	ID           string      `json:"id"`
-	Name         *string     `json:"name" nullable:"true" doc:"The station's name; null when not published."`
-	Brand        *string     `json:"brand" nullable:"true" doc:"The brand; null when not published."`
-	Location     Position    `json:"location"`
-	DistanceM    int         `json:"distanceM" doc:"Distance from the asked position in metres, to the nearest 100 m: the platform's filling-station search states it in kilometres to one decimal (0.1 km). The order is by the exact distance."`
-	OpenState    string      `json:"openingState" doc:"open, closed or unknown at the answer's instant (open_at's, when asked), read from the published opening hours: unknown when there are none or they cannot be read. Under sort=price, the state the station reported, as the platform's cheapest-fuel search states it. Open enumeration."`
+	ID        string   `json:"id"`
+	Name      *string  `json:"name" nullable:"true" doc:"The station's name; null when not published."`
+	Brand     *string  `json:"brand" nullable:"true" doc:"The brand; null when not published."`
+	Location  Position `json:"location"`
+	DistanceM int      `json:"distanceM" doc:"Distance from the asked position in metres, to the nearest 100 m: the platform's filling-station search states it in kilometres to one decimal (0.1 km). The order is by the exact distance."`
+	OpenState string   `json:"openingState" doc:"open, closed or unknown at the answer's instant (open_at's, when asked), read from the published opening hours: unknown when there are none or they cannot be read. Under sort=price, the state the station reported, as the platform's cheapest-fuel search states it. Open enumeration."`
+	// OpenObservedAt is when the station reported the state openingState
+	// states under sort=price.
+	OpenObservedAt *time.Time `json:"openingObservedAt" nullable:"true" doc:"When the station reported the open state it reported, with a price (under sort=price, with the asked grade's price): the state openingState states under sort=price. Null when no observation stated one."`
+	// HoursAsOf is when the published hours were last read.
+	HoursAsOf    *time.Time  `json:"openingHoursAsOf" nullable:"true" doc:"When the station's published opening hours were last read from the provider. Null when never: then the station has no published hours and no claim of being open around the clock is made."`
 	Prices       []FuelPrice `json:"prices" doc:"The newest price per grade the station reported, by grade; empty when it reported none. Under sort=price, the asked grade's only."`
 	SourceFamily string      `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
 }
@@ -91,6 +96,16 @@ type FuelQueryMeta struct {
 	WithoutCurrent     int        `json:"stationsWithoutCurrentPrice" doc:"Under sort=price, the stations we hold within the radius with no price for the grade reported within the price cache window (fuel.price_fresh); else the listed stations without such a price (for the grade asked, else for any grade)."`
 }
 
+// OSMFuelStation is an OpenStreetMap filling station without a price.
+type OSMFuelStation struct {
+	Name         string        `json:"name"`
+	Brand        *string       `json:"brand" nullable:"true" doc:"The brand; null when not mapped."`
+	Address      PostalAddress `json:"address"`
+	Location     Position      `json:"location"`
+	DistanceM    int           `json:"distanceM" doc:"Distance from the asked position in metres, to the nearest 100 m, as the stations' distanceM."`
+	SourceFamily string        `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
+}
+
 // FuelMeta is the meta member of listFuelOptions.
 type FuelMeta struct {
 	DataMeta
@@ -100,9 +115,11 @@ type FuelMeta struct {
 
 // FuelEnvelope is the enveloped answer of listFuelOptions.
 type FuelEnvelope struct {
-	Data  []FuelStation `json:"data"`
-	Meta  FuelMeta      `json:"meta"`
-	Links Links         `json:"links"`
+	Data []FuelStation `json:"data"`
+	// OSMWithoutPrice are OpenStreetMap's stations without a price.
+	OSMWithoutPrice []OSMFuelStation `json:"osmWithoutPrice" doc:"More filling stations mapped by OpenStreetMap with no station we hold within 300 m: no price for these stations yet. Nearest first, at most the limit and 5; empty when there are none or the key may not read OpenStreetMap's places. Credited in meta.attribution (ODbL)."`
+	Meta            FuelMeta         `json:"meta"`
+	Links           Links            `json:"links"`
 }
 
 // FuelOutput is the response of listFuelOptions.
@@ -143,8 +160,13 @@ func registerFuel(api huma.API, s *server, op huma.Operation) {
 		query := FuelQueryMeta{At: position(q.At), RadiusM: q.RadiusM, Sort: q.Sort, Matched: a.Matched,
 			DroppedClosed: a.DroppedClosed, DroppedUnknown: a.DroppedUnknown, DroppedNotWholeDay: a.DroppedNotWholeDay, OpenAt: a.OpenAt}
 		fuelCoverage(&query, a.Coverage, data, q.Fuel)
+		osm := make([]OSMFuelStation, len(a.OSMWithoutPrice))
+		for i, o := range a.OSMWithoutPrice {
+			osm[i] = OSMFuelStation{Name: o.Name, Brand: o.Brand, Address: PostalAddress{Street: o.Address.Street, Number: o.Address.HouseNumber,
+				Postcode: o.Address.Postcode, Place: o.Address.City}, Location: position(o.Location), DistanceM: tenthKm(o.DistanceM), SourceFamily: o.Family}
+		}
 		return &FuelOutput{CacheControl: noStore, Body: FuelEnvelope{
-			Data: data,
+			Data: data, OSMWithoutPrice: osm,
 			Meta: FuelMeta{
 				DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
 				Page:     Page{Limit: q.Limit, HasMore: a.HasMore},
@@ -193,30 +215,27 @@ func fuelStations(a features.FuelStations, window time.Duration) []FuelStation {
 				ReportedAtLocal: local(p.ObservedAt), Current: p.Current(a.At, window)}
 		}
 		data[i] = FuelStation{ID: st.ID, Name: st.Name, Brand: st.Brand, Location: position(st.Location),
-			DistanceM: tenthKm(st.DistanceM), OpenState: st.OpenStateAt(openStateInstant(a)), Prices: prices, SourceFamily: st.Family}
+			DistanceM: tenthKm(st.DistanceM), OpenState: st.OpenStateAt(openStateInstant(a)), OpenObservedAt: utc(st.OpenObservedAt),
+			HoursAsOf: utc(st.Hours.AsOf), Prices: prices, SourceFamily: st.Family}
 	}
 	return data
 }
 
 // cheapest restates a price-ordered answer as the platform's cheapest-fuel
-// search states it: each station with the asked grade's price only, and its
-// reported opening state (the price row's), not the published hours'. The
+// search states it: each station with the asked grade's price only, and the
+// opening state the station reported with that price and when, not the
+// published hours'. The
 // cheapest-fuel search reads no hours.
 func cheapest(a features.FuelStations, data []FuelStation, fuel string) []FuelStation {
 	for i, st := range a.Items {
 		data[i].Prices = slices.DeleteFunc(data[i].Prices, func(p FuelPrice) bool { return p.Fuel != fuel })
-		data[i].OpenState = reportedOpenState(st.Open)
+		data[i].OpenState, data[i].OpenObservedAt = "unknown", nil
+		if p := st.Price(fuel); p != nil {
+			s, at := energy.Reported([]energy.FuelPrice{*p})
+			data[i].OpenState, data[i].OpenObservedAt = s, utc(at)
+		}
 	}
 	return data
-}
-
-// reportedOpenState is a station's reported state as an opening state: open,
-// closed, or unknown when the station reported neither.
-func reportedOpenState(open string) string {
-	if open == "open" || open == "closed" {
-		return open
-	}
-	return "unknown"
 }
 
 // tenthKm states a distance as the platform's filling-station search states

@@ -21,6 +21,9 @@ type OpeningTime struct {
 type Hours struct {
 	WholeDay *bool
 	Times    []OpeningTime
+	// AsOf is when the hours were last read from the provider; nil when
+	// never, and then there are none.
+	AsOf *time.Time
 }
 
 // window is one weekday's opening, in minutes from midnight; an end past

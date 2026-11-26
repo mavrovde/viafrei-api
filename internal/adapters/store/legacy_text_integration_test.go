@@ -2,10 +2,16 @@
 
 package store
 
+// legacyTermsPage is the terms link of the source s since a family without
+// one links its register's source page (the sources and provenance reads,
+// as the platform's credits): the view's link, else the register row's page.
+const legacyTermsPage = `coalesce(nullif(s.terms_url, ''), (select g.source_url from contract_sources cs join source_register g on g.source_id = cs.register_id
+                                     where cs.source_ref = s.source_ref))`
+
 // legacyWarningText are the text columns the view never carried (#222), read
 // from the warning's own row: the frozen statements gain them as the named
 // ones did, so the replay still compares every other column.
-const legacyWarningText = `left join lateral (select x.id, x.description, x.instruction, x.urgency, x.certainty, x.official_sha256
+const legacyWarningText = `left join lateral (select x.id, x.description, x.instruction, x.urgency, x.certainty, x.official_sha256, x.level_source
   from weather_warnings x where 'dwd:' || x.id = w.warning_id) x on true
 left join lateral (select e.en_headline, e.en_description, e.en_instruction, e.en_sha256 from weather_warning_english(x.id) e
   where 'dwd_warnings_en' = any($1::text[])) en on true
@@ -18,7 +24,13 @@ left join lateral (select e.en_headline, e.en_description, e.en_instruction, e.e
 const legacyFacilitySeen = `left join lateral (select coalesce((select st.last_seen_at from station_equipment_state st where 'equipment:' || st.equipment_id = f.facility_id),
                                      (select e.last_seen_at from station_equipment e where 'equipment:' || e.equipment_id = f.facility_id),
                                      (select d.last_seen_at from db_facilities d where 'fasta:' || d.equipment_no = f.facility_id)) seen,
-                            (select e.equipment_no from station_equipment e where 'equipment:' || e.equipment_id = f.facility_id) eno) x on true`
+                            (select e.equipment_no from station_equipment e where 'equipment:' || e.equipment_id = f.facility_id) eno,
+                            -- the family that lists the unit, and the operator's explanation of its state
+                            -- (since the facilities carry them): the unit's own rows
+                            coalesce((select e.source_feed from station_equipment e where 'equipment:' || e.equipment_id = f.facility_id),
+                                     (select d.source_feed from db_facilities d where 'fasta:' || d.equipment_no = f.facility_id)) listed,
+                            coalesce((select st.status_description from station_equipment_state st where 'equipment:' || st.equipment_id = f.facility_id),
+                                     (select d.state_explanation from db_facilities d where 'fasta:' || d.equipment_no = f.facility_id)) expl) x on true`
 
 // The road-surface forecast had no view (#222): its frozen statement is the
 // platform's own read of it (its weather warnings check), the stations of

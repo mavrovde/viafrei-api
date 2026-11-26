@@ -29,6 +29,7 @@ import (
 // Features is the port to the feature use cases.
 type Features interface {
 	Charging(ctx context.Context, key access.Record, q energy.Query) (features.Answer[energy.Site], error)
+	ChargingPlaces(ctx context.Context, key access.Record, q features.PlaceQuery) (features.PlacesAnswer, error)
 	Parking(ctx context.Context, key access.Record, q parking.Query) (features.Answer[parking.Site], error)
 	Overview(ctx context.Context, key access.Record, q features.OverviewQuery) (features.Overview, error)
 	MotorwayConditions(ctx context.Context, key access.Record, q roads.CorridorQuery) (features.Conditions, error)
@@ -42,12 +43,15 @@ type Features interface {
 	Sources(ctx context.Context, key access.Record, domain string) ([]provenance.Family, features.Answer[struct{}], error)
 	Stations(ctx context.Context, key access.Record, q transit.Query) (features.Answer[transit.Station], error)
 	Departures(ctx context.Context, key access.Record, q transit.DepartureQuery) (features.Board, error)
+	StopBoards(ctx context.Context, key access.Record, q transit.StopBoardsQuery) (features.StopBoards, error)
+	StationPage(ctx context.Context, key access.Record, q features.StationPageQuery) (features.StationPage, error)
 	Facilities(ctx context.Context, key access.Record, q transit.FacilityQuery) (features.StationFacilities, error)
 	RequestRefresh(ctx context.Context, key access.Record, a refresh.Ask) (refresh.Request, error)
 	Refresh(ctx context.Context, key access.Record, id string) (refresh.Request, error)
 	ParkingBays(ctx context.Context, key access.Record, q parking.BayQuery) (features.BaysAnswer, error)
-	TrainBoard(ctx context.Context, key access.Record, eva string) (features.TrainBoardAnswer, error)
+	TrainBoard(ctx context.Context, key access.Record, q features.TrainBoardQuery) (features.TrainBoardAnswer, error)
 	Places(ctx context.Context, key access.Record, q places.Query) (features.Answer[places.Place], error)
+	ResolvePlace(ctx context.Context, key access.Record, text string) (features.ResolveAnswer, error)
 	FuelStations(ctx context.Context, key access.Record, q energy.FuelQuery) (features.FuelStations, error)
 	FuelStation(ctx context.Context, key access.Record, id string, held time.Duration) (energy.FuelStationPage, features.Answer[struct{}], error)
 	ChargingSite(ctx context.Context, key access.Record, id string, statusMaxAge time.Duration) (features.Answer[energy.Site], error)
@@ -84,9 +88,27 @@ const schemaPrefix = "#/components/schemas/"
 
 var nullableObjects = []struct{ schema, member string }{
 	{"ChargePoint", "availability"},
+	{"ChargingPlace", "address"},
+	{"ChargingPlace", "status"},
+	{"ChargingPlace", "price"},
+	{"MotorwayData", "motorway"},
+	{"MotorwayData", "roadStatus"},
+	{"MotorwayBlock", "measured"},
+	{"MotorwayEntryView", "jam"},
+	{"MotorwayJam", "trend"},
+	{"MotorwayJam", "usual"},
+	{"MotorwayJam", "howLong"},
 	{"RefreshData", "queue"},
 	{"HydrogenData", "nearest"},
 	{"DisruptionData", "punctuality"},
+	{"DisruptionData", "alertsCoverage"},
+	{"LocationData", "gemeinde"},
+	{"LocationData", "junction"},
+	{"StationFacilitiesData", "platforms"},
+	{"StationPageEnvelope", "data"},
+	{"PageFacilities", "location"},
+	{"PlatformsStation", "station"},
+	{"PlatformAccess", "heightCm"},
 	{"DisruptionData", "line"},
 	{"SpeedCamera", "location"},
 	{"LocationZone", "plaque"},
@@ -98,6 +120,9 @@ var nullableObjects = []struct{ schema, member string }{
 	{"MotorwayData", "coverage"},
 	{"ParkingSite", "occupancy"},
 	{"ParkingListing", "occupancy"},
+	{"ParkingMeta", "around"},
+	{"TrainBoardData", "capped"},
+	{"TrainBoardData", "interchange"},
 	{"RoadSituation", "location"},
 	{"RoadSituation", "lanes"},
 	{"RoadSituation", "position"},
@@ -255,6 +280,9 @@ type FreshnessEntry struct {
 	AgeS        *int64     `json:"ageS" nullable:"true" doc:"generatedAt minus dataAsOf, in whole seconds; null when dataAsOf is."`
 	StaleAfterS int64      `json:"staleAfterS" doc:"The family's design threshold: data older than this is stale. A family with no fixed interval, which is never stale, has 9007199254740991 (2^53 - 1, the largest integer every JSON reader holds exactly), which no age passes: its age is shown only."`
 	Stale       bool       `json:"stale" doc:"True when ageS is above staleAfterS, or dataAsOf is unknown; never for a family with no fixed interval."`
+	// LastCheckedAt is the family's newest read: when its source was last
+	// asked and its data found current, a new or a confirmed unchanged copy.
+	LastCheckedAt *time.Time `json:"lastCheckedAt" nullable:"true" doc:"When the family's source was last asked and its data found current, whether it brought a new copy or confirmed the data unchanged (UTC); null when it never was. Beside dataAsOf it says how recently an unchanged answer was confirmed."`
 }
 
 // neverStaleS is staleAfterS of a family with no fixed interval: the /v1
@@ -322,7 +350,8 @@ func (s *server) dataMeta(ctx context.Context, fams []provenance.Family, at time
 		fr := f.Assess(at)
 		noteFreshness(ctx, f, fr, at)
 		fs = append(fs, fr)
-		m.Freshness = append(m.Freshness, FreshnessEntry{Family: fr.Family, DataAsOf: fr.DataAsOf, AgeS: fr.AgeS, StaleAfterS: staleAfterS(fr), Stale: fr.Stale})
+		m.Freshness = append(m.Freshness, FreshnessEntry{Family: fr.Family, DataAsOf: fr.DataAsOf, AgeS: fr.AgeS, StaleAfterS: staleAfterS(fr), Stale: fr.Stale,
+			LastCheckedAt: utcOrNil(f.ReadAt)})
 		m.Attribution = append(m.Attribution, attribution(f.Source))
 		if !f.FilledUntil.IsZero() {
 			// A filled year is wrong from the next new year on: no stored
@@ -484,13 +513,14 @@ type ChargingInput struct {
 	Conditions    []string `query:"conditions" enum:"open247,card,free,public" doc:"Only sites with one point that meets every listed term: open247 (open around the clock), card (pay by card at the charger), free (free of charge; a zero ad-hoc price counts for 90 days after its update), public (open to the public, not customers only)."`
 	OnlyAvailable bool     `query:"only_available" doc:"Only sites with a point reported available now. The nearest 100 sites are examined; meta.dropped counts the others by reason, so a site whose status is unknown is never silently hidden. Default false."`
 	Access        string   `query:"access" enum:"public,restricted,all" default:"public" doc:"Who may use the site."`
+	Group         string   `query:"group" enum:"place" doc:"place: one item a place, as the MCP charging search answers: the records of one place (an operator's site, the Bundesnetzagentur register's rows of it, one building listed per charging unit) folded into one item named by its name and address, with item.place. Takes min_kw, connector and only_available; not max_kw, operator, conditions or access other than public. Default: one item a site record."`
 	operatorKey   string
 }
 
 // Resolve reads the position, refuses a lower power limit above the upper
 // one and an operator that names no brand, and keeps the operator's key.
 func (in *ChargingInput) Resolve(ctx huma.Context) []error {
-	errs := in.AtPosition.Resolve(ctx)
+	errs := append(in.AtPosition.Resolve(ctx), in.refusedWithGroup()...)
 	if in.MaxKw > 0 && in.MinKw > in.MaxKw {
 		errs = append(errs, &huma.ErrorDetail{Location: "query.max_kw", Message: "the upper power limit is below min_kw", Value: in.MaxKw})
 	}
@@ -536,6 +566,7 @@ type ChargingSite struct {
 	Summary      ChargingSummary `json:"summary"`
 	ChargePoints []ChargePoint   `json:"chargePoints"`
 	SourceFamily string          `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
+	Place        *ChargingPlace  `json:"place,omitempty" doc:"Only with group=place: the place this item stands for. The item is then its first record, name is the place's label (its name and address, never a record id), and chargePoints are every record's points."`
 }
 
 // ChargingQuery is meta.query of listChargingOptions.
@@ -548,6 +579,7 @@ type ChargingQuery struct {
 	Conditions    []string `json:"conditions,omitempty"`
 	OnlyAvailable bool     `json:"onlyAvailable"`
 	Access        string   `json:"access" enum:"public,restricted,all"`
+	Group         string   `json:"group,omitempty" enum:"place"`
 }
 
 // ChargingDropped counts the examined sites an only-available answer left
@@ -561,10 +593,11 @@ type ChargingDropped struct {
 // ChargingMeta is the meta member of listChargingOptions.
 type ChargingMeta struct {
 	DataMeta
-	Page     Page             `json:"page"`
-	Query    ChargingQuery    `json:"query"`
-	Dropped  *ChargingDropped `json:"dropped,omitempty" doc:"With only_available: the examined sites left out."`
-	InRadius *int             `json:"inRadius,omitempty" doc:"Only when data is empty: how many charging sites the key may read within the radius, every filter dropped (the platform's \"I know N charging sites in that circle\")."`
+	Page     Page                     `json:"page"`
+	Query    ChargingQuery            `json:"query"`
+	Dropped  *ChargingDropped         `json:"dropped,omitempty" doc:"With only_available: the examined sites left out."`
+	InRadius *int                     `json:"inRadius,omitempty" doc:"Only when data is empty: how many charging sites the key may read within the radius, every filter dropped (the platform's \"I know N charging sites in that circle\")."`
+	Prices   *ChargingPricesPublished `json:"pricesPublished,omitempty" doc:"Only with group=place: how many of the places listed publish a price per kWh (\"published for 3 of 5 only\")."`
 }
 
 // ChargingEnvelope is the enveloped answer of listChargingOptions.
@@ -640,6 +673,9 @@ func registerCharging(api huma.API, s *server, op huma.Operation) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
+		if in.Group == groupPlace {
+			return s.chargingByPlace(ctx, in)
+		}
 		q := energy.Query{At: in.point, RadiusM: s.radius(in.RadiusM), MinKw: in.MinKw, Access: energy.AccessFilter(in.Access), Limit: s.limit(in.Limit),
 			Filter: energy.Filter{Connector: in.Connector, MaxKw: in.MaxKw, OperatorKey: in.operatorKey, Terms: in.Conditions,
 				OnlyAvailable: in.OnlyAvailable, StatusMaxAge: s.cfg.Charging.StatusMaxAge}}
@@ -661,6 +697,30 @@ func registerCharging(api huma.API, s *server, op huma.Operation) {
 			Links: s.selfLink(ctx),
 		}}, nil
 	})
+}
+
+// chargingByPlace answers listChargingOptions with group=place.
+func (s *server) chargingByPlace(ctx context.Context, in *ChargingInput) (*ChargingOutput, error) {
+	q := features.PlaceQuery{At: in.point, RadiusM: s.radius(in.RadiusM), Limit: s.limit(in.Limit), MinKw: in.MinKw,
+		Connector: in.Connector, OnlyAvailable: in.OnlyAvailable}
+	a, err := s.features.ChargingPlaces(ctx, principalFrom(ctx).Key, q)
+	if err != nil {
+		return nil, s.featureProblem(ctx, err)
+	}
+	data, prices := chargingPlaces(ctx, a)
+	return &ChargingOutput{CacheControl: noStore, Body: ChargingEnvelope{
+		Data: data,
+		Meta: ChargingMeta{
+			DataMeta: s.dataMeta(ctx, a.Families, a.At, a.Partial, partialDetail),
+			Page:     Page{Limit: q.Limit, HasMore: a.HasMore},
+			Query: ChargingQuery{NearQuery: NearQuery{At: position(q.At), RadiusM: q.RadiusM}, MinKw: q.MinKw, Access: string(energy.FilterPublic),
+				Connector: q.Connector, OnlyAvailable: q.OnlyAvailable, Group: groupPlace},
+			Dropped:  chargingDropped(a.Dropped),
+			InRadius: a.InRadius,
+			Prices:   &prices,
+		},
+		Links: s.selfLink(ctx),
+	}}, nil
 }
 
 // ------------------------------------------------------------------ parking
@@ -704,16 +764,17 @@ type Occupancy struct {
 // without a distance: an item of listMotorwayParking and of the nearby
 // answer.
 type ParkingListing struct {
-	ID            string           `json:"id"`
-	Name          *string          `json:"name" nullable:"true"`
-	Operator      *string          `json:"operator" nullable:"true"`
-	Kind          string           `json:"kind" enum:"garage,lot,park_and_ride,on_street,rest_area,truck_parking,other" doc:"Open enumeration; treat an unknown value as other."`
-	Location      Position         `json:"location"`
-	DistanceM     *int             `json:"distanceM" nullable:"true" doc:"Distance from the asked position, in metres; null along a motorway (no point was asked) and for a site whose terms need accepting (a Toll Collect site), which the platform names without a distance."`
-	Occupancy     *Occupancy       `json:"occupancy" doc:"The last report; null when none is published, or while the terms are not accepted."`
-	TermsRequired bool             `json:"termsRequired" doc:"True when the occupancy is withheld until the family's terms are accepted."`
-	SourceFamily  string           `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
-	Amenities     ParkingAmenities `json:"amenities" doc:"The amenities the site's own publisher states it has and states it lacks; an amenity in neither is unknown, never absent."`
+	ID              string           `json:"id"`
+	Name            *string          `json:"name" nullable:"true"`
+	Operator        *string          `json:"operator" nullable:"true"`
+	Kind            string           `json:"kind" enum:"garage,lot,park_and_ride,on_street,rest_area,truck_parking,other" doc:"Open enumeration; treat an unknown value as other."`
+	Location        Position         `json:"location"`
+	DistanceM       *int             `json:"distanceM" nullable:"true" doc:"Distance from the asked position, in metres; null along a motorway (no point was asked) and for a site whose terms need accepting (a Toll Collect site), which the platform names without a distance."`
+	Occupancy       *Occupancy       `json:"occupancy" doc:"The last report; null when none is published, or while the terms are not accepted."`
+	TermsRequired   bool             `json:"termsRequired" doc:"True when the occupancy is withheld until the family's terms are accepted."`
+	SourceFamily    string           `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
+	Amenities       ParkingAmenities `json:"amenities" doc:"The amenities the site's own publisher states it has and states it lacks; an amenity in neither is unknown, never absent."`
+	NearbyAmenities []NearbyAmenity  `json:"nearbyAmenities" nullable:"true" doc:"What OpenStreetMap maps near the site (500 m around a city car park, park and ride or other site, else 300 m; along a motorway 300 m): the nearest named entry of each amenity, none the site's publisher states, nearest first, five at most; null when not read (a nearby search, a place overview)."`
 }
 
 // ParkingAmenities are a site's stated amenities, in the platform's order.
@@ -757,6 +818,8 @@ type ParkingMeta struct {
 	Page  Page         `json:"page"`
 	Query ParkingQuery `json:"query"`
 	Terms []TermsOffer `json:"terms,omitempty" doc:"The terms of the sites marked termsRequired, with their text: show it to the end user, and pass accept_terms only once the user accepts."`
+	// Around is what the platform's parking search shows beside its list.
+	Around *ParkingAround `json:"around"`
 }
 
 // ParkingEnvelope is the enveloped answer of listParkingOptions.
@@ -778,7 +841,7 @@ func parkingSites(a features.Answer[parking.Site]) ([]ParkingListing, bool) {
 	for i, v := range a.Items {
 		item := ParkingListing{
 			ID: v.ID, Name: v.Name, Operator: v.Operator, Kind: string(v.Kind), Location: position(v.Location),
-			TermsRequired: v.TermsRequired, SourceFamily: v.Family, Amenities: parkingAmenities(v.Amenities),
+			TermsRequired: v.TermsRequired, SourceFamily: v.Family, Amenities: parkingAmenities(v.Amenities), NearbyAmenities: siteNearby(a.Around, i),
 		}
 		if !v.Unranged {
 			d := v.DistanceM
@@ -833,12 +896,13 @@ func registerParking(api huma.API, s *server, op huma.Operation) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
-		q := in.query(parking.Query{At: in.point, RadiusM: s.radius(in.RadiusM), Limit: s.limit(in.Limit)})
+		q := in.query(parking.Query{At: in.point, RadiusM: s.radius(in.RadiusM), Limit: s.limit(in.Limit), CarParks: true, Around: true})
 		a, meta, err := s.parkingAnswer(in.with(ctx), q)
 		if err != nil {
 			return nil, err
 		}
 		meta.Query = ParkingQuery{NearQuery: NearQuery{At: position(q.At), RadiusM: q.RadiusM}, ParkingFilterQuery: parkingFilterQuery(q)}
+		meta.Around = parkingAround(a.Around)
 		data, _ := rangedParkingSites(a)
 		return &ParkingOutput{CacheControl: noStore, Body: ParkingEnvelope{Data: data, Meta: meta, Links: s.selfLink(ctx)}}, nil
 	})
@@ -916,7 +980,7 @@ func registerMotorwayParking(api huma.API, s *server, op huma.Operation) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
-		q := in.query(parking.Query{Road: in.road, Limit: s.limit(in.Limit)})
+		q := in.query(parking.Query{Road: in.road, Limit: s.limit(in.Limit), Around: true})
 		a, meta, err := s.parkingAnswer(in.with(ctx), q)
 		if err != nil {
 			return nil, err
@@ -965,16 +1029,17 @@ type ParkingPart struct {
 // distance: the /v1 contract states one for each (VER-001), a Toll Collect
 // site's too, which the platform names without one.
 type ParkingSite struct {
-	ID            string           `json:"id"`
-	Name          *string          `json:"name" nullable:"true"`
-	Operator      *string          `json:"operator" nullable:"true"`
-	Kind          string           `json:"kind" enum:"garage,lot,park_and_ride,on_street,rest_area,truck_parking,other" doc:"Open enumeration; treat an unknown value as other."`
-	Location      Position         `json:"location"`
-	DistanceM     int              `json:"distanceM" doc:"Distance from the asked position, in metres."`
-	Occupancy     *Occupancy       `json:"occupancy" doc:"The last report; null when none is published, or while the terms are not accepted."`
-	TermsRequired bool             `json:"termsRequired" doc:"True when the occupancy is withheld until the family's terms are accepted."`
-	SourceFamily  string           `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
-	Amenities     ParkingAmenities `json:"amenities" doc:"The amenities the site's own publisher states it has and states it lacks; an amenity in neither is unknown, never absent."`
+	ID              string           `json:"id"`
+	Name            *string          `json:"name" nullable:"true"`
+	Operator        *string          `json:"operator" nullable:"true"`
+	Kind            string           `json:"kind" enum:"garage,lot,park_and_ride,on_street,rest_area,truck_parking,other" doc:"Open enumeration; treat an unknown value as other."`
+	Location        Position         `json:"location"`
+	DistanceM       int              `json:"distanceM" doc:"Distance from the asked position, in metres."`
+	Occupancy       *Occupancy       `json:"occupancy" doc:"The last report; null when none is published, or while the terms are not accepted."`
+	TermsRequired   bool             `json:"termsRequired" doc:"True when the occupancy is withheld until the family's terms are accepted."`
+	SourceFamily    string           `json:"sourceFamily" doc:"The source family of the item; its attribution is in meta.attribution."`
+	Amenities       ParkingAmenities `json:"amenities" doc:"The amenities the site's own publisher states it has and states it lacks; an amenity in neither is unknown, never absent."`
+	NearbyAmenities []NearbyAmenity  `json:"nearbyAmenities" nullable:"true" doc:"What OpenStreetMap maps near the site (500 m around a city car park, park and ride or other site, else 300 m; along a motorway 300 m): the nearest named entry of each amenity, none the site's publisher states, nearest first, five at most; null when not read (a nearby search, a place overview)."`
 }
 
 // rangedParkingSites are the sites of an answer around a position, each
@@ -984,7 +1049,8 @@ func rangedParkingSites(a features.Answer[parking.Site]) ([]ParkingSite, bool) {
 	out := make([]ParkingSite, len(listed))
 	for i, v := range listed {
 		out[i] = ParkingSite{ID: v.ID, Name: v.Name, Operator: v.Operator, Kind: v.Kind, Location: v.Location,
-			DistanceM: a.Items[i].DistanceM, Occupancy: v.Occupancy, TermsRequired: v.TermsRequired, SourceFamily: v.SourceFamily, Amenities: v.Amenities}
+			DistanceM: a.Items[i].DistanceM, Occupancy: v.Occupancy, TermsRequired: v.TermsRequired, SourceFamily: v.SourceFamily, Amenities: v.Amenities,
+			NearbyAmenities: v.NearbyAmenities}
 	}
 	return out, withheld
 }

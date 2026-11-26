@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -20,6 +21,13 @@ import (
 // background road read (WarmRoads, KeepRoads), so a test can hold that read
 // part-way.
 func (s *Store) HoldJunctionRead(hold func()) { s.landsRead = hold }
+
+// WithReferenceVersions keeps the reference fingerprints of the versions read
+// for ttl while their probe stays (db.reference_versions_ttl).
+func (s *Store) WithReferenceVersions(ttl time.Duration) *Store { s.refs.ttl = ttl; return s }
+
+// PunctualityOfArea is the punctuality of the Land of the area $1 alone.
+func PunctualityOfArea() string { return punctualityOfArea }
 
 // OpaqueRead is a statement opaque rewrote: as sent, as written, and the
 // types it declares.
@@ -117,6 +125,49 @@ func WithTest(ctx context.Context, t testing.TB) context.Context {
 	return context.WithValue(ctx, testKey{}, t)
 }
 
+// batchKey carries, in a test's context, the batch its reads' checks join.
+type batchKey struct{}
+
+// parityBatch is the checks of reads under one WithBatch context.
+type parityBatch struct {
+	mu     sync.Mutex
+	checks []parityCheck
+}
+
+// batchReplays is how many of a batch's checks replay side by side, each on
+// a connection of its own.
+const batchReplays = 4
+
+// WithBatch is ctx carrying t, for a test that reads many statements after
+// planting its rows: the checks of the reads under it are compared side by
+// side, batchReplays at a time, in one cleanup of t registered now, so
+// before the cleanups registered earlier (the rows planted before this
+// call are still there). A read under it must come after every row it
+// reads is planted and before t plants rows of another database.
+func WithBatch(ctx context.Context, t testing.TB) context.Context {
+	b := &parityBatch{}
+	t.Cleanup(func() {
+		b.mu.Lock()
+		checks := slices.Clone(b.checks)
+		b.mu.Unlock()
+		next := make(chan parityCheck)
+		var wg sync.WaitGroup
+		for range batchReplays {
+			wg.Go(func() {
+				for c := range next {
+					replayInTest(ctx, t, c)
+				}
+			})
+		}
+		for _, c := range checks {
+			next <- c
+		}
+		close(next)
+		wg.Wait()
+	})
+	return context.WithValue(WithTest(ctx, t), batchKey{}, b)
+}
+
 // replayBound is the ceiling on one check's replay: three reads, outside
 // the request's budget.
 const replayBound = time.Minute
@@ -146,6 +197,17 @@ func replayInTest(ctx context.Context, t testing.TB, c parityCheck) {
 // no test pays for the comparison.
 var parity = flag.Bool("parity", false, "compare every named statement with the frozen view statement it replaced")
 
+// noPlatformRead are the named statements the platform has no statement
+// of, so none to compare with, each with its reason.
+var noPlatformRead = map[string]string{
+	"api_register_probe":         "the API's own probe of the row versions its register cache is read from; it answers no question",
+	"api_charging_feed_register": "the platform holds the charging feed register as code, not as a table it reads",
+}
+
+// NoPlatformRead is why a named statement has no platform statement to
+// compare with; empty when it has one.
+func NoPlatformRead(name string) string { return noPlatformRead[name] }
+
 // ParityOn reports whether the run compares the named statements with the
 // frozen view statements (-parity); the flags are parsed.
 func ParityOn() bool { return *parity }
@@ -157,6 +219,9 @@ func ParityOn() bool { return *parity }
 func EnableParity() {
 	beside = func(ctx context.Context, tx pgx.Tx, s stmt, args []any) {
 		legacy, ok := legacyReads[s.Name]
+		if !ok && noPlatformRead[s.Name] != "" {
+			return
+		}
 		if !ok {
 			parityMu.Lock()
 			defer parityMu.Unlock()
@@ -184,6 +249,12 @@ func EnableParity() {
 		parityKeys[key] = true
 		if inTest {
 			c.url = tx.Conn().Config().ConnString()
+			if b, ok := ctx.Value(batchKey{}).(*parityBatch); ok {
+				b.mu.Lock()
+				b.checks = append(b.checks, c)
+				b.mu.Unlock()
+				return
+			}
 			// Registered now, so it runs before the cleanups of the rows
 			// planted before this read.
 			t.Cleanup(func() { replayInTest(ctx, t, c) })
@@ -247,6 +318,12 @@ func replay(ctx context.Context, conn *pgx.Conn, c parityCheck, onMiss func(Pari
 		parityMisses = append(parityMisses, m)
 	}
 	if _, err := tx.Exec(ctx, "select set_config('viafrei_api.own_key', $1, true)", c.own); err != nil {
+		return err
+	}
+	// The replay runs outside the request's budget, under replayBound: the
+	// role's per-read statement timeout would cancel the frozen statement
+	// whenever the machine is loaded (four parity shards side by side).
+	if _, err := tx.Exec(ctx, "select set_config('statement_timeout', $1, true)", strconv.FormatInt(replayBound.Milliseconds(), 10)); err != nil {
 		return err
 	}
 	sp, err := tx.Begin(ctx)

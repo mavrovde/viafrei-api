@@ -15,9 +15,13 @@
   "response": {
     "data": {
       "eva": "8001001",
+      "evaNumbers": [
+        "8001001"
+      ],
       "fresh": true,
       "fetchedAt": "2026-03-30T00:00:00Z",
       "ageSeconds": 0,
+      "degraded": false,
       "departures": [
         {
           "line": null,
@@ -31,9 +35,12 @@
           "plannedPlatform": "4",
           "platformChanged": false,
           "cancelled": false,
+          "stationPart": null,
           "sourceFamily": "db_timetables"
         }
-      ]
+      ],
+      "capped": null,
+      "interchange": null
     },
     "meta": {
       "requestId": "example-request-0001",
@@ -46,7 +53,8 @@
           "dataAsOf": null,
           "ageS": null,
           "staleAfterS": 9007199254740991,
-          "stale": false
+          "stale": false,
+          "lastCheckedAt": null
         }
       ],
       "attribution": [

@@ -23,6 +23,10 @@ func legacySpeedCellOf(point string) string {
 	return `(select g.cell from cut_gemeinde g order by g.at <-> ` + point + `, g.cell limit 1)`
 }
 
+// legacySpeedOSM takes, as the named read since the cut keeps the official
+// Gemeinden (carried from main), the official lists' cells as $7: they are
+// read by their own statement (api_speed_official_cells), compared apart.
+//
 //nolint:misspell // materialized is the SQL keyword
 var legacySpeedOSM = `
 with cut_gemeinde as materialized (
@@ -32,16 +36,7 @@ with cut_gemeinde as materialized (
     and p.official_key ~ '^[0-9]{8}$' and ` + permitted("p") + `
     and st_dwithin(p.location::geography, st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography, $3::float8 + 80000)
 ), official as (
-  select ` + legacySpeedCellOf("o.location::geography") + ` as cell
-  from contract.speed_camera o
-  where o.camera_id not like 'osm:%' and o.camera_kind in ('fixed', 'section_control') and o.location is not null
-    and st_dwithin(o.location::geography, st_setsrid(st_makepoint($1::float8, $2::float8), 4326)::geography, $3::float8 + 50000)
-    and o.source_ref = any($5::text[]) and ` + permitted("o") + `
-  union
-  select o.admin_code
-  from contract.speed_camera o
-  where o.camera_id not like 'osm:%' and o.camera_kind in ('fixed', 'section_control') and o.location is null
-    and o.admin_code ~ '^[0-9]{8}$' and o.source_ref = any($5::text[]) and ` + permitted("o") + `
+  select unnest($7::text[]) as cell
 ), kept as (
   select c.camera_id
   from contract.speed_camera c

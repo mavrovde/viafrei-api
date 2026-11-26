@@ -55,6 +55,17 @@ values ('sa_live:a1', 'Bauarbeiten', '{09998}', '{09}', 'stop', 'k1', null, true
 		!slices.Equal(d.AlertFamilies, []string{"sa_live", "sx_live"}) {
 		t.Fatalf("read %+v %v", d, err)
 	}
+	// The Land's coverage: every stop-placed alert seen within 14 days, of
+	// every family asked, a dead publication's too; a Land none placed one
+	// in is not covered and was never seen.
+	if c := d.Coverage; c == nil || !c.Covered || c.LookbackDays != 14 || len(c.Lands) != 1 || c.Lands[0].Land != "09" ||
+		c.Lands[0].AlertsSeen != 7 || c.Lands[0].LastSeenAt == nil {
+		t.Errorf("coverage %+v", d.Coverage)
+	}
+	if d, err := st.Disruptions(bounded(t), transit.DisruptionQuery{Area: "01", Limit: 2, Now: time.Now()}, fams); err != nil || d.Coverage == nil ||
+		d.Coverage.Covered || d.Coverage.Lands[0].Land != "01" || d.Coverage.Lands[0].AlertsSeen != 0 || d.Coverage.Lands[0].LastSeenAt != nil {
+		t.Errorf("an uncovered Land: %+v %v", d.Coverage, err)
+	}
 	q.Limit = 10
 	if d, err := st.Disruptions(bounded(t), q, fams); err != nil || !slices.Equal(ids(d.Alerts), []string{"sa_live:a1", "sa_live:a2", "sx_live:s3"}) {
 		t.Errorf("listed %v %v", ids(d.Alerts), err)

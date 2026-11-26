@@ -13,9 +13,11 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/testkit/req"
 )
 
-// trRegister: two transit families, one consumer only.
+// trRegister: two accessibility families, two transit families, one
+// consumer only.
 var trRegister = []access.Terms{
 	{Family: "a1", Domain: "accessibility", UseClasses: all, Version: "v1"},
+	{Family: "a2", Domain: "accessibility", UseClasses: all, Version: "v1"},
 	{Family: "t1", Domain: "transit", UseClasses: all, Version: "v1"},
 	{Family: "t2", Domain: "transit", UseClasses: []access.UseClass{"consumer"}, Version: "v1"},
 }
@@ -27,6 +29,13 @@ type trFake struct {
 	readErr     error
 	gotQuery    transit.Query
 	gotFamilies []string
+	stopBoards  []transit.StopBoard
+	platforms   []transit.PlatformRow
+	platErr     error
+	gotEvas     []string
+	stopErr     error
+	gotStops    transit.StopBoardsQuery
+	gotStopFams []string
 	station     transit.Station
 	stErr       error
 	calls       []transit.Departure
@@ -35,6 +44,26 @@ type trFake struct {
 	facilities  []transit.Facility
 	facErr      error
 	gotFacFams  []string
+	reach       transit.Reach
+	reachErr    error
+	record      transit.StationRecord
+	recErr      error
+	alertRows   []transit.StationAlertRow
+	alertErr    error
+	gotAlerts   transit.StationAlertsQuery
+}
+
+func (f *trFake) StationRecord(context.Context, string, []string) (transit.StationRecord, error) {
+	return f.record, f.recErr
+}
+
+func (f *trFake) StationAlerts(_ context.Context, q transit.StationAlertsQuery, _ []string) ([]transit.StationAlertRow, error) {
+	f.gotAlerts = q
+	return f.alertRows, f.alertErr
+}
+
+func (f *trFake) TimetableReach(context.Context) (transit.Reach, error) {
+	return f.reach, f.reachErr
 }
 
 func (f *trFake) Facilities(_ context.Context, _ string, fams []string, _ time.Time) ([]transit.Facility, error) {
@@ -45,6 +74,16 @@ func (f *trFake) Facilities(_ context.Context, _ string, fams []string, _ time.T
 func (f *trFake) Station(_ context.Context, id string, fams []string) (transit.Station, error) {
 	f.gotFamilies = fams
 	return f.station, f.stErr
+}
+
+func (f *trFake) Platforms(_ context.Context, evas, _ []string) ([]transit.PlatformRow, error) {
+	f.gotEvas = evas
+	return f.platforms, f.platErr
+}
+
+func (f *trFake) StopBoards(_ context.Context, q transit.StopBoardsQuery, fams []string) ([]transit.StopBoard, error) {
+	f.gotStops, f.gotStopFams = q, fams
+	return f.stopBoards, f.stopErr
 }
 
 func (f *trFake) Departures(_ context.Context, q transit.DepartureQuery, _ []string) ([]transit.Departure, error) {
@@ -89,7 +128,7 @@ func TestStationsAreGatedAndAttributed(t *testing.T) {
 
 func TestANameSeveralStationsAnswerCreditsTheirPlacement(t *testing.T) {
 	req.Covers(t, "FR-TRANSIT-001")
-	p := "p1"
+	p, g := "p1", "g1"
 	two := []transit.Station{{ID: "a", Family: "t1", PlacedBy: &p}, {ID: "b", Family: "t1"}}
 	consumer := key("commercial", []access.Scope{"transit"}, "t1")
 	for _, c := range []struct {
@@ -104,6 +143,8 @@ func TestANameSeveralStationsAnswerCreditsTheirPlacement(t *testing.T) {
 		// One station found in the town the text names: its district
 		// placed it there.
 		{"one station in the town", []transit.Station{{ID: "a", Family: "t1", PlacedBy: &p, InTown: true}}, transit.Query{Text: "town nam", Limit: 5}, []string{"p1", "t1"}},
+		// A town a Gemeinde of the gazetteer named: the gazetteer is credited.
+		{"a town the gazetteer named", []transit.Station{{ID: "a", Family: "t1", PlacedBy: &p, InTown: true, TownBy: &g}}, transit.Query{Text: "town nam", Limit: 5}, []string{"g1", "p1", "t1"}},
 	} {
 		a, err := trService(&trFake{stations: c.stations}).Stations(context.Background(), consumer, c.q)
 		if err != nil || !slices.Equal(names(a.Families), c.want) {
@@ -135,7 +176,7 @@ func TestStationsRefusals(t *testing.T) {
 func TestDeparturesAreTheBoardGatedAndAttributed(t *testing.T) {
 	req.Covers(t, "FR-TRANSIT-002", "SEC-030")
 	at := now.Add(time.Minute)
-	f := &trFake{station: transit.Station{ID: "s", Family: "t1"}, calls: []transit.Departure{
+	f := &trFake{station: transit.Station{ID: "s", Family: "t1"}, reach: transit.Reach{Until: &at}, calls: []transit.Departure{
 		{JourneyID: "a", PlannedAt: at, Mode: "bus", RouteType: 3, Family: "t1", Families: []string{"t1"}},
 		{JourneyID: "b", PlannedAt: at.Add(time.Minute), Mode: "bus", RouteType: 3, Family: "t1", Families: []string{"t1"}},
 		{JourneyID: "c", StopPointID: "p2", PlannedAt: at, Mode: "tram", RouteType: 0, Family: "t1", Families: []string{"t1"}},
@@ -149,7 +190,7 @@ func TestDeparturesAreTheBoardGatedAndAttributed(t *testing.T) {
 		t.Errorf("asked %+v of %v", f.gotBoard, f.gotFamilies)
 	}
 	if b.Station.ID != "s" || len(b.Items) != 1 || b.Items[0].JourneyID != "a" || !b.HasMore || !b.Partial || b.Matched != 2 ||
-		b.MatchedAll != 3 || b.Dropped[0] != 1 || !b.At.Equal(now) || !slices.Equal(names(b.Families), []string{"t1"}) {
+		b.MatchedAll != 3 || b.Dropped[0] != 1 || !b.At.Equal(now) || b.Reach.Until != &at || !slices.Equal(names(b.Families), []string{"t1"}) {
 		t.Errorf("board %+v", b)
 	}
 }
@@ -194,6 +235,7 @@ func TestDeparturesRefusals(t *testing.T) {
 		"none":       {&trFake{}, key("commercial", []access.Scope{"transit"}, "t2"), access.ErrNonePermitted},
 		"station":    {&trFake{stErr: transit.ErrNotFound}, full, transit.ErrNotFound},
 		"read":       {&trFake{station: st, depErr: errStore}, full, errStore},
+		"reach":      {&trFake{station: st, reachErr: errStore}, full, errStore},
 		"post-check": {&trFake{station: st, calls: []transit.Departure{{Families: []string{"t2"}}}}, full, features.ErrGateViolation},
 		"provenance": {&trFake{fake: &fake{provErr: errStore}, station: st}, full, errStore},
 	} {
@@ -203,18 +245,59 @@ func TestDeparturesRefusals(t *testing.T) {
 	}
 }
 
+// The stops around a position are read of the board's families, gated on
+// every stop's family and every departure's, and credited.
+func TestStopBoardsAreGatedAndAttributed(t *testing.T) {
+	req.Covers(t, "FR-TRANSIT-002", "SEC-030")
+	f := &trFake{stopBoards: []transit.StopBoard{{Stop: transit.NearStop{StopNear: transit.StopNear{Root: "1:a", Family: "t1"}},
+		Board: transit.BoardAnswer{Rows: []transit.Departure{{Families: []string{"t1"}}}}}}}
+	q := transit.StopBoardsQuery{RadiusM: 5000, Limit: 8, PerStop: 4}
+	a, err := trService(f).StopBoards(context.Background(), key("commercial", []access.Scope{"transit"}, "t1", "t2"), q)
+	if err != nil || f.gotStops.Limit != 8 || !slices.Equal(f.gotStopFams, []string{"t1"}) || len(a.Items) != 1 || !a.Partial ||
+		!a.At.Equal(now) || !slices.Equal(names(a.Families), []string{"t1"}) {
+		t.Errorf("%+v %v of %v: %v", a, f.gotStops, f.gotStopFams, err)
+	}
+	full := key("commercial", []access.Scope{"transit"}, "t1")
+	for name, c := range map[string]struct {
+		f    *trFake
+		k    access.Record
+		want error
+	}{
+		"register":   {&trFake{fake: &fake{regErr: errStore}}, full, errStore},
+		"none":       {&trFake{}, key("commercial", []access.Scope{"transit"}, "t2"), access.ErrNonePermitted},
+		"read":       {&trFake{stopErr: errStore}, full, errStore},
+		"post-check": {&trFake{stopBoards: []transit.StopBoard{{Stop: transit.NearStop{StopNear: transit.StopNear{Family: "t2"}}}}}, full, features.ErrGateViolation},
+		"provenance": {&trFake{fake: &fake{provErr: errStore}}, full, errStore},
+	} {
+		if _, err := trService(c.f).StopBoards(context.Background(), c.k, q); !errors.Is(err, c.want) {
+			t.Errorf("%s: %v, want %v", name, err, c.want)
+		}
+	}
+}
+
 func TestFacilitiesAreListedGatedAndAttributed(t *testing.T) {
 	req.Covers(t, "FR-TRANSIT-003", "SEC-030")
 	f := &trFake{station: transit.Station{ID: "s", Family: "t1"}, facilities: []transit.Facility{
-		{ID: "x", State: "active", Family: "a1"}, {ID: "y", State: "inactive", Family: "a1"},
+		{ID: "x", State: "active", Family: "a1"}, {ID: "y", State: "inactive", Family: "a1", Listing: "a2"},
 	}}
-	a, err := trService(f).Facilities(context.Background(), key("commercial", []access.Scope{"transit"}, "t1", "t2", "a1"), transit.FacilityQuery{StationID: "s", Limit: 1})
+	a, err := trService(f).Facilities(context.Background(), key("commercial", []access.Scope{"transit"}, "t1", "t2", "a1", "a2"), transit.FacilityQuery{StationID: "s", Limit: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(f.gotFacFams, []string{"a1"}) || len(a.Items) != 1 || a.Items[0].ID != "y" || !a.HasMore || !a.Partial ||
-		a.Active != 1 || a.Inactive != 1 || !slices.Equal(names(a.Families), []string{"a1", "t1"}) {
+	// the unit's listing family is credited beside its state's
+	if !slices.Equal(f.gotFacFams, []string{"a1", "a2"}) || len(a.Items) != 1 || a.Items[0].ID != "y" || !a.HasMore || !a.Partial ||
+		a.Active != 1 || a.Inactive != 1 || !slices.Equal(names(a.Families), []string{"a1", "a2", "t1"}) {
 		t.Errorf("answer %+v", a)
+	}
+	// A DB station's platforms are DB's inventory's, credited, with its
+	// newest publication.
+	at := now.Add(-time.Hour)
+	pf := &trFake{station: transit.Station{ID: "s", Family: "t1", EVANumbers: []string{"8000001"}}, platforms: []transit.PlatformRow{
+		{ElementID: "q1", StopPlaceID: "x", Family: "a2", UpdatedAt: &at}, {ElementID: "q2", StopPlaceID: "x", Family: "a2"}}}
+	a, err = trService(pf).Facilities(context.Background(), key("commercial", []access.Scope{"transit"}, "t1", "a1", "a2"), transit.FacilityQuery{StationID: "s", Limit: 1})
+	if err != nil || !slices.Equal(pf.gotEvas, []string{"8000001"}) || len(a.Platforms) != 1 || len(a.Platforms[0].Platforms) != 2 ||
+		a.PlatformsAt != &at || !slices.Equal(names(a.Families), []string{"a2", "t1"}) {
+		t.Errorf("platforms %+v: %v", a, err)
 	}
 	full := key("commercial", []access.Scope{"transit"}, "t1", "a1")
 	st := transit.Station{ID: "s", Family: "t1"}
@@ -230,9 +313,36 @@ func TestFacilitiesAreListedGatedAndAttributed(t *testing.T) {
 		"read":       {&trFake{station: st, facErr: errStore}, full, errStore},
 		"post-check": {&trFake{station: st, facilities: []transit.Facility{{Family: "t2"}}}, full, features.ErrGateViolation},
 		"provenance": {&trFake{fake: &fake{provErr: errStore}, station: st}, full, errStore},
+		"platforms":  {&trFake{station: transit.Station{ID: "s", Family: "t1", EVANumbers: []string{"8000001"}}, platErr: errStore}, full, errStore},
 	} {
 		if _, err := trService(c.f).Facilities(context.Background(), c.k, transit.FacilityQuery{Limit: 5}); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)
+		}
+	}
+}
+
+// A railway station is named as DB's register names it where the key may
+// read the register, which is then credited; else, and off railway, the
+// stop's name stands.
+func TestARailwayStationIsNamedAsTheRegisterNamesIt(t *testing.T) {
+	req.Covers(t, "FR-TRANSIT-001")
+	reg, other, nm := "t1", "t2", "Frankfurt (Main) Hbf"
+	k := key("commercial", []access.Scope{"transit"}, "t1")
+	for _, c := range []struct {
+		name    string
+		by      *string
+		railway bool
+		want    string
+	}{
+		{"railway", &reg, true, nm},
+		{"register not readable", &other, true, "Frankfurt Hbf"},
+		{"no register family", nil, true, "Frankfurt Hbf"},
+		{"not railway", &reg, false, "Frankfurt Hbf"},
+	} {
+		f := &trFake{stations: []transit.Station{{ID: "a", Name: "Frankfurt Hbf", Family: "t1", RegisterName: &nm, RegisterBy: c.by}}}
+		a, err := trService(f).Stations(context.Background(), k, transit.Query{Railway: c.railway, Limit: 5})
+		if err != nil || a.Items[0].Name != c.want {
+			t.Errorf("%s: %v %v", c.name, a.Items, err)
 		}
 	}
 }

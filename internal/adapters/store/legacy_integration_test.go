@@ -127,7 +127,7 @@ order by d.planned_departure_at, d.journey_id, d.call_order`, "text", "timestamp
 	// alone (#222): both read from the facility's own row.
 	"api_station_facilities": `
 with v as (
-  select f.*, x.seen, x.eno
+  select f.*, x.seen, x.eno, x.listed, x.expl
   from contract.station_facility f
   ` + legacyFacilitySeen + `
   where (f.stop_place_id = $1
@@ -140,7 +140,9 @@ select v.facility_id, v.facility_kind, v.position_text,
        case when v.seen is null then 'unknown'
             when s.stale_after_s is not null and v.seen < $3::timestamptz - make_interval(secs => s.stale_after_s) then 'unknown'
             else v.facility_status end,
-       v.seen, v.source_ref, case when v.facility_id like 'fasta:%' then substr(v.facility_id, 7) else v.eno end
+       v.seen, v.source_ref, case when v.facility_id like 'fasta:%' then substr(v.facility_id, 7) else v.eno end,
+       case when v.listed <> v.source_ref and v.listed = any($2) then v.listed else '' end,
+       case when lower(btrim(v.expl)) in ('', 'available', 'not available') then null else btrim(v.expl) end
 from v
 join contract.source s on s.source_ref = v.source_ref
 where not exists (select 1 from v g where g.facility_id = 'fasta:' || v.eno)
@@ -289,10 +291,20 @@ var legacyRegionAlerts = strings.NewReplacer("{live}", alertLive("a", "$1"), "{i
 // as the view answers it: the stations of the districts the town names
 // whose name holds the stop name, by name then id, collapsed as the name
 // search is (legacyStationsPage).
+// legacyStationRegister is the station register's row of a stop place (the
+// stations carry its name and family since the register reads, as the
+// platform's station read): the open DB station whose IFOPT is the stop's
+// id, StaDa's first.
+const legacyStationRegister = `left join lateral (select x.name, x.source_id from db_stations x
+                    where x.ifopt = substr(s.stop_place_id, strpos(s.stop_place_id, ':') + 1) and x.closed_at is null
+                    order by (x.source_id = 'db_stada') desc, x.station_no limit 1) reg on true`
+
 var legacyStationsInTowns = `
 select s.stop_place_id, s.name, st_y(s.location), st_x(s.location), s.national_stop_code, s.region_code,
-       coalesce(s.modes, '{}'), s.source_ref, null::integer, s.placement_source_ref, s.eva_no, s.eva_numbers
+       coalesce(s.modes, '{}'), s.source_ref, null::integer, s.placement_source_ref, s.eva_no, s.eva_numbers,
+       reg.name, reg.source_id
 from contract.stop_place s
+` + legacyStationRegister + `
 where s.withdrawn_at is null
   and s.location is not null
   and s.source_ref = any($1)
@@ -327,8 +339,9 @@ with here as (
 select s.stop_place_id, s.name, st_y(s.location), st_x(s.location), s.national_stop_code, s.region_code,
        coalesce(s.modes, '{}'), s.source_ref,
        case when here.g is null then null else round(st_distance(s.location::geography, here.g))::int end dist,
-       s.placement_source_ref, s.eva_no, s.eva_numbers
-from contract.stop_place s, here
+       s.placement_source_ref, s.eva_no, s.eva_numbers, reg.name, reg.source_id
+from contract.stop_place s cross join here
+` + legacyStationRegister + `
 where s.withdrawn_at is null
   and s.location is not null
   and s.source_ref = any($1)

@@ -52,6 +52,8 @@ func TestAFacilityStateIsCurrentWhileRestatedAndAUnitIsListedOnce(t *testing.T) 
 		`insert into public.db_facilities (equipment_no, station_no, kind, state, state_since, first_seen_at, last_seen_at, source_feed, source_publisher, description)
 		 values ('9990020', '999000920', 'elevator', 'active', now() - interval '7 days', now() - interval '7 days', now() - interval '1 minute', 'db_fasta', 'DB', 'zu Gleis 1'),
 		        ('9990021', '999000920', 'elevator', 'active', now() - interval '7 days', now() - interval '7 days', now() - interval '1 day', 'db_fasta', 'DB', 'zu Gleis 2')`,
+		// The operator's explanation of a state is kept verbatim.
+		`update public.db_facilities set state_explanation = 'under maintenance' where equipment_no = '9990021'`,
 		`insert into public.station_equipment (equipment_id, kind, equipment_no, stop_place_id, description, first_seen_at, last_seen_at, source_feed, source_publisher)
 		 values ('diid:9990020', 'elevator', '9990020', 'de:09998:920', 'zu Gleis 1', now(), now(), 'openstation_netex', 'DB'),
 		        ('diid:9990022', 'escalator', '9990022', 'de:09998:920', 'zur Halle', now(), now(), 'openstation_netex', 'DB'),
@@ -71,9 +73,17 @@ func TestAFacilityStateIsCurrentWhileRestatedAndAUnitIsListedOnce(t *testing.T) 
 			no = *f.EquipmentNo
 		}
 		got[f.ID] = f.State + " " + f.Family + " " + no
+		// a unit whose state is the status family's names its listing's
+		// family (the inventory) beside it, as today's credit line does
+		if f.Listing != "" {
+			got[f.ID] += " listed " + f.Listing
+		}
+		if f.StateExplanation != nil {
+			got[f.ID] += " " + *f.StateExplanation
+		}
 	}
-	want := map[string]string{"fasta:9990020": "active db_fasta 9990020", "fasta:9990021": "unknown db_fasta 9990021",
-		"equipment:diid:9990022": "active openstation_siri_fm 9990022", "equipment:diid:9990023": "active openstation_siri_fm -"}
+	want := map[string]string{"fasta:9990020": "active db_fasta 9990020", "fasta:9990021": "unknown db_fasta 9990021 under maintenance",
+		"equipment:diid:9990022": "active openstation_siri_fm 9990022 listed openstation_netex", "equipment:diid:9990023": "active openstation_siri_fm - listed openstation_netex"}
 	if err != nil || len(got) != len(want) || len(fs) != len(want) {
 		t.Fatalf("the station's facilities: %v, %v", got, err)
 	}
@@ -85,6 +95,16 @@ func TestAFacilityStateIsCurrentWhileRestatedAndAUnitIsListedOnce(t *testing.T) 
 	fs, err = st.Facilities(bounded(t), "1:de:09998:920", []string{"openstation_siri_fm", "openstation_netex"}, time.Now())
 	if err != nil || len(fs) != 3 || fs[0].ID != "equipment:diid:9990020" || fs[0].State != "inactive" {
 		t.Errorf("without FaSta, OpenStation answers alone: %+v, %v", fs, err)
+	}
+	// a key that may not read the inventory is not credited with it
+	fs, err = st.Facilities(bounded(t), "1:de:09998:920", []string{"openstation_siri_fm"}, time.Now())
+	for _, f := range fs {
+		if f.Listing != "" {
+			t.Errorf("%s: credited %q to a key that may not read it", f.ID, f.Listing)
+		}
+	}
+	if err != nil {
+		t.Error(err)
 	}
 }
 
@@ -109,8 +129,32 @@ func TestARailwaySearchByNameKeepsTheDBStations(t *testing.T) {
 			t.Errorf("%s, every stop: %+v, %v", text, all, err)
 		}
 		rail, _, err := st.Stations(bounded(t), transit.Query{Text: text, Limit: 1, Railway: true}, fams)
-		if err != nil || len(rail) != 1 || rail[0].ID != "1:de:09998:930" || rail[0].EVA == nil || *rail[0].EVA != "9999930" {
+		if err != nil || len(rail) != 1 || rail[0].ID != "1:de:09998:930" || rail[0].EVA == nil || *rail[0].EVA != "9999930" ||
+			rail[0].RegisterName == nil || *rail[0].RegisterName != "Lindenhof Hbf" || rail[0].RegisterBy == nil || *rail[0].RegisterBy != "db_stada" {
 			t.Errorf("%s, railway: %+v, %v", text, rail, err)
 		}
+	}
+}
+
+// A DB station's platforms are DB's inventory's open rows of its EVA
+// numbers, of a family the key reads; a closed row is not read.
+func TestPlatformsOfTheEVANumbers(t *testing.T) {
+	row := func(id, kind, parent, plate string, closed bool) string {
+		c := "null"
+		if closed {
+			c = "now()"
+		}
+		return `insert into public.station_accessibility (element_id, element_kind, stop_place_id, eva_nos, parent_quay_id, plate_code, has_assessment,
+		  step_free_access, platform_height_cm, first_seen_at, last_seen_at, source_feed, source_publisher, closed_at)
+		  values ('` + id + `', '` + kind + `', 'sp-9', '{8099001}', ` + parent + `, ` + plate + `, true, 'true', 76, now(), now(), 'openstation_netex', 'DB', ` + c + `)`
+	}
+	st, _ := private(t, row("q1", "quay", "null", "null", false), row("q1a", "quay", "'q1'", "'7'", false),
+		row("q2", "quay", "null", "'9'", true), row("sp-9", "stop_place", "null", "null", false))
+	rows, err := st.Platforms(bounded(t), []string{"8099001"}, append(every(t), "openstation_netex"))
+	if err != nil || len(rows) != 3 || rows[1].ElementID != "q1" || !rows[0].StopPlace || *rows[1].HeightCm != 76 || rows[1].Family != "openstation_netex" {
+		t.Fatalf("%+v %v", rows, err)
+	}
+	if rows, err := st.Platforms(bounded(t), []string{"8099001"}, []string{"db_fasta"}); err != nil || len(rows) != 0 {
+		t.Errorf("another family: %+v %v", rows, err)
 	}
 }

@@ -24,9 +24,12 @@ var refusedReads = map[string]*regexp.Regexp{
 // allowedReads are the forms of a refused name a statement may read, cut
 // from its text before refusedReads is applied: a named field of a provider
 // payload (a jsonb path of literal keys, never the payload whole), whether
-// one is stored (is [not] null), the comparison of two payloads' hashes, and
-// the platform's data status (the freshness the read contract publishes).
+// one is stored (is [not] null), the comparison of two payloads' hashes, a
+// jsonb path query of a literal path (the fields it names, never the payload
+// whole), and the platform's data status (the freshness the read contract
+// publishes).
 var allowedReads = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)\bjsonb_path_(?:query|query_first|query_array|exists)\(\s*(?:[a-z_][a-z0-9_]*\.)?[a-z_][a-z0-9_]*\s*,\s*'[^']*'`),
 	regexp.MustCompile(`(?i)\b(?:[a-z_][a-z0-9_]*\.)?(?:raw|payload)(?:\s*(?:->>?|#>>?)\s*'[^']*')+`),
 	regexp.MustCompile(`(?i)\b(?:[a-z_][a-z0-9_]*\.)?(?:raw|payload)\s+is\s+(?:not\s+)?null\b`),
 	regexp.MustCompile(`(?i)\b[a-z_][a-z0-9_]*\.raw_hash\s*=\s*[a-z_][a-z0-9_]*\.raw_hash\b`),
@@ -53,17 +56,50 @@ func withoutTrafficEvents(sql string) string {
 	before, after, _ := strings.Cut(relTrafficEvent, rulesPerRow("b.source_ref"))
 	// the form that reads the stored Land, cut around its rules (their $1 is made opaque)
 	landBefore, landAfter, _ := strings.Cut(trafficEventsOfFamilies, rulesOfFamilies("b.source_ref"))
-	for _, part := range []string{relTrafficEvent, before, after, landBefore, landAfter} {
+	// the motorway answer's sweep rows and plan rule, which derive fields from the payload
+	motorway := []string{motorwaySweepRows("$3", "true"), motorwaySweepRows("$6", "true"), planInForce,
+		motorwaySweepRows("$10", "$11::boolean"), planSuspended, strategyPayloadColumn, strategyPayloadOnce}
+	for _, part := range append([]string{relTrafficEvent, before, after, landBefore, landAfter}, motorway...) {
 		sql = strings.ReplaceAll(sql, part, "")
 	}
-	return sql
+	return withoutTwinRule(sql)
+}
+
+// twinWords are the forms in which the place-grouped charging read reads
+// the operator's comparable words: compared between two sites (the
+// register's twin rule), and carried to that comparison in the column
+// lists of the sites read.
+var twinWords = regexp.MustCompile(`\b(?:[a-z_]+\.)?operator_tokens\s*&&\s*[a-z_]+\.operator_tokens\b|` +
+	`(?:\(c\.site\)|\bs)\.operator_tokens,|\bgeom, operator_tokens,`)
+
+// withoutTwinRule cuts the twin rule's reads of the operator's words from
+// the place-grouped charging read, whose answered columns (its last select
+// list) never name them.
+func withoutTwinRule(sql string) string {
+	if sql != chargingPlacesNear.SQL {
+		return sql
+	}
+	return twinWords.ReplaceAllString(sql, " ")
+}
+
+// TestTheTwinRuleAnswersNoOperatorWords: the place-grouped charging read
+// answers no operator words, and the cut leaves every other read of them.
+func TestTheTwinRuleAnswersNoOperatorWords(t *testing.T) {
+	head, _, _ := strings.Cut(chargingPlacesNear.SQL[strings.LastIndex(chargingPlacesNear.SQL, "select k.source_feed"):], "(select (select eps.slug")
+	if strings.Contains(head, "operator_tokens") {
+		t.Errorf("the answered columns name the operator words: %s", head)
+	}
+	if got := withoutTwinRule("select operator_tokens from s"); got != "select operator_tokens from s" {
+		t.Errorf("another statement was cut: %s", got)
+	}
 }
 
 // TestNamedStatementsReadNoRefusedColumn: no named statement reads a whole
 // row, a contract view or a column the platform keeps from the API.
 //
 // The traffic events relation alone (and its form with the rules matched
-// per family) reads the Autobahn payload, to derive an event's fields from
+// per family, and the motorway answer's sweep rows and plan rule) reads the
+// Autobahn payload, to derive an event's fields from
 // it as the platform does; it never answers it.
 func TestNamedStatementsReadNoRefusedColumn(t *testing.T) {
 	// One statement a subtest, side by side: each one's patterns are its

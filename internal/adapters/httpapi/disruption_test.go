@@ -27,6 +27,7 @@ func TestDisruptionsAnswer(t *testing.T) {
 			Alerts:      []transit.Alert{{ID: "vrr:1", Header: sp("Bauarbeiten"), ActiveFrom: &fixedNow, PlacedBy: "route", Family: "src-alpha-transit"}},
 			AlertsTotal: 2,
 			Punctuality: &transit.Punctuality{AreaLevel: "kreis", AreaCode: "05315", TripsObserved: 40, TripsLate: 4, Family: "src-alpha-transit"},
+			Coverage:    &transit.AlertsCoverage{Covered: true, LookbackDays: 14, Lands: []transit.LandCoverage{{Land: "05", AlertsSeen: 3, LastSeenAt: &fixedNow}}},
 		},
 		Meta: features.Answer[struct{}]{Families: []provenance.Family{transitFamily}, At: fixedNow},
 	}
@@ -39,7 +40,8 @@ func TestDisruptionsAnswer(t *testing.T) {
 	if f.gotDisrupt.Line != "RE1" || f.gotDisrupt.WindowMin != 60 || f.gotDisrupt.Limit != 1 || f.gotDisrupt.Area != "05315" {
 		t.Errorf("asked %+v", f.gotDisrupt)
 	}
-	for _, want := range []string{`"id":"vrr:1"`, `"lines":[]`, `"alertsTotal":2`, `"late":4`, `"windowMin":30`, `"windowMin":60`, `"hasMore":true`} {
+	for _, want := range []string{`"id":"vrr:1"`, `"lines":[]`, `"alertsTotal":2`, `"late":4`, `"windowMin":30`, `"windowMin":60`, `"hasMore":true`,
+		`"alertsCoverage":{"covered":true,"lookbackDays":14,"lands":[{"land":"05","alertsSeen":3,"newestAlertSeenAt":"2026-03-29T01:30:00Z"}]}`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("answer lacks %s: %s", want, body)
 		}

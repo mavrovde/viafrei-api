@@ -34,6 +34,27 @@ func legacyParkingDistance(q parking.Query) string {
 	return `round(st_distance(f.location::geography, here.g))::int`
 }
 
+// legacyParkingKind is a site's kind since a stored car_park is a garage
+// (#226 C): the view's kind, else garage where the site's own row (the
+// facility table its id names) states car_park.
+const legacyParkingKind = `case when (select x.kind from (
+    select 'p:' || id facility_id, kind from parking_facilities union all
+    select 'bysa:' || id, kind from parking_facilities_bysa union all
+    select 'odbl:' || id, kind from parking_facilities_odbl union all
+    select 'sid:' || id, kind from parking_facilities_sid) x where x.facility_id = f.facility_id) = 'car_park'
+  then 'garage' else f.parking_kind end`
+
+// legacyParkingReading keeps a report o of the view as a site's reading
+// since the newest-reading rule (#226 D): its own tick row (the tick table
+// its id names, at its instant and family) is one of the two days up to
+// the request's instant that says something, parkingReading over that row.
+var legacyParkingReading = `(exists (select 1 from parking_occupancy t where o.facility_id = 'p:' || t.facility_id
+            and t.observed_at = o.observed_at and t.source_feed = o.source_ref and ` + parkingReading("t", "$7::timestamptz") + `)
+       or exists (select 1 from parking_occupancy_odbl t where o.facility_id = 'odbl:' || t.facility_id
+            and t.observed_at = o.observed_at and t.source_feed = o.source_ref and ` + parkingReading("t", "$7::timestamptz") + `)
+       or exists (select 1 from parking_occupancy_sid t where o.facility_id = 'sid:' || t.facility_id
+            and t.observed_at = o.observed_at and t.source_feed = o.source_ref and ` + parkingReading("t", "$7::timestamptz") + `))`
+
 func legacyParking(road bool) (next, list string) {
 	q := parking.Query{}
 	if road {
@@ -53,7 +74,7 @@ where f.withdrawn_at is null
   and ` + held("f") + `
   and ` + where
 	list = legacyParkingHere + `
-select f.facility_id, f.source_ref, f.name, f.operator_name, f.parking_kind,
+select f.facility_id, f.source_ref, f.name, f.operator_name, ` + legacyParkingKind + `,
        st_y(f.location), st_x(f.location),
        ` + legacyParkingDistance(q) + `,
        o.free_spaces, o.total_spaces, o.occupancy_status, o.observed_at, o.source_ref,
@@ -64,6 +85,7 @@ left join lateral (
   select free_spaces, total_spaces, occupancy_status, observed_at, source_ref
   from contract.occupancy_observation o
   where o.facility_id = f.facility_id and o.source_ref = any($4::text[]) and o.observed_at <= $7 and ` + held("o") + `
+    and ` + legacyParkingReading + `
   order by o.observed_at desc
   limit 1) o on true
 where f.withdrawn_at is null

@@ -53,6 +53,9 @@ invoke() {
     internal/testkit/covergate)
       expect 2 "$bin"
       ;;
+    internal/testkit/paritygather)
+      expect 2 "$bin"
+      ;;
     internal/testkit/mutgate)
       expect 2 "$bin"
       ;;

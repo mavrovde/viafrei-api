@@ -58,7 +58,7 @@ func coverageGateFindings(src []byte) []string {
 		return []string{"ci.yml does not parse: " + err.Error()}
 	}
 	out := measureFindings(w)
-	for _, job := range []string{"test", "integration", "parity", "coverage"} {
+	for _, job := range []string{"test", "integration", "parity-shard", "parity", "coverage"} {
 		out = append(out, swallowFindings(job, w.Jobs[job])...)
 	}
 	out = append(out, needsFindings(w)...)
@@ -91,9 +91,16 @@ func measureFindings(w ciJobs) []string {
 		out = append(out, "job integration does not run internal/perf alone into coverage-perf.out")
 	}
 	// The parity of the named statements with the frozen views is a set of
-	// its own (-parity), in a job of its own, into a profile of its own.
-	if r := runOf(w.Jobs["parity"]); !strings.Contains(r, "-coverpkg=./... -coverprofile=coverage-parity.out -json ./internal/adapters/store -args -parity") {
-		out = append(out, "job parity does not run the store's parity into coverage-parity.out")
+	// its own (-parity), in shards side by side, each into a profile of its
+	// own; the parity job judges the shards together and merges their
+	// profiles into the one the gate reads.
+	if r := runOf(w.Jobs["parity-shard"]); !strings.Contains(r, "-coverpkg=./... -coverprofile=coverage-parity.out -json ./internal/adapters/store -args -parity -parity.shard=") ||
+		!strings.Contains(r, "-parity.ran=") {
+		out = append(out, "job parity-shard does not run a shard of the store's parity into coverage-parity.out")
+	}
+	if r := runOf(w.Jobs["parity"]); !strings.Contains(r, "go run ./internal/testkit/paritygather ") ||
+		!strings.Contains(r, "covergate -min 0 -exclusions test/coverage-exclusions.txt -o coverage-parity.out ") {
+		out = append(out, "job parity does not judge the shards together and merge them into coverage-parity.out")
 	}
 	gate := runOf(w.Jobs["coverage"])
 	for _, want := range []string{
@@ -164,10 +171,13 @@ func TestCoverageGateIsWired(t *testing.T) {
 		"job coverage sets continue-on-error":          {"    name: Coverage gate (100 % per package)\n", "    name: Coverage gate (100 % per package)\n    continue-on-error: true\n"},
 		"(Merge and gate) sets continue-on-error":      {"      - name: Merge and gate\n", "      - name: Merge and gate\n        continue-on-error: ${{ true }}\n"},
 		"(Merge and gate) swallows a failure":          {"coverage-unit.out coverage-integration.out coverage-perf.out coverage-parity.out coverage-boot.out", "coverage-unit.out coverage-integration.out coverage-perf.out coverage-parity.out coverage-boot.out || true"},
-		"job parity does not run the store's parity":   {"./internal/adapters/store -args -parity", "./internal/adapters/store"},
+		"job parity-shard does not run a shard":        {"./internal/adapters/store -args -parity", "./internal/adapters/store"},
+		"job parity does not judge the shards":         {"go run ./internal/testkit/paritygather ", "true "},
 		"swallows a failure with || true":              {"-coverprofile=coverage-integration.out", "-coverprofile=coverage-integration.out || :"},
-		"job parity sets continue-on-error":            {"    name: Store parity against the frozen views (PostGIS)\n", "    name: Store parity against the frozen views (PostGIS)\n    continue-on-error: true\n"},
-		"job parity step 4 (go test -tags integration (store parity against the frozen views)) swallows a failure with || true": {
+		"job parity-shard sets continue-on-error": {"    name: Store parity against the frozen views (PostGIS, shard ${{ matrix.shard }}/4)\n",
+			"    name: Store parity against the frozen views (PostGIS, shard ${{ matrix.shard }}/4)\n    continue-on-error: true\n"},
+		"job parity sets continue-on-error": {"    name: Store parity against the frozen views (PostGIS)\n", "    name: Store parity against the frozen views (PostGIS)\n    continue-on-error: true\n"},
+		"job parity-shard step 4 (go test -tags integration (store parity against the frozen views)) swallows a failure with || true": {
 			"| tee test-parity.json | go run ./internal/testkit/gotestsum-lite", "| tee test-parity.json | go run ./internal/testkit/gotestsum-lite || true"},
 		"job coverage does not need parity": {"needs: [test, integration, parity]", "needs: [test, integration]"},
 	} {

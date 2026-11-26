@@ -123,8 +123,12 @@ const autobahnStarted = `coalesce(case when a.starts ~ '^\d{4}-\d\d-\d\dT\d\d:\d
 
 // trafficEvents are the situations as the platform publishes them, read
 // from its tables as the read contract's situation reads them: the
-// Autobahn messages of each road and kind's newest sweep of the last day,
-// and the open traffic messages; each with its family's rule (excluded
+// Autobahn messages of each road's newest sweep, when that sweep is under 30
+// minutes old (today's motorway read: a road's latest tick within the 30
+// minutes before the clock, and the messages at that tick), and the open
+// traffic messages. A kind whose newest sweep is older than its road's
+// newest is no longer published: a jam the sweep has stopped reporting is
+// gone, though no sweep of its kind has replaced it; each with its family's rule (excluded
 // families dropped, a message under a confidentiality withheld), the
 // columns of eventRow. An Autobahn message's start, blocking and
 // description are fields of its provider message, which a sweep stores only
@@ -149,8 +153,10 @@ func trafficEvents(in string) string {
     and (` + in + ` = 'de' or e.land_code = ` + in + `)`
 	}
 	return `(with newest as (
-  select s.road, s.kind, s.observed_at as at from autobahn_sweeps s
-  where s.observed_at > now() - interval '1 day' and s.kind = any(array['warning', 'roadworks', 'closure', 'closure_entry_exit'])),
+  select x.road, x.kind, x.at from (
+    select s.road, s.kind, s.observed_at as at, max(s.observed_at) over (partition by s.road) road_at from autobahn_sweeps s
+    where s.kind = any(array['warning', 'roadworks', 'closure', 'closure_entry_exit'])) x
+  where x.at = x.road_at and x.at > now() - interval '30 minutes'),
 autobahn as (
   select e.observed_at, e.road, e.kind, e.ext_id, e.title, e.subtitle, e.abnormal_traffic_type, e.delay_s, e.geom, e.source, ` + landA + ` land_code,
          coalesce(e.raw->>'isBlocked', c.blocked) blocked, coalesce(e.raw->>'startTimestamp', c.starts) starts,

@@ -31,6 +31,9 @@
         "sourceFamily": "geonames"
       },
       "mayLieOutsideGermany": true,
+      "gemeinde": null,
+      "junction": null,
+      "governmentRegion": null,
       "lowEmissionZone": null
     },
     "meta": {
@@ -44,14 +47,16 @@
           "dataAsOf": null,
           "ageS": null,
           "staleAfterS": 9007199254740991,
-          "stale": false
+          "stale": false,
+          "lastCheckedAt": null
         },
         {
           "family": "osm",
           "dataAsOf": null,
           "ageS": null,
           "staleAfterS": 9007199254740991,
-          "stale": false
+          "stale": false,
+          "lastCheckedAt": null
         }
       ],
       "attribution": [

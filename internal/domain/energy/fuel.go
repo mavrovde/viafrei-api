@@ -68,6 +68,9 @@ type FuelPrice struct {
 	Product    string
 	Price      float64
 	ObservedAt time.Time
+	// Open is the open state the station reported with the price; nil when
+	// it stated none.
+	Open *bool
 }
 
 // Current says whether the price is current at now, under a window: an
@@ -87,6 +90,9 @@ type FuelStation struct {
 	// answer states the published hours' state instead (OpenStateAt), as the
 	// platform does; the reported one is kept for the reader that has no hours.
 	Open string
+	// OpenObservedAt is when the station reported Open: the newest price
+	// observation that stated it; nil when none did.
+	OpenObservedAt *time.Time
 	// Hours are the published opening hours.
 	Hours  Hours
 	Prices []FuelPrice
@@ -253,4 +259,38 @@ func openAt(named *time.Time, now time.Time) time.Time {
 
 func contains(s *string, part string) bool {
 	return s != nil && strings.Contains(strings.ToLower(*s), part)
+}
+
+// Reported is the open state the newest price observation stated, open or
+// closed, and its time, as today's cheapest-fuel line states it ("open when
+// last seen, as of"); unknown and nil when no observation stated one.
+func Reported(prices []FuelPrice) (string, *time.Time) {
+	var at *time.Time
+	state := "unknown"
+	for i := range prices {
+		p := &prices[i]
+		if p.Open == nil || (at != nil && !p.ObservedAt.After(*at)) {
+			continue
+		}
+		at, state = &p.ObservedAt, "closed"
+		if *p.Open {
+			state = "open"
+		}
+	}
+	return state, at
+}
+
+// MaxOSMFuel is the most OpenStreetMap stations without a price an answer
+// lists, as today's (OSM_FUEL_MAX).
+const MaxOSMFuel = 5
+
+// OSMFuelStation is an OpenStreetMap filling station no priced station stands
+// hold: no id, no state, no grade, no price.
+type OSMFuelStation struct {
+	Name      string
+	Brand     *string
+	Address   Address
+	Location  geo.Point
+	DistanceM int
+	Family    string
 }

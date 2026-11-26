@@ -29,7 +29,13 @@ func TestFacilitiesAnswer(t *testing.T) {
 			{ID: "e2", Kind: "elevator", State: "unknown", Family: "src-alpha-transit"},
 		}, HasMore: true, Families: []provenance.Family{transitFamily}, At: fixedNow},
 		Station: transit.Station{ID: "sp-1", Name: "Köln Hbf"}, Active: 3, Inactive: 1, Unknown: 1,
+		Platforms: []transit.StationPlatforms{{StationName: sp("Köln Hbf"), Station: &transit.PlatformFacts{StepFree: "yes", Wheelchair: "yes", TactileGuidance: "no", LevelBoarding: "unknown"},
+			StepFreeCounts: map[string]int{"yes": 1, "unknown": 1}, Platforms: []transit.Platform{
+				{Name: sp("Bahnsteig Gleis 1/2"), Tracks: []string{"1", "2"}, Facts: &transit.PlatformFacts{StepFree: "yes", Wheelchair: "no", TactileGuidance: "unknown", LevelBoarding: "partial"}, Height: &transit.HeightRange{Min: 55, Max: 76}},
+				{Tracks: []string{}}}}},
+		PlatformsAt: &seen,
 	}
+	// A publication without a stated date has no releasedOn.
 	h := featureHandler(t, config.Defaults(), f, nil)
 	w := do(t, h, http.MethodGet, "/v1/stations/sp-1/facilities?kind=elevator&limit=2", bearer)
 	if w.Code != http.StatusOK || f.gotFacil != (transit.FacilityQuery{StationID: "sp-1", Kind: "elevator", Limit: 2}) {
@@ -50,6 +56,23 @@ func TestFacilitiesAnswer(t *testing.T) {
 	// The unit's DB equipment number, null when its source gives none.
 	if v, has := r1["equipmentNo"]; r0["equipmentNo"] != "10500001" || !has || v != nil {
 		t.Errorf("rows %v", rows)
+	}
+	pl, _ := data["platforms"].(map[string]any)
+	pst, _ := pl["stations"].([]any)
+	if len(pst) != 1 || pl["releasedOn"] == nil {
+		t.Fatalf("platforms %v", pl)
+	}
+	p0, _ := pst[0].(map[string]any)
+	list, _ := p0["list"].([]any)
+	l0, _ := list[0].(map[string]any)
+	l1, _ := list[1].(map[string]any)
+	if p0["total"] != 2.0 || len(list) != 2 || l0["stated"] != true || l1["stated"] != false || l1["heightCm"] != nil ||
+		l1["facts"].(map[string]any)["stepFree"] != "unknown" || p0["station"].(map[string]any)["tactileGuidance"] != "no" {
+		t.Errorf("platforms %v", p0)
+	}
+	f.facilities.Platforms, f.facilities.PlatformsAt = nil, nil
+	if data, _ := decode(t, do(t, h, http.MethodGet, "/v1/stations/sp-1/facilities", bearer))["data"].(map[string]any); data["platforms"] != nil {
+		t.Errorf("no platforms: %v", data["platforms"])
 	}
 	if st, _ := data["station"].(map[string]any); len(st) != 1 || st["name"] == nil {
 		t.Errorf("station %v", data["station"])

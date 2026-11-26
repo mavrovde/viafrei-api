@@ -21,9 +21,47 @@ type Facility struct {
 	State      string
 	ObservedAt *time.Time
 	Family     string
+	// Listing is the family the unit's listing (its kind and position)
+	// comes from when its state is another family's; "" when they are one.
+	Listing string
 	// EquipmentNo is DB's equipment number of the unit, as its source
 	// lists it; nil when the source gives none.
 	EquipmentNo *string
+	// StateExplanation is the operator's explanation of the state ("not
+	// monitored"), verbatim; nil when it gives none or one that repeats the
+	// state.
+	StateExplanation *string
+	// NameShared marks a unit another unit of the station shares its kind
+	// and position with, so an answer names its number.
+	NameShared bool
+}
+
+// OnePerUnit keeps one row per DB equipment number, as today's check keeps
+// them (dedupeByEquipment): the first, unless it is unknown and a later copy
+// has a state; a row without a number is its own unit.
+func OnePerUnit(fs []Facility) []Facility {
+	at := map[string]int{}
+	keep := make([]bool, len(fs))
+	for i, f := range fs {
+		if f.EquipmentNo == nil {
+			keep[i] = true
+			continue
+		}
+		j, seen := at[*f.EquipmentNo]
+		if !seen || (fs[j].State == "unknown" && f.State != "unknown") {
+			if seen {
+				keep[j] = false
+			}
+			at[*f.EquipmentNo], keep[i] = i, true
+		}
+	}
+	out := []Facility{}
+	for i, f := range fs {
+		if keep[i] {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // FacilityQuery asks for the facilities of a station: of one kind (empty:
@@ -65,6 +103,13 @@ func ListFacilities(all []Facility, q FacilityQuery) Facilities {
 			out.Unknown++
 		}
 		out.Rows = append(out.Rows, f)
+	}
+	shared := map[string]int{}
+	for _, f := range out.Rows {
+		shared[f.Kind+"\x00"+text(f.Position)]++
+	}
+	for i, f := range out.Rows {
+		out.Rows[i].NameShared = shared[f.Kind+"\x00"+text(f.Position)] > 1
 	}
 	german := collate.New(language.German)
 	slices.SortStableFunc(out.Rows, func(a, b Facility) int {

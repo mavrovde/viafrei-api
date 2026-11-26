@@ -88,7 +88,7 @@ func TestConfirmedUnchangedDataDoesNotReadAsStale(t *testing.T) {
 	a := overviewAnswer()
 	a.Families = []provenance.Family{confirmed}
 	w := do(t, featureHandler(t, config.Defaults(), &fakeFeatures{overview: a}, nil), http.MethodGet, "/v1/places/pl-01-0001/overview", bearer)
-	if !bytes.Contains(w.Body.Bytes(), []byte(`"family":"src-alpha-energy","dataAsOf":"2026-03-29T01:27:11Z","ageS":169,"staleAfterS":990,"stale":false`)) {
+	if !bytes.Contains(w.Body.Bytes(), []byte(`"family":"src-alpha-energy","dataAsOf":"2026-03-29T01:27:11Z","ageS":169,"staleAfterS":990,"stale":false,"lastCheckedAt":"2026-03-29T01:27:11Z"`)) {
 		t.Fatalf("overview freshness: %s", w.Body)
 	}
 	if bytes.Contains(w.Body.Bytes(), []byte(`"data_stale"`)) {

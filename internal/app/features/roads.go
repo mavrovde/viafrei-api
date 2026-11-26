@@ -17,6 +17,11 @@ type Roads interface {
 	// Road returns the road with a canonical reference, or
 	// roads.ErrUnknownRoad.
 	Road(ctx context.Context, ref string) (roads.Road, error)
+	// Motorway reads a motorway as the platform's motorway tool does; a
+	// road with no recent sweep answers a zero Tick.
+	Motorway(ctx context.Context, q roads.MotorwayQuery) (roads.MotorwayRead, error)
+	// RoadStatus reads q as the platform's road status by road number does.
+	RoadStatus(ctx context.Context, q roads.RoadStatusQuery) (roads.RoadStatusRead, error)
 	// SituationsOnRoad returns, from one snapshot, up to q.Limit active
 	// situations on the road of the roads families, in the platform's
 	// motorway status order, and whether there are more; the lamp's view of
@@ -63,6 +68,14 @@ type Conditions struct {
 	// (Families names only those): a new version of any of them, or of its
 	// confirmation, may change the lamp.
 	Read roads.Families
+	// Motorway is a registered motorway's answer as the platform's motorway
+	// tool gives it; nil for any other road, an area, a window ahead or a
+	// key that may not read the road operator's events.
+	Motorway *roads.MotorwayAnswer
+	// RoadStatus is the road's status as the platform's road status by road
+	// number gives it; nil for an area or a key that may read none of its
+	// sources.
+	RoadStatus *roads.RoadStatusAnswer
 }
 
 // sights are the sight of every group the lamp reads (ampelOf's sight):
@@ -239,6 +252,12 @@ func (s *Service) MotorwayConditions(ctx context.Context, key access.Record, q r
 		return Conditions{}, err
 	}
 	c.Road = &road
+	if err := s.motorway(ctx, &c, q); err != nil {
+		return Conditions{}, err
+	}
+	if err := s.roadStatus(ctx, key, &c, q); err != nil {
+		return Conditions{}, err
+	}
 	if q.Unregistered {
 		if c.Covering == nil {
 			c.Covering = []string{}
@@ -248,6 +267,81 @@ func (s *Service) MotorwayConditions(ctx context.Context, key access.Record, q r
 		}
 	}
 	return c, nil
+}
+
+// motorway adds the platform's motorway answer to c: a registered
+// motorway, asked now, by a key that may read the road operator's events,
+// with a sweep in the last half hour.
+func (s *Service) motorway(ctx context.Context, c *Conditions, q roads.CorridorQuery) error {
+	if q.Unregistered || q.Ahead || c.Road.Class != roads.ClassMotorway {
+		return nil
+	}
+	mq, ok := roads.MotorwayQueryOf(c.Road.Ref, q.Limit, c.At, c.Read.Roads)
+	if !ok {
+		return nil
+	}
+	read, err := s.repos.Roads.Motorway(ctx, mq)
+	if err != nil || read.Tick.IsZero() {
+		return err
+	}
+	reasons := 0
+	for _, r := range c.Reasons {
+		reasons += r.Count
+	}
+	m := roads.MotorwayAnswerOf(read, reasons, c.At)
+	c.Motorway = &m
+	names := []string{roads.MotorwayFamily}
+	for _, f := range c.Families {
+		names = append(names, f.Source.Family)
+	}
+	names = append(names, m.Families...)
+	slices.Sort(names)
+	c.Families, err = s.attributed(ctx, slices.Compact(names))
+	return err
+}
+
+// roadStatus adds the platform's road status by road number to c: its
+// counts, its entries up to the limit, the sources that answered with their
+// stamps and, on a motorway, the switched strategies; over the window asked,
+// else the tool's three days.
+func (s *Service) roadStatus(ctx context.Context, key access.Record, c *Conditions, q roads.CorridorQuery) error {
+	_, gate, err := s.gate(ctx, key)
+	if err != nil {
+		return err
+	}
+	permitted := slices.DeleteFunc(append(slices.Clone(roads.RoadStatusFamilies), roads.StrategyFamilies...), func(f string) bool { return !gate.Permits(f) })
+	until := time.Time{}
+	if q.Ahead {
+		until = q.Until
+	}
+	rq, ok := roads.RoadStatusQueryOf(c.Road.Ref, c.Road.Class, q.Limit, c.At, until, permitted)
+	if !ok {
+		return nil
+	}
+	read, err := s.repos.Roads.RoadStatus(ctx, rq)
+	if err != nil {
+		return err
+	}
+	a := roads.RoadStatusAnswerOf(rq, read)
+	names := make([]string, 0, len(c.Families)+len(a.Answered)+len(a.Strategies))
+	for _, f := range c.Families {
+		names = append(names, f.Source.Family)
+	}
+	answered := make([]string, 0, len(a.Answered)+len(a.Strategies))
+	for _, f := range a.Answered {
+		answered = append(answered, f.Family)
+	}
+	for _, st := range a.Strategies {
+		answered = append(answered, st.Family)
+	}
+	if err := gate.Check(answered); err != nil {
+		return err
+	}
+	c.RoadStatus = &a
+	names = append(names, answered...)
+	slices.Sort(names)
+	c.Families, err = s.attributed(ctx, slices.Compact(names))
+	return err
 }
 
 // RoadConditions answers "what is happening on the roads near here" for key

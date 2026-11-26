@@ -1005,3 +1005,45 @@ func TestASituationStatesItsSubtitleAndBlock(t *testing.T) {
 		t.Fatalf("not published: %+v, %v", s, err)
 	}
 }
+
+// A road's Autobahn messages are those of its newest sweep while that sweep
+// is under 30 minutes old, as today's motorway read takes them: a jam the
+// sweep has stopped reporting is gone, though no sweep of its kind replaced
+// it; a jam of the newest sweep 29 minutes old is listed; a road whose only
+// sweep is 31 minutes old lists none, without an error.
+func TestAutobahnJamsGoWithTheRoadsNewestSweep(t *testing.T) {
+	st, _ := private(t, `insert into vf_seed.traffic_event (event_id, event_kind, road_ref, road_class, location, valid_from, headline, source_ref, origin_key, recorded_at, changed_at, traffic_type, delay_s)
+  select v.id, v.kind, v.road, 'motorway', e.location, date_trunc('milliseconds', now()) - interval '2 hours', v.headline, 'autobahn', substr(v.id, 10),
+         date_trunc('milliseconds', now()) - v.age, date_trunc('milliseconds', now()) - v.age, v.traffic, 600
+  from contract.traffic_event e,
+    (values ('autobahn:ev-sweep-gone', 'jam', 'A971', 'Stau alt', 'STATIONARY_TRAFFIC', interval '40 minutes'),
+            ('autobahn:ev-sweep-works', 'roadworks', 'A971', 'Baustelle', null, interval '5 minutes'),
+            ('autobahn:ev-sweep-limit', 'jam', 'A972', 'Stau', 'STATIONARY_TRAFFIC', interval '29 minutes'),
+            ('autobahn:ev-sweep-stale', 'jam', 'A973', 'Stau', 'STATIONARY_TRAFFIC', interval '31 minutes'))
+    v(id, kind, road, headline, traffic, age)
+  where e.event_id = '`+fixtures.PlantedEvent("ev-u-kind")+`'`)
+	fams := roads.Families{Roads: []string{"autobahn"}}
+	ids := func(road string) []string {
+		t.Helper()
+		p, err := st.SituationsOnRoad(bounded(t), roads.CorridorQuery{Road: road, Direction: roads.DirectionBoth, Filter: roads.Filter{MinSeverity: roads.SeverityInfo}, Limit: 100}, fams, time.Now())
+		if err != nil {
+			t.Fatalf("%s: %v", road, err)
+		}
+		var out []string
+		for _, s := range p.Items {
+			if strings.HasPrefix(s.ID, "autobahn:ev-sweep-") {
+				out = append(out, s.ID)
+			}
+		}
+		return out
+	}
+	if got := ids("A971"); !slices.Equal(got, []string{"autobahn:ev-sweep-works"}) {
+		t.Errorf("A971 (jam of an older sweep, roadworks of the newest): %v", got)
+	}
+	if got := ids("A972"); !slices.Equal(got, []string{"autobahn:ev-sweep-limit"}) {
+		t.Errorf("A972 (jam 29 min old): %v", got)
+	}
+	if got := ids("A973"); len(got) != 0 {
+		t.Errorf("A973 (only sweep 31 min old): %v", got)
+	}
+}

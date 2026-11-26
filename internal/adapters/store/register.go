@@ -210,6 +210,9 @@ func (r *snapshot[T]) start(ctx context.Context, now func() time.Time, read func
 // (contract_source_rules, the first by priority); an excluded family and
 // one whose licence is pending are not published. A family's use classes
 // are its register's, only consumer when its rule does not give it openly.
+// A family's terms page is its own terms link, else its register row's
+// source page, as today's credit line links it (the FlixBus and FlixTrain
+// parts link the dataset's page, the register row they share).
 // full adds what the register's own read does not need: the changes
 // statement, the freshness target (the register's cadence, else the
 // feed status's) and the stale bound (three of it), the review date, the
@@ -226,6 +229,7 @@ func sourceCTE(full bool) string {
 	}
 	return `src as (
   select s.source_ref, d.domain, s.licence_code, s.attribution_text, s.terms_url, s.publisher_name,
+         coalesce(nullif(s.terms_url, ''), g.source_url) terms_page,
          case when g.share_alike or s.licence_code ~* '(BY-SA|ODbL|Open Database License)' then 'https://viafrei.de/impressum' end share_alike_offer_url,
          s.acceptance_required,
          case when coalesce(k.display_class, 'open') = 'open' then coalesce(g.use_classes, '{}')
@@ -275,7 +279,7 @@ var sourcesRead = named("api_sources", `
 with `+sourceRows+`
 select s.source_ref, s.domain, s.publisher_name, s.attribution_text, s.licence_code,
        `+licenceURL("s.licence_code")+`,
-       s.licence_code ~* '(BY-SA|ODbL|Open Database License)', s.share_alike_offer_url, s.terms_url
+       s.licence_code ~* '(BY-SA|ODbL|Open Database License)', s.share_alike_offer_url, s.terms_page
 from src s
 where s.source_ref = any((select $1::text[])::text[]) and s.publisher_name is not null and s.licence_code is not null
 order by s.source_ref`, "text[]")
@@ -288,24 +292,67 @@ join source_terms_texts x on x.terms_gate = t.terms_gate
 where t.terms_gate = any((select $1::text[])::text[])
 order by t.terms_gate, x.binding desc, x.lang`, "text[]")
 
+// registerProbeRead is the probe of the rows the register is read from
+// (registerProbe).
+var registerProbeRead = named("api_register_probe", `select `+registerProbe)
+
+// registerKept is the last register read and the probe it was read under.
+type registerKept struct {
+	mu    sync.Mutex
+	probe string
+	at    time.Time
+	items []access.Terms
+}
+
+// readRegister reads the register, about 40 to 70 ms on prod (2026-11-25),
+// once a second (db.register_snapshot_ttl) in the background: the probe of
+// the rows it is read from (about 1 ms) decides first, and while it stays
+// and the last read is younger than db.reference_versions_ttl the last read
+// is the answer, as a read would return the same rows.
 func (s *Store) readRegister(ctx context.Context) ([]access.Terms, error) {
 	return ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]access.Terms, error) {
-		// A failed query surfaces through CollectRows (pgx returns it from
-		// rows.Err as well).
-		rows, _ := run(ctx, tx, registerRead)
-		return pgx.CollectRows(rows, func(r pgx.CollectableRow) (access.Terms, error) {
-			var (
-				t       access.Terms
-				classes []string
-			)
-			var audience string
-			err := r.Scan(&t.Family, &t.Domain, &classes, &t.AcceptanceRequired, &t.Version, &audience, &t.HoldReason)
-			t.Audience = access.Audience(audience)
-			for _, c := range classes {
-				t.UseClasses = append(t.UseClasses, access.UseClass(c))
-			}
-			return t, err
-		})
+		var probe string
+		if err := scanOne(run(ctx, tx, registerProbeRead))(&probe); err != nil {
+			return nil, err
+		}
+		at := s.nowFn()
+		k := &s.regKept
+		k.mu.Lock()
+		if k.items != nil && k.probe == probe && at.Sub(k.at) < s.refs.ttl {
+			items := slices.Clone(k.items)
+			k.mu.Unlock()
+			return items, nil
+		}
+		k.mu.Unlock()
+		items, err := s.readRegisterRows(ctx, tx)
+		if err != nil {
+			return nil, err
+		}
+		k.mu.Lock()
+		k.probe, k.at, k.items = probe, at, slices.Clone(items)
+		k.mu.Unlock()
+		return items, nil
+	})
+}
+
+// readRegisterRows reads every published family's licence terms and
+// envelope (registerRead).
+func (s *Store) readRegisterRows(ctx context.Context, tx pgx.Tx) ([]access.Terms, error) {
+	// A failed query surfaces through CollectRows (pgx returns it from
+	// rows.Err as well).
+	rows, _ := run(ctx, tx, registerRead)
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (access.Terms, error) {
+		var (
+			t       access.Terms
+			classes []string
+		)
+		var audience string
+		err := r.Scan(&t.Family, &t.Domain, &classes, &t.AcceptanceRequired, &t.Version, &audience, &t.HoldReason)
+		t.Audience = access.Audience(audience)
+		for _, c := range classes {
+			t.UseClasses = append(t.UseClasses, access.UseClass(c))
+		}
+		return t, err
 	})
 }
 

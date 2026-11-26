@@ -49,6 +49,9 @@ type LocationData struct {
 	District             *LocationPlace      `json:"district" doc:"The nearest district within 100 km; null when none."`
 	State                *LocationPlace      `json:"state" doc:"The Land of the district; with no district, the nearest Land within 250 km; null when none."`
 	MayLieOutsideGermany bool                `json:"mayLieOutsideGermany" doc:"True when the position may lie outside Germany, off the coast or near the border: no address within 1.5 km, and at least half of the circle of 15 km around it, in neighbouring eighths, holds none. The facts are then the nearest in Germany and may not describe the position itself."`
+	Gemeinde             *LocationGemeinde   `json:"gemeinde" doc:"The Gemeinde the position lies in: the one the nearest German address names as its town (inside true), else the nearest Gemeinde within 15 km (inside false); null when none, or when the position may lie outside Germany. It decides the Kreis and the Regierungsbezirk, by its key."`
+	Junction             *LocationJunction   `json:"junction" doc:"The nearest motorway junction within 100 km, as listNearby reads junctions (OpenStreetMap's node on the road the LCL places it on, else the gazetteer's point); null when none."`
+	GovernmentRegion     *string             `json:"governmentRegion" nullable:"true" doc:"The Regierungsbezirk the Gemeinde lies in; null where its Land has none, or with no Gemeinde."`
 	Zone                 *LocationZone       `json:"lowEmissionZone" doc:"The low-emission zone the position lies in, as the platform's description of a position states it; null when the key may read no zone source."`
 }
 
@@ -120,8 +123,35 @@ func registerLocation(api huma.API, s *server, op huma.Operation) {
 	})
 }
 
+// LocationJunction is the nearest motorway junction.
+type LocationJunction struct {
+	Name         string   `json:"name"`
+	Road         *string  `json:"road" nullable:"true" doc:"The motorway it lies on; null for a junction off any motorway that can be named."`
+	Location     Position `json:"location"`
+	DistanceM    int      `json:"distanceM"`
+	From         string   `json:"from" enum:"osm,gazetteer" doc:"osm, or gazetteer when no OpenStreetMap junction node is within reach: the gazetteer's points are sparse, so one beyond 15 km may not be the nearest there is."`
+	SourceFamily string   `json:"sourceFamily"`
+}
+
+// LocationGemeinde is the Gemeinde a position lies in.
+type LocationGemeinde struct {
+	Name         string  `json:"name"`
+	Code         string  `json:"code" doc:"Its eight-digit official key (AGS)."`
+	Inside       bool    `json:"inside" doc:"True when the nearest German address names it as its town; false when it is only the nearest Gemeinde."`
+	Kreis        *string `json:"kreis" nullable:"true" doc:"The Kreis its key names; null when the gazetteer holds none."`
+	Bezirk       *string `json:"bezirk" nullable:"true" doc:"The Regierungsbezirk its key names; null where there is none."`
+	SourceFamily string  `json:"sourceFamily"`
+}
+
 func locationEnvelope(s *server, ctx context.Context, a features.LocationAnswer) LocationEnvelope {
 	data := LocationData{District: locationPlace(a.District), State: locationPlace(a.State), MayLieOutsideGermany: a.MayLieAbroad, Zone: locationZone(a.Zone, a.ZoneAnswer)}
+	if j := a.Junction; j != nil {
+		data.Junction = &LocationJunction{Name: j.Name, Road: j.Road, Location: position(j.Location), DistanceM: j.DistanceM, From: a.JunctionFrom, SourceFamily: j.Family}
+	}
+	if g := a.Gemeinde; g != nil {
+		data.Gemeinde = &LocationGemeinde{Name: g.Name, Code: g.Code, Inside: g.Inside, Kreis: g.Kreis, Bezirk: g.Bezirk, SourceFamily: g.Family}
+		data.GovernmentRegion = g.Bezirk
+	}
 	if p := a.Municipality; p != nil {
 		data.Municipality = &LocationSettlement{ID: p.ID, Name: p.Name, Location: position(p.Location), DistanceM: p.DistanceM, SourceFamily: p.Family}
 	}

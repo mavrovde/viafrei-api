@@ -25,6 +25,18 @@ type Transit interface {
 	// window, of the given families: calls a passenger can board, of trips
 	// that call outside the station after them, by planned instant.
 	Departures(ctx context.Context, q transit.DepartureQuery, families []string) ([]transit.Departure, error)
+	// StopBoards returns the stops around q.At, as today's departures
+	// around a place pick them, each with its board.
+	StopBoards(ctx context.Context, q transit.StopBoardsQuery, families []string) ([]transit.StopBoard, error)
+	// Platforms returns DB's station inventory of the station numbered
+	// evas, of the given families.
+	Platforms(ctx context.Context, evas, families []string) ([]transit.PlatformRow, error)
+	// StationRecord returns DB's register row of the station id names;
+	// transit.ErrNotFound when none.
+	StationRecord(ctx context.Context, id string, families []string) (transit.StationRecord, error)
+	// StationAlerts returns the alerts in force near a station.
+	StationAlerts(ctx context.Context, q transit.StationAlertsQuery, families []string) ([]transit.StationAlertRow, error)
+	TimetableReach(ctx context.Context) (transit.Reach, error)
 	// Facilities returns the lifts and escalators of a station, of the
 	// given families, each with its state at now.
 	Facilities(ctx context.Context, station string, families []string, now time.Time) ([]transit.Facility, error)
@@ -49,6 +61,12 @@ func (s *Service) Stations(ctx context.Context, key access.Record, q transit.Que
 	contributed := make([]string, len(stations))
 	for i, st := range stations {
 		contributed[i] = st.Family
+		// A railway station is named as DB's station register names it
+		// ("Frankfurt (Main) Hbf"), where the key may read the register.
+		if q.Railway && st.RegisterName != nil && st.RegisterBy != nil && slices.Contains(permitted, *st.RegisterBy) {
+			stations[i].Name = *st.RegisterName
+			contributed = append(contributed, *st.RegisterBy)
+		}
 	}
 	if err := gate.Check(contributed); err != nil {
 		return Answer[transit.Station]{}, err
@@ -63,6 +81,10 @@ func (s *Service) Stations(ctx context.Context, key access.Record, q transit.Que
 		for _, st := range stations {
 			if st.PlacedBy != nil && (len(stations) > 1 || st.InTown) {
 				contributed = append(contributed, *st.PlacedBy)
+			}
+			// the gazetteer whose Gemeinde named the town
+			if st.TownBy != nil {
+				contributed = append(contributed, *st.TownBy)
 			}
 		}
 	}
@@ -83,6 +105,8 @@ type Board struct {
 	Matched    int
 	MatchedAll int
 	Dropped    map[int]int
+	// Reach is how far the loaded timetable reaches.
+	Reach transit.Reach
 }
 
 // Departures answers "what leaves this station" for key: the departures
@@ -105,6 +129,10 @@ func (s *Service) Departures(ctx context.Context, key access.Record, q transit.D
 	if err != nil {
 		return Board{}, err
 	}
+	reach, err := s.repos.Transit.TimetableReach(ctx)
+	if err != nil {
+		return Board{}, err
+	}
 	b := transit.Board(calls, q)
 	contributed := []string{st.Family}
 	for _, d := range b.Rows {
@@ -119,8 +147,46 @@ func (s *Service) Departures(ctx context.Context, key access.Record, q transit.D
 	}
 	return Board{
 		Answer:  Answer[transit.Departure]{Items: b.Rows, HasMore: b.Matched > len(b.Rows), Families: fams, Partial: partial, At: s.now()},
-		Station: st, Matched: b.Matched, MatchedAll: b.MatchedAll, Dropped: b.Dropped,
+		Station: st, Matched: b.Matched, MatchedAll: b.MatchedAll, Dropped: b.Dropped, Reach: reach,
 	}, nil
+}
+
+// StopBoards is the stops around a position with their next departures.
+type StopBoards struct {
+	Answer[transit.StopBoard]
+}
+
+// StopBoards answers "what leaves near here" for key: the stops around
+// q.At as today's departures around a place pick them, each with its
+// departures as its board shows them, in one read of all their calls.
+func (s *Service) StopBoards(ctx context.Context, key access.Record, q transit.StopBoardsQuery) (StopBoards, error) {
+	reg, gate, err := s.gate(ctx, key)
+	if err != nil {
+		return StopBoards{}, err
+	}
+	permitted, partial, err := gate.Answer(boardFamilies(reg))
+	if err != nil {
+		return StopBoards{}, err
+	}
+	bs, err := s.repos.Transit.StopBoards(ctx, q, permitted)
+	if err != nil {
+		return StopBoards{}, err
+	}
+	var contributed []string
+	for _, b := range bs {
+		contributed = append(contributed, b.Stop.Family)
+		for _, d := range b.Board.Rows {
+			contributed = append(contributed, d.Families...)
+		}
+	}
+	if err := gate.Check(contributed); err != nil {
+		return StopBoards{}, err
+	}
+	fams, err := s.provenanceOf(ctx, contributed, permitted)
+	if err != nil {
+		return StopBoards{}, err
+	}
+	return StopBoards{Answer[transit.StopBoard]{Items: bs, Families: fams, Partial: partial, At: s.now()}}, nil
 }
 
 // StationFacilities is a station's lifts and escalators (FR-TRANSIT-003).
@@ -128,6 +194,11 @@ type StationFacilities struct {
 	Answer[transit.Facility]
 	Station                   transit.Station
 	Active, Inactive, Unknown int
+	// Platforms are the station's platforms as DB's inventory states them
+	// and PlatformsAt its newest publication; none for a station with no
+	// EVA number or none listed.
+	Platforms   []transit.StationPlatforms
+	PlatformsAt *time.Time
 }
 
 // Facilities answers "do the lifts work at this station" for key, as
@@ -157,8 +228,24 @@ func (s *Service) Facilities(ctx context.Context, key access.Record, q transit.F
 	}
 	l := transit.ListFacilities(all, q)
 	contributed := []string{st.Family}
+	var plat []transit.PlatformRow
+	if len(st.EVANumbers) > 0 {
+		if plat, err = s.repos.Transit.Platforms(ctx, st.EVANumbers, permitted); err != nil {
+			return StationFacilities{}, err
+		}
+	}
+	var platAt *time.Time
+	for _, p := range plat {
+		contributed = append(contributed, p.Family)
+		if p.UpdatedAt != nil && (platAt == nil || p.UpdatedAt.After(*platAt)) {
+			platAt = p.UpdatedAt
+		}
+	}
 	for _, f := range l.Rows {
 		contributed = append(contributed, f.Family)
+		if f.Listing != "" {
+			contributed = append(contributed, f.Listing)
+		}
 	}
 	if err := gate.Check(contributed); err != nil {
 		return StationFacilities{}, err
@@ -170,6 +257,7 @@ func (s *Service) Facilities(ctx context.Context, key access.Record, q transit.F
 	return StationFacilities{
 		Answer:  Answer[transit.Facility]{Items: l.Rows, HasMore: l.Active+l.Inactive+l.Unknown > len(l.Rows), Families: fams, Partial: partial || stPartial, At: now},
 		Station: st, Active: l.Active, Inactive: l.Inactive, Unknown: l.Unknown,
+		Platforms: transit.PlatformsOf(plat), PlatformsAt: platAt,
 	}, nil
 }
 

@@ -2,7 +2,7 @@
   "fixture": {
     "profile": "tiny",
     "seed": 1,
-    "sha256": "6b146cee258538b77b3eb7f018e5335c7a8c606041afee7c08a08210a2e04dea"
+    "sha256": "fa6540d71811eeb6227e68be2de011bf13ab601ad62c01c512812f61f8119c0b"
   },
   "cases": [
     {
@@ -2245,6 +2245,88 @@
           "eva": "8001001"
         }
       }
+    },
+    {
+      "id": "station-page",
+      "operation": "getStationPage",
+      "counterpart": "station page",
+      "request": "/v1/stations/8001001/page?departures=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit",
+          "accessibility"
+        ],
+        "sources": [
+          "db_stada",
+          "delfi_static",
+          "delfi_rt_tu",
+          "openstation_siri_fm",
+          "delfi_sa_alpha"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "station-page-db",
+      "operation": "getStationPage",
+      "counterpart": "station page",
+      "request": "/v1/stations/8001001/page?departures=3",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit",
+          "accessibility"
+        ],
+        "sources": [
+          "db_stada",
+          "delfi_static",
+          "delfi_rt_tu",
+          "openstation_siri_fm",
+          "delfi_sa_alpha",
+          "db_timetables"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "stop-boards",
+      "operation": "listStopBoards",
+      "counterpart": "departures around a place",
+      "request": "/v1/stop-boards?at=49.15,7.79",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "transit"
+        ],
+        "sources": [
+          "delfi_static",
+          "delfi_rt_tu"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
+    },
+    {
+      "id": "resolve-place",
+      "operation": "resolvePlace",
+      "counterpart": "place resolver",
+      "request": "/v1/places/resolve?q=Matfienland",
+      "key": {
+        "useClass": "commercial",
+        "scopes": [
+          "places"
+        ],
+        "sources": [
+          "bkg_gvisys",
+          "delfi_static",
+          "geonames"
+        ],
+        "accepted": null
+      },
+      "now": "2026-03-30T00:00:00Z"
     }
   ]
 }

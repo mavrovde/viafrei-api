@@ -30,6 +30,10 @@ var db *pgtest.DB
 
 func TestMain(m *testing.M) {
 	flag.Parse()
+	if err := setShard("."); err != nil {
+		fmt.Fprintln(os.Stderr, "sharding the run:", err)
+		os.Exit(2)
+	}
 	if store.ParityOn() {
 		store.EnableParity()
 	}

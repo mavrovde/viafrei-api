@@ -97,10 +97,16 @@ jobs:
           docker pull testcontainers/ryuk:0.14.0@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0
           docker tag testcontainers/ryuk:0.14.0@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0 testcontainers/ryuk:0.14.0
       - name: go test -tags integration
+        # -p 1: one package at a time. TST-012 judges each test's own wall
+        # time; with four race-instrumented packages (each running its
+        # parallel tests) and PostGIS sharing the runner's four cores, the
+        # same test measured 0.64 s on one run and 2.17 s on another
+        # (2026-11-26, six runs), so the bound judged the neighbours, not
+        # the test. Alone, each test competes only with its own package.
         run: |
           set -o pipefail
           mapfile -t pkgs < <(go list ./... | grep -v '/internal/perf$')
-          go test -race -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out -json "${pkgs[@]}" | tee test-integration.json | go run ./internal/testkit/gotestsum-lite
+          go test -race -p 1 -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out -json "${pkgs[@]}" | tee test-integration.json | go run ./internal/testkit/gotestsum-lite
       - name: go test -tags integration (internal/perf alone, its budgets time the queries)
         run: |
           set -o pipefail

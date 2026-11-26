@@ -212,3 +212,38 @@ where 'dwd:' || id = $1`, id); n != 1 {
 		}
 	}
 }
+
+// The English names of a Land's events are the DWD's English event of the
+// same event code, read only with the English family; an event the English
+// warnings do not carry has none.
+func TestStateEventsEnglishAreTheIssuersOwnByEventCode(t *testing.T) {
+	st := seeded(t)
+	fams := append(families(t, st, "weather"), "dwd_warnings_en")
+	plantCells(t)
+	at := time.Date(2103, 1, 1, 1, 0, 0, 0, time.UTC)
+	if n := change(t, `update weather_warnings set raw = jsonb_set(coalesce(raw, '{}'), '{properties}', coalesce(raw->'properties', '{}') || '{"EC_II": "51"}')
+where event = 'STURMBÖEN' and warncell_id in ('809990001', '709990002')`); n != 5 {
+		t.Fatalf("coded %d of 5", n)
+	}
+	got, family, err := st.StateEventsEnglish(bounded(t), "09", fams, at)
+	if err != nil || len(got) != 0 || family != "dwd_warnings_en" {
+		t.Fatalf("no English warning: %v %q %v", got, family, err)
+	}
+	if n := change(t, `insert into public.weather_warnings_en (source_id, source_feed, identifier, base_identifier, language, event, headline, description,
+  content_sha256, sent_at, valid_from, valid_to, warncell_ids, raw)
+values ('dwd_warnings_en', 'dwd_warnings_en', 'test-en-state', 'test-en-state', 'en-GB', 'wind gusts', 'Wind gusts', 'Wind gusts are expected.',
+  repeat('a', 64), '2103-01-01T00:00:00Z', '2103-01-01T00:00:00Z', '2103-01-02T00:00:00Z', array['809990001'], '{"eventCodes": {"II": "51"}}')`); n != 1 {
+		t.Fatalf("inserted %d rows", n)
+	}
+	t.Cleanup(func() { change(t, `delete from public.weather_warnings_en where identifier = 'test-en-state'`) })
+	if got, _, err := st.StateEventsEnglish(bounded(t), "09", fams, at); err != nil || len(got) != 1 || got["STURMBÖEN"] != "wind gusts" {
+		t.Errorf("read: %v %v", got, err)
+	}
+	without := slices.DeleteFunc(slices.Clone(fams), func(f string) bool { return f == "dwd_warnings_en" })
+	if got, _, err := st.StateEventsEnglish(bounded(t), "09", without, at); err != nil || len(got) != 0 {
+		t.Errorf("not read: %v %v", got, err)
+	}
+	if got, _, err := st.StateEventsEnglish(bounded(t), "08", fams, at); err != nil || len(got) != 0 {
+		t.Errorf("another Land: %v %v", got, err)
+	}
+}

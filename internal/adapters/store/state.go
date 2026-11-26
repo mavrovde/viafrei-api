@@ -20,14 +20,50 @@ import (
 var stateWarnings = named("api_state_warnings", `
 select w.event, max(w.level::int)::int, count(distinct w.identifier)::int, count(distinct w.warncell_id)::int,
        max(w.valid_to), array_agg(distinct w.source_feed order by w.source_feed)
-from weather_warnings w
+`+stateWarningsOf+`
+group by w.event
+order by 2 desc, 1`, "text[]", "timestamptz", "text")
+
+// stateWarningsOf are the warnings stateWarnings counts, aliased w.
+const stateWarningsOf = `from weather_warnings w
 where w.closed_at is null and w.deleted_at is null and w.valid_from is not null and w.area is not null
   and w.source_feed = any((select $1::text[])::text[])
   and (w.valid_to is null or w.valid_to > (select $2::timestamptz)) and w.valid_from <= (select $2::timestamptz)
   and left(w.warncell_id, 1) in ('7', '8') and substring(w.warncell_id from 2 for 2) = (select $3::text)
-  and w.level::int >= 1
-group by w.event
-order by 2 desc, 1`, "text[]", "timestamptz", "text")
+  and w.level::int >= 1`
+
+// stateEventsEnglish are the DWD's own English names of the events
+// stateWarnings lists, one row per German event that has one: the event of
+// the newest English warning issued under the same event code (EC_II), read
+// only while the English source is among the families ($1), as the
+// warnings at a point read the English texts (warningEnglish).
+var stateEventsEnglish = named("api_state_events_english", `
+select w.event, e.event
+from (select w.event, min(w.raw->'properties'->>'EC_II') as ii
+      `+stateWarningsOf+`
+      group by w.event) w
+join lateral (select e.event from weather_warnings_en_live e
+  where e.event_ii = w.ii and coalesce(e.event, '') <> '' order by e.sent_at desc nulls last, e.event limit 1) e on true
+where w.event is not null and '`+englishWarnings+`' = any((select $1::text[])::text[])
+order by 1`, "text[]", "timestamptz", "text")
+
+// StateEventsEnglish returns the DWD's English name of each event the
+// Land's warnings in force at now name, by its German name, and the family
+// the names come from; none while the English source is not among the
+// families (features.StateWarnings).
+func (s *Store) StateEventsEnglish(ctx context.Context, land string, families []string, now time.Time) (map[string]string, string, error) {
+	names, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (map[string]string, error) {
+		rows, _ := run(ctx, tx, stateEventsEnglish, families, now, land)
+		out := map[string]string{}
+		var de, en string
+		_, err := pgx.ForEachRow(rows, []any{&de, &en}, func() error {
+			out[de] = en
+			return nil
+		})
+		return out, err
+	})
+	return names, englishWarnings, err
+}
 
 // StateWarnings returns the warnings of the families in force at now in the
 // Land, one per event (features.States).

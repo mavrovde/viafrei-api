@@ -50,7 +50,7 @@ and a mutant the tests do not kill is reported.
 
 | Run | When | Mutants scored | Fails |
 |---|---|---|---|
-| full | once per release, in `release.yml` on the tagged commit before anything is built (a red run stops the publish), or a manual run of `mutation.yml` | every in-scope mutant | below 70 %, or a stale equivalent entry |
+| full | once per release, in `release.yml` (its own run, dispatched by release-please's `tag` job) on the tagged commit before anything is built (a red run stops the publish), or a manual run of `mutation.yml` | every in-scope mutant | below 70 %, or a stale equivalent entry |
 | changed code | by hand only: `scripts/mutation.sh pr origin/main report.md` | the changed code lines of in-scope files; a changed test file puts its whole package under test | below 80 %, or zero mutants for changed in-scope code |
 
 No pull request runs mutation testing (owner 2026-11-18, as in viafrei-database and viafrei-web).

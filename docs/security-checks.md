@@ -1,6 +1,6 @@
 # Security checks
 
-Every check below runs on each pull request and weekly on Monday (`.github/workflows/security.yml`), except where noted. Snyk runs weekly on `main` (Mondays) and once per release, before anything is published (`.github/workflows/snyk.yml`, called by `release.yml`), and never on a pull request or a push. All
+Every check below runs on each pull request and weekly on Monday (`.github/workflows/security.yml`), except where noted. Snyk runs weekly on `main` (Mondays) and once per release, before anything is published (`.github/workflows/snyk.yml`, called by `release.yml`, the release run that release-please's `tag` job dispatches once the tag is pushed, with the repository's `SNYK_TOKEN`), and never on a pull request or a push. All
 of them run in CI only. None reaches a live data source or production: the
 DAST scan targets the local compose stack.
 

@@ -233,11 +233,11 @@ func snykFindings(files map[string][]byte) []string {
 		out = append(out, "release.yml's snyk job does not call snyk.yml on the tagged commit")
 	}
 	out = append(out, secretsFindings("release.yml job snyk", rel.Jobs["snyk"].Secrets)...)
-	call, _ := rel.On["workflow_call"].(map[string]any)
-	sec, _ := call["secrets"].(map[string]any)
-	tok, _ := sec["SNYK_TOKEN"].(map[string]any)
-	if tok["required"] != true {
-		out = append(out, "release.yml's workflow_call does not require the SNYK_TOKEN secret")
+	// release.yml runs on its own (a tag push or a dispatch), so the token it
+	// hands snyk.yml is the repository secret itself; as a called workflow it
+	// would hold only what a caller passed it.
+	if _, called := rel.On["workflow_call"]; called {
+		out = append(out, "release.yml is a called workflow (workflow_call); it runs on its own and hands snyk.yml the repository's SNYK_TOKEN")
 	}
 	if !slices.Contains(needs(rel.Jobs["publish"].Needs), "snyk") {
 		out = append(out, "release.yml's publish does not need snyk")
@@ -270,7 +270,9 @@ func snykFindings(files map[string][]byte) []string {
 			out = append(out, fmt.Sprintf("the commit job exits %d with sha %q for %s, not %d with %q", got, sha, c.name, c.want, c.sha))
 		}
 	}
-	out = append(out, secretsFindings("release-please.yml job release", parsed["release-please.yml"].Jobs["release"].Secrets)...)
+	if strings.Contains(string(files["release-please.yml"]), "SNYK_TOKEN") {
+		out = append(out, "release-please.yml names SNYK_TOKEN; only release.yml hands it to snyk.yml")
+	}
 	sort.Strings(out)
 	return out
 }
@@ -311,8 +313,9 @@ func TestSnykRunsWeeklyAndOncePerRelease(t *testing.T) {
 		"snyk.yml carries continue-on-error":                         plant("snyk.yml", "    timeout-minutes: 30\n", "    timeout-minutes: 30\n    continue-on-error: true\n"),
 		"ci.yml references workflows/snyk.yml":                       plant("ci.yml", "\njobs:\n", "\njobs:\n  s:\n    uses: ./.github/workflows/snyk.yml\n"),
 		"release.yml passes secrets: inherit":                        plant("release.yml", "    secrets:\n      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}\n\n", "    secrets: inherit\n\n"),
-		"release-please.yml job release does not pass exactly":       plant("release-please.yml", "    secrets:\n      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}\n", "    secrets: inherit\n"),
-		"does not require the SNYK_TOKEN secret":                     plant("release.yml", "    secrets:\n      SNYK_TOKEN:\n        required: true\n  push:", "  push:"),
+		"release-please.yml names SNYK_TOKEN":                        plant("release-please.yml", "\n  approve:\n", "\n  scan:\n    env:\n      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}\n\n  approve:\n"),
+		"release.yml is a called workflow":                           plant("release.yml", "on:\n  push:", "on:\n  workflow_call:\n    secrets:\n      SNYK_TOKEN:\n        required: true\n  push:"),
+		"release.yml job snyk does not pass exactly":                 plant("release.yml", "      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}\n\n", "      SNYK_TOKEN: ${{ secrets.OTHER }}\n\n"),
 		"release.yml's publish does not need snyk":                   plant("release.yml", "    needs: [commit, snyk, mutation]\n", "    needs: [commit, mutation]\n"),
 		"release.yml's publish does not need the mutation run":       plant("release.yml", "    needs: [commit, snyk, mutation]\n", "    needs: [commit, snyk]\n"),
 		"release.yml's publish header is not exactly":                plant("release.yml", "    needs: [commit, snyk, mutation]\n", "    needs: [commit, snyk, mutation]\n    if: always()\n"),

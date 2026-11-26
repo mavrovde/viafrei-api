@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -32,6 +33,7 @@ import (
 	"github.com/mavrovde/viafrei-api/internal/buildinfo"
 	"github.com/mavrovde/viafrei-api/internal/dbcontract"
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
+	"github.com/mavrovde/viafrei-api/internal/domain/transit"
 	"github.com/mavrovde/viafrei-api/internal/fixtures"
 	"github.com/mavrovde/viafrei-api/internal/perf"
 	"github.com/mavrovde/viafrei-api/internal/runtime/config"
@@ -351,7 +353,6 @@ func open(t *testing.T) *rig {
 	list("departures", "select stop_place_id from contract.stop_place where withdrawn_at is null order by 1 limit 40",
 		"/v1/stations/", "/departures?from="+r.now.Add(-2*time.Hour).UTC().Format(time.RFC3339)+"&duration_min=240")
 	list("facilities", "select distinct stop_place_id from contract.station_facility order by 1 limit 40", "/v1/stations/", "/facilities")
-	list("station-page", "select stop_place_id from contract.stop_place where withdrawn_at is null order by 1 limit 40", "/v1/stations/", "/page")
 	list("stop-boards", fmt.Sprintf(at, "stop_place"), "/v1/stop-boards?at=", "&radius_m=1000&limit=5")
 	list("disruptions", "select region_code from contract.admin_region order by 1 limit 40", "/v1/transit-disruptions?area=", "")
 	list("states", "select distinct region_code from contract.admin_region where region_level = 'state' order by 1 limit 40",
@@ -371,6 +372,30 @@ func open(t *testing.T) *rig {
 	permitted, _, err := access.NewGate(reg, r.key.Key.Plan, r.key.Key.Audience, nil, cfg.Sources.Disabled).Answer(access.Answering(reg, "roads"))
 	if err != nil {
 		t.Fatal(err)
+	}
+	// A station's page is read for a station of DB's register: the stop
+	// places its station record read resolves, the first 40.
+	all := make([]string, len(reg))
+	for i, f := range reg {
+		all[i] = f.Family
+	}
+	places, err := pgx.CollectRows(must(conn.Query(ctx, "select stop_place_id from contract.stop_place where withdrawn_at is null order by 1")), pgx.RowTo[string])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range places {
+		if len(r.targets["station-page"]) == 40 {
+			break
+		}
+		_, err := r.st.StationRecord(ctx, id, all)
+		if err == nil {
+			r.targets["station-page"] = append(r.targets["station-page"], "/v1/stations/"+id+"/page")
+		} else if !errors.Is(err, transit.ErrNotFound) {
+			t.Fatal(err)
+		}
+	}
+	if len(r.targets["station-page"]) == 0 {
+		t.Fatal("nothing to ask for station-page: no stop place is a register station")
 	}
 	list("situation", "select event_id from contract.traffic_event where source_ref = any($1) and withdrawn_at is null "+
 		"and (valid_to is null or valid_to > $2) order by 1 limit 40", "/v1/road-situations/", "", permitted, r.now)

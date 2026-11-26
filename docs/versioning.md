@@ -51,6 +51,7 @@ announces it.
 | Accepted | Why |
 |---|---|
 | `data.warnings[].level` minimum 1 → 0 in `GET /v1/watch` and `GET /v1/weather-risk` (0.4.0) | The DWD's level-0 advance notices (Vorabinformation Unwetter) are warnings of the specification's levels 0 to 4, which the platform lists; the API left them out. A client reading `level` must accept 0. |
+| `GET /v1/stations/{stationId}/page` for an id that names no station: 200 with `data: null` → 404 `not-found` | Every other operation that reads one item by its id answers 404 not-found when none has it; the station page answered an empty 200, which a client could not tell from a page. A client must handle the 404. |
 
 ## Deprecation and sunset
 

@@ -80,9 +80,7 @@ func TestStationPageAnswer(t *testing.T) {
 		t.Errorf("no land %v", land)
 	}
 	f.pageErr = transit.ErrNotFound
-	if w := do(t, h, http.MethodGet, "/v1/stations/x/page", bearer); w.Code != 200 || decode(t, w)["data"] != nil {
-		t.Errorf("unknown %d %s", w.Code, w.Body)
-	}
+	assertProblem(t, do(t, h, http.MethodGet, "/v1/stations/x/page", bearer), 404, "not-found")
 	f.pageErr = errFake
 	if w := do(t, h, http.MethodGet, "/v1/stations/x/page", bearer); w.Code < 500 {
 		t.Errorf("failure %d", w.Code)

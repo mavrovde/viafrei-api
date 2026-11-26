@@ -10839,7 +10839,6 @@
         "properties": {
           "data": {
             "additionalProperties": false,
-            "description": "Null when no station of DB's register has that id.",
             "properties": {
               "pageUrl": {
                 "description": "The station's page on viafrei.de, in the language asked.",
@@ -26773,7 +26772,7 @@
                 }
               }
             },
-            "description": "Not used by this operation.",
+            "description": "No station with this id (not-found), or the operation is switched off on this instance (feature-disabled).",
             "headers": {
               "RateLimit": {
                 "$ref": "#/components/headers/RateLimit"

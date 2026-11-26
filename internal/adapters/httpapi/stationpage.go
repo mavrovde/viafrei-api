@@ -3,7 +3,6 @@ package httpapi
 import (
 	"cmp"
 	"context"
-	"errors"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -122,7 +121,7 @@ type StationPageData struct {
 
 // StationPageEnvelope is the enveloped answer of getStationPage.
 type StationPageEnvelope struct {
-	Data  *StationPageData `json:"data" doc:"Null when no station of DB's register has that id."`
+	Data  *StationPageData `json:"data"`
 	Meta  DataMeta         `json:"meta"`
 	Links Links            `json:"links"`
 }
@@ -146,16 +145,13 @@ const stationPageOrigin = "https://viafrei.de/"
 func registerStationPage(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "A station's page"
 	op.Description = "A station's page as the platform's station page shows it, section by section: the register's record, the rail lamp, the step-free platforms now, the lifts, the platforms, the next departures, the service alerts and DB's facility flags. Needs the scope transit."
-	featureResponses(api, &op, "Not used by this operation.")
+	featureResponses(api, &op, "No station with this id (not-found), or the operation is switched off on this instance (feature-disabled).")
 	op.Extensions[counterpartExtension] = "station page"
 	huma.Register(api, op, func(ctx context.Context, in *StationPageInput) (*StationPageOutput, error) {
 		if err := s.featuresOff(ctx); err != nil {
 			return nil, err
 		}
 		p, err := s.features.StationPage(ctx, principalFrom(ctx).Key, features.StationPageQuery{StationID: in.StationID, Departures: cmp.Or(in.Departures, transit.PageDepartures)})
-		if errors.Is(err, transit.ErrNotFound) {
-			return &StationPageOutput{CacheControl: noStore, Body: StationPageEnvelope{Meta: s.dataMeta(ctx, nil, s.at(), false, partialDetail), Links: s.selfLink(ctx)}}, nil
-		}
 		if err != nil {
 			return nil, s.featureProblem(ctx, err)
 		}

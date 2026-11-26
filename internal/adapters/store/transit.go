@@ -791,13 +791,20 @@ from u group by 1 having sum(c) + sum(l) > 0`, "text[]")
 // of $1) are read once, not per call or per group, and the stations are the
 // open register rows with an ifopt and a slug, tested for the slug, not
 // sorted for the current one (the view's lateral, 90 to 380 ms on prod; the
-// semi join 12 ms). The relation's limit of 500 calls per ref changes
-// nothing: the most a ref holds in an hour on prod is under a hundred. The
-// calls are those of the families ($1): a statement reading it keeps only
-// those.
+// semi join 12 ms). The calls are those of the families ($1): a statement
+// reading it keeps only those. The hour's calls (about 30 000 on prod) are
+// sorted for the newest observation of each call and grouped per station,
+// minute and line by byte order (callsDistinctBytes and the two after it), not by the database's
+// en_US collation: its string comparisons made those sorts about 0.15 s of
+// a 0.85 s read on prod, and 0.5 s of 1.6 s under load (2026-11-26). The
+// groups are the same: the collation is deterministic, so two strings are
+// equal under it only when their bytes are.
 var stationDisruptionOfHour = strings.NewReplacer(
 	stationsOfIndex, stationsWithSlug,
 	callsPerRef, callsOfHour,
+	callsDistinct, callsDistinctBytes,
+	callsNewestFirst, callsNewestFirstBytes,
+	callsLineKey, callsLineKeyBytes,
 	"\n                 LIMIT 500) c_1\n", "\n                 OFFSET 0) c_1\n",
 	freshPerCall, freshOnce,
 	rulesPerRow("c.source_feed"), rulesOfFamilies("c.source_feed"),
@@ -821,6 +828,21 @@ const (
 const (
 	freshPerCall = " AND x.source_feed IN ( SELECT fr.feed_key FROM fresh fr)"
 	freshOnce    = " AND x.source_feed = ANY (ARRAY( SELECT fr.feed_key FROM fresh fr))"
+)
+
+// The relation's one-per-call pick of the newest observation
+// (callsDistinct, callsNewestFirst) and the station and line key its groups
+// are formed by (callsLineKey), each compared by byte order ("C"): the
+// station's ifopt and the line key carry it into the groups; the family
+// keeps the database's order, which the sources' list of a station is
+// sorted by.
+const (
+	callsDistinct         = `SELECT DISTINCT ON (r.station_ifopt, c_1.source_feed, c_1.journey_ref, c_1.aimed_dep) r.station_ifopt,`
+	callsDistinctBytes    = `SELECT DISTINCT ON (r.station_ifopt COLLATE "C", c_1.source_feed COLLATE "C", c_1.journey_ref COLLATE "C", c_1.aimed_dep) r.station_ifopt COLLATE "C" AS station_ifopt,`
+	callsNewestFirst      = `ORDER BY r.station_ifopt, c_1.source_feed, c_1.journey_ref, c_1.aimed_dep, c_1.observed_at DESC`
+	callsNewestFirstBytes = `ORDER BY r.station_ifopt COLLATE "C", c_1.source_feed COLLATE "C", c_1.journey_ref COLLATE "C", c_1.aimed_dep, c_1.observed_at DESC`
+	callsLineKey          = `c_1.journey_ref) AS line_key,`
+	callsLineKeyBytes     = `c_1.journey_ref) COLLATE "C" AS line_key,`
 )
 
 // callsPerRef is the station disruption relation's read of the calls, one

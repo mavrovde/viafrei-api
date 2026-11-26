@@ -876,6 +876,11 @@ const callsOfHour = `FROM refs r
 
 // affectedPlaces are the stations of the families ($1) with these ids or
 // IFOPTs ($2), each with the ref it was named by.
+// The stop is joined on its own id (origin_key) as well as the computed
+// stop place id: the planner then reads each stop and its modes by index,
+// where the computed id alone made it expect 32 rows a hit and scan every
+// row of transit_stop_modes (prod 2026-11-26: 250-400 ms, now 53-78 ms,
+// the same rows; the request was cut at 2 s).
 var affectedPlaces = namedOpaque("api_affected_places", `
 with hits as (
   select distinct q.ref, s.gtfs_feed_key, s.id
@@ -890,7 +895,7 @@ with hits as (
 select r.ref, s.stop_place_id, s.name, st_y(s.location), st_x(s.location), s.national_stop_code, s.region_code, coalesce(s.modes, '{}'), s.source_ref
 from unnest($2::text[]) r(ref)
 join hits h on h.ref = r.ref
-join (`+relStopPlace+`) s on s.stop_place_id = (h.gtfs_feed_key::text || ':') || h.id
+join (`+relStopPlace+`) s on s.origin_key = h.id and s.stop_place_id = (h.gtfs_feed_key::text || ':') || h.id
 where s.withdrawn_at is null and s.location is not null and s.source_ref = any($1)
   and `+"s.display_class <> 'withhold' and (s.audience = 'public' or "+ownKeyOn+")", "text[]", "text[]")
 

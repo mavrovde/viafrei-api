@@ -197,6 +197,23 @@ func spellingsOf(text string) []string {
 	return []string{}
 }
 
+// stationSpellingsOf are the spellings a station search reads beside its
+// text: the main station's (spellingsOf), and the text's river form with
+// its own main-station spellings, where it joins a town to its river
+// ("Frankfurt am Main" finds "Frankfurt (Main) Hbf", "Frankfurt am Main
+// Hauptbahnhof" finds it too).
+func stationSpellingsOf(text string) []string {
+	sp := spellingsOf(text)
+	if r := transit.RiverForm(text); r != "" {
+		for _, v := range append([]string{transit.Fold(r)}, spellingsOf(r)...) {
+			if !slices.Contains(sp, v) {
+				sp = append(sp, v)
+			}
+		}
+	}
+	return sp
+}
+
 // stationStarts and stationHolds are a stop place s whose name starts with
 // or holds the folded text $4, or one of the main-station spellings $10 the
 // text gives (transit.MainStationSpellings): "Berlin Hbf" finds "S+U Berlin
@@ -368,7 +385,7 @@ func (s *Store) Stations(ctx context.Context, q transit.Query, families []string
 	}
 	out, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) ([]transit.Station, error) {
 		text := transit.Fold(q.Text)
-		rows, _ := run(ctx, tx, stationsPage[shapeOf(q, text)], families, lat, lon, text, q.RadiusM, q.Limit+1, q.Code, q.Railway, q.Area, spellingsOf(q.Text))
+		rows, _ := run(ctx, tx, stationsPage[shapeOf(q, text)], families, lat, lon, text, q.RadiusM, q.Limit+1, q.Code, q.Railway, q.Area, stationSpellingsOf(q.Text))
 		return pgx.CollectRows(rows, stationRow)
 	})
 	if err == nil && len(out) == 0 && q.Code == "" && q.Area == "" {

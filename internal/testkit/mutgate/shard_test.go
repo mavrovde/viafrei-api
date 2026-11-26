@@ -23,14 +23,10 @@ const releaseShards = 20
 // stays under 10 minutes, well inside its timeout-minutes: 15.
 const shardBudget = 540.0
 
-// pairBudget is the most one mutator of one file, the unit nothing cuts
-// further, may cost alone in a shard: 700 s and the job's start stay about
-// three minutes inside timeout-minutes: 15. Above it no shard count helps;
-// the unit's tests must get cheaper.
-const pairBudget = 700.0
-
-// budgetFindings are the shards over their budget. A unit whose mutants are
-// all of one mutator of one file (len(want) == 1) cannot be cut.
+// budgetFindings are the shards over their budget. A shard of one unit
+// whose mutants are all of one mutator of one file (len(want) == 1) cannot
+// be cut: no shard count helps it, its tests must get cheaper (#255: a
+// mutant that never ends costs Gremlins' timeout).
 func budgetFindings(shards [][]unit) []string {
 	var out []string
 	for k, s := range shards {
@@ -38,10 +34,11 @@ func budgetFindings(shards [][]unit) []string {
 		for _, u := range s {
 			load += u.cost
 		}
-		switch pair := len(s) == 1 && len(s[0].want) == 1; {
-		case pair && load > pairBudget:
-			out = append(out, fmt.Sprintf("shard %d/%d is the one unit %s, one mutator of one file, estimated at %.0f s, above the budget of %.0f s: no shard count helps, its tests must get cheaper", k+1, len(shards), s[0].name, load, pairBudget))
-		case !pair && load > shardBudget:
+		switch {
+		case load <= shardBudget:
+		case len(s) == 1 && len(s[0].want) == 1:
+			out = append(out, fmt.Sprintf("shard %d/%d is the one unit %s, one mutator of one file, estimated at %.0f s, above the budget of %.0f s: no shard count helps, its tests must get cheaper", k+1, len(shards), s[0].name, load, shardBudget))
+		default:
 			out = append(out, fmt.Sprintf("shard %d/%d is estimated at %.0f s, above the budget of %.0f s: raise the shard count of mutation.yml and releaseShards", k+1, len(shards), load, shardBudget))
 		}
 	}
@@ -431,20 +428,24 @@ func TestTheReleaseShardsOfTheRealScope(t *testing.T) {
 	for _, f := range budgetFindings(shards) {
 		t.Error(f)
 	}
-	// The check catches a shard over its budget.
+	// The check catches a shard over its budget, and names a lone
+	// mutator of one file as one no shard count helps.
 	pair := unit{name: "p.1", files: []string{"a.go"}, mutators: []string{"ARITHMETIC_BASE", "CONDITIONALS_NEGATION"}, want: map[string]int{"a.go CONDITIONALS_NEGATION": 2}}
-	for planted, bad := range map[string][][]unit{
-		"a shard of two units over the budget":    {{{name: "a", cost: 300}, {name: "b", cost: shardBudget - 299}}},
-		"a whole package alone over the budget":   {{{name: "a", files: []string{"a.go"}, want: map[string]int{"a.go INVERT_LOGICAL": 1, "a.go CONDITIONALS_NEGATION": 1}, cost: shardBudget + 1}}},
-		"two mutators of a file over the budget":  {{{name: "a", files: []string{"a.go"}, mutators: []string{"A", "B"}, want: map[string]int{"a.go A": 1, "a.go B": 1}, cost: shardBudget + 1}}},
-		"one mutator of one file over its budget": {{func() unit { u := pair; u.cost = pairBudget + 1; return u }()}},
+	for planted, c := range map[string]struct {
+		shards [][]unit
+		want   string
+	}{
+		"a shard of two units over the budget":    {[][]unit{{{name: "a", cost: 300}, {name: "b", cost: shardBudget - 299}}}, "raise the shard count"},
+		"a whole package alone over the budget":   {[][]unit{{{name: "a", files: []string{"a.go"}, want: map[string]int{"a.go INVERT_LOGICAL": 1, "a.go CONDITIONALS_NEGATION": 1}, cost: shardBudget + 1}}}, "raise the shard count"},
+		"two mutators of a file over the budget":  {[][]unit{{{name: "a", files: []string{"a.go"}, mutators: []string{"A", "B"}, want: map[string]int{"a.go A": 1, "a.go B": 1}, cost: shardBudget + 1}}}, "raise the shard count"},
+		"one mutator of one file over the budget": {[][]unit{{func() unit { u := pair; u.cost = shardBudget + 1; return u }()}}, "its tests must get cheaper"},
 	} {
-		if len(budgetFindings(bad)) != 1 {
-			t.Errorf("%s: planted and not reported", planted)
+		if f := budgetFindings(c.shards); len(f) != 1 || !strings.Contains(f[0], c.want) {
+			t.Errorf("%s: %v", planted, f)
 		}
 	}
-	if f := budgetFindings([][]unit{{func() unit { u := pair; u.cost = pairBudget; return u }()}}); len(f) > 0 {
-		t.Errorf("one mutator of one file within its budget: %v", f)
+	if f := budgetFindings([][]unit{{func() unit { u := pair; u.cost = shardBudget; return u }()}}); len(f) > 0 {
+		t.Errorf("one mutator of one file within the budget: %v", f)
 	}
 	for _, r := range roots {
 		if !slices.ContainsFunc(units, func(u unit) bool { return inScope([]root{r}, path.Join(u.dir, u.files[0])) }) {

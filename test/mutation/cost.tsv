@@ -14,7 +14,8 @@
 # local status by the fit of the 36 places units of that run: 1.41 s a
 # killed and 8.91 s a lived mutant, and at least 600 s for a file's
 # mutator with a mutant that timed out (unit places.23 took 618 s on the
-# runner for one). Another package's unit is its local time times 3.7
+# runner for one; since #255 the tests kill those, and the three rows are
+# re-measured from local runs with the loop deadlines). Another package's unit is its local time times 3.7
 # (units places.37, places.10, limits and number: 453 s on the runner, 123
 # to 126 s locally). The cost varies by file and mutator: a mutant that
 # lives runs all of its package's tests (about 9 s on the
@@ -57,7 +58,7 @@ internal/domain/places/resolve.go:ARITHMETIC_BASE	4.35	unit internal_domain_plac
 internal/domain/places/resolve.go:CONDITIONALS_BOUNDARY	4.35	unit internal_domain_places.4 of run 45751491495: 91 s of mutation for 21 mutants
 internal/domain/places/resolve.go:CONDITIONALS_NEGATION	1.86	unit internal_domain_places.5 of run 45751491495: 198 s of mutation for 106 mutants
 internal/domain/places/resolve.go:INVERT_LOGICAL	2.66	internal_domain_places.6 run locally (run 45751491495 did not finish it): 30 killed, 6 lived; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run)
-internal/domain/places/resolve.go:INVERT_LOOPCTRL	300.00	internal_domain_places.6 run locally (run 45751491495 did not finish it): 1 killed, 1 timed out; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run), at least 600 s with a timed-out one beside it (unit places.23: 618 s on the runner)
+internal/domain/places/resolve.go:INVERT_LOOPCTRL	1.41	unit internal_domain_places.10 run locally with the loop deadlines of #255: 2 killed in 3 s; at 1.41 s a killed mutant (the fit of the 36 places units of run 45751491495)
 internal/domain/places/resolve.go:INVERT_NEGATIVES	8.91	internal_domain_places.6 run locally (run 45751491495 did not finish it): 1 lived; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run)
 internal/domain/places/resolve_address.go:ARITHMETIC_BASE	2.46	unit internal_domain_places.7 of run 45751491495: 86 s of mutation for 35 mutants
 internal/domain/places/resolve_address.go:CONDITIONALS_BOUNDARY	2.46	unit internal_domain_places.7 of run 45751491495: 86 s of mutation for 35 mutants
@@ -97,8 +98,8 @@ internal/domain/places/resolve_junction.go:INVERT_LOOPCTRL	1.64	unit internal_do
 internal/domain/places/resolve_junction.go:INVERT_NEGATIVES	1.64	unit internal_domain_places.21 of run 45751491495: 115 s of mutation for 70 mutants
 internal/domain/places/resolve_labels.go:ARITHMETIC_BASE	1.94	unit internal_domain_places.22 of run 45751491495: 78 s of mutation for 40 mutants
 internal/domain/places/resolve_labels.go:CONDITIONALS_BOUNDARY	1.94	unit internal_domain_places.22 of run 45751491495: 78 s of mutation for 40 mutants
-internal/domain/places/resolve_labels.go:CONDITIONALS_NEGATION	7.25	unit internal_domain_places.23 of run 45751491495: 618 s, less 16 s of start (its shard timed out before the upload); locally 79 killed, 2 lived, 1 not covered, 1 timed out, the timed-out one resolve_labels.go:212
-internal/domain/places/resolve_labels.go:INCREMENT_DECREMENT	100.00	internal_domain_places.24 run locally (run 45751491495 did not finish it): 3 killed, 1 lived, 2 timed out; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run), at least 600 s with a timed-out one beside it (unit places.23: 618 s on the runner)
+internal/domain/places/resolve_labels.go:CONDITIONALS_NEGATION	1.48	unit internal_domain_places.25 run locally with the loop deadlines of #255: 81 killed, 1 lived, 1 not covered in 28 s; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of run 45751491495)
+internal/domain/places/resolve_labels.go:INCREMENT_DECREMENT	2.66	unit internal_domain_places.26 run locally with the loop deadlines of #255: 5 killed, 1 lived in 9 s; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of run 45751491495)
 internal/domain/places/resolve_labels.go:INVERT_LOGICAL	1.58	internal_domain_places.24 run locally (run 45751491495 did not finish it): 43 killed, 1 lived; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run)
 internal/domain/places/resolve_labels.go:INVERT_LOOPCTRL	3.29	internal_domain_places.24 run locally (run 45751491495 did not finish it): 9 killed, 3 lived; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run)
 internal/domain/places/resolve_labels.go:INVERT_NEGATIVES	3.29	internal_domain_places.24 run locally (run 45751491495 did not finish it): 3 killed, 1 lived; at 1.41 s a killed and 8.91 s a lived mutant (the fit of the 36 places units of that run)

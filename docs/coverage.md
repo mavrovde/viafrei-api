@@ -100,8 +100,12 @@ has no report or has two, and the gate is exit 2 on a report that holds a
 mutant of another unit; it is red unless every shard ended green.
 `internal/testkit/mutgate/shard_test.go` proves the units of the real scope
 disjoint and complete, the twenty shards none empty and each within the
-budget of 9 minutes of work, except a shard holding only one mutator of one
-file, the unit nothing cuts further, which may take up to about 12 minutes. A conformance test holds `mutation.yml` to the
+budget of 9 minutes of work. One mutator of one file is a unit nothing cuts
+further, so one above the budget is red with "its tests must get cheaper":
+a mutant that never ends costs Gremlins' timeout (30 times the coverage
+run), and the tests of a loop give it its own deadline instead
+(`internal/domain/places/loop_bounds_test.go`, #255). A conformance test
+holds `mutation.yml` to the
 matrix and the fan-in.
 
 Run it locally with `scripts/mutation.sh pr origin/main` or

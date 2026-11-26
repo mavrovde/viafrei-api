@@ -402,3 +402,64 @@ func TestATiersOwnKeyShareAdmitsAServiceKeysConcurrency(t *testing.T) {
 		t.Fatalf("permits leaked: %+v", s)
 	}
 }
+
+// TestAReadsWaitForAPermitIsTallied: the time a read waited for a permit,
+// granted or given up at its deadline, is added to its request's tally; a
+// permit granted at once adds nothing.
+func TestAReadsWaitForAPermitIsTallied(t *testing.T) {
+	clk := newClock()
+	c := admission.New(settings(1), clk.now)
+	ctx := admission.WithTally(as(admission.Standard, "k"))
+	hold := acquire(t, c, ctx)
+	if got := admission.AdmissionWait(ctx); got != 0 {
+		t.Fatalf("a permit granted at once waited %v", got)
+	}
+	got := make(chan result, 1)
+	queue(t, c, ctx, "waiter", got)
+	clk.advance(70 * time.Millisecond)
+	hold()
+	r := <-got
+	if r.err != nil {
+		t.Fatal(r.err)
+	}
+	r.release(true)
+	if w := admission.AdmissionWait(ctx); w != 70*time.Millisecond {
+		t.Fatalf("waited %v, want 70ms", w)
+	}
+	// A wait the deadline ends counts too.
+	hold = acquire(t, c, as(admission.Standard, "other"))
+	defer hold()
+	dctx, cancel := context.WithCancel(ctx)
+	queue(t, c, dctx, "cut", got)
+	clk.advance(30 * time.Millisecond)
+	cancel()
+	if r := <-got; r.err == nil {
+		t.Fatal("a cancelled wait was granted")
+	}
+	if w := admission.AdmissionWait(ctx); w != 100*time.Millisecond {
+		t.Fatalf("waited %v, want 100ms", w)
+	}
+	if admission.AdmissionWait(context.Background()) != 0 {
+		t.Fatal("a wait without a tally")
+	}
+}
+
+// TestTheFirstCutStatementIsKept: the statement a deadline cut is the first
+// one noted; an empty name notes nothing; WithTally on a tallied context
+// keeps its tally, so the log line reads what the metering reads.
+func TestTheFirstCutStatementIsKept(t *testing.T) {
+	ctx := admission.WithTally(context.Background())
+	admission.NoteCut(ctx, "")
+	if got := admission.CutStatement(ctx); got != "" {
+		t.Fatalf("an empty name was noted: %q", got)
+	}
+	admission.NoteCut(admission.WithTally(ctx), "api_first")
+	admission.NoteCut(ctx, "api_second")
+	if got := admission.CutStatement(ctx); got != "api_first" {
+		t.Fatalf("cut %q, want api_first", got)
+	}
+	admission.NoteCut(context.Background(), "api_x")
+	if admission.CutStatement(context.Background()) != "" {
+		t.Fatal("a cut without a tally")
+	}
+}

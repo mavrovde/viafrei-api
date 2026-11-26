@@ -434,3 +434,18 @@ func textRows(ctx context.Context, tx pgx.Tx, sql string, args []any) ([]string,
 }
 
 func sorted(rows []string) []string { s := slices.Clone(rows); slices.Sort(s); return s }
+
+// CutRegisterProbe runs the register's probe (api_register_probe) in a read
+// and then waits in that read until ctx ends, as a read the deadline cuts
+// after its statement started.
+func CutRegisterProbe(ctx context.Context, s *Store) error {
+	_, err := ReadValue(ctx, s, func(ctx context.Context, tx pgx.Tx) (struct{}, error) {
+		var probe string
+		if err := scanOne(run(ctx, tx, registerProbeRead))(&probe); err != nil {
+			return struct{}{}, err
+		}
+		<-ctx.Done()
+		return struct{}{}, ctx.Err()
+	})
+	return err
+}

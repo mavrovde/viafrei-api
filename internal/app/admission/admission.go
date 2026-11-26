@@ -135,24 +135,95 @@ func SlotTierOf(ctx context.Context) Tier {
 
 type tallyKey struct{}
 
+// Tally is what the reads of one request spent: the time they held a
+// permit (storage), the time they waited for one, and the named statement
+// a read had started last when the request's deadline cut it.
+type Tally struct {
+	storage atomic.Int64
+	wait    atomic.Int64
+
+	mu  sync.Mutex
+	cut string
+}
+
+// TallyOf is the tally of ctx (WithTally), or nil; a nil tally reads zero.
+func TallyOf(ctx context.Context) *Tally {
+	t, _ := ctx.Value(tallyKey{}).(*Tally)
+	return t
+}
+
+// Wait is the time the reads waited for a permit, granted or not.
+func (t *Tally) Wait() time.Duration {
+	if t == nil {
+		return 0
+	}
+	return time.Duration(t.wait.Load())
+}
+
+// Storage is the time the reads held a permit.
+func (t *Tally) Storage() time.Duration {
+	if t == nil {
+		return 0
+	}
+	return time.Duration(t.storage.Load())
+}
+
+// Cut is the statement a deadline cut (NoteCut), or "".
+func (t *Tally) Cut() string {
+	if t == nil {
+		return ""
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.cut
+}
+
 // WithTally returns ctx counting the storage time of its reads, for usage
-// metering (RATE-014).
+// metering (RATE-014), their wait for a permit and the statement a deadline
+// cut, for the request's log line. A ctx that already counts keeps its
+// tally, so the log line and the metering read the same one.
 func WithTally(ctx context.Context) context.Context {
-	return context.WithValue(ctx, tallyKey{}, new(atomic.Int64))
+	if TallyOf(ctx) != nil {
+		return ctx
+	}
+	return context.WithValue(ctx, tallyKey{}, new(Tally))
 }
 
 // StorageTime is the time the reads under ctx held a permit; zero without a
 // tally.
-func StorageTime(ctx context.Context) time.Duration {
-	if t, ok := ctx.Value(tallyKey{}).(*atomic.Int64); ok {
-		return time.Duration(t.Load())
+func StorageTime(ctx context.Context) time.Duration { return TallyOf(ctx).Storage() }
+
+// AdmissionWait is the time the reads under ctx waited for a permit, granted
+// or not; zero without a tally.
+func AdmissionWait(ctx context.Context) time.Duration { return TallyOf(ctx).Wait() }
+
+// NoteCut records name as the statement a read under ctx was running when
+// the request's deadline cut it; the first one noted is kept. An empty name
+// (no statement had started) records nothing.
+func NoteCut(ctx context.Context, name string) {
+	t := TallyOf(ctx)
+	if t == nil || name == "" {
+		return
 	}
-	return 0
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.cut == "" {
+		t.cut = name
+	}
 }
 
+// CutStatement is the statement NoteCut recorded under ctx, or "".
+func CutStatement(ctx context.Context) string { return TallyOf(ctx).Cut() }
+
 func addStorageTime(ctx context.Context, d time.Duration) {
-	if t, ok := ctx.Value(tallyKey{}).(*atomic.Int64); ok {
-		t.Add(int64(d))
+	if t := TallyOf(ctx); t != nil {
+		t.storage.Add(int64(d))
+	}
+}
+
+func addWait(ctx context.Context, d time.Duration) {
+	if t := TallyOf(ctx); t != nil {
+		t.wait.Add(int64(d))
 	}
 }
 
@@ -236,6 +307,7 @@ func (c *Controller) AcquireRead(ctx context.Context) (release func(answered boo
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	addWait(ctx, c.now().Sub(w.at))
 	if w.granted {
 		// Granted, possibly in the same moment the wait ended: the permit
 		// is this request's either way.

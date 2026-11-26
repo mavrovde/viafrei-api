@@ -14,6 +14,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -249,6 +250,10 @@ func ReadValue[T any](ctx context.Context, s *Store, fn func(context.Context, pg
 	// as the deadline arrives: the caller, or the goroutine itself, which
 	// then logs a panic nobody else will see.
 	done, gone := make(chan outcome[T]), make(chan struct{})
+	// The read's goroutine names each statement as it starts it (run), so a
+	// deadline that cuts the read can say which one was running.
+	cur := new(atomic.Pointer[string])
+	ctx = context.WithValue(ctx, runningKey{}, cur)
 	go func() {
 		o := guarded(ctx, s, fn)
 		release(answered(ctx, o.reached, o.err))
@@ -269,7 +274,20 @@ func ReadValue[T any](ctx context.Context, s *Store, fn func(context.Context, pg
 		return o.value, o.err
 	case <-ctx.Done():
 		close(gone)
+		if name := cur.Load(); name != nil {
+			admission.NoteCut(ctx, *name)
+		}
 		return zero, fmt.Errorf("%w: %w", ErrDeadlineExhausted, ctx.Err())
+	}
+}
+
+// runningKey is the context key of a read's running statement (ReadValue).
+type runningKey struct{}
+
+// noteRunning records s as the statement the read under ctx is running.
+func noteRunning(ctx context.Context, s stmt) {
+	if cur, ok := ctx.Value(runningKey{}).(*atomic.Pointer[string]); ok {
+		cur.Store(&s.Name)
 	}
 }
 

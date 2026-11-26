@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/mavrovde/viafrei-api/internal/app/admission"
 )
 
 // RequestIDHeader carries the request id in both directions.
@@ -163,19 +165,30 @@ func (s *statusRecorder) Write(b []byte) (int, error) {
 func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 
 // accessLog writes one structured line per request. The query string is not
-// logged: it may carry a key presented by mistake.
+// logged: it may carry a key presented by mistake. The line says where the
+// request's time went: how long its reads waited for an admission permit
+// (admissionWaitMs), how long they held one, the transactions of their
+// statements (storageMs), and the named statement a read had started last
+// when the request's deadline cut it (cutStatement, empty when no read was
+// cut inside a statement), so a request answered at the deadline shows
+// whether it waited, read, or both.
 func accessLog(log *slog.Logger, now func() time.Time) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := now()
 			rec := &statusRecorder{ResponseWriter: w}
-			next.ServeHTTP(rec, r)
+			tallied := admission.WithTally(r.Context())
+			tally := admission.TallyOf(tallied)
+			next.ServeHTTP(rec, r.WithContext(tallied))
 			log.Info("request",
 				"requestId", RequestIDFrom(r.Context()),
 				"method", r.Method,
 				"path", r.URL.Path,
 				"status", rec.status,
 				"durationMs", now().Sub(start).Milliseconds(),
+				"admissionWaitMs", tally.Wait().Milliseconds(),
+				"storageMs", tally.Storage().Milliseconds(),
+				"cutStatement", tally.Cut(),
 			)
 		})
 	}

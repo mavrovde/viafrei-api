@@ -9,6 +9,24 @@ Entries above `0.1.0` are written by release-please from the Conventional
 Commit messages merged into `main`; do not edit a released section by hand.
 See [docs/RELEASING.md](docs/RELEASING.md).
 
+## [1.2.0](https://github.com/mavrovde/viafrei-api/compare/v1.1.4...v1.2.0) (2026-11-26)
+
+
+### Added
+
+* the MCP change list - every answer today's MCP server gives, from the API alone ([#247](https://github.com/mavrovde/viafrei-api/issues/247)) ([63d098b](https://github.com/mavrovde/viafrei-api/commit/63d098be7780fb1fcf1f124b5c1e95cda533991c))
+
+
+### Fixed
+
+* confirmed-unchanged data reads as current; weather warnings carry the issuer's text ([#222](https://github.com/mavrovde/viafrei-api/issues/222) items 5, 2 part) ([#224](https://github.com/mavrovde/viafrei-api/issues/224)) ([2bb8198](https://github.com/mavrovde/viafrei-api/commit/2bb8198461dadc12534775734c020fac0f02b129))
+* **load:** the load stack makes the coming week's partitions, as pgtest does, so a fresh connection's plans no longer shed requests after a repair ([#251](https://github.com/mavrovde/viafrei-api/issues/251)) ([3ac8756](https://github.com/mavrovde/viafrei-api/commit/3ac87561cc4b0d01120996d96d488ff89f8212a2))
+
+
+### Dependencies
+
+* bump golang.org/x/text from 0.43.0 to 0.44.0 ([#199](https://github.com/mavrovde/viafrei-api/issues/199)) ([14384ba](https://github.com/mavrovde/viafrei-api/commit/14384bacde9d96022495aedb49ecc5e2baad5104))
+
 ## [1.1.4](https://github.com/mavrovde/viafrei-api/compare/v1.1.3...v1.1.4) (2026-11-24)
 
 

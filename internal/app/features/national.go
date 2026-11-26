@@ -39,6 +39,7 @@ func (s *Service) National(ctx context.Context, key access.Record, fuelWindow ti
 		permitted []string
 		rows      []national.Row
 		err       error
+		panicked  any
 	}
 	var parts []*part
 	var consulted []string
@@ -79,10 +80,20 @@ func (s *Service) National(ctx context.Context, key access.Record, fuelWindow ti
 		wg.Go(func() {
 			slots <- struct{}{}
 			defer func() { <-slots }()
+			// A panic of a read is taken here and raised again in the
+			// request's goroutine below, where the handler's recovery
+			// answers it (ERR-008): left in this goroutine it would end
+			// the process.
+			defer func() { p.panicked = recover() }()
 			p.rows, p.err = s.repos.National.National(ctx, p.domain, p.permitted, now, fuelWindow)
 		})
 	}
 	wg.Wait()
+	for _, p := range parts {
+		if p.panicked != nil {
+			panic(p.panicked)
+		}
+	}
 	var rows []national.Row
 	for _, p := range parts {
 		if p.err != nil {

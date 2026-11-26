@@ -139,6 +139,32 @@ func TestNationalReadsNoMoreThanTheKeysShareAtOnce(t *testing.T) {
 	}
 }
 
+// panicNat panics in the energy read.
+type panicNat struct{ *fake }
+
+func (panicNat) National(_ context.Context, d string, _ []string, _ time.Time, _ time.Duration) ([]national.Row, error) {
+	if d == "energy" {
+		panic("energy read")
+	}
+	return nil, nil
+}
+
+// A read's panic reaches the caller's goroutine, where the handler's
+// recovery answers it (ERR-008), not the read's own, which would end the
+// process.
+func TestNationalRaisesAReadsPanicInTheCaller(t *testing.T) {
+	f := panicNat{&fake{reg: natRegister}}
+	svc := features.New(features.Repositories{Register: f, National: f}, features.Settings{Language: "en"}, func() time.Time { return now })
+	k := key("commercial", []access.Scope{"roads", "energy"}, "r1", "e1")
+	defer func() {
+		if r := recover(); r != "energy read" {
+			t.Errorf("recovered %v, want the energy read's panic", r)
+		}
+	}()
+	_, _ = svc.National(context.Background(), k, time.Hour)
+	t.Error("National returned, want the read's panic")
+}
+
 func TestNationalReadsEveryScopedDomain(t *testing.T) {
 	f := &natFake{rows: map[string][]national.Row{
 		"energy": {{Section: national.SectionFuel, Key: "e10", Family: "e1", N: 2}},

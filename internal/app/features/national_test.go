@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,6 +23,7 @@ var natRegister = []access.Terms{
 
 type natFake struct {
 	*fake
+	mu      sync.Mutex
 	rows    map[string][]national.Row
 	err     error
 	asked   []string
@@ -30,6 +32,8 @@ type natFake struct {
 }
 
 func (f *natFake) National(_ context.Context, d string, fams []string, _ time.Time, win time.Duration) ([]national.Row, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.asked, f.gotWin = append(f.asked, d), win
 	if f.gotFams == nil {
 		f.gotFams = map[string][]string{}
@@ -41,6 +45,56 @@ func (f *natFake) National(_ context.Context, d string, fams []string, _ time.Ti
 func natService(f *natFake) *features.Service {
 	f.fake = &fake{reg: natRegister}
 	return features.New(features.Repositories{Register: f, National: f}, features.Settings{Language: "en"}, func() time.Time { return now })
+}
+
+// barrierNat answers each domain only once every asked domain is being
+// read, so a National that read them one after another never answers.
+type barrierNat struct {
+	*fake
+	want    int
+	mu      sync.Mutex
+	arrived int
+	all     chan struct{}
+	errs    map[string]error
+}
+
+func (f *barrierNat) National(ctx context.Context, d string, _ []string, _ time.Time, _ time.Duration) ([]national.Row, error) {
+	f.mu.Lock()
+	if f.arrived++; f.arrived == f.want {
+		close(f.all)
+	}
+	f.mu.Unlock()
+	select {
+	case <-f.all:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	return []national.Row{{Section: national.SectionSituations, Family: map[string]string{"roads": "r1", "energy": "e1"}[d]}}, f.errs[d]
+}
+
+// The domains are read at the same time, their rows kept in the domains'
+// order, and the first failure in that order is the answer's.
+func TestNationalReadsTheDomainsAtOnce(t *testing.T) {
+	k := key("commercial", []access.Scope{"roads", "energy"}, "r1", "e1")
+	read := func(errs map[string]error) (features.NationalAnswer, error) {
+		f := &barrierNat{want: 2, all: make(chan struct{}), errs: errs}
+		f.fake = &fake{reg: natRegister}
+		svc := features.New(features.Repositories{Register: f, National: f}, features.Settings{Language: "en"}, func() time.Time { return now })
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		return svc.National(ctx, k, time.Hour)
+	}
+	a, err := read(nil)
+	if err != nil || len(a.Rows) != 2 || a.Rows[0].Family != "r1" || a.Rows[1].Family != "e1" {
+		t.Fatalf("at once: %+v %v", a.Rows, err)
+	}
+	errRoads, errEnergy := errors.New("roads"), errors.New("energy")
+	if _, err := read(map[string]error{"roads": errRoads, "energy": errEnergy}); !errors.Is(err, errRoads) {
+		t.Errorf("both failed: %v, want the roads' failure", err)
+	}
+	if _, err := read(map[string]error{"energy": errEnergy}); !errors.Is(err, errEnergy) {
+		t.Errorf("energy failed: %v", err)
+	}
 }
 
 func TestNationalReadsEveryScopedDomain(t *testing.T) {
@@ -58,7 +112,8 @@ func TestNationalReadsEveryScopedDomain(t *testing.T) {
 	if len(a.Rows) != 2 || a.Rows[0].Section != national.SectionSituations || !a.Meta.Partial || f.gotWin != time.Hour {
 		t.Fatalf("rows %+v partial %v", a.Rows, a.Meta.Partial)
 	}
-	if !slices.Equal(f.asked, []string{"roads", "energy"}) {
+	// the domains are read at once, so in any order
+	if slices.Sort(f.asked); !slices.Equal(f.asked, []string{"energy", "roads"}) {
 		t.Errorf("asked %v: weather is consumer-only, parking and transit not scoped", f.asked)
 	}
 	if !slices.Equal(names(a.Meta.Families), []string{"e1", "r1"}) {

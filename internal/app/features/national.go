@@ -3,6 +3,7 @@ package features
 import (
 	"context"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/mavrovde/viafrei-api/internal/domain/access"
@@ -33,7 +34,13 @@ func (s *Service) National(ctx context.Context, key access.Record, fuelWindow ti
 		return NationalAnswer{}, err
 	}
 	now := s.now()
-	var rows []national.Row
+	type part struct {
+		domain    string
+		permitted []string
+		rows      []national.Row
+		err       error
+	}
+	var parts []*part
 	var consulted []string
 	partial, asked := false, false
 	for _, d := range national.Domains {
@@ -41,24 +48,37 @@ func (s *Service) National(ctx context.Context, key access.Record, fuelWindow ti
 			continue
 		}
 		asked = true
-		permitted, part, err := gate.Answer(access.Answering(reg, d))
+		permitted, withheld, err := gate.Answer(access.Answering(reg, d))
 		if err != nil {
 			partial = true
 			continue
 		}
-		partial = partial || part
+		partial = partial || withheld
 		consulted = append(consulted, permitted...)
-		got, err := s.repos.National.National(ctx, d, permitted, now, fuelWindow)
-		if err != nil {
-			return NationalAnswer{}, err
-		}
-		if err := gate.Check(national.Families(got)); err != nil {
-			return NationalAnswer{}, err
-		}
-		rows = append(rows, got...)
+		parts = append(parts, &part{domain: d, permitted: permitted})
 	}
 	if !asked || len(consulted) == 0 {
 		return NationalAnswer{}, access.ErrNonePermitted
+	}
+	// The domains' reads are independent: each runs at once, in a read of
+	// its own (its own connection) under the request's deadline, so the
+	// answer waits for the slowest one, not for their sum. Their rows are
+	// taken in the domains' order, and the first failure in that order is
+	// the answer's.
+	var wg sync.WaitGroup
+	for _, p := range parts {
+		wg.Go(func() { p.rows, p.err = s.repos.National.National(ctx, p.domain, p.permitted, now, fuelWindow) })
+	}
+	wg.Wait()
+	var rows []national.Row
+	for _, p := range parts {
+		if p.err != nil {
+			return NationalAnswer{}, p.err
+		}
+		if err := gate.Check(national.Families(p.rows)); err != nil {
+			return NationalAnswer{}, err
+		}
+		rows = append(rows, p.rows...)
 	}
 	fams, err := s.provenanceOf(ctx, national.Families(rows), consulted)
 	if err != nil {

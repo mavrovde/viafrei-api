@@ -54,6 +54,9 @@ const (
 	aGo      = "package d\n\nfunc A(x, y int) bool {\n\treturn x < y && x-y != 0\n}\n"
 	authGo   = "package h\n\nfunc Auth(k string) bool { return k == \"\" }\n"
 	serverGo = "package h\n\nfunc Serve(n int) int { return n + 1 }\n"
+	// oneCN is a d/a.go of one CONDITIONALS_NEGATION mutant, for a d.json
+	// of one.
+	oneCN = "package d\n\nfunc A(x int) bool {\n\treturn x == 0\n}\n"
 )
 
 func base() map[string]string {
@@ -248,7 +251,7 @@ func TestEquivalents(t *testing.T) {
 		"stale in full mode":    {"d/a.go:99:1\tCONDITIONALS_NEGATION\tsame\tr\n", "full", "matches no mutant (stale)", 1},
 		"stale in pr mode":      {"d/a.go:99:1\tCONDITIONALS_NEGATION\tsame\tr\n", "pr", "", 0},
 	} {
-		dir := files(t, with(map[string]string{"eq.tsv": c.eq, "d.json": gremlins("a.go", mutation("CONDITIONALS_NEGATION", "KILLED", 3, 2))}))
+		dir := files(t, with(map[string]string{"eq.tsv": c.eq, "d/a.go": oneCN, "d.json": gremlins("a.go", mutation("CONDITIONALS_NEGATION", "KILLED", 3, 2))}))
 		args := []string{"-mode", c.mode, "-min", "70", "d=d.json", "h=h.json"}
 		if c.mode == "pr" {
 			args = []string{"-mode", c.mode, "-min", "70", "-changed", "chg.tsv", "d=d.json"}
@@ -261,7 +264,7 @@ func TestEquivalents(t *testing.T) {
 }
 
 func TestNotCoveredIsASurvivor(t *testing.T) {
-	dir := files(t, with(map[string]string{"d.json": gremlins("a.go", mutation("CONDITIONALS_NEGATION", "NOT COVERED", 3, 2))}))
+	dir := files(t, with(map[string]string{"d/a.go": oneCN, "d.json": gremlins("a.go", mutation("CONDITIONALS_NEGATION", "NOT COVERED", 3, 2))}))
 	code, out, _ := runGate(dir, "-mode", "full", "-min", "70", "d=d.json", "h=h.json")
 	if code != 1 || !strings.Contains(out, "not covered 1") || !strings.Contains(out, "(NOT COVERED)") {
 		t.Fatalf("exit %d: %s", code, out)

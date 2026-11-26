@@ -54,6 +54,10 @@ var enabled = []string{
 	"INCREMENT_DECREMENT", "INVERT_LOGICAL", "INVERT_LOOPCTRL", "INVERT_NEGATIVES",
 }
 
+// gremlinsVersion is the Gremlins release whose token table sites copies;
+// scripts/mutation.sh runs the same one (shard_test.go pins the two).
+const gremlinsVersion = "v0.6.0"
+
 // sites is Gremlins v0.6.0's TokenMutantType, cut to the enabled mutators:
 // the token of an assignment, binary, branch, inc/dec or unary node and the
 // mutants it yields.
@@ -104,6 +108,7 @@ type unit struct {
 	others    []string // the other non-test Go files of dir, excluded
 	mutators  []string // nil: every enabled mutator
 	sites     int
+	want      map[string]int // "file mutator" -> the mutants countSites finds
 	cost      float64
 }
 
@@ -245,7 +250,7 @@ func packageUnits(tree, dir string, names []string, roots []root, cost map[strin
 	name := strings.ReplaceAll(dir, "/", "_")
 	weigh := func(sites int) float64 { return unitOverhead + per*float64(sites) }
 	if weigh(total) <= unitCap {
-		return []unit{{name: name, dir: dir, files: files, others: others, sites: total, cost: weigh(total)}}, nil
+		return []unit{{name: name, dir: dir, files: files, others: others, sites: total, cost: weigh(total), want: wants(count, files, nil)}}, nil
 	}
 	// Each file whole when it fits, else its mutators in groups that fit.
 	var whole, split []piece
@@ -288,7 +293,7 @@ func packageUnits(tree, dir string, names []string, roots []root, cost map[strin
 			continue // files without a mutant, packed together
 		}
 		slices.Sort(g.files)
-		u := unit{name: fmt.Sprintf("%s.%d", name, len(out)+1), dir: dir, files: g.files, mutators: g.mutators, sites: g.sites, cost: weigh(g.sites)}
+		u := unit{name: fmt.Sprintf("%s.%d", name, len(out)+1), dir: dir, files: g.files, mutators: g.mutators, sites: g.sites, cost: weigh(g.sites), want: wants(count, g.files, g.mutators)}
 		for _, f := range files {
 			if !slices.Contains(g.files, f) {
 				u.others = append(u.others, f)
@@ -299,6 +304,47 @@ func packageUnits(tree, dir string, names []string, roots []root, cost map[strin
 		out = append(out, u)
 	}
 	return out, nil
+}
+
+// wants are the mutants per "file mutator" of the files with the mutators
+// (nil: every enabled one).
+func wants(count map[string]map[string]int, files, ms []string) map[string]int {
+	if ms == nil {
+		ms = enabled
+	}
+	out := map[string]int{}
+	for _, f := range files {
+		for _, m := range ms {
+			if count[f][m] > 0 {
+				out[f+" "+m] = count[f][m]
+			}
+		}
+	}
+	return out
+}
+
+// drift compares the mutants of a unit's report, every status counted, with
+// the ones countSites found: a difference means the copy of Gremlins' token
+// table no longer is Gremlins', and the cut may have lost a mutant.
+func drift(u unit, ms []mutant) error {
+	got := map[string]int{}
+	for _, m := range ms {
+		got[strings.TrimPrefix(m.file, u.dir+"/")+" "+m.mutator]++
+	}
+	keys := slices.Sorted(maps.Keys(got))
+	for k := range maps.Keys(u.want) {
+		if _, ok := got[k]; !ok {
+			keys = append(keys, k)
+		}
+	}
+	slices.Sort(keys)
+	for _, k := range keys {
+		if got[k] != u.want[k] {
+			file, m, _ := strings.Cut(k, " ")
+			return fmt.Errorf("unit %s: the token table drifted from Gremlins %s: %s/%s %s has %d mutant(s) in the report and %d counted", u.name, gremlinsVersion, u.dir, file, m, got[k], u.want[k])
+		}
+	}
+	return nil
 }
 
 // spread deals the units to count shards, the costliest first, each to the
@@ -343,6 +389,9 @@ func readUnitReports(args []string, units []unit) ([]mutant, map[string]bool, er
 			if !units[i].holds(m) {
 				return nil, nil, fmt.Errorf("%s: the report of unit %s holds %s %s, which is not its own: its run was not the planned one", file, name, m.location(), m.mutator)
 			}
+		}
+		if err := drift(units[i], ms); err != nil {
+			return nil, nil, fmt.Errorf("%s: %w", file, err)
 		}
 		out = append(out, ms...)
 	}

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -451,5 +452,88 @@ func TestAUnitsReportHoldsOnlyItsOwnMutants(t *testing.T) {
 	u := unit{name: "p.2", dir: "p", files: []string{"a.go"}, mutators: []string{"INVERT_LOGICAL"}}
 	if !u.holds(mutant{file: "p/a.go", mutator: "INVERT_LOGICAL"}) || u.holds(mutant{file: "p/a.go", mutator: "ARITHMETIC_BASE"}) || u.holds(mutant{file: "p/b.go", mutator: "INVERT_LOGICAL"}) {
 		t.Error("a mutator group holds a mutant of another group or file")
+	}
+}
+
+func TestAUnitsReportMatchesTheTokenTable(t *testing.T) {
+	req.Covers(t, "TST-002")
+	// d/a.go has CONDITIONALS_NEGATION 2, CONDITIONALS_BOUNDARY 1,
+	// INVERT_LOGICAL 1, ARITHMETIC_BASE 1 and INVERT_NEGATIVES 1, which
+	// fourOfFive (d.json) reports, every status counted.
+	dir := files(t, base())
+	if code, out, errs := runGate(dir, "-mode", "full", "-min", "60", "d=d.json", "h=h.json"); code != 0 {
+		t.Fatalf("the matching report: exit %d %s %s", code, out, errs)
+	}
+	extra := strings.Replace(fourOfFive, `]}]}`, ","+mutation("CONDITIONALS_BOUNDARY", "NOT COVERED", 9, 5)+`]}]}`, 1)
+	for planted, c := range map[string]struct{ over map[string]string }{
+		// The table counts a mutant Gremlins does not make (an over-count):
+		// a source with a second < where the report has one boundary mutant.
+		"an over-count": {map[string]string{"d/a.go": strings.Replace(aGo, "x-y != 0", "x-y < 0", 1)}},
+		// The table misses a mutant Gremlins makes (an under-count): the
+		// report holds a boundary mutant more, not covered.
+		"an under-count": {map[string]string{"d.json": extra}},
+		// A mutant missing from a report (its only INVERT_NEGATIVES): the
+		// table and the source agree.
+		"a mutant missing": {map[string]string{"d.json": gremlins("a.go",
+			mutation("CONDITIONALS_NEGATION", "KILLED", 3, 2),
+			mutation("CONDITIONALS_BOUNDARY", "KILLED", 4, 2),
+			mutation("INVERT_LOGICAL", "KILLED", 5, 2),
+			mutation("ARITHMETIC_BASE", "KILLED", 6, 2),
+			mutation("CONDITIONALS_NEGATION", "LIVED", 9, 5),
+		)}},
+	} {
+		dir := files(t, with(c.over))
+		code, out, errs := runGate(dir, "-mode", "full", "-min", "60", "d=d.json", "h=h.json")
+		if code != 2 || out != "" || !strings.Contains(errs, "the token table drifted from Gremlins v0.6.0: d/a.go") {
+			t.Errorf("%s: exit %d %q %q", planted, code, out, errs)
+		}
+	}
+	// The message names the file, the mutator and both counts.
+	u := unit{name: "u", dir: "p", files: []string{"a.go"}, want: map[string]int{"a.go INVERT_LOGICAL": 2}}
+	err := drift(u, []mutant{{file: "p/a.go", mutator: "INVERT_LOGICAL"}})
+	if err == nil || !strings.Contains(err.Error(), "p/a.go INVERT_LOGICAL has 1 mutant(s) in the report and 2 counted") {
+		t.Errorf("drift: %v", err)
+	}
+}
+
+var gremlinsRun = regexp.MustCompile(`gremlins/cmd/gremlins@(v[0-9][0-9A-Za-z.\-]*)`)
+
+// versionFindings holds a script to running the Gremlins release of the
+// token table, and only that one.
+func versionFindings(script string) []string {
+	var out []string
+	runs := gremlinsRun.FindAllStringSubmatch(script, -1)
+	if len(runs) == 0 {
+		out = append(out, "the script runs no gremlins@vX")
+	}
+	for _, r := range runs {
+		if r[1] != gremlinsVersion {
+			out = append(out, fmt.Sprintf("the script runs gremlins@%s, the token table is %s's", r[1], gremlinsVersion))
+		}
+	}
+	return out
+}
+
+func TestTheTokenTableIsTheScriptsGremlins(t *testing.T) {
+	req.Covers(t, "TST-002")
+	b, err := os.ReadFile(filepath.Join("..", "..", "..", "scripts", "mutation.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(b)
+	if f := versionFindings(script); len(f) > 0 {
+		t.Fatalf("scripts/mutation.sh: %v", f)
+	}
+	for planted, bad := range map[string]string{
+		"a bump":       strings.Replace(script, "gremlins@"+gremlinsVersion, "gremlins@v0.7.0", 1),
+		"a second run": script + "\ngo run github.com/go-gremlins/gremlins/cmd/gremlins@v0.5.1\n",
+		"no version":   strings.ReplaceAll(script, "gremlins@"+gremlinsVersion, "gremlins@latest"),
+	} {
+		if bad == script {
+			t.Fatalf("%s: the planted text is not in the script", planted)
+		}
+		if len(versionFindings(bad)) == 0 {
+			t.Errorf("%s: planted and not reported", planted)
+		}
 	}
 }

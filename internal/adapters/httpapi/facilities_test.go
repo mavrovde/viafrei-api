@@ -80,6 +80,13 @@ func TestFacilitiesAnswer(t *testing.T) {
 	if do(t, h, http.MethodGet, "/v1/stations/sp-1/facilities?lang=en", bearer); f.gotLang != "en" {
 		t.Errorf("lang not asked: %q", f.gotLang)
 	}
+	// meta.language is the language the texts were asked in, the
+	// default's when none is asked.
+	for q, want := range map[string]string{"?lang=de": "de", "?lang=en": "en", "": "en"} {
+		if meta, _ := decode(t, do(t, h, http.MethodGet, "/v1/stations/sp-1/facilities"+q, bearer))["meta"].(map[string]any); meta["language"] != want {
+			t.Errorf("%q: meta.language %v, want %s", q, meta["language"], want)
+		}
+	}
 	assertProblem(t, do(t, h, http.MethodGet, "/v1/stations/sp-1/facilities?lang=fr", bearer), 400, "invalid-parameter")
 	if do(t, h, http.MethodGet, "/v1/stations/sp-1/facilities", bearer); f.gotFacil.Limit != 20 || f.gotLang != "" {
 		t.Errorf("default %+v", f.gotFacil)

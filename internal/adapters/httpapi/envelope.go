@@ -3,6 +3,8 @@ package httpapi
 import (
 	"context"
 	"time"
+
+	"github.com/mavrovde/viafrei-api/internal/app/features"
 )
 
 // ResponseMeta is the meta member of every enveloped answer (ENV-002). Data
@@ -19,14 +21,23 @@ type Links struct {
 	Self string `json:"self" format:"uri" doc:"This response's own URL."`
 }
 
-// defaultLanguage is the response language until negotiation arrives.
+// defaultLanguage is the language of an answer that asks none (lang).
 const defaultLanguage = "en"
+
+// answerLanguage is the language the texts of the answer under ctx are
+// written in: the one its lang parameter asked, else defaultLanguage.
+func answerLanguage(ctx context.Context) string {
+	if l, ok := features.LanguageOf(ctx); ok {
+		return l
+	}
+	return defaultLanguage
+}
 
 func (s *server) envelopeMeta(ctx context.Context) ResponseMeta {
 	return ResponseMeta{
 		RequestID:   RequestIDFrom(ctx),
 		GeneratedAt: s.at().UTC().Truncate(time.Second),
-		Language:    defaultLanguage,
+		Language:    answerLanguage(ctx),
 	}
 }
 

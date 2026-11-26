@@ -185,3 +185,5 @@ vocabulary	internal/adapters/store/export_integration_test.go	feed	the name of a
 vocabulary	internal/testkit/parity/parity_integration_test.go	gtfs	owner decision 2026-11-23: the platform's derived views the harness refreshes after its load, as the platform's workers do, carry this word in their names
 denylist	internal/adapters/store/stoppage_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them seeds the stations and refreshes the stop families they read
 vocabulary	internal/adapters/store/stoppage_integration_test.go	gtfs	owner decision 2026-11-23: the platform's table and column names this test's seed rows read carry this word
+denylist	internal/adapters/store/freshness_osm_integration_test.go	-	owner decision 2026-11-23: the store's statements read the platform's tables directly, and this test of them names those tables
+vocabulary	internal/adapters/store/freshness_osm_integration_test.go	ingest	the platform's feed status ledger this test plants a row in carries this word

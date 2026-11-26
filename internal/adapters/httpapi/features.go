@@ -889,7 +889,7 @@ func noteFreeMin(ctx context.Context, a features.Answer[parking.Site], freeMin i
 
 func registerParking(api huma.API, s *server, op huma.Operation) {
 	op.Summary = "Where to park near a position"
-	op.Description = "Parking sites within the radius of a position, nearest first, then by id, each with its last reported occupancy. A site whose terms are not accepted (accept_terms) is not listed; meta.terms offers its terms. Needs the scope parking."
+	op.Description = "Parking sites within the radius of a position, nearest first, then by id, each with its last reported occupancy. A site whose terms are not accepted (accept_terms) is not listed; meta.terms offers its terms. The sites are those the parking publishers report, so the list can be empty where none covers the area (the centre of a city whose publishers report only park-and-ride sites on its edge); OpenStreetMap's car parks there are in meta.around.osmCarParks. Needs the scope parking."
 	op.Extensions[counterpartExtension] = "parking search"
 	featureResponses(api, &op, featureOffDoc)
 	huma.Register(api, op, func(ctx context.Context, in *ParkingInput) (*ParkingOutput, error) {

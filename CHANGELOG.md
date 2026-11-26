@@ -15,6 +15,7 @@ See [docs/RELEASING.md](docs/RELEASING.md).
 ### ⚠ BREAKING CHANGES
 
 * GET /v1/stations/{stationId}/page answers 404 not-found for an id that names no station, where it answered 200 with data null.
+* GET /v1/stations/{stationId}/page answers a page for a listStations stop that DB's station register does not hold; `data.pageUrl` and the header's `slug` and `stationNo` may now be null (pageUrl is the nested stop URL of the nearest station page that lists the stop, null when none does).
 
 ### Fixed
 

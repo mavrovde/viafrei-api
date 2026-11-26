@@ -84,6 +84,13 @@ func measureFindings(w ciJobs) []string {
 			out = append(out, "job "+job+" does not measure every package into "+profile)
 		}
 	}
+	// The other integration packages run one at a time (-p 1): TST-012
+	// judges each test's own wall time, which four packages sharing the
+	// runner's cores made a measure of the neighbours (0.64 s and 2.17 s
+	// for one test on two runs, 2026-11-26).
+	if r := runOf(w.Jobs["integration"]); !strings.Contains(r, `go test -race -p 1 -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out -json "${pkgs[@]}"`) {
+		out = append(out, "job integration does not run its packages one at a time")
+	}
 	// internal/perf times the queries: it runs alone (-p 1), after the
 	// other integration packages, into a profile of its own.
 	if r := runOf(w.Jobs["integration"]); !strings.Contains(r, "grep -v '/internal/perf$'") ||
@@ -163,7 +170,8 @@ func TestCoverageGateIsWired(t *testing.T) {
 	for want, plant := range map[string][2]string{
 		"job coverage does not run covergate -min 100": {"covergate -min 100", "covergate -min 95"},
 		"job integration does not measure every":       {"-coverpkg=./... -coverprofile=coverage-integration.out", "-coverprofile=coverage-integration.out"},
-		"does not run internal/perf alone":             {"go test -race -p 1 -count=1", "go test -race -count=1"},
+		"does not run internal/perf alone":             {"-race -p 1 -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-perf.out", "-race -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-perf.out"},
+		"does not run its packages one at a time":      {"-race -p 1 -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out", "-race -count=1 -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out"},
 		"job coverage does not run scripts/boot":       {"scripts/boot-coverage.sh coverage-boot.out", "true"},
 		"job sonar does not need coverage":             {"needs: [test, coverage, docs-portal]", "needs: [test, docs-portal]"},
 		"job sonar does not need docs-portal":          {"needs: [test, coverage, docs-portal]", "needs: [test, coverage]"},

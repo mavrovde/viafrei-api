@@ -34,12 +34,15 @@ func TestResolveAMainStation(t *testing.T) {
 
 func TestResolveAStationByTheTownAlone(t *testing.T) {
 	f := &fakeReads{cands: map[string][]GazetteerRow{"fulda": {row("s1", "station", "Fulda", 50.5546, 9.6838, 0, "db_stada", 1)}}}
-	r, err := resolveWith(f, "Fulda Bahnhof", "de")
+	var r Resolution
+	var err error
+	returnsWithin(t, "resolveWith of a station word", func() { r, err = resolveWith(f, "Fulda Bahnhof", "de") })
 	if err != nil || r.Kind != ResolvedPoint || r.Label != "Fulda" || r.PlaceKind != "station" {
 		t.Fatalf("got %+v %v", r, err)
 	}
 	f = &fakeReads{cands: map[string][]GazetteerRow{"frankfurt hbf": {row("s1", "station", "Frankfurt (Main) Hbf", 50.107, 8.663, 0, "db_stada", 0.6)}}}
-	if r, err = resolveWith(f, "Frankfurt Hbf", "de"); err != nil || r.Kind != ResolvedPoint || r.Label != "Frankfurt (Main) Hbf" {
+	returnsWithin(t, "resolveWith of a main station", func() { r, err = resolveWith(f, "Frankfurt Hbf", "de") })
+	if err != nil || r.Kind != ResolvedPoint || r.Label != "Frankfurt (Main) Hbf" {
 		t.Fatalf("qualified: got %+v %v", r, err)
 	}
 }

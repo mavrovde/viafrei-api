@@ -11,9 +11,9 @@ import (
 // test that only waits would run into Gremlins' timeout, 30 times the
 // coverage run (#255). These tests give each loop its own deadline and
 // assert the bound's effect on an input built to reach it, so a broken
-// bound fails within two seconds. They sit in a file that sorts before the
-// tests that reach the loops through the resolver (go test runs a package's
-// tests by file, then in source order, and Gremlins runs them -failfast).
+// bound fails within two seconds. The tests that reach the loops through
+// the resolver call it under returnsWithin too, so whichever runs first
+// fails at the deadline, whatever the order of the files.
 
 const loopDeadline = 2 * time.Second
 

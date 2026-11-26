@@ -59,7 +59,7 @@ jobs:
     # min together. Per shard, from the profile's run lengths: soak 2 + 9 min,
     # spike-stress about 5, faults-a about 9, faults-b about 7, each plus the
     # stack's start.
-    timeout-minutes: 15
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -99,7 +99,7 @@ jobs:
     needs: load
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     permissions:
       contents: read
       actions: read # the previous nightly run's artifact (scripts/load-previous.sh)

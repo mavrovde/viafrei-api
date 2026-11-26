@@ -77,14 +77,14 @@ func TestJobTimeoutRuleCanSayNo(t *testing.T) {
 	if f := jobTimeoutFindings("fuzz-nightly.yml", []byte(good)); len(f) > 0 {
 		t.Fatalf("the unplanted file already has findings: %v", f)
 	}
-	native := "    runs-on: ubuntu-24.04\n    # Evidence (run of 2026-11-22, one job): a target took its 10 min budget\n    # plus 1 to 20 s of build; the job's setup 13 s. One target per job is\n    # about 11 min.\n    timeout-minutes: 15\n"
+	native := "    runs-on: ubuntu-24.04\n    # Evidence (run of 2026-11-22, one job): a target took its 10 min budget\n    # plus 1 to 20 s of build; the job's setup 13 s. One target per job is\n    # about 11 min.\n    timeout-minutes: 30\n"
 	for want, bad := range map[string]string{
-		"job native has timeout-minutes 31, above 30":          strings.Replace(good, native, strings.Replace(native, ": 15\n", ": 31\n", 1), 1),
-		"job native has timeout-minutes 150, above 30":         strings.Replace(good, native, strings.Replace(native, ": 15\n", ": 150\n", 1), 1),
-		"job native has timeout-minutes 0":                     strings.Replace(good, native, strings.Replace(native, ": 15\n", ": 0\n", 1), 1),
-		"job native has no timeout-minutes":                    strings.Replace(good, native, strings.Replace(native, "    timeout-minutes: 15\n", "", 1), 1),
-		"job native has timeout-minutes ${{ inputs.minutes }}": strings.Replace(good, native, strings.Replace(native, ": 15\n", ": ${{ inputs.minutes }}\n", 1), 1),
-		"job native has timeout-minutes 14.5, not a whole":     strings.Replace(good, native, strings.Replace(native, ": 15\n", ": 14.5\n", 1), 1),
+		"job native has timeout-minutes 31, above 30":          strings.Replace(good, native, strings.Replace(native, ": 30\n", ": 31\n", 1), 1),
+		"job native has timeout-minutes 150, above 30":         strings.Replace(good, native, strings.Replace(native, ": 30\n", ": 150\n", 1), 1),
+		"job native has timeout-minutes 0":                     strings.Replace(good, native, strings.Replace(native, ": 30\n", ": 0\n", 1), 1),
+		"job native has no timeout-minutes":                    strings.Replace(good, native, strings.Replace(native, "    timeout-minutes: 30\n", "", 1), 1),
+		"job native has timeout-minutes ${{ inputs.minutes }}": strings.Replace(good, native, strings.Replace(native, ": 30\n", ": ${{ inputs.minutes }}\n", 1), 1),
+		"job native has timeout-minutes 14.5, not a whole":     strings.Replace(good, native, strings.Replace(native, ": 30\n", ": 14.5\n", 1), 1),
 		"job remote has no timeout-minutes":                    good + "  remote:\n    uses: other/repo/.github/workflows/x.yml@0123456789abcdef0123456789abcdef01234567\n",
 		"fuzz-nightly.yml: does not parse":                     good + "\n\t:\n",
 	} {

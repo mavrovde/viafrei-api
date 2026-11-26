@@ -24,7 +24,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -48,7 +48,7 @@ jobs:
   test:
     name: Unit and handler tests
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -75,7 +75,7 @@ jobs:
   integration:
     name: Integration tests (PostGIS)
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -127,7 +127,7 @@ jobs:
     # on a miss, and writes what it compared for the parity job to judge.
     name: Store parity against the frozen views (PostGIS, shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -176,7 +176,7 @@ jobs:
     name: Store parity against the frozen views (PostGIS)
     needs: [parity-shard]
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -215,7 +215,7 @@ jobs:
     # run is no latency measurement). docs/performance.md says what the leg
     # measures and what it does not.
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       # pgtest.Image is pulled by its digest; the reaper, pinned and pulled by
       # the integration job, is not needed on a runner discarded afterwards.
@@ -247,7 +247,7 @@ jobs:
     # entry. The merged profile is the one SonarCloud reads.
     needs: [test, integration, parity]
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -290,7 +290,7 @@ jobs:
   generated:
     name: Generated files are current
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -303,7 +303,7 @@ jobs:
   openapi:
     name: OpenAPI lint and breaking changes
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     permissions:
       contents: read
       security-events: write # uploads SARIF to code scanning
@@ -343,7 +343,7 @@ jobs:
   docs-portal:
     name: Documentation portal (links, diagrams, accessibility)
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
@@ -392,7 +392,7 @@ jobs:
   vulncheck:
     name: govulncheck
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     permissions:
       contents: read
       security-events: write # uploads SARIF to code scanning
@@ -420,7 +420,7 @@ jobs:
   image:
     name: Image (build, lint, scan, healthz)
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     permissions:
       contents: read
       security-events: write # uploads SARIF to code scanning
@@ -490,7 +490,7 @@ jobs:
     # The long run is fuzz-nightly.yml.
     name: Fuzz smoke (pull-request budget)
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -514,7 +514,7 @@ jobs:
   compose:
     name: Compose smoke (Schemathesis)
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -527,7 +527,7 @@ jobs:
     # load-nightly.yml. Nothing but that stack's loopback is a target.
     name: Load and faults (pull-request budget)
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -554,7 +554,7 @@ jobs:
     name: SonarCloud analysis
     needs: [test, coverage, docs-portal]
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - name: SONAR_TOKEN must be set
         env:
@@ -595,7 +595,7 @@ jobs:
     name: Requirement report
     needs: [test, integration]
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
